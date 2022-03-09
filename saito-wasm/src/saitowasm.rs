@@ -9,3 +9,5 @@ pub struct SaitoWasm {
     saito: Saito,
     lock: RwLock<u8>,
 }
+
+impl SaitoWasm {}

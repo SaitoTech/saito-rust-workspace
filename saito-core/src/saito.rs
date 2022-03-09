@@ -1,5 +1,10 @@
 use std::io::Error;
 
+pub enum SaitoEvent {
+    NetworkRead,
+    FileRead,
+}
+
 pub struct Saito {}
 
 impl Saito {
