@@ -1,0 +1,13 @@
+[package]
+name = "saito-core"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.17.0" }
+secp256k1 = { version = "0.20.3", features = ["rand", "bitcoin_hashes"] }
+rand = { version = "0.8.4", features = ["getrandom"] }
+pretty_env_logger = "0.4"
+blake3 = "1.2.0"
