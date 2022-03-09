@@ -1,11 +1,19 @@
 use std::collections::HashMap;
-use std::net::TcpStream;
 
-use tungstenite::stream::MaybeTlsStream;
-use tungstenite::WebSocket;
+use log::{debug, info};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::task::JoinHandle;
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 pub struct NetworkHandler {
-    sockets: HashMap<u64, WebSocket<MaybeTlsStream<TcpStream>>>,
+    sockets: HashMap<u64, WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    pub server: TcpListener,
 }
 
 impl NetworkHandler {}
+
+pub async fn run_network_handler() {
+    info!("running network handler");
+
+    loop {}
+}
