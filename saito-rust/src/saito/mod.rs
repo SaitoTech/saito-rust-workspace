@@ -1,4 +1,4 @@
-mod command;
+pub mod command;
 pub mod controller;
 pub mod network_handler;
 pub mod rust_io_handler;

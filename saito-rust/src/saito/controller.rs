@@ -1,7 +1,5 @@
-use std::net::TcpListener;
-use std::sync::mpsc::Receiver;
-
 use log::info;
+use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 
 use saito_core::saito::Saito;
@@ -15,7 +13,7 @@ pub struct Controller {
 
 impl Controller {}
 
-pub async fn run_controller() {
+pub async fn run_controller(receiver_in_controller: Receiver<Command>) {
     info!("running controller thread");
     loop {}
 }
