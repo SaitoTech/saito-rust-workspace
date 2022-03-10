@@ -660,6 +660,7 @@ name = "saito-wasm"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "js-sys",
  "saito-core",
  "serde",
  "tokio",
