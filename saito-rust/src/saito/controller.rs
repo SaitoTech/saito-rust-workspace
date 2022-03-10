@@ -5,9 +5,10 @@ use tokio::task::JoinHandle;
 use saito_core::core::saito::Saito;
 
 use crate::saito::command::Command;
+use crate::saito::rust_io_handler::RustIOHandler;
 
 pub struct Controller {
-    pub saito: Saito,
+    pub saito: Saito<RustIOHandler>,
     pub receiver: Receiver<Command>,
 }
 
