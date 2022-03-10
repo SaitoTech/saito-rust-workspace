@@ -2,7 +2,7 @@ use log::info;
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 
-use saito_core::saito::Saito;
+use saito_core::core::saito::Saito;
 
 use crate::saito::command::Command;
 
