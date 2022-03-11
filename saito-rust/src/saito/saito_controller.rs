@@ -6,10 +6,10 @@ use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 
+use saito_core::common::command::Command;
 use saito_core::core::context::Context;
-use saito_core::core::saito::Saito;
+use saito_core::saito::Saito;
 
-use crate::saito::command::Command;
 use crate::saito::rust_io_handler::RustIOHandler;
 
 pub struct SaitoController {
@@ -17,8 +17,12 @@ pub struct SaitoController {
 }
 
 impl SaitoController {
-    fn process_new_message(&mut self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
-        todo!()
+    fn process_network_message(&mut self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
+        info!("processing network message");
+
+        let blockchain = self.saito.context.blockchain.read().unwrap();
+        blockchain.do_something();
+        Ok(())
     }
     fn on_timer(&mut self, duration: Duration) -> Option<()> {
         None
@@ -29,7 +33,7 @@ pub async fn run_saito_controller(
     mut receiver: Receiver<Command>,
     mut sender_to_io_controller: Sender<Command>,
 ) {
-    info!("running controller thread");
+    info!("running saito controller");
     let mut saito_controller = SaitoController {
         saito: Saito {
             io_handler: RustIOHandler {},
@@ -47,13 +51,23 @@ pub async fn run_saito_controller(
             let command = result.unwrap();
             match command {
                 Command::NetworkMessage(peer_index, buffer) => {
-                    let result = saito_controller.process_new_message(peer_index, buffer);
+                    info!("received network message");
+                    let result = saito_controller.process_network_message(peer_index, buffer);
                     work_done = true;
                 }
-                Command::DataSaveRequest(_, _) => {}
+                Command::DataSaveRequest(_, _) => {
+                    unreachable!()
+                }
                 Command::DataSaveResponse(_, _) => {}
-                Command::DataReadRequest(_) => {}
+                Command::DataReadRequest(_) => {
+                    unreachable!()
+                }
                 Command::DataReadResponse(_, _, _) => {}
+                Command::ConnectToPeer(_) => {
+                    unreachable!()
+                }
+                Command::PeerConnected(_, _) => {}
+                Command::PeerDisconnected(_) => {}
             }
         }
 
@@ -65,7 +79,7 @@ pub async fn run_saito_controller(
         }
 
         if !work_done {
-            std::thread::sleep(Duration::new(0, 1000));
+            std::thread::sleep(Duration::new(1, 0));
         }
     }
 }

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
+use log::info;
+
 use crate::common::defs::Hash32;
 use crate::core::blockring::BlockRing;
 use crate::core::data::block::Block;
@@ -29,5 +31,11 @@ impl Blockchain {
             genesis_block_id: 0,
             fork_id: [0; 32],
         }
+    }
+
+    pub fn do_something(&self) {
+        tokio::spawn(async {
+            info!("printing from inner thread");
+        });
     }
 }

@@ -1,6 +1,7 @@
 use tokio::sync::mpsc::Receiver;
 
-use crate::saito::command::Command;
+use saito_core::common::command::Command;
+
 use crate::saito::io_controller::run_io_controller;
 use crate::saito::saito_controller::run_saito_controller;
 

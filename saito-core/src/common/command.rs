@@ -7,4 +7,7 @@ pub enum Command {
     DataSaveResponse(String, Error),
     DataReadRequest(String),
     DataReadResponse(String, Vec<u8>, Error),
+    ConnectToPeer(String),
+    PeerConnected(u64, String),
+    PeerDisconnected(String),
 }

@@ -5,7 +5,12 @@ use saito_core::common::handle_io::HandleIo;
 pub struct RustIOHandler {}
 
 impl HandleIo for RustIOHandler {
-    fn send_message(&self, message_name: String, buffer: Vec<u8>) -> Result<(), Error> {
+    fn send_message(
+        &self,
+        peer_index: u64,
+        message_name: String,
+        buffer: Vec<u8>,
+    ) -> Result<(), Error> {
         todo!()
     }
 

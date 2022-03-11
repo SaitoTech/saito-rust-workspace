@@ -11,6 +11,9 @@ pub struct Saito<T: HandleIo> {
 }
 
 impl<T: HandleIo> Saito<T> {
+    pub fn process_message_buffer(&mut self, peer_index: u64, buffer: Vec<u8>) {
+        todo!()
+    }
     pub fn on_timer(&mut self) -> Option<()> {
         todo!()
     }
