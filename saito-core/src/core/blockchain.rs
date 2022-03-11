@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use log::info;
 
+use crate::common::command::Command;
 use crate::common::defs::Hash32;
 use crate::core::blockring::BlockRing;
 use crate::core::data::block::Block;
@@ -34,8 +35,9 @@ impl Blockchain {
     }
 
     pub fn do_something(&self) {
-        tokio::spawn(async {
-            info!("printing from inner thread");
-        });
+        let (receiver, sender) = tokio::sync::mpsc::channel::<Command>(10);
+        // std::spawn({
+        //     info!("printing from inner thread");
+        // });
     }
 }
