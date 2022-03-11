@@ -11,17 +11,17 @@ use saito_core::core::context::Context;
 use saito_core::saito::Saito;
 
 use crate::saito::rust_io_handler::RustIOHandler;
+use crate::saito::rust_task_runner::RustTaskRunner;
 
 pub struct SaitoController {
-    pub saito: Saito<RustIOHandler>,
+    pub saito: Saito<RustIOHandler, RustTaskRunner>,
 }
 
 impl SaitoController {
     fn process_network_message(&mut self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         info!("processing network message");
 
-        let blockchain = self.saito.context.blockchain.read().unwrap();
-        blockchain.do_something();
+        self.saito.process_message_buffer(peer_index, buffer);
         Ok(())
     }
     fn on_timer(&mut self, duration: Duration) -> Option<()> {
@@ -37,6 +37,7 @@ pub async fn run_saito_controller(
     let mut saito_controller = SaitoController {
         saito: Saito {
             io_handler: RustIOHandler {},
+            task_runner: RustTaskRunner {},
             context: Context::new(),
         },
     };
