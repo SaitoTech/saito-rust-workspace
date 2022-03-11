@@ -12,10 +12,22 @@ pub struct Blockchain {
     pub staking: Staking,
     pub utxoset: UtxoSet,
     pub block_ring: BlockRing,
-    pub wallet_lock: Arc<RwLock<Wallet>>,
+    pub wallet: Arc<RwLock<Wallet>>,
     pub blocks: HashMap<Hash32, Block>,
     genesis_block_id: u64,
     fork_id: Hash32,
 }
 
-impl Blockchain {}
+impl Blockchain {
+    pub fn new(wallet: Arc<RwLock<Wallet>>) -> Blockchain {
+        Blockchain {
+            staking: Staking::new(),
+            utxoset: UtxoSet::new(),
+            block_ring: BlockRing::new(),
+            wallet,
+            blocks: Default::default(),
+            genesis_block_id: 0,
+            fork_id: [0; 32],
+        }
+    }
+}

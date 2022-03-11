@@ -10,4 +10,8 @@ pub struct Saito<T: HandleIo> {
     pub context: Context,
 }
 
-impl<T: HandleIo> Saito<T> {}
+impl<T: HandleIo> Saito<T> {
+    pub fn on_timer(&mut self) -> Option<()> {
+        todo!()
+    }
+}

@@ -11,13 +11,24 @@ pub struct Mempool {
     pub transactions: Vec<Transaction>,
     // vector so we just copy it over
     routing_work_in_mempool: u64,
-    wallet_lock: Arc<RwLock<Wallet>>,
+    wallet: Arc<RwLock<Wallet>>,
     currently_bundling_block: bool,
-    mempool_publickey: PublicKey,
-    mempool_privatekey: PrivateKey,
+    public_key: PublicKey,
+    private_key: PrivateKey,
 }
 
 impl Mempool {
+    pub fn new(wallet: Arc<RwLock<Wallet>>) -> Mempool {
+        Mempool {
+            blocks_queue: Default::default(),
+            transactions: vec![],
+            routing_work_in_mempool: 0,
+            wallet,
+            currently_bundling_block: false,
+            public_key: [0; 33],
+            private_key: [0; 32],
+        }
+    }
     pub fn add_block(&mut self, block: Block) {
         todo!()
     }

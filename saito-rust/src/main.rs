@@ -1,8 +1,8 @@
 use tokio::sync::mpsc::Receiver;
 
 use crate::saito::command::Command;
-use crate::saito::controller::run_controller;
-use crate::saito::network_handler::run_network_handler;
+use crate::saito::io_controller::run_io_controller;
+use crate::saito::saito_controller::run_saito_controller;
 
 mod saito;
 
@@ -12,12 +12,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     pretty_env_logger::init();
 
-    let (sender_to_controller, receiver_in_controller) =
+    let (sender_to_saito_controller, receiver_in_saito_controller) =
         tokio::sync::mpsc::channel::<Command>(1000);
 
-    let result1 = tokio::spawn(run_controller(receiver_in_controller));
+    let (sender_to_io_controller, receiver_in_io_controller) =
+        tokio::sync::mpsc::channel::<Command>(1000);
 
-    let result2 = tokio::spawn(run_network_handler(sender_to_controller.clone()));
+    let result1 = tokio::spawn(run_saito_controller(
+        receiver_in_saito_controller,
+        sender_to_io_controller.clone(),
+    ));
+
+    let result2 = tokio::spawn(run_io_controller(
+        receiver_in_io_controller,
+        sender_to_saito_controller.clone(),
+    ));
 
     let result = tokio::join!(result1, result2);
     Ok(())
