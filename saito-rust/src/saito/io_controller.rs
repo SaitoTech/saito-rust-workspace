@@ -72,14 +72,15 @@ pub async fn run_io_controller(
 
             // todo : send PeerConnected command to saito lib
         }
-    });
+    })
+    .await;
     let mut work_done = false;
 
     loop {
-        let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
-
-        sender_to_saito_controller.send(command).await;
-        info!("sending test message to saito controller");
+        // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
+        //
+        // sender_to_saito_controller.send(command).await;
+        // info!("sending test message to saito controller");
 
         let result = receiver.try_recv();
         if result.is_ok() {

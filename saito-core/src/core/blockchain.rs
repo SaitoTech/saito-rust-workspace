@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
-use log::info;
+use log::{debug, info};
 
 use crate::common::command::Command;
 use crate::common::defs::Hash32;
@@ -36,16 +36,7 @@ impl Blockchain {
             fork_id: [0; 32],
         }
     }
-
-    pub fn do_something(&self, task_runner: &dyn RunTask) {
-        let (receiver, sender) = tokio::sync::mpsc::channel::<Command>(10);
-
-        task_runner.run(Box::pin(async {
-            info!("printing from task runner");
-        }));
-
-        // std::spawn({
-        //     info!("printing from inner thread");
-        // });
+    pub fn init(&mut self) {
+        debug!("blockchain.init");
     }
 }

@@ -25,7 +25,7 @@ impl SaitoController {
         Ok(())
     }
     fn on_timer(&mut self, duration: Duration) -> Option<()> {
-        None
+        self.saito.on_timer(duration)
     }
 }
 
@@ -42,7 +42,9 @@ pub async fn run_saito_controller(
         },
     };
 
-    let last_timestamp = Instant::now();
+    saito_controller.saito.init();
+
+    let mut last_timestamp = Instant::now();
     let mut work_done = false;
     loop {
         work_done = false;
@@ -74,6 +76,7 @@ pub async fn run_saito_controller(
 
         let current_instant = Instant::now();
         let duration = current_instant.duration_since(last_timestamp);
+        last_timestamp = current_instant;
         let result = saito_controller.on_timer(duration);
         if result.is_some() {
             work_done = true;

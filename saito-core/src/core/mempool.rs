@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 
+use log::debug;
+
 use crate::common::defs::{PrivateKey, PublicKey};
 use crate::core::data::block::Block;
 use crate::core::data::transaction::Transaction;
@@ -29,6 +31,10 @@ impl Mempool {
             private_key: [0; 32],
         }
     }
+    pub fn init(&mut self) {
+        debug!("mempool.init");
+    }
+
     pub fn add_block(&mut self, block: Block) {
         todo!()
     }
