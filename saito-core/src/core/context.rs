@@ -31,5 +31,8 @@ impl Context {
         {
             self.miner.write().unwrap().init(task_runner);
         }
+        {
+            self.mempool.write().unwrap().init(task_runner);
+        }
     }
 }

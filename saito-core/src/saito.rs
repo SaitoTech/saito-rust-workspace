@@ -23,6 +23,7 @@ impl<T: HandleIo, S: RunTask> Saito<T, S> {
     }
     pub fn process_message_buffer(&mut self, peer_index: u64, buffer: Vec<u8>) {}
     pub fn on_timer(&mut self, duration: Duration) -> Option<()> {
+        self.context.mempool.write().unwrap().on_timer(duration);
         None
     }
 }
