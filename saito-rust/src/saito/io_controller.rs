@@ -87,7 +87,7 @@ pub async fn run_io_controller(
             let command = result.unwrap();
             work_done = true;
             match command {
-                Command::NetworkMessage(index, buffer) => {
+                Command::OutgoingNetworkMessage(index, buffer) => {
                     io_controller.process_network_message(index, buffer);
                 }
                 Command::DataSaveRequest(_, _) => {}
@@ -97,6 +97,7 @@ pub async fn run_io_controller(
                 Command::ConnectToPeer(_) => {}
                 Command::PeerConnected(_, _) => {}
                 Command::PeerDisconnected(_) => {}
+                _ => {}
             }
         }
 

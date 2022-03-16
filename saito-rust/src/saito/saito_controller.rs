@@ -6,7 +6,7 @@ use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 
-use saito_core::common::command::Command;
+use saito_core::common::command::{BroadcastMessage, Command};
 use saito_core::core::context::Context;
 use saito_core::saito::Saito;
 
@@ -32,6 +32,7 @@ impl SaitoController {
 pub async fn run_saito_controller(
     mut receiver: Receiver<Command>,
     mut sender_to_io_controller: Sender<Command>,
+    mut global_sender: tokio::sync::broadcast::Sender<BroadcastMessage>,
 ) {
     info!("running saito controller");
     let mut saito_controller = SaitoController {
@@ -41,7 +42,7 @@ pub async fn run_saito_controller(
             context: Context::new(),
         },
     };
-
+    let global_receiver = global_sender.subscribe();
     saito_controller.saito.init();
 
     let mut last_timestamp = Instant::now();
@@ -53,7 +54,7 @@ pub async fn run_saito_controller(
         if result.is_ok() {
             let command = result.unwrap();
             match command {
-                Command::NetworkMessage(peer_index, buffer) => {
+                Command::IncomingNetworkMessage(peer_index, buffer) => {
                     info!("received network message");
                     let result = saito_controller.process_network_message(peer_index, buffer);
                     work_done = true;
@@ -71,6 +72,7 @@ pub async fn run_saito_controller(
                 }
                 Command::PeerConnected(_, _) => {}
                 Command::PeerDisconnected(_) => {}
+                _ => {}
             }
         }
 

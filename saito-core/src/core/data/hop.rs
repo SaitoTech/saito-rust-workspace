@@ -1,7 +1,8 @@
-use crate::common::defs::{PublicKey, Signature};
+use crate::common::defs::{SaitoPublicKey, Signature};
 
+#[derive(Clone, Debug)]
 pub struct Hop {
-    from: PublicKey,
-    to: PublicKey,
+    from: SaitoPublicKey,
+    to: SaitoPublicKey,
     sig: Signature,
 }

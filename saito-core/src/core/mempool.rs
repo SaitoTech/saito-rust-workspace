@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use log::{debug, info};
 
-use crate::common::defs::{PrivateKey, PublicKey};
+use crate::common::defs::{PrivateKey, SaitoPublicKey};
 use crate::common::run_task::RunTask;
 use crate::core::data::block::Block;
 use crate::core::data::transaction::Transaction;
@@ -18,7 +18,7 @@ pub struct Mempool {
     routing_work_in_mempool: u64,
     wallet: Arc<RwLock<Wallet>>,
     currently_bundling_block: bool,
-    public_key: PublicKey,
+    public_key: SaitoPublicKey,
     private_key: PrivateKey,
 }
 

@@ -3,21 +3,21 @@ use std::convert::TryInto;
 use bigint::uint::U256;
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{Hash32, PublicKey};
+use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::core::crypto::hash;
 
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GoldenTicket {
-    target: Hash32,
-    random: Hash32,
+    target: SaitoHash,
+    random: SaitoHash,
     #[serde_as(as = "[_; 33]")]
-    publickey: PublicKey,
+    publickey: SaitoPublicKey,
 }
 
 impl GoldenTicket {
     #[allow(clippy::new_without_default)]
-    pub fn new(target: Hash32, random: Hash32, publickey: PublicKey) -> Self {
+    pub fn new(target: SaitoHash, random: SaitoHash, publickey: SaitoPublicKey) -> Self {
         return Self {
             target,
             random,
@@ -27,10 +27,10 @@ impl GoldenTicket {
 
     // TODO - review exact solution generated and mechanism to determine validity
     pub fn generate_solution(
-        previous_block_hash: Hash32,
-        random_bytes: Hash32,
-        publickey: PublicKey,
-    ) -> Hash32 {
+        previous_block_hash: SaitoHash,
+        random_bytes: SaitoHash,
+        publickey: SaitoPublicKey,
+    ) -> SaitoHash {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&previous_block_hash);
         vbytes.extend(&random_bytes);
@@ -39,7 +39,7 @@ impl GoldenTicket {
     }
 
     // TODO - review exact algorithm in use here
-    pub fn is_valid_solution(solution: Hash32, difficulty: u64) -> bool {
+    pub fn is_valid_solution(solution: SaitoHash, difficulty: u64) -> bool {
         let leading_zeroes_required: u64 = difficulty / 16;
         let final_digit: u8 = 15 - ((difficulty % 16) as u8);
 
@@ -119,15 +119,15 @@ impl GoldenTicket {
         return false;
     }
 
-    pub fn get_target(&self) -> Hash32 {
+    pub fn get_target(&self) -> SaitoHash {
         self.target
     }
 
-    pub fn get_random(&self) -> Hash32 {
+    pub fn get_random(&self) -> SaitoHash {
         self.random
     }
 
-    pub fn get_publickey(&self) -> PublicKey {
+    pub fn get_publickey(&self) -> SaitoPublicKey {
         self.publickey
     }
 
@@ -140,9 +140,9 @@ impl GoldenTicket {
     }
 
     pub fn deserialize_for_transaction(bytes: Vec<u8>) -> GoldenTicket {
-        let target: Hash32 = bytes[0..32].try_into().unwrap();
-        let random: Hash32 = bytes[32..64].try_into().unwrap();
-        let publickey: PublicKey = bytes[64..97].try_into().unwrap();
+        let target: SaitoHash = bytes[0..32].try_into().unwrap();
+        let random: SaitoHash = bytes[32..64].try_into().unwrap();
+        let publickey: SaitoPublicKey = bytes[64..97].try_into().unwrap();
         GoldenTicket::new(target, random, publickey)
     }
 }

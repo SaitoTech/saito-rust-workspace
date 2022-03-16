@@ -2,6 +2,7 @@ use crate::common::defs::Signature;
 use crate::core::data::hop::Hop;
 use crate::core::data::slip::Slip;
 
+#[derive(Clone, Debug)]
 pub enum TransactionType {
     Normal,
     Fee,
@@ -14,6 +15,7 @@ pub enum TransactionType {
     SPV,
 }
 
+#[derive(Clone, Debug)]
 pub struct Transaction {
     timestamp: u64,
     pub inputs: Vec<Slip>,

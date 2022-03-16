@@ -7,13 +7,12 @@ use std::time::Duration;
 use log::{debug, info, trace};
 
 use crate::common::command::Command;
-use crate::common::defs::Hash32;
+use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::common::run_task::RunTask;
 use crate::core::blockring::BlockRing;
 use crate::core::context::Context;
 use crate::core::data::block::Block;
 use crate::core::staking::Staking;
-use crate::core::utxo_set::UtxoSet;
 use crate::core::wallet::Wallet;
 
 pub struct Blockchain {
@@ -21,9 +20,9 @@ pub struct Blockchain {
     pub utxoset: UtxoSet,
     pub block_ring: BlockRing,
     pub wallet: Arc<RwLock<Wallet>>,
-    pub blocks: HashMap<Hash32, Block>,
+    pub blocks: HashMap<SaitoHash, Block>,
     genesis_block_id: u64,
-    fork_id: Hash32,
+    fork_id: SaitoHash,
 }
 
 impl Blockchain {

@@ -9,5 +9,4 @@ pub mod miner;
 pub mod peer;
 pub mod staking;
 pub mod storage;
-pub mod utxo_set;
 pub mod wallet;

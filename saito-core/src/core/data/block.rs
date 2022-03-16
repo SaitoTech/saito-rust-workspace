@@ -1,11 +1,11 @@
-use crate::common::defs::{Hash32, PublicKey, Signature};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, Signature};
 
 pub struct Block {
     id: u64,
     timestamp: u64,
-    previous_block_hash: Hash32,
-    creator: PublicKey,
-    merkle_root: Hash32,
+    previous_block_hash: SaitoHash,
+    creator: SaitoPublicKey,
+    merkle_root: SaitoHash,
     signature: Signature,
     treasury: u64,
     burnfee: u64,

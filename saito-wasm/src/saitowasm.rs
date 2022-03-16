@@ -4,7 +4,7 @@ use js_sys::{Array, BigInt, Uint8Array};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use saito_core::common::defs::{Currency, Hash32, PublicKey, Signature};
+use saito_core::common::defs::{Currency, PublicKey, SaitoHash, Signature};
 use saito_core::saito::Saito;
 
 use crate::wasm_io_handler::WasmIoHandler;
@@ -20,7 +20,7 @@ pub struct SaitoWasm {
 #[wasm_bindgen]
 pub struct WasmSlip {
     pub(crate) public_key: PublicKey,
-    pub(crate) uuid: Hash32,
+    pub(crate) uuid: SaitoHash,
     pub(crate) amount: Currency,
 }
 

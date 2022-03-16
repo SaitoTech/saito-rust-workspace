@@ -6,8 +6,9 @@ use block_modes::{BlockMode, Cbc};
 pub use merkle::MerkleTree;
 pub use secp256k1::{Message, PublicKey, SecretKey, Signature, SECP256K1};
 
-use crate::common::defs::PublicKey as SaitoPublicKey;
-use crate::common::defs::{Hash32, PrivateKey as SaitoPrivateKey, Signature as SaitoSignature};
+use crate::common::defs::{
+    PrivateKey as SaitoPrivateKey, SaitoHash, SaitoPublicKey, Signature as SaitoSignature,
+};
 
 type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
@@ -80,7 +81,7 @@ pub fn generate_random_bytes(len: u64) -> Vec<u8> {
     (0..len).map(|_| rand::random::<u8>()).collect()
 }
 
-pub fn hash(data: &Vec<u8>) -> Hash32 {
+pub fn hash(data: &Vec<u8>) -> SaitoHash {
     let mut hasher = Hasher::new();
     // Hashing in parallel can be faster if large enough
     // TODO: Blake3 has benchmarked 128 kb as the cutoff,
