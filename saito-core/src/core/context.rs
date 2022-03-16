@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::Error;
 use std::sync::{Arc, RwLock};
 
 use crate::common::run_task::RunTask;
@@ -27,12 +28,11 @@ impl Context {
             miner: Arc::new(RwLock::new(Miner::new())),
         }
     }
-    pub fn init(&self, task_runner: &dyn RunTask) {
-        {
-            self.miner.write().unwrap().init(task_runner);
-        }
-        {
-            self.mempool.write().unwrap().init(task_runner);
-        }
+    pub fn init(&self, task_runner: &dyn RunTask) -> Result<(), Error> {
+        self.miner.write().unwrap().init(task_runner)?;
+        self.mempool.write().unwrap().init(task_runner)?;
+        self.blockchain.write().unwrap().init()?;
+
+        Ok(())
     }
 }

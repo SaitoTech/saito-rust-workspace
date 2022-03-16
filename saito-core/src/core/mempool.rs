@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::io::Error;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
@@ -33,7 +34,7 @@ impl Mempool {
             private_key: [0; 32],
         }
     }
-    pub fn init(&mut self, task_runner: &dyn RunTask) {
+    pub fn init(&mut self, task_runner: &dyn RunTask) -> Result<(), Error> {
         debug!("mempool.init");
 
         debug!("main thread id = {:?}", std::thread::current().id());
@@ -58,11 +59,14 @@ impl Mempool {
                 counter = 0;
             }
         }));
+        Ok(())
     }
 
     pub fn add_block(&mut self, block: Block) {
         todo!()
     }
 
-    pub fn on_timer(&mut self, duration: Duration) {}
+    pub fn on_timer(&mut self, duration: Duration) -> Option<()> {
+        None
+    }
 }

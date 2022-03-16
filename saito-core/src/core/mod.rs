@@ -3,6 +3,7 @@ pub mod blockring;
 pub mod context;
 pub mod crypto;
 pub mod data;
+pub mod golden_ticket;
 pub mod mempool;
 pub mod miner;
 pub mod peer;

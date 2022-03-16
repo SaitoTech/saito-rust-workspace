@@ -1,8 +1,10 @@
 use std::collections::HashMap;
+use std::io::Error;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
-use log::{debug, info};
+use log::{debug, info, trace};
 
 use crate::common::command::Command;
 use crate::common::defs::Hash32;
@@ -36,7 +38,12 @@ impl Blockchain {
             fork_id: [0; 32],
         }
     }
-    pub fn init(&mut self) {
+    pub fn init(&mut self) -> Result<(), Error> {
         debug!("blockchain.init");
+        Ok(())
+    }
+    pub fn on_timer(&mut self, duration: Duration) -> Option<()> {
+        trace!("Blockchain.on_timer");
+        None
     }
 }
