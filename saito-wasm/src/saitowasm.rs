@@ -1,10 +1,9 @@
-use std::sync::RwLock;
-
 use js_sys::{Array, BigInt, Uint8Array};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 use wasm_bindgen::prelude::*;
 
-use saito_core::common::defs::{Currency, PublicKey, SaitoHash, Signature};
+use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::saito::Saito;
 
 use crate::wasm_io_handler::WasmIoHandler;
@@ -19,7 +18,7 @@ pub struct SaitoWasm {
 // #[derive(Serialize, Deserialize)]
 #[wasm_bindgen]
 pub struct WasmSlip {
-    pub(crate) public_key: PublicKey,
+    pub(crate) public_key: SaitoPublicKey,
     pub(crate) uuid: SaitoHash,
     pub(crate) amount: Currency,
 }
@@ -41,7 +40,7 @@ pub struct WasmTransaction {
     pub(crate) to: Vec<WasmSlip>,
     pub(crate) fees_total: Currency,
     pub timestamp: u64,
-    pub(crate) signature: Signature,
+    pub(crate) signature: SaitoSignature,
 }
 
 #[wasm_bindgen]

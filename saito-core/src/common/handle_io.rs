@@ -9,4 +9,6 @@ pub trait HandleIo {
     ) -> Result<(), Error>;
     fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error>;
     fn read_value(&self, key: String) -> Result<Vec<u8>, Error>;
+
+    fn get_timestamp(&self) -> u64;
 }

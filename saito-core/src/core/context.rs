@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::io::Error;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
+use tokio::sync::RwLock;
+
+use crate::common::command::BroadcastMessage;
 use crate::common::run_task::RunTask;
 use crate::core::blockchain::Blockchain;
 use crate::core::mempool::Mempool;
@@ -18,20 +21,23 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new() -> Context {
+    pub fn new(global_sender: tokio::sync::broadcast::Sender<BroadcastMessage>) -> Context {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         Context {
-            blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
+            blockchain: Arc::new(RwLock::new(Blockchain::new(
+                wallet.clone(),
+                global_sender.clone(),
+            ))),
             mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
             wallet,
             peers: Default::default(),
             miner: Arc::new(RwLock::new(Miner::new())),
         }
     }
-    pub fn init(&self, task_runner: &dyn RunTask) -> Result<(), Error> {
-        self.miner.write().unwrap().init(task_runner)?;
-        self.mempool.write().unwrap().init(task_runner)?;
-        self.blockchain.write().unwrap().init()?;
+    pub async fn init(&self, task_runner: &dyn RunTask) -> Result<(), Error> {
+        self.miner.write().await.init(task_runner)?;
+        self.mempool.write().await.init(task_runner)?;
+        self.blockchain.write().await.init()?;
 
         Ok(())
     }

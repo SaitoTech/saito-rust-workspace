@@ -24,8 +24,8 @@ impl SaitoController {
         self.saito.process_message_buffer(peer_index, buffer);
         Ok(())
     }
-    fn on_timer(&mut self, duration: Duration) -> Option<()> {
-        self.saito.on_timer(duration)
+    async fn on_timer(&mut self, duration: Duration) -> Option<()> {
+        self.saito.on_timer(duration).await
     }
 }
 
@@ -39,7 +39,7 @@ pub async fn run_saito_controller(
         saito: Saito {
             io_handler: RustIOHandler {},
             task_runner: RustTaskRunner {},
-            context: Context::new(),
+            context: Context::new(global_sender.clone()),
         },
     };
     let global_receiver = global_sender.subscribe();
@@ -79,7 +79,7 @@ pub async fn run_saito_controller(
         let current_instant = Instant::now();
         let duration = current_instant.duration_since(last_timestamp);
         last_timestamp = current_instant;
-        let result = saito_controller.on_timer(duration);
+        let result = saito_controller.on_timer(duration).await;
         if result.is_some() {
             work_done = true;
         }

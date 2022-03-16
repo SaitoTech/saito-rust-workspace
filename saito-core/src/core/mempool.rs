@@ -1,11 +1,12 @@
 use std::collections::VecDeque;
 use std::io::Error;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use log::{debug, info};
+use tokio::sync::RwLock;
 
-use crate::common::defs::{PrivateKey, SaitoPublicKey};
+use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey};
 use crate::common::run_task::RunTask;
 use crate::core::data::block::Block;
 use crate::core::data::transaction::Transaction;
@@ -19,7 +20,7 @@ pub struct Mempool {
     wallet: Arc<RwLock<Wallet>>,
     currently_bundling_block: bool,
     public_key: SaitoPublicKey,
-    private_key: PrivateKey,
+    private_key: SaitoPrivateKey,
 }
 
 impl Mempool {

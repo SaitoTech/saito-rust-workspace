@@ -24,13 +24,13 @@ impl<T: HandleIo, S: RunTask> Saito<T, S> {
 
     pub fn process_message_buffer(&mut self, peer_index: u64, buffer: Vec<u8>) {}
 
-    pub fn on_timer(&mut self, duration: Duration) -> Option<()> {
+    pub async fn on_timer(&mut self, duration: Duration) -> Option<()> {
         let mut work_done = false;
-        let result = self.context.mempool.write().unwrap().on_timer(duration);
+        let result = self.context.mempool.write().await.on_timer(duration);
         work_done = work_done || result.is_some();
-        let result = self.context.miner.write().unwrap().on_timer(duration);
+        let result = self.context.miner.write().await.on_timer(duration);
         work_done = work_done || result.is_some();
-        let result = self.context.blockchain.write().unwrap().on_timer(duration);
+        let result = self.context.blockchain.write().await.on_timer(duration);
         work_done = work_done || result.is_some();
 
         if work_done {

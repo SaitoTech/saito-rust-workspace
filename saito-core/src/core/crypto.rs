@@ -6,9 +6,7 @@ use block_modes::{BlockMode, Cbc};
 pub use merkle::MerkleTree;
 pub use secp256k1::{Message, PublicKey, SecretKey, Signature, SECP256K1};
 
-use crate::common::defs::{
-    PrivateKey as SaitoPrivateKey, SaitoHash, SaitoPublicKey, Signature as SaitoSignature,
-};
+use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 
 type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 

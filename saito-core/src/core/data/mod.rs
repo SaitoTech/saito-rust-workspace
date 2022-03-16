@@ -1,4 +1,4 @@
 pub mod block;
-mod hop;
-mod slip;
+pub mod hop;
+pub mod slip;
 pub mod transaction;
