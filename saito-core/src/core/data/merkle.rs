@@ -1,5 +1,5 @@
 use crate::common::defs::SaitoHash;
-use crate::core::crypto::hash;
+use crate::core::data::crypto::hash;
 
 //
 // MerkleTreeLayer is a short implementation that uses the default

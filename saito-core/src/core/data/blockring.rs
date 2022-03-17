@@ -1,8 +1,8 @@
 use log::trace;
 
 use crate::common::defs::SaitoHash;
-use crate::core::blockchain::GENESIS_PERIOD;
 use crate::core::data::block::Block;
+use crate::core::data::blockchain::GENESIS_PERIOD;
 
 pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
 

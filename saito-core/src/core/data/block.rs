@@ -4,25 +4,24 @@ use std::{mem, sync::Arc};
 use ahash::AHashMap;
 use bigint::uint::U256;
 use log::{error, info, trace};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-
-use rayon::prelude::*;
 
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
-use crate::core::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
-use crate::core::burnfee::BurnFee;
-use crate::core::crypto::{hash, sign, verify};
+use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
+use crate::core::data::burnfee::BurnFee;
+use crate::core::data::crypto::{hash, sign, verify};
+use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
+use crate::core::data::merkle::MerkleTreeLayer;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
+use crate::core::data::staking::Staking;
+use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
-use crate::core::golden_ticket::GoldenTicket;
-use crate::core::merkle::MerkleTreeLayer;
-use crate::core::staking::Staking;
-use crate::core::storage::Storage;
-use crate::core::wallet::Wallet;
+use crate::core::data::wallet::Wallet;
 
 pub const BLOCK_HEADER_SIZE: usize = 213;
 

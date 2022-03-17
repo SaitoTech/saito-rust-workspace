@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
-use crate::core::crypto::sign;
-use crate::core::wallet::Wallet;
+use crate::core::data::crypto::sign;
+use crate::core::data::wallet::Wallet;
 
 pub const HOP_SIZE: usize = 130;
 

@@ -8,12 +8,12 @@ use bigint::uint::U256;
 use log::{info, trace};
 
 use crate::common::defs::SaitoHash;
-use crate::core::blockchain::GENESIS_PERIOD;
-use crate::core::crypto::hash;
 use crate::core::data::block::Block;
+use crate::core::data::blockchain::GENESIS_PERIOD;
+use crate::core::data::crypto::hash;
+use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::{Slip, SlipType};
 use crate::core::data::transaction::TransactionType;
-use crate::core::golden_ticket::GoldenTicket;
 
 #[derive(Debug, Clone)]
 pub struct Staking {

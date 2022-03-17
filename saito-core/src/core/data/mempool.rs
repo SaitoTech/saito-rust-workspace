@@ -6,11 +6,13 @@ use std::time::{Duration, Instant};
 use log::{debug, info};
 use tokio::sync::RwLock;
 
+use crate::common::command::{InterfaceEvent, SaitoEvent};
 use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey};
+use crate::common::process_event::ProcessEvent;
 use crate::common::run_task::RunTask;
 use crate::core::data::block::Block;
 use crate::core::data::transaction::Transaction;
-use crate::core::wallet::Wallet;
+use crate::core::data::wallet::Wallet;
 
 pub struct Mempool {
     blocks_queue: VecDeque<Block>,

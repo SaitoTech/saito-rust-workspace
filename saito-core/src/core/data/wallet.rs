@@ -3,15 +3,15 @@ use log::{debug, info};
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
-use crate::core::crypto::{
+use crate::core::data::block::Block;
+use crate::core::data::crypto::{
     decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
 };
-use crate::core::data::block::Block;
+use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::{Slip, SlipType};
+use crate::core::data::staking::Staking;
+use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
-use crate::core::golden_ticket::GoldenTicket;
-use crate::core::staking::Staking;
-use crate::core::storage::Storage;
 
 pub const WALLET_SIZE: usize = 65;
 

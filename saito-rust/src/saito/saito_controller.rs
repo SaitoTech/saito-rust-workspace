@@ -1,13 +1,22 @@
+use std::future::Future;
 use std::io::Error;
-use std::sync::{Arc, RwLock};
+use std::pin::Pin;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use log::info;
+use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
-use saito_core::common::command::{BroadcastMessage, Command};
-use saito_core::core::context::Context;
+use saito_core::common::command::{InterfaceEvent, SaitoEvent};
+use saito_core::common::process_event::ProcessEvent;
+use saito_core::common::run_task::RunnableTask;
+use saito_core::core::blockchain_controller::{BlockchainController, BlockchainEvent};
+use saito_core::core::data::context::Context;
+use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
+use saito_core::core::miner_controller::MinerEvent;
 use saito_core::saito::Saito;
 
 use crate::saito::rust_io_handler::RustIOHandler;
@@ -29,12 +38,93 @@ impl SaitoController {
     }
 }
 
+async fn run_thread<T>(
+    mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
+    mut global_receiver: tokio::sync::broadcast::Receiver<SaitoEvent>,
+    mut interface_event_receiver: Receiver<InterfaceEvent>,
+    mut event_receiver: Receiver<T>,
+) where
+    T: Send + 'static,
+{
+    tokio::spawn(async move {
+        let mut work_done = false;
+        let mut last_timestamp = Instant::now();
+        loop {
+            let result = global_receiver.try_recv();
+            if result.is_ok() {
+                let event = result.unwrap();
+                if event_processor.process_saito_event(event).is_some() {
+                    work_done = true;
+                }
+            }
+
+            let result = interface_event_receiver.try_recv();
+            if result.is_ok() {
+                let event = result.unwrap();
+                if event_processor.process_interface_event(event).is_some() {
+                    work_done = true;
+                }
+            }
+
+            let result = event_receiver.try_recv();
+            if result.is_ok() {
+                let event = result.unwrap();
+                if event_processor.process_event(event).is_some() {
+                    work_done = true;
+                }
+            }
+
+            let current_instant = Instant::now();
+            let duration = current_instant.duration_since(last_timestamp);
+            last_timestamp = current_instant;
+
+            if event_processor.process_timer_event(duration).is_some() {
+                work_done = true;
+            }
+
+            if work_done {
+                work_done = false;
+                std::thread::yield_now();
+            } else {
+                std::thread::sleep(Duration::new(0, 10_000));
+            }
+        }
+    })
+    .await;
+}
+
 pub async fn run_saito_controller(
-    mut receiver: Receiver<Command>,
-    mut sender_to_io_controller: Sender<Command>,
-    mut global_sender: tokio::sync::broadcast::Sender<BroadcastMessage>,
+    mut receiver: Receiver<InterfaceEvent>,
+    mut sender_to_io_controller: Sender<InterfaceEvent>,
 ) {
     info!("running saito controller");
+
+    let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<SaitoEvent>(1000);
+
+    let context = Context::new(global_sender.clone());
+
+    let (sender_to_mempool, receiver_for_mempool) =
+        tokio::sync::mpsc::channel::<MempoolEvent>(1000);
+    let (sender_to_blockchain, receiver_for_blockchain) =
+        tokio::sync::mpsc::channel::<BlockchainEvent>(1000);
+    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1000);
+
+    let blockchain_controller = BlockchainController {
+        blockchain: context.blockchain.clone(),
+        sender_to_mempool: sender_to_mempool.clone(),
+        sender_to_miner: sender_to_miner.clone(),
+        io_handler: Box::new(RustIOHandler {}),
+    };
+
+    let mempool_controller = MempoolController {
+        mempool: context.mempool.clone(),
+        sender_to_blockchain: sender_to_blockchain.clone(),
+        sender_to_miner: sender_to_miner.clone(),
+        io_handler: Box::new(RustIOHandler {}),
+    };
+
+    let sender_clone = global_sender.clone();
+
     let mut saito_controller = SaitoController {
         saito: Saito {
             io_handler: RustIOHandler {},
@@ -54,24 +144,24 @@ pub async fn run_saito_controller(
         if result.is_ok() {
             let command = result.unwrap();
             match command {
-                Command::IncomingNetworkMessage(peer_index, buffer) => {
+                InterfaceEvent::IncomingNetworkMessage(peer_index, buffer) => {
                     info!("received network message");
                     let result = saito_controller.process_network_message(peer_index, buffer);
                     work_done = true;
                 }
-                Command::DataSaveRequest(_, _) => {
+                InterfaceEvent::DataSaveRequest(_, _) => {
                     unreachable!()
                 }
-                Command::DataSaveResponse(_, _) => {}
-                Command::DataReadRequest(_) => {
+                InterfaceEvent::DataSaveResponse(_, _) => {}
+                InterfaceEvent::DataReadRequest(_) => {
                     unreachable!()
                 }
-                Command::DataReadResponse(_, _, _) => {}
-                Command::ConnectToPeer(_) => {
+                InterfaceEvent::DataReadResponse(_, _, _) => {}
+                InterfaceEvent::ConnectToPeer(_) => {
                     unreachable!()
                 }
-                Command::PeerConnected(_, _) => {}
-                Command::PeerDisconnected(_) => {}
+                InterfaceEvent::PeerConnected(_, _) => {}
+                InterfaceEvent::PeerDisconnected(_) => {}
                 _ => {}
             }
         }

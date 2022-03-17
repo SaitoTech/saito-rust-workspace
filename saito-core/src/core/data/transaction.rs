@@ -12,11 +12,11 @@ use tokio::sync::RwLock;
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
 };
-use crate::core::crypto::{hash, sign, verify};
+use crate::core::data::crypto::{hash, sign, verify};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
-use crate::core::staking::Staking;
-use crate::core::wallet::Wallet;
+use crate::core::data::staking::Staking;
+use crate::core::data::wallet::Wallet;
 
 pub const TRANSACTION_SIZE: usize = 89;
 

@@ -4,7 +4,7 @@ use bigint::uint::U256;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
-use crate::core::crypto::hash;
+use crate::core::data::crypto::hash;
 
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]

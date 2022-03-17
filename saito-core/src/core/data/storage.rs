@@ -4,8 +4,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::common::handle_io::HandleIo;
-use crate::core::blockchain::Blockchain;
 use crate::core::data::block::Block;
+use crate::core::data::blockchain::Blockchain;
 use crate::core::data::slip::Slip;
 
 pub struct Storage {

@@ -1,11 +1,11 @@
 use std::io::Error;
 
 use crate::common::defs::SaitoHash;
+use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::Transaction;
-use crate::core::golden_ticket::GoldenTicket;
 
 #[derive(Clone, Debug)]
-pub enum BroadcastMessage {
+pub enum SaitoEvent {
     // broadcast when a block is received but parent is unknown
     MissingBlock { peer_id: SaitoHash, hash: SaitoHash },
     // broadcast when the longest chain block changes
@@ -22,7 +22,7 @@ pub enum BroadcastMessage {
     WalletNewTransaction { transaction: Transaction },
 }
 
-pub enum Command {
+pub enum InterfaceEvent {
     OutgoingNetworkMessage(u64, Vec<u8>),
     IncomingNetworkMessage(u64, Vec<u8>),
     DataSaveRequest(String, Vec<u8>),

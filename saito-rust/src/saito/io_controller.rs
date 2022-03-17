@@ -9,9 +9,9 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::{accept_async, MaybeTlsStream, WebSocketStream};
 
-use saito_core::core::peer::Peer;
+use saito_core::core::data::peer::Peer;
 
-use crate::Command;
+use crate::InterfaceEvent;
 
 pub struct IoController {
     sockets: HashMap<u64, WebSocketStream<MaybeTlsStream<TcpStream>>>,
@@ -21,7 +21,7 @@ impl IoController {
     pub fn process_network_message(&self, peer_index: u64, buffer: Vec<u8>) {
         todo!()
     }
-    pub fn process_file_request(&self, file_request: Command) {}
+    pub fn process_file_request(&self, file_request: InterfaceEvent) {}
 }
 
 struct PeerCounter {
@@ -36,8 +36,8 @@ impl PeerCounter {
 }
 
 pub async fn run_io_controller(
-    mut receiver: Receiver<Command>,
-    sender_to_saito_controller: Sender<Command>,
+    mut receiver: Receiver<InterfaceEvent>,
+    sender_to_saito_controller: Sender<InterfaceEvent>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -87,16 +87,16 @@ pub async fn run_io_controller(
             let command = result.unwrap();
             work_done = true;
             match command {
-                Command::OutgoingNetworkMessage(index, buffer) => {
+                InterfaceEvent::OutgoingNetworkMessage(index, buffer) => {
                     io_controller.process_network_message(index, buffer);
                 }
-                Command::DataSaveRequest(_, _) => {}
-                Command::DataSaveResponse(_, _) => {}
-                Command::DataReadRequest(_) => {}
-                Command::DataReadResponse(_, _, _) => {}
-                Command::ConnectToPeer(_) => {}
-                Command::PeerConnected(_, _) => {}
-                Command::PeerDisconnected(_) => {}
+                InterfaceEvent::DataSaveRequest(_, _) => {}
+                InterfaceEvent::DataSaveResponse(_, _) => {}
+                InterfaceEvent::DataReadRequest(_) => {}
+                InterfaceEvent::DataReadResponse(_, _, _) => {}
+                InterfaceEvent::ConnectToPeer(_) => {}
+                InterfaceEvent::PeerConnected(_, _) => {}
+                InterfaceEvent::PeerDisconnected(_) => {}
                 _ => {}
             }
         }

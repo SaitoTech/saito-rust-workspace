@@ -7,14 +7,15 @@ use async_recursion::async_recursion;
 use log::{error, info, trace, warn};
 use tokio::sync::{broadcast, RwLock};
 
-use crate::common::command::BroadcastMessage;
+use crate::common::command::SaitoEvent;
 use crate::common::defs::{SaitoHash, SaitoUTXOSetKey};
-use crate::core::blockring::BlockRing;
+use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::{Block, BlockType};
+use crate::core::data::blockring::BlockRing;
+use crate::core::data::staking::Staking;
+use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
-use crate::core::staking::Staking;
-use crate::core::storage::Storage;
-use crate::core::wallet::Wallet;
+use crate::core::data::wallet::Wallet;
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 10;
@@ -49,7 +50,7 @@ pub struct Blockchain {
     pub blockring: BlockRing,
     pub blocks: AHashMap<SaitoHash, Block>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
-    broadcast_channel_sender: broadcast::Sender<BroadcastMessage>,
+    broadcast_channel_sender: broadcast::Sender<SaitoEvent>,
     genesis_block_id: u64,
     fork_id: SaitoHash,
 }
@@ -58,7 +59,7 @@ impl Blockchain {
     #[allow(clippy::new_without_default)]
     pub fn new(
         wallet_lock: Arc<RwLock<Wallet>>,
-        sender: tokio::sync::broadcast::Sender<BroadcastMessage>,
+        sender: tokio::sync::broadcast::Sender<SaitoEvent>,
     ) -> Self {
         Blockchain {
             staking: Staking::new(),
@@ -110,7 +111,7 @@ impl Blockchain {
                     if block.get_id() > earliest_block_id {
                         if block.get_source_connection_id().is_some() {
                             self.broadcast_channel_sender
-                                .send(BroadcastMessage::MissingBlock {
+                                .send(SaitoEvent::MissingBlock {
                                     peer_id: block.get_source_connection_id().unwrap(),
                                     hash: block.get_previous_block_hash(),
                                 })
@@ -322,13 +323,13 @@ impl Blockchain {
                 }
 
                 self.broadcast_channel_sender
-                    .send(BroadcastMessage::BlockchainAddBlockSuccess { hash: block_hash })
+                    .send(SaitoEvent::BlockchainAddBlockSuccess { hash: block_hash })
                     .expect("error: BlockchainAddBlockSuccess message failed to send");
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
 
                 self.broadcast_channel_sender
-                    .send(BroadcastMessage::BlockchainNewLongestChainBlock {
+                    .send(SaitoEvent::BlockchainNewLongestChainBlock {
                         hash: block_hash,
                         difficulty,
                     })
@@ -337,14 +338,14 @@ impl Blockchain {
                 self.add_block_failure().await;
 
                 self.broadcast_channel_sender
-                    .send(BroadcastMessage::BlockchainAddBlockFailure { hash: block_hash })
+                    .send(SaitoEvent::BlockchainAddBlockFailure { hash: block_hash })
                     .expect("error: BlockchainAddBlockFailure message failed to send");
             }
         } else {
             self.add_block_failure().await;
 
             self.broadcast_channel_sender
-                .send(BroadcastMessage::BlockchainAddBlockFailure { hash: block_hash })
+                .send(SaitoEvent::BlockchainAddBlockFailure { hash: block_hash })
                 .expect("error: BlockchainAddBlockFailure message failed to send");
         }
     }
@@ -386,7 +387,7 @@ impl Blockchain {
         // propagate block to network
         //
         self.broadcast_channel_sender
-            .send(BroadcastMessage::BlockchainSavedBlock { hash: block_hash })
+            .send(SaitoEvent::BlockchainSavedBlock { hash: block_hash })
             .expect("error: BlockchainSavedBlock message failed to send");
         // trace!(" ... block save done:            {:?}", create_timestamp());
 
