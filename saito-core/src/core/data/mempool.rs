@@ -82,19 +82,19 @@ impl Mempool {
         }
     }
 
-    pub async fn add_transaction_if_validates(
-        &mut self,
-        transaction: Transaction,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
-    ) {
-        //
-        // validate
-        //
-        let blockchain = blockchain_lock.read().await;
-        if transaction.validate(&blockchain.utxoset, &blockchain.staking) {
-            self.add_transaction(transaction).await;
-        }
-    }
+    // pub async fn add_transaction_if_validates(
+    //     &mut self,
+    //     transaction: Transaction,
+    //     blockchain_lock: Arc<RwLock<Blockchain>>,
+    // ) {
+    //     //
+    //     // validate
+    //     //
+    //     let blockchain = blockchain_lock.read().await;
+    //     if transaction.validate(&blockchain.utxoset, &blockchain.staking) {
+    //         self.add_transaction(transaction).await;
+    //     }
+    // }
     pub async fn add_transaction(&mut self, mut transaction: Transaction) {
         info!("add_transaction {:?}", transaction.get_transaction_type());
         let tx_sig_to_insert = transaction.get_signature();
@@ -235,31 +235,5 @@ impl Mempool {
         self.transactions
             .iter()
             .any(|transaction| transaction.get_hash_for_signature() == tx_hash)
-    }
-}
-
-pub async fn try_bundle_block(
-    mempool_lock: Arc<RwLock<Mempool>>,
-    blockchain_lock: Arc<RwLock<Blockchain>>,
-    current_timestamp: u64,
-) -> Option<Block> {
-    info!("try_bundle_block");
-    // We use a boolean here so we can avoid taking the write lock most of the time
-    let can_bundle;
-    {
-        let mempool = mempool_lock.read().await;
-        can_bundle = mempool
-            .can_bundle_block(blockchain_lock.clone(), current_timestamp)
-            .await;
-    }
-    if can_bundle {
-        let mut mempool = mempool_lock.write().await;
-        Some(
-            mempool
-                .bundle_block(blockchain_lock.clone(), current_timestamp)
-                .await,
-        )
-    } else {
-        None
     }
 }

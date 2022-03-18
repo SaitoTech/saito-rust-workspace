@@ -21,6 +21,7 @@ pub struct MempoolController {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub sender_to_blockchain: Sender<BlockchainEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
+    pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
     pub io_handler: Box<dyn HandleIo + Send>,
 }
 
@@ -31,7 +32,9 @@ impl MempoolController {
         let mut blockchain = self.blockchain.write().await;
         while let Some(block) = mempool.blocks_queue.pop_front() {
             mempool.delete_transactions(&block.get_transactions());
-            blockchain.add_block(block).await;
+            blockchain
+                .add_block(block, self.sender_global.clone())
+                .await;
         }
     }
 }

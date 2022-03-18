@@ -137,6 +137,7 @@ pub async fn run_saito_controller(
         blockchain: context.blockchain.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_miner: sender_to_miner.clone(),
+        sender_global: global_sender.clone(),
         io_handler: Box::new(RustIOHandler::new(
             sender_to_io_controller.clone(),
             MEMPOOL_CONTROLLER_ID,

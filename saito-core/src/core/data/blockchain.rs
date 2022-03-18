@@ -5,6 +5,7 @@ use std::time::Duration;
 use ahash::AHashMap;
 use async_recursion::async_recursion;
 use log::{error, info, trace, warn};
+use tokio::sync::broadcast::Sender;
 use tokio::sync::{broadcast, RwLock};
 
 use crate::common::command::GlobalEvent;
@@ -50,7 +51,7 @@ pub struct Blockchain {
     pub blockring: BlockRing,
     pub blocks: AHashMap<SaitoHash, Block>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
-    broadcast_channel_sender: broadcast::Sender<GlobalEvent>,
+    // broadcast_channel_sender: broadcast::Sender<GlobalEvent>,
     genesis_block_id: u64,
     fork_id: SaitoHash,
 }
@@ -67,7 +68,7 @@ impl Blockchain {
             blockring: BlockRing::new(),
             blocks: AHashMap::new(),
             wallet_lock,
-            broadcast_channel_sender: sender,
+            // broadcast_channel_sender: sender,
             genesis_block_id: 0,
             fork_id: [0; 32],
         }
@@ -84,7 +85,7 @@ impl Blockchain {
         self.fork_id
     }
 
-    pub async fn add_block(&mut self, mut block: Block) {
+    pub async fn add_block(&mut self, mut block: Block, global_sender: Sender<GlobalEvent>) {
         //
         // get missing block
         //
@@ -108,7 +109,7 @@ impl Blockchain {
                 {
                     if block.get_id() > earliest_block_id {
                         if block.get_source_connection_id().is_some() {
-                            self.broadcast_channel_sender
+                            global_sender
                                 .send(GlobalEvent::MissingBlock {
                                     peer_id: block.get_source_connection_id().unwrap(),
                                     hash: block.get_previous_block_hash(),
@@ -307,7 +308,8 @@ impl Blockchain {
         if am_i_the_longest_chain {
             let does_new_chain_validate = self.validate(new_chain, old_chain).await;
             if does_new_chain_validate {
-                self.add_block_success(block_hash).await;
+                self.add_block_success(block_hash, global_sender.clone())
+                    .await;
 
                 //
                 // TODO
@@ -320,13 +322,13 @@ impl Blockchain {
                     self.blocks.get_mut(&block_hash).unwrap().set_lc(true);
                 }
 
-                self.broadcast_channel_sender
+                global_sender
                     .send(GlobalEvent::BlockchainAddBlockSuccess { hash: block_hash })
                     .expect("error: BlockchainAddBlockSuccess message failed to send");
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
 
-                self.broadcast_channel_sender
+                global_sender
                     .send(GlobalEvent::BlockchainNewLongestChainBlock {
                         hash: block_hash,
                         difficulty,
@@ -335,25 +337,29 @@ impl Blockchain {
             } else {
                 self.add_block_failure().await;
 
-                self.broadcast_channel_sender
+                global_sender
                     .send(GlobalEvent::BlockchainAddBlockFailure { hash: block_hash })
                     .expect("error: BlockchainAddBlockFailure message failed to send");
             }
         } else {
             self.add_block_failure().await;
 
-            self.broadcast_channel_sender
+            global_sender
                 .send(GlobalEvent::BlockchainAddBlockFailure { hash: block_hash })
                 .expect("error: BlockchainAddBlockFailure message failed to send");
         }
     }
-    pub async fn add_block_to_blockchain(blockchain_lock: Arc<RwLock<Blockchain>>, block: Block) {
-        let mut blockchain = blockchain_lock.write().await;
-        let res = blockchain.add_block(block).await;
-        res
-    }
+    // pub async fn add_block_to_blockchain(blockchain_lock: Arc<RwLock<Blockchain>>, block: Block) {
+    //     let mut blockchain = blockchain_lock.write().await;
+    //     let res = blockchain.add_block(block).await;
+    //     res
+    // }
 
-    pub async fn add_block_success(&mut self, block_hash: SaitoHash) {
+    pub async fn add_block_success(
+        &mut self,
+        block_hash: SaitoHash,
+        global_sender: tokio::sync::broadcast::Sender<GlobalEvent>,
+    ) {
         // trace!(
         //     " ... blockchain.add_block_success: {:?}",
         //     create_timestamp()
@@ -384,7 +390,7 @@ impl Blockchain {
         //
         // propagate block to network
         //
-        self.broadcast_channel_sender
+        global_sender
             .send(GlobalEvent::BlockchainSavedBlock { hash: block_hash })
             .expect("error: BlockchainSavedBlock message failed to send");
         // trace!(" ... block save done:            {:?}", create_timestamp());
