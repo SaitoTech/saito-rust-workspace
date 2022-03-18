@@ -17,7 +17,7 @@ pub struct MempoolController {
     pub mempool: Arc<RwLock<Mempool>>,
     pub sender_to_blockchain: Sender<BlockchainEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
-    pub io_handler: Box<dyn HandleIo>,
+    pub io_handler: Box<dyn HandleIo + Send>,
 }
 
 impl MempoolController {}

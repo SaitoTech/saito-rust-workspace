@@ -17,7 +17,7 @@ pub struct BlockchainController {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub sender_to_mempool: Sender<MempoolEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
-    pub io_handler: Box<dyn HandleIo>,
+    pub io_handler: Box<dyn HandleIo + Send>,
 }
 
 impl BlockchainController {}

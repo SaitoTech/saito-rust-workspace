@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::io::Error;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -113,21 +114,31 @@ pub async fn run_saito_controller(
         blockchain: context.blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
-        io_handler: Box::new(RustIOHandler {}),
+        io_handler: Box::new(RustIOHandler::new(sender_to_io_controller.clone())),
     };
 
     let mempool_controller = MempoolController {
         mempool: context.mempool.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_miner: sender_to_miner.clone(),
-        io_handler: Box::new(RustIOHandler {}),
+        io_handler: Box::new(RustIOHandler::new(sender_to_io_controller.clone())),
     };
 
-    let sender_clone = global_sender.clone();
+    let (interface_sender_to_blockchain, interface_receiver_for_blockchain) =
+        tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
+
+    let global_sender_clone = global_sender.clone();
+    let blockchain_handle = run_thread(
+        Box::new(blockchain_controller),
+        global_sender_clone.subscribe(),
+        interface_receiver_for_blockchain,
+        receiver_for_blockchain,
+    )
+    .await;
 
     let mut saito_controller = SaitoController {
         saito: Saito {
-            io_handler: RustIOHandler {},
+            io_handler: RustIOHandler::new(sender_to_io_controller.clone()),
             task_runner: RustTaskRunner {},
             context: Context::new(global_sender.clone()),
         },

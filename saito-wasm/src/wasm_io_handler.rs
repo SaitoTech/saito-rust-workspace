@@ -1,11 +1,13 @@
 use std::io::Error;
 
+use async_trait::async_trait;
 use saito_core::common::handle_io::HandleIo;
 
 pub struct WasmIoHandler {}
 
+#[async_trait]
 impl HandleIo for WasmIoHandler {
-    fn send_message(
+    async fn send_message(
         &self,
         peer_index: u64,
         message_name: String,
@@ -14,15 +16,15 @@ impl HandleIo for WasmIoHandler {
         todo!()
     }
 
-    fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
+    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
         todo!()
     }
 
-    fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
+    async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()
     }
 
-    fn get_timestamp(&self) -> u64 {
+    async fn get_timestamp(&self) -> u64 {
         todo!()
     }
 }
