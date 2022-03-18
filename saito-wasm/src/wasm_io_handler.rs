@@ -1,6 +1,8 @@
 use std::io::Error;
 
 use async_trait::async_trait;
+
+use saito_core::common::command::InterfaceEvent;
 use saito_core::common::handle_io::HandleIo;
 
 pub struct WasmIoHandler {}
@@ -16,6 +18,10 @@ impl HandleIo for WasmIoHandler {
         todo!()
     }
 
+    async fn process_interface_event(&mut self, event: InterfaceEvent) {
+        todo!()
+    }
+
     async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
         todo!()
     }
@@ -24,7 +30,7 @@ impl HandleIo for WasmIoHandler {
         todo!()
     }
 
-    async fn get_timestamp(&self) -> u64 {
+    fn get_timestamp(&self) -> u64 {
         todo!()
     }
 }
