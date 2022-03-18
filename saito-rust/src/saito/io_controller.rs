@@ -11,7 +11,7 @@ use tokio_tungstenite::{accept_async, MaybeTlsStream, WebSocketStream};
 
 use saito_core::core::data::peer::Peer;
 
-use crate::InterfaceEvent;
+use crate::{InterfaceEvent, IoEvent};
 
 pub struct IoController {
     sockets: HashMap<u64, WebSocketStream<MaybeTlsStream<TcpStream>>>,
@@ -36,8 +36,8 @@ impl PeerCounter {
 }
 
 pub async fn run_io_controller(
-    mut receiver: Receiver<InterfaceEvent>,
-    sender_to_saito_controller: Sender<InterfaceEvent>,
+    mut receiver: Receiver<IoEvent>,
+    sender_to_saito_controller: Sender<IoEvent>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -84,9 +84,10 @@ pub async fn run_io_controller(
 
         let result = receiver.try_recv();
         if result.is_ok() {
-            let command = result.unwrap();
+            let event = result.unwrap();
+            let event = event.event;
             work_done = true;
-            match command {
+            match event {
                 InterfaceEvent::OutgoingNetworkMessage(index, buffer) => {
                     io_controller.process_network_message(index, buffer);
                 }

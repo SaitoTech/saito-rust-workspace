@@ -4,14 +4,12 @@ use tokio::sync::RwLock;
 use wasm_bindgen::prelude::*;
 
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
-use saito_core::saito::Saito;
 
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_task_runner::WasmTaskRunner;
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    saito: Saito<WasmIoHandler, WasmTaskRunner>,
     lock: RwLock<u8>,
 }
 
@@ -68,7 +66,6 @@ impl WasmTransaction {
 impl SaitoWasm {
     pub fn send_transaction(&mut self, transaction: WasmTransaction) -> Result<JsValue, JsValue> {
         // todo : convert transaction
-        self.saito.process_message_buffer(0, [0, 1, 2, 3].to_vec());
 
         Ok(JsValue::from("test"))
     }

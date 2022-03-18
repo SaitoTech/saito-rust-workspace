@@ -3,6 +3,7 @@ use tokio::sync::mpsc::Receiver;
 use saito_core::common::command::{InterfaceEvent, SaitoEvent};
 
 use crate::saito::io_controller::run_io_controller;
+use crate::saito::io_event::IoEvent;
 use crate::saito::saito_controller::run_saito_controller;
 
 mod saito;
@@ -14,10 +15,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
     let (sender_to_saito_controller, receiver_in_saito_controller) =
-        tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(1000);
 
     let (sender_to_io_controller, receiver_in_io_controller) =
-        tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(1000);
 
     let result1 = tokio::spawn(run_saito_controller(
         receiver_in_saito_controller,

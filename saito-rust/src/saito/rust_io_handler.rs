@@ -13,6 +13,8 @@ use tokio::sync::{Mutex, RwLock};
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::handle_io::HandleIo;
 
+use crate::IoEvent;
+
 lazy_static! {
     static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
 }
@@ -41,16 +43,13 @@ pub struct HandlerFuture {
 }
 
 pub struct RustIOHandler {
-    sender: Sender<InterfaceEvent>,
+    sender: Sender<IoEvent>,
     handler_id: u8,
 }
 
 impl RustIOHandler {
-    pub fn new(sender: Sender<InterfaceEvent>) -> RustIOHandler {
-        RustIOHandler {
-            sender,
-            handler_id: 0,
-        }
+    pub fn new(sender: Sender<IoEvent>, handler_id: u8) -> RustIOHandler {
+        RustIOHandler { sender, handler_id }
     }
 
     pub fn process_interface_event(&mut self, event: InterfaceEvent) {
