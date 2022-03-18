@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use log::trace;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -23,23 +24,24 @@ pub struct MinerController {
 
 impl MinerController {}
 
+#[async_trait]
 impl ProcessEvent<MinerEvent> for MinerController {
-    fn process_global_event(&mut self, event: GlobalEvent) -> Option<()> {
+    async fn process_global_event(&mut self, event: GlobalEvent) -> Option<()> {
         trace!("processing new global event");
         None
     }
 
-    fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
+    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
         trace!("processing new interface event");
         None
     }
 
-    fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
+    async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         trace!("processing timer event : {:?}", duration.as_micros());
         None
     }
 
-    fn process_event(&mut self, event: MinerEvent) -> Option<()> {
+    async fn process_event(&mut self, event: MinerEvent) -> Option<()> {
         None
     }
 }

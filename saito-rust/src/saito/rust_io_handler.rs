@@ -70,6 +70,10 @@ impl HandleIo for RustIOHandler {
         todo!()
     }
 
+    async fn process_interface_event(&mut self, event: InterfaceEvent) {
+        todo!()
+    }
+
     async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
         todo!()
     }
@@ -78,8 +82,8 @@ impl HandleIo for RustIOHandler {
         todo!()
     }
 
-    async fn get_timestamp(&self) -> u64 {
-        todo!()
+    fn get_timestamp(&self) -> u64 {
+        0
     }
 }
 

@@ -75,9 +75,7 @@ impl Blockchain {
     pub fn init(&mut self) -> Result<(), Error> {
         Ok(())
     }
-    pub fn on_timer(&mut self, duration: Duration) -> Option<()> {
-        None
-    }
+
     pub fn set_fork_id(&mut self, fork_id: SaitoHash) {
         self.fork_id = fork_id;
     }

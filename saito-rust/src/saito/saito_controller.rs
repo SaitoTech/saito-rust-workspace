@@ -41,10 +41,11 @@ where
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
         loop {
+            // TODO : refactor to support async calls
             let result = global_receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();
-                if event_processor.process_global_event(event).is_some() {
+                if event_processor.process_global_event(event).await.is_some() {
                     work_done = true;
                 }
             }
@@ -52,7 +53,11 @@ where
             let result = interface_event_receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();
-                if event_processor.process_interface_event(event).is_some() {
+                if event_processor
+                    .process_interface_event(event)
+                    .await
+                    .is_some()
+                {
                     work_done = true;
                 }
             }
@@ -60,7 +65,7 @@ where
             let result = event_receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();
-                if event_processor.process_event(event).is_some() {
+                if event_processor.process_event(event).await.is_some() {
                     work_done = true;
                 }
             }
@@ -69,7 +74,11 @@ where
             let duration = current_instant.duration_since(last_timestamp);
             last_timestamp = current_instant;
 
-            if event_processor.process_timer_event(duration).is_some() {
+            if event_processor
+                .process_timer_event(duration)
+                .await
+                .is_some()
+            {
                 work_done = true;
             }
 
@@ -125,6 +134,7 @@ pub async fn run_saito_controller(
 
     let mempool_controller = MempoolController {
         mempool: context.mempool.clone(),
+        blockchain: context.blockchain.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_miner: sender_to_miner.clone(),
         io_handler: Box::new(RustIOHandler::new(
