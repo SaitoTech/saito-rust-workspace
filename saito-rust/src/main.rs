@@ -1,6 +1,6 @@
 use tokio::sync::mpsc::Receiver;
 
-use saito_core::common::command::{InterfaceEvent, SaitoEvent};
+use saito_core::common::command::{GlobalEvent, InterfaceEvent};
 
 use crate::saito::io_controller::run_io_controller;
 use crate::saito::io_event::IoEvent;

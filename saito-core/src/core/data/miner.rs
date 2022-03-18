@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use log::{debug, info, trace};
 
-use crate::common::command::{InterfaceEvent, SaitoEvent};
+use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::process_event::ProcessEvent;
 use crate::common::run_task::RunTask;
 

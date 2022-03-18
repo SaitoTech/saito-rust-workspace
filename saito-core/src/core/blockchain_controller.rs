@@ -1,10 +1,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::{InterfaceEvent, SaitoEvent};
+use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::handle_io::HandleIo;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::blockchain::Blockchain;
@@ -23,19 +24,24 @@ pub struct BlockchainController {
 impl BlockchainController {}
 
 impl ProcessEvent<BlockchainEvent> for BlockchainController {
-    fn process_saito_event(&mut self, event: SaitoEvent) -> Option<()> {
-        todo!()
+    fn process_global_event(&mut self, event: GlobalEvent) -> Option<()> {
+        trace!("processing new global event");
+        None
     }
 
     fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
-        todo!()
+        trace!("processing new interface event");
+
+        None
     }
 
     fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
-        todo!()
+        trace!("processing timer event : {:?}", duration.as_micros());
+        None
     }
 
     fn process_event(&mut self, event: BlockchainEvent) -> Option<()> {
-        todo!()
+        trace!("processing blockchain event");
+        None
     }
 }

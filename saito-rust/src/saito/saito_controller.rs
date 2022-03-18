@@ -11,7 +11,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
-use saito_core::common::command::{InterfaceEvent, SaitoEvent};
+use saito_core::common::command::{GlobalEvent, InterfaceEvent};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::common::run_task::RunnableTask;
 use saito_core::core::blockchain_controller::{BlockchainController, BlockchainEvent};
@@ -29,7 +29,7 @@ impl SaitoController {}
 
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
-    mut global_receiver: tokio::sync::broadcast::Receiver<SaitoEvent>,
+    mut global_receiver: tokio::sync::broadcast::Receiver<GlobalEvent>,
     mut interface_event_receiver: Receiver<InterfaceEvent>,
     mut event_receiver: Receiver<T>,
 ) -> JoinHandle<()>
@@ -44,7 +44,7 @@ where
             let result = global_receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();
-                if event_processor.process_saito_event(event).is_some() {
+                if event_processor.process_global_event(event).is_some() {
                     work_done = true;
                 }
             }
@@ -77,7 +77,7 @@ where
                 work_done = false;
                 std::thread::yield_now();
             } else {
-                std::thread::sleep(Duration::new(0, 10_000));
+                std::thread::sleep(Duration::new(0, 1000_000));
             }
         }
     })
@@ -93,7 +93,7 @@ pub async fn run_saito_controller(
     const MEMPOOL_CONTROLLER_ID: u8 = 2;
     const MINER_CONTROLLER_ID: u8 = 3;
 
-    let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<SaitoEvent>(1000);
+    let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(1000);
 
     let context = Context::new(global_sender.clone());
 

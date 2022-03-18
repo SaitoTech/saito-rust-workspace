@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::common::command::SaitoEvent;
+use crate::common::command::GlobalEvent;
 use crate::common::run_task::RunTask;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::mempool::Mempool;
@@ -21,7 +21,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(global_sender: tokio::sync::broadcast::Sender<SaitoEvent>) -> Context {
+    pub fn new(global_sender: tokio::sync::broadcast::Sender<GlobalEvent>) -> Context {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         Context {
             blockchain: Arc::new(RwLock::new(Blockchain::new(

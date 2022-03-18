@@ -5,7 +5,7 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::Transaction;
 
 #[derive(Clone, Debug)]
-pub enum SaitoEvent {
+pub enum GlobalEvent {
     // broadcast when a block is received but parent is unknown
     MissingBlock { peer_id: SaitoHash, hash: SaitoHash },
     // broadcast when the longest chain block changes
