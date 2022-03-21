@@ -4,6 +4,7 @@ use std::io::Error;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
@@ -83,7 +84,10 @@ impl HandleIo for RustIOHandler {
     }
 
     fn get_timestamp(&self) -> u64 {
-        0
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
     }
 }
 

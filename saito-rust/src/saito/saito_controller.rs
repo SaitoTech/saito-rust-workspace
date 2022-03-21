@@ -36,8 +36,8 @@ async fn run_thread<T>(
 where
     T: Send + 'static,
 {
-    info!("starting new thread");
     tokio::spawn(async move {
+        info!("new thread started");
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
         loop {
@@ -144,6 +144,8 @@ pub async fn run_saito_controller(
             sender_to_io_controller.clone(),
             MEMPOOL_CONTROLLER_ID,
         )),
+        block_producing_timer: 0,
+        tx_producing_timer: 0,
     };
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);

@@ -590,6 +590,7 @@ impl Transaction {
             transaction
         }
     }
+    // TODO : move from this class
     pub async fn generate_vip_transaction(
         _wallet_lock: Arc<RwLock<Wallet>>,
         to_publickey: SaitoPublicKey,

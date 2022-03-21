@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
+use tokio::time::Instant;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::handle_io::HandleIo;
@@ -26,6 +27,8 @@ pub struct MempoolController {
     pub sender_to_miner: Sender<MinerEvent>,
     pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
     pub io_handler: Box<dyn HandleIo + Send>,
+    pub block_producing_timer: u128,
+    pub tx_producing_timer: u128,
 }
 
 impl MempoolController {
@@ -40,12 +43,16 @@ impl MempoolController {
                 .await;
         }
     }
-    async fn generate_tx(&self) {
+    async fn generate_tx(
+        mempool: Arc<RwLock<Mempool>>,
+        wallet: Arc<RwLock<Wallet>>,
+        blockchain: Arc<RwLock<Blockchain>>,
+    ) {
         debug!("generating mock transactions");
 
-        let mempool_lock_clone = self.mempool.clone();
-        let wallet_lock_clone = self.wallet.clone();
-        let blockchain_lock_clone = self.blockchain.clone();
+        let mempool_lock_clone = mempool.clone();
+        let wallet_lock_clone = wallet.clone();
+        let blockchain_lock_clone = blockchain.clone();
 
         let txs_to_generate = 10;
         let bytes_per_tx = 1024;
@@ -79,40 +86,34 @@ impl MempoolController {
             }
         }
 
-        loop {
-            for _i in 0..txs_to_generate {
-                let mut transaction = Transaction::generate_transaction(
-                    wallet_lock_clone.clone(),
-                    publickey,
-                    5000,
-                    5000,
-                )
-                .await;
-                transaction.set_message(
-                    (0..bytes_per_tx)
-                        .into_iter()
-                        .map(|_| rand::random::<u8>())
-                        .collect(),
-                );
-                transaction.sign(privatekey);
-                // before validation!
-                transaction.generate_metadata(publickey);
+        for _i in 0..txs_to_generate {
+            let mut transaction =
+                Transaction::generate_transaction(wallet_lock_clone.clone(), publickey, 5000, 5000)
+                    .await;
+            transaction.set_message(
+                (0..bytes_per_tx)
+                    .into_iter()
+                    .map(|_| rand::random::<u8>())
+                    .collect(),
+            );
+            transaction.sign(privatekey);
+            // before validation!
+            transaction.generate_metadata(publickey);
 
-                transaction
-                    .add_hop_to_path(wallet_lock_clone.clone(), publickey)
+            transaction
+                .add_hop_to_path(wallet_lock_clone.clone(), publickey)
+                .await;
+            transaction
+                .add_hop_to_path(wallet_lock_clone.clone(), publickey)
+                .await;
+            {
+                let mut mempool = mempool_lock_clone.write().await;
+                mempool
+                    .add_transaction_if_validates(transaction, blockchain_lock_clone.clone())
                     .await;
-                transaction
-                    .add_hop_to_path(wallet_lock_clone.clone(), publickey)
-                    .await;
-                {
-                    let mut mempool = mempool_lock_clone.write().await;
-                    mempool
-                        .add_transaction_if_validates(transaction, blockchain_lock_clone.clone())
-                        .await;
-                }
             }
-            info!("TXS TO GENERATE: {:?}", txs_to_generate);
         }
+        info!("TXS TO GENERATE: {:?}", txs_to_generate);
     }
 }
 
@@ -133,8 +134,26 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
 
         let mut can_bundle = false;
         let timestamp = self.io_handler.get_timestamp();
-        // TODO : create mock transactions here
-        self.generate_tx();
+
+        let duration_value = duration.as_micros();
+        self.block_producing_timer = self.block_producing_timer + duration_value;
+        if self.block_producing_timer >= 5_000_000 {
+            debug!("producing block...");
+            self.block_producing_timer = 0;
+        }
+
+        self.tx_producing_timer = self.tx_producing_timer + duration_value;
+        if self.tx_producing_timer >= 1_000_000 {
+            // TODO : Remove this transaction generation once testing is done
+            MempoolController::generate_tx(
+                self.mempool.clone(),
+                self.wallet.clone(),
+                self.blockchain.clone(),
+            )
+            .await;
+
+            self.tx_producing_timer = 0;
+        }
 
         {
             let mempool = self.mempool.read().await;
