@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tokio::time::Instant;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::handle_io::HandleIo;
@@ -34,6 +33,7 @@ pub struct MempoolController {
 impl MempoolController {
     // TODO : rename function
     pub async fn send_blocks_to_blockchain(&mut self) {
+        // TODO : refactor to use channel instead of directly calling the blockchain methods
         let mut mempool = self.mempool.write().await;
         let mut blockchain = self.blockchain.write().await;
         while let Some(block) = mempool.blocks_queue.pop_front() {
@@ -131,17 +131,13 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         trace!("processing timer event : {:?}", duration.as_micros());
+        let mut work_done = false;
 
-        let mut can_bundle = false;
         let timestamp = self.io_handler.get_timestamp();
 
         let duration_value = duration.as_micros();
-        self.block_producing_timer = self.block_producing_timer + duration_value;
-        if self.block_producing_timer >= 5_000_000 {
-            debug!("producing block...");
-            self.block_producing_timer = 0;
-        }
 
+        // generate test transactions
         self.tx_producing_timer = self.tx_producing_timer + duration_value;
         if self.tx_producing_timer >= 1_000_000 {
             // TODO : Remove this transaction generation once testing is done
@@ -153,14 +149,23 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
             .await;
 
             self.tx_producing_timer = 0;
+            work_done = true;
         }
 
-        {
+        // generate blocks
+        let mut can_bundle = false;
+        self.block_producing_timer = self.block_producing_timer + duration_value;
+        // TODO : make timers configurable
+        if self.block_producing_timer >= 5_000_000 {
+            debug!("producing block...");
             let mempool = self.mempool.read().await;
             can_bundle = mempool
                 .can_bundle_block(self.blockchain.clone(), timestamp)
                 .await;
+            self.block_producing_timer = 0;
+            work_done = true;
         }
+
         if can_bundle {
             let mempool = self.mempool.clone();
             let mut mempool = mempool.write().await;
@@ -169,6 +174,7 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
                 .await;
             mempool.add_block(result);
             self.send_blocks_to_blockchain();
+            work_done = true;
         }
         None
     }

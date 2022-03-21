@@ -3,7 +3,7 @@ use std::{mem, sync::Arc};
 
 use ahash::AHashMap;
 use bigint::uint::U256;
-use log::{error, info, trace};
+use log::{debug, error, info, trace};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -1650,6 +1650,10 @@ impl Block {
         blockchain_lock: Arc<RwLock<Blockchain>>,
         current_timestamp: u64,
     ) -> Block {
+        debug!(
+            "Block::generate : previous block hash : {:?}",
+            hex::encode(previous_block_hash)
+        );
         let blockchain = blockchain_lock.read().await;
         let wallet = wallet_lock.read().await;
         let publickey = wallet.get_publickey();

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, collections::VecDeque, sync::Arc, thread::sleep, time::Duration};
 
-use log::info;
+use log::{debug, info};
 use tokio::sync::{broadcast, mpsc, RwLock};
 
 use crate::common::command::GlobalEvent;
@@ -56,6 +56,7 @@ impl Mempool {
     }
 
     pub fn add_block(&mut self, block: Block) {
+        debug!("mempool add block : {:?}", hex::encode(block.get_hash()));
         let hash_to_insert = block.get_hash();
         if self
             .blocks_queue
@@ -132,6 +133,7 @@ impl Mempool {
     ) -> Block {
         let blockchain = blockchain_lock.read().await;
         let previous_block_hash = blockchain.get_latest_block_hash();
+        debug!("bundling block...");
 
         let mut block = Block::generate(
             &mut self.transactions,
