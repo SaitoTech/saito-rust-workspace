@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
-use log::info;
+use log::{debug, info};
 use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
@@ -124,6 +124,7 @@ pub async fn run_saito_controller(
     let (interface_sender_to_blockchain, interface_receiver_for_blockchain) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
 
+    debug!("running blockchain thread");
     let blockchain_handle = run_thread(
         Box::new(blockchain_controller),
         global_sender.subscribe(),
@@ -135,6 +136,7 @@ pub async fn run_saito_controller(
     let mempool_controller = MempoolController {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
+        wallet: context.wallet.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_miner: sender_to_miner.clone(),
         sender_global: global_sender.clone(),
@@ -145,6 +147,7 @@ pub async fn run_saito_controller(
     };
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
+    debug!("running mempool thread");
     let mempool_handle = run_thread(
         Box::new(mempool_controller),
         global_sender.subscribe(),
@@ -164,6 +167,8 @@ pub async fn run_saito_controller(
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
+
+    debug!("running miner thread");
     let miner_handle = run_thread(
         Box::new(miner_controller),
         global_sender.subscribe(),

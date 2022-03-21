@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
 };
-use crate::core::data::crypto::{hash, sign, verify};
+use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::staking::Staking;
@@ -483,7 +483,132 @@ impl Transaction {
         transaction.set_path(path);
         transaction
     }
+    //
+    // this function exists largely for testing. It attempts to attach the requested fee
+    // to the transaction if possible. If not possible it reverts back to a transaction
+    // with 1 zero-fee input and 1 zero-fee output.
+    //
+    pub async fn generate_transaction(
+        wallet_lock: Arc<RwLock<Wallet>>,
+        to_publickey: SaitoPublicKey,
+        with_payment: u64,
+        with_fee: u64,
+    ) -> Transaction {
+        let mut wallet = wallet_lock.write().await;
+        let wallet_publickey = wallet.get_publickey();
 
+        let available_balance = wallet.get_available_balance();
+        let total_requested = with_payment + with_fee;
+        // info!("in generate transaction ab: {} and pr: {} and fr: {}", available_balance, with_payment, with_fee);
+
+        if available_balance >= total_requested {
+            let mut transaction = Transaction::new();
+            let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
+            let input_len = input_slips.len();
+            let output_len = output_slips.len();
+
+            for _i in 0..input_len {
+                transaction.add_input(input_slips[0].clone());
+                input_slips.remove(0);
+            }
+            for _i in 0..output_len {
+                transaction.add_output(output_slips[0].clone());
+                output_slips.remove(0);
+            }
+
+            // add the payment
+            let mut output = Slip::new();
+            output.set_publickey(to_publickey);
+            output.set_amount(with_payment);
+            transaction.add_output(output);
+
+            transaction
+        } else {
+            if available_balance > with_payment {
+                let mut transaction = Transaction::new();
+                let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
+                let input_len = input_slips.len();
+                let output_len = output_slips.len();
+
+                for _i in 0..input_len {
+                    transaction.add_input(input_slips[0].clone());
+                    input_slips.remove(0);
+                }
+                for _i in 0..output_len {
+                    transaction.add_output(output_slips[0].clone());
+                    output_slips.remove(0);
+                }
+
+                // add the payment
+                let mut output = Slip::new();
+                output.set_publickey(to_publickey);
+                output.set_amount(with_payment);
+                transaction.add_output(output);
+
+                return transaction;
+            }
+
+            if available_balance > with_fee {
+                let mut transaction = Transaction::new();
+                let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
+                let input_len = input_slips.len();
+                let output_len = output_slips.len();
+
+                for _i in 0..input_len {
+                    transaction.add_input(input_slips[0].clone());
+                    input_slips.remove(0);
+                }
+                for _i in 0..output_len {
+                    transaction.add_output(output_slips[0].clone());
+                    output_slips.remove(0);
+                }
+
+                return transaction;
+            }
+
+            //
+            // we have neither enough for the payment OR the fee, so
+            // we just create a transaction that has no payment AND no
+            // attached fee.
+            //
+            let mut transaction = Transaction::new();
+
+            let mut input1 = Slip::new();
+            input1.set_publickey(to_publickey);
+            input1.set_amount(0);
+            let random_uuid = hash(&generate_random_bytes(32));
+            input1.set_uuid(random_uuid);
+
+            let mut output1 = Slip::new();
+            output1.set_publickey(wallet_publickey);
+            output1.set_amount(0);
+            output1.set_uuid([0; 32]);
+
+            transaction.add_input(input1);
+            transaction.add_output(output1);
+
+            transaction
+        }
+    }
+    pub async fn generate_vip_transaction(
+        _wallet_lock: Arc<RwLock<Wallet>>,
+        to_publickey: SaitoPublicKey,
+        with_amount: u64,
+        number_of_vip_slips: u64,
+    ) -> Transaction {
+        let mut transaction = Transaction::new();
+        transaction.set_transaction_type(TransactionType::Vip);
+
+        for _i in 0..number_of_vip_slips {
+            let mut output = Slip::new();
+            output.set_publickey(to_publickey);
+            output.set_amount(with_amount);
+            output.set_slip_type(SlipType::VipOutput);
+            transaction.add_output(output);
+        }
+
+        transaction
+    }
     /// Serialize a Transaction for transport or disk.
     /// [len of inputs - 4 bytes - u32]
     /// [len of outputs - 4 bytes - u32]
