@@ -17,7 +17,7 @@ use crate::core::miner_controller::MinerEvent;
 
 pub enum BlockchainEvent {
     NewBlockBundled(Block),
-    BlockFetched,
+    BlockFetched(Vec<u8>),
 }
 
 pub struct BlockchainController {
@@ -58,7 +58,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                     .add_block(block, &self.io_handler, self.peers.clone())
                     .await;
             }
-            BlockchainEvent::BlockFetched => {}
+            BlockchainEvent::BlockFetched(buffer) => {}
         }
         None
     }

@@ -1,6 +1,6 @@
 use std::io::Error;
 
-use crate::common::defs::SaitoHash;
+use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::core::data::block::Block;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::Transaction;
@@ -34,4 +34,5 @@ pub enum InterfaceEvent {
     ConnectToPeer(String),
     PeerConnected(u64, String),
     PeerDisconnected(String),
+    BlockFetchRequest(SaitoHash, SaitoPublicKey),
 }
