@@ -16,6 +16,7 @@ use saito_core::common::process_event::ProcessEvent;
 use saito_core::common::run_task::RunnableTask;
 use saito_core::core::blockchain_controller::{BlockchainController, BlockchainEvent};
 use saito_core::core::data::context::Context;
+use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
@@ -120,6 +121,7 @@ pub async fn run_saito_controller(
             sender_to_io_controller.clone(),
             BLOCKCHAIN_CONTROLLER_ID,
         )),
+        peers: context.peers.clone(),
     };
     let (interface_sender_to_blockchain, interface_receiver_for_blockchain) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);

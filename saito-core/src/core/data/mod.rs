@@ -10,6 +10,7 @@ pub mod mempool;
 pub mod merkle;
 pub mod miner;
 pub mod peer;
+pub mod peer_collection;
 pub mod slip;
 pub mod staking;
 pub mod storage;

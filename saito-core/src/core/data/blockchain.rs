@@ -4,15 +4,17 @@ use std::time::Duration;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
-use log::{error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use tokio::sync::broadcast::Sender;
 use tokio::sync::{broadcast, RwLock};
 
 use crate::common::command::GlobalEvent;
 use crate::common::defs::{SaitoHash, SaitoUTXOSetKey};
+use crate::common::handle_io::HandleIo;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
+use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::staking::Staking;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
@@ -85,7 +87,13 @@ impl Blockchain {
         self.fork_id
     }
 
-    pub async fn add_block(&mut self, mut block: Block, global_sender: Sender<GlobalEvent>) {
+    pub async fn add_block(
+        &mut self,
+        mut block: Block,
+        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        peers: Arc<RwLock<PeerCollection>>,
+    ) {
+        debug!("adding block to blockchain");
         //
         // get missing block
         //
@@ -109,12 +117,21 @@ impl Blockchain {
                 {
                     if block.get_id() > earliest_block_id {
                         if block.get_source_connection_id().is_some() {
-                            global_sender
-                                .send(GlobalEvent::MissingBlock {
-                                    peer_id: block.get_source_connection_id().unwrap(),
-                                    hash: block.get_previous_block_hash(),
-                                })
-                                .expect("error: MissingBlock message failed to send");
+                            // let peers = peers.read().await;
+                            // let peer = peers.find_peer_by_address(block.get_source_connection_id().unwrap())
+                            // let peer_index: u64 = 0;
+                            // Block::fetch_missing_block(
+                            //     block.get_source_connection_id().unwrap(),
+                            //     block.get_previous_block_hash(),
+                            //     io_handler,
+                            // )
+                            // .await;
+                            // global_sender
+                            //     .send(GlobalEvent::MissingBlock {
+                            //         peer_id: block.get_source_connection_id().unwrap(),
+                            //         hash: block.get_previous_block_hash(),
+                            //     })
+                            //     .expect("error: MissingBlock message failed to send");
                         }
                     }
                 }
@@ -293,7 +310,7 @@ impl Blockchain {
         //
         // find out whether this new block is claiming to require chain-validation
         //
-        let am_i_the_longest_chain = self.is_new_chain_the_longest_chain(&new_chain, &old_chain);
+        // let am_i_the_longest_chain = self.is_new_chain_the_longest_chain(&new_chain, &old_chain);
 
         //
         // validate
@@ -305,49 +322,52 @@ impl Blockchain {
         // with the BlockRing. We fail if the newly-preferred chain is not
         // viable.
         //
-        if am_i_the_longest_chain {
-            let does_new_chain_validate = self.validate(new_chain, old_chain).await;
-            if does_new_chain_validate {
-                self.add_block_success(block_hash, global_sender.clone())
-                    .await;
-
-                //
-                // TODO
-                //
-                // mutable update is hell -- we can do this but have to have
-                // manually checked that the entry exists in order to pull
-                // this trick. we did this check before validating.
-                //
-                {
-                    self.blocks.get_mut(&block_hash).unwrap().set_lc(true);
-                }
-
-                global_sender
-                    .send(GlobalEvent::BlockchainAddBlockSuccess { hash: block_hash })
-                    .expect("error: BlockchainAddBlockSuccess message failed to send");
-
-                let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
-
-                global_sender
-                    .send(GlobalEvent::BlockchainNewLongestChainBlock {
-                        hash: block_hash,
-                        difficulty,
-                    })
-                    .expect("error: BlockchainNewLongestChainBlock message failed to send");
-            } else {
-                self.add_block_failure().await;
-
-                global_sender
-                    .send(GlobalEvent::BlockchainAddBlockFailure { hash: block_hash })
-                    .expect("error: BlockchainAddBlockFailure message failed to send");
-            }
-        } else {
-            self.add_block_failure().await;
-
-            global_sender
-                .send(GlobalEvent::BlockchainAddBlockFailure { hash: block_hash })
-                .expect("error: BlockchainAddBlockFailure message failed to send");
-        }
+        // if am_i_the_longest_chain {
+        //     let does_new_chain_validate = self.validate(new_chain, old_chain).await;
+        //     if does_new_chain_validate {
+        //         self.add_block_success(block_hash, io_handler).await;
+        //
+        //         //
+        //         // TODO
+        //         //
+        //         // mutable update is hell -- we can do this but have to have
+        //         // manually checked that the entry exists in order to pull
+        //         // this trick. we did this check before validating.
+        //         //
+        //         {
+        //             self.blocks.get_mut(&block_hash).unwrap().set_lc(true);
+        //         }
+        //
+        //         // TODO : send with the right channel
+        //         // global_sender
+        //         //     .send(GlobalEvent::BlockchainAddBlockSuccess { hash: block_hash })
+        //         //     .expect("error: BlockchainAddBlockSuccess message failed to send");
+        //
+        //         let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
+        //
+        //         // TODO : send this via channel to miner
+        //         // global_sender
+        //         //     .send(GlobalEvent::BlockchainNewLongestChainBlock {
+        //         //         hash: block_hash,
+        //         //         difficulty,
+        //         //     })
+        //         //     .expect("error: BlockchainNewLongestChainBlock message failed to send");
+        //     } else {
+        //         self.add_block_failure().await;
+        //
+        //         // TODO : send with related channel
+        //         // global_sender
+        //         //     .send(GlobalEvent::BlockchainAddBlockFailure { hash: block_hash })
+        //         //     .expect("error: BlockchainAddBlockFailure message failed to send");
+        //     }
+        // } else {
+        //     self.add_block_failure().await;
+        //
+        //     // TODO : send with related channel
+        //     // global_sender
+        //     //     .send(GlobalEvent::BlockchainAddBlockFailure { hash: block_hash })
+        //     //     .expect("error: BlockchainAddBlockFailure message failed to send");
+        // }
     }
     // pub async fn add_block_to_blockchain(blockchain_lock: Arc<RwLock<Blockchain>>, block: Block) {
     //     let mut blockchain = blockchain_lock.write().await;
@@ -358,8 +378,9 @@ impl Blockchain {
     pub async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
-        global_sender: tokio::sync::broadcast::Sender<GlobalEvent>,
+        io_handler: &Box<dyn HandleIo + Send + Sync>,
     ) {
+        debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
         //     " ... blockchain.add_block_success: {:?}",
         //     create_timestamp()
@@ -390,9 +411,10 @@ impl Blockchain {
         //
         // propagate block to network
         //
-        global_sender
-            .send(GlobalEvent::BlockchainSavedBlock { hash: block_hash })
-            .expect("error: BlockchainSavedBlock message failed to send");
+        // TODO : notify other threads and propagate to other peers
+        // global_sender
+        //     .send(GlobalEvent::BlockchainSavedBlock { hash: block_hash })
+        //     .expect("error: BlockchainSavedBlock message failed to send");
         // trace!(" ... block save done:            {:?}", create_timestamp());
 
         //

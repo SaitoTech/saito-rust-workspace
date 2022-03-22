@@ -66,7 +66,7 @@ pub async fn run_io_controller(
             let result = accept_async(stream).await.unwrap();
 
             let mut counter = peer_counter_clone.lock().unwrap();
-            let peer = Peer::new(counter.get_next_index());
+            let peer = Peer::new(counter.get_next_index(), [0; 33]);
 
             // todo : add to peer list
 

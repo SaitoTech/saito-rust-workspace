@@ -1,6 +1,6 @@
 use std::{collections::HashMap, collections::VecDeque, sync::Arc, thread::sleep, time::Duration};
 
-use log::{debug, info};
+use log::{debug, info, trace};
 use tokio::sync::{broadcast, mpsc, RwLock};
 
 use crate::common::command::GlobalEvent;
@@ -97,7 +97,7 @@ impl Mempool {
         }
     }
     pub async fn add_transaction(&mut self, mut transaction: Transaction) {
-        info!("add_transaction {:?}", transaction.get_transaction_type());
+        trace!("add_transaction {:?}", transaction.get_transaction_type());
         let tx_sig_to_insert = transaction.get_signature();
 
         //

@@ -1,6 +1,7 @@
 use std::io::Error;
 
 use crate::common::defs::SaitoHash;
+use crate::core::data::block::Block;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::Transaction;
 

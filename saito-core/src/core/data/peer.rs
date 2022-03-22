@@ -1,9 +1,15 @@
+use crate::common::defs::SaitoPublicKey;
+
 pub struct Peer {
-    peer_index: u64,
+    pub peer_index: u64,
+    pub peer_address: SaitoPublicKey,
 }
 
 impl Peer {
-    pub fn new(peer_index: u64) -> Peer {
-        Peer { peer_index }
+    pub fn new(peer_index: u64, address: SaitoPublicKey) -> Peer {
+        Peer {
+            peer_index,
+            peer_address: address,
+        }
     }
 }

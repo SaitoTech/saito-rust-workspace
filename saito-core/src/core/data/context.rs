@@ -10,13 +10,14 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::miner::Miner;
 use crate::core::data::peer::Peer;
+use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::wallet::Wallet;
 
 pub struct Context {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub mempool: Arc<RwLock<Mempool>>,
     pub wallet: Arc<RwLock<Wallet>>,
-    pub peers: HashMap<u64, Peer>,
+    pub peers: Arc<RwLock<PeerCollection>>,
     pub miner: Arc<RwLock<Miner>>,
 }
 
@@ -30,7 +31,7 @@ impl Context {
             ))),
             mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
             wallet,
-            peers: Default::default(),
+            peers: Arc::new(RwLock::new(PeerCollection::new())),
             miner: Arc::new(RwLock::new(Miner::new())),
         }
     }

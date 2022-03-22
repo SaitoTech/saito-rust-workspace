@@ -1,10 +1,11 @@
+use std::borrow::BorrowMut;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockWriteGuard};
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::handle_io::HandleIo;
@@ -32,15 +33,18 @@ pub struct MempoolController {
 
 impl MempoolController {
     // TODO : rename function
-    pub async fn send_blocks_to_blockchain(&mut self) {
+    pub async fn send_blocks_to_blockchain(&mut self, mempool: &mut Mempool) {
         // TODO : refactor to use channel instead of directly calling the blockchain methods
-        let mut mempool = self.mempool.write().await;
-        let mut blockchain = self.blockchain.write().await;
+        // let mut mempool = self.mempool.write().await;
+        // let mut blockchain = self.blockchain.write().await;
         while let Some(block) = mempool.blocks_queue.pop_front() {
             mempool.delete_transactions(&block.get_transactions());
-            blockchain
-                .add_block(block, self.sender_global.clone())
+            self.sender_to_blockchain
+                .send(BlockchainEvent::NewBlockBundled(block))
                 .await;
+            // blockchain
+            //     .add_block(block, self.sender_global.clone())
+            //     .await;
         }
     }
     async fn generate_tx(
@@ -113,7 +117,7 @@ impl MempoolController {
                     .await;
             }
         }
-        info!("TXS TO GENERATE: {:?}", txs_to_generate);
+        info!("generated transaction count: {:?}", txs_to_generate);
     }
 }
 
@@ -173,7 +177,7 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
                 .bundle_block(self.blockchain.clone(), timestamp)
                 .await;
             mempool.add_block(result);
-            self.send_blocks_to_blockchain();
+            self.send_blocks_to_blockchain(mempool.borrow_mut()).await;
             work_done = true;
         }
         None

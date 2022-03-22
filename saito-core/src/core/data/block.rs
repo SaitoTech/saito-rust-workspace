@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
+use crate::common::handle_io::HandleIo;
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
 use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::{hash, sign, verify};
@@ -1832,5 +1833,16 @@ impl Block {
             tx.delete(utxoset).await;
         }
         true
+    }
+
+    pub async fn fetch_missing_block(
+        peer_index: u64,
+        block_hash: SaitoHash,
+        io_handler: &Box<dyn HandleIo + Send>,
+    ) {
+        debug!(
+            "fetch missing block : block : {:?}",
+            hex::encode(block_hash)
+        );
     }
 }
