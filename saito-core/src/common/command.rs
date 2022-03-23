@@ -24,11 +24,11 @@ pub enum GlobalEvent {
 }
 
 pub enum InterfaceEvent {
-    OutgoingNetworkMessage(u64, Vec<u8>),
-    IncomingNetworkMessage(u64, Vec<u8>),
-    DataSaveRequest(String, Vec<u8>),
+    OutgoingNetworkMessage(u64, String, Vec<u8>),
+    IncomingNetworkMessage(u64, String, Vec<u8>),
+    DataSaveRequest(String, String, Vec<u8>),
     // can do without this.
-    DataSaveResponse(String, Error),
+    DataSaveResponse(String, Result<String, std::io::Error>),
     DataReadRequest(String),
     DataReadResponse(String, Vec<u8>, Error),
     ConnectToPeer(String),

@@ -90,7 +90,7 @@ impl Blockchain {
     pub async fn add_block(
         &mut self,
         mut block: Block,
-        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
     ) {
         debug!("adding block to blockchain");
@@ -214,7 +214,7 @@ impl Blockchain {
         // blocks are stored in a hashmap indexed by the block_hash. we expect all
         // all block_hashes to be unique, so simply insert blocks one-by-one on
         // arrival if they do not exist.
-        //
+
         if !self.blocks.contains_key(&block_hash) {
             self.blocks.insert(block_hash, block);
         } else {
@@ -305,6 +305,11 @@ impl Blockchain {
             }
         }
 
+        let block = self.blocks.get(&block_hash);
+        if block.is_some() {
+            Storage::write_block_to_disk(&block.unwrap(), io_handler).await;
+        }
+
         //
         // at this point we should have a shared ancestor or not
         //
@@ -378,7 +383,7 @@ impl Blockchain {
     pub async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
-        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -394,7 +399,7 @@ impl Blockchain {
         {
             let block = self.get_mut_block(&block_hash).await;
             if block.get_block_type() != BlockType::Header {
-                Storage::write_block_to_disk(block);
+                Storage::write_block_to_disk(block, io_handler);
             }
         }
 

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::common::handle_io::HandleIo;
-use crate::core::data::block::Block;
+use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::slip::Slip;
 
@@ -39,10 +39,25 @@ impl Storage {
     }
 
     pub fn generate_block_filename(block: &Block) -> String {
-        "".parse().unwrap()
+        let timestamp = block.get_timestamp();
+        let block_hash = block.get_hash();
+        "data/".to_string()
+            + timestamp.to_string().as_str()
+            + "-"
+            + hex::encode(block_hash).as_str()
+            + ".block"
     }
-    pub fn write_block_to_disk(block: &mut Block) -> String {
-        "".parse().unwrap()
+    pub async fn write_block_to_disk(
+        block: &Block,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> String {
+        let buffer = block.serialize_for_net(BlockType::Full);
+        let filename = Storage::generate_block_filename(block);
+
+        let result = io_handler
+            .write_value(hex::encode(block.get_hash()), filename.clone(), buffer)
+            .await;
+        filename
     }
 
     pub async fn load_blocks_from_disk(blockchain_lock: Arc<RwLock<Blockchain>>) {}

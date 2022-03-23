@@ -129,7 +129,8 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
     }
 
     async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
-        trace!("processing new interface event");
+        debug!("processing new interface event");
+
         None
     }
 

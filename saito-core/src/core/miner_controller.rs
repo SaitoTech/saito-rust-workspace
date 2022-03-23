@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::trace;
+use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -32,7 +32,8 @@ impl ProcessEvent<MinerEvent> for MinerController {
     }
 
     async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
-        trace!("processing new interface event");
+        debug!("processing new interface event");
+
         None
     }
 
