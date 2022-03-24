@@ -12,6 +12,29 @@ pub trait HandleIo {
         message_name: String,
         buffer: Vec<u8>,
     ) -> Result<(), Error>;
+
+    /// Sends the given message buffer to all the peers except the ones specified
+    ///
+    /// # Arguments
+    ///
+    /// * `message_name`:
+    /// * `buffer`:
+    /// * `peer_exceptions`: Peer indices for which this message should not be sent
+    ///
+    /// returns: Result<(), Error>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    async fn send_message_to_all(
+        &self,
+        message_name: u64,
+        buffer: Vec<u8>,
+        peer_exceptions: Vec<u64>,
+    ) -> Result<(), Error>;
+
     async fn process_interface_event(&mut self, event: InterfaceEvent);
     async fn write_value(
         &mut self,

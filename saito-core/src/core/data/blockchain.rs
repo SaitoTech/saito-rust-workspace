@@ -116,7 +116,7 @@ impl Blockchain {
                     .is_none()
                 {
                     if block.get_id() > earliest_block_id {
-                        if block.get_source_connection_id().is_some() {
+                        if block.source_connection_id.is_some() {
                             // let peers = peers.read().await;
                             // let peer = peers.find_peer_by_address(block.get_source_connection_id().unwrap())
                             // let peer_index: u64 = 0;

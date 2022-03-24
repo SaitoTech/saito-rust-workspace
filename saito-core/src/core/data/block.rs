@@ -204,7 +204,8 @@ pub struct Block {
     #[serde(skip)]
     created_hashmap_of_slips_spent_this_block: bool,
     // the peer's connection ID who sent us this block
-    source_connection_id: Option<SaitoHash>,
+    #[serde(skip)]
+    pub(crate) source_connection_id: Option<SaitoPublicKey>,
 }
 
 impl Block {
@@ -338,10 +339,6 @@ impl Block {
         self.routing_work_for_creator
     }
 
-    pub fn get_source_connection_id(&self) -> Option<SaitoHash> {
-        self.source_connection_id
-    }
-
     pub fn set_routing_work_for_creator(&mut self, routing_work_for_creator: u64) {
         self.routing_work_for_creator = routing_work_for_creator;
     }
@@ -441,10 +438,6 @@ impl Block {
 
     pub fn set_hash(&mut self, hash: SaitoHash) {
         self.hash = hash;
-    }
-
-    pub fn set_source_connection_id(&mut self, source_connection_id: SaitoHash) {
-        self.source_connection_id = Some(source_connection_id);
     }
 
     pub fn add_transaction(&mut self, tx: Transaction) {

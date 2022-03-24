@@ -55,7 +55,10 @@ impl IoController {
                 warn!("{:?}", error);
                 self.sender_to_saito_controller.send(IoEvent {
                     controller_id: 1,
-                    event: InterfaceEvent::DataSaveResponse(request_key, Err(error)),
+                    event: InterfaceEvent::DataSaveResponse {
+                        key: request_key,
+                        result: Err(error),
+                    },
                 });
                 return Err(std::io::Error::from(ErrorKind::Other));
             }
@@ -64,7 +67,10 @@ impl IoController {
         self.sender_to_saito_controller
             .send(IoEvent {
                 controller_id: 1,
-                event: InterfaceEvent::DataSaveResponse(request_key, Ok(filename)),
+                event: InterfaceEvent::DataSaveResponse {
+                    key: request_key,
+                    result: Ok(filename),
+                },
             })
             .await;
         Ok(())
@@ -133,13 +139,21 @@ pub async fn run_io_controller(
                 let interface_event = event.event;
                 work_done = true;
                 match interface_event {
-                    InterfaceEvent::OutgoingNetworkMessage(index, message_name, buffer) => {
+                    InterfaceEvent::OutgoingNetworkMessage {
+                        peer_index: index,
+                        message_name: message_name,
+                        buffer: buffer,
+                    } => {
                         io_controller.send_outgoing_message(index, buffer);
                     }
-                    InterfaceEvent::DataSaveRequest(index, key, buffer) => {
+                    InterfaceEvent::DataSaveRequest {
+                        key: index,
+                        filename: key,
+                        buffer: buffer,
+                    } => {
                         io_controller.write_to_file(index, key, buffer).await;
                     }
-                    InterfaceEvent::DataSaveResponse(_, _) => {
+                    InterfaceEvent::DataSaveResponse { key: _, result: _ } => {
                         unreachable!()
                     }
                     InterfaceEvent::DataReadRequest(_) => {}

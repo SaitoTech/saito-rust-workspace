@@ -20,6 +20,7 @@ use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
+use crate::saito::config_handler::ConfigHandler;
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::rust_task_runner::RustTaskRunner;
 use crate::IoEvent;
@@ -105,7 +106,9 @@ pub async fn run_saito_controller(
 
     let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(1000);
 
-    let context = Context::new(global_sender.clone());
+    let configs = ConfigHandler::load_configs("configs/saito.config.json".to_string())
+        .expect("loading configs failed");
+    let context = Context::new(configs, global_sender.clone());
 
     let (sender_to_mempool, receiver_for_mempool) =
         tokio::sync::mpsc::channel::<MempoolEvent>(1000);

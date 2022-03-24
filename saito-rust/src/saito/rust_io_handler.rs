@@ -94,11 +94,24 @@ impl HandleIo for RustIOHandler {
             .sender
             .send(IoEvent {
                 controller_id: 0,
-                event: InterfaceEvent::OutgoingNetworkMessage(peer_index, message_name, buffer),
+                event: InterfaceEvent::OutgoingNetworkMessage {
+                    peer_index,
+                    message_name,
+                    buffer,
+                },
             })
             .await;
 
         Ok(())
+    }
+
+    async fn send_message_to_all(
+        &self,
+        message_name: u64,
+        buffer: Vec<u8>,
+        peer_exceptions: Vec<u64>,
+    ) -> Result<(), Error> {
+        todo!()
     }
 
     async fn process_interface_event(&mut self, event: InterfaceEvent) {
@@ -121,7 +134,11 @@ impl HandleIo for RustIOHandler {
             .sender
             .send(IoEvent {
                 controller_id: 0,
-                event: InterfaceEvent::DataSaveRequest(result_key, key, value),
+                event: InterfaceEvent::DataSaveRequest {
+                    key: result_key,
+                    filename: key,
+                    buffer: value,
+                },
             })
             .await;
 

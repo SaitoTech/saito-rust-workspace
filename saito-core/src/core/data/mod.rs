@@ -2,6 +2,7 @@ pub mod block;
 pub mod blockchain;
 pub mod blockring;
 pub mod burnfee;
+pub mod configuration;
 pub mod context;
 pub mod crypto;
 pub mod golden_ticket;

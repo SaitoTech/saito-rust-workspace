@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 use crate::common::command::GlobalEvent;
 use crate::common::run_task::RunTask;
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::configuration::Configuration;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::miner::Miner;
 use crate::core::data::peer::Peer;
@@ -19,10 +20,14 @@ pub struct Context {
     pub wallet: Arc<RwLock<Wallet>>,
     pub peers: Arc<RwLock<PeerCollection>>,
     pub miner: Arc<RwLock<Miner>>,
+    pub configuration: Arc<RwLock<Configuration>>,
 }
 
 impl Context {
-    pub fn new(global_sender: tokio::sync::broadcast::Sender<GlobalEvent>) -> Context {
+    pub fn new(
+        configs: Configuration,
+        global_sender: tokio::sync::broadcast::Sender<GlobalEvent>,
+    ) -> Context {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         Context {
             blockchain: Arc::new(RwLock::new(Blockchain::new(
@@ -33,6 +38,7 @@ impl Context {
             wallet,
             peers: Arc::new(RwLock::new(PeerCollection::new())),
             miner: Arc::new(RwLock::new(Miner::new())),
+            configuration: Arc::new(RwLock::new(configs)),
         }
     }
     pub async fn init(&self, task_runner: &dyn RunTask) -> Result<(), Error> {

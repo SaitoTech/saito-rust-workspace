@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -40,12 +41,21 @@ impl BlockchainController {
         }
         let block = block.unwrap();
         let buffer = block.serialize_for_net(BlockType::Full);
-        for peer in &peers.index_to_peers {
-            // TODO : remove buffer clone by using a different specialized method
-            self.io_handler
-                .send_message(*peer.0, String::from("BLOCK"), buffer.clone())
-                .await;
+        let mut exceptions = vec![];
+
+        // finding block sender to avoid resending the block to that node
+        if block.source_connection_id.is_some() {
+            let peers = self.peers.read().await;
+            let peer = peers
+                .address_to_peers
+                .get(&block.source_connection_id.unwrap());
+            if peer.is_some() {
+                exceptions.push(peer.unwrap().peer_index);
+            }
         }
+
+        self.io_handler
+            .send_message_to_all("BLOCK".parse().unwrap(), buffer, exceptions);
     }
 }
 
@@ -59,9 +69,20 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
         debug!("processing new interface event");
         match event {
-            InterfaceEvent::OutgoingNetworkMessage(_, _, _) => {}
-            InterfaceEvent::IncomingNetworkMessage(_, _, _) => {}
-            InterfaceEvent::DataSaveResponse(key, result) => {
+            InterfaceEvent::OutgoingNetworkMessage {
+                peer_index: _,
+                message_name: _,
+                buffer: _,
+            } => {}
+            InterfaceEvent::IncomingNetworkMessage {
+                peer_index: _,
+                message_name: _,
+                buffer: _,
+            } => {}
+            InterfaceEvent::DataSaveResponse {
+                key: key,
+                result: result,
+            } => {
                 // propagate block to network
                 // TODO : add a data type == block check here
                 let hash: SaitoHash = hex::decode(key).unwrap().try_into().unwrap();
