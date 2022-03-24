@@ -13,4 +13,5 @@ where
     async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()>;
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()>;
     async fn process_event(&mut self, event: T) -> Option<()>;
+    async fn on_init(&mut self);
 }

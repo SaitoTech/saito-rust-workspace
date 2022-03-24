@@ -25,7 +25,7 @@ pub struct Context {
 
 impl Context {
     pub fn new(
-        configs: Configuration,
+        configs: Arc<RwLock<Configuration>>,
         global_sender: tokio::sync::broadcast::Sender<GlobalEvent>,
     ) -> Context {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
@@ -38,7 +38,7 @@ impl Context {
             wallet,
             peers: Arc::new(RwLock::new(PeerCollection::new())),
             miner: Arc::new(RwLock::new(Miner::new())),
-            configuration: Arc::new(RwLock::new(configs)),
+            configuration: configs,
         }
     }
     pub async fn init(&self, task_runner: &dyn RunTask) -> Result<(), Error> {

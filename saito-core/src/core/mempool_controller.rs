@@ -187,4 +187,6 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
     async fn process_event(&mut self, event: MempoolEvent) -> Option<()> {
         None
     }
+
+    async fn on_init(&mut self) {}
 }

@@ -45,4 +45,6 @@ impl ProcessEvent<MinerEvent> for MinerController {
     async fn process_event(&mut self, event: MinerEvent) -> Option<()> {
         None
     }
+
+    async fn on_init(&mut self) {}
 }

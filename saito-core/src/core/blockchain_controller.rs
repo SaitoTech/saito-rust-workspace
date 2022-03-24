@@ -1,4 +1,5 @@
-use std::borrow::Borrow;
+use std::borrow::{Borrow, BorrowMut};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,8 +12,11 @@ use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::defs::SaitoHash;
 use crate::common::handle_io::HandleIo;
 use crate::common::process_event::ProcessEvent;
+use crate::core::data;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::configuration::Configuration;
+use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
 use crate::core::mempool_controller::MempoolEvent;
@@ -22,11 +26,25 @@ pub enum BlockchainEvent {
     NewBlockBundled(Block),
 }
 
+pub enum PeerState {
+    Connected,
+    Connecting,
+    Disconnected,
+}
+
+pub struct StaticPeer {
+    pub peer_details: data::configuration::Peer,
+    pub peer_state: PeerState,
+    pub peer_index: u64,
+}
+
 pub struct BlockchainController {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub sender_to_mempool: Sender<MempoolEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
+    pub static_peers: Vec<StaticPeer>,
+    pub configs: Arc<RwLock<Configuration>>,
     pub io_handler: Box<dyn HandleIo + Send + Sync>,
 }
 
@@ -50,12 +68,36 @@ impl BlockchainController {
                 .address_to_peers
                 .get(&block.source_connection_id.unwrap());
             if peer.is_some() {
-                exceptions.push(peer.unwrap().peer_index);
+                exceptions.push(*peer.unwrap());
             }
         }
 
         self.io_handler
             .send_message_to_all("BLOCK".parse().unwrap(), buffer, exceptions);
+    }
+    async fn connect_to_static_peers(&mut self) {
+        debug!("connect to peers from config");
+        let mut configs = self.configs.write().await;
+
+        for peer in &mut configs.peers {
+            self.io_handler.connect_to_peer(peer.clone()).await;
+        }
+    }
+    async fn handle_new_peer(&mut self, peer: data::configuration::Peer, peer_index: u64) {
+        // TODO : if an incoming peer is same as static peer, handle the scenario
+        let mut peers = self.peers.write().await;
+        for mut static_peer in &mut self.static_peers {
+            if static_peer.peer_details == peer {
+                static_peer.peer_state = PeerState::Connected;
+            }
+        }
+        let mut peer = Peer::new(peer_index);
+        peer.initiate_handshake(&self.io_handler).await;
+
+        peers.index_to_peers.insert(peer_index, peer);
+    }
+    async fn handle_peer_disconnect(&mut self, peer_index: u64) {
+        todo!()
     }
 }
 
@@ -73,7 +115,9 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                 peer_index: _,
                 message_name: _,
                 buffer: _,
-            } => {}
+            } => {
+                // TODO : remove this case if not being used
+            }
             InterfaceEvent::IncomingNetworkMessage {
                 peer_index: _,
                 message_name: _,
@@ -89,12 +133,12 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                 self.propagate_block_to_peers(hash);
                 // self.io_handler.set_write_result(index, result)
             }
-            InterfaceEvent::DataReadRequest(_) => {}
             InterfaceEvent::DataReadResponse(_, _, _) => {}
-            InterfaceEvent::ConnectToPeer(_) => {}
-            InterfaceEvent::PeerConnected(_, _) => {}
-            InterfaceEvent::PeerDisconnected(_) => {}
-            InterfaceEvent::BlockFetchRequest(_, _) => {}
+            InterfaceEvent::PeerConnectionResult {
+                peer_details,
+                result,
+            } => {}
+            InterfaceEvent::PeerDisconnected { peer_index } => {}
             _ => {
                 unreachable!()
             }
@@ -104,6 +148,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         trace!("processing timer event : {:?}", duration.as_micros());
+
         None
     }
 
@@ -119,5 +164,10 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
             }
         }
         None
+    }
+
+    async fn on_init(&mut self) {
+        // connect to peers
+        self.connect_to_static_peers().await;
     }
 }

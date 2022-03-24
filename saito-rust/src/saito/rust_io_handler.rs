@@ -16,6 +16,7 @@ use tokio::sync::RwLock;
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::handle_io::HandleIo;
 use saito_core::core::data::block::Block;
+use saito_core::core::data::configuration::Peer;
 
 use crate::IoEvent;
 
@@ -114,7 +115,17 @@ impl HandleIo for RustIOHandler {
         todo!()
     }
 
-    async fn process_interface_event(&mut self, event: InterfaceEvent) {
+    async fn connect_to_peer(&mut self, peer: Peer) -> Result<(), Error> {
+        self.sender
+            .send(IoEvent {
+                controller_id: 0,
+                event: InterfaceEvent::ConnectToPeer { peer_details: peer },
+            })
+            .await;
+        Ok(())
+    }
+
+    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
         todo!()
     }
 
@@ -166,13 +177,18 @@ impl HandleIo for RustIOHandler {
         // }
     }
 
-    fn set_write_result(&mut self, result_key: String, result: Result<String, Error>) {
+    fn set_write_result(
+        &mut self,
+        result_key: String,
+        result: Result<String, Error>,
+    ) -> Result<(), Error> {
         debug!("setting write result");
         // let mut states = self.future_states.lock().unwrap();
         // let mut wakers = self.future_wakers.lock().unwrap();
         // let waker = wakers.remove(&index).expect("waker not found");
         // states.insert(index, FutureState::DataSaved(result));
         // waker.wake();
+        todo!()
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {

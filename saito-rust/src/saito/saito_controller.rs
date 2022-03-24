@@ -14,7 +14,9 @@ use tokio::task::JoinHandle;
 use saito_core::common::command::{GlobalEvent, InterfaceEvent};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::common::run_task::RunnableTask;
-use saito_core::core::blockchain_controller::{BlockchainController, BlockchainEvent};
+use saito_core::core::blockchain_controller::{
+    BlockchainController, BlockchainEvent, PeerState, StaticPeer,
+};
 use saito_core::core::data::context::Context;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
@@ -42,6 +44,9 @@ where
         info!("new thread started");
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
+
+        event_processor.on_init().await;
+
         loop {
             // TODO : refactor to support async calls
             let result = global_receiver.try_recv();
@@ -106,9 +111,11 @@ pub async fn run_saito_controller(
 
     let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(1000);
 
-    let configs = ConfigHandler::load_configs("configs/saito.config.json".to_string())
-        .expect("loading configs failed");
-    let context = Context::new(configs, global_sender.clone());
+    let configs = Arc::new(RwLock::new(
+        ConfigHandler::load_configs("configs/saito.config.json".to_string())
+            .expect("loading configs failed"),
+    ));
+    let context = Context::new(configs.clone(), global_sender.clone());
 
     let (sender_to_mempool, receiver_for_mempool) =
         tokio::sync::mpsc::channel::<MempoolEvent>(1000);
@@ -116,7 +123,7 @@ pub async fn run_saito_controller(
         tokio::sync::mpsc::channel::<BlockchainEvent>(1000);
     let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1000);
 
-    let blockchain_controller = BlockchainController {
+    let mut blockchain_controller = BlockchainController {
         blockchain: context.blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
@@ -125,7 +132,21 @@ pub async fn run_saito_controller(
             BLOCKCHAIN_CONTROLLER_ID,
         )),
         peers: context.peers.clone(),
+        static_peers: vec![],
+        configs: configs.clone(),
     };
+    {
+        let configs = configs.write().await;
+        let peers = &configs.peers;
+        for peer in peers {
+            blockchain_controller.static_peers.push(StaticPeer {
+                peer_details: (*peer).clone(),
+                peer_state: PeerState::Disconnected,
+                peer_index: 0,
+            });
+        }
+    }
+
     let (interface_sender_to_blockchain, interface_receiver_for_blockchain) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
 
