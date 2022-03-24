@@ -83,14 +83,15 @@ impl BlockchainController {
             self.io_handler.connect_to_peer(peer.clone()).await;
         }
     }
-    async fn handle_new_peer(&mut self, peer: data::configuration::Peer, peer_index: u64) {
+    async fn handle_new_peer(&mut self, peer: Option<data::configuration::Peer>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
+        debug!("handing new peer : {:?}", peer_index);
         let mut peers = self.peers.write().await;
-        for mut static_peer in &mut self.static_peers {
-            if static_peer.peer_details == peer {
-                static_peer.peer_state = PeerState::Connected;
-            }
-        }
+        // for mut static_peer in &mut self.static_peers {
+        //     if static_peer.peer_details == peer {
+        //         static_peer.peer_state = PeerState::Connected;
+        //     }
+        // }
         let mut peer = Peer::new(peer_index);
         peer.initiate_handshake(&self.io_handler).await;
 
@@ -137,7 +138,11 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
             InterfaceEvent::PeerConnectionResult {
                 peer_details,
                 result,
-            } => {}
+            } => {
+                if result.is_ok() {
+                    self.handle_new_peer(peer_details, result.unwrap()).await;
+                }
+            }
             InterfaceEvent::PeerDisconnected { peer_index } => {}
             _ => {
                 unreachable!()

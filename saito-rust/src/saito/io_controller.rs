@@ -125,13 +125,15 @@ impl IoController {
 
         sockets.insert(next_index, socket);
         debug!("sending new peer : {:?}", next_index);
-        sender.send(IoEvent {
-            controller_id: 1,
-            event: PeerConnectionResult {
-                peer_details: None,
-                result: Ok(next_index),
-            },
-        });
+        sender
+            .send(IoEvent {
+                controller_id: 1,
+                event: PeerConnectionResult {
+                    peer_details: None,
+                    result: Ok(next_index),
+                },
+            })
+            .await;
     }
 }
 
