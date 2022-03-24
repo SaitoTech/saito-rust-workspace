@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, trace};
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -96,6 +96,7 @@ impl BlockchainController {
         peer.initiate_handshake(&self.io_handler).await;
 
         peers.index_to_peers.insert(peer_index, peer);
+        info!("new peer added : {:?}", peer_index);
     }
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         todo!()
