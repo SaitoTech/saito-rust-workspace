@@ -18,6 +18,7 @@ use tungstenite::connect;
 use saito_core::common::command::InterfaceEvent::PeerConnectionResult;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
+use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::peer::Peer;
 
 use crate::{InterfaceEvent, IoEvent};
@@ -149,11 +150,19 @@ impl PeerCounter {
 pub async fn run_io_controller(
     mut receiver: Receiver<IoEvent>,
     sender_to_saito_controller: Sender<IoEvent>,
+    configs: Arc<RwLock<Configuration>>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
 
-    let listener: TcpListener = TcpListener::bind("localhost:3000").await.unwrap();
+    let mut url = "".to_string();
+    {
+        let configs = configs.write().await;
+        url = "localhost:".to_string() + configs.server.port.to_string().as_str();
+    }
+
+    info!("starting server on : {:?}", url);
+    let listener: TcpListener = TcpListener::bind(url).await.unwrap();
     let peer_counter_clone = peer_index_counter.clone();
     let sender_clone = sender_to_saito_controller.clone();
 

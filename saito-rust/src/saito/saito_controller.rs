@@ -17,6 +17,7 @@ use saito_core::common::run_task::RunnableTask;
 use saito_core::core::blockchain_controller::{
     BlockchainController, BlockchainEvent, PeerState, StaticPeer,
 };
+use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
@@ -102,6 +103,7 @@ where
 pub async fn run_saito_controller(
     mut receiver: Receiver<IoEvent>,
     mut sender_to_io_controller: Sender<IoEvent>,
+    configs: Arc<RwLock<Configuration>>,
 ) {
     info!("running saito controller");
 
@@ -111,10 +113,6 @@ pub async fn run_saito_controller(
 
     let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(1000);
 
-    let configs = Arc::new(RwLock::new(
-        ConfigHandler::load_configs("configs/saito.config.json".to_string())
-            .expect("loading configs failed"),
-    ));
     let context = Context::new(configs.clone(), global_sender.clone());
 
     let (sender_to_mempool, receiver_for_mempool) =
