@@ -9,6 +9,7 @@ use tokio::sync::{RwLock, RwLockWriteGuard};
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::handle_io::HandleIo;
+use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::blockchain_controller::BlockchainEvent;
 use crate::core::data::blockchain::Blockchain;
@@ -26,25 +27,21 @@ pub struct MempoolController {
     pub sender_to_blockchain: Sender<BlockchainEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
     pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
-    pub io_handler: Box<dyn HandleIo + Send>,
     pub block_producing_timer: u128,
     pub tx_producing_timer: u128,
+    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
 }
 
 impl MempoolController {
     // TODO : rename function
     pub async fn send_blocks_to_blockchain(&mut self, mempool: &mut Mempool) {
+        debug!("send blocks to blockchain");
         // TODO : refactor to use channel instead of directly calling the blockchain methods
-        // let mut mempool = self.mempool.write().await;
-        // let mut blockchain = self.blockchain.write().await;
         while let Some(block) = mempool.blocks_queue.pop_front() {
             mempool.delete_transactions(&block.get_transactions());
             self.sender_to_blockchain
                 .send(BlockchainEvent::NewBlockBundled(block))
                 .await;
-            // blockchain
-            //     .add_block(block, self.sender_global.clone())
-            //     .await;
         }
     }
     async fn generate_tx(
@@ -65,15 +62,18 @@ impl MempoolController {
         let latest_block_id;
 
         {
+            debug!("aaaaaaaaaaaaaaa");
             let wallet = wallet_lock_clone.read().await;
             publickey = wallet.get_publickey();
             privatekey = wallet.get_privatekey();
         }
 
         {
+            debug!("bbbbbbbbbbbbbbbbb");
             let blockchain = blockchain_lock_clone.read().await;
             latest_block_id = blockchain.get_latest_block_id();
         }
+        debug!("ccccccccccccccccc");
 
         {
             if latest_block_id == 0 {
@@ -89,6 +89,7 @@ impl MempoolController {
                 mempool.add_transaction(vip_transaction).await;
             }
         }
+        debug!("ddddddddddddddd");
 
         for _i in 0..txs_to_generate {
             let mut transaction =
@@ -111,10 +112,15 @@ impl MempoolController {
                 .add_hop_to_path(wallet_lock_clone.clone(), publickey)
                 .await;
             {
+                debug!("5555");
+                let blockchain = blockchain_lock_clone.read().await;
+                debug!("xxxx");
                 let mut mempool = mempool_lock_clone.write().await;
+                debug!("yyyy");
                 mempool
-                    .add_transaction_if_validates(transaction, blockchain_lock_clone.clone())
+                    .add_transaction_if_validates(transaction, &blockchain)
                     .await;
+                debug!("6666");
             }
         }
         info!("generated transaction count: {:?}", txs_to_generate);
@@ -135,10 +141,10 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
     }
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
-        trace!("processing timer event : {:?}", duration.as_micros());
+        // trace!("processing timer event : {:?}", duration.as_micros());
         let mut work_done = false;
 
-        let timestamp = self.io_handler.get_timestamp();
+        let timestamp = self.time_keeper.get_timestamp();
 
         let duration_value = duration.as_micros();
 

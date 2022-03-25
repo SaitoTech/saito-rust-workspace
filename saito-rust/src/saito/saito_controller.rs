@@ -26,6 +26,7 @@ use saito_core::core::miner_controller::{MinerController, MinerEvent};
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::rust_task_runner::RustTaskRunner;
+use crate::saito::time_keeper::TimeKeeper;
 use crate::IoEvent;
 
 pub struct SaitoController {}
@@ -129,6 +130,7 @@ pub async fn run_saito_controller(
             sender_to_io_controller.clone(),
             BLOCKCHAIN_CONTROLLER_ID,
         )),
+        time_keeper: Box::new(TimeKeeper {}),
         peers: context.peers.clone(),
         static_peers: vec![],
         configs: configs.clone(),
@@ -164,10 +166,7 @@ pub async fn run_saito_controller(
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_miner: sender_to_miner.clone(),
         sender_global: global_sender.clone(),
-        io_handler: Box::new(RustIOHandler::new(
-            sender_to_io_controller.clone(),
-            MEMPOOL_CONTROLLER_ID,
-        )),
+        time_keeper: Box::new(TimeKeeper {}),
         block_producing_timer: 0,
         tx_producing_timer: 0,
     };
@@ -186,10 +185,7 @@ pub async fn run_saito_controller(
         miner: context.miner.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
-        io_handler: Box::new(RustIOHandler::new(
-            sender_to_io_controller.clone(),
-            MINER_CONTROLLER_ID,
-        )),
+        time_keeper: Box::new(TimeKeeper {}),
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);

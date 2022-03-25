@@ -204,13 +204,6 @@ impl HandleIo for RustIOHandler {
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()
     }
-
-    fn get_timestamp(&self) -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64
-    }
 }
 
 impl Future for IoFuture {

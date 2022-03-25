@@ -49,6 +49,4 @@ pub trait HandleIo {
         result: Result<String, Error>,
     ) -> Result<(), Error>;
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error>;
-
-    fn get_timestamp(&self) -> u64;
 }

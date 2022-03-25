@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::defs::SaitoHash;
 use crate::common::handle_io::HandleIo;
+use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data;
 use crate::core::data::block::{Block, BlockType};
@@ -46,35 +47,40 @@ pub struct BlockchainController {
     pub static_peers: Vec<StaticPeer>,
     pub configs: Arc<RwLock<Configuration>>,
     pub io_handler: Box<dyn HandleIo + Send + Sync>,
+    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
 }
 
 impl BlockchainController {
     async fn propagate_block_to_peers(&self, block_hash: SaitoHash) {
         debug!("propagating blocks to peers");
         let peers = self.peers.read().await;
-        let blockchain = self.blockchain.write().await;
-        let block = blockchain.blocks.get(&block_hash);
-        if block.is_none() {
-            // TODO : handle
-        }
-        let block = block.unwrap();
-        let buffer = block.serialize_for_net(BlockType::Full);
+        let buffer: Vec<u8>;
         let mut exceptions = vec![];
+        {
+            let blockchain = self.blockchain.write().await;
+            let block = blockchain.blocks.get(&block_hash);
+            if block.is_none() {
+                // TODO : handle
+            }
+            let block = block.unwrap();
+            buffer = block.serialize_for_net(BlockType::Full);
 
-        // finding block sender to avoid resending the block to that node
-        if block.source_connection_id.is_some() {
-            let peers = self.peers.read().await;
-            let peer = peers
-                .address_to_peers
-                .get(&block.source_connection_id.unwrap());
-            if peer.is_some() {
-                exceptions.push(*peer.unwrap());
+            // finding block sender to avoid resending the block to that node
+            if block.source_connection_id.is_some() {
+                let peers = self.peers.read().await;
+                let peer = peers
+                    .address_to_peers
+                    .get(&block.source_connection_id.unwrap());
+                if peer.is_some() {
+                    exceptions.push(*peer.unwrap());
+                }
             }
         }
 
         self.io_handler
             .send_message_to_all("BLOCK".parse().unwrap(), buffer, exceptions)
             .await;
+        debug!("block sent to peers");
     }
     async fn connect_to_static_peers(&mut self) {
         debug!("connect to peers from config");
@@ -154,13 +160,13 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
-        trace!("processing timer event : {:?}", duration.as_micros());
+        // trace!("processing timer event : {:?}", duration.as_micros());
 
         None
     }
 
     async fn process_event(&mut self, event: BlockchainEvent) -> Option<()> {
-        trace!("processing blockchain event");
+        debug!("processing blockchain event");
 
         match event {
             BlockchainEvent::NewBlockBundled(block) => {

@@ -86,12 +86,11 @@ impl Mempool {
     pub async fn add_transaction_if_validates(
         &mut self,
         transaction: Transaction,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
+        blockchain: &Blockchain,
     ) {
         //
         // validate
         //
-        let blockchain = blockchain_lock.read().await;
         if transaction.validate(&blockchain.utxoset, &blockchain.staking) {
             self.add_transaction(transaction).await;
         }
@@ -131,9 +130,12 @@ impl Mempool {
         blockchain_lock: Arc<RwLock<Blockchain>>,
         current_timestamp: u64,
     ) -> Block {
-        let blockchain = blockchain_lock.read().await;
-        let previous_block_hash = blockchain.get_latest_block_hash();
         debug!("bundling block...");
+        let previous_block_hash: SaitoHash;
+        {
+            let blockchain = blockchain_lock.read().await;
+            previous_block_hash = blockchain.get_latest_block_hash();
+        }
 
         let mut block = Block::generate(
             &mut self.transactions,
@@ -158,6 +160,7 @@ impl Mempool {
         if self.transactions.is_empty() {
             return false;
         }
+        debug!("can bundle block");
 
         let blockchain = blockchain_lock.read().await;
 

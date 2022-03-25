@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::handle_io::HandleIo;
+use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::blockchain_controller::BlockchainEvent;
 use crate::core::data::miner::Miner;
@@ -19,7 +20,7 @@ pub struct MinerController {
     pub miner: Arc<RwLock<Miner>>,
     pub sender_to_blockchain: Sender<BlockchainEvent>,
     pub sender_to_mempool: Sender<MempoolEvent>,
-    pub io_handler: Box<dyn HandleIo + Send>,
+    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
 }
 
 impl MinerController {}
