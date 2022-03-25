@@ -167,14 +167,14 @@ impl IoController {
             })
             .await;
 
-        IoController::receive_message_from_peer(socket_receiver, sender.clone(), next_index);
+        IoController::receive_message_from_peer(socket_receiver, sender.clone(), next_index).await;
         debug!("new peer : {:?} processed successfully", next_index);
     }
     pub async fn receive_message_from_peer(
         mut receiver: SocketReceiver,
         sender: Sender<IoEvent>,
         next_index: u64,
-    ) -> JoinHandle<()> {
+    ) {
         debug!("starting new task for reading from peer : {:?}", next_index);
         tokio::spawn(async move {
             debug!("new thread started for peer receiving");
@@ -206,7 +206,7 @@ impl IoController {
                     }
                 }
             }
-        })
+        });
     }
 }
 
