@@ -133,7 +133,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                 // propagate block to network
                 // TODO : add a data type == block check here
                 let hash: SaitoHash = hex::decode(key).unwrap().try_into().unwrap();
-                self.propagate_block_to_peers(hash);
+                self.propagate_block_to_peers(hash).await;
                 // self.io_handler.set_write_result(index, result)
             }
             InterfaceEvent::DataReadResponse(_, _, _) => {}

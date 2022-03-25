@@ -87,7 +87,10 @@ impl IoController {
             .await;
         Ok(())
     }
-    pub async fn connect_to_peer(&mut self, peer: data::configuration::Peer) {
+    pub async fn connect_to_peer(
+        io_controller: Arc<RwLock<IoController>>,
+        peer: data::configuration::Peer,
+    ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
 
         debug!("connecting to peer : {:?}", peer);
@@ -99,23 +102,28 @@ impl IoController {
         let result = connect_async(url).await;
         if result.is_err() {
             warn!("failed connecting to peer : {:?}", peer);
-            self.sender_to_saito_controller.send(IoEvent {
-                controller_id: 1,
-                event: PeerConnectionResult {
-                    peer_details: Some(peer),
-                    result: Err(Error::from(ErrorKind::Other)),
-                },
-            });
+            let io_controller = io_controller.write().await;
+            io_controller
+                .sender_to_saito_controller
+                .send(IoEvent {
+                    controller_id: 1,
+                    event: PeerConnectionResult {
+                        peer_details: Some(peer),
+                        result: Err(Error::from(ErrorKind::Other)),
+                    },
+                })
+                .await;
             return;
         }
         let result = result.unwrap();
         let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
+        let io_controller = io_controller.write().await;
         IoController::send_new_peer(
-            self.peer_counter.clone(),
-            &mut self.sockets,
+            io_controller.peer_counter.clone(),
+            &mut io_controller.sockets,
             socket,
-            self.sender_to_saito_controller.clone(),
+            io_controller.sender_to_saito_controller.clone(),
         )
         .await;
     }
@@ -291,8 +299,7 @@ pub async fn run_io_controller(
                     InterfaceEvent::DataReadRequest(_) => {}
                     InterfaceEvent::DataReadResponse(_, _, _) => {}
                     InterfaceEvent::ConnectToPeer { peer_details } => {
-                        let mut io_controller = io_controller.write().await;
-                        io_controller.connect_to_peer(peer_details).await;
+                        IoController::connect_to_peer(io_controller.clone(), peer_details).await;
                     }
                     InterfaceEvent::PeerConnectionResult {
                         peer_details,
