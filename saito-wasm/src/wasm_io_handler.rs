@@ -4,6 +4,7 @@ use async_trait::async_trait;
 
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::handle_io::HandleIo;
+use saito_core::core::data::configuration::Peer;
 
 pub struct WasmIoHandler {}
 
@@ -18,11 +19,37 @@ impl HandleIo for WasmIoHandler {
         todo!()
     }
 
-    async fn process_interface_event(&mut self, event: InterfaceEvent) {
+    async fn send_message_to_all(
+        &self,
+        message_name: String,
+        buffer: Vec<u8>,
+        peer_exceptions: Vec<u64>,
+    ) -> Result<(), Error> {
         todo!()
     }
 
-    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
+    async fn connect_to_peer(&mut self, peer: Peer) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn write_value(
+        &mut self,
+        result_key: String,
+        key: String,
+        value: Vec<u8>,
+    ) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn set_write_result(
+        &mut self,
+        result_key: String,
+        result: Result<String, Error>,
+    ) -> Result<(), Error> {
         todo!()
     }
 
