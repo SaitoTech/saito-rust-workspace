@@ -126,7 +126,7 @@ impl IoController {
         exceptions: Vec<u64>,
     ) {
         debug!("sending message : {:?} to all", message_name);
-        for entry in self.sockets {
+        for entry in self.sockets.iter_mut() {
             if exceptions.contains(&entry.0) {
                 continue;
             }
