@@ -118,12 +118,13 @@ impl IoController {
         let result = result.unwrap();
         let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-        let io_controller = io_controller.write().await;
+        let mut io_controller = io_controller.write().await;
+        let sender_to_controller = io_controller.sender_to_saito_controller.clone();
         IoController::send_new_peer(
             io_controller.peer_counter.clone(),
             &mut io_controller.sockets,
             socket,
-            io_controller.sender_to_saito_controller.clone(),
+            sender_to_controller,
         )
         .await;
     }
