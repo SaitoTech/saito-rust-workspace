@@ -31,7 +31,7 @@ pub trait HandleIo {
     /// ```
     async fn send_message_to_all(
         &self,
-        message_name: u64,
+        message_name: String,
         buffer: Vec<u8>,
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error>;

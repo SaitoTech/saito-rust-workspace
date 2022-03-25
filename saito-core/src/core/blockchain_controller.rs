@@ -73,7 +73,8 @@ impl BlockchainController {
         }
 
         self.io_handler
-            .send_message_to_all("BLOCK".parse().unwrap(), buffer, exceptions);
+            .send_message_to_all("BLOCK".parse().unwrap(), buffer, exceptions)
+            .await;
     }
     async fn connect_to_static_peers(&mut self) {
         debug!("connect to peers from config");

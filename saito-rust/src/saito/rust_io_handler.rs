@@ -108,11 +108,21 @@ impl HandleIo for RustIOHandler {
 
     async fn send_message_to_all(
         &self,
-        message_name: u64,
+        message_name: String,
         buffer: Vec<u8>,
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
-        todo!()
+        self.sender
+            .send(IoEvent {
+                controller_id: 0,
+                event: InterfaceEvent::OutgoingNetworkMessageForAll {
+                    message_name,
+                    buffer,
+                    exceptions: peer_exceptions,
+                },
+            })
+            .await;
+        Ok(())
     }
 
     async fn connect_to_peer(&mut self, peer: Peer) -> Result<(), Error> {

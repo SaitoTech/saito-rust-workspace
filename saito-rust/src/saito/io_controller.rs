@@ -7,13 +7,15 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::stream::{SplitSink, SplitStream};
+use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::{accept_async, connect_async, MaybeTlsStream, WebSocketStream};
-use tungstenite::connect;
+use tungstenite::{connect, Message};
 
 use saito_core::common::command::InterfaceEvent::PeerConnectionResult;
 use saito_core::core::data;
@@ -23,14 +25,17 @@ use saito_core::core::data::peer::Peer;
 
 use crate::{InterfaceEvent, IoEvent};
 
+type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
+
 pub struct IoController {
-    sockets: HashMap<u64, WebSocketStream<MaybeTlsStream<TcpStream>>>,
+    sockets: HashMap<u64, SocketSender>,
     peer_counter: Arc<Mutex<PeerCounter>>,
     pub sender_to_saito_controller: Sender<IoEvent>,
 }
 
 impl IoController {
-    pub fn send_outgoing_message(&self, peer_index: u64, buffer: Vec<u8>) {
+    pub async fn send_outgoing_message(&self, peer_index: u64, buffer: Vec<u8>) {
         debug!("sending outgoing message : peer = {:?}", peer_index);
         let socket = self.sockets.get(&peer_index);
         if socket.is_none() {
@@ -114,16 +119,34 @@ impl IoController {
         )
         .await;
     }
+    pub async fn send_to_all(
+        &mut self,
+        message_name: String,
+        buffer: Vec<u8>,
+        exceptions: Vec<u64>,
+    ) {
+        debug!("sending message : {:?} to all", message_name);
+        for entry in self.sockets {
+            if exceptions.contains(&entry.0) {
+                continue;
+            }
+            let mut socket = entry.1;
+            socket.send(Message::Binary(buffer.clone())).await;
+        }
+        debug!("message {:?} sent to all", message_name);
+    }
     pub async fn send_new_peer(
         peer_counter: Arc<Mutex<PeerCounter>>,
-        sockets: &mut HashMap<u64, WebSocketStream<MaybeTlsStream<TcpStream>>>,
+        sockets: &mut HashMap<u64, SocketSender>,
         socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
         sender: Sender<IoEvent>,
     ) {
         let mut counter = peer_counter.lock().await;
         let next_index = counter.get_next_index();
 
-        sockets.insert(next_index, socket);
+        let (socket_sender, mut socket_receiver): (SocketSender, SocketReceiver) = socket.split();
+
+        sockets.insert(next_index, socket_sender);
         debug!("sending new peer : {:?}", next_index);
         sender
             .send(IoEvent {
@@ -134,6 +157,47 @@ impl IoController {
                 },
             })
             .await;
+
+        IoController::receive_message_from_peer(socket_receiver, sender.clone(), next_index);
+        debug!("new peer : {:?} processed successfully", next_index);
+    }
+    pub async fn receive_message_from_peer(
+        mut receiver: SocketReceiver,
+        sender: Sender<IoEvent>,
+        next_index: u64,
+    ) -> JoinHandle<()> {
+        debug!("starting new task for reading from peer : {:?}", next_index);
+        tokio::spawn(async move {
+            debug!("new thread started for peer receiving");
+            loop {
+                let result = receiver.next().await;
+                if result.is_none() {
+                    continue;
+                }
+                let result = result.unwrap();
+                if result.is_err() {
+                    warn!("{:?}", result.err().unwrap());
+                    continue;
+                }
+                let result = result.unwrap();
+                match result {
+                    Message::Binary(buffer) => {
+                        let message = IoEvent {
+                            controller_id: 1,
+                            event: InterfaceEvent::IncomingNetworkMessage {
+                                peer_index: next_index,
+                                message_name: "TEST".to_string(),
+                                buffer,
+                            },
+                        };
+                        sender.send(message).await;
+                    }
+                    _ => {
+                        // Not handling these scenarios
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -195,6 +259,16 @@ pub async fn run_io_controller(
                 let interface_event = event.event;
                 work_done = true;
                 match interface_event {
+                    InterfaceEvent::OutgoingNetworkMessageForAll {
+                        message_name,
+                        buffer,
+                        exceptions,
+                    } => {
+                        let mut io_controller = io_controller.write().await;
+                        io_controller
+                            .send_to_all(message_name, buffer, exceptions)
+                            .await;
+                    }
                     InterfaceEvent::OutgoingNetworkMessage {
                         peer_index: index,
                         message_name: message_name,
