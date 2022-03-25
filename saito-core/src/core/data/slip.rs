@@ -317,3 +317,58 @@ impl Slip {
         vbytes
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use tokio::sync::RwLock;
+
+    use super::*;
+
+    #[test]
+    fn slip_new_test() {
+        let mut slip = Slip::new();
+        assert_eq!(slip.get_publickey(), [0; 33]);
+        assert_eq!(slip.get_uuid(), [0; 32]);
+        assert_eq!(slip.get_amount(), 0);
+        assert_eq!(slip.get_slip_type(), SlipType::Normal);
+        assert_eq!(slip.get_slip_ordinal(), 0);
+
+        slip.set_publickey([1; 33]);
+        assert_eq!(slip.get_publickey(), [1; 33]);
+
+        slip.set_amount(100);
+        assert_eq!(slip.get_amount(), 100);
+
+        slip.set_uuid([30; 32]);
+        assert_eq!(slip.get_uuid(), [30; 32]);
+
+        slip.set_slip_ordinal(1);
+        assert_eq!(slip.get_slip_ordinal(), 1);
+
+        slip.set_slip_type(SlipType::MinerInput);
+        assert_eq!(slip.get_slip_type(), SlipType::MinerInput);
+    }
+
+    #[test]
+    fn slip_serialize_for_signature_test() {
+        let slip = Slip::new();
+        assert_eq!(slip.serialize_input_for_signature(), vec![0; 78]);
+    }
+
+    #[test]
+    fn slip_get_utxoset_key_test() {
+        let slip = Slip::new();
+        assert_eq!(slip.get_utxoset_key(), [0; 74]);
+    }
+
+    #[test]
+    fn slip_serialization_for_net_test() {
+        let slip = Slip::new();
+        let serialized_slip = slip.serialize_for_net();
+        assert_eq!(serialized_slip.len(), 75);
+        let deserilialized_slip = Slip::deserialize_from_net(serialized_slip);
+        assert_eq!(slip, deserilialized_slip);
+    }
+}

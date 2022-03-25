@@ -1839,3 +1839,136 @@ impl Block {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use hex::FromHex;
+
+    use crate::core::data::block::{Block, BlockType};
+    use crate::core::data::slip::Slip;
+    use crate::core::data::transaction::{Transaction, TransactionType};
+
+    #[test]
+    fn block_serialize_for_signature_hash_with_data() {
+        let mut block = Block::new();
+
+        block.id = 10;
+        block.timestamp = 1637034582666;
+        block.previous_block_hash = <[u8; 32]>::from_hex(
+            "bcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        )
+        .unwrap();
+        block.merkle_root = <[u8; 32]>::from_hex(
+            "ccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        )
+        .unwrap();
+        block.creator = <[u8; 33]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+        )
+        .unwrap();
+        block.burnfee = 50000000;
+        block.difficulty = 0;
+        block.treasury = 0;
+        block.staking_treasury = 0;
+        block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
+
+        let serialized_body = block.serialize_for_signature();
+        assert_eq!(serialized_body.len(), 145);
+        // TestManager::check_block_consistency(&block);
+
+        block.sign(
+            <[u8; 33]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+            )
+            .unwrap(),
+            <[u8; 32]>::from_hex(
+                "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
+            )
+            .unwrap(),
+        );
+        assert_eq!(block.signature.len(), 64);
+        assert_eq!(
+            block.signature,
+            [
+                235, 76, 9, 192, 163, 53, 245, 3, 41, 25, 140, 231, 66, 149, 218, 232, 130, 66,
+                162, 91, 12, 246, 188, 58, 41, 42, 69, 192, 250, 81, 161, 87, 94, 145, 108, 115,
+                200, 186, 242, 204, 221, 100, 154, 75, 35, 162, 39, 224, 116, 76, 252, 208, 27, 32,
+                110, 80, 199, 139, 141, 134, 125, 246, 6, 155
+            ]
+        )
+    }
+
+    #[test]
+    // confirm serialization / deserialization does not modify block content
+    fn block_serialize_for_net_test() {
+        let mock_input = Slip::new();
+        let mock_output = Slip::new();
+        let mut mock_tx = Transaction::new();
+        mock_tx.set_timestamp(0);
+        mock_tx.add_input(mock_input.clone());
+        mock_tx.add_output(mock_output.clone());
+        mock_tx.set_message(vec![104, 101, 108, 111]);
+        mock_tx.set_transaction_type(TransactionType::Normal);
+        mock_tx.set_signature([1; 64]);
+
+        let mut mock_tx2 = Transaction::new();
+        mock_tx2.set_timestamp(0);
+        mock_tx2.add_input(mock_input);
+        mock_tx2.add_output(mock_output);
+        mock_tx2.set_message(vec![]);
+        mock_tx2.set_transaction_type(TransactionType::Normal);
+        mock_tx2.set_signature([2; 64]);
+
+        let timestamp = 0;
+
+        let mut block = Block::new();
+        block.set_id(1);
+        block.set_timestamp(timestamp);
+        block.set_previous_block_hash([1; 32]);
+        block.set_creator([2; 33]);
+        block.set_merkle_root([3; 32]);
+        block.set_signature([4; 64]);
+        block.set_treasury(1);
+        block.set_burnfee(2);
+        block.set_difficulty(3);
+        block.set_transactions(&mut vec![mock_tx, mock_tx2]);
+
+        let serialized_block = block.serialize_for_net(BlockType::Full);
+        let deserialized_block = Block::deserialize_for_net(&serialized_block);
+
+        let serialized_block_header = block.serialize_for_net(BlockType::Header);
+        let deserialized_block_header = Block::deserialize_for_net(&serialized_block_header);
+
+        assert_eq!(
+            block.serialize_for_net(BlockType::Full),
+            deserialized_block.serialize_for_net(BlockType::Full)
+        );
+        assert_eq!(deserialized_block.get_id(), 1);
+        assert_eq!(deserialized_block.get_timestamp(), timestamp);
+        assert_eq!(deserialized_block.get_previous_block_hash(), [1; 32]);
+        assert_eq!(deserialized_block.get_creator(), [2; 33]);
+        assert_eq!(deserialized_block.get_merkle_root(), [3; 32]);
+        assert_eq!(deserialized_block.get_signature(), [4; 64]);
+        assert_eq!(deserialized_block.get_treasury(), 1);
+        assert_eq!(deserialized_block.get_burnfee(), 2);
+        assert_eq!(deserialized_block.get_difficulty(), 3);
+
+        assert_eq!(
+            deserialized_block_header.serialize_for_net(BlockType::Full),
+            deserialized_block.serialize_for_net(BlockType::Header)
+        );
+        assert_eq!(deserialized_block_header.get_id(), 1);
+        assert_eq!(deserialized_block_header.get_timestamp(), timestamp);
+        assert_eq!(deserialized_block_header.get_previous_block_hash(), [1; 32]);
+        assert_eq!(deserialized_block_header.get_creator(), [2; 33]);
+        assert_eq!(deserialized_block_header.get_merkle_root(), [3; 32]);
+        assert_eq!(deserialized_block_header.get_signature(), [4; 64]);
+        assert_eq!(deserialized_block_header.get_treasury(), 1);
+        assert_eq!(deserialized_block_header.get_burnfee(), 2);
+        assert_eq!(deserialized_block_header.get_difficulty(), 3);
+
+        // TestManager::check_block_consistency(&block);
+        // TestManager::check_block_consistency(&deserialized_block);
+        // TestManager::check_block_consistency(&deserialized_block_header);
+    }
+}

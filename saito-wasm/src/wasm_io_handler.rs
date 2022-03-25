@@ -56,8 +56,4 @@ impl HandleIo for WasmIoHandler {
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()
     }
-
-    fn get_timestamp(&self) -> u64 {
-        todo!()
-    }
 }

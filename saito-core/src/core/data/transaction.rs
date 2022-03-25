@@ -976,3 +976,122 @@ impl Transaction {
         inputs_validate
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use hex::FromHex;
+
+    use super::*;
+
+    #[test]
+    fn transaction_sign_test() {
+        let mut tx = Transaction::new();
+        let wallet = Wallet::new();
+
+        tx.set_outputs(vec![Slip::new()]);
+        tx.sign(wallet.get_privatekey());
+
+        assert_eq!(tx.get_outputs()[0].get_slip_ordinal(), 0);
+        assert_ne!(tx.get_signature(), [0; 64]);
+        assert_ne!(tx.get_hash_for_signature(), Some([0; 32]));
+    }
+
+    #[test]
+    fn test_serialize_for_signature() {
+        let tx = Transaction::new();
+        assert_eq!(
+            tx.serialize_for_signature(),
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 125]
+        );
+    }
+
+    #[test]
+    fn test_serialize_for_signature_with_data() {
+        let mut tx = Transaction::new();
+        tx.timestamp = 1637034582666;
+        tx.transaction_type = TransactionType::ATR;
+        tx.message = vec![
+            123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
+        ];
+
+        let mut input_slip = Slip::new();
+        input_slip.set_publickey(
+            <[u8; 33]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+            )
+            .unwrap(),
+        );
+        input_slip.set_uuid(
+            <[u8; 32]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+            )
+            .unwrap(),
+        );
+        input_slip.set_amount(123);
+        input_slip.set_slip_ordinal(10);
+        input_slip.set_slip_type(SlipType::ATR);
+
+        let mut output_slip = Slip::new();
+        output_slip.set_publickey(
+            <[u8; 33]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+            )
+            .unwrap(),
+        );
+        output_slip.set_uuid(
+            <[u8; 32]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+            )
+            .unwrap(),
+        );
+        output_slip.set_amount(345);
+        output_slip.set_slip_ordinal(23);
+        output_slip.set_slip_type(SlipType::Normal);
+
+        tx.inputs.push(input_slip);
+        tx.outputs.push(output_slip);
+
+        assert_eq!(
+            tx.serialize_for_signature(),
+            vec![
+                0, 0, 1, 125, 38, 221, 98, 138, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247,
+                35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192,
+                176, 22, 31, 205, 139, 204, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35,
+                148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192, 176,
+                22, 31, 205, 139, 0, 0, 0, 0, 0, 0, 0, 123, 10, 0, 0, 0, 1, 220, 246, 204, 235,
+                116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237,
+                191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 1, 89, 23, 0, 0, 0, 0, 0, 0, 0, 3, 123, 34, 116, 101, 115, 116, 34, 58, 34,
+                116, 101, 115, 116, 34, 125,
+            ]
+        );
+    }
+
+    #[test]
+    fn serialize_for_net_test() {
+        let mock_input = Slip::new();
+        let mock_output = Slip::new();
+        let mut mock_hop = Hop::new();
+        mock_hop.set_from([0; 33]);
+        mock_hop.set_to([0; 33]);
+        mock_hop.set_sig([0; 64]);
+        let mut mock_tx = Transaction::new();
+        let mut mock_path: Vec<Hop> = vec![];
+        mock_path.push(mock_hop);
+        let ctimestamp = 0;
+
+        mock_tx.set_timestamp(ctimestamp);
+        mock_tx.add_input(mock_input);
+        mock_tx.add_output(mock_output);
+        mock_tx.set_message(vec![104, 101, 108, 108, 111]);
+        mock_tx.set_transaction_type(TransactionType::Normal);
+        mock_tx.set_signature([1; 64]);
+        mock_tx.set_path(mock_path);
+
+        let serialized_tx = mock_tx.serialize_for_net();
+
+        let deserialized_tx = Transaction::deserialize_from_net(serialized_tx);
+        assert_eq!(mock_tx, deserialized_tx);
+    }
+}
