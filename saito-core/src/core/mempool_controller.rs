@@ -62,18 +62,15 @@ impl MempoolController {
         let latest_block_id;
 
         {
-            debug!("aaaaaaaaaaaaaaa");
             let wallet = wallet_lock_clone.read().await;
             publickey = wallet.get_publickey();
             privatekey = wallet.get_privatekey();
         }
 
         {
-            debug!("bbbbbbbbbbbbbbbbb");
             let blockchain = blockchain_lock_clone.read().await;
             latest_block_id = blockchain.get_latest_block_id();
         }
-        debug!("ccccccccccccccccc");
 
         {
             if latest_block_id == 0 {
@@ -89,7 +86,6 @@ impl MempoolController {
                 mempool.add_transaction(vip_transaction).await;
             }
         }
-        debug!("ddddddddddddddd");
 
         for _i in 0..txs_to_generate {
             let mut transaction =

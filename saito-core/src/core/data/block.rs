@@ -1845,8 +1845,10 @@ mod tests {
     use hex::FromHex;
 
     use crate::core::data::block::{Block, BlockType};
+    use crate::core::data::crypto::verify;
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
+    use crate::core::data::wallet::Wallet;
 
     #[test]
     fn block_serialize_for_signature_hash_with_data() {
@@ -1970,5 +1972,25 @@ mod tests {
         // TestManager::check_block_consistency(&block);
         // TestManager::check_block_consistency(&deserialized_block);
         // TestManager::check_block_consistency(&deserialized_block_header);
+    }
+
+    // signs and verifies the signature of a block
+    fn block_sign_test() {
+        let wallet = Wallet::new();
+        let mut block = Block::new();
+
+        block.sign(wallet.get_publickey(), wallet.get_privatekey());
+
+        assert_eq!(block.creator, wallet.get_publickey());
+        assert_eq!(
+            verify(
+                &block.get_pre_hash(),
+                block.get_signature(),
+                block.get_creator(),
+            ),
+            true
+        );
+        assert_ne!(block.get_hash(), [0; 32]);
+        assert_ne!(block.get_signature(), [0; 64]);
     }
 }
