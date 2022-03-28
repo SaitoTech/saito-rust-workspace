@@ -32,7 +32,7 @@ impl Context {
         Context {
             blockchain: Arc::new(RwLock::new(Blockchain::new(
                 wallet.clone(),
-                global_sender.clone(),
+                // global_sender.clone(),
             ))),
             mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
             wallet,

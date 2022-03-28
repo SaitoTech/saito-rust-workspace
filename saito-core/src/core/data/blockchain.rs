@@ -62,7 +62,7 @@ impl Blockchain {
     #[allow(clippy::new_without_default)]
     pub fn new(
         wallet_lock: Arc<RwLock<Wallet>>,
-        sender: tokio::sync::broadcast::Sender<GlobalEvent>,
+        // sender: tokio::sync::broadcast::Sender<GlobalEvent>,
     ) -> Self {
         Blockchain {
             staking: Staking::new(),

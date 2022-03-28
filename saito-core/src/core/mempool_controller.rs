@@ -26,7 +26,7 @@ pub struct MempoolController {
     pub wallet: Arc<RwLock<Wallet>>,
     pub sender_to_blockchain: Sender<BlockchainEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
-    pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
+    // pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
     pub block_producing_timer: u128,
     pub tx_producing_timer: u128,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,

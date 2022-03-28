@@ -165,7 +165,7 @@ pub async fn run_saito_controller(
         wallet: context.wallet.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_miner: sender_to_miner.clone(),
-        sender_global: global_sender.clone(),
+        // sender_global: global_sender.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         block_producing_timer: 0,
         tx_producing_timer: 0,
