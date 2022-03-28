@@ -1047,6 +1047,7 @@ dependencies = [
  "async-trait",
  "hex",
  "js-sys",
+ "lazy_static",
  "saito-core",
  "serde",
  "tokio",

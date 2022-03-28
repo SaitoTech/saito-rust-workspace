@@ -1,12 +1,16 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use js_sys::{Array, BigInt, Uint8Array};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
-use saito_core::core::blockchain_controller::BlockchainController;
+use saito_core::common::process_event::ProcessEvent;
+use saito_core::core::blockchain_controller::{BlockchainController, BlockchainEvent};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
@@ -14,8 +18,8 @@ use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::miner::Miner;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::mempool_controller::MempoolController;
-use saito_core::core::miner_controller::MinerController;
+use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
+use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_task_runner::WasmTaskRunner;
@@ -26,6 +30,9 @@ pub struct SaitoWasm {
     blockchain_controller: BlockchainController,
     mempool_controller: MempoolController,
     miner_controller: MinerController,
+    receiver_in_blockchain: Receiver<BlockchainEvent>,
+    receiver_in_mempool: Receiver<MempoolEvent>,
+    receiver_in_miner: Receiver<MinerEvent>,
 }
 
 // #[derive(Serialize, Deserialize)]
@@ -77,6 +84,10 @@ impl WasmTransaction {
     }
 }
 
+lazy_static! {
+    static ref SAITO: Mutex<SaitoWasm> = Mutex::new(SaitoWasm::new());
+}
+
 #[wasm_bindgen]
 impl SaitoWasm {
     pub fn new() -> SaitoWasm {
@@ -123,23 +134,65 @@ impl SaitoWasm {
                 sender_to_mempool: sender_to_mempool.clone(),
                 time_keeper: Box::new(WasmTimeKeeper {}),
             },
+            receiver_in_blockchain,
+            receiver_in_mempool,
+            receiver_in_miner,
         }
     }
 }
 
-pub async fn send_transaction(
-    saito: &mut SaitoWasm,
-    transaction: WasmTransaction,
-) -> Result<JsValue, JsValue> {
+#[wasm_bindgen]
+pub async fn send_transaction(transaction: WasmTransaction) -> Result<JsValue, JsValue> {
     // todo : convert transaction
 
+    let saito = SAITO.lock().await;
+    // saito.blockchain_controller.
     Ok(JsValue::from("test"))
 }
 
-pub fn get_latest_block_hash(saito: &SaitoWasm) -> Result<JsValue, JsValue> {
+#[wasm_bindgen]
+pub fn get_latest_block_hash() -> Result<JsValue, JsValue> {
     Ok(JsValue::from("latestblockhash"))
 }
 
-pub fn get_public_key(saito: &mut SaitoWasm) -> Result<JsValue, JsValue> {
+#[wasm_bindgen]
+pub fn get_public_key() -> Result<JsValue, JsValue> {
     Ok(JsValue::from("publickey"))
+}
+
+#[wasm_bindgen]
+pub async fn process_timer_event(duration: u64) {
+    let mut saito = SAITO.lock().await;
+
+    let duration = Duration::new(0, 1_000_000 * duration as u32);
+
+    // blockchain controller
+    let result = saito.receiver_in_blockchain.try_recv();
+    if result.is_ok() {
+        let event = result.unwrap();
+        let result = saito.blockchain_controller.process_event(event).await;
+    }
+
+    saito
+        .blockchain_controller
+        .process_timer_event(duration.clone())
+        .await;
+    // mempool controller
+    let result = saito.receiver_in_mempool.try_recv();
+    if result.is_ok() {
+        let event = result.unwrap();
+        let result = saito.mempool_controller.process_event(event).await;
+    }
+    saito
+        .mempool_controller
+        .process_timer_event(duration.clone())
+        .await;
+
+    // miner controller
+    let result = saito.receiver_in_miner.try_recv();
+    if result.is_ok() {
+        let event = result.unwrap();
+        let result = saito.miner_controller.process_event(event).await;
+    }
+    saito.miner_controller.process_timer_event(duration.clone());
 }
