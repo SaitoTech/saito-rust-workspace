@@ -313,6 +313,10 @@ impl Wallet {
         sign(message_bytes, self.privatekey)
     }
 
+    pub async fn create_transaction_with_default_fees(&self) -> Transaction {
+        // TODO : to be implemented
+        Transaction::new()
+    }
     pub async fn create_golden_ticket_transaction(
         &mut self,
         golden_ticket: GoldenTicket,

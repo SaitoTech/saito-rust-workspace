@@ -17,6 +17,7 @@ use saito_core::core::data::context::Context;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::miner::Miner;
 use saito_core::core::data::peer_collection::PeerCollection;
+use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
@@ -33,6 +34,7 @@ pub struct SaitoWasm {
     receiver_in_blockchain: Receiver<BlockchainEvent>,
     receiver_in_mempool: Receiver<MempoolEvent>,
     receiver_in_miner: Receiver<MinerEvent>,
+    context: Context,
 }
 
 // #[derive(Serialize, Deserialize)]
@@ -80,6 +82,9 @@ impl WasmTransaction {
         todo!()
     }
     pub fn get_from_slips(&self) -> Array {
+        todo!()
+    }
+    fn from_transaction(transaction: Transaction) -> WasmTransaction {
         todo!()
     }
 }
@@ -137,8 +142,18 @@ impl SaitoWasm {
             receiver_in_blockchain,
             receiver_in_mempool,
             receiver_in_miner,
+            context,
         }
     }
+}
+
+#[wasm_bindgen]
+pub async fn create_transaction() -> Result<WasmTransaction, JsValue> {
+    let saito = SAITO.lock().await;
+    let wallet = saito.context.wallet.write().await;
+    let transaction = wallet.create_transaction_with_default_fees().await;
+    let wasm_transaction = WasmTransaction::from_transaction(transaction);
+    return Ok(wasm_transaction);
 }
 
 #[wasm_bindgen]
