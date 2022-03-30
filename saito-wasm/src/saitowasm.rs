@@ -23,8 +23,10 @@ use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
 use crate::wasm_io_handler::WasmIoHandler;
+use crate::wasm_slip::WasmSlip;
 use crate::wasm_task_runner::WasmTaskRunner;
 use crate::wasm_time_keeper::WasmTimeKeeper;
+use crate::wasm_transaction::WasmTransaction;
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
@@ -35,58 +37,6 @@ pub struct SaitoWasm {
     receiver_in_mempool: Receiver<MempoolEvent>,
     receiver_in_miner: Receiver<MinerEvent>,
     context: Context,
-}
-
-// #[derive(Serialize, Deserialize)]
-#[wasm_bindgen]
-pub struct WasmSlip {
-    pub(crate) public_key: SaitoPublicKey,
-    pub(crate) uuid: SaitoHash,
-    pub(crate) amount: Currency,
-}
-
-#[wasm_bindgen]
-impl WasmSlip {
-    pub fn new() -> WasmSlip {
-        WasmSlip {
-            public_key: [0; 33],
-            uuid: [0; 32],
-            amount: 0,
-        }
-    }
-}
-
-#[wasm_bindgen]
-pub struct WasmTransaction {
-    pub(crate) from: Vec<WasmSlip>,
-    pub(crate) to: Vec<WasmSlip>,
-    pub(crate) fees_total: Currency,
-    pub timestamp: u64,
-    pub(crate) signature: SaitoSignature,
-}
-
-#[wasm_bindgen]
-impl WasmTransaction {
-    pub fn new() -> WasmTransaction {
-        WasmTransaction {
-            from: vec![],
-            to: vec![],
-            fees_total: 0,
-            timestamp: 0,
-            signature: [0; 64],
-        }
-    }
-    pub fn add_to_slip(&mut self, slip: WasmSlip) {}
-    pub fn add_from_slip(&mut self, slip: WasmSlip) {}
-    pub fn get_to_slips(&self) -> Array {
-        todo!()
-    }
-    pub fn get_from_slips(&self) -> Array {
-        todo!()
-    }
-    fn from_transaction(transaction: Transaction) -> WasmTransaction {
-        todo!()
-    }
 }
 
 lazy_static! {

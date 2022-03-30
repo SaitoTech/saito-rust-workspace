@@ -1,7 +1,9 @@
 pub mod saitowasm;
 mod wasm_io_handler;
+mod wasm_slip;
 mod wasm_task_runner;
 mod wasm_time_keeper;
+mod wasm_transaction;
 
 #[cfg(test)]
 mod tests {
