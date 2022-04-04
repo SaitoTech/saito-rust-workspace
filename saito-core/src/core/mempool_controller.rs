@@ -13,12 +13,15 @@ use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::blockchain_controller::BlockchainEvent;
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::core::miner_controller::MinerEvent;
 
-pub enum MempoolEvent {}
+pub enum MempoolEvent {
+    NewGoldenTicket { golden_ticket: GoldenTicket },
+}
 
 pub struct MempoolController {
     pub mempool: Arc<RwLock<Mempool>>,

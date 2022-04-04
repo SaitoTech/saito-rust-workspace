@@ -35,9 +35,9 @@ impl Context {
                 // global_sender.clone(),
             ))),
             mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
-            wallet,
+            wallet: wallet.clone(),
             peers: Arc::new(RwLock::new(PeerCollection::new())),
-            miner: Arc::new(RwLock::new(Miner::new())),
+            miner: Arc::new(RwLock::new(Miner::new(wallet.clone()))),
             configuration: configs,
         }
     }

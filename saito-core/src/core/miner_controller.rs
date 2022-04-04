@@ -7,6 +7,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
+use crate::common::defs::SaitoHash;
 use crate::common::handle_io::HandleIo;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -14,7 +15,9 @@ use crate::core::blockchain_controller::BlockchainEvent;
 use crate::core::data::miner::Miner;
 use crate::core::mempool_controller::MempoolEvent;
 
-pub enum MinerEvent {}
+pub enum MinerEvent {
+    Mine { hash: SaitoHash, difficulty: u64 },
+}
 
 pub struct MinerController {
     pub miner: Arc<RwLock<Miner>>,
@@ -44,6 +47,14 @@ impl ProcessEvent<MinerEvent> for MinerController {
     }
 
     async fn process_event(&mut self, event: MinerEvent) -> Option<()> {
+        match event {
+            MinerEvent::Mine { hash, difficulty } => {
+                let miner = self.miner.read().await;
+                miner
+                    .mine(hash, difficulty, self.sender_to_mempool.clone())
+                    .await;
+            }
+        }
         None
     }
 
