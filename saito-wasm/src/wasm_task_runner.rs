@@ -8,6 +8,6 @@ pub struct WasmTaskRunner {}
 impl RunTask for WasmTaskRunner {
     fn run(&self, task: Pin<Box<dyn Fn() -> () + Send + 'static>>) {
         println!("WasmTaskRunner.run");
-        todo!()
+        task();
     }
 }
