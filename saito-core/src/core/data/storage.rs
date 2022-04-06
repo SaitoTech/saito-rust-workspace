@@ -28,11 +28,22 @@ pub fn configure_storage() -> String {
 
 impl Storage {
     /// read from a path to a Vec<u8>
-    pub fn read(path: &str) -> std::io::Result<Vec<u8>> {
+    pub fn read(
+        path: &str,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> std::io::Result<Vec<u8>> {
         Ok(vec![])
     }
 
-    pub fn write(data: Vec<u8>, filename: &str) {}
+    pub async fn write(
+        data: Vec<u8>,
+        filename: &str,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) {
+        let result = io_handler
+            .write_value(filename.to_string(), filename.to_string(), data)
+            .await;
+    }
 
     pub fn file_exists(filename: &str) -> bool {
         false

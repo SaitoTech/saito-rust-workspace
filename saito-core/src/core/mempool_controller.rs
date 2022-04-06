@@ -190,8 +190,42 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
     }
 
     async fn process_event(&mut self, event: MempoolEvent) -> Option<()> {
+        match event {
+            MempoolEvent::NewGoldenTicket { golden_ticket } => {
+                let mut mempool = self.mempool.write().await;
+                mempool.add_golden_ticket(golden_ticket).await;
+            }
+        }
         None
     }
 
     async fn on_init(&mut self) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::VecDeque;
+    use std::sync::Arc;
+
+    use tokio::sync::RwLock;
+
+    use crate::core::data::block::Block;
+
+    use super::*;
+
+    #[test]
+    fn mempool_new_test() {
+        let wallet = Wallet::new();
+        let mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
+        assert_eq!(mempool.blocks_queue, VecDeque::new());
+    }
+
+    #[test]
+    fn mempool_add_block_test() {
+        let wallet = Wallet::new();
+        let mut mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
+        let block = Block::new();
+        mempool.add_block(block.clone());
+        assert_eq!(Some(block), mempool.blocks_queue.pop_front())
+    }
 }

@@ -65,25 +65,21 @@ impl IoController {
                 warn!("failed writing file : {:?}", filename);
                 let error = result.err().unwrap();
                 warn!("{:?}", error);
-                self.sender_to_saito_controller.send(IoEvent {
-                    controller_id: 1,
-                    event: InterfaceEvent::DataSaveResponse {
+                self.sender_to_saito_controller.send(IoEvent::new(
+                    InterfaceEvent::DataSaveResponse {
                         key: request_key,
                         result: Err(error),
                     },
-                });
+                ));
                 return Err(std::io::Error::from(ErrorKind::Other));
             }
         }
         debug!("file written successfully : {:?}", filename);
         self.sender_to_saito_controller
-            .send(IoEvent {
-                controller_id: 1,
-                event: InterfaceEvent::DataSaveResponse {
-                    key: request_key,
-                    result: Ok(filename),
-                },
-            })
+            .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
+                key: request_key,
+                result: Ok(filename),
+            }))
             .await;
         Ok(())
     }
@@ -105,13 +101,10 @@ impl IoController {
             let io_controller = io_controller.write().await;
             io_controller
                 .sender_to_saito_controller
-                .send(IoEvent {
-                    controller_id: 1,
-                    event: PeerConnectionResult {
-                        peer_details: Some(peer),
-                        result: Err(Error::from(ErrorKind::Other)),
-                    },
-                })
+                .send(IoEvent::new(PeerConnectionResult {
+                    peer_details: Some(peer),
+                    result: Err(Error::from(ErrorKind::Other)),
+                }))
                 .await;
             return;
         }
@@ -157,15 +150,15 @@ impl IoController {
 
         sockets.insert(next_index, socket_sender);
         debug!("sending new peer : {:?}", next_index);
-        sender
-            .send(IoEvent {
-                controller_id: 1,
-                event: PeerConnectionResult {
-                    peer_details: None,
-                    result: Ok(next_index),
-                },
-            })
-            .await;
+        // sender
+        //     .send(IoEvent {
+        //         controller_id: 1,
+        //         event: PeerConnectionResult {
+        //             peer_details: None,
+        //             result: Ok(next_index),
+        //         },
+        //     })
+        //     .await;
 
         IoController::receive_message_from_peer(socket_receiver, sender.clone(), next_index).await;
         debug!("new peer : {:?} processed successfully", next_index);
@@ -191,15 +184,15 @@ impl IoController {
                 let result = result.unwrap();
                 match result {
                     Message::Binary(buffer) => {
-                        let message = IoEvent {
-                            controller_id: 1,
-                            event: InterfaceEvent::IncomingNetworkMessage {
-                                peer_index: next_index,
-                                message_name: "TEST".to_string(),
-                                buffer,
-                            },
-                        };
-                        sender.send(message).await;
+                        // let message = IoEvent {
+                        //     controller_id: 1,
+                        //     event: InterfaceEvent::IncomingNetworkMessage {
+                        //         peer_index: next_index,
+                        //         message_name: "TEST".to_string(),
+                        //         buffer,
+                        //     },
+                        // };
+                        // sender.send(message).await;
                     }
                     _ => {
                         // Not handling these scenarios

@@ -3,6 +3,7 @@ use log::{debug, info};
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
+use crate::common::handle_io::HandleIo;
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
     decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
@@ -63,30 +64,35 @@ impl Wallet {
         }
     }
 
-    pub fn load(&mut self) {
+    pub async fn load(&mut self, io_handler: &mut Box<dyn HandleIo + Send + Sync>) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
         if Storage::file_exists(&filename) {
             let password = self.get_password();
-            let encoded = Storage::read(&filename).unwrap();
+            let encoded = Storage::read(&filename, io_handler).unwrap();
             let decrypted_encoded = decrypt_with_password(encoded, &password);
             self.deserialize_for_disk(&decrypted_encoded);
         } else {
             //
             // new wallet, save to disk
             //
-            self.save();
+            self.save(io_handler).await;
         }
     }
 
-    pub fn load_wallet(&mut self, wallet_path: &str, password: Option<&str>) {
+    pub async fn load_wallet(
+        &mut self,
+        wallet_path: &str,
+        password: Option<&str>,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) {
         self.set_filename(wallet_path.to_string());
         self.set_password(password.unwrap().to_string());
-        self.load();
+        self.load(io_handler).await;
     }
 
-    pub fn save(&mut self) {
+    pub async fn save(&mut self, io_handler: &mut Box<dyn HandleIo + Send + Sync>) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
@@ -94,7 +100,7 @@ impl Wallet {
         let byte_array: Vec<u8> = self.serialize_for_disk();
         let encrypted_wallet = encrypt_with_password((&byte_array[..]).to_vec(), &password);
 
-        Storage::write(encrypted_wallet, &filename);
+        Storage::write(encrypted_wallet, &filename, io_handler).await;
     }
 
     /// [privatekey - 32 bytes]
@@ -517,4 +523,37 @@ impl WalletSlip {
     pub fn set_slip_ordinal(&mut self, slip_ordinal: u8) {
         self.slip_ordinal = slip_ordinal;
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wallet_new_test() {
+        let wallet = Wallet::new();
+        assert_ne!(wallet.get_publickey(), [0; 33]);
+        assert_ne!(wallet.get_privatekey(), [0; 32]);
+        assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
+    }
+
+    // TODO : fix this test
+    // #[test]
+    // fn save_and_restore_wallet_test() {
+    //     let mut wallet = Wallet::new();
+    //     let publickey1 = wallet.get_publickey().clone();
+    //     let privatekey1 = wallet.get_privatekey().clone();
+    //
+    //     wallet.save();
+    //
+    //     wallet = Wallet::new();
+    //
+    //     assert_ne!(wallet.get_publickey(), publickey1);
+    //     assert_ne!(wallet.get_privatekey(), privatekey1);
+    //
+    //     wallet.load();
+    //
+    //     assert_eq!(wallet.get_publickey(), publickey1);
+    //     assert_eq!(wallet.get_privatekey(), privatekey1);
+    // }
 }

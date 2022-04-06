@@ -42,7 +42,7 @@ pub trait HandleIo {
         result_key: String,
         key: String,
         value: Vec<u8>,
-    ) -> Result<(), Error>;
+    ) -> Result<String, Error>;
     fn set_write_result(
         &mut self,
         result_key: String,
