@@ -41,7 +41,7 @@ impl HandleIo for WasmIoHandler {
         result_key: String,
         key: String,
         value: Vec<u8>,
-    ) -> Result<(), Error> {
+    ) -> Result<String, Error> {
         todo!()
     }
 

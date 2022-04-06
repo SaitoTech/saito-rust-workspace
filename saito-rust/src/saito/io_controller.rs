@@ -17,12 +17,13 @@ use tokio::task::JoinHandle;
 use tokio_tungstenite::{accept_async, connect_async, MaybeTlsStream, WebSocketStream};
 use tungstenite::{connect, Message};
 
-use saito_core::common::command::InterfaceEvent::PeerConnectionResult;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::peer::Peer;
 
+use crate::saito::rust_io_handler::FutureState::PeerConnectionResult;
+use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
 use crate::{InterfaceEvent, IoEvent};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
@@ -46,6 +47,7 @@ impl IoController {
     pub fn process_file_request(&self, file_request: InterfaceEvent) {}
     async fn write_to_file(
         &self,
+        event_id: u64,
         request_key: String,
         filename: String,
         buffer: Vec<u8>,
@@ -65,25 +67,28 @@ impl IoController {
                 warn!("failed writing file : {:?}", filename);
                 let error = result.err().unwrap();
                 warn!("{:?}", error);
-                self.sender_to_saito_controller.send(IoEvent::new(
-                    InterfaceEvent::DataSaveResponse {
-                        key: request_key,
-                        result: Err(error),
-                    },
-                ));
+                // self.sender_to_saito_controller.send(IoEvent::new(
+                //     InterfaceEvent::DataSaveResponse {
+                //         key: request_key,
+                //         result: Err(error),
+                //     },
+                // ));
+                RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Err(error)));
                 return Err(std::io::Error::from(ErrorKind::Other));
             }
         }
         debug!("file written successfully : {:?}", filename);
-        self.sender_to_saito_controller
-            .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
-                key: request_key,
-                result: Ok(filename),
-            }))
-            .await;
+        RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Ok(filename)));
+        // self.sender_to_saito_controller
+        //     .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
+        //         key: request_key,
+        //         result: Ok(filename),
+        //     }))
+        //     .await;
         Ok(())
     }
     pub async fn connect_to_peer(
+        event_id: u64,
         io_controller: Arc<RwLock<IoController>>,
         peer: data::configuration::Peer,
     ) {
@@ -98,14 +103,18 @@ impl IoController {
         let result = connect_async(url).await;
         if result.is_err() {
             warn!("failed connecting to peer : {:?}", peer);
-            let io_controller = io_controller.write().await;
-            io_controller
-                .sender_to_saito_controller
-                .send(IoEvent::new(PeerConnectionResult {
-                    peer_details: Some(peer),
-                    result: Err(Error::from(ErrorKind::Other)),
-                }))
-                .await;
+            // let io_controller = io_controller.write().await;
+            // io_controller
+            //     .sender_to_saito_controller
+            //     .send(IoEvent::new(PeerConnectionResult {
+            //         peer_details: Some(peer),
+            //         result: Err(Error::from(ErrorKind::Other)),
+            //     }))
+            //     .await;
+            RustIOHandler::set_event_response(
+                event_id,
+                FutureState::PeerConnectionResult(Err(Error::from(ErrorKind::Other))),
+            );
             return;
         }
         let result = result.unwrap();
@@ -114,6 +123,7 @@ impl IoController {
         let mut io_controller = io_controller.write().await;
         let sender_to_controller = io_controller.sender_to_saito_controller.clone();
         IoController::send_new_peer(
+            event_id,
             io_controller.peer_counter.clone(),
             &mut io_controller.sockets,
             socket,
@@ -138,6 +148,7 @@ impl IoController {
         debug!("message {:?} sent to all", message_name);
     }
     pub async fn send_new_peer(
+        event_id: u64,
         peer_counter: Arc<Mutex<PeerCounter>>,
         sockets: &mut HashMap<u64, SocketSender>,
         socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
@@ -150,6 +161,11 @@ impl IoController {
 
         sockets.insert(next_index, socket_sender);
         debug!("sending new peer : {:?}", next_index);
+        RustIOHandler::set_event_response(
+            event_id,
+            FutureState::PeerConnectionResult(Ok(next_index)),
+        );
+
         // sender
         //     .send(IoEvent {
         //         controller_id: 1,
@@ -258,6 +274,7 @@ pub async fn run_io_controller(
             let result = receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();
+                let event_id = event.event_id;
                 let interface_event = event.event;
                 work_done = true;
                 match interface_event {
@@ -285,7 +302,9 @@ pub async fn run_io_controller(
                         buffer: buffer,
                     } => {
                         let io_controller = io_controller.write().await;
-                        io_controller.write_to_file(index, key, buffer).await;
+                        io_controller
+                            .write_to_file(event_id, index, key, buffer)
+                            .await;
                     }
                     InterfaceEvent::DataSaveResponse { key: _, result: _ } => {
                         unreachable!()
@@ -293,7 +312,12 @@ pub async fn run_io_controller(
                     InterfaceEvent::DataReadRequest(_) => {}
                     InterfaceEvent::DataReadResponse(_, _, _) => {}
                     InterfaceEvent::ConnectToPeer { peer_details } => {
-                        IoController::connect_to_peer(io_controller.clone(), peer_details).await;
+                        IoController::connect_to_peer(
+                            event_id,
+                            io_controller.clone(),
+                            peer_details,
+                        )
+                        .await;
                     }
                     InterfaceEvent::PeerConnectionResult {
                         peer_details,
@@ -334,6 +358,7 @@ fn run_server(
             let stream = accept_async(stream).await.unwrap();
             let mut controller = io_controller_clone.write().await;
             IoController::send_new_peer(
+                0,
                 peer_counter_clone.clone(),
                 &mut controller.sockets,
                 stream,

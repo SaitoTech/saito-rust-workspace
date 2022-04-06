@@ -42,10 +42,11 @@ pub enum FutureState {
     DataSaved(Result<String, std::io::Error>),
     DataSent(),
     BlockFetched(Block),
+    PeerConnectionResult(Result<u64, std::io::Error>),
 }
 
 pub struct IoFuture {
-    pub index: u64,
+    pub event_id: u64,
 }
 
 #[derive(Clone)]
@@ -64,13 +65,18 @@ impl RustIOHandler {
         }
     }
 
-    pub fn set_event_response(&mut self, index: u64, response: FutureState) {
+    pub fn set_event_response(event_id: u64, response: FutureState) {
+        debug!("setting event response for : {:?}", event_id);
+        if event_id == 0 {
+            return;
+        }
         let mut context = SHARED_CONTEXT.lock().unwrap();
-        context.future_states.insert(index, response);
+        context.future_states.insert(event_id, response);
         let waker = context
             .future_wakers
-            .remove(&index)
+            .remove(&event_id)
             .expect("waker not found");
+        debug!("waking future : {:?}", event_id);
         waker.wake();
     }
     fn get_next_future_index(&mut self) -> u64 {
@@ -136,7 +142,7 @@ impl HandleIo for RustIOHandler {
     ) -> Result<String, Error> {
         debug!("writing value to disk : {:?}", key);
         let io_future = IoFuture {
-            index: self.get_next_future_index(),
+            event_id: self.get_next_future_index(),
         };
         let result = self
             .sender
@@ -195,9 +201,12 @@ impl Future for IoFuture {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut context = SHARED_CONTEXT.lock().unwrap();
 
-        let result = context.future_states.remove(&self.index);
+        let result = context.future_states.remove(&self.event_id);
         if result.is_none() {
-            context.future_wakers.insert(self.index, cx.waker().clone());
+            context
+                .future_wakers
+                .insert(self.event_id, cx.waker().clone());
+            debug!("waiting for event : {:?}", self.event_id);
             return Poll::Pending;
         }
         Poll::Ready(Ok(result.unwrap()))
@@ -216,12 +225,11 @@ mod tests {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
         let mut io_handler = RustIOHandler::new(sender, 0);
 
-        let mut io_handler_2 = io_handler.clone();
         tokio::spawn(async move {
             let result = receiver.recv().await;
 
             let event = result.unwrap();
-            io_handler_2.set_event_response(
+            RustIOHandler::set_event_response(
                 event.event_id,
                 FutureState::DataSaved(Ok("RESULT".to_string())),
             );

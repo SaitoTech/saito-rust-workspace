@@ -20,6 +20,7 @@ impl IoEvent {
     pub fn new(event: InterfaceEvent) -> IoEvent {
         let mut value = EVENT_COUNTER.lock().unwrap();
         *value = *value + 1;
+        assert_ne!(*value, 0);
         IoEvent {
             controller_id: 0,
             event_id: value.clone(),
