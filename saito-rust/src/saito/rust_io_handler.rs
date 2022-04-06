@@ -79,6 +79,7 @@ impl RustIOHandler {
         debug!("waking future : {:?}", event_id);
         waker.wake();
     }
+
     fn get_next_future_index(&mut self) -> u64 {
         self.future_index_counter = self.future_index_counter + 1;
         return self.future_index_counter;
@@ -127,12 +128,13 @@ impl HandleIo for RustIOHandler {
                 peer_details: peer,
             }))
             .await;
+        // not waiting for the result
         Ok(())
     }
-
-    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
-        todo!()
-    }
+    //
+    // async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
+    //     todo!()
+    // }
 
     async fn write_value(
         &mut self,
@@ -175,20 +177,20 @@ impl HandleIo for RustIOHandler {
             }
         }
     }
-
-    fn set_write_result(
-        &mut self,
-        result_key: String,
-        result: Result<String, Error>,
-    ) -> Result<(), Error> {
-        debug!("setting write result");
-        // let mut states = self.future_states.lock().unwrap();
-        // let mut wakers = self.future_wakers.lock().unwrap();
-        // let waker = wakers.remove(&index).expect("waker not found");
-        // states.insert(index, FutureState::DataSaved(result));
-        // waker.wake();
-        todo!()
-    }
+    //
+    // fn set_write_result(
+    //     &mut self,
+    //     result_key: String,
+    //     result: Result<String, Error>,
+    // ) -> Result<(), Error> {
+    //     debug!("setting write result");
+    //     // let mut states = self.future_states.lock().unwrap();
+    //     // let mut wakers = self.future_wakers.lock().unwrap();
+    //     // let waker = wakers.remove(&index).expect("waker not found");
+    //     // states.insert(index, FutureState::DataSaved(result));
+    //     // waker.wake();
+    //     todo!()
+    // }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()

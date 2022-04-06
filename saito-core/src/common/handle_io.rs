@@ -36,17 +36,17 @@ pub trait HandleIo {
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error>;
     async fn connect_to_peer(&mut self, peer: data::configuration::Peer) -> Result<(), Error>;
-    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error>;
+    // async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error>;
     async fn write_value(
         &mut self,
         result_key: String,
         key: String,
         value: Vec<u8>,
     ) -> Result<String, Error>;
-    fn set_write_result(
-        &mut self,
-        result_key: String,
-        result: Result<String, Error>,
-    ) -> Result<(), Error>;
+    // fn set_write_result(
+    //     &mut self,
+    //     result_key: String,
+    //     result: Result<String, Error>,
+    // ) -> Result<(), Error>;
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error>;
 }
