@@ -1,4 +1,4 @@
-use std::io::{Error, ErrorKind, Read};
+use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 use tokio::sync::RwLock;

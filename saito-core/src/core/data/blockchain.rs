@@ -1,17 +1,13 @@
 use std::io::Error;
 use std::sync::Arc;
-use std::time::Duration;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
 use log::{debug, error, info, trace, warn};
-use tokio::sync::broadcast::Sender;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::RwLock;
 
-use crate::common::command::GlobalEvent;
 use crate::common::defs::{SaitoHash, SaitoUTXOSetKey};
 use crate::common::handle_io::HandleIo;
-use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::peer_collection::PeerCollection;
@@ -358,7 +354,8 @@ impl Blockchain {
                         hash: block_hash,
                         difficulty,
                     })
-                    .await;
+                    .await
+                    .unwrap();
                 debug!("event sent to miner");
                 // global_sender
                 //     .send(GlobalEvent::BlockchainNewLongestChainBlock {
@@ -408,7 +405,7 @@ impl Blockchain {
         {
             let block = self.get_mut_block(&block_hash).await;
             if block.get_block_type() != BlockType::Header {
-                Storage::write_block_to_disk(block, io_handler);
+                Storage::write_block_to_disk(block, io_handler).await;
             }
         }
 
@@ -795,10 +792,11 @@ impl Blockchain {
     }
 
     pub fn is_new_chain_the_longest_chain(
-        &mut self,
+        &self,
         new_chain: &Vec<[u8; 32]>,
         old_chain: &Vec<[u8; 32]>,
     ) -> bool {
+        debug!("checking for longest chain");
         if old_chain.len() > new_chain.len() {
             warn!("WARN: old chain length is greater than new chain length");
             return false;

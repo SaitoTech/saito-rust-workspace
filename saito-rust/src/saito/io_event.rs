@@ -1,4 +1,3 @@
-use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
@@ -6,6 +5,7 @@ use log::debug;
 
 use saito_core::common::command::InterfaceEvent;
 
+#[derive(Debug)]
 pub struct IoEvent {
     // TODO : remove controller id if not used
     pub controller_id: u8,

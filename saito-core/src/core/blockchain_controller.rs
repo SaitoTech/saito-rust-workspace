@@ -1,5 +1,3 @@
-use std::borrow::{Borrow, BorrowMut};
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -19,14 +17,15 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::storage::Storage;
 use crate::core::mempool_controller::MempoolEvent;
 use crate::core::miner_controller::MinerEvent;
 
+#[derive(Debug)]
 pub enum BlockchainEvent {
     NewBlockBundled(Block),
 }
 
+#[derive(Debug)]
 pub enum PeerState {
     Connected,
     Connecting,
@@ -79,7 +78,8 @@ impl BlockchainController {
 
         self.io_handler
             .send_message_to_all("BLOCK".parse().unwrap(), buffer, exceptions)
-            .await;
+            .await
+            .unwrap();
         debug!("block sent to peers");
     }
     async fn connect_to_static_peers(&mut self) {
@@ -87,7 +87,7 @@ impl BlockchainController {
         let mut configs = self.configs.write().await;
 
         for peer in &mut configs.peers {
-            self.io_handler.connect_to_peer(peer.clone()).await;
+            self.io_handler.connect_to_peer(peer.clone()).await.unwrap();
         }
         debug!("connected to peers");
     }
@@ -133,10 +133,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                 message_name: _,
                 buffer: _,
             } => {}
-            InterfaceEvent::DataSaveResponse {
-                key: key,
-                result: result,
-            } => {
+            InterfaceEvent::DataSaveResponse { key, result } => {
                 // propagate block to network
                 // TODO : add a data type == block check here
                 let hash: SaitoHash = hex::decode(key).unwrap().try_into().unwrap();

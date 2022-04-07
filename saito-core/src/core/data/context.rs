@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::io::Error;
 use std::sync::Arc;
 
@@ -10,7 +9,6 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::miner::Miner;
-use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::wallet::Wallet;
 

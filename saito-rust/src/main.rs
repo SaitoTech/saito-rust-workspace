@@ -2,11 +2,9 @@ use std::env;
 use std::io::Write;
 use std::sync::Arc;
 
-use log::LevelFilter;
-use tokio::sync::mpsc::Receiver;
 use tokio::sync::RwLock;
 
-use saito_core::common::command::{GlobalEvent, InterfaceEvent};
+use saito_core::common::command::InterfaceEvent;
 
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::io_controller::run_io_controller;

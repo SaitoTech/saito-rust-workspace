@@ -1,8 +1,7 @@
 use std::io::Error;
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::common::defs::SaitoHash;
 use crate::core::data;
-use crate::core::data::block::Block;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::Transaction;
 
@@ -24,6 +23,7 @@ pub enum GlobalEvent {
     WalletNewTransaction { transaction: Transaction },
 }
 
+#[derive(Debug)]
 pub enum InterfaceEvent {
     OutgoingNetworkMessage {
         peer_index: u64,

@@ -3,12 +3,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info, trace};
+use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{RwLock, RwLockWriteGuard};
+use tokio::sync::RwLock;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
-use crate::common::handle_io::HandleIo;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::blockchain_controller::BlockchainEvent;
@@ -44,7 +43,8 @@ impl MempoolController {
             mempool.delete_transactions(&block.get_transactions());
             self.sender_to_blockchain
                 .send(BlockchainEvent::NewBlockBundled(block))
-                .await;
+                .await
+                .unwrap();
         }
     }
     async fn generate_tx(

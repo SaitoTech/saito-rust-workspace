@@ -1,37 +1,24 @@
-use std::future::Future;
-use std::io::Error;
-use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use log::{debug, info};
-use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 use saito_core::common::command::{GlobalEvent, InterfaceEvent};
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::common::run_task::RunnableTask;
 use saito_core::core::blockchain_controller::{
     BlockchainController, BlockchainEvent, PeerState, StaticPeer,
 };
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
-use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
-use crate::saito::config_handler::ConfigHandler;
 use crate::saito::rust_io_handler::RustIOHandler;
-use crate::saito::rust_task_runner::RustTaskRunner;
 use crate::saito::time_keeper::TimeKeeper;
 use crate::IoEvent;
-
-pub struct SaitoController {}
-
-impl SaitoController {}
 
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
@@ -103,7 +90,7 @@ where
 
 pub async fn run_saito_controller(
     mut receiver: Receiver<IoEvent>,
-    mut sender_to_io_controller: Sender<IoEvent>,
+    sender_to_io_controller: Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
 ) {
     info!("running saito controller");
@@ -127,7 +114,7 @@ pub async fn run_saito_controller(
         sender_to_miner: sender_to_miner.clone(),
         io_handler: Box::new(RustIOHandler::new(
             sender_to_io_controller.clone(),
-            BLOCKCHAIN_CONTROLLER_ID,
+            // BLOCKCHAIN_CONTROLLER_ID,
         )),
         time_keeper: Box::new(TimeKeeper {}),
         peers: context.peers.clone(),
@@ -150,7 +137,7 @@ pub async fn run_saito_controller(
         tokio::sync::mpsc::channel::<InterfaceEvent>(1);
 
     debug!("running blockchain thread");
-    let blockchain_handle = run_thread(
+    let _blockchain_handle = run_thread(
         Box::new(blockchain_controller),
         global_sender.subscribe(),
         interface_receiver_for_blockchain,
@@ -172,7 +159,7 @@ pub async fn run_saito_controller(
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1);
     debug!("running mempool thread");
-    let mempool_handle = run_thread(
+    let _mempool_handle = run_thread(
         Box::new(mempool_controller),
         global_sender.subscribe(),
         interface_receiver_for_mempool,
@@ -190,7 +177,7 @@ pub async fn run_saito_controller(
         tokio::sync::mpsc::channel::<InterfaceEvent>(1);
 
     debug!("running miner thread");
-    let miner_handle = run_thread(
+    let _miner_handle = run_thread(
         Box::new(miner_controller),
         global_sender.subscribe(),
         interface_receiver_for_miner,
@@ -207,7 +194,7 @@ pub async fn run_saito_controller(
     // };
     // saito_controller.saito.init();
 
-    let mut work_done = false;
+    let mut work_done: bool;
     loop {
         work_done = false;
 
@@ -217,13 +204,19 @@ pub async fn run_saito_controller(
             // TODO : remove hard coded values
             match command.controller_id {
                 BLOCKCHAIN_CONTROLLER_ID => {
-                    interface_sender_to_blockchain.send(command.event).await;
+                    interface_sender_to_blockchain
+                        .send(command.event)
+                        .await
+                        .unwrap();
                 }
                 MEMPOOL_CONTROLLER_ID => {
-                    interface_sender_to_mempool.send(command.event).await;
+                    interface_sender_to_mempool
+                        .send(command.event)
+                        .await
+                        .unwrap();
                 }
                 MINER_CONTROLLER_ID => {
-                    interface_sender_to_miner.send(command.event).await;
+                    interface_sender_to_miner.send(command.event).await.unwrap();
                 }
                 _ => {
                     unreachable!()

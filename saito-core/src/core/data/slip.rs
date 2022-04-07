@@ -5,7 +5,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
 /// The size of a serilized slip in bytes.
 pub const SLIP_SIZE: usize = 75;

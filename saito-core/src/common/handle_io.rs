@@ -2,7 +2,6 @@ use std::io::Error;
 
 use async_trait::async_trait;
 
-use crate::common::command::InterfaceEvent;
 use crate::core::data;
 
 #[async_trait]

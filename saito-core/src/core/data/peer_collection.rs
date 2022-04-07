@@ -1,13 +1,6 @@
-use std::borrow::{Borrow, BorrowMut};
-use std::cell::Cell;
 use std::collections::HashMap;
-use std::rc::Rc;
-use std::sync::Arc;
-
-use tokio::sync::Mutex;
 
 use crate::common::defs::SaitoPublicKey;
-use crate::core::data;
 use crate::core::data::peer::Peer;
 
 pub struct PeerCollection {

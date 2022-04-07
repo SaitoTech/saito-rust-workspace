@@ -8,13 +8,13 @@ use tokio::sync::RwLock;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::defs::SaitoHash;
-use crate::common::handle_io::HandleIo;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::blockchain_controller::BlockchainEvent;
 use crate::core::data::miner::Miner;
 use crate::core::mempool_controller::MempoolEvent;
 
+#[derive(Debug)]
 pub enum MinerEvent {
     Mine { hash: SaitoHash, difficulty: u64 },
 }

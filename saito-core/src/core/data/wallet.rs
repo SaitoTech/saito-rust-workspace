@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::info;
 
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,

@@ -1,4 +1,3 @@
-use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
@@ -15,14 +14,11 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::{accept_async, connect_async, MaybeTlsStream, WebSocketStream};
-use tungstenite::{connect, Message};
+use tungstenite::Message;
 
 use saito_core::core::data;
-use saito_core::core::data::block::BlockType;
 use saito_core::core::data::configuration::Configuration;
-use saito_core::core::data::peer::Peer;
 
-use crate::saito::rust_io_handler::FutureState::PeerConnectionResult;
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
 use crate::{InterfaceEvent, IoEvent};
 
@@ -142,8 +138,8 @@ impl IoController {
             if exceptions.contains(&entry.0) {
                 continue;
             }
-            let mut socket = entry.1;
-            socket.send(Message::Binary(buffer.clone())).await;
+            let socket = entry.1;
+            socket.send(Message::Binary(buffer.clone())).await.unwrap();
         }
         debug!("message {:?} sent to all", message_name);
     }
@@ -157,7 +153,7 @@ impl IoController {
         let mut counter = peer_counter.lock().await;
         let next_index = counter.get_next_index();
 
-        let (socket_sender, mut socket_receiver): (SocketSender, SocketReceiver) = socket.split();
+        let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
 
         sockets.insert(next_index, socket_sender);
         debug!("sending new peer : {:?}", next_index);
@@ -239,7 +235,7 @@ pub async fn run_io_controller(
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
 
-    let mut url = "".to_string();
+    let url;
     {
         let configs = configs.write().await;
         url = "localhost:".to_string() + configs.server.port.to_string().as_str();
@@ -290,23 +286,24 @@ pub async fn run_io_controller(
                     }
                     InterfaceEvent::OutgoingNetworkMessage {
                         peer_index: index,
-                        message_name: message_name,
-                        buffer: buffer,
+                        message_name,
+                        buffer,
                     } => {
                         let io_controller = io_controller.write().await;
-                        io_controller.send_outgoing_message(index, buffer);
+                        io_controller.send_outgoing_message(index, buffer).await;
                     }
                     InterfaceEvent::DataSaveRequest {
                         key: index,
                         filename: key,
-                        buffer: buffer,
+                        buffer,
                     } => {
                         let io_controller = io_controller.write().await;
                         io_controller
                             .write_to_file(event_id, index, key, buffer)
-                            .await;
+                            .await
+                            .unwrap();
                     }
-                    InterfaceEvent::DataSaveResponse { key: _, result: _ } => {
+                    InterfaceEvent::DataSaveResponse { .. } => {
                         unreachable!()
                     }
                     InterfaceEvent::DataReadRequest(_) => {}
@@ -319,10 +316,7 @@ pub async fn run_io_controller(
                         )
                         .await;
                     }
-                    InterfaceEvent::PeerConnectionResult {
-                        peer_details,
-                        result,
-                    } => {
+                    InterfaceEvent::PeerConnectionResult { .. } => {
                         unreachable!()
                     }
                     InterfaceEvent::PeerDisconnected { peer_index } => {}
@@ -335,7 +329,7 @@ pub async fn run_io_controller(
             }
         }
     });
-    tokio::join!(server_handle, controller_handle);
+    let result = tokio::join!(server_handle, controller_handle);
 }
 
 fn run_server(

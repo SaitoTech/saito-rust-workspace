@@ -1,17 +1,10 @@
-use std::collections::HashMap;
-use std::future::Future;
 use std::io::{Error, ErrorKind};
-use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll, Waker};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
 
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::handle_io::HandleIo;
@@ -36,16 +29,16 @@ pub enum FutureState {
 #[derive(Clone)]
 pub struct RustIOHandler {
     sender: Sender<IoEvent>,
-    handler_id: u8,
-    future_index_counter: u64,
+    // handler_id: u8,
+    // future_index_counter: u64,
 }
 
 impl RustIOHandler {
-    pub fn new(sender: Sender<IoEvent>, handler_id: u8) -> RustIOHandler {
+    pub fn new(sender: Sender<IoEvent>) -> RustIOHandler {
         RustIOHandler {
             sender,
-            handler_id,
-            future_index_counter: 0,
+            // handler_id,
+            // future_index_counter: 0,
         }
     }
 
@@ -89,7 +82,7 @@ impl HandleIo for RustIOHandler {
         let io_future = IoFuture {
             event_id: event.event_id,
         };
-        let result = self.sender.send(event).await;
+        self.sender.send(event).await.unwrap();
 
         let result = io_future.await;
         if result.is_err() {
@@ -122,7 +115,7 @@ impl HandleIo for RustIOHandler {
         let io_future = IoFuture {
             event_id: event.event_id,
         };
-        self.sender.send(event).await;
+        self.sender.send(event).await.unwrap();
 
         let result = io_future.await;
         if result.is_err() {
@@ -148,7 +141,7 @@ impl HandleIo for RustIOHandler {
         let io_future = IoFuture {
             event_id: event.event_id,
         };
-        self.sender.send(event).await;
+        self.sender.send(event).await.unwrap();
         let result = io_future.await;
         if result.is_err() {
             warn!("failed connecting to peer : {:?}", peer.host);
