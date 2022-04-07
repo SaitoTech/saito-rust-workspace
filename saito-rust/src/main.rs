@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             style.set_bold(true);
             writeln!(
                 buf,
-                "{:6} {:2?} - {:35}- {:?}",
+                "{:6} {:2?} - {:45}- {:?}",
                 style.value(record.level()),
                 // record.level(),
                 std::thread::current().id(),
@@ -46,10 +46,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     let (sender_to_saito_controller, receiver_in_saito_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(1);
 
     let (sender_to_io_controller, receiver_in_io_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(1);
 
     let result1 = tokio::spawn(run_saito_controller(
         receiver_in_saito_controller,

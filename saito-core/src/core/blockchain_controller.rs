@@ -83,10 +83,7 @@ impl BlockchainController {
         debug!("block sent to peers");
     }
     async fn connect_to_static_peers(&mut self) {
-        debug!(
-            "connect to peers from config : thread : {:?}",
-            std::thread::current().id()
-        );
+        debug!("connect to peers from config",);
         let mut configs = self.configs.write().await;
 
         for peer in &mut configs.peers {
@@ -180,6 +177,8 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                     .await;
             }
         }
+
+        debug!("blockchain event processed successfully");
         None
     }
 
