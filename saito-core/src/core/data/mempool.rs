@@ -69,6 +69,7 @@ impl Mempool {
         }
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
+        debug!("adding golden ticket");
         let mut wallet = self.wallet_lock.write().await;
         let transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
 

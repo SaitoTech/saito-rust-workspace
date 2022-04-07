@@ -45,7 +45,7 @@ impl Miner {
         difficulty: u64,
         sender_to_mempool: Sender<MempoolEvent>,
     ) {
-        trace!("Miner.mine");
+        debug!("mining for golden ticket");
         // TODO : remove this if not required
         // self.time_to_next_tick = self.time_to_next_tick + duration.as_micros();
         // if self.time_to_next_tick >= 5_000_000 {

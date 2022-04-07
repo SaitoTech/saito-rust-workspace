@@ -173,7 +173,12 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
             BlockchainEvent::NewBlockBundled(block) => {
                 let mut blockchain = self.blockchain.write().await;
                 blockchain
-                    .add_block(block, &mut self.io_handler, self.peers.clone())
+                    .add_block(
+                        block,
+                        &mut self.io_handler,
+                        self.peers.clone(),
+                        self.sender_to_miner.clone(),
+                    )
                     .await;
             }
         }
