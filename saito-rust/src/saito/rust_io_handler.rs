@@ -18,35 +18,19 @@ use saito_core::common::handle_io::HandleIo;
 use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Peer;
 
+use crate::saito::io_context::IoContext;
+use crate::saito::io_future::IoFuture;
 use crate::IoEvent;
 
 lazy_static! {
-    static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
-}
-
-struct IoContext {
-    pub future_wakers: HashMap<u64, Waker>,
-    pub future_states: HashMap<u64, FutureState>,
-}
-
-impl IoContext {
-    fn new() -> IoContext {
-        IoContext {
-            future_wakers: Default::default(),
-            future_states: Default::default(),
-        }
-    }
+    pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
 }
 
 pub enum FutureState {
     DataSaved(Result<String, std::io::Error>),
-    DataSent(),
+    DataSent(Vec<u8>),
     BlockFetched(Block),
     PeerConnectionResult(Result<u64, std::io::Error>),
-}
-
-pub struct IoFuture {
-    pub event_id: u64,
 }
 
 #[derive(Clone)]
@@ -66,24 +50,34 @@ impl RustIOHandler {
     }
 
     pub fn set_event_response(event_id: u64, response: FutureState) {
-        debug!("setting event response for : {:?}", event_id);
+        debug!(
+            "setting event response for : {:?} in thread : {:?}",
+            event_id,
+            std::thread::current().id()
+        );
         if event_id == 0 {
             return;
         }
         let mut context = SHARED_CONTEXT.lock().unwrap();
         context.future_states.insert(event_id, response);
-        let waker = context
-            .future_wakers
-            .remove(&event_id)
-            .expect("waker not found");
-        debug!("waking future : {:?}", event_id);
-        waker.wake();
+        let waker = context.future_wakers.remove(&event_id);
+        if waker.is_some() {
+            debug!(
+                "waking future : {:?} from thread : {:?}",
+                event_id,
+                std::thread::current().id()
+            );
+            let waker = waker.unwrap();
+            waker.wake();
+        } else {
+            warn!("waker not found for : {:?}", event_id);
+        }
     }
 
-    fn get_next_future_index(&mut self) -> u64 {
-        self.future_index_counter = self.future_index_counter + 1;
-        return self.future_index_counter;
-    }
+    // fn get_next_future_index(&mut self) -> u64 {
+    //     self.future_index_counter = self.future_index_counter + 1;
+    //     return self.future_index_counter;
+    // }
 }
 
 #[async_trait]
@@ -94,15 +88,29 @@ impl HandleIo for RustIOHandler {
         message_name: String,
         buffer: Vec<u8>,
     ) -> Result<(), Error> {
-        let result = self
-            .sender
-            .send(IoEvent::new(InterfaceEvent::OutgoingNetworkMessage {
-                peer_index,
-                message_name,
-                buffer,
-            }))
-            .await;
+        // TODO : refactor to combine event and the future
+        let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessage {
+            peer_index,
+            message_name,
+            buffer,
+        });
+        let io_future = IoFuture {
+            event_id: event.event_id,
+        };
+        let result = self.sender.send(event).await;
 
+        let result = io_future.await;
+        if result.is_err() {
+            // warn!("sending message failed : {:?}", result.err().unwrap());
+            return Err(result.err().unwrap());
+        }
+        let result = result.unwrap();
+        match result {
+            FutureState::DataSent(data) => {}
+            _ => {
+                unreachable!()
+            }
+        }
         Ok(())
     }
 
@@ -112,23 +120,48 @@ impl HandleIo for RustIOHandler {
         buffer: Vec<u8>,
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
-        self.sender
-            .send(IoEvent::new(InterfaceEvent::OutgoingNetworkMessageForAll {
-                message_name,
-                buffer,
-                exceptions: peer_exceptions,
-            }))
-            .await;
+        debug!("send message to all {:?}", message_name);
+
+        let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessageForAll {
+            message_name,
+            buffer,
+            exceptions: peer_exceptions,
+        });
+        let io_future = IoFuture {
+            event_id: event.event_id,
+        };
+        self.sender.send(event).await;
+
+        let result = io_future.await;
+        if result.is_err() {
+            // warn!("sending message failed : {:?}", result.err().unwrap());
+            return Err(result.err().unwrap());
+        }
+        debug!("message sent to all");
+        let result = result.unwrap();
+        match result {
+            FutureState::DataSent(data) => {}
+            _ => {
+                unreachable!()
+            }
+        }
         Ok(())
     }
 
     async fn connect_to_peer(&mut self, peer: Peer) -> Result<(), Error> {
-        self.sender
-            .send(IoEvent::new(InterfaceEvent::ConnectToPeer {
-                peer_details: peer,
-            }))
-            .await;
-        // not waiting for the result
+        debug!("connecting to peer : {:?}", peer.host);
+        let event = IoEvent::new(InterfaceEvent::ConnectToPeer {
+            peer_details: peer.clone(),
+        });
+        let io_future = IoFuture {
+            event_id: event.event_id,
+        };
+        self.sender.send(event).await;
+        let result = io_future.await;
+        if result.is_err() {
+            warn!("failed connecting to peer : {:?}", peer.host);
+            return Err(result.err().unwrap());
+        }
         Ok(())
     }
     //
@@ -143,30 +176,28 @@ impl HandleIo for RustIOHandler {
         value: Vec<u8>,
     ) -> Result<String, Error> {
         debug!("writing value to disk : {:?}", key);
+
+        let event = IoEvent::new(InterfaceEvent::DataSaveRequest {
+            key: result_key,
+            filename: key,
+            buffer: value,
+        });
         let io_future = IoFuture {
-            event_id: self.get_next_future_index(),
+            event_id: event.event_id,
         };
-        let result = self
-            .sender
-            .send(IoEvent::new(InterfaceEvent::DataSaveRequest {
-                key: result_key,
-                filename: key,
-                buffer: value,
-            }))
-            .await;
+        let result = self.sender.send(event).await;
 
         if result.is_err() {
             warn!("{:?}", result.err().unwrap().to_string());
             return Err(Error::from(ErrorKind::Other));
         }
 
-        debug!("waiting for future to complete");
         let result = io_future.await;
         if result.is_err() {
             debug!("failed writing value for disk");
             return Err(result.err().unwrap());
         }
-        debug!("future is complete");
+        debug!("value written to disk");
         let result = result.unwrap();
         match result {
             FutureState::DataSaved(result) => {
@@ -194,24 +225,6 @@ impl HandleIo for RustIOHandler {
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()
-    }
-}
-
-impl Future for IoFuture {
-    type Output = Result<FutureState, std::io::Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut context = SHARED_CONTEXT.lock().unwrap();
-
-        let result = context.future_states.remove(&self.event_id);
-        if result.is_none() {
-            context
-                .future_wakers
-                .insert(self.event_id, cx.waker().clone());
-            debug!("waiting for event : {:?}", self.event_id);
-            return Poll::Pending;
-        }
-        Poll::Ready(Ok(result.unwrap()))
     }
 }
 

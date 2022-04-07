@@ -32,9 +32,9 @@ impl HandleIo for WasmIoHandler {
         todo!()
     }
 
-    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
-        todo!()
-    }
+    // async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
+    //     todo!()
+    // }
 
     async fn write_value(
         &mut self,
@@ -45,13 +45,13 @@ impl HandleIo for WasmIoHandler {
         todo!()
     }
 
-    fn set_write_result(
-        &mut self,
-        result_key: String,
-        result: Result<String, Error>,
-    ) -> Result<(), Error> {
-        todo!()
-    }
+    // fn set_write_result(
+    //     &mut self,
+    //     result_key: String,
+    //     result: Result<String, Error>,
+    // ) -> Result<(), Error> {
+    //     todo!()
+    // }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()

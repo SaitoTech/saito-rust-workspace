@@ -83,12 +83,16 @@ impl BlockchainController {
         debug!("block sent to peers");
     }
     async fn connect_to_static_peers(&mut self) {
-        debug!("connect to peers from config");
+        debug!(
+            "connect to peers from config : thread : {:?}",
+            std::thread::current().id()
+        );
         let mut configs = self.configs.write().await;
 
         for peer in &mut configs.peers {
             self.io_handler.connect_to_peer(peer.clone()).await;
         }
+        debug!("connected to peers");
     }
     async fn handle_new_peer(&mut self, peer: Option<data::configuration::Peer>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario

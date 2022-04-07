@@ -1,5 +1,8 @@
+use std::env;
+use std::io::Write;
 use std::sync::Arc;
 
+use log::LevelFilter;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::RwLock;
 
@@ -16,7 +19,27 @@ mod saito;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Running saito");
 
-    pretty_env_logger::init();
+    // pretty_env_logger::init();
+    let mut builder = pretty_env_logger::formatted_builder();
+    builder
+        .format(|buf, record| {
+            let mut style = buf.style();
+
+            // TODO : set colored output
+
+            style.set_bold(true);
+            writeln!(
+                buf,
+                "{:6} {:2?} - {:35}- {:?}",
+                style.value(record.level()),
+                // record.level(),
+                std::thread::current().id(),
+                record.module_path().unwrap_or_default(),
+                record.args(),
+            )
+        })
+        .parse_filters(&env::var("RUST_LOG").unwrap_or_default())
+        .init();
     let configs = Arc::new(RwLock::new(
         ConfigHandler::load_configs("configs/saito.config.json".to_string())
             .expect("loading configs failed"),

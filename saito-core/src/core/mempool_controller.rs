@@ -52,7 +52,7 @@ impl MempoolController {
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        debug!("generating mock transactions");
+        trace!("generating mock transactions");
 
         let mempool_lock_clone = mempool.clone();
         let wallet_lock_clone = wallet.clone();
@@ -111,18 +111,14 @@ impl MempoolController {
                 .add_hop_to_path(wallet_lock_clone.clone(), publickey)
                 .await;
             {
-                debug!("5555");
                 let blockchain = blockchain_lock_clone.read().await;
-                debug!("xxxx");
                 let mut mempool = mempool_lock_clone.write().await;
-                debug!("yyyy");
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)
                     .await;
-                debug!("6666");
             }
         }
-        info!("generated transaction count: {:?}", txs_to_generate);
+        trace!("generated transaction count: {:?}", txs_to_generate);
     }
 }
 
