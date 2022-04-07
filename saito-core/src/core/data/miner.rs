@@ -56,7 +56,7 @@ impl Miner {
         //     return;
         // }
         //
-        info!("block created");
+        // info!("block created");
 
         let publickey: SaitoPublicKey;
 

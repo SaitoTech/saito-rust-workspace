@@ -242,3 +242,28 @@ impl Mempool {
             .any(|transaction| transaction.get_hash_for_signature() == tx_hash)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use tokio::sync::RwLock;
+
+    use super::*;
+
+    #[test]
+    fn mempool_new_test() {
+        let wallet = Wallet::new();
+        let mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
+        assert_eq!(mempool.blocks_queue, VecDeque::new());
+    }
+
+    #[test]
+    fn mempool_add_block_test() {
+        let wallet = Wallet::new();
+        let mut mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
+        let block = Block::new();
+        mempool.add_block(block.clone());
+        assert_eq!(Some(block), mempool.blocks_queue.pop_front())
+    }
+}

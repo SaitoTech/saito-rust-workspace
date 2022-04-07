@@ -537,7 +537,7 @@ mod tests {
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
     }
 
-    // TODO : fix this test
+    // TODO : fix this test. need a custom io handler which directly writes to disk
     // #[test]
     // fn save_and_restore_wallet_test() {
     //     let mut wallet = Wallet::new();

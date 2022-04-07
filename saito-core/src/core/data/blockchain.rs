@@ -1368,3 +1368,6 @@ impl Blockchain {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {}
