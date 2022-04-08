@@ -31,7 +31,7 @@ impl MinerController {}
 #[async_trait]
 impl ProcessEvent<MinerEvent> for MinerController {
     async fn process_global_event(&mut self, event: GlobalEvent) -> Option<()> {
-        trace!("processing new global event");
+        debug!("processing new global event");
         None
     }
 
@@ -47,6 +47,7 @@ impl ProcessEvent<MinerEvent> for MinerController {
     }
 
     async fn process_event(&mut self, event: MinerEvent) -> Option<()> {
+        debug!("event received : {:?}", event);
         match event {
             MinerEvent::Mine { hash, difficulty } => {
                 let miner = self.miner.read().await;
