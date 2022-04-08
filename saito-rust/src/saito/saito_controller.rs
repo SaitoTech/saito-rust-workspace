@@ -99,14 +99,15 @@ pub async fn run_saito_controller(
     const MEMPOOL_CONTROLLER_ID: u8 = 2;
     const MINER_CONTROLLER_ID: u8 = 3;
 
-    let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(100);
+    let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(1000);
 
     let context = Context::new(configs.clone(), global_sender.clone());
 
-    let (sender_to_mempool, receiver_for_mempool) = tokio::sync::mpsc::channel::<MempoolEvent>(1);
+    let (sender_to_mempool, receiver_for_mempool) =
+        tokio::sync::mpsc::channel::<MempoolEvent>(1000);
     let (sender_to_blockchain, receiver_for_blockchain) =
-        tokio::sync::mpsc::channel::<BlockchainEvent>(1);
-    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1);
+        tokio::sync::mpsc::channel::<BlockchainEvent>(1000);
+    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1000);
 
     let mut blockchain_controller = BlockchainController {
         blockchain: context.blockchain.clone(),
@@ -134,7 +135,7 @@ pub async fn run_saito_controller(
     }
 
     let (interface_sender_to_blockchain, interface_receiver_for_blockchain) =
-        tokio::sync::mpsc::channel::<InterfaceEvent>(1);
+        tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
 
     debug!("running blockchain thread");
     let _blockchain_handle = run_thread(
@@ -157,7 +158,7 @@ pub async fn run_saito_controller(
         tx_producing_timer: 0,
     };
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
-        tokio::sync::mpsc::channel::<InterfaceEvent>(1);
+        tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
     debug!("running mempool thread");
     let _mempool_handle = run_thread(
         Box::new(mempool_controller),
@@ -174,7 +175,7 @@ pub async fn run_saito_controller(
         time_keeper: Box::new(TimeKeeper {}),
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
-        tokio::sync::mpsc::channel::<InterfaceEvent>(1);
+        tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
 
     debug!("running miner thread");
     let _miner_handle = run_thread(

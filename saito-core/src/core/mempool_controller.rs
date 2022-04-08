@@ -162,7 +162,7 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
         let mut can_bundle = false;
         self.block_producing_timer = self.block_producing_timer + duration_value;
         // TODO : make timers configurable
-        if self.block_producing_timer >= 5_000_000 {
+        if self.block_producing_timer >= 3_000_000 {
             debug!("producing block...");
             let mempool = self.mempool.read().await;
             can_bundle = mempool

@@ -44,10 +44,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     let (sender_to_saito_controller, receiver_in_saito_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1);
+        tokio::sync::mpsc::channel::<IoEvent>(1000);
 
     let (sender_to_io_controller, receiver_in_io_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1);
+        tokio::sync::mpsc::channel::<IoEvent>(1000);
 
     let result1 = tokio::spawn(run_saito_controller(
         receiver_in_saito_controller,
