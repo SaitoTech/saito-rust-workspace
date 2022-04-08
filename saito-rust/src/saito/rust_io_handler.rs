@@ -47,13 +47,17 @@ impl RustIOHandler {
         if event_id == 0 {
             return;
         }
-        let mut context = SHARED_CONTEXT.lock().unwrap();
-        context.future_states.insert(event_id, response);
-        let waker = context.future_wakers.remove(&event_id);
+        let waker;
+        {
+            let mut context = SHARED_CONTEXT.lock().unwrap();
+            context.future_states.insert(event_id, response);
+            waker = context.future_wakers.remove(&event_id);
+        }
         if waker.is_some() {
             debug!("waking future on event: {:?}", event_id,);
             let waker = waker.unwrap();
             waker.wake();
+            debug!("waker invoked on event: {:?}", event_id);
         } else {
             warn!("waker not found for event: {:?}", event_id);
         }
@@ -223,7 +227,7 @@ mod tests {
     #[tokio::test]
     async fn test_write_value() {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
-        let mut io_handler = RustIOHandler::new(sender, 0);
+        let mut io_handler = RustIOHandler::new(sender);
 
         tokio::spawn(async move {
             let result = receiver.recv().await;

@@ -46,13 +46,14 @@ impl MempoolController {
                 .await
                 .unwrap();
         }
+        debug!("blocks sent to blockchain");
     }
     async fn generate_tx(
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        trace!("generating mock transactions");
+        debug!("generating mock transactions");
 
         let mempool_lock_clone = mempool.clone();
         let wallet_lock_clone = wallet.clone();
@@ -162,7 +163,7 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
         let mut can_bundle = false;
         self.block_producing_timer = self.block_producing_timer + duration_value;
         // TODO : make timers configurable
-        if self.block_producing_timer >= 5_000_000 {
+        if self.block_producing_timer >= 1_000_000 {
             debug!("producing block...");
             let mempool = self.mempool.read().await;
             can_bundle = mempool
