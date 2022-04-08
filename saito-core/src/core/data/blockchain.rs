@@ -348,7 +348,6 @@ impl Blockchain {
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
 
-                // TODO : send this via channel to miner
                 sender_to_miner
                     .send(MinerEvent::Mine {
                         hash: block_hash,

@@ -24,7 +24,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut style = buf.style();
 
             // TODO : set colored output
-
             style.set_bold(true);
             writeln!(
                 buf,

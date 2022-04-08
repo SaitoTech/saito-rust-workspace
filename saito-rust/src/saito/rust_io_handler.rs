@@ -57,6 +57,7 @@ impl RustIOHandler {
             debug!("waking future on event: {:?}", event_id,);
             let waker = waker.unwrap();
             waker.wake();
+            debug!("waker invoked on event: {:?}", event_id);
         } else {
             warn!("waker not found for event: {:?}", event_id);
         }
