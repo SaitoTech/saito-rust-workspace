@@ -158,7 +158,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
-        // trace!("processing timer event : {:?}", duration.as_micros());
+        trace!("processing timer event : {:?}", duration.as_micros());
 
         None
     }
