@@ -80,7 +80,8 @@ where
 
             if work_done {
                 work_done = false;
-                std::thread::yield_now();
+                // std::thread::yield_now();
+                tokio::task::yield_now();
             } else {
                 std::thread::sleep(Duration::new(0, 1000_000));
             }
@@ -195,38 +196,47 @@ pub async fn run_saito_controller(
     // };
     // saito_controller.saito.init();
 
-    let mut work_done: bool;
-    loop {
-        work_done = false;
+    let loop_handle = tokio::spawn(async move {
+        let mut work_done: bool;
+        loop {
+            work_done = false;
 
-        let result = receiver.try_recv();
-        if result.is_ok() {
-            let command = result.unwrap();
-            // TODO : remove hard coded values
-            match command.controller_id {
-                BLOCKCHAIN_CONTROLLER_ID => {
-                    interface_sender_to_blockchain
-                        .send(command.event)
-                        .await
-                        .unwrap();
-                }
-                MEMPOOL_CONTROLLER_ID => {
-                    interface_sender_to_mempool
-                        .send(command.event)
-                        .await
-                        .unwrap();
-                }
-                MINER_CONTROLLER_ID => {
-                    interface_sender_to_miner.send(command.event).await.unwrap();
-                }
-                _ => {
-                    unreachable!()
+            let result = receiver.try_recv();
+            if result.is_ok() {
+                let command = result.unwrap();
+                // TODO : remove hard coded values
+                match command.controller_id {
+                    BLOCKCHAIN_CONTROLLER_ID => {
+                        interface_sender_to_blockchain
+                            .send(command.event)
+                            .await
+                            .unwrap();
+                    }
+                    MEMPOOL_CONTROLLER_ID => {
+                        interface_sender_to_mempool
+                            .send(command.event)
+                            .await
+                            .unwrap();
+                    }
+                    MINER_CONTROLLER_ID => {
+                        interface_sender_to_miner.send(command.event).await.unwrap();
+                    }
+                    _ => {
+                        unreachable!()
+                    }
                 }
             }
-        }
 
-        if !work_done {
-            std::thread::sleep(Duration::new(1, 0));
+            if !work_done {
+                std::thread::sleep(Duration::new(1, 0));
+            }
         }
-    }
+    });
+    // TODO : move saito controller code into main.
+    tokio::join!(
+        _blockchain_handle,
+        _mempool_handle,
+        _miner_handle,
+        loop_handle
+    );
 }

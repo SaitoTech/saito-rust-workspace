@@ -837,6 +837,7 @@ impl Blockchain {
     // in opposite directions.
     //
     pub async fn validate(&mut self, new_chain: Vec<[u8; 32]>, old_chain: Vec<[u8; 32]>) -> bool {
+        debug!("validating chains");
         //
         // ensure new chain has adequate mining support to be considered as
         // a viable chain. we handle this check here as opposed to handling
