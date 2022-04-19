@@ -292,22 +292,22 @@ pub async fn run_io_controller(
                         let io_controller = io_controller.write().await;
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
-                    InterfaceEvent::DataSaveRequest {
-                        key: index,
-                        filename: key,
-                        buffer,
-                    } => {
-                        let io_controller = io_controller.write().await;
-                        io_controller
-                            .write_to_file(event_id, index, key, buffer)
-                            .await
-                            .unwrap();
-                    }
-                    InterfaceEvent::DataSaveResponse { .. } => {
-                        unreachable!()
-                    }
-                    InterfaceEvent::DataReadRequest(_) => {}
-                    InterfaceEvent::DataReadResponse(_, _, _) => {}
+                    // InterfaceEvent::DataSaveRequest {
+                    //     key: index,
+                    //     filename: key,
+                    //     buffer,
+                    // } => {
+                    //     let io_controller = io_controller.write().await;
+                    //     io_controller
+                    //         .write_to_file(event_id, index, key, buffer)
+                    //         .await
+                    //         .unwrap();
+                    // }
+                    // InterfaceEvent::DataSaveResponse { .. } => {
+                    //     unreachable!()
+                    // }
+                    // InterfaceEvent::DataReadRequest(_) => {}
+                    // InterfaceEvent::DataReadResponse(_, _, _) => {}
                     InterfaceEvent::ConnectToPeer { peer_details } => {
                         IoController::connect_to_peer(
                             event_id,

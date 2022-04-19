@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::{debug, warn};
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::Sender;
 
 use saito_core::common::command::InterfaceEvent;
@@ -158,44 +160,51 @@ impl HandleIo for RustIOHandler {
     //     todo!()
     // }
 
-    async fn write_value(
-        &mut self,
-        result_key: String,
-        key: String,
-        value: Vec<u8>,
-    ) -> Result<String, Error> {
+    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
 
-        let event = IoEvent::new(InterfaceEvent::DataSaveRequest {
-            key: result_key,
-            filename: key,
-            buffer: value,
-        });
-        let io_future = IoFuture {
-            event_id: event.event_id,
-        };
-        let result = self.sender.send(event).await;
-
+        let result = File::create(key).await;
         if result.is_err() {
-            warn!("{:?}", result.err().unwrap().to_string());
-            return Err(Error::from(ErrorKind::Other));
-        }
-
-        let result = io_future.await;
-        if result.is_err() {
-            debug!("failed writing value for disk");
             return Err(result.err().unwrap());
         }
-        debug!("value written to disk");
-        let result = result.unwrap();
-        match result {
-            FutureState::DataSaved(result) => {
-                return result;
-            }
-            _ => {
-                unreachable!()
-            }
+        let mut file = result.unwrap();
+        let result = file.write_all(&value).await;
+        if result.is_err() {
+            return Err(result.err().unwrap());
         }
+
+        Ok(())
+        //
+        // let event = IoEvent::new(InterfaceEvent::DataSaveRequest {
+        //     key: result_key,
+        //     filename: key,
+        //     buffer: value,
+        // });
+        // let io_future = IoFuture {
+        //     event_id: event.event_id,
+        // };
+        // let result = self.sender.send(event).await;
+        //
+        // if result.is_err() {
+        //     warn!("{:?}", result.err().unwrap().to_string());
+        //     return Err(Error::from(ErrorKind::Other));
+        // }
+        //
+        // let result = io_future.await;
+        // if result.is_err() {
+        //     debug!("failed writing value for disk");
+        //     return Err(result.err().unwrap());
+        // }
+        // debug!("value written to disk");
+        // let result = result.unwrap();
+        // match result {
+        //     FutureState::DataSaved(result) => {
+        //         return result;
+        //     }
+        //     _ => {
+        //         unreachable!()
+        //     }
+        // }
     }
     //
     // fn set_write_result(
@@ -240,7 +249,7 @@ mod tests {
         });
 
         let result = io_handler
-            .write_value("KEY".to_string(), "TEST".to_string(), [1, 2, 3, 4].to_vec())
+            .write_value("KEY".to_string(), [1, 2, 3, 4].to_vec())
             .await;
 
         assert!(result.is_ok());
