@@ -40,18 +40,18 @@ pub enum InterfaceEvent {
         message_name: String,
         buffer: Vec<u8>,
     },
-    DataSaveRequest {
-        key: String,
-        filename: String,
-        buffer: Vec<u8>,
-    },
-    // can do without this.
-    DataSaveResponse {
-        key: String,
-        result: Result<String, std::io::Error>,
-    },
-    DataReadRequest(String),
-    DataReadResponse(String, Vec<u8>, Error),
+    // DataSaveRequest {
+    //     key: String,
+    //     filename: String,
+    //     buffer: Vec<u8>,
+    // },
+    // // can do without this.
+    // DataSaveResponse {
+    //     key: String,
+    //     result: Result<String, std::io::Error>,
+    // },
+    // DataReadRequest(String),
+    // DataReadResponse(String, Vec<u8>, Error),
     ConnectToPeer {
         peer_details: data::configuration::Peer,
     },

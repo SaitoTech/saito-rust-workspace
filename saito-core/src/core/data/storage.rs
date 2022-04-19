@@ -40,9 +40,7 @@ impl Storage {
         filename: &str,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) {
-        let result = io_handler
-            .write_value(filename.to_string(), filename.to_string(), data)
-            .await;
+        let result = io_handler.write_value(filename.to_string(), data).await;
     }
 
     pub fn file_exists(filename: &str) -> bool {
@@ -65,9 +63,7 @@ impl Storage {
         let buffer = block.serialize_for_net(BlockType::Full);
         let filename = Storage::generate_block_filename(block);
 
-        let result = io_handler
-            .write_value(hex::encode(block.get_hash()), filename.clone(), buffer)
-            .await;
+        let result = io_handler.write_value(filename.clone(), buffer).await;
         filename
     }
 

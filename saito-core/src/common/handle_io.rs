@@ -36,12 +36,7 @@ pub trait HandleIo {
     ) -> Result<(), Error>;
     async fn connect_to_peer(&mut self, peer: data::configuration::Peer) -> Result<(), Error>;
     // async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error>;
-    async fn write_value(
-        &mut self,
-        result_key: String,
-        key: String,
-        value: Vec<u8>,
-    ) -> Result<String, Error>;
+    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error>;
     // fn set_write_result(
     //     &mut self,
     //     result_key: String,
