@@ -1382,7 +1382,7 @@ mod tests {
 
     use tokio::sync::RwLock;
 
-    use crate::core::data::blockchain::Blockchain;
+    use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
 
     #[tokio::test]
@@ -1401,5 +1401,32 @@ mod tests {
 
         assert_eq!(blockchain.fork_id, [0; 32]);
         assert_eq!(blockchain.genesis_block_id, 0);
+    }
+    #[test]
+    //
+    // code that packs/unpacks two 32-bit values into one 64-bit variable
+    //
+    fn bit_pack_test() {
+        let top = 157171715;
+        let bottom = 11661612;
+        let packed = bit_pack(top, bottom);
+        assert_eq!(packed, 157171715 * (u64::pow(2, 32)) + 11661612);
+        let (new_top, new_bottom) = bit_unpack(packed);
+        assert_eq!(top, new_top);
+        assert_eq!(bottom, new_bottom);
+
+        let top = u32::MAX;
+        let bottom = u32::MAX;
+        let packed = bit_pack(top, bottom);
+        let (new_top, new_bottom) = bit_unpack(packed);
+        assert_eq!(top, new_top);
+        assert_eq!(bottom, new_bottom);
+
+        let top = 0;
+        let bottom = 1;
+        let packed = bit_pack(top, bottom);
+        let (new_top, new_bottom) = bit_unpack(packed);
+        assert_eq!(top, new_top);
+        assert_eq!(bottom, new_bottom);
     }
 }

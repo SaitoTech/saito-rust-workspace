@@ -26,7 +26,7 @@ use std::{thread::sleep, time::Duration};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-fn create_timestamp() -> u64 {
+pub fn create_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
