@@ -28,7 +28,7 @@ pub enum FutureState {
     PeerConnectionResult(Result<u64, std::io::Error>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RustIOHandler {
     sender: Sender<IoEvent>,
     // handler_id: u8,

@@ -1377,4 +1377,29 @@ impl Blockchain {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::sync::Arc;
+
+    use tokio::sync::RwLock;
+
+    use crate::core::data::blockchain::Blockchain;
+    use crate::core::data::wallet::Wallet;
+
+    #[tokio::test]
+    async fn test_blockchain_init() {
+        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let blockchain = Blockchain::new(wallet);
+
+        assert_eq!(blockchain.fork_id, [0; 32]);
+        assert_eq!(blockchain.genesis_block_id, 0);
+    }
+
+    #[tokio::test]
+    async fn test_add_block() {
+        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let blockchain = Blockchain::new(wallet);
+
+        assert_eq!(blockchain.fork_id, [0; 32]);
+        assert_eq!(blockchain.genesis_block_id, 0);
+    }
+}
