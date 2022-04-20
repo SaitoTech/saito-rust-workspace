@@ -162,8 +162,8 @@ impl HandleIo for RustIOHandler {
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
-
-        let result = File::create(key).await;
+        let filename = "./data/".to_string() + key.as_str();
+        let result = File::create(filename).await;
         if result.is_err() {
             return Err(result.err().unwrap());
         }
