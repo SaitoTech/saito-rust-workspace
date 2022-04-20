@@ -16,3 +16,6 @@ async-trait = "0.1.52"
 lazy_static = "1.4.0"
 figment = { version = "0.10.6", features = ["json"] }
 futures = { version = "0.3.21", default-features = false }
+rand = "0.8.5"
+rayon = "1.5.2"
+ahash = "0.7.6"

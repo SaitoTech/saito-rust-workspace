@@ -231,7 +231,6 @@ mod tests {
     use saito_core::common::handle_io::HandleIo;
 
     use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
-    use crate::IoEvent;
 
     #[tokio::test]
     async fn test_write_value() {
@@ -253,6 +252,5 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "RESULT");
     }
 }

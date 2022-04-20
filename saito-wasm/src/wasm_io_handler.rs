@@ -36,12 +36,7 @@ impl HandleIo for WasmIoHandler {
     //     todo!()
     // }
 
-    async fn write_value(
-        &mut self,
-        result_key: String,
-        key: String,
-        value: Vec<u8>,
-    ) -> Result<String, Error> {
+    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         todo!()
     }
 

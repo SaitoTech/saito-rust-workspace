@@ -133,14 +133,6 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                 message_name: _,
                 buffer: _,
             } => {}
-            // InterfaceEvent::DataSaveResponse { key, result } => {
-            //     // propagate block to network
-            //     // TODO : add a data type == block check here
-            //     let hash: SaitoHash = hex::decode(key).unwrap().try_into().unwrap();
-            //     self.propagate_block_to_peers(hash).await;
-            //     // self.io_handler.set_write_result(index, result)
-            // }
-            // InterfaceEvent::DataReadResponse(_, _, _) => {}
             InterfaceEvent::PeerConnectionResult {
                 peer_details,
                 result,
@@ -188,4 +180,10 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
         // connect to peers
         self.connect_to_static_peers().await;
     }
+}
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn process_new_transaction() {}
 }

@@ -12,6 +12,7 @@ use crate::saito::io_event::IoEvent;
 use crate::saito::saito_controller::run_saito_controller;
 
 mod saito;
+mod test;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

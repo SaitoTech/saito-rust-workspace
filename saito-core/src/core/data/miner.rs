@@ -74,4 +74,24 @@ impl Miner {
             // TODO : check result
         }
     }
+    // TODO : move this to test manager
+    // function used primarily for test functions
+    pub async fn mine_on_block_until_golden_ticket_found(
+        &mut self,
+        block_hash: SaitoHash,
+        block_difficulty: u64,
+    ) -> GoldenTicket {
+        let wallet = self.wallet.read().await;
+        let publickey = wallet.get_publickey();
+        let mut random_bytes = hash(&generate_random_bytes(32));
+
+        let mut solution = GoldenTicket::generate_solution(block_hash, random_bytes, publickey);
+
+        while !GoldenTicket::is_valid_solution(solution, block_difficulty) {
+            random_bytes = hash(&generate_random_bytes(32));
+            solution = GoldenTicket::generate_solution(block_hash, random_bytes, publickey);
+        }
+
+        GoldenTicket::new(block_hash, random_bytes, publickey)
+    }
 }
