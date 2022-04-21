@@ -31,7 +31,7 @@ pub enum MempoolMessage {
 /// the `Blockchain`
 #[derive(Debug)]
 pub struct Mempool {
-    pub(crate) blocks_queue: VecDeque<Block>,
+    pub blocks_queue: VecDeque<Block>,
     pub transactions: Vec<Transaction>,
     // vector so we just copy it over
     routing_work_in_mempool: u64,

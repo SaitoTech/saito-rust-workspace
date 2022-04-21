@@ -1,12 +1,15 @@
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
+use log::debug;
 use tokio::sync::RwLock;
 
 use crate::common::handle_io::HandleIo;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::slip::Slip;
+use crate::core::miner_controller::MinerEvent;
 
 pub struct Storage {
     io_handler: dyn HandleIo,
@@ -67,18 +70,48 @@ impl Storage {
         filename
     }
 
-    pub async fn load_blocks_from_disk(blockchain_lock: Arc<RwLock<Blockchain>>) {}
+    pub async fn load_blocks_from_disk(
+        blockchain_lock: Arc<RwLock<Blockchain>>,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        peers: Arc<RwLock<PeerCollection>>,
+        sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
+    ) {
+        debug!("loading blocks from disk");
+        let file_names = io_handler.load_block_file_list().await;
+        let mut blockchain = blockchain_lock.write().await;
 
-    pub async fn load_block_from_disk(filename: String) -> Result<Block, std::io::Error> {
-        // let file_to_load = &filename;
-        // let mut f = File::open(file_to_load).unwrap();
-        // let mut encoded = Vec::<u8>::new();
-        // f.read_to_end(&mut encoded).unwrap();
-        // Block::deserialize_for_net(&vec![])
-        Err(Error::from(ErrorKind::NotFound))
+        let file_names = file_names.unwrap();
+        for file_name in file_names {
+            let result = io_handler.read_value(file_name).await;
+            if result.is_err() {
+                todo!()
+            }
+            let buffer = result.unwrap();
+            let mut block = Block::deserialize_for_net(&buffer);
+            block.generate_metadata();
+            blockchain
+                .add_block(block, io_handler, peers.clone(), sender_to_miner.clone())
+                .await;
+        }
     }
 
-    pub async fn delete_block_from_disk(filename: String) -> bool {
+    pub async fn load_block_from_disk(
+        file_name: String,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> Result<Block, std::io::Error> {
+        debug!("loading block {:?} from disk", file_name);
+        let result = io_handler.read_value(file_name).await;
+        if result.is_err() {
+            todo!()
+        }
+        let buffer = result.unwrap();
+        Ok(Block::deserialize_for_net(&buffer))
+    }
+
+    pub async fn delete_block_from_disk(
+        filename: String,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> bool {
         // TODO: get rid of this function or make it useful.
         // it should match the result and provide some error handling.
         // let _res = std::fs::remove_file(filename);

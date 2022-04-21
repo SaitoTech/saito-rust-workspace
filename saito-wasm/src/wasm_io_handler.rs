@@ -51,4 +51,8 @@ impl HandleIo for WasmIoHandler {
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()
     }
+
+    async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
+        todo!()
+    }
 }

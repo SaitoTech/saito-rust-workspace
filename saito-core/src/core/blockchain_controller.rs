@@ -17,6 +17,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
+use crate::core::data::storage::Storage;
 use crate::core::mempool_controller::MempoolEvent;
 use crate::core::miner_controller::MinerEvent;
 
@@ -177,6 +178,15 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn on_init(&mut self) {
+        {
+            Storage::load_blocks_from_disk(
+                self.blockchain.clone(),
+                &mut self.io_handler,
+                self.peers.clone(),
+                self.sender_to_miner.clone(),
+            )
+            .await;
+        }
         // connect to peers
         self.connect_to_static_peers().await;
     }

@@ -3,8 +3,7 @@
 // help make tests more succinct.
 //
 
-use crate::saito::rust_io_handler::RustIOHandler;
-use crate::IoEvent;
+use crate::test::test_io_handler::TestIOHandler;
 use ahash::AHashMap;
 use log::{debug, info};
 use rayon::prelude::*;
@@ -43,13 +42,12 @@ pub fn create_timestamp() -> u64 {
 //
 //
 
-#[derive(Debug, Clone)]
 pub struct TestManager {
     pub mempool_lock: Arc<RwLock<Mempool>>,
     pub blockchain_lock: Arc<RwLock<Blockchain>>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub latest_block_hash: SaitoHash,
-    pub io_handler: Box<RustIOHandler>,
+    pub io_handler: Box<dyn HandleIo + Send + Sync>,
     pub sender_to_miner: Sender<MinerEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
 }
@@ -58,7 +56,6 @@ impl TestManager {
     pub fn new(
         blockchain_lock: Arc<RwLock<Blockchain>>,
         wallet_lock: Arc<RwLock<Wallet>>,
-        sender_to_io: Sender<IoEvent>,
         sender_to_miner: Sender<MinerEvent>,
     ) -> Self {
         Self {
@@ -66,7 +63,7 @@ impl TestManager {
             blockchain_lock: blockchain_lock.clone(),
             wallet_lock: wallet_lock.clone(),
             latest_block_hash: [0; 32],
-            io_handler: Box::new(RustIOHandler::new(sender_to_io.clone())),
+            io_handler: Box::new(TestIOHandler::new()),
             sender_to_miner,
             peers: Arc::new(RwLock::new(PeerCollection::new())),
         }
@@ -135,7 +132,7 @@ impl TestManager {
         Self::add_block_to_blockchain(
             self.blockchain_lock.clone(),
             block,
-            self.io_handler.clone(),
+            &mut self.io_handler,
             self.peers.clone(),
             self.sender_to_miner.clone(),
         )
@@ -145,13 +142,13 @@ impl TestManager {
     pub async fn add_block_to_blockchain(
         blockchain_lock: Arc<RwLock<Blockchain>>,
         block: Block,
-        mut io_handler: Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
         sender: Sender<MinerEvent>,
     ) {
         let mut blockchain = blockchain_lock.write().await;
         let res = blockchain
-            .add_block(block, &mut io_handler, peers.clone(), sender.clone())
+            .add_block(block, io_handler, peers.clone(), sender.clone())
             .await;
         res
     }
@@ -816,6 +813,27 @@ impl TestManager {
                 info!("TXS TO GENERATE: {:?}", txs_to_generate);
             }
         });
+    }
+    pub async fn send_blocks_to_blockchain(
+        &mut self,
+        mempool_lock: Arc<RwLock<Mempool>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
+    ) {
+        let mut mempool = mempool_lock.write().await;
+        // mempool.currently_bundling_block = true;
+        let mut blockchain = blockchain_lock.write().await;
+        while let Some(block) = mempool.blocks_queue.pop_front() {
+            mempool.delete_transactions(&block.get_transactions());
+            blockchain
+                .add_block(
+                    block,
+                    &mut self.io_handler,
+                    self.peers.clone(),
+                    self.sender_to_miner.clone(),
+                )
+                .await;
+        }
+        // mempool.currently_bundling_block = false;
     }
 }
 

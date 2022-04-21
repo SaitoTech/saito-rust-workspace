@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{Error, ErrorKind};
 use std::sync::Mutex;
 
@@ -5,7 +6,7 @@ use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
 use saito_core::common::command::InterfaceEvent;
@@ -19,8 +20,15 @@ use crate::IoEvent;
 
 lazy_static! {
     pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
+    pub static ref BLOCKS_DIR_PATH: String = configure_storage();
 }
-
+pub fn configure_storage() -> String {
+    if cfg!(test) {
+        String::from("./data/test/blocks/")
+    } else {
+        String::from("./data/blocks/")
+    }
+}
 pub enum FutureState {
     DataSaved(Result<String, std::io::Error>),
     DataSent(Vec<u8>),
@@ -222,7 +230,40 @@ impl HandleIo for RustIOHandler {
     // }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        todo!()
+        let mut result = File::open(key).await;
+        if result.is_err() {
+            todo!()
+        }
+        let mut file = result.unwrap();
+        let mut encoded = Vec::<u8>::new();
+
+        let result = file.read_to_end(&mut encoded).await;
+        if result.is_err() {
+            todo!()
+        }
+        Ok(encoded)
+    }
+
+    async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
+        let mut paths: Vec<_> = fs::read_dir(BLOCKS_DIR_PATH.clone())
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        paths.sort_by(|a, b| {
+            let a_metadata = fs::metadata(a.path()).unwrap();
+            let b_metadata = fs::metadata(b.path()).unwrap();
+            a_metadata
+                .modified()
+                .unwrap()
+                .partial_cmp(&b_metadata.modified().unwrap())
+                .unwrap()
+        });
+        let mut filenames = vec![];
+        for entry in paths {
+            filenames.push(entry.file_name().into_string().unwrap());
+        }
+
+        Ok(filenames)
     }
 }
 

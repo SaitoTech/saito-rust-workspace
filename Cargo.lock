@@ -1078,6 +1078,7 @@ dependencies = [
  "secp256k1",
  "serde",
  "serde_with",
+ "serial_test",
  "tokio",
 ]
 
