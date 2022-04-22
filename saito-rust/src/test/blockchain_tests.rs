@@ -428,13 +428,12 @@ mod tests {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(1000);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
             sender_miner.clone(),
         );
-
         // 5 initial blocks
         test_manager.generate_blockchain(5, [0; 32]).await;
 

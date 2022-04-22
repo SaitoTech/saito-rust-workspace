@@ -69,7 +69,7 @@ impl HandleIo for TestIOHandler {
         if result.is_err() {
             return Err(result.err().unwrap());
         }
-
+        file.flush().await.expect("flush failed");
         Ok(())
     }
 

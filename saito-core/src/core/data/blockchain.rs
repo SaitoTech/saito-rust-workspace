@@ -340,6 +340,7 @@ impl Blockchain {
                 {
                     self.blocks.get_mut(&block_hash).unwrap().set_lc(true);
                 }
+                info!("1111");
 
                 // TODO : send with the right channel
                 // global_sender
@@ -347,6 +348,7 @@ impl Blockchain {
                 //     .expect("error: BlockchainAddBlockSuccess message failed to send");
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
+                info!("2222");
 
                 sender_to_miner
                     .send(MinerEvent::Mine {
@@ -355,6 +357,7 @@ impl Blockchain {
                     })
                     .await
                     .unwrap();
+                info!("3333");
                 debug!("event sent to miner");
                 // global_sender
                 //     .send(GlobalEvent::BlockchainNewLongestChainBlock {
