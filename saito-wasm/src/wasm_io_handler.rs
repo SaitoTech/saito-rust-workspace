@@ -55,4 +55,8 @@ impl HandleIo for WasmIoHandler {
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
         todo!()
     }
+
+    async fn is_existing_file(&self, key: String) -> bool {
+        todo!()
+    }
 }

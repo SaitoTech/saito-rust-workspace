@@ -68,7 +68,9 @@ impl TestManager {
             peers: Arc::new(RwLock::new(PeerCollection::new())),
         }
     }
-
+    pub async fn clear_data_folder() {
+        tokio::fs::remove_dir_all("data").await;
+    }
     //
     // add block at end of longest chain
     //

@@ -31,11 +31,16 @@ pub fn configure_storage() -> String {
 
 impl Storage {
     /// read from a path to a Vec<u8>
-    pub fn read(
+    pub async fn read(
         path: &str,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) -> std::io::Result<Vec<u8>> {
-        Ok(vec![])
+        let buffer = io_handler.read_value(path.to_string()).await;
+        if buffer.is_err() {
+            todo!()
+        }
+        let buffer = buffer.unwrap();
+        Ok(buffer)
     }
 
     pub async fn write(
@@ -43,11 +48,17 @@ impl Storage {
         filename: &str,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) {
-        let result = io_handler.write_value(filename.to_string(), data).await;
+        io_handler
+            .write_value(filename.to_string(), data)
+            .await
+            .expect("writing to storage failed");
     }
 
-    pub fn file_exists(filename: &str) -> bool {
-        false
+    pub async fn file_exists(
+        filename: &str,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> bool {
+        return io_handler.is_existing_file(filename.to_string()).await;
     }
 
     pub fn generate_block_filename(block: &Block) -> String {

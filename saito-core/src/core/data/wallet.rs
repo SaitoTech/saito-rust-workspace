@@ -68,9 +68,9 @@ impl Wallet {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
-        if Storage::file_exists(&filename) {
+        if Storage::file_exists(&filename, io_handler).await {
             let password = self.get_password();
-            let encoded = Storage::read(&filename, io_handler).unwrap();
+            let encoded = Storage::read(&filename, io_handler).await.unwrap();
             let decrypted_encoded = decrypt_with_password(encoded, &password);
             self.deserialize_for_disk(&decrypted_encoded);
         } else {

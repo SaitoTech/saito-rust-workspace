@@ -1,11 +1,12 @@
 use std::fs;
 use std::io::Error;
+use std::path::Path;
 
 use async_trait::async_trait;
 
-use log::debug;
+use log::{debug, info};
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use saito_core::common::handle_io::HandleIo;
 
@@ -52,7 +53,13 @@ impl HandleIo for TestIOHandler {
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
-        let filename = "./data/".to_string() + key.as_str();
+        let filename = key.as_str();
+        let path = Path::new(filename);
+        if path.parent().is_some() {
+            tokio::fs::create_dir_all(path.parent().unwrap())
+                .await
+                .expect("creating directory structure failed");
+        }
         let result = File::create(filename).await;
         if result.is_err() {
             return Err(result.err().unwrap());
@@ -67,13 +74,26 @@ impl HandleIo for TestIOHandler {
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        todo!()
+        let mut result = File::open(key).await;
+        if result.is_err() {
+            todo!()
+        }
+        let mut file = result.unwrap();
+        let mut encoded = Vec::<u8>::new();
+
+        let result = file.read_to_end(&mut encoded).await;
+        if result.is_err() {
+            todo!()
+        }
+        Ok(encoded)
     }
 
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
-        let mut paths: Vec<_> = fs::read_dir("./data/blocks")
+        info!("current dir = {:?}", std::env::current_dir().unwrap());
+        let mut paths: Vec<_> = fs::read_dir("data/blocks")
             .unwrap()
             .map(|r| r.unwrap())
+            .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
             .collect();
         paths.sort_by(|a, b| {
             let a_metadata = fs::metadata(a.path()).unwrap();
@@ -90,5 +110,12 @@ impl HandleIo for TestIOHandler {
         }
 
         Ok(filenames)
+    }
+    async fn is_existing_file(&self, key: String) -> bool {
+        let result = tokio::fs::File::open(key).await;
+        if result.is_ok() {
+            return true;
+        }
+        return false;
     }
 }

@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::{Error, ErrorKind};
+use std::path::Path;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
@@ -29,6 +30,7 @@ pub fn configure_storage() -> String {
         String::from("./data/blocks/")
     }
 }
+
 pub enum FutureState {
     DataSaved(Result<String, std::io::Error>),
     DataSent(Vec<u8>),
@@ -170,7 +172,13 @@ impl HandleIo for RustIOHandler {
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
-        let filename = "./data/".to_string() + key.as_str();
+        let filename = key.as_str();
+        let path = Path::new(filename);
+        if path.parent().is_some() {
+            tokio::fs::create_dir_all(path.parent().unwrap())
+                .await
+                .expect("creating directory structure failed");
+        }
         let result = File::create(filename).await;
         if result.is_err() {
             return Err(result.err().unwrap());
@@ -248,6 +256,7 @@ impl HandleIo for RustIOHandler {
         let mut paths: Vec<_> = fs::read_dir(BLOCKS_DIR_PATH.clone())
             .unwrap()
             .map(|r| r.unwrap())
+            .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
             .collect();
         paths.sort_by(|a, b| {
             let a_metadata = fs::metadata(a.path()).unwrap();
@@ -265,6 +274,14 @@ impl HandleIo for RustIOHandler {
 
         Ok(filenames)
     }
+
+    async fn is_existing_file(&self, key: String) -> bool {
+        let result = tokio::fs::File::open(key).await;
+        if result.is_ok() {
+            return true;
+        }
+        return false;
+    }
 }
 
 #[cfg(test)]
@@ -278,20 +295,13 @@ mod tests {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
         let mut io_handler = RustIOHandler::new(sender);
 
-        tokio::spawn(async move {
-            let result = receiver.recv().await;
-
-            let event = result.unwrap();
-            RustIOHandler::set_event_response(
-                event.event_id,
-                FutureState::DataSaved(Ok("RESULT".to_string())),
-            );
-        });
-
         let result = io_handler
-            .write_value("KEY".to_string(), [1, 2, 3, 4].to_vec())
+            .write_value("./data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())
             .await;
-
         assert!(result.is_ok());
+        let result = io_handler.read_value("./data/test/KEY".to_string()).await;
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result, [1, 2, 3, 4]);
     }
 }
