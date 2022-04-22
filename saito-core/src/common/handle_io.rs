@@ -43,4 +43,8 @@ pub trait HandleIo {
     //     result: Result<String, Error>,
     // ) -> Result<(), Error>;
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error>;
+    async fn load_block_file_list(&self) -> Result<Vec<String>, Error>;
+    async fn is_existing_file(&self, key: String) -> bool;
+    async fn remove_value(&self, key: String) -> Result<(), Error>;
+    fn get_block_dir(&self) -> String;
 }

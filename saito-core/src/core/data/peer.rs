@@ -2,6 +2,7 @@ use crate::common::defs::SaitoPublicKey;
 use crate::common::handle_io::HandleIo;
 use crate::core::data;
 
+#[derive(Debug, Clone)]
 pub struct Peer {
     pub peer_index: u64,
     pub peer_address: SaitoPublicKey,

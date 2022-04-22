@@ -323,6 +323,8 @@ mod tests {
     use std::sync::Arc;
 
     use tokio::sync::RwLock;
+    use crate::core::data::blockchain::Blockchain;
+    use crate::core::data::wallet::Wallet;
 
     use super::*;
 
@@ -370,5 +372,33 @@ mod tests {
         assert_eq!(serialized_slip.len(), 75);
         let deserilialized_slip = Slip::deserialize_from_net(serialized_slip);
         assert_eq!(slip, deserilialized_slip);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn slip_addition_and_removal_from_utxoset() {
+        let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
+        let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
+        let mut blockchain = blockchain_lock.write().await;
+        let wallet = wallet_lock.write().await;
+        let mut slip = Slip::new();
+        slip.set_amount(100_000);
+        slip.set_uuid([1; 32]);
+        slip.set_publickey(wallet.get_publickey());
+        slip.generate_utxoset_key();
+
+        // add to utxoset
+        slip.on_chain_reorganization(&mut blockchain.utxoset, true, 2);
+        assert_eq!(
+            blockchain.utxoset.contains_key(&slip.get_utxoset_key()),
+            true
+        );
+
+        // remove from utxoset
+        // TODO: Repair this test
+        // slip.purge(&mut blockchain.utxoset);
+        // assert_eq!(
+        //     blockchain.utxoset.contains_key(&slip.get_utxoset_key()),
+        //     false
+        // );
     }
 }

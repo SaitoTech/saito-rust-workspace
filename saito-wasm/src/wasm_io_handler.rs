@@ -36,12 +36,7 @@ impl HandleIo for WasmIoHandler {
     //     todo!()
     // }
 
-    async fn write_value(
-        &mut self,
-        result_key: String,
-        key: String,
-        value: Vec<u8>,
-    ) -> Result<String, Error> {
+    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         todo!()
     }
 
@@ -55,5 +50,21 @@ impl HandleIo for WasmIoHandler {
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()
+    }
+
+    async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
+        todo!()
+    }
+
+    async fn is_existing_file(&self, key: String) -> bool {
+        todo!()
+    }
+
+    async fn remove_value(&self, key: String) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn get_block_dir(&self) -> String {
+        "data/blocks/".to_string()
     }
 }

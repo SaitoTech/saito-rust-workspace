@@ -167,7 +167,7 @@ pub struct Block {
     difficulty: u64,
     staking_treasury: u64,
     /// Transactions
-    transactions: Vec<Transaction>,
+    pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
     pre_hash: SaitoHash,
     /// Self-Calculated / Validated
@@ -449,7 +449,11 @@ impl Block {
     // data that is necessary for blocks of that type if possible. if this is
     // not possible, return false. if it is possible, return true once upgraded.
     //
-    pub async fn upgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
+    pub async fn upgrade_block_to_block_type(
+        &mut self,
+        block_type: BlockType,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> bool {
         trace!("UPGRADE_BLOCK_TO_BLOCK_TYPE {:?}", self.block_type);
         if self.block_type == block_type {
             return true;
@@ -465,10 +469,12 @@ impl Block {
         // load the block if it exists on disk.
         //
         if block_type == BlockType::Full {
-            let mut new_block =
-                Storage::load_block_from_disk(Storage::generate_block_filename(&self))
-                    .await
-                    .unwrap();
+            let mut new_block = Storage::load_block_from_disk(
+                Storage::generate_block_filename(&self, io_handler),
+                io_handler,
+            )
+            .await
+            .unwrap();
             let hash_for_signature = hash(&new_block.serialize_for_signature());
             new_block.set_pre_hash(hash_for_signature);
             let hash_for_hash = hash(&new_block.serialize_for_hash());
@@ -1837,19 +1843,46 @@ impl Block {
             "fetch missing block : block : {:?}",
             hex::encode(block_hash)
         );
+        todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use hex::FromHex;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
 
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::verify;
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
-
+    #[test]
+    fn block_new_test() {
+        let block = Block::new();
+        assert_eq!(block.id, 0);
+        assert_eq!(block.timestamp, 0);
+        assert_eq!(block.previous_block_hash, [0; 32]);
+        assert_eq!(block.creator, [0; 33]);
+        assert_eq!(block.merkle_root, [0; 32]);
+        assert_eq!(block.signature, [0; 64]);
+        assert_eq!(block.treasury, 0);
+        assert_eq!(block.burnfee, 0);
+        assert_eq!(block.difficulty, 0);
+        assert_eq!(block.transactions, vec![]);
+        assert_eq!(block.hash, [0; 32]);
+        assert_eq!(block.total_fees, 0);
+        assert_eq!(block.lc, false);
+        assert_eq!(block.has_golden_ticket, false);
+        assert_eq!(block.has_fee_transaction, false);
+        assert_eq!(block.has_issuance_transaction, false);
+        assert_eq!(block.issuance_transaction_idx, 0);
+        assert_eq!(block.fee_transaction_idx, 0);
+        assert_eq!(block.golden_ticket_idx, 0);
+        assert_eq!(block.routing_work_for_creator, 0);
+        // TestManager::check_block_consistency(&block);
+    }
     #[test]
     fn block_serialize_for_signature_hash_with_data() {
         let mut block = Block::new();
@@ -1992,5 +2025,57 @@ mod tests {
         );
         assert_ne!(block.get_hash(), [0; 32]);
         assert_ne!(block.get_signature(), [0; 64]);
+    }
+    #[test]
+    // test that we are properly generating pre_hash and hash
+    fn block_generate_hashes() {
+        let mut block = Block::new();
+        let hash = block.generate_hashes();
+        assert_ne!(hash, [0; 32]);
+        assert_ne!(block.get_pre_hash(), [0; 32]);
+        assert_ne!(block.get_hash(), [0; 32]);
+        // TestManager::check_block_consistency(&block);
+    }
+    #[test]
+    // confirm merkle root is being generated from transactions in block
+    fn block_merkle_root_test() {
+        let mut block = Block::new();
+        let wallet = Wallet::new();
+
+        let mut transactions = (0..5)
+            .into_iter()
+            .map(|_| {
+                let mut transaction = Transaction::new();
+                transaction.sign(wallet.get_privatekey());
+                transaction
+            })
+            .collect();
+
+        block.set_transactions(&mut transactions);
+        block.set_merkle_root(block.generate_merkle_root());
+
+        assert!(block.get_merkle_root().len() == 32);
+        assert_ne!(block.get_merkle_root(), [0; 32]);
+
+        // TestManager::check_block_consistency(&block);
+    }
+    // TODO It is not obvious that calling sign() would have the side effect of setting the hash.
+    //      The API of block.sign() and block.set_hash() should be clearer.
+    #[ignore]
+    #[tokio::test]
+    async fn signature_idempotency_test() {
+        let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
+        let publickey;
+        let privatekey;
+        {
+            let wallet = wallet_lock.read().await;
+            publickey = wallet.get_publickey();
+            privatekey = wallet.get_privatekey();
+        }
+        let mut block = Block::new();
+        let block_hash_0 = block.get_hash();
+        block.sign(publickey, privatekey);
+        let block_hash_1 = block.get_hash();
+        assert_eq!(block_hash_0, block_hash_1);
     }
 }

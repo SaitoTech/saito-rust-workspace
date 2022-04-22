@@ -1,16 +1,16 @@
-use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
+use log::{debug, error, warn};
 use tokio::sync::RwLock;
 
 use crate::common::handle_io::HandleIo;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::slip::Slip;
+use crate::core::miner_controller::MinerEvent;
 
-pub struct Storage {
-    io_handler: dyn HandleIo,
-}
+pub struct Storage {}
 
 pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
@@ -28,11 +28,16 @@ pub fn configure_storage() -> String {
 
 impl Storage {
     /// read from a path to a Vec<u8>
-    pub fn read(
+    pub async fn read(
         path: &str,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) -> std::io::Result<Vec<u8>> {
-        Ok(vec![])
+        let buffer = io_handler.read_value(path.to_string()).await;
+        if buffer.is_err() {
+            todo!()
+        }
+        let buffer = buffer.unwrap();
+        Ok(buffer)
     }
 
     pub async fn write(
@@ -40,17 +45,26 @@ impl Storage {
         filename: &str,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) {
-        let result = io_handler.write_value(filename.to_string(), data).await;
+        io_handler
+            .write_value(filename.to_string(), data)
+            .await
+            .expect("writing to storage failed");
     }
 
-    pub fn file_exists(filename: &str) -> bool {
-        false
+    pub async fn file_exists(
+        filename: &str,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> bool {
+        return io_handler.is_existing_file(filename.to_string()).await;
     }
 
-    pub fn generate_block_filename(block: &Block) -> String {
+    pub fn generate_block_filename(
+        block: &Block,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> String {
         let timestamp = block.get_timestamp();
         let block_hash = block.get_hash();
-        "data/".to_string()
+        io_handler.get_block_dir().to_string()
             + timestamp.to_string().as_str()
             + "-"
             + hex::encode(block_hash).as_str()
@@ -61,28 +75,65 @@ impl Storage {
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) -> String {
         let buffer = block.serialize_for_net(BlockType::Full);
-        let filename = Storage::generate_block_filename(block);
+        let filename = Storage::generate_block_filename(block, io_handler);
 
         let result = io_handler.write_value(filename.clone(), buffer).await;
+        if result.is_err() {
+            todo!()
+        }
         filename
     }
 
-    pub async fn load_blocks_from_disk(blockchain_lock: Arc<RwLock<Blockchain>>) {}
+    pub async fn load_blocks_from_disk(
+        blockchain_lock: Arc<RwLock<Blockchain>>,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        peers: Arc<RwLock<PeerCollection>>,
+        sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
+    ) {
+        debug!("loading blocks from disk");
+        let file_names = io_handler.load_block_file_list().await;
+        let mut blockchain = blockchain_lock.write().await;
 
-    pub async fn load_block_from_disk(filename: String) -> Result<Block, std::io::Error> {
-        // let file_to_load = &filename;
-        // let mut f = File::open(file_to_load).unwrap();
-        // let mut encoded = Vec::<u8>::new();
-        // f.read_to_end(&mut encoded).unwrap();
-        // Block::deserialize_for_net(&vec![])
-        Err(Error::from(ErrorKind::NotFound))
+        if file_names.is_err() {
+            error!("{:?}", file_names.err().unwrap());
+            return;
+        }
+        let file_names = file_names.unwrap();
+        debug!("block file names : {:?}", file_names);
+        for file_name in file_names {
+            let result = io_handler
+                .read_value(io_handler.get_block_dir() + file_name.as_str())
+                .await;
+            if result.is_err() {
+                todo!()
+            }
+            let buffer = result.unwrap();
+            let mut block = Block::deserialize_for_net(&buffer);
+            block.generate_metadata();
+            blockchain
+                .add_block(block, io_handler, peers.clone(), sender_to_miner.clone())
+                .await;
+        }
     }
 
-    pub async fn delete_block_from_disk(filename: String) -> bool {
-        // TODO: get rid of this function or make it useful.
-        // it should match the result and provide some error handling.
-        // let _res = std::fs::remove_file(filename);
-        true
+    pub async fn load_block_from_disk(
+        file_name: String,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> Result<Block, std::io::Error> {
+        debug!("loading block {:?} from disk", file_name);
+        let result = io_handler.read_value(file_name).await;
+        if result.is_err() {
+            todo!()
+        }
+        let buffer = result.unwrap();
+        Ok(Block::deserialize_for_net(&buffer))
+    }
+
+    pub async fn delete_block_from_disk(
+        filename: String,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> bool {
+        io_handler.remove_value(filename).await.is_ok()
     }
 
     //

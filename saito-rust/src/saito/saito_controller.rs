@@ -81,7 +81,7 @@ where
             if work_done {
                 work_done = false;
                 // std::thread::yield_now();
-                tokio::task::yield_now();
+                tokio::task::yield_now().await;
             } else {
                 std::thread::sleep(Duration::new(0, 1000_000));
             }
@@ -233,7 +233,7 @@ pub async fn run_saito_controller(
         }
     });
     // TODO : move saito controller code into main.
-    tokio::join!(
+    let result = tokio::join!(
         _blockchain_handle,
         _mempool_handle,
         _miner_handle,

@@ -88,7 +88,7 @@ impl Blockchain {
         &mut self,
         mut block: Block,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
-        peers: Arc<RwLock<PeerCollection>>,
+        _peers: Arc<RwLock<PeerCollection>>,
         sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
     ) {
         debug!("adding block to blockchain");
@@ -326,7 +326,7 @@ impl Blockchain {
         // viable.
         //
         if am_i_the_longest_chain {
-            let does_new_chain_validate = self.validate(new_chain, old_chain).await;
+            let does_new_chain_validate = self.validate(new_chain, old_chain, io_handler).await;
             if does_new_chain_validate {
                 self.add_block_success(block_hash, io_handler).await;
 
@@ -456,7 +456,9 @@ impl Blockchain {
             //
             {
                 let pblock = self.get_mut_block(&pruned_block_hash).await;
-                pblock.upgrade_block_to_block_type(BlockType::Full).await;
+                pblock
+                    .upgrade_block_to_block_type(BlockType::Full, io_handler)
+                    .await;
             }
         }
     }
@@ -836,7 +838,12 @@ impl Blockchain {
     // winding requires starting from th END of the vector. the loops move
     // in opposite directions.
     //
-    pub async fn validate(&mut self, new_chain: Vec<[u8; 32]>, old_chain: Vec<[u8; 32]>) -> bool {
+    pub async fn validate(
+        &mut self,
+        new_chain: Vec<[u8; 32]>,
+        old_chain: Vec<[u8; 32]>,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> bool {
         debug!("validating chains");
         //
         // ensure new chain has adequate mining support to be considered as
@@ -889,13 +896,19 @@ impl Blockchain {
 
         if !old_chain.is_empty() {
             let res = self
-                .unwind_chain(&new_chain, &old_chain, 0, true)
+                .unwind_chain(&new_chain, &old_chain, 0, true, io_handler)
                 //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
                 .await;
             res
         } else if !new_chain.is_empty() {
             let res = self
-                .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false)
+                .wind_chain(
+                    &new_chain,
+                    &old_chain,
+                    new_chain.len() - 1,
+                    false,
+                    io_handler,
+                )
                 .await;
             res
         } else {
@@ -927,6 +940,7 @@ impl Blockchain {
         old_chain: &Vec<[u8; 32]>,
         current_wind_index: usize,
         wind_failure: bool,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) -> bool {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
@@ -970,7 +984,9 @@ impl Blockchain {
                     self.blockring.get_longest_chain_block_hash_by_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
                     block = self.get_mut_block(&previous_block_hash).await;
-                    block.upgrade_block_to_block_type(BlockType::Full).await;
+                    block
+                        .upgrade_block_to_block_type(BlockType::Full, io_handler)
+                        .await;
                 }
             }
         }
@@ -1015,7 +1031,8 @@ impl Blockchain {
             }
 
             let block_id = block.get_id();
-            self.on_chain_reorganization(block_id, true).await;
+            self.on_chain_reorganization(block_id, true, io_handler)
+                .await;
 
             //
             // we cannot pass the UTXOSet into the staking object to update as that would
@@ -1052,7 +1069,13 @@ impl Blockchain {
             }
 
             let res = self
-                .wind_chain(new_chain, old_chain, current_wind_index - 1, false)
+                .wind_chain(
+                    new_chain,
+                    old_chain,
+                    current_wind_index - 1,
+                    false,
+                    io_handler,
+                )
                 .await;
             res
         } else {
@@ -1091,7 +1114,7 @@ impl Blockchain {
                 if old_chain.len() > 0 {
                     info!("old chain len: {}", old_chain.len());
                     let res = self
-                        .wind_chain(old_chain, new_chain, old_chain.len() - 1, true)
+                        .wind_chain(old_chain, new_chain, old_chain.len() - 1, true, io_handler)
                         .await;
                     res
                 } else {
@@ -1119,7 +1142,7 @@ impl Blockchain {
                 // unwinding starts from the BEGINNING of the vector
                 //
                 let res = self
-                    .unwind_chain(old_chain, &chain_to_unwind, 0, true)
+                    .unwind_chain(old_chain, &chain_to_unwind, 0, true, io_handler)
                     .await;
                 res
             }
@@ -1149,6 +1172,7 @@ impl Blockchain {
         old_chain: &Vec<[u8; 32]>,
         current_unwind_index: usize,
         wind_failure: bool,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) -> bool {
         let block = &self.blocks[&old_chain[current_unwind_index]];
 
@@ -1200,7 +1224,13 @@ impl Blockchain {
             // backwards until we have added block #5, etc.
             //
             let res = self
-                .wind_chain(new_chain, old_chain, new_chain.len() - 1, wind_failure)
+                .wind_chain(
+                    new_chain,
+                    old_chain,
+                    new_chain.len() - 1,
+                    wind_failure,
+                    io_handler,
+                )
                 .await;
             res
         } else {
@@ -1211,7 +1241,13 @@ impl Blockchain {
             // the blockchain). So we increment our unwind index.
             //
             let res = self
-                .unwind_chain(new_chain, old_chain, current_unwind_index + 1, wind_failure)
+                .unwind_chain(
+                    new_chain,
+                    old_chain,
+                    current_unwind_index + 1,
+                    wind_failure,
+                    io_handler,
+                )
                 .await;
             res
         }
@@ -1220,7 +1256,12 @@ impl Blockchain {
     /// keeps any blockchain variables like fork_id or genesis_period
     /// tracking variables updated as the chain gets new blocks. also
     /// pre-loads any blocks needed to improve performance.
-    async fn on_chain_reorganization(&mut self, block_id: u64, longest_chain: bool) {
+    async fn on_chain_reorganization(
+        &mut self,
+        block_id: u64,
+        longest_chain: bool,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) {
         //
         // skip out if earlier than we need to be vis-a-vis last_block_id
         //
@@ -1232,7 +1273,7 @@ impl Blockchain {
             //
             // update genesis period, purge old data
             //
-            self.update_genesis_period().await;
+            self.update_genesis_period(io_handler).await;
 
             //
             // generate fork_id
@@ -1244,7 +1285,10 @@ impl Blockchain {
         self.downgrade_blockchain_data().await;
     }
 
-    pub async fn update_genesis_period(&mut self) {
+    pub async fn update_genesis_period(
+        &mut self,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) {
         //
         // we need to make sure this is not a random block that is disconnected
         // from our previous genesis_id. If there is no connection between it
@@ -1268,7 +1312,7 @@ impl Blockchain {
             // lowest_block_id that we have found. we use the purge_id to
             // handle purges.
             //
-            self.delete_blocks(purge_bid).await;
+            self.delete_blocks(purge_bid, io_handler).await;
         }
 
         //TODO: we already had in update_genesis_period() in self method - maybe no need to call here?
@@ -1278,7 +1322,11 @@ impl Blockchain {
     //
     // deletes all blocks at a single block_id
     //
-    pub async fn delete_blocks(&mut self, delete_block_id: u64) {
+    pub async fn delete_blocks(
+        &mut self,
+        delete_block_id: u64,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) {
         trace!(
             "removing data including from disk at id {}",
             delete_block_id
@@ -1296,20 +1344,25 @@ impl Blockchain {
         trace!("number of hashes to remove {}", block_hashes_copy.len());
 
         for hash in block_hashes_copy {
-            self.delete_block(delete_block_id, hash).await;
+            self.delete_block(delete_block_id, hash, io_handler).await;
         }
     }
 
     //
     // deletes a single block
     //
-    pub async fn delete_block(&mut self, delete_block_id: u64, delete_block_hash: SaitoHash) {
+    pub async fn delete_block(
+        &mut self,
+        delete_block_id: u64,
+        delete_block_hash: SaitoHash,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) {
         //
         // ask block to delete itself / utxo-wise
         //
         {
             let pblock = self.blocks.get(&delete_block_hash).unwrap();
-            let pblock_filename = Storage::generate_block_filename(pblock);
+            let pblock_filename = Storage::generate_block_filename(pblock, io_handler);
 
             //
             // remove slips from wallet
@@ -1325,7 +1378,7 @@ impl Blockchain {
             //
             // deletes block from disk
             //
-            Storage::delete_block_from_disk(pblock_filename).await;
+            Storage::delete_block_from_disk(pblock_filename, io_handler).await;
         }
 
         //
@@ -1377,4 +1430,57 @@ impl Blockchain {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::sync::Arc;
+
+    use tokio::sync::RwLock;
+
+    use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
+    use crate::core::data::wallet::Wallet;
+
+    #[tokio::test]
+    async fn test_blockchain_init() {
+        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let blockchain = Blockchain::new(wallet);
+
+        assert_eq!(blockchain.fork_id, [0; 32]);
+        assert_eq!(blockchain.genesis_block_id, 0);
+    }
+
+    #[tokio::test]
+    async fn test_add_block() {
+        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let blockchain = Blockchain::new(wallet);
+
+        assert_eq!(blockchain.fork_id, [0; 32]);
+        assert_eq!(blockchain.genesis_block_id, 0);
+    }
+
+    #[test]
+    //
+    // code that packs/unpacks two 32-bit values into one 64-bit variable
+    //
+    fn bit_pack_test() {
+        let top = 157171715;
+        let bottom = 11661612;
+        let packed = bit_pack(top, bottom);
+        assert_eq!(packed, 157171715 * (u64::pow(2, 32)) + 11661612);
+        let (new_top, new_bottom) = bit_unpack(packed);
+        assert_eq!(top, new_top);
+        assert_eq!(bottom, new_bottom);
+
+        let top = u32::MAX;
+        let bottom = u32::MAX;
+        let packed = bit_pack(top, bottom);
+        let (new_top, new_bottom) = bit_unpack(packed);
+        assert_eq!(top, new_top);
+        assert_eq!(bottom, new_bottom);
+
+        let top = 0;
+        let bottom = 1;
+        let packed = bit_pack(top, bottom);
+        let (new_top, new_bottom) = bit_unpack(packed);
+        assert_eq!(top, new_top);
+        assert_eq!(bottom, new_bottom);
+    }
+}

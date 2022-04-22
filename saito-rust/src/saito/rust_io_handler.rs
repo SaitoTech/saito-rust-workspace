@@ -1,11 +1,13 @@
-use std::io::{Error, ErrorKind};
+use std::fs;
+use std::io::Error;
+use std::path::Path;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
 use saito_core::common::command::InterfaceEvent;
@@ -19,6 +21,14 @@ use crate::IoEvent;
 
 lazy_static! {
     pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
+    pub static ref BLOCKS_DIR_PATH: String = configure_storage();
+}
+pub fn configure_storage() -> String {
+    if cfg!(test) {
+        String::from("./data/test/blocks/")
+    } else {
+        String::from("./data/blocks/")
+    }
 }
 
 pub enum FutureState {
@@ -28,7 +38,7 @@ pub enum FutureState {
     PeerConnectionResult(Result<u64, std::io::Error>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RustIOHandler {
     sender: Sender<IoEvent>,
     // handler_id: u8,
@@ -162,8 +172,14 @@ impl HandleIo for RustIOHandler {
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
-
-        let result = File::create(key).await;
+        let filename = key.as_str();
+        let path = Path::new(filename);
+        if path.parent().is_some() {
+            tokio::fs::create_dir_all(path.parent().unwrap())
+                .await
+                .expect("creating directory structure failed");
+        }
+        let result = File::create(filename).await;
         if result.is_err() {
             return Err(result.err().unwrap());
         }
@@ -222,7 +238,58 @@ impl HandleIo for RustIOHandler {
     // }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        todo!()
+        let mut result = File::open(key).await;
+        if result.is_err() {
+            todo!()
+        }
+        let mut file = result.unwrap();
+        let mut encoded = Vec::<u8>::new();
+
+        let result = file.read_to_end(&mut encoded).await;
+        if result.is_err() {
+            todo!()
+        }
+        Ok(encoded)
+    }
+
+    async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
+        let mut paths: Vec<_> = fs::read_dir(self.get_block_dir())
+            .unwrap()
+            .map(|r| r.unwrap())
+            .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
+            .collect();
+        paths.sort_by(|a, b| {
+            let a_metadata = fs::metadata(a.path()).unwrap();
+            let b_metadata = fs::metadata(b.path()).unwrap();
+            a_metadata
+                .modified()
+                .unwrap()
+                .partial_cmp(&b_metadata.modified().unwrap())
+                .unwrap()
+        });
+        let mut filenames = vec![];
+        for entry in paths {
+            filenames.push(entry.file_name().into_string().unwrap());
+        }
+
+        Ok(filenames)
+    }
+
+    async fn is_existing_file(&self, key: String) -> bool {
+        let result = tokio::fs::File::open(key).await;
+        if result.is_ok() {
+            return true;
+        }
+        return false;
+    }
+
+    async fn remove_value(&self, key: String) -> Result<(), Error> {
+        let result = tokio::fs::remove_file(key).await;
+        return result;
+    }
+
+    fn get_block_dir(&self) -> String {
+        BLOCKS_DIR_PATH.to_string()
     }
 }
 
@@ -230,29 +297,20 @@ impl HandleIo for RustIOHandler {
 mod tests {
     use saito_core::common::handle_io::HandleIo;
 
-    use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
-    use crate::IoEvent;
+    use crate::saito::rust_io_handler::RustIOHandler;
 
     #[tokio::test]
     async fn test_write_value() {
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
+        let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
         let mut io_handler = RustIOHandler::new(sender);
 
-        tokio::spawn(async move {
-            let result = receiver.recv().await;
-
-            let event = result.unwrap();
-            RustIOHandler::set_event_response(
-                event.event_id,
-                FutureState::DataSaved(Ok("RESULT".to_string())),
-            );
-        });
-
         let result = io_handler
-            .write_value("KEY".to_string(), [1, 2, 3, 4].to_vec())
+            .write_value("./data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())
             .await;
-
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "RESULT");
+        let result = io_handler.read_value("./data/test/KEY".to_string()).await;
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result, [1, 2, 3, 4]);
     }
 }
