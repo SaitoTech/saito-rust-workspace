@@ -69,9 +69,7 @@ impl TestManager {
         }
     }
     pub async fn clear_data_folder() {
-        tokio::fs::remove_dir_all("data")
-            .await
-            .expect("directory cleanup failed");
+        tokio::fs::remove_dir_all("data").await;
     }
     //
     // add block at end of longest chain
@@ -151,10 +149,9 @@ impl TestManager {
         sender: Sender<MinerEvent>,
     ) {
         let mut blockchain = blockchain_lock.write().await;
-        let res = blockchain
+        blockchain
             .add_block(block, io_handler, peers.clone(), sender.clone())
             .await;
-        res
     }
     //
     // generate_blockchain can be used to add multiple chains of blocks that are not
@@ -230,7 +227,6 @@ impl TestManager {
     ) -> Block {
         let mut transactions: Vec<Transaction> = vec![];
         let mut miner = Miner::new(self.wallet_lock.clone());
-        let blockchain = self.blockchain_lock.read().await;
         let privatekey: SaitoPrivateKey;
         let publickey: SaitoPublicKey;
 
@@ -270,6 +266,7 @@ impl TestManager {
         info!("parent hash {:?}", parent_hash);
 
         if golden_ticket {
+            let blockchain = self.blockchain_lock.read().await;
             let blk = blockchain.get_block(&parent_hash).await.unwrap();
             let last_block_difficulty = blk.get_difficulty();
             let golden_ticket: GoldenTicket = miner
