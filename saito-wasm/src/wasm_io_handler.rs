@@ -59,4 +59,12 @@ impl HandleIo for WasmIoHandler {
     async fn is_existing_file(&self, key: String) -> bool {
         todo!()
     }
+
+    async fn remove_value(&self, key: String) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn get_block_dir(&self) -> String {
+        "data/blocks/".to_string()
+    }
 }

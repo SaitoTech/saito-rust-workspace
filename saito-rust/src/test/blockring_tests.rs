@@ -17,6 +17,7 @@ mod test {
     #[serial_test::serial]
     // winding / unwinding updates blockring view of longest chain
     async fn blockring_manual_reorganization_test() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -148,6 +149,7 @@ mod test {
     #[serial_test::serial]
     // adding blocks to blockchain wind / unwind blockring view of longest chain
     async fn blockring_automatic_reorganization_test() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -322,6 +324,7 @@ mod test {
     #[serial_test::serial]
     // confirm adding block changes nothing until on_chain_reorg
     async fn blockring_add_block_test() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);

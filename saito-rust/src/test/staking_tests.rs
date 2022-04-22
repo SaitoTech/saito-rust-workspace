@@ -196,6 +196,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn staking_create_blockchain_with_two_staking_deposits_one_staker_payout_per_block() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -429,6 +430,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn staking_create_blockchain_with_many_staking_deposits_many_staker_payouts_per_block() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -579,6 +581,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn blockchain_staking_deposits_test() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -750,6 +753,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn blockchain_roll_forward_staking_table_test_with_test_manager() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);

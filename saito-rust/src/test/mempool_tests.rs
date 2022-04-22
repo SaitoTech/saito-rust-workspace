@@ -10,6 +10,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn mempool_bundle_blocks_test() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);

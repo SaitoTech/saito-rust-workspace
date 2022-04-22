@@ -90,7 +90,11 @@ impl HandleIo for TestIOHandler {
 
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
         info!("current dir = {:?}", std::env::current_dir().unwrap());
-        let mut paths: Vec<_> = fs::read_dir("data/blocks")
+        let result = fs::read_dir(self.get_block_dir());
+        if result.is_err() {
+            return Err(result.err().unwrap());
+        }
+        let mut paths: Vec<_> = result
             .unwrap()
             .map(|r| r.unwrap())
             .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
@@ -121,5 +125,9 @@ impl HandleIo for TestIOHandler {
     async fn remove_value(&self, key: String) -> Result<(), Error> {
         let result = tokio::fs::remove_file(key).await;
         return result;
+    }
+
+    fn get_block_dir(&self) -> String {
+        "./data/blocks/".to_string()
     }
 }

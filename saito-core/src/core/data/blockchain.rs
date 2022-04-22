@@ -1362,7 +1362,7 @@ impl Blockchain {
         //
         {
             let pblock = self.blocks.get(&delete_block_hash).unwrap();
-            let pblock_filename = Storage::generate_block_filename(pblock);
+            let pblock_filename = Storage::generate_block_filename(pblock, io_handler);
 
             //
             // remove slips from wallet

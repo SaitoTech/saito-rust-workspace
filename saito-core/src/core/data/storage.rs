@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::debug;
+use log::{debug, error, warn};
 use tokio::sync::RwLock;
 
 use crate::common::handle_io::HandleIo;
@@ -58,10 +58,13 @@ impl Storage {
         return io_handler.is_existing_file(filename.to_string()).await;
     }
 
-    pub fn generate_block_filename(block: &Block) -> String {
+    pub fn generate_block_filename(
+        block: &Block,
+        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+    ) -> String {
         let timestamp = block.get_timestamp();
         let block_hash = block.get_hash();
-        "data/".to_string()
+        io_handler.get_block_dir().to_string()
             + timestamp.to_string().as_str()
             + "-"
             + hex::encode(block_hash).as_str()
@@ -72,7 +75,7 @@ impl Storage {
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) -> String {
         let buffer = block.serialize_for_net(BlockType::Full);
-        let filename = Storage::generate_block_filename(block);
+        let filename = Storage::generate_block_filename(block, io_handler);
 
         let result = io_handler.write_value(filename.clone(), buffer).await;
         if result.is_err() {
@@ -91,9 +94,16 @@ impl Storage {
         let file_names = io_handler.load_block_file_list().await;
         let mut blockchain = blockchain_lock.write().await;
 
+        if file_names.is_err() {
+            error!("{:?}", file_names.err().unwrap());
+            return;
+        }
         let file_names = file_names.unwrap();
+        debug!("block file names : {:?}", file_names);
         for file_name in file_names {
-            let result = io_handler.read_value(file_name).await;
+            let result = io_handler
+                .read_value(io_handler.get_block_dir() + file_name.as_str())
+                .await;
             if result.is_err() {
                 todo!()
             }

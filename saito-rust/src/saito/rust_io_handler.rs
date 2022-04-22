@@ -253,7 +253,7 @@ impl HandleIo for RustIOHandler {
     }
 
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
-        let mut paths: Vec<_> = fs::read_dir(BLOCKS_DIR_PATH.clone())
+        let mut paths: Vec<_> = fs::read_dir(self.get_block_dir())
             .unwrap()
             .map(|r| r.unwrap())
             .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
@@ -286,6 +286,10 @@ impl HandleIo for RustIOHandler {
     async fn remove_value(&self, key: String) -> Result<(), Error> {
         let result = tokio::fs::remove_file(key).await;
         return result;
+    }
+
+    fn get_block_dir(&self) -> String {
+        BLOCKS_DIR_PATH.to_string()
     }
 }
 

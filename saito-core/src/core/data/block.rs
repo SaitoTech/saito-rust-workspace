@@ -469,10 +469,12 @@ impl Block {
         // load the block if it exists on disk.
         //
         if block_type == BlockType::Full {
-            let mut new_block =
-                Storage::load_block_from_disk(Storage::generate_block_filename(&self), io_handler)
-                    .await
-                    .unwrap();
+            let mut new_block = Storage::load_block_from_disk(
+                Storage::generate_block_filename(&self, io_handler),
+                io_handler,
+            )
+            .await
+            .unwrap();
             let hash_for_signature = hash(&new_block.serialize_for_signature());
             new_block.set_pre_hash(hash_for_signature);
             let hash_for_hash = hash(&new_block.serialize_for_hash());

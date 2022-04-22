@@ -2,6 +2,7 @@
 mod tests {
     use crate::saito::rust_io_handler::RustIOHandler;
     use crate::test::test_io_handler::TestIOHandler;
+    use crate::test::test_manager::TestManager;
     use log::info;
     use saito_core::common::handle_io::HandleIo;
     use saito_core::core::data::wallet::Wallet;
@@ -10,6 +11,7 @@ mod tests {
     #[serial_test::serial]
     async fn save_and_restore_wallet_test() {
         info!("current dir = {:?}", std::env::current_dir().unwrap());
+        TestManager::clear_data_folder().await;
         let mut wallet = Wallet::new();
         let publickey1 = wallet.get_publickey().clone();
         let privatekey1 = wallet.get_privatekey().clone();

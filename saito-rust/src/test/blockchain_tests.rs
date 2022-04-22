@@ -2,6 +2,7 @@
 mod tests {
     use crate::test::test_manager::{create_timestamp, TestManager};
     use crate::IoEvent;
+    use log::info;
     use saito_core::core::data::blockchain::Blockchain;
     use saito_core::core::data::storage::Storage;
     use saito_core::core::data::wallet::Wallet;
@@ -14,6 +15,7 @@ mod tests {
     // test we can produce five blocks in a row
     //
     async fn add_five_good_blocks() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -63,6 +65,7 @@ mod tests {
     // test we do not add blocks 6 and 7 because of insuffient mining
     //
     async fn add_seven_good_blocks_but_no_golden_tickets() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -124,6 +127,7 @@ mod tests {
     // test we add blocks 6 and 7 because of suffient mining
     //
     async fn add_seven_good_blocks_and_two_golden_tickets() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -185,6 +189,7 @@ mod tests {
     // add 10 blocks including chain reorganization and sufficient mining
     //
     async fn add_ten_blocks_including_five_block_chain_reorg() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -420,6 +425,7 @@ mod tests {
     // use test_manager to generate blockchains and reorgs and test
     //
     async fn test_manager_blockchain_fork_test() {
+        TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
@@ -479,6 +485,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
+        info!("current dir = {:?}", std::env::current_dir().unwrap());
         TestManager::clear_data_folder().await;
         let wallet_lock1 = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock1 = Arc::new(RwLock::new(Blockchain::new(wallet_lock1.clone())));

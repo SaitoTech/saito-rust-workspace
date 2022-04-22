@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use futures::future::join_all;
     use std::sync::Arc;
 
     use tokio::sync::RwLock;
@@ -16,17 +17,19 @@ mod tests {
     #[serial_test::serial]
     // downgrade and upgrade a block with transactions
     async fn block_downgrade_upgrade_test() {
+        TestManager::clear_data_folder().await;
         let mut block = Block::new();
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         // let wallet = Wallet::new();
-        let mut transactions = (0..5)
-            .into_iter()
-            .map(|_| {
-                let mut transaction = Transaction::new();
-                transaction.sign(wallet_lock.blocking_read().get_privatekey());
-                transaction
-            })
-            .collect();
+
+        let mut transactions = join_all((0..5).into_iter().map(|_| async {
+            let mut transaction = Transaction::new();
+            let wallet = wallet_lock.read().await;
+            transaction.sign(wallet.get_privatekey());
+            transaction
+        }))
+        .await
+        .to_vec();
         block.set_transactions(&mut transactions);
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
