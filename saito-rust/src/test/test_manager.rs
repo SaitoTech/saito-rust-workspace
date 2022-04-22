@@ -69,7 +69,9 @@ impl TestManager {
         }
     }
     pub async fn clear_data_folder() {
-        tokio::fs::remove_dir_all("data").await;
+        tokio::fs::remove_dir_all("data")
+            .await
+            .expect("directory cleanup failed");
     }
     //
     // add block at end of longest chain

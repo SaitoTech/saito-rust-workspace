@@ -479,6 +479,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
+        TestManager::clear_data_folder().await;
         let wallet_lock1 = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock1 = Arc::new(RwLock::new(Blockchain::new(wallet_lock1.clone())));
         let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);

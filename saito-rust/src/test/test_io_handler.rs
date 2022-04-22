@@ -118,4 +118,8 @@ impl HandleIo for TestIOHandler {
         }
         return false;
     }
+    async fn remove_value(&self, key: String) -> Result<(), Error> {
+        let result = tokio::fs::remove_file(key).await;
+        return result;
+    }
 }

@@ -53,7 +53,6 @@ pub struct BlockchainController {
 impl BlockchainController {
     async fn propagate_block_to_peers(&self, block_hash: SaitoHash) {
         debug!("propagating blocks to peers");
-        let peers = self.peers.read().await;
         let buffer: Vec<u8>;
         let mut exceptions = vec![];
         {
@@ -92,7 +91,7 @@ impl BlockchainController {
         }
         debug!("connected to peers");
     }
-    async fn handle_new_peer(&mut self, peer: Option<data::configuration::Peer>, peer_index: u64) {
+    async fn handle_new_peer(&mut self, _peer: Option<data::configuration::Peer>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
         let mut peers = self.peers.write().await;
@@ -114,7 +113,7 @@ impl BlockchainController {
 
 #[async_trait]
 impl ProcessEvent<BlockchainEvent> for BlockchainController {
-    async fn process_global_event(&mut self, event: GlobalEvent) -> Option<()> {
+    async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         trace!("processing new global event");
         None
     }
@@ -142,7 +141,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                     self.handle_new_peer(peer_details, result.unwrap()).await;
                 }
             }
-            InterfaceEvent::PeerDisconnected { peer_index } => {}
+            InterfaceEvent::PeerDisconnected { .. } => {}
             _ => {
                 unreachable!()
             }

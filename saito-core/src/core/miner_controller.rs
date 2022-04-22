@@ -30,12 +30,12 @@ impl MinerController {}
 
 #[async_trait]
 impl ProcessEvent<MinerEvent> for MinerController {
-    async fn process_global_event(&mut self, event: GlobalEvent) -> Option<()> {
+    async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         debug!("processing new global event");
         None
     }
 
-    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
+    async fn process_interface_event(&mut self, _event: InterfaceEvent) -> Option<()> {
         debug!("processing new interface event");
 
         None

@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -282,17 +282,22 @@ impl HandleIo for RustIOHandler {
         }
         return false;
     }
+
+    async fn remove_value(&self, key: String) -> Result<(), Error> {
+        let result = tokio::fs::remove_file(key).await;
+        return result;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use saito_core::common::handle_io::HandleIo;
 
-    use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
+    use crate::saito::rust_io_handler::RustIOHandler;
 
     #[tokio::test]
     async fn test_write_value() {
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
+        let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
         let mut io_handler = RustIOHandler::new(sender);
 
         let result = io_handler

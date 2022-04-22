@@ -88,7 +88,7 @@ impl Blockchain {
         &mut self,
         mut block: Block,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
-        peers: Arc<RwLock<PeerCollection>>,
+        _peers: Arc<RwLock<PeerCollection>>,
         sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
     ) {
         debug!("adding block to blockchain");

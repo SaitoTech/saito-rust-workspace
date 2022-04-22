@@ -125,12 +125,12 @@ impl MempoolController {
 
 #[async_trait]
 impl ProcessEvent<MempoolEvent> for MempoolController {
-    async fn process_global_event(&mut self, event: GlobalEvent) -> Option<()> {
+    async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         trace!("processing new global event");
         None
     }
 
-    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
+    async fn process_interface_event(&mut self, _event: InterfaceEvent) -> Option<()> {
         debug!("processing new interface event");
 
         None
@@ -182,6 +182,10 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
             mempool.add_block(result);
             self.send_blocks_to_blockchain(mempool.borrow_mut()).await;
             work_done = true;
+        }
+
+        if work_done {
+            return Some(());
         }
         None
     }

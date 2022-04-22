@@ -1,4 +1,3 @@
-use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 use log::debug;
@@ -11,9 +10,7 @@ use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::slip::Slip;
 use crate::core::miner_controller::MinerEvent;
 
-pub struct Storage {
-    io_handler: dyn HandleIo,
-}
+pub struct Storage {}
 
 pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
@@ -78,6 +75,9 @@ impl Storage {
         let filename = Storage::generate_block_filename(block);
 
         let result = io_handler.write_value(filename.clone(), buffer).await;
+        if result.is_err() {
+            todo!()
+        }
         filename
     }
 
@@ -123,10 +123,7 @@ impl Storage {
         filename: String,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
     ) -> bool {
-        // TODO: get rid of this function or make it useful.
-        // it should match the result and provide some error handling.
-        // let _res = std::fs::remove_file(filename);
-        true
+        io_handler.remove_value(filename).await.is_ok()
     }
 
     //

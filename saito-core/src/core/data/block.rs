@@ -1841,6 +1841,7 @@ impl Block {
             "fetch missing block : block : {:?}",
             hex::encode(block_hash)
         );
+        todo!()
     }
 }
 

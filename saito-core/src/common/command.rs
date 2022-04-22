@@ -1,5 +1,3 @@
-use std::io::Error;
-
 use crate::common::defs::SaitoHash;
 use crate::core::data;
 use crate::core::data::golden_ticket::GoldenTicket;
