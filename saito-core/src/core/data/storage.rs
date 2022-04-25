@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::{debug, error, warn};
+use log::{debug, error};
 use tokio::sync::RwLock;
 
 use crate::common::handle_io::HandleIo;

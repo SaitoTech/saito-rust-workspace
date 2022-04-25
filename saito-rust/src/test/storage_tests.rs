@@ -1,11 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use crate::test::test_manager::{create_timestamp, TestManager};
+    use std::sync::Arc;
+
+    use tokio::sync::RwLock;
+
     use saito_core::core::data::blockchain::{Blockchain, MAX_TOKEN_SUPPLY};
     use saito_core::core::data::storage::Storage;
     use saito_core::core::data::wallet::Wallet;
-    use std::sync::Arc;
-    use tokio::sync::RwLock;
+
+    use crate::test::test_manager::{create_timestamp, TestManager};
 
     // impl Drop for Blockchain {
     //     fn drop(&mut self) {
@@ -31,6 +34,7 @@ mod tests {
     //     }
     // }
 
+    #[ignore]
     #[test]
     fn read_issuance_file_test() {
         let slips = Storage::return_token_supply_slips_from_disk();

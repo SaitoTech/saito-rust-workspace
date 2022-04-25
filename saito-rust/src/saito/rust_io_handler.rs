@@ -307,7 +307,7 @@ mod tests {
         let result = io_handler
             .write_value("./data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())
             .await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "{:?}", result.err().unwrap().to_string());
         let result = io_handler.read_value("./data/test/KEY".to_string()).await;
         assert!(result.is_ok());
         let result = result.unwrap();
