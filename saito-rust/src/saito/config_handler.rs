@@ -1,8 +1,8 @@
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use log::debug;
+use log::{debug, error};
 
 use saito_core::core::data::configuration::Configuration;
 
@@ -18,8 +18,13 @@ impl ConfigHandler {
 
         let configs = Figment::new()
             .merge(Json::file(config_file_path))
-            .extract::<Configuration>()
-            .expect("failed loading configs");
-        Ok(configs)
+            .extract::<Configuration>();
+
+        if configs.is_err() {
+            error!("{:?}", configs.err().unwrap());
+            return Err(std::io::Error::from(ErrorKind::InvalidInput));
+        }
+
+        Ok(configs.unwrap())
     }
 }
