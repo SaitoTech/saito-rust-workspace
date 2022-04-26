@@ -88,11 +88,11 @@ impl BlockchainController {
     }
     async fn connect_to_static_peers(&mut self) {
         debug!("connect to peers from config",);
-        trace!("waiting for the configs write lock");
-        let mut configs = self.configs.write().await;
-        trace!("acquired the configs write lock");
+        trace!("waiting for the configs read lock");
+        let configs = self.configs.read().await;
+        trace!("acquired the configs read lock");
 
-        for peer in &mut configs.peers {
+        for peer in &configs.peers {
             self.io_handler.connect_to_peer(peer.clone()).await.unwrap();
         }
         debug!("connected to peers");
@@ -169,16 +169,18 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
         match event {
             BlockchainEvent::NewBlockBundled(block) => {
                 trace!("waiting for the blockchain write lock");
-                let mut blockchain = self.blockchain.write().await;
-                trace!("acquired the blockchain write lock");
-                blockchain
-                    .add_block(
-                        block,
-                        &mut self.io_handler,
-                        self.peers.clone(),
-                        self.sender_to_miner.clone(),
-                    )
-                    .await;
+                {
+                    let mut blockchain = self.blockchain.write().await;
+                    trace!("acquired the blockchain write lock");
+                    blockchain
+                        .add_block(
+                            block,
+                            &mut self.io_handler,
+                            self.peers.clone(),
+                            self.sender_to_miner.clone(),
+                        )
+                        .await;
+                }
             }
         }
 
@@ -187,6 +189,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn on_init(&mut self) {
+        debug!("on_init");
         {
             Storage::load_blocks_from_disk(
                 self.blockchain.clone(),

@@ -72,12 +72,15 @@ impl MempoolController {
             publickey = wallet.get_publickey();
             privatekey = wallet.get_privatekey();
         }
-        {
-            trace!("waiting for the blockchain read lock");
-            let blockchain = blockchain_lock_clone.read().await;
-            trace!("acquired the blockchain read lock");
-            latest_block_id = blockchain.get_latest_block_id();
-        }
+
+        trace!("waiting for the mempool write lock");
+        let mut mempool = mempool_lock_clone.write().await;
+        trace!("acquired the mempool write lock");
+        trace!("waiting for the blockchain read lock");
+        let blockchain = blockchain_lock_clone.read().await;
+        trace!("acquired the blockchain read lock");
+
+        latest_block_id = blockchain.get_latest_block_id();
 
         {
             if latest_block_id == 0 {
@@ -89,9 +92,7 @@ impl MempoolController {
                 )
                 .await;
                 vip_transaction.sign(privatekey);
-                trace!("waiting for the mempool write lock");
-                let mut mempool = mempool_lock_clone.write().await;
-                trace!("acquired the mempool write lock");
+
                 mempool.add_transaction(vip_transaction).await;
             }
         }
@@ -117,12 +118,12 @@ impl MempoolController {
                 .add_hop_to_path(wallet_lock_clone.clone(), publickey)
                 .await;
             {
-                trace!("waiting for the mempool write lock");
-                let mut mempool = mempool_lock_clone.write().await;
-                trace!("acquired the mempool write lock");
-                trace!("waiting for the blockchain read lock");
-                let blockchain = blockchain_lock_clone.read().await;
-                trace!("acquired the blockchain read lock");
+                // trace!("waiting for the mempool write lock");
+                // let mut mempool = mempool_lock_clone.write().await;
+                // trace!("acquired the mempool write lock");
+                // trace!("waiting for the blockchain read lock");
+                // let blockchain = blockchain_lock_clone.read().await;
+                // trace!("acquired the blockchain read lock");
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)
                     .await;
