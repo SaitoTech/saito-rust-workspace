@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use bigint::U256;
-use log::{error, info};
+use log::{debug, error, info, trace};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use rayon::prelude::*;
@@ -494,7 +494,10 @@ impl Transaction {
         with_payment: u64,
         with_fee: u64,
     ) -> Transaction {
+        trace!("generating transaction");
+        trace!("waiting for the wallet write lock");
         let mut wallet = wallet_lock.write().await;
+        trace!("acquired the wallet write lock");
         let wallet_publickey = wallet.get_publickey();
 
         let available_balance = wallet.get_available_balance();
@@ -982,6 +985,7 @@ mod tests {
     use hex::FromHex;
 
     use super::*;
+
     #[test]
     fn transaction_new_test() {
         let tx = Transaction::new();
@@ -1084,6 +1088,7 @@ mod tests {
             ]
         );
     }
+
     #[test]
     fn tx_sign_with_data() {
         let mut tx = Transaction::new();
@@ -1098,13 +1103,13 @@ mod tests {
             <[u8; 33]>::from_hex(
                 "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
             )
-                .unwrap(),
+            .unwrap(),
         );
         input_slip.set_uuid(
             <[u8; 32]>::from_hex(
                 "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
             )
-                .unwrap(),
+            .unwrap(),
         );
         input_slip.set_amount(123);
         input_slip.set_slip_ordinal(10);
@@ -1115,13 +1120,13 @@ mod tests {
             <[u8; 33]>::from_hex(
                 "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
             )
-                .unwrap(),
+            .unwrap(),
         );
         output_slip.set_uuid(
             <[u8; 32]>::from_hex(
                 "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
             )
-                .unwrap(),
+            .unwrap(),
         );
         output_slip.set_amount(345);
         output_slip.set_slip_ordinal(23);
@@ -1134,7 +1139,7 @@ mod tests {
             <[u8; 32]>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
-                .unwrap(),
+            .unwrap(),
         );
 
         assert_eq!(tx.signature.len(), 64);

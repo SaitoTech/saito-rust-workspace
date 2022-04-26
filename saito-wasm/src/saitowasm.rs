@@ -172,7 +172,7 @@ pub fn get_public_key() -> Result<JsValue, JsValue> {
 
 #[wasm_bindgen]
 pub async fn process_timer_event(duration: u64) {
-    println!("processing timer event : {:?}", duration);
+    // println!("processing timer event : {:?}", duration);
 
     let mut saito = SAITO.lock().await;
 

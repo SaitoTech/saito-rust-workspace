@@ -322,7 +322,9 @@ impl Slip {
 mod tests {
     use std::sync::Arc;
 
+    use log::{debug, trace};
     use tokio::sync::RwLock;
+
     use crate::core::data::blockchain::Blockchain;
     use crate::core::data::wallet::Wallet;
 
@@ -373,17 +375,25 @@ mod tests {
         let deserilialized_slip = Slip::deserialize_from_net(serialized_slip);
         assert_eq!(slip, deserilialized_slip);
     }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn slip_addition_and_removal_from_utxoset() {
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
+        trace!("waiting for the blockchain write lock");
         let mut blockchain = blockchain_lock.write().await;
-        let wallet = wallet_lock.write().await;
+        trace!("acquired the blockchain write lock");
+
         let mut slip = Slip::new();
         slip.set_amount(100_000);
         slip.set_uuid([1; 32]);
-        slip.set_publickey(wallet.get_publickey());
+        {
+            trace!("waiting for the wallet write lock");
+            let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet write lock");
+            slip.set_publickey(wallet.get_publickey());
+        }
         slip.generate_utxoset_key();
 
         // add to utxoset

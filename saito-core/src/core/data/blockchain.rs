@@ -340,7 +340,6 @@ impl Blockchain {
                 {
                     self.blocks.get_mut(&block_hash).unwrap().set_lc(true);
                 }
-                info!("1111");
 
                 // TODO : send with the right channel
                 // global_sender
@@ -348,7 +347,6 @@ impl Blockchain {
                 //     .expect("error: BlockchainAddBlockSuccess message failed to send");
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
-                info!("2222");
 
                 sender_to_miner
                     .send(MinerEvent::Mine {
@@ -357,7 +355,6 @@ impl Blockchain {
                     })
                     .await
                     .unwrap();
-                info!("3333");
                 debug!("event sent to miner");
                 // global_sender
                 //     .send(GlobalEvent::BlockchainNewLongestChainBlock {
@@ -1028,8 +1025,12 @@ impl Blockchain {
             //
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
+
+                trace!("waiting for the wallet write lock");
                 let mut wallet = self.wallet_lock.write().await;
+                trace!("acquired the wallet write lock");
                 wallet.on_chain_reorganization(&block, true);
+
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
 
@@ -1192,7 +1193,9 @@ impl Blockchain {
 
         // wallet update
         {
+            trace!("waiting for the wallet write lock");
             let mut wallet = self.wallet_lock.write().await;
+            trace!("acquired the wallet write lock");
             wallet.on_chain_reorganization(&block, false);
         }
 
@@ -1370,9 +1373,12 @@ impl Blockchain {
             //
             // remove slips from wallet
             //
-            let mut wallet = self.wallet_lock.write().await;
-            wallet.delete_block(pblock);
-
+            {
+                trace!("waiting for the wallet write lock");
+                let mut wallet = self.wallet_lock.write().await;
+                trace!("acquired the wallet write lock");
+                wallet.delete_block(pblock);
+            }
             //
             // removes utxoset data
             //

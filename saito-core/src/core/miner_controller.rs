@@ -42,7 +42,7 @@ impl ProcessEvent<MinerEvent> for MinerController {
     }
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
-        trace!("processing timer event : {:?}", duration.as_micros());
+        // trace!("processing timer event : {:?}", duration.as_micros());
         None
     }
 
@@ -50,7 +50,9 @@ impl ProcessEvent<MinerEvent> for MinerController {
         debug!("event received : {:?}", event);
         match event {
             MinerEvent::Mine { hash, difficulty } => {
+                trace!("waiting for the miner read lock");
                 let miner = self.miner.read().await;
+                trace!("acquired the miner read lock");
                 miner
                     .mine(hash, difficulty, self.sender_to_mempool.clone())
                     .await;

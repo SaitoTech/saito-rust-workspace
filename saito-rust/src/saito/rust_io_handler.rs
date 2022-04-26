@@ -55,7 +55,7 @@ impl RustIOHandler {
     }
 
     pub fn set_event_response(event_id: u64, response: FutureState) {
-        debug!("setting event response for : {:?}", event_id,);
+        // debug!("setting event response for : {:?}", event_id,);
         if event_id == 0 {
             return;
         }
@@ -66,10 +66,10 @@ impl RustIOHandler {
             waker = context.future_wakers.remove(&event_id);
         }
         if waker.is_some() {
-            debug!("waking future on event: {:?}", event_id,);
+            // debug!("waking future on event: {:?}", event_id,);
             let waker = waker.unwrap();
             waker.wake();
-            debug!("waker invoked on event: {:?}", event_id);
+            // debug!("waker invoked on event: {:?}", event_id);
         } else {
             warn!("waker not found for event: {:?}", event_id);
         }
@@ -307,7 +307,7 @@ mod tests {
         let result = io_handler
             .write_value("./data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())
             .await;
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "{:?}", result.err().unwrap().to_string());
         let result = io_handler.read_value("./data/test/KEY".to_string()).await;
         assert!(result.is_ok());
         let result = result.unwrap();

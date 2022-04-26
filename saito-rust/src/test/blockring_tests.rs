@@ -4,12 +4,12 @@ mod test {
 
     use tokio::sync::RwLock;
 
-    use crate::IoEvent;
     use saito_core::core::data::blockchain::Blockchain;
     use saito_core::core::data::blockring::BlockRing;
     use saito_core::core::data::wallet::Wallet;
 
     use crate::test::test_manager::{create_timestamp, TestManager};
+    use crate::IoEvent;
 
     use super::*;
 

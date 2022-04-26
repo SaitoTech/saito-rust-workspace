@@ -56,7 +56,9 @@ impl BlockchainController {
         let buffer: Vec<u8>;
         let mut exceptions = vec![];
         {
-            let blockchain = self.blockchain.write().await;
+            trace!("waiting for the blockchain write lock");
+            let blockchain = self.blockchain.read().await;
+            trace!("acquired the blockchain write lock");
             let block = blockchain.blocks.get(&block_hash);
             if block.is_none() {
                 // TODO : handle
@@ -66,7 +68,9 @@ impl BlockchainController {
 
             // finding block sender to avoid resending the block to that node
             if block.source_connection_id.is_some() {
+                trace!("waiting for the peers read lock");
                 let peers = self.peers.read().await;
+                trace!("acquired the peers read lock");
                 let peer = peers
                     .address_to_peers
                     .get(&block.source_connection_id.unwrap());
@@ -84,9 +88,11 @@ impl BlockchainController {
     }
     async fn connect_to_static_peers(&mut self) {
         debug!("connect to peers from config",);
-        let mut configs = self.configs.write().await;
+        trace!("waiting for the configs read lock");
+        let configs = self.configs.read().await;
+        trace!("acquired the configs read lock");
 
-        for peer in &mut configs.peers {
+        for peer in &configs.peers {
             self.io_handler.connect_to_peer(peer.clone()).await.unwrap();
         }
         debug!("connected to peers");
@@ -94,7 +100,9 @@ impl BlockchainController {
     async fn handle_new_peer(&mut self, _peer: Option<data::configuration::Peer>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
+        trace!("waiting for the peers write lock");
         let mut peers = self.peers.write().await;
+        trace!("acquired the peers write lock");
         // for mut static_peer in &mut self.static_peers {
         //     if static_peer.peer_details == peer {
         //         static_peer.peer_state = PeerState::Connected;
@@ -150,7 +158,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
-        trace!("processing timer event : {:?}", duration.as_micros());
+        // trace!("processing timer event : {:?}", duration.as_micros());
 
         None
     }
@@ -160,15 +168,19 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
 
         match event {
             BlockchainEvent::NewBlockBundled(block) => {
-                let mut blockchain = self.blockchain.write().await;
-                blockchain
-                    .add_block(
-                        block,
-                        &mut self.io_handler,
-                        self.peers.clone(),
-                        self.sender_to_miner.clone(),
-                    )
-                    .await;
+                trace!("waiting for the blockchain write lock");
+                {
+                    let mut blockchain = self.blockchain.write().await;
+                    trace!("acquired the blockchain write lock");
+                    blockchain
+                        .add_block(
+                            block,
+                            &mut self.io_handler,
+                            self.peers.clone(),
+                            self.sender_to_miner.clone(),
+                        )
+                        .await;
+                }
             }
         }
 
@@ -177,6 +189,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn on_init(&mut self) {
+        debug!("on_init");
         {
             Storage::load_blocks_from_disk(
                 self.blockchain.clone(),

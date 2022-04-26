@@ -3,6 +3,8 @@ use std::io::Write;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
+use tracing::info;
+use tracing_subscriber;
 
 use saito_core::common::command::InterfaceEvent;
 
@@ -19,25 +21,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Running saito");
 
     // pretty_env_logger::init();
-    let mut builder = pretty_env_logger::formatted_builder();
-    builder
-        .format(|buf, record| {
-            let mut style = buf.style();
+    // let mut builder = pretty_env_logger::formatted_builder();
+    // builder
+    //     .format(|buf, record| {
+    //         let mut style = buf.style();
+    //
+    //         // TODO : set colored output
+    //         style.set_bold(true);
+    //         writeln!(
+    //             buf,
+    //             "{:6} {:2?} - {:45}- {:?}",
+    //             style.value(record.level()),
+    //             // record.level(),
+    //             std::thread::current().id(),
+    //             record.module_path().unwrap_or_default(),
+    //             record.args(),
+    //         )
+    //     })
+    //     .parse_filters(&env::var("RUST_LOG").unwrap_or_default())
+    //     .init();
 
-            // TODO : set colored output
-            style.set_bold(true);
-            writeln!(
-                buf,
-                "{:6} {:2?} - {:45}- {:?}",
-                style.value(record.level()),
-                // record.level(),
-                std::thread::current().id(),
-                record.module_path().unwrap_or_default(),
-                record.args(),
-            )
-        })
-        .parse_filters(&env::var("RUST_LOG").unwrap_or_default())
-        .init();
+    // install global subscriber configured based on RUST_LOG envvar.
+    tracing_subscriber::fmt::init();
+
     let configs = Arc::new(RwLock::new(
         ConfigHandler::load_configs("configs/saito.config.json".to_string())
             .expect("loading configs failed"),

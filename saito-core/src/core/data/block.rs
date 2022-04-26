@@ -1654,10 +1654,16 @@ impl Block {
             "Block::generate : previous block hash : {:?}",
             hex::encode(previous_block_hash)
         );
+        trace!("waiting for the blockchain read lock");
         let blockchain = blockchain_lock.read().await;
-        let wallet = wallet_lock.read().await;
-        let publickey = wallet.get_publickey();
-
+        trace!("acquired the blockchain read lock");
+        let publickey;
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
+            publickey = wallet.get_publickey();
+        }
         let mut previous_block_id = 0;
         let mut previous_block_burnfee = 0;
         let mut previous_block_timestamp = 0;
@@ -1754,8 +1760,12 @@ impl Block {
             let mut fee_tx = cv.fee_transaction.unwrap();
             let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
             fee_tx.set_hash_for_signature(hash_for_signature);
-            fee_tx.sign(wallet.get_privatekey());
-
+            {
+                trace!("waiting for the wallet read lock");
+                let wallet = wallet_lock.read().await;
+                trace!("acquired the wallet read lock");
+                fee_tx.sign(wallet.get_privatekey());
+            }
             //
             // and we add it to the block
             //
@@ -1822,7 +1832,12 @@ impl Block {
         let block_merkle_root = block.generate_merkle_root();
         block.set_merkle_root(block_merkle_root);
 
-        block.sign(wallet.get_publickey(), wallet.get_privatekey());
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
+            block.sign(wallet.get_publickey(), wallet.get_privatekey());
+        }
 
         block
     }
@@ -1849,8 +1864,10 @@ impl Block {
 
 #[cfg(test)]
 mod tests {
-    use hex::FromHex;
     use std::sync::Arc;
+
+    use hex::FromHex;
+    use log::{debug, trace};
     use tokio::sync::RwLock;
 
     use crate::core::data::block::{Block, BlockType};
@@ -1858,6 +1875,7 @@ mod tests {
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
+
     #[test]
     fn block_new_test() {
         let block = Block::new();
@@ -1883,6 +1901,7 @@ mod tests {
         assert_eq!(block.routing_work_for_creator, 0);
         // TestManager::check_block_consistency(&block);
     }
+
     #[test]
     fn block_serialize_for_signature_hash_with_data() {
         let mut block = Block::new();
@@ -2026,6 +2045,7 @@ mod tests {
         assert_ne!(block.get_hash(), [0; 32]);
         assert_ne!(block.get_signature(), [0; 64]);
     }
+
     #[test]
     // test that we are properly generating pre_hash and hash
     fn block_generate_hashes() {
@@ -2036,6 +2056,7 @@ mod tests {
         assert_ne!(block.get_hash(), [0; 32]);
         // TestManager::check_block_consistency(&block);
     }
+
     #[test]
     // confirm merkle root is being generated from transactions in block
     fn block_merkle_root_test() {
@@ -2059,6 +2080,7 @@ mod tests {
 
         // TestManager::check_block_consistency(&block);
     }
+
     // TODO It is not obvious that calling sign() would have the side effect of setting the hash.
     //      The API of block.sign() and block.set_hash() should be clearer.
     #[ignore]
@@ -2068,7 +2090,9 @@ mod tests {
         let publickey;
         let privatekey;
         {
+            trace!("waiting for the wallet read lock");
             let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
             publickey = wallet.get_publickey();
             privatekey = wallet.get_privatekey();
         }
