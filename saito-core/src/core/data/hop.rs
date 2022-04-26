@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -34,7 +35,9 @@ impl Hop {
         to_publickey: SaitoPublicKey,
         hash_to_sign: SaitoHash,
     ) -> Hop {
+        trace!("waiting for the wallet read lock");
         let wallet = wallet_lock.read().await;
+        trace!("acquired the wallet read lock");
         let mut hop = Hop::new();
 
         hop.set_from(wallet.get_publickey());

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use futures::future::join_all;
     use std::sync::Arc;
 
+    use futures::future::join_all;
     use tokio::sync::RwLock;
 
     use saito_core::core::data::block::{Block, BlockType};

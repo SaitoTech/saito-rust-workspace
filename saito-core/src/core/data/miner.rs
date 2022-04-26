@@ -2,7 +2,7 @@ use std::io::Error;
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::{debug, trace};
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -59,18 +59,24 @@ impl Miner {
         let publickey: SaitoPublicKey;
 
         {
+            trace!("waiting for the wallet read lock");
             let wallet = self.wallet.read().await;
+            trace!("acquired the wallet read lock");
             publickey = wallet.get_publickey();
         }
-
         let random_bytes = hash(&generate_random_bytes(32));
         let solution = GoldenTicket::generate_solution(target, random_bytes, publickey);
         if GoldenTicket::is_valid_solution(solution, difficulty) {
             let gt = GoldenTicket::new(target, random_bytes, publickey);
 
+            debug!(
+                "golden ticket found. sending to mempool : {:?}",
+                hex::encode(gt.get_target())
+            );
             let result = sender_to_mempool
                 .send(MempoolEvent::NewGoldenTicket { golden_ticket: gt })
                 .await;
+            trace!("sent to mempool");
             // TODO : check result
         }
     }
@@ -81,8 +87,13 @@ impl Miner {
         block_hash: SaitoHash,
         block_difficulty: u64,
     ) -> GoldenTicket {
-        let wallet = self.wallet.read().await;
-        let publickey = wallet.get_publickey();
+        let publickey;
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = self.wallet.read().await;
+            trace!("acquired the wallet read lock");
+            publickey = wallet.get_publickey();
+        }
         let mut random_bytes = hash(&generate_random_bytes(32));
 
         let mut solution = GoldenTicket::generate_solution(block_hash, random_bytes, publickey);

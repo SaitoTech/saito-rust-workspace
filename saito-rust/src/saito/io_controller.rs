@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
@@ -116,7 +116,9 @@ impl IoController {
         let result = result.unwrap();
         let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
+        trace!("waiting for the io controller write lock");
         let mut io_controller = io_controller.write().await;
+        trace!("acquired the io controller write lock");
         let sender_to_controller = io_controller.sender_to_saito_controller.clone();
         IoController::send_new_peer(
             event_id,
@@ -237,7 +239,9 @@ pub async fn run_io_controller(
 
     let url;
     {
-        let configs = configs.write().await;
+        trace!("waiting for the configs write lock");
+        let configs = configs.read().await;
+        trace!("acquired the configs write lock");
         url = "localhost:".to_string() + configs.server.port.to_string().as_str();
     }
 
@@ -279,7 +283,9 @@ pub async fn run_io_controller(
                         buffer,
                         exceptions,
                     } => {
+                        trace!("waiting for the io controller write lock");
                         let mut io_controller = io_controller.write().await;
+                        trace!("acquired the io controller write lock");
                         io_controller
                             .send_to_all(message_name, buffer, exceptions)
                             .await;
@@ -289,7 +295,9 @@ pub async fn run_io_controller(
                         message_name,
                         buffer,
                     } => {
-                        let io_controller = io_controller.write().await;
+                        trace!("waiting for the io_controller write lock");
+                        let io_controller = io_controller.read().await;
+                        trace!("acquired the io controller write lock");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
                     // InterfaceEvent::DataSaveRequest {
@@ -350,7 +358,9 @@ fn run_server(
             let result = result.unwrap();
             let stream = MaybeTlsStream::Plain(result.0);
             let stream = accept_async(stream).await.unwrap();
+            trace!("waiting for the io controller write lock");
             let mut controller = io_controller_clone.write().await;
+            trace!("acquired the io controller write lock");
             IoController::send_new_peer(
                 0,
                 peer_counter_clone.clone(),

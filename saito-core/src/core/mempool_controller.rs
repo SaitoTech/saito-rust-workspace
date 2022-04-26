@@ -66,13 +66,16 @@ impl MempoolController {
         let latest_block_id;
 
         {
+            trace!("waiting for the wallet read lock");
             let wallet = wallet_lock_clone.read().await;
+            trace!("acquired the wallet read lock");
             publickey = wallet.get_publickey();
             privatekey = wallet.get_privatekey();
         }
-
         {
+            trace!("waiting for the blockchain read lock");
             let blockchain = blockchain_lock_clone.read().await;
+            trace!("acquired the blockchain read lock");
             latest_block_id = blockchain.get_latest_block_id();
         }
 
@@ -86,7 +89,9 @@ impl MempoolController {
                 )
                 .await;
                 vip_transaction.sign(privatekey);
+                trace!("waiting for the mempool write lock");
                 let mut mempool = mempool_lock_clone.write().await;
+                trace!("acquired the mempool write lock");
                 mempool.add_transaction(vip_transaction).await;
             }
         }
@@ -112,14 +117,18 @@ impl MempoolController {
                 .add_hop_to_path(wallet_lock_clone.clone(), publickey)
                 .await;
             {
-                let blockchain = blockchain_lock_clone.read().await;
+                trace!("waiting for the mempool write lock");
                 let mut mempool = mempool_lock_clone.write().await;
+                trace!("acquired the mempool write lock");
+                trace!("waiting for the blockchain read lock");
+                let blockchain = blockchain_lock_clone.read().await;
+                trace!("acquired the blockchain read lock");
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)
                     .await;
             }
         }
-        trace!("generated transaction count: {:?}", txs_to_generate);
+        debug!("generated transaction count: {:?}", txs_to_generate);
     }
 }
 
@@ -165,7 +174,9 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
         // TODO : make timers configurable
         if self.block_producing_timer >= 1_000_000 {
             debug!("producing block...");
+            trace!("waiting for the mempool read lock");
             let mempool = self.mempool.read().await;
+            trace!("acquired the mempool read lock");
             can_bundle = mempool
                 .can_bundle_block(self.blockchain.clone(), timestamp)
                 .await;
@@ -175,7 +186,9 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
 
         if can_bundle {
             let mempool = self.mempool.clone();
+            trace!("waiting for the mempool write lock");
             let mut mempool = mempool.write().await;
+            trace!("acquired the mempool write lock");
             let result = mempool
                 .bundle_block(self.blockchain.clone(), timestamp)
                 .await;
@@ -193,7 +206,13 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
     async fn process_event(&mut self, event: MempoolEvent) -> Option<()> {
         match event {
             MempoolEvent::NewGoldenTicket { golden_ticket } => {
+                debug!(
+                    "received new golden ticket : {:?}",
+                    hex::encode(golden_ticket.get_target())
+                );
+                trace!("waiting for the mempool write lock");
                 let mut mempool = self.mempool.write().await;
+                trace!("acquired the mempool write lock");
                 mempool.add_golden_ticket(golden_ticket).await;
             }
         }

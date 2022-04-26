@@ -55,7 +55,7 @@ impl RustIOHandler {
     }
 
     pub fn set_event_response(event_id: u64, response: FutureState) {
-        debug!("setting event response for : {:?}", event_id,);
+        // debug!("setting event response for : {:?}", event_id,);
         if event_id == 0 {
             return;
         }
@@ -66,10 +66,10 @@ impl RustIOHandler {
             waker = context.future_wakers.remove(&event_id);
         }
         if waker.is_some() {
-            debug!("waking future on event: {:?}", event_id,);
+            // debug!("waking future on event: {:?}", event_id,);
             let waker = waker.unwrap();
             waker.wake();
-            debug!("waker invoked on event: {:?}", event_id);
+            // debug!("waker invoked on event: {:?}", event_id);
         } else {
             warn!("waker not found for event: {:?}", event_id);
         }

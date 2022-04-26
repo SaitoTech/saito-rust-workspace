@@ -70,9 +70,13 @@ impl Mempool {
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
         debug!("adding golden ticket");
-        let mut wallet = self.wallet_lock.write().await;
-        let transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
-
+        let transaction;
+        {
+            trace!("waiting for the wallet write lock");
+            let mut wallet = self.wallet_lock.write().await;
+            trace!("acquired the wallet write lock");
+            transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
+        }
         if self
             .transactions
             .iter()
@@ -82,6 +86,7 @@ impl Mempool {
             info!("adding golden ticket to mempool...");
             self.transactions.push(transaction);
         }
+        trace!("golden ticket added to mempool");
     }
 
     pub async fn add_transaction_if_validates(
@@ -89,6 +94,7 @@ impl Mempool {
         transaction: Transaction,
         blockchain: &Blockchain,
     ) {
+        trace!("add transaction if validates");
         //
         // validate
         //
@@ -107,7 +113,9 @@ impl Mempool {
         //
         let publickey;
         {
+            trace!("waiting for the wallet read lock");
             let wallet = self.wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
             publickey = wallet.get_publickey();
         }
         transaction.generate_metadata(publickey);
@@ -134,7 +142,9 @@ impl Mempool {
         debug!("bundling block...");
         let previous_block_hash: SaitoHash;
         {
+            trace!("waiting for the blockchain read lock");
             let blockchain = blockchain_lock.read().await;
+            trace!("acquired the blockchain read lock");
             previous_block_hash = blockchain.get_latest_block_hash();
         }
 
@@ -163,7 +173,9 @@ impl Mempool {
         }
         debug!("can bundle block");
 
+        trace!("waiting for the blockchain read lock");
         let blockchain = blockchain_lock.read().await;
+        trace!("acquired the blockchain read lock");
 
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();

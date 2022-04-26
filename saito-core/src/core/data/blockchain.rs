@@ -1025,8 +1025,12 @@ impl Blockchain {
             //
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
+
+                trace!("waiting for the wallet write lock");
                 let mut wallet = self.wallet_lock.write().await;
+                trace!("acquired the wallet write lock");
                 wallet.on_chain_reorganization(&block, true);
+
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
 
@@ -1189,7 +1193,9 @@ impl Blockchain {
 
         // wallet update
         {
+            trace!("waiting for the wallet write lock");
             let mut wallet = self.wallet_lock.write().await;
+            trace!("acquired the wallet write lock");
             wallet.on_chain_reorganization(&block, false);
         }
 
@@ -1367,9 +1373,12 @@ impl Blockchain {
             //
             // remove slips from wallet
             //
-            let mut wallet = self.wallet_lock.write().await;
-            wallet.delete_block(pblock);
-
+            {
+                trace!("waiting for the wallet write lock");
+                let mut wallet = self.wallet_lock.write().await;
+                trace!("acquired the wallet write lock");
+                wallet.delete_block(pblock);
+            }
             //
             // removes utxoset data
             //

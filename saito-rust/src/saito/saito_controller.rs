@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use log::{debug, info};
+use log::{debug, info, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -124,7 +124,9 @@ pub async fn run_saito_controller(
         configs: configs.clone(),
     };
     {
-        let configs = configs.write().await;
+        trace!("waiting for the configs write lock");
+        let configs = configs.read().await;
+        trace!("acquired the configs write lock");
         let peers = &configs.peers;
         for peer in peers {
             blockchain_controller.static_peers.push(StaticPeer {

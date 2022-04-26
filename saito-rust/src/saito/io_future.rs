@@ -29,7 +29,7 @@ impl Future for IoFuture {
             // debug!("waiting for event : {:?}", self.event_id);
             return Poll::Pending;
         }
-        debug!("event result found for : {:?}", self.event_id);
+        // debug!("event result found for : {:?}", self.event_id);
         Poll::Ready(Ok(result.unwrap()))
     }
 }

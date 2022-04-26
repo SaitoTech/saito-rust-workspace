@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::{debug, error};
+use log::{debug, error, trace};
 use tokio::sync::RwLock;
 
 use crate::common::handle_io::HandleIo;
@@ -92,7 +92,9 @@ impl Storage {
     ) {
         debug!("loading blocks from disk");
         let file_names = io_handler.load_block_file_list().await;
+        trace!("waiting for the blockchain write lock");
         let mut blockchain = blockchain_lock.write().await;
+        trace!("acquired the blockchain write lock");
 
         if file_names.is_err() {
             error!("{:?}", file_names.err().unwrap());

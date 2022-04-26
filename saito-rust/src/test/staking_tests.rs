@@ -1,16 +1,18 @@
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
 
-    use crate::test::test_manager::{create_timestamp, TestManager};
     use log::info;
+    use tokio::sync::RwLock;
+
     use saito_core::core::data::block::Block;
     use saito_core::core::data::blockchain::Blockchain;
     use saito_core::core::data::slip::{Slip, SlipType};
     use saito_core::core::data::staking::Staking;
     use saito_core::core::data::transaction::Transaction;
     use saito_core::core::data::wallet::Wallet;
-    use std::sync::Arc;
-    use tokio::sync::RwLock;
+
+    use crate::test::test_manager::{create_timestamp, TestManager};
 
     //
     // does adding staking slips in different orders give us the same
@@ -283,7 +285,7 @@ mod tests {
         // we have yet to find a single golden ticket, so all in stakers
         //
         {
-            let blockchain = blockchain_lock.write().await;
+            let blockchain = blockchain_lock.read().await;
             assert_eq!(blockchain.staking.stakers.len(), 2);
             assert_eq!(blockchain.staking.pending.len(), 0);
             assert_eq!(blockchain.staking.deposits.len(), 0);
@@ -316,7 +318,7 @@ mod tests {
         // we have found a single golden ticket, so we have paid a single staker
         //
         {
-            let blockchain = blockchain_lock.write().await;
+            let blockchain = blockchain_lock.read().await;
             assert_eq!(blockchain.staking.stakers.len(), 1);
             assert_eq!(blockchain.staking.pending.len(), 1);
             assert_eq!(blockchain.staking.deposits.len(), 0);
@@ -346,7 +348,7 @@ mod tests {
         .await;
 
         {
-            let blockchain = blockchain_lock.write().await;
+            let blockchain = blockchain_lock.read().await;
             assert_eq!(blockchain.staking.stakers.len(), 1);
             assert_eq!(blockchain.staking.pending.len(), 1);
             assert_eq!(blockchain.staking.deposits.len(), 0);
@@ -517,7 +519,7 @@ mod tests {
         // we have yet to find a single golden ticket, so all in stakers
         //
         {
-            let blockchain = blockchain_lock.write().await;
+            let blockchain = blockchain_lock.read().await;
             assert_eq!(blockchain.staking.stakers.len(), 3);
             assert_eq!(blockchain.staking.pending.len(), 0);
             assert_eq!(blockchain.staking.deposits.len(), 0);

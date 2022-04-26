@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 saito-core = { path = "../saito-core" }
-tokio = { version = "1.17.0", features = ["full"] }
+tokio = { version = "1.17.0", features = ["full", "tracing"] }
 tungstenite = { version = "0.17.2" }
 tokio-tungstenite = "0.17.1"
 log = "0.4.14"
@@ -19,6 +19,8 @@ futures = { version = "0.3.21", default-features = false }
 rand = "0.8.5"
 rayon = "1.5.2"
 ahash = "0.7.6"
+tracing = { version = "0.1" }
+tracing-subscriber = "0.3"
 
 [dev-dependencies]
 serial_test = "0.6.0"
