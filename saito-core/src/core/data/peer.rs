@@ -1,4 +1,6 @@
-use crate::common::defs::SaitoPublicKey;
+use log::debug;
+
+use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::handle_io::HandleIo;
 use crate::core::data;
 
@@ -18,6 +20,18 @@ impl Peer {
         }
     }
     pub async fn initiate_handshake(&mut self, io_handler: &Box<dyn HandleIo + Send + Sync>) {
+        debug!("initiating handshake : {:?}", self.peer_index);
         // TODO : implement this
+        todo!()
+    }
+    pub fn get_block_fetch_url(&self, block_hash: SaitoHash) -> String {
+        let config = self.static_peer_config.as_ref().unwrap();
+        format!(
+            "{:?}://{:?}:{:?}/block/{:?}",
+            config.protocol,
+            config.host,
+            config.port,
+            hex::encode(block_hash)
+        )
     }
 }

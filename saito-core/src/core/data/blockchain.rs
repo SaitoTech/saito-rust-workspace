@@ -84,11 +84,12 @@ impl Blockchain {
         self.fork_id
     }
 
+    #[async_recursion]
     pub async fn add_block(
         &mut self,
         mut block: Block,
         io_handler: &mut Box<dyn HandleIo + Send + Sync>,
-        _peers: Arc<RwLock<PeerCollection>>,
+        peers: Arc<RwLock<PeerCollection>>,
         sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
     ) {
         debug!("adding block to blockchain");
@@ -115,15 +116,34 @@ impl Blockchain {
                 {
                     if block.get_id() > earliest_block_id {
                         if block.source_connection_id.is_some() {
-                            // let peers = peers.read().await;
-                            // let peer = peers.find_peer_by_address(block.get_source_connection_id().unwrap())
-                            // let peer_index: u64 = 0;
-                            // Block::fetch_missing_block(
-                            //     block.get_source_connection_id().unwrap(),
-                            //     block.get_previous_block_hash(),
-                            //     io_handler,
-                            // )
-                            // .await;
+                            // TODO : fetch the block here
+                            let url;
+                            {
+                                let peers = peers.read().await;
+                                let peer = peers.find_peer_by_address(
+                                    &block.get_source_connection_id().unwrap(),
+                                );
+
+                                let peer = peer.unwrap();
+                                url = peer.get_block_fetch_url(block.get_previous_block_hash());
+                            }
+                            let result = Block::fetch_missing_block(io_handler, url).await;
+                            if result.is_err() {
+                                warn!(
+                                    "couldn't fetch block : {:?}",
+                                    hex::encode(block.get_previous_block_hash())
+                                );
+                                todo!()
+                            }
+
+                            let result = result.unwrap();
+                            self.add_block(
+                                result,
+                                io_handler,
+                                peers.clone(),
+                                sender_to_miner.clone(),
+                            )
+                            .await;
                             // global_sender
                             //     .send(GlobalEvent::MissingBlock {
                             //         peer_id: block.get_source_connection_id().unwrap(),
@@ -302,11 +322,6 @@ impl Blockchain {
                 error!("blocks received out-of-order issue...");
             }
         }
-
-        // let block = self.blocks.get(&block_hash);
-        // if block.is_some() {
-        //     Storage::write_block_to_disk(&block.unwrap(), io_handler).await;
-        // }
 
         //
         // at this point we should have a shared ancestor or not

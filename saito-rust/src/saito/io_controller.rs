@@ -16,7 +16,9 @@ use tokio::task::JoinHandle;
 use tokio_tungstenite::{accept_async, connect_async, MaybeTlsStream, WebSocketStream};
 use tungstenite::Message;
 
+use saito_core::common::defs::SaitoHash;
 use saito_core::core::data;
+use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Configuration;
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
@@ -99,14 +101,6 @@ impl IoController {
         let result = connect_async(url).await;
         if result.is_err() {
             warn!("failed connecting to peer : {:?}", peer);
-            // let io_controller = io_controller.write().await;
-            // io_controller
-            //     .sender_to_saito_controller
-            //     .send(IoEvent::new(PeerConnectionResult {
-            //         peer_details: Some(peer),
-            //         result: Err(Error::from(ErrorKind::Other)),
-            //     }))
-            //     .await;
             RustIOHandler::set_event_response(
                 event_id,
                 FutureState::PeerConnectionResult(Err(Error::from(ErrorKind::Other))),
@@ -144,6 +138,23 @@ impl IoController {
             socket.send(Message::Binary(buffer.clone())).await.unwrap();
         }
         debug!("message {:?} sent to all", message_name);
+    }
+    pub async fn fetch_block(url: String, event_id: u64) {
+        debug!("fetching block : {:?}", url);
+
+        let result = reqwest::get(url).await;
+        if result.is_err() {
+            todo!()
+        }
+        let response = result.unwrap();
+        let result = response.bytes().await;
+        if result.is_err() {
+            todo!()
+        }
+        let result = result.unwrap();
+        let buffer = result.to_vec();
+        let block = Block::deserialize_for_net(&buffer);
+        RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
     }
     pub async fn send_new_peer(
         event_id: u64,
@@ -300,22 +311,6 @@ pub async fn run_io_controller(
                         trace!("acquired the io controller write lock");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
-                    // InterfaceEvent::DataSaveRequest {
-                    //     key: index,
-                    //     filename: key,
-                    //     buffer,
-                    // } => {
-                    //     let io_controller = io_controller.write().await;
-                    //     io_controller
-                    //         .write_to_file(event_id, index, key, buffer)
-                    //         .await
-                    //         .unwrap();
-                    // }
-                    // InterfaceEvent::DataSaveResponse { .. } => {
-                    //     unreachable!()
-                    // }
-                    // InterfaceEvent::DataReadRequest(_) => {}
-                    // InterfaceEvent::DataReadResponse(_, _, _) => {}
                     InterfaceEvent::ConnectToPeer { peer_details } => {
                         IoController::connect_to_peer(
                             event_id,
@@ -328,7 +323,10 @@ pub async fn run_io_controller(
                         unreachable!()
                     }
                     InterfaceEvent::PeerDisconnected { peer_index } => {}
-                    _ => {}
+                    InterfaceEvent::IncomingNetworkMessage { .. } => {}
+                    InterfaceEvent::BlockFetchRequest { url } => {
+                        IoController::fetch_block(url, event_id).await
+                    }
                 }
             }
 

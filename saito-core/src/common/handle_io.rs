@@ -2,7 +2,9 @@ use std::io::Error;
 
 use async_trait::async_trait;
 
+use crate::common::defs::SaitoHash;
 use crate::core::data;
+use crate::core::data::block::Block;
 
 #[async_trait]
 pub trait HandleIo {
@@ -47,4 +49,5 @@ pub trait HandleIo {
     async fn is_existing_file(&self, key: String) -> bool;
     async fn remove_value(&self, key: String) -> Result<(), Error>;
     fn get_block_dir(&self) -> String;
+    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error>;
 }
