@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::io::Error;
 use std::{mem, sync::Arc};
 
 use ahash::AHashMap;
@@ -339,6 +340,10 @@ impl Block {
         self.routing_work_for_creator
     }
 
+    pub fn get_source_connection_id(&self) -> Option<SaitoPublicKey> {
+        self.source_connection_id
+    }
+
     pub fn set_routing_work_for_creator(&mut self, routing_work_for_creator: u64) {
         self.routing_work_for_creator = routing_work_for_creator;
     }
@@ -633,6 +638,7 @@ impl Block {
     /// [difficulty - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
     pub fn deserialize_for_net(bytes: &Vec<u8>) -> Block {
+        // TODO : return Option<Block> to support invalid buffers
         let transactions_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let id: u64 = u64::from_be_bytes(bytes[4..12].try_into().unwrap());
         let timestamp: u64 = u64::from_be_bytes(bytes[12..20].try_into().unwrap());
@@ -1850,15 +1856,11 @@ impl Block {
     }
 
     pub async fn fetch_missing_block(
-        peer_index: u64,
-        block_hash: SaitoHash,
-        io_handler: &Box<dyn HandleIo + Send>,
-    ) {
-        debug!(
-            "fetch missing block : block : {:?}",
-            hex::encode(block_hash)
-        );
-        todo!()
+        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        url: String,
+    ) -> Result<Block, Error> {
+        debug!("fetch missing block : block : {:?}", url);
+        io_handler.fetch_block_from_peer(url).await
     }
 }
 

@@ -14,19 +14,25 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::{accept_async, connect_async, MaybeTlsStream, WebSocketStream};
-use tungstenite::Message;
+use tracing_subscriber::filter::FilterExt;
+use warp::ws::WebSocket;
+use warp::Filter;
 
+use saito_core::common::command::InterfaceEvent::PeerConnectionResult;
+use saito_core::common::defs::SaitoHash;
 use saito_core::core::data;
+use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Configuration;
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
 use crate::{InterfaceEvent, IoEvent};
 
-type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+type SocketSender =
+    SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 pub struct IoController {
-    sockets: HashMap<u64, SocketSender>,
+    sockets: HashMap<u64, PeerSender>,
     peer_counter: Arc<Mutex<PeerCounter>>,
     pub sender_to_saito_controller: Sender<IoEvent>,
 }
@@ -99,14 +105,6 @@ impl IoController {
         let result = connect_async(url).await;
         if result.is_err() {
             warn!("failed connecting to peer : {:?}", peer);
-            // let io_controller = io_controller.write().await;
-            // io_controller
-            //     .sender_to_saito_controller
-            //     .send(IoEvent::new(PeerConnectionResult {
-            //         peer_details: Some(peer),
-            //         result: Err(Error::from(ErrorKind::Other)),
-            //     }))
-            //     .await;
             RustIOHandler::set_event_response(
                 event_id,
                 FutureState::PeerConnectionResult(Err(Error::from(ErrorKind::Other))),
@@ -120,11 +118,13 @@ impl IoController {
         let mut io_controller = io_controller.write().await;
         trace!("acquired the io controller write lock");
         let sender_to_controller = io_controller.sender_to_saito_controller.clone();
+        let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
         IoController::send_new_peer(
             event_id,
             io_controller.peer_counter.clone(),
             &mut io_controller.sockets,
-            socket,
+            PeerSender::Tungstenite(socket_sender),
+            PeerReceiver::Tungstenite(socket_receiver),
             sender_to_controller,
         )
         .await;
@@ -141,77 +141,139 @@ impl IoController {
                 continue;
             }
             let socket = entry.1;
-            socket.send(Message::Binary(buffer.clone())).await.unwrap();
+            match socket {
+                PeerSender::Warp(sender) => {
+                    sender
+                        .send(warp::ws::Message::binary(buffer.clone()))
+                        .await
+                        .unwrap();
+                }
+                PeerSender::Tungstenite(sender) => {
+                    sender
+                        .send(tokio_tungstenite::tungstenite::Message::Binary(
+                            buffer.clone(),
+                        ))
+                        .await
+                        .unwrap();
+                }
+            }
         }
         debug!("message {:?} sent to all", message_name);
+    }
+    pub async fn fetch_block(url: String, event_id: u64) {
+        debug!("fetching block : {:?}", url);
+
+        let result = reqwest::get(url).await;
+        if result.is_err() {
+            todo!()
+        }
+        let response = result.unwrap();
+        let result = response.bytes().await;
+        if result.is_err() {
+            todo!()
+        }
+        let result = result.unwrap();
+        let buffer = result.to_vec();
+        let block = Block::deserialize_for_net(&buffer);
+        RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
     }
     pub async fn send_new_peer(
         event_id: u64,
         peer_counter: Arc<Mutex<PeerCounter>>,
-        sockets: &mut HashMap<u64, SocketSender>,
-        socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
-        sender: Sender<IoEvent>,
+        sockets: &mut HashMap<u64, PeerSender>,
+        sender: PeerSender,
+        receiver: PeerReceiver,
+        sender_to_core: Sender<IoEvent>,
     ) {
         let mut counter = peer_counter.lock().await;
         let next_index = counter.get_next_index();
 
-        let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
-
-        sockets.insert(next_index, socket_sender);
+        sockets.insert(next_index, sender);
         debug!("sending new peer : {:?}", next_index);
-        RustIOHandler::set_event_response(
-            event_id,
-            FutureState::PeerConnectionResult(Ok(next_index)),
-        );
+        if event_id != 0 {
+            RustIOHandler::set_event_response(
+                event_id,
+                FutureState::PeerConnectionResult(Ok(next_index)),
+            );
+        } else {
+            sender_to_core
+                .send(IoEvent {
+                    controller_id: 1,
+                    event_id,
+                    event: PeerConnectionResult {
+                        peer_details: None,
+                        result: Ok(next_index),
+                    },
+                })
+                .await;
+        }
 
-        // sender
-        //     .send(IoEvent {
-        //         controller_id: 1,
-        //         event: PeerConnectionResult {
-        //             peer_details: None,
-        //             result: Ok(next_index),
-        //         },
-        //     })
-        //     .await;
-
-        IoController::receive_message_from_peer(socket_receiver, sender.clone(), next_index).await;
+        IoController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
         debug!("new peer : {:?} processed successfully", next_index);
     }
     pub async fn receive_message_from_peer(
-        mut receiver: SocketReceiver,
+        mut receiver: PeerReceiver,
         sender: Sender<IoEvent>,
         next_index: u64,
     ) {
         debug!("starting new task for reading from peer : {:?}", next_index);
         tokio::spawn(async move {
             debug!("new thread started for peer receiving");
-            loop {
-                let result = receiver.next().await;
-                if result.is_none() {
-                    continue;
-                }
-                let result = result.unwrap();
-                if result.is_err() {
-                    warn!("{:?}", result.err().unwrap());
-                    continue;
-                }
-                let result = result.unwrap();
-                match result {
-                    Message::Binary(buffer) => {
-                        // let message = IoEvent {
-                        //     controller_id: 1,
-                        //     event: InterfaceEvent::IncomingNetworkMessage {
-                        //         peer_index: next_index,
-                        //         message_name: "TEST".to_string(),
-                        //         buffer,
-                        //     },
-                        // };
-                        // sender.send(message).await;
+            match receiver {
+                PeerReceiver::Warp(mut receiver) => loop {
+                    let result = receiver.next().await;
+                    if result.is_none() {
+                        continue;
                     }
-                    _ => {
-                        // Not handling these scenarios
+                    let result = result.unwrap();
+                    if result.is_err() {
+                        warn!("{:?}", result.err().unwrap());
+                        continue;
                     }
-                }
+                    let result = result.unwrap();
+                    if result.is_binary() {
+                        let buffer = result.into_bytes();
+                        let message = IoEvent {
+                            controller_id: 1,
+                            event_id: 0,
+                            event: InterfaceEvent::IncomingNetworkMessage {
+                                peer_index: next_index,
+                                message_name: "TEST".to_string(),
+                                buffer,
+                            },
+                        };
+                        sender.send(message).await;
+                    }
+                },
+                PeerReceiver::Tungstenite(mut receiver) => loop {
+                    let result = receiver.next().await;
+                    if result.is_none() {
+                        continue;
+                    }
+                    let result = result.unwrap();
+                    if result.is_err() {
+                        warn!("{:?}", result.err().unwrap());
+                        continue;
+                    }
+                    let result = result.unwrap();
+                    match result {
+                        tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
+                            let message = IoEvent {
+                                controller_id: 1,
+                                event_id: 0,
+                                event: InterfaceEvent::IncomingNetworkMessage {
+                                    peer_index: next_index,
+                                    message_name: "TEST".to_string(),
+                                    buffer,
+                                },
+                            };
+                            sender.send(message).await;
+                        }
+                        _ => {
+                            // Not handling these scenarios
+                        }
+                    }
+                },
             }
         });
     }
@@ -238,11 +300,13 @@ pub async fn run_io_controller(
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
 
     let url;
+    let port;
     {
         trace!("waiting for the configs write lock");
         let configs = configs.read().await;
         trace!("acquired the configs write lock");
         url = "localhost:".to_string() + configs.server.port.to_string().as_str();
+        port = configs.server.port;
     }
 
     info!("starting server on : {:?}", url);
@@ -257,12 +321,15 @@ pub async fn run_io_controller(
     }));
 
     let io_controller_clone = io_controller.clone();
-    let server_handle = run_server(
-        listener,
+
+    let server_handle = run_websocket_server(
         peer_counter_clone,
-        sender_clone,
-        io_controller_clone,
+        sender_clone.clone(),
+        io_controller_clone.clone(),
+        port,
     );
+    let web_server_handle =
+        run_web_server(sender_clone.clone(), io_controller_clone.clone(), port + 1);
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
         loop {
@@ -300,22 +367,6 @@ pub async fn run_io_controller(
                         trace!("acquired the io controller write lock");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
-                    // InterfaceEvent::DataSaveRequest {
-                    //     key: index,
-                    //     filename: key,
-                    //     buffer,
-                    // } => {
-                    //     let io_controller = io_controller.write().await;
-                    //     io_controller
-                    //         .write_to_file(event_id, index, key, buffer)
-                    //         .await
-                    //         .unwrap();
-                    // }
-                    // InterfaceEvent::DataSaveResponse { .. } => {
-                    //     unreachable!()
-                    // }
-                    // InterfaceEvent::DataReadRequest(_) => {}
-                    // InterfaceEvent::DataReadResponse(_, _, _) => {}
                     InterfaceEvent::ConnectToPeer { peer_details } => {
                         IoController::connect_to_peer(
                             event_id,
@@ -328,7 +379,10 @@ pub async fn run_io_controller(
                         unreachable!()
                     }
                     InterfaceEvent::PeerDisconnected { peer_index } => {}
-                    _ => {}
+                    InterfaceEvent::IncomingNetworkMessage { .. } => {}
+                    InterfaceEvent::BlockFetchRequest { url } => {
+                        IoController::fetch_block(url, event_id).await
+                    }
                 }
             }
 
@@ -337,51 +391,73 @@ pub async fn run_io_controller(
             }
         }
     });
-    let result = tokio::join!(server_handle, controller_handle);
+    let result = tokio::join!(server_handle, controller_handle, web_server_handle);
 }
 
-fn run_server(
-    listener: TcpListener,
-    peer_counter_clone: Arc<Mutex<PeerCounter>>,
+pub enum PeerSender {
+    Warp(SplitSink<WebSocket, warp::ws::Message>),
+    Tungstenite(SocketSender),
+}
+
+pub enum PeerReceiver {
+    Warp(SplitStream<WebSocket>),
+    Tungstenite(SocketReceiver),
+}
+
+fn run_websocket_server(
+    peer_counter: Arc<Mutex<PeerCounter>>,
     sender_clone: Sender<IoEvent>,
-    io_controller_clone: Arc<RwLock<IoController>>,
+    io_controller: Arc<RwLock<IoController>>,
+    port: u16,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
         info!("starting server");
-        loop {
-            let result: std::io::Result<(TcpStream, SocketAddr)> = listener.accept().await;
-            if result.is_err() {
-                error!("{:?}", result.err());
-                continue;
-            }
-            info!("receiving incoming connection");
-            let result = result.unwrap();
-            let stream = MaybeTlsStream::Plain(result.0);
-            let stream = accept_async(stream).await.unwrap();
-            trace!("waiting for the io controller write lock");
-            let mut controller = io_controller_clone.write().await;
-            trace!("acquired the io controller write lock");
-            IoController::send_new_peer(
-                0,
-                peer_counter_clone.clone(),
-                &mut controller.sockets,
-                stream,
-                sender_clone.clone(),
-            )
-            .await;
-            // let mut counter = peer_counter_clone.lock().unwrap();
-            // let next_index = counter.get_next_index();
-            //
-            // let controller = io_controller_clone.write().await;
-            // controller.sockets.insert(next_index, stream);
-            //
-            // sender_clone.send(IoEvent {
-            //     controller_id: 1,
-            //     event: PeerConnectionResult {
-            //         peer_details: None,
-            //         result: Ok(next_index),
-            //     },
-            // });
-        }
+        let io_controller = io_controller.clone();
+        let sender_to_io = sender_clone.clone();
+        let peer_counter = peer_counter.clone();
+        let ws_route = warp::path("ws")
+            .and(warp::ws())
+            .map(move |ws: warp::ws::Ws| {
+                let clone = io_controller.clone();
+                let peer_counter = peer_counter.clone();
+                let sender_to_io = sender_to_io.clone();
+                ws.on_upgrade(move |socket| async move {
+                    let (sender, receiver) = socket.split();
+                    let mut controller = clone.write().await;
+
+                    IoController::send_new_peer(
+                        0,
+                        peer_counter,
+                        &mut controller.sockets,
+                        PeerSender::Warp(sender),
+                        PeerReceiver::Warp(receiver),
+                        sender_to_io,
+                    )
+                    .await
+                })
+            });
+
+        let (address, server) =
+            warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
+                // tokio::signal::ctrl_c().await.ok();
+            });
+        server.await;
+    })
+}
+
+fn run_web_server(
+    sender_clone: Sender<IoEvent>,
+    io_controller_clone: Arc<RwLock<IoController>>,
+    port: u16,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        debug!("running web server");
+
+        let http_route = warp::path!("block" / String).map(|hash| {
+            debug!("serving block : {:?}", hash);
+            ""
+        });
+        info!("starting server");
+        warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
     })
 }

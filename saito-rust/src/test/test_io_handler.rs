@@ -3,13 +3,12 @@ use std::io::Error;
 use std::path::Path;
 
 use async_trait::async_trait;
-
 use log::{debug, info};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use saito_core::common::handle_io::HandleIo;
-
+use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Peer;
 
 #[derive(Clone, Debug)]
@@ -129,5 +128,9 @@ impl HandleIo for TestIOHandler {
 
     fn get_block_dir(&self) -> String {
         "./data/blocks/".to_string()
+    }
+
+    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
+        todo!()
     }
 }

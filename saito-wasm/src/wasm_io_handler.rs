@@ -4,6 +4,7 @@ use async_trait::async_trait;
 
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::handle_io::HandleIo;
+use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Peer;
 
 pub struct WasmIoHandler {}
@@ -66,5 +67,9 @@ impl HandleIo for WasmIoHandler {
 
     fn get_block_dir(&self) -> String {
         "data/blocks/".to_string()
+    }
+
+    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
+        todo!()
     }
 }

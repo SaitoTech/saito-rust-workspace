@@ -194,6 +194,7 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
                 .bundle_block(self.blockchain.clone(), timestamp)
                 .await;
             mempool.add_block(result);
+            // TODO : add this directly to the blockchain with write lock.
             self.send_blocks_to_blockchain(mempool.borrow_mut()).await;
             work_done = true;
         }

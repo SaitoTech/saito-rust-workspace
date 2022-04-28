@@ -5,12 +5,13 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
 use saito_core::common::command::InterfaceEvent;
+use saito_core::common::defs::SaitoHash;
 use saito_core::common::handle_io::HandleIo;
 use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Peer;
@@ -290,6 +291,35 @@ impl HandleIo for RustIOHandler {
 
     fn get_block_dir(&self) -> String {
         BLOCKS_DIR_PATH.to_string()
+    }
+
+    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
+        debug!("fetching block from peer : {:?}", url);
+        let event = IoEvent::new(InterfaceEvent::BlockFetchRequest { url: url.clone() });
+        let io_future = IoFuture {
+            event_id: event.event_id,
+        };
+        self.sender
+            .send(event)
+            .await
+            .expect("failed sending to io controller");
+
+        let result = io_future.await;
+        if result.is_err() {
+            let err = result.err().unwrap();
+            warn!("failed fetching block from peer : {:?}", err);
+            return Err(err);
+        }
+        let result = result.unwrap();
+        match result {
+            FutureState::BlockFetched(block) => {
+                trace!("block : {:?} fetched from peer", url);
+                return Ok(block);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
     }
 }
 
