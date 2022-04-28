@@ -323,7 +323,6 @@ pub async fn run_io_controller(
     let io_controller_clone = io_controller.clone();
 
     let server_handle = run_websocket_server(
-        listener,
         peer_counter_clone,
         sender_clone.clone(),
         io_controller_clone.clone(),
@@ -406,7 +405,6 @@ pub enum PeerReceiver {
 }
 
 fn run_websocket_server(
-    listener: TcpListener,
     peer_counter: Arc<Mutex<PeerCounter>>,
     sender_clone: Sender<IoEvent>,
     io_controller: Arc<RwLock<IoController>>,
