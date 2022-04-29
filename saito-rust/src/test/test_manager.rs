@@ -69,7 +69,7 @@ impl TestManager {
         }
     }
     pub async fn clear_data_folder() {
-        tokio::fs::remove_dir_all("data").await;
+        tokio::fs::remove_dir_all("data").await.unwrap();
     }
     //
     // add block at end of longest chain

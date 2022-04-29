@@ -205,7 +205,8 @@ impl IoController {
                         result: Ok(next_index),
                     },
                 })
-                .await;
+                .await
+                .expect("sending failed");
         }
 
         IoController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
@@ -242,7 +243,7 @@ impl IoController {
                                 buffer,
                             },
                         };
-                        sender.send(message).await;
+                        sender.send(message).await.expect("sending failed");
                     }
                 },
                 PeerReceiver::Tungstenite(mut receiver) => loop {
@@ -267,7 +268,7 @@ impl IoController {
                                     buffer,
                                 },
                             };
-                            sender.send(message).await;
+                            sender.send(message).await.expect("sending failed");
                         }
                         _ => {
                             // Not handling these scenarios
@@ -416,6 +417,7 @@ fn run_websocket_server(
     io_controller: Arc<RwLock<IoController>>,
     port: u16,
 ) -> JoinHandle<()> {
+    info!("running websocket server on {:?}", port);
     tokio::spawn(async move {
         info!("starting server");
         let io_controller = io_controller.clone();
@@ -443,7 +445,7 @@ fn run_websocket_server(
                 })
             });
 
-        let (address, server) =
+        let (_, server) =
             warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
                 tokio::signal::ctrl_c().await.ok();
             });
@@ -458,7 +460,7 @@ fn run_web_server(
     blockchain: Arc<RwLock<Blockchain>>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        debug!("running web server");
+        debug!("running web server on : {:?}", port);
         let blockchain = blockchain.clone();
         // TODO : handle security aspect of the server connections
         let http_route = warp::path!("block" / String)
@@ -487,15 +489,15 @@ fn run_web_server(
                         // TODO : check if the full block is in memory or need to load from disk
                         buffer = block.unwrap().serialize_for_net(BlockType::Full);
                     }
-                    Ok(warp::reply::with_status(buffer, StatusCode::FOUND))
+                    Ok(warp::reply::with_status(buffer, StatusCode::OK))
                 },
             );
         info!("starting server");
-        // let (address, server) =
-        //     warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-        //         tokio::signal::ctrl_c().await.ok();
-        //     });
-        // server.await;
-        warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
+        let (_, server) =
+            warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
+                tokio::signal::ctrl_c().await.ok();
+            });
+        server.await;
+        // warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
     })
 }
