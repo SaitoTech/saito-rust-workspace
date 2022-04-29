@@ -1,27 +1,27 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
-use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::{accept_async, connect_async, MaybeTlsStream, WebSocketStream};
-use tracing_subscriber::filter::FilterExt;
+use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
 use saito_core::common::command::InterfaceEvent::PeerConnectionResult;
 use saito_core::common::defs::SaitoHash;
 use saito_core::core::data;
-use saito_core::core::data::block::Block;
+use saito_core::core::data::block::{Block, BlockType};
+use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
@@ -205,7 +205,8 @@ impl IoController {
                         result: Ok(next_index),
                     },
                 })
-                .await;
+                .await
+                .expect("sending failed");
         }
 
         IoController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
@@ -242,7 +243,7 @@ impl IoController {
                                 buffer,
                             },
                         };
-                        sender.send(message).await;
+                        sender.send(message).await.expect("sending failed");
                     }
                 },
                 PeerReceiver::Tungstenite(mut receiver) => loop {
@@ -267,7 +268,7 @@ impl IoController {
                                     buffer,
                                 },
                             };
-                            sender.send(message).await;
+                            sender.send(message).await.expect("sending failed");
                         }
                         _ => {
                             // Not handling these scenarios
@@ -295,6 +296,7 @@ pub async fn run_io_controller(
     mut receiver: Receiver<IoEvent>,
     sender_to_saito_controller: Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
+    blockchain: Arc<RwLock<Blockchain>>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -328,8 +330,13 @@ pub async fn run_io_controller(
         io_controller_clone.clone(),
         port,
     );
-    let web_server_handle =
-        run_web_server(sender_clone.clone(), io_controller_clone.clone(), port + 1);
+    const WEB_SERVER_PORT_OFFSET: u16 = 1;
+    let web_server_handle = run_web_server(
+        sender_clone.clone(),
+        io_controller_clone.clone(),
+        port + WEB_SERVER_PORT_OFFSET,
+        blockchain,
+    );
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
         loop {
@@ -410,6 +417,7 @@ fn run_websocket_server(
     io_controller: Arc<RwLock<IoController>>,
     port: u16,
 ) -> JoinHandle<()> {
+    info!("running websocket server on {:?}", port);
     tokio::spawn(async move {
         info!("starting server");
         let io_controller = io_controller.clone();
@@ -437,9 +445,9 @@ fn run_websocket_server(
                 })
             });
 
-        let (address, server) =
+        let (_, server) =
             warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-                // tokio::signal::ctrl_c().await.ok();
+                tokio::signal::ctrl_c().await.ok();
             });
         server.await;
     })
@@ -449,15 +457,47 @@ fn run_web_server(
     sender_clone: Sender<IoEvent>,
     io_controller_clone: Arc<RwLock<IoController>>,
     port: u16,
+    blockchain: Arc<RwLock<Blockchain>>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
-        debug!("running web server");
-
-        let http_route = warp::path!("block" / String).map(|hash| {
-            debug!("serving block : {:?}", hash);
-            ""
-        });
+        debug!("running web server on : {:?}", port);
+        let blockchain = blockchain.clone();
+        // TODO : handle security aspect of the server connections
+        let http_route = warp::path!("block" / String)
+            .and(warp::any().map(move || blockchain.clone()))
+            .and_then(
+                |block_hash: String, blockchain: Arc<RwLock<Blockchain>>| async move {
+                    debug!("serving block : {:?}", block_hash);
+                    let buffer: Vec<u8>;
+                    {
+                        let block_hash = hex::decode(block_hash);
+                        if block_hash.is_err() {
+                            todo!()
+                        }
+                        let block_hash = block_hash.unwrap();
+                        if block_hash.len() != 32 {
+                            todo!()
+                        }
+                        let block_hash: SaitoHash = block_hash.try_into().unwrap();
+                        let blockchain = blockchain.read().await;
+                        let block = blockchain.get_block(&block_hash).await;
+                        if block.is_none() {
+                            debug!("block not found : {:?}", block_hash);
+                            buffer = vec![];
+                            return Err(warp::reject::not_found());
+                        }
+                        // TODO : check if the full block is in memory or need to load from disk
+                        buffer = block.unwrap().serialize_for_net(BlockType::Full);
+                    }
+                    Ok(warp::reply::with_status(buffer, StatusCode::OK))
+                },
+            );
         info!("starting server");
-        warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
+        let (_, server) =
+            warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
+                tokio::signal::ctrl_c().await.ok();
+            });
+        server.await;
+        // warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
     })
 }

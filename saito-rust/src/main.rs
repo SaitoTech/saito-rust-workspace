@@ -40,8 +40,8 @@ async fn run_thread<T>(
     mut interface_event_receiver: Receiver<InterfaceEvent>,
     mut event_receiver: Receiver<T>,
 ) -> JoinHandle<()>
-    where
-        T: Send + 'static,
+where
+    T: Send + 'static,
 {
     tokio::spawn(async move {
         info!("new thread started");
@@ -103,48 +103,13 @@ async fn run_thread<T>(
     })
 }
 
-async fn run_saito_controllers(
-    mut receiver: Receiver<IoEvent>,
-    sender_to_io_controller: Sender<IoEvent>,
-    configs: Arc<RwLock<Configuration>>,
-) ->(JoinHandle<()>, JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) {
-    info!("running saito controllers");
-
-    let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(1000);
-
-    let context = Context::new(configs.clone(), global_sender.clone());
-
-    let (sender_to_mempool, receiver_for_mempool) =
-        tokio::sync::mpsc::channel::<MempoolEvent>(1000);
-
-    let (sender_to_blockchain, receiver_for_blockchain) =
-        tokio::sync::mpsc::channel::<BlockchainEvent>(1000);
-
-    let (sender_to_miner, receiver_for_miner) =
-        tokio::sync::mpsc::channel::<MinerEvent>(1000);
-
-    let (interface_sender_to_blockchain, blockchain_handle) =
-        run_blockchain_controller(sender_to_io_controller, configs, &global_sender, &context,
-                                  &sender_to_mempool, receiver_for_blockchain, &sender_to_miner).await;
-
-    let (interface_sender_to_mempool, mempool_handle) =
-        run_mempool_controller(&global_sender, &context, receiver_for_mempool,
-                               &sender_to_blockchain, sender_to_miner).await;
-
-    let (interface_sender_to_miner, miner_handle) =
-        run_miner_controller(&global_sender, context, &sender_to_mempool, &sender_to_blockchain,
-                             receiver_for_miner).await;
-
-    let loop_handle = run_loop_thread(receiver, interface_sender_to_blockchain,
-                                      interface_sender_to_mempool, interface_sender_to_miner);
-
-    (blockchain_handle, mempool_handle, miner_handle, loop_handle)
-}
-
-async fn run_miner_controller(global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
-                              context: Context, sender_to_mempool: &tokio::sync::mpsc::Sender<MempoolEvent>,
-                              sender_to_blockchain: &tokio::sync::mpsc::Sender<BlockchainEvent>,
-                              receiver_for_miner: tokio::sync::mpsc::Receiver<MinerEvent>) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
+async fn run_miner_controller(
+    global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
+    context: &Context,
+    sender_to_mempool: &tokio::sync::mpsc::Sender<MempoolEvent>,
+    sender_to_blockchain: &tokio::sync::mpsc::Sender<BlockchainEvent>,
+    receiver_for_miner: tokio::sync::mpsc::Receiver<MinerEvent>,
+) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
     let miner_controller = MinerController {
         miner: context.miner.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
@@ -161,14 +126,17 @@ async fn run_miner_controller(global_sender: &tokio::sync::broadcast::Sender<Glo
         interface_receiver_for_miner,
         receiver_for_miner,
     )
-        .await;
+    .await;
     (interface_sender_to_miner, _miner_handle)
 }
 
-async fn run_mempool_controller(global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
-                                context: &Context, receiver_for_mempool: Receiver<MempoolEvent>,
-                                sender_to_blockchain: &Sender<BlockchainEvent>,
-                                sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
+async fn run_mempool_controller(
+    global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
+    context: &Context,
+    receiver_for_mempool: Receiver<MempoolEvent>,
+    sender_to_blockchain: &Sender<BlockchainEvent>,
+    sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
+) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
     let mempool_controller = MempoolController {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
@@ -190,16 +158,20 @@ async fn run_mempool_controller(global_sender: &tokio::sync::broadcast::Sender<G
         interface_receiver_for_mempool,
         receiver_for_mempool,
     )
-        .await;
+    .await;
 
     (interface_sender_to_mempool, _mempool_handle)
 }
 
-async fn run_blockchain_controller(sender_to_io_controller: tokio::sync::mpsc::Sender<IoEvent>,
-                                   configs: Arc<RwLock<Configuration>>, global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
-                                   context: &Context, sender_to_mempool: &Sender<MempoolEvent>,
-                                   receiver_for_blockchain: Receiver<BlockchainEvent>,
-                                   sender_to_miner: &Sender<MinerEvent>) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
+async fn run_blockchain_controller(
+    sender_to_io_controller: tokio::sync::mpsc::Sender<IoEvent>,
+    configs: Arc<RwLock<Configuration>>,
+    global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
+    context: &Context,
+    sender_to_mempool: &Sender<MempoolEvent>,
+    receiver_for_blockchain: Receiver<BlockchainEvent>,
+    sender_to_miner: &Sender<MinerEvent>,
+) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
     let mut blockchain_controller = BlockchainController {
         blockchain: context.blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
@@ -236,16 +208,18 @@ async fn run_blockchain_controller(sender_to_io_controller: tokio::sync::mpsc::S
         global_sender.subscribe(),
         interface_receiver_for_blockchain,
         receiver_for_blockchain,
-    ).await;
+    )
+    .await;
 
     (interface_sender_to_blockchain, _blockchain_handle)
 }
 
-fn run_loop_thread(mut receiver: Receiver<IoEvent>,
-                   interface_sender_to_blockchain: Sender<InterfaceEvent>,
-                   interface_sender_to_mempool: Sender<InterfaceEvent>,
-                   interface_sender_to_miner: Sender<InterfaceEvent>) -> JoinHandle<()> {
-
+fn run_loop_thread(
+    mut receiver: Receiver<IoEvent>,
+    interface_sender_to_blockchain: Sender<InterfaceEvent>,
+    interface_sender_to_mempool: Sender<InterfaceEvent>,
+    interface_sender_to_miner: Sender<InterfaceEvent>,
+) -> JoinHandle<()> {
     const BLOCKCHAIN_CONTROLLER_ID: u8 = 1;
     const MEMPOOL_CONTROLLER_ID: u8 = 2;
     const MINER_CONTROLLER_ID: u8 = 3;
@@ -329,18 +303,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (sender_to_io_controller, receiver_in_io_controller) =
         tokio::sync::mpsc::channel::<IoEvent>(1000);
 
-    let (blockchain_handle, mempool_handle, miner_handle, loop_handle) = run_saito_controllers(
-        receiver_in_saito_controller,
-        sender_to_io_controller.clone(),
+    info!("running saito controllers");
+
+    let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(1000);
+
+    let context = Context::new(configs.clone(), global_sender.clone());
+
+    let (sender_to_mempool, receiver_for_mempool) =
+        tokio::sync::mpsc::channel::<MempoolEvent>(1000);
+
+    let (sender_to_blockchain, receiver_for_blockchain) =
+        tokio::sync::mpsc::channel::<BlockchainEvent>(1000);
+
+    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1000);
+
+    let (interface_sender_to_blockchain, blockchain_handle) = run_blockchain_controller(
+        sender_to_io_controller,
         configs.clone(),
-    ).await;
+        &global_sender,
+        &context,
+        &sender_to_mempool,
+        receiver_for_blockchain,
+        &sender_to_miner,
+    )
+    .await;
+
+    let (interface_sender_to_mempool, mempool_handle) = run_mempool_controller(
+        &global_sender,
+        &context,
+        receiver_for_mempool,
+        &sender_to_blockchain,
+        sender_to_miner,
+    )
+    .await;
+
+    let (interface_sender_to_miner, miner_handle) = run_miner_controller(
+        &global_sender,
+        &context,
+        &sender_to_mempool,
+        &sender_to_blockchain,
+        receiver_for_miner,
+    )
+    .await;
+
+    let loop_handle = run_loop_thread(
+        receiver_in_saito_controller,
+        interface_sender_to_blockchain,
+        interface_sender_to_mempool,
+        interface_sender_to_miner,
+    );
 
     let result2 = tokio::spawn(run_io_controller(
         receiver_in_io_controller,
         sender_to_saito_controller.clone(),
         configs.clone(),
+        context.blockchain.clone(),
     ));
 
-    let result = tokio::join!(blockchain_handle, mempool_handle, miner_handle, loop_handle,result2);
+    let result = tokio::join!(
+        blockchain_handle,
+        mempool_handle,
+        miner_handle,
+        loop_handle,
+        result2
+    );
     Ok(())
 }
