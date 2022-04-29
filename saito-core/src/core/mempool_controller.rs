@@ -18,6 +18,7 @@ use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::core::miner_controller::MinerEvent;
 
+#[derive(Debug)]
 pub enum MempoolEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
 }

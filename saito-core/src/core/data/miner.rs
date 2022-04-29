@@ -73,9 +73,10 @@ impl Miner {
                 "golden ticket found. sending to mempool : {:?}",
                 hex::encode(gt.get_target())
             );
-            let result = sender_to_mempool
+            sender_to_mempool
                 .send(MempoolEvent::NewGoldenTicket { golden_ticket: gt })
-                .await;
+                .await
+                .expect("sending to mempool failed");
             trace!("sent to mempool");
             // TODO : check result
         }
@@ -87,22 +88,22 @@ impl Miner {
         block_hash: SaitoHash,
         block_difficulty: u64,
     ) -> GoldenTicket {
-        let publickey;
+        let public_key;
         {
             trace!("waiting for the wallet read lock");
             let wallet = self.wallet.read().await;
             trace!("acquired the wallet read lock");
-            publickey = wallet.get_publickey();
+            public_key = wallet.get_publickey();
         }
         let mut random_bytes = hash(&generate_random_bytes(32));
 
-        let mut solution = GoldenTicket::generate_solution(block_hash, random_bytes, publickey);
+        let mut solution = GoldenTicket::generate_solution(block_hash, random_bytes, public_key);
 
         while !GoldenTicket::is_valid_solution(solution, block_difficulty) {
             random_bytes = hash(&generate_random_bytes(32));
-            solution = GoldenTicket::generate_solution(block_hash, random_bytes, publickey);
+            solution = GoldenTicket::generate_solution(block_hash, random_bytes, public_key);
         }
 
-        GoldenTicket::new(block_hash, random_bytes, publickey)
+        GoldenTicket::new(block_hash, random_bytes, public_key)
     }
 }
