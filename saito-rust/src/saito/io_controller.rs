@@ -447,7 +447,7 @@ fn run_websocket_server(
 
         let (_, server) =
             warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-                tokio::signal::ctrl_c().await.ok();
+                // tokio::signal::ctrl_c().await.ok();
             });
         server.await;
     })
@@ -495,7 +495,7 @@ fn run_web_server(
         info!("starting server");
         let (_, server) =
             warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-                tokio::signal::ctrl_c().await.ok();
+                // tokio::signal::ctrl_c().await.ok();
             });
         server.await;
         // warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
