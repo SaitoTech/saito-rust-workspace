@@ -319,7 +319,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     let configs = Arc::new(RwLock::new(
-        ConfigHandler::load_configs("configs/saito.config.template.json".to_string())
+        ConfigHandler::load_configs("configs/saito.config.json".to_string())
             .expect("loading configs failed"),
     ));
 
