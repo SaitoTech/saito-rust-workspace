@@ -763,8 +763,10 @@ impl Blockchain {
             info!(
                 "{} - {:?}",
                 current_id,
-                self.blockring
-                    .get_longest_chain_block_hash_by_block_id(current_id)
+                hex::encode(
+                    self.blockring
+                        .get_longest_chain_block_hash_by_block_id(current_id)
+                )
             );
             current_id -= 1;
         }
