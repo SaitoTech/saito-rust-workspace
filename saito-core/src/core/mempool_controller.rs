@@ -32,6 +32,7 @@ pub struct MempoolController {
     // pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
     pub block_producing_timer: u128,
     pub tx_producing_timer: u128,
+    pub generate_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
 }
 
@@ -156,18 +157,20 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
         let duration_value = duration.as_micros();
 
         // generate test transactions
-        self.tx_producing_timer = self.tx_producing_timer + duration_value;
-        if self.tx_producing_timer >= 1_000_000 {
-            // TODO : Remove this transaction generation once testing is done
-            MempoolController::generate_tx(
-                self.mempool.clone(),
-                self.wallet.clone(),
-                self.blockchain.clone(),
-            )
-            .await;
+        if self.generate_test_tx {
+            self.tx_producing_timer = self.tx_producing_timer + duration_value;
+            if self.tx_producing_timer >= 1_000_000 {
+                // TODO : Remove this transaction generation once testing is done
+                MempoolController::generate_tx(
+                    self.mempool.clone(),
+                    self.wallet.clone(),
+                    self.blockchain.clone(),
+                )
+                .await;
 
-            self.tx_producing_timer = 0;
-            work_done = true;
+                self.tx_producing_timer = 0;
+                work_done = true;
+            }
         }
 
         // generate blocks

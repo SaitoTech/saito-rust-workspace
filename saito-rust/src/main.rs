@@ -147,6 +147,7 @@ async fn run_mempool_controller(
         time_keeper: Box::new(TimeKeeper {}),
         block_producing_timer: 0,
         tx_producing_timer: 0,
+        generate_test_tx: true,
     };
 
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
