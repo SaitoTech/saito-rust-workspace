@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
@@ -96,21 +96,28 @@ impl IoController {
     ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
 
-        debug!("connecting to peer : {:?}", peer);
         let mut protocol: String = String::from("ws");
         if peer.protocol == "https" {
             protocol = String::from("wss");
         }
-        let url = protocol + "://" + peer.host.as_str() + ":" + peer.port.to_string().as_str();
-        let result = connect_async(url).await;
+        let url = protocol
+            + "://"
+            + peer.host.as_str()
+            + ":"
+            + peer.port.to_string().as_str()
+            + "/wsopen";
+        debug!("connecting to peer : {:?}", url);
+        let result = connect_async(url.clone()).await;
         if result.is_err() {
             warn!("failed connecting to peer : {:?}", peer);
+            error!("{:?}", result.err());
             RustIOHandler::set_event_response(
                 event_id,
                 FutureState::PeerConnectionResult(Err(Error::from(ErrorKind::Other))),
             );
             return;
         }
+        debug!("connected to peer : {:?}", url);
         let result = result.unwrap();
         let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
