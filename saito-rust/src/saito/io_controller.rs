@@ -426,17 +426,19 @@ fn run_websocket_server(
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
     tokio::spawn(async move {
-        info!("starting server");
+        info!("starting websocket server");
         let io_controller = io_controller.clone();
         let sender_to_io = sender_clone.clone();
         let peer_counter = peer_counter.clone();
-        let ws_route = warp::path("ws")
+        let ws_route = warp::path("wsopen")
             .and(warp::ws())
             .map(move |ws: warp::ws::Ws| {
+                debug!("incoming connection received");
                 let clone = io_controller.clone();
                 let peer_counter = peer_counter.clone();
                 let sender_to_io = sender_to_io.clone();
                 ws.on_upgrade(move |socket| async move {
+                    debug!("socket connection established");
                     let (sender, receiver) = socket.split();
                     let mut controller = clone.write().await;
 
@@ -501,7 +503,7 @@ fn run_web_server(
                     Ok(warp::reply::with_status(buffer, StatusCode::OK))
                 },
             );
-        info!("starting server");
+        info!("starting web server");
         // let (_, server) =
         //     warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
         //         // tokio::signal::ctrl_c().await.ok();
