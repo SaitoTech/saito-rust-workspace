@@ -6,6 +6,7 @@ pub mod configuration;
 pub mod context;
 pub mod crypto;
 pub mod golden_ticket;
+mod handshake;
 pub mod hop;
 pub mod mempool;
 pub mod merkle;
