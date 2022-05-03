@@ -72,8 +72,10 @@ impl TestManager {
         }
     }
     pub async fn clear_data_folder() {
-        tokio::fs::remove_dir_all("data").await.unwrap();
-        tokio::fs::create_dir_all("data").await.unwrap();
+        tokio::fs::remove_dir_all("data/blocks").await;
+        tokio::fs::create_dir_all("data/blocks").await.unwrap();
+        tokio::fs::remove_dir_all("data/wallet").await;
+        tokio::fs::create_dir_all("data/wallet").await.unwrap();
     }
     //
     // add block at end of longest chain
@@ -427,10 +429,8 @@ impl TestManager {
         }
     }
 
-    //
     // check that everything spendable in the main UTXOSET is spendable on the longest
     // chain and vice-versa.
-    //
     pub async fn check_utxoset(&self) {
         let blockchain = self.blockchain_lock.read().await;
         let mut utxoset: AHashMap<SaitoUTXOSetKey, u64> = AHashMap::new();

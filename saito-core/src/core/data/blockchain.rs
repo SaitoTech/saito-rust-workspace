@@ -93,12 +93,12 @@ impl Blockchain {
         sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
     ) {
         debug!("adding block to blockchain");
-        //
+
         // get missing block
-        //
         if self.blockring.get_latest_block_id() > 0 {
             let mut earliest_block_id = 1;
             if self.get_latest_block_id() > GENESIS_PERIOD {
+                // if the ring is full
                 earliest_block_id = self.get_latest_block_id() - GENESIS_PERIOD;
             }
             trace!("earliest_block_id {}", earliest_block_id);
@@ -108,6 +108,7 @@ impl Blockchain {
             trace!("earliest_block_hash {:?}", earliest_block_hash);
             let earliest_block = self.get_mut_block(&earliest_block_hash).await;
 
+            // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
             if block.get_timestamp() > earliest_block.get_timestamp() {
                 if self
                     .get_block(&block.get_previous_block_hash())
@@ -116,7 +117,6 @@ impl Blockchain {
                 {
                     if block.get_id() > earliest_block_id {
                         if block.source_connection_id.is_some() {
-                            // TODO : fetch the block here
                             let url;
                             {
                                 let peers = peers.read().await;
@@ -137,6 +137,7 @@ impl Blockchain {
                             }
 
                             let result = result.unwrap();
+                            // adding the missing block before adding the new block. (will recursively add missing blocks)
                             self.add_block(
                                 result,
                                 io_handler,
@@ -144,12 +145,6 @@ impl Blockchain {
                                 sender_to_miner.clone(),
                             )
                             .await;
-                            // global_sender
-                            //     .send(GlobalEvent::MissingBlock {
-                            //         peer_id: block.get_source_connection_id().unwrap(),
-                            //         hash: block.get_previous_block_hash(),
-                            //     })
-                            //     .expect("error: MissingBlock message failed to send");
                         }
                     }
                 }
@@ -161,13 +156,7 @@ impl Blockchain {
         //
         block.generate_hashes();
 
-        info!("add_block {}", &hex::encode(&block.get_hash()));
-        // trace!(
-        //     " ... blockchain.add_block start: {:?} hash: {:?}, and id {}",
-        //     create_timestamp(),
-        //     block.get_hash(),
-        //     block.get_id()
-        // );
+        info!("add_block {:?}", &hex::encode(&block.get_hash()));
 
         //
         // start by extracting some variables that we will use
@@ -222,6 +211,7 @@ impl Blockchain {
         // the block next, so we insert it into our BlockRing first as that will avoid
         // needing to borrow the value back for insertion into the BlockRing.
         //
+        // TODO : check if this "if" condition can be moved to an assert
         if !self
             .blockring
             .contains_block_hash_at_block_id(block_id, block_hash)
@@ -240,6 +230,7 @@ impl Blockchain {
                 "BLOCK IS ALREADY IN THE BLOCKCHAIN, WHY ARE WE ADDING IT????? {:?}",
                 block.get_hash()
             );
+            return;
         }
 
         //
@@ -253,7 +244,12 @@ impl Blockchain {
 
         while !shared_ancestor_found {
             if self.blocks.contains_key(&new_chain_hash) {
-                if self.blocks.get(&new_chain_hash).unwrap().get_lc() {
+                if self
+                    .blocks
+                    .get(&new_chain_hash)
+                    .unwrap()
+                    .is_in_longest_chain()
+                {
                     shared_ancestor_found = true;
                     break;
                 } else {
@@ -272,9 +268,7 @@ impl Blockchain {
             }
         }
 
-        //
         // and get existing current chain for comparison
-        //
         if shared_ancestor_found {
             loop {
                 if new_chain_hash == old_chain_hash {
@@ -311,7 +305,7 @@ impl Blockchain {
                 // unexpected / edge-case issues around block receipt.
                 //
             } else {
-                //
+                //•
                 // TODO - implement logic to handle once nodes can connect
                 //
                 // if this not our first block, handle edge-case around receiving
@@ -323,11 +317,8 @@ impl Blockchain {
             }
         }
 
-        //
         // at this point we should have a shared ancestor or not
-        //
         // find out whether this new block is claiming to require chain-validation
-        //
         let am_i_the_longest_chain = self.is_new_chain_the_longest_chain(&new_chain, &old_chain);
 
         //
@@ -353,7 +344,10 @@ impl Blockchain {
                 // this trick. we did this check before validating.
                 //
                 {
-                    self.blocks.get_mut(&block_hash).unwrap().set_lc(true);
+                    self.blocks
+                        .get_mut(&block_hash)
+                        .unwrap()
+                        .set_in_longest_chain(true);
                 }
 
                 // TODO : send with the right channel

@@ -479,6 +479,7 @@ fn run_web_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
+                        // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
                         let block = blockchain.get_block(&block_hash).await;
                         if block.is_none() {

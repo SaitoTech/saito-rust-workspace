@@ -1,6 +1,6 @@
 use ahash::AHashMap;
 use bigint::U256;
-use log::{error, info};
+use log::{error, info, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -61,18 +61,19 @@ impl Slip {
                     if *value == 1 {
                         true
                     } else {
-                        info!(
+                        warn!(
                             "in utxoset but invalid: value is {} at {:?}",
-                            *value, &self.utxoset_key
+                            *value,
+                            hex::encode(self.utxoset_key)
                         );
                         false
                     }
                 }
                 None => {
-                    info!("not in utxoset so invalid");
+                    warn!("not in utxoset so invalid");
                     error!(
                         "value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
-                        self.utxoset_key,
+                        hex::encode(self.utxoset_key),
                         self.get_slip_type(),
                         self.get_slip_ordinal(),
                         self.get_amount()
@@ -95,7 +96,7 @@ impl Slip {
                 info!(
                     " ====> update deposit to {}: {:?} -- {:?}",
                     slip_value,
-                    self.get_utxoset_key(),
+                    hex::encode(self.get_utxoset_key()),
                     self.get_slip_type()
                 );
             }
@@ -105,7 +106,7 @@ impl Slip {
                 info!(
                     " ====> update output to {}: {:?} -- {:?}",
                     slip_value,
-                    self.get_utxoset_key(),
+                    hex::encode(self.get_utxoset_key()),
                     self.get_slip_type(),
                 );
             }
