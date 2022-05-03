@@ -5,10 +5,11 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, trace, warn};
+use log::{debug, info, trace, warn};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
+use tracing::field::debug;
 
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::defs::SaitoHash;
@@ -254,7 +255,16 @@ impl HandleIo for RustIOHandler {
     }
 
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
-        let mut paths: Vec<_> = fs::read_dir(self.get_block_dir())
+        debug!(
+            "loading blocks from dir : {:?}",
+            self.get_block_dir().to_string(),
+        );
+        let result = fs::read_dir(self.get_block_dir());
+        if result.is_err() {
+            debug!("no blocks found");
+            return Err(result.err().unwrap());
+        }
+        let mut paths: Vec<_> = result
             .unwrap()
             .map(|r| r.unwrap())
             .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
