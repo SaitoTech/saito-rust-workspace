@@ -178,7 +178,6 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
         self.block_producing_timer = self.block_producing_timer + duration_value;
         // TODO : make timers configurable
         if self.block_producing_timer >= 1_000_000 {
-            debug!("producing block...");
             trace!("waiting for the mempool read lock");
             let mempool = self.mempool.read().await;
             trace!("acquired the mempool read lock");
