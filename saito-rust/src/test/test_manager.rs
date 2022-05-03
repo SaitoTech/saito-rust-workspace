@@ -74,8 +74,8 @@ impl TestManager {
     pub async fn clear_data_folder() {
         tokio::fs::remove_dir_all("data/blocks").await;
         tokio::fs::create_dir_all("data/blocks").await.unwrap();
-        tokio::fs::remove_dir_all("data/wallet").await;
-        tokio::fs::create_dir_all("data/wallet").await.unwrap();
+        tokio::fs::remove_dir_all("data/wallets").await;
+        tokio::fs::create_dir_all("data/wallets").await.unwrap();
     }
     //
     // add block at end of longest chain
