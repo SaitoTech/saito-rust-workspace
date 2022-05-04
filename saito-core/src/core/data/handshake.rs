@@ -3,18 +3,21 @@ use std::io::{Error, ErrorKind};
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
 use crate::core::data::serialize::Serialize;
 
+#[derive(Debug)]
 pub struct HandshakeChallenge {
     pub public_key: SaitoPublicKey,
     pub challenge: SaitoHash,
 }
 
 // TODO : can we drop other 2 structs and only use this ? need to confirm with more fields being added
+#[derive(Debug)]
 pub struct HandshakeResponse {
     pub public_key: SaitoPublicKey,
     pub signature: SaitoSignature,
     pub challenge: SaitoHash,
 }
 
+#[derive(Debug)]
 pub struct HandshakeCompletion {
     pub signature: SaitoSignature,
 }

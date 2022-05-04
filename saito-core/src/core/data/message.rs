@@ -4,6 +4,7 @@ use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;
 use std::io::{Error, ErrorKind};
 
+#[derive(Debug)]
 pub enum Message {
     HandshakeChallenge(HandshakeChallenge),
     HandshakeResponse(HandshakeResponse),

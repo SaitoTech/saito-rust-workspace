@@ -33,7 +33,6 @@ pub enum InterfaceEvent {
     },
     IncomingNetworkMessage {
         peer_index: u64,
-        message_name: String,
         buffer: Vec<u8>,
     },
     ConnectToPeer {

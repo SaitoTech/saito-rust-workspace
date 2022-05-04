@@ -121,6 +121,57 @@ impl BlockchainController {
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         todo!()
     }
+    async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
+        debug!(
+            "processing incoming message type : {:?} from peer : {:?}",
+            message, peer_index
+        );
+        match message {
+            Message::HandshakeChallenge(challenge) => {
+                debug!("received handshake challenge");
+                let mut peers = self.peers.write().await;
+                let peer = peers.index_to_peers.get_mut(&peer_index);
+                if peer.is_none() {
+                    todo!()
+                }
+                let peer = peer.unwrap();
+                peer.handle_handshake_challenge(challenge, &self.io_handler, self.wallet.clone())
+                    .await;
+            }
+            Message::HandshakeResponse(response) => {
+                debug!("received handshake response");
+                let mut peers = self.peers.write().await;
+                let peer = peers.index_to_peers.get_mut(&peer_index);
+                if peer.is_none() {
+                    todo!()
+                }
+                let peer = peer.unwrap();
+                peer.handle_handshake_response(response, &self.io_handler, self.wallet.clone())
+                    .await;
+            }
+            Message::HandshakeCompletion(response) => {
+                debug!("received handshake completion");
+                let mut peers = self.peers.write().await;
+                let peer = peers.index_to_peers.get_mut(&peer_index);
+                if peer.is_none() {
+                    todo!()
+                }
+                let peer = peer.unwrap();
+                let result = peer
+                    .handle_handshake_completion(response, &self.io_handler)
+                    .await;
+            }
+            Message::ApplicationMessage(_) => {
+                debug!("received buffer");
+            }
+            Message::Block(_) => {
+                debug!("received block");
+            }
+            Message::Transaction(_) => {
+                debug!("received transaction");
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -133,17 +184,14 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
         debug!("processing new interface event");
         match event {
-            InterfaceEvent::OutgoingNetworkMessage {
-                peer_index: _,
-                buffer: _,
-            } => {
+            InterfaceEvent::OutgoingNetworkMessage { peer_index, buffer } => {
                 // TODO : remove this case if not being used
+                unreachable!()
             }
-            InterfaceEvent::IncomingNetworkMessage {
-                peer_index: _,
-                message_name: _,
-                buffer: _,
-            } => {}
+            InterfaceEvent::IncomingNetworkMessage { peer_index, buffer } => {
+                debug!("incoming message received from peer : {:?}", peer_index);
+                let message = Message::deserialize(buffer);
+            }
             InterfaceEvent::PeerConnectionResult {
                 peer_details,
                 result,
@@ -159,7 +207,6 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
         }
         None
     }
-
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 

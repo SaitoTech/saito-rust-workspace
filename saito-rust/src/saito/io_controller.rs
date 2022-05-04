@@ -241,7 +241,6 @@ impl IoController {
                             event_id: 0,
                             event: InterfaceEvent::IncomingNetworkMessage {
                                 peer_index: next_index,
-                                message_name: "TEST".to_string(),
                                 buffer,
                             },
                         };
@@ -266,7 +265,6 @@ impl IoController {
                                 event_id: 0,
                                 event: InterfaceEvent::IncomingNetworkMessage {
                                     peer_index: next_index,
-                                    message_name: "TEST".to_string(),
                                     buffer,
                                 },
                             };
