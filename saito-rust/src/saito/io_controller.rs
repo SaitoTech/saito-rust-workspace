@@ -38,57 +38,31 @@ pub struct IoController {
 }
 
 impl IoController {
-    pub async fn send_outgoing_message(&self, peer_index: u64, buffer: Vec<u8>) {
+    pub async fn send_outgoing_message(&mut self, peer_index: u64, buffer: Vec<u8>) {
         debug!("sending outgoing message : peer = {:?}", peer_index);
-        let socket = self.sockets.get(&peer_index);
+        let socket = self.sockets.get_mut(&peer_index);
         if socket.is_none() {
             // TODO : handle
         }
         let socket = socket.unwrap();
+        match socket {
+            PeerSender::Warp(sender) => {
+                sender
+                    .send(warp::ws::Message::binary(buffer.clone()))
+                    .await
+                    .unwrap();
+            }
+            PeerSender::Tungstenite(sender) => {
+                sender
+                    .send(tokio_tungstenite::tungstenite::Message::Binary(
+                        buffer.clone(),
+                    ))
+                    .await
+                    .unwrap();
+            }
+        }
     }
-    // pub fn process_file_request(&self, file_request: InterfaceEvent) {}
-    // async fn write_to_file(
-    //     &self,
-    //     event_id: u64,
-    //     request_key: String,
-    //     filename: String,
-    //     buffer: Vec<u8>,
-    // ) -> Result<(), std::io::Error> {
-    //     debug!(
-    //         "writing to file : {:?} in {:?}",
-    //         filename,
-    //         std::env::current_dir().unwrap().to_str()
-    //     );
-    //
-    //     // TODO : run in a new thread with perf testing
-    //
-    //     if !Path::new(&filename).exists() {
-    //         let mut file = File::create(filename.clone()).unwrap();
-    //         let result = file.write_all(&buffer[..]);
-    //         if result.is_err() {
-    //             warn!("failed writing file : {:?}", filename);
-    //             let error = result.err().unwrap();
-    //             warn!("{:?}", error);
-    //             // self.sender_to_saito_controller.send(IoEvent::new(
-    //             //     InterfaceEvent::DataSaveResponse {
-    //             //         key: request_key,
-    //             //         result: Err(error),
-    //             //     },
-    //             // ));
-    //             RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Err(error)));
-    //             return Err(std::io::Error::from(ErrorKind::Other));
-    //         }
-    //     }
-    //     debug!("file written successfully : {:?}", filename);
-    //     RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Ok(filename)));
-    //     // self.sender_to_saito_controller
-    //     //     .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
-    //     //         key: request_key,
-    //     //         result: Ok(filename),
-    //     //     }))
-    //     //     .await;
-    //     Ok(())
-    // }
+
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<IoController>>,
@@ -363,7 +337,7 @@ pub async fn run_io_controller(
                         buffer,
                     } => {
                         trace!("waiting for the io_controller write lock");
-                        let io_controller = io_controller.read().await;
+                        let mut io_controller = io_controller.write().await;
                         trace!("acquired the io controller write lock");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
