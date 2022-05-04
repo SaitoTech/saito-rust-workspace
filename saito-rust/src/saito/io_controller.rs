@@ -193,9 +193,9 @@ impl IoController {
         mut receiver: PeerReceiver,
         sender: Sender<IoEvent>,
         next_index: u64,
-    ) -> JoinHandle<()> {
+    ) {
         debug!("starting new task for reading from peer : {:?}", next_index);
-        tokio::spawn(async move {
+        tokio::task::spawn(async move {
             debug!("new thread started for peer receiving");
             match receiver {
                 PeerReceiver::Warp(mut receiver) => loop {
@@ -254,7 +254,7 @@ impl IoController {
                     }
                 },
             }
-        })
+        });
     }
 }
 
