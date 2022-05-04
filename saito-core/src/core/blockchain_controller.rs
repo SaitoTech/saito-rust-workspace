@@ -15,9 +15,11 @@ use crate::core::data;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
+use crate::core::data::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
+use crate::core::data::wallet::Wallet;
 use crate::core::mempool_controller::MempoolEvent;
 use crate::core::miner_controller::MinerEvent;
 
@@ -48,6 +50,7 @@ pub struct BlockchainController {
     pub configs: Arc<RwLock<Configuration>>,
     pub io_handler: Box<dyn HandleIo + Send + Sync>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
+    pub wallet: Arc<RwLock<Wallet>>,
 }
 
 impl BlockchainController {
@@ -81,7 +84,7 @@ impl BlockchainController {
         }
 
         self.io_handler
-            .send_message_to_all("BLOCK".parse().unwrap(), buffer, exceptions)
+            .send_message_to_all(buffer, exceptions)
             .await
             .unwrap();
         debug!("block sent to peers");
@@ -109,7 +112,8 @@ impl BlockchainController {
         //     }
         // }
         let mut peer = Peer::new(peer_index);
-        peer.initiate_handshake(&self.io_handler).await;
+        peer.initiate_handshake(&self.io_handler, self.wallet.clone())
+            .await;
 
         peers.index_to_peers.insert(peer_index, peer);
         info!("new peer added : {:?}", peer_index);
@@ -131,7 +135,6 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
         match event {
             InterfaceEvent::OutgoingNetworkMessage {
                 peer_index: _,
-                message_name: _,
                 buffer: _,
             } => {
                 // TODO : remove this case if not being used

@@ -85,18 +85,9 @@ impl RustIOHandler {
 
 #[async_trait]
 impl HandleIo for RustIOHandler {
-    async fn send_message(
-        &self,
-        peer_index: u64,
-        message_name: String,
-        buffer: Vec<u8>,
-    ) -> Result<(), Error> {
+    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         // TODO : refactor to combine event and the future
-        let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessage {
-            peer_index,
-            message_name,
-            buffer,
-        });
+        let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessage { peer_index, buffer });
         let io_future = IoFuture {
             event_id: event.event_id,
         };
@@ -119,14 +110,12 @@ impl HandleIo for RustIOHandler {
 
     async fn send_message_to_all(
         &self,
-        message_name: String,
         buffer: Vec<u8>,
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
-        debug!("send message to all {:?}", message_name);
+        debug!("send message to all");
 
         let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessageForAll {
-            message_name,
             buffer,
             exceptions: peer_exceptions,
         });
@@ -330,6 +319,10 @@ impl HandleIo for RustIOHandler {
                 unreachable!()
             }
         }
+    }
+
+    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+        todo!()
     }
 }
 

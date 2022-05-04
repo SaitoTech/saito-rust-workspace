@@ -1,10 +1,14 @@
+use std::io::{Error, ErrorKind};
+
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
+use crate::core::data::serialize::Serialize;
 
 pub struct HandshakeChallenge {
     pub public_key: SaitoPublicKey,
     pub challenge: SaitoHash,
 }
 
+// TODO : can we drop other 2 structs and only use this ? need to confirm with more fields being added
 pub struct HandshakeResponse {
     pub public_key: SaitoPublicKey,
     pub signature: SaitoSignature,
@@ -15,25 +19,28 @@ pub struct HandshakeCompletion {
     pub signature: SaitoSignature,
 }
 
-impl HandshakeChallenge {
-    pub fn serialize(&self) -> Vec<u8> {
+impl Serialize<Self> for HandshakeChallenge {
+    fn serialize(&self) -> Vec<u8> {
         let buffer = [self.public_key.to_vec(), self.challenge.to_vec()].concat();
 
         return buffer;
     }
-    pub fn deserialize(buffer: &Vec<u8>) -> Self {
+    fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
+        if buffer.len() != 65 {
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
         let mut challenge = HandshakeChallenge {
             public_key: [0; 33],
             challenge: [0; 32],
         };
         challenge.public_key = buffer[0..33].to_vec().try_into().unwrap();
         challenge.challenge = buffer[33..65].to_vec().try_into().unwrap();
-        return challenge;
+        return Ok(challenge);
     }
 }
 
-impl HandshakeResponse {
-    pub fn serialize(&self) -> Vec<u8> {
+impl Serialize<Self> for HandshakeResponse {
+    fn serialize(&self) -> Vec<u8> {
         [
             self.public_key.to_vec(),
             self.signature.to_vec(),
@@ -41,33 +48,40 @@ impl HandshakeResponse {
         ]
         .concat()
     }
-    pub fn deserialize(buffer: &Vec<u8>) -> Self {
-        HandshakeResponse {
+    fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
+        if buffer.len() != 129 {
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
+        Ok(HandshakeResponse {
             public_key: buffer[0..33].to_vec().try_into().unwrap(),
             signature: buffer[33..97].to_vec().try_into().unwrap(),
             challenge: buffer[97..129].to_vec().try_into().unwrap(),
-        }
+        })
     }
 }
 
-impl HandshakeCompletion {
-    pub fn serialize(&self) -> Vec<u8> {
+impl Serialize<Self> for HandshakeCompletion {
+    fn serialize(&self) -> Vec<u8> {
         self.signature.to_vec()
     }
-    pub fn deserialize(buffer: &Vec<u8>) -> Self {
-        HandshakeCompletion {
-            signature: buffer[0..64].try_into().unwrap(),
+    fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
+        if buffer.len() != 64 {
+            return Err(Error::from(ErrorKind::InvalidData));
         }
+        Ok(HandshakeCompletion {
+            signature: buffer[0..64].try_into().unwrap(),
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
+    use rand::Rng;
 
     use crate::core::data::handshake::{
         HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
     };
+    use crate::core::data::serialize::Serialize;
 
     #[test]
     fn test_handshake() {
@@ -83,7 +97,7 @@ mod tests {
         };
         let buffer = challenge.serialize();
         assert_eq!(buffer.len(), 65);
-        let challenge2 = HandshakeChallenge::deserialize(&buffer);
+        let challenge2 = HandshakeChallenge::deserialize(&buffer).expect("deserialization failed");
         assert_eq!(challenge.challenge, challenge2.challenge);
         assert_eq!(challenge.public_key, challenge2.public_key);
 
@@ -98,7 +112,7 @@ mod tests {
         };
         let buffer = response.serialize();
         assert_eq!(buffer.len(), 129);
-        let response2 = HandshakeResponse::deserialize(&buffer);
+        let response2 = HandshakeResponse::deserialize(&buffer).expect("deserialization failed");
         assert_eq!(response.challenge, response2.challenge);
         assert_eq!(response.public_key, response2.public_key);
 
@@ -108,7 +122,7 @@ mod tests {
         };
         let buffer = response.serialize();
         assert_eq!(buffer.len(), 64);
-        let response2 = HandshakeCompletion::deserialize(&buffer);
+        let response2 = HandshakeCompletion::deserialize(&buffer).expect("deserialization failed");
         assert_eq!(response.signature, response2.signature);
     }
 }

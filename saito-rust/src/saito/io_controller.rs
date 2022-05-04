@@ -46,49 +46,49 @@ impl IoController {
         }
         let socket = socket.unwrap();
     }
-    pub fn process_file_request(&self, file_request: InterfaceEvent) {}
-    async fn write_to_file(
-        &self,
-        event_id: u64,
-        request_key: String,
-        filename: String,
-        buffer: Vec<u8>,
-    ) -> Result<(), std::io::Error> {
-        debug!(
-            "writing to file : {:?} in {:?}",
-            filename,
-            std::env::current_dir().unwrap().to_str()
-        );
-
-        // TODO : run in a new thread with perf testing
-
-        if !Path::new(&filename).exists() {
-            let mut file = File::create(filename.clone()).unwrap();
-            let result = file.write_all(&buffer[..]);
-            if result.is_err() {
-                warn!("failed writing file : {:?}", filename);
-                let error = result.err().unwrap();
-                warn!("{:?}", error);
-                // self.sender_to_saito_controller.send(IoEvent::new(
-                //     InterfaceEvent::DataSaveResponse {
-                //         key: request_key,
-                //         result: Err(error),
-                //     },
-                // ));
-                RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Err(error)));
-                return Err(std::io::Error::from(ErrorKind::Other));
-            }
-        }
-        debug!("file written successfully : {:?}", filename);
-        RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Ok(filename)));
-        // self.sender_to_saito_controller
-        //     .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
-        //         key: request_key,
-        //         result: Ok(filename),
-        //     }))
-        //     .await;
-        Ok(())
-    }
+    // pub fn process_file_request(&self, file_request: InterfaceEvent) {}
+    // async fn write_to_file(
+    //     &self,
+    //     event_id: u64,
+    //     request_key: String,
+    //     filename: String,
+    //     buffer: Vec<u8>,
+    // ) -> Result<(), std::io::Error> {
+    //     debug!(
+    //         "writing to file : {:?} in {:?}",
+    //         filename,
+    //         std::env::current_dir().unwrap().to_str()
+    //     );
+    //
+    //     // TODO : run in a new thread with perf testing
+    //
+    //     if !Path::new(&filename).exists() {
+    //         let mut file = File::create(filename.clone()).unwrap();
+    //         let result = file.write_all(&buffer[..]);
+    //         if result.is_err() {
+    //             warn!("failed writing file : {:?}", filename);
+    //             let error = result.err().unwrap();
+    //             warn!("{:?}", error);
+    //             // self.sender_to_saito_controller.send(IoEvent::new(
+    //             //     InterfaceEvent::DataSaveResponse {
+    //             //         key: request_key,
+    //             //         result: Err(error),
+    //             //     },
+    //             // ));
+    //             RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Err(error)));
+    //             return Err(std::io::Error::from(ErrorKind::Other));
+    //         }
+    //     }
+    //     debug!("file written successfully : {:?}", filename);
+    //     RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Ok(filename)));
+    //     // self.sender_to_saito_controller
+    //     //     .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
+    //     //         key: request_key,
+    //     //         result: Ok(filename),
+    //     //     }))
+    //     //     .await;
+    //     Ok(())
+    // }
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<IoController>>,
@@ -136,13 +136,8 @@ impl IoController {
         )
         .await;
     }
-    pub async fn send_to_all(
-        &mut self,
-        message_name: String,
-        buffer: Vec<u8>,
-        exceptions: Vec<u64>,
-    ) {
-        debug!("sending message : {:?} to all", message_name);
+    pub async fn send_to_all(&mut self, buffer: Vec<u8>, exceptions: Vec<u64>) {
+        debug!("sending message : {:?} to all", buffer[0]);
         for entry in self.sockets.iter_mut() {
             if exceptions.contains(&entry.0) {
                 continue;
@@ -165,7 +160,7 @@ impl IoController {
                 }
             }
         }
-        debug!("message {:?} sent to all", message_name);
+        trace!("message sent to all");
     }
     pub async fn fetch_block(url: String, event_id: u64) {
         debug!("fetching block : {:?}", url);
@@ -359,21 +354,14 @@ pub async fn run_io_controller(
                 let interface_event = event.event;
                 work_done = true;
                 match interface_event {
-                    InterfaceEvent::OutgoingNetworkMessageForAll {
-                        message_name,
-                        buffer,
-                        exceptions,
-                    } => {
+                    InterfaceEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
                         trace!("waiting for the io controller write lock");
                         let mut io_controller = io_controller.write().await;
                         trace!("acquired the io controller write lock");
-                        io_controller
-                            .send_to_all(message_name, buffer, exceptions)
-                            .await;
+                        io_controller.send_to_all(buffer, exceptions).await;
                     }
                     InterfaceEvent::OutgoingNetworkMessage {
                         peer_index: index,
-                        message_name,
                         buffer,
                     } => {
                         trace!("waiting for the io_controller write lock");

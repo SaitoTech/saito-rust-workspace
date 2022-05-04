@@ -101,6 +101,7 @@ pub fn new() -> SaitoWasm {
             configs: context.configuration.clone(),
             io_handler: Box::new(WasmIoHandler {}),
             time_keeper: Box::new(WasmTimeKeeper {}),
+            wallet,
         },
         mempool_controller: MempoolController {
             mempool: context.mempool.clone(),

@@ -190,6 +190,7 @@ async fn run_blockchain_controller(
         peers: context.peers.clone(),
         static_peers: vec![],
         configs: configs.clone(),
+        wallet: context.wallet.clone(),
     };
     {
         trace!("waiting for the configs write lock");
