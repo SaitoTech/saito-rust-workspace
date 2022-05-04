@@ -10,6 +10,7 @@ use crate::common::defs::{SaitoHash, SaitoUTXOSetKey};
 use crate::common::handle_io::HandleIo;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
+use crate::core::data::mempool::Mempool;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::staking::Staking;
 use crate::core::data::storage::Storage;

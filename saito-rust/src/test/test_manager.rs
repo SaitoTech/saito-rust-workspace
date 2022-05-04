@@ -22,6 +22,7 @@ use saito_core::core::miner_controller::MinerEvent;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread::sleep, time::Duration};
+use std::borrow::BorrowMut;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -288,7 +289,7 @@ impl TestManager {
             &mut transactions,
             parent_hash,
             self.wallet_lock.clone(),
-            self.blockchain_lock.clone(),
+            self.blockchain_lock.clone().write().await.borrow_mut(),
             timestamp,
         )
         .await;
@@ -370,7 +371,7 @@ impl TestManager {
         if can_bundle {
             let mempool = mempool.clone();
             let mut mempool = mempool.write().await;
-            let result = mempool.bundle_block(blockchain.clone(), timestamp).await;
+            let result = mempool.bundle_block(blockchain.clone().write().await.borrow_mut(), timestamp).await;
             return Some(result);
         }
         return None;

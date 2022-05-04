@@ -112,6 +112,9 @@ pub fn new() -> SaitoWasm {
             block_producing_timer: 0,
             tx_producing_timer: 0,
             time_keeper: Box::new(WasmTimeKeeper {}),
+            io_handler: Box::new(WasmIoHandler {}),
+            peers: context.peers.clone(),
+            static_peers: vec![]
         },
         miner_controller: MinerController {
             miner: context.miner.clone(),
