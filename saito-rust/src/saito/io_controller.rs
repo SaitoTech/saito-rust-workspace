@@ -42,7 +42,7 @@ impl IoController {
         debug!("sending outgoing message : peer = {:?}", peer_index);
         let socket = self.sockets.get_mut(&peer_index);
         if socket.is_none() {
-            // TODO : handle
+            todo!()
         }
         let socket = socket.unwrap();
         match socket {
@@ -51,6 +51,7 @@ impl IoController {
                     .send(warp::ws::Message::binary(buffer.clone()))
                     .await
                     .unwrap();
+                sender.flush().await.unwrap();
             }
             PeerSender::Tungstenite(sender) => {
                 sender
@@ -59,6 +60,7 @@ impl IoController {
                     ))
                     .await
                     .unwrap();
+                sender.flush().await.unwrap();
             }
         }
     }
