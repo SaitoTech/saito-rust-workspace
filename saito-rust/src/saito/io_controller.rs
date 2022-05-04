@@ -254,8 +254,7 @@ impl IoController {
                     }
                 },
             }
-        })
-        .await;
+        });
     }
 }
 
