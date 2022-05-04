@@ -191,6 +191,11 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
             InterfaceEvent::IncomingNetworkMessage { peer_index, buffer } => {
                 debug!("incoming message received from peer : {:?}", peer_index);
                 let message = Message::deserialize(buffer);
+                if message.is_err() {
+                    todo!()
+                }
+                self.process_incoming_message(peer_index, message.unwrap())
+                    .await;
             }
             InterfaceEvent::PeerConnectionResult {
                 peer_details,

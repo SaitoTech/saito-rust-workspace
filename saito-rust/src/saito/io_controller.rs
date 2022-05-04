@@ -188,7 +188,6 @@ impl IoController {
         }
 
         IoController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
-        debug!("new peer : {:?} processed successfully", next_index);
     }
     pub async fn receive_message_from_peer(
         mut receiver: PeerReceiver,
@@ -196,7 +195,7 @@ impl IoController {
         next_index: u64,
     ) {
         debug!("starting new task for reading from peer : {:?}", next_index);
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             debug!("new thread started for peer receiving");
             match receiver {
                 PeerReceiver::Warp(mut receiver) => loop {
@@ -221,6 +220,8 @@ impl IoController {
                             },
                         };
                         sender.send(message).await.expect("sending failed");
+                    } else {
+                        todo!()
                     }
                 },
                 PeerReceiver::Tungstenite(mut receiver) => loop {
@@ -248,11 +249,13 @@ impl IoController {
                         }
                         _ => {
                             // Not handling these scenarios
+                            todo!()
                         }
                     }
                 },
             }
         });
+        tokio::join!(handle);
     }
 }
 
