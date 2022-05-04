@@ -3,10 +3,16 @@
 // help make tests more succinct.
 //
 
-use crate::test::test_io_handler::TestIOHandler;
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{thread::sleep, time::Duration};
+
 use ahash::AHashMap;
 use log::{debug, info};
 use rayon::prelude::*;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::RwLock;
+
 use saito_core::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoUTXOSetKey};
 use saito_core::common::handle_io::HandleIo;
 use saito_core::core::data::block::{Block, BlockType};
@@ -19,11 +25,8 @@ use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::miner_controller::MinerEvent;
-use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{thread::sleep, time::Duration};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
+
+use crate::test::test_io_handler::TestIOHandler;
 
 pub fn create_timestamp() -> u64 {
     SystemTime::now()
@@ -69,7 +72,10 @@ impl TestManager {
         }
     }
     pub async fn clear_data_folder() {
-        tokio::fs::remove_dir_all("data").await.unwrap();
+        tokio::fs::remove_dir_all("data/blocks").await;
+        tokio::fs::create_dir_all("data/blocks").await.unwrap();
+        tokio::fs::remove_dir_all("data/wallets").await;
+        tokio::fs::create_dir_all("data/wallets").await.unwrap();
     }
     //
     // add block at end of longest chain
@@ -423,10 +429,8 @@ impl TestManager {
         }
     }
 
-    //
     // check that everything spendable in the main UTXOSET is spendable on the longest
     // chain and vice-versa.
-    //
     pub async fn check_utxoset(&self) {
         let blockchain = self.blockchain_lock.read().await;
         let mut utxoset: AHashMap<SaitoUTXOSetKey, u64> = AHashMap::new();

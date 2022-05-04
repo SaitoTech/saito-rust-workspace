@@ -137,6 +137,11 @@ async fn run_mempool_controller(
     sender_to_blockchain: &Sender<BlockchainEvent>,
     sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
 ) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
+    let result = std::env::var("GEN_TX");
+    let mut generate_test_tx = false;
+    if result.is_ok() {
+        generate_test_tx = result.unwrap().eq("1");
+    }
     let mempool_controller = MempoolController {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
@@ -147,6 +152,7 @@ async fn run_mempool_controller(
         time_keeper: Box::new(TimeKeeper {}),
         block_producing_timer: 0,
         tx_producing_timer: 0,
+        generate_test_tx,
     };
 
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
@@ -184,6 +190,7 @@ async fn run_blockchain_controller(
         peers: context.peers.clone(),
         static_peers: vec![],
         configs: configs.clone(),
+        wallet: context.wallet.clone(),
     };
     {
         trace!("waiting for the configs write lock");

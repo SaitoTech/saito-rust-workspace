@@ -11,18 +11,12 @@ pub struct WasmIoHandler {}
 
 #[async_trait]
 impl HandleIo for WasmIoHandler {
-    async fn send_message(
-        &self,
-        peer_index: u64,
-        message_name: String,
-        buffer: Vec<u8>,
-    ) -> Result<(), Error> {
+    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         todo!()
     }
 
     async fn send_message_to_all(
         &self,
-        message_name: String,
         buffer: Vec<u8>,
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
@@ -70,6 +64,10 @@ impl HandleIo for WasmIoHandler {
     }
 
     async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
+        todo!()
+    }
+
+    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
         todo!()
     }
 }

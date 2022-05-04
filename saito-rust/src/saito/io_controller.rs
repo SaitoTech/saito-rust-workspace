@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
@@ -46,49 +46,49 @@ impl IoController {
         }
         let socket = socket.unwrap();
     }
-    pub fn process_file_request(&self, file_request: InterfaceEvent) {}
-    async fn write_to_file(
-        &self,
-        event_id: u64,
-        request_key: String,
-        filename: String,
-        buffer: Vec<u8>,
-    ) -> Result<(), std::io::Error> {
-        debug!(
-            "writing to file : {:?} in {:?}",
-            filename,
-            std::env::current_dir().unwrap().to_str()
-        );
-
-        // TODO : run in a new thread with perf testing
-
-        if !Path::new(&filename).exists() {
-            let mut file = File::create(filename.clone()).unwrap();
-            let result = file.write_all(&buffer[..]);
-            if result.is_err() {
-                warn!("failed writing file : {:?}", filename);
-                let error = result.err().unwrap();
-                warn!("{:?}", error);
-                // self.sender_to_saito_controller.send(IoEvent::new(
-                //     InterfaceEvent::DataSaveResponse {
-                //         key: request_key,
-                //         result: Err(error),
-                //     },
-                // ));
-                RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Err(error)));
-                return Err(std::io::Error::from(ErrorKind::Other));
-            }
-        }
-        debug!("file written successfully : {:?}", filename);
-        RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Ok(filename)));
-        // self.sender_to_saito_controller
-        //     .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
-        //         key: request_key,
-        //         result: Ok(filename),
-        //     }))
-        //     .await;
-        Ok(())
-    }
+    // pub fn process_file_request(&self, file_request: InterfaceEvent) {}
+    // async fn write_to_file(
+    //     &self,
+    //     event_id: u64,
+    //     request_key: String,
+    //     filename: String,
+    //     buffer: Vec<u8>,
+    // ) -> Result<(), std::io::Error> {
+    //     debug!(
+    //         "writing to file : {:?} in {:?}",
+    //         filename,
+    //         std::env::current_dir().unwrap().to_str()
+    //     );
+    //
+    //     // TODO : run in a new thread with perf testing
+    //
+    //     if !Path::new(&filename).exists() {
+    //         let mut file = File::create(filename.clone()).unwrap();
+    //         let result = file.write_all(&buffer[..]);
+    //         if result.is_err() {
+    //             warn!("failed writing file : {:?}", filename);
+    //             let error = result.err().unwrap();
+    //             warn!("{:?}", error);
+    //             // self.sender_to_saito_controller.send(IoEvent::new(
+    //             //     InterfaceEvent::DataSaveResponse {
+    //             //         key: request_key,
+    //             //         result: Err(error),
+    //             //     },
+    //             // ));
+    //             RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Err(error)));
+    //             return Err(std::io::Error::from(ErrorKind::Other));
+    //         }
+    //     }
+    //     debug!("file written successfully : {:?}", filename);
+    //     RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Ok(filename)));
+    //     // self.sender_to_saito_controller
+    //     //     .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
+    //     //         key: request_key,
+    //     //         result: Ok(filename),
+    //     //     }))
+    //     //     .await;
+    //     Ok(())
+    // }
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<IoController>>,
@@ -96,21 +96,28 @@ impl IoController {
     ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
 
-        debug!("connecting to peer : {:?}", peer);
         let mut protocol: String = String::from("ws");
         if peer.protocol == "https" {
             protocol = String::from("wss");
         }
-        let url = protocol + "://" + peer.host.as_str() + ":" + peer.port.to_string().as_str();
-        let result = connect_async(url).await;
+        let url = protocol
+            + "://"
+            + peer.host.as_str()
+            + ":"
+            + peer.port.to_string().as_str()
+            + "/wsopen";
+        debug!("connecting to peer : {:?}", url);
+        let result = connect_async(url.clone()).await;
         if result.is_err() {
             warn!("failed connecting to peer : {:?}", peer);
+            error!("{:?}", result.err());
             RustIOHandler::set_event_response(
                 event_id,
                 FutureState::PeerConnectionResult(Err(Error::from(ErrorKind::Other))),
             );
             return;
         }
+        debug!("connected to peer : {:?}", url);
         let result = result.unwrap();
         let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
@@ -129,13 +136,8 @@ impl IoController {
         )
         .await;
     }
-    pub async fn send_to_all(
-        &mut self,
-        message_name: String,
-        buffer: Vec<u8>,
-        exceptions: Vec<u64>,
-    ) {
-        debug!("sending message : {:?} to all", message_name);
+    pub async fn send_to_all(&mut self, buffer: Vec<u8>, exceptions: Vec<u64>) {
+        debug!("sending message : {:?} to all", buffer[0]);
         for entry in self.sockets.iter_mut() {
             if exceptions.contains(&entry.0) {
                 continue;
@@ -158,7 +160,7 @@ impl IoController {
                 }
             }
         }
-        debug!("message {:?} sent to all", message_name);
+        trace!("message sent to all");
     }
     pub async fn fetch_block(url: String, event_id: u64) {
         debug!("fetching block : {:?}", url);
@@ -352,21 +354,14 @@ pub async fn run_io_controller(
                 let interface_event = event.event;
                 work_done = true;
                 match interface_event {
-                    InterfaceEvent::OutgoingNetworkMessageForAll {
-                        message_name,
-                        buffer,
-                        exceptions,
-                    } => {
+                    InterfaceEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
                         trace!("waiting for the io controller write lock");
                         let mut io_controller = io_controller.write().await;
                         trace!("acquired the io controller write lock");
-                        io_controller
-                            .send_to_all(message_name, buffer, exceptions)
-                            .await;
+                        io_controller.send_to_all(buffer, exceptions).await;
                     }
                     InterfaceEvent::OutgoingNetworkMessage {
                         peer_index: index,
-                        message_name,
                         buffer,
                     } => {
                         trace!("waiting for the io_controller write lock");
@@ -419,17 +414,19 @@ fn run_websocket_server(
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
     tokio::spawn(async move {
-        info!("starting server");
+        info!("starting websocket server");
         let io_controller = io_controller.clone();
         let sender_to_io = sender_clone.clone();
         let peer_counter = peer_counter.clone();
-        let ws_route = warp::path("ws")
+        let ws_route = warp::path("wsopen")
             .and(warp::ws())
             .map(move |ws: warp::ws::Ws| {
+                debug!("incoming connection received");
                 let clone = io_controller.clone();
                 let peer_counter = peer_counter.clone();
                 let sender_to_io = sender_to_io.clone();
                 ws.on_upgrade(move |socket| async move {
+                    debug!("socket connection established");
                     let (sender, receiver) = socket.split();
                     let mut controller = clone.write().await;
 
@@ -445,11 +442,12 @@ fn run_websocket_server(
                 })
             });
 
-        let (_, server) =
-            warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-                tokio::signal::ctrl_c().await.ok();
-            });
-        server.await;
+        // let (_, server) =
+        //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
+        //         // tokio::signal::ctrl_c().await.ok();
+        //     });
+        // server.await;
+        warp::serve(ws_route).run(([127, 0, 0, 1], port)).await;
     })
 }
 
@@ -479,6 +477,7 @@ fn run_web_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
+                        // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
                         let block = blockchain.get_block(&block_hash).await;
                         if block.is_none() {
@@ -492,12 +491,12 @@ fn run_web_server(
                     Ok(warp::reply::with_status(buffer, StatusCode::OK))
                 },
             );
-        info!("starting server");
-        let (_, server) =
-            warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-                tokio::signal::ctrl_c().await.ok();
-            });
-        server.await;
-        // warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
+        info!("starting web server");
+        // let (_, server) =
+        //     warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
+        //         // tokio::signal::ctrl_c().await.ok();
+        //     });
+        // server.await;
+        warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
     })
 }

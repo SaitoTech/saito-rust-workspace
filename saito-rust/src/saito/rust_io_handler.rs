@@ -5,10 +5,11 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, trace, warn};
+use log::{debug, info, trace, warn};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
+use tracing::field::debug;
 
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::defs::SaitoHash;
@@ -84,18 +85,9 @@ impl RustIOHandler {
 
 #[async_trait]
 impl HandleIo for RustIOHandler {
-    async fn send_message(
-        &self,
-        peer_index: u64,
-        message_name: String,
-        buffer: Vec<u8>,
-    ) -> Result<(), Error> {
+    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         // TODO : refactor to combine event and the future
-        let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessage {
-            peer_index,
-            message_name,
-            buffer,
-        });
+        let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessage { peer_index, buffer });
         let io_future = IoFuture {
             event_id: event.event_id,
         };
@@ -118,14 +110,12 @@ impl HandleIo for RustIOHandler {
 
     async fn send_message_to_all(
         &self,
-        message_name: String,
         buffer: Vec<u8>,
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
-        debug!("send message to all {:?}", message_name);
+        debug!("send message to all");
 
         let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessageForAll {
-            message_name,
             buffer,
             exceptions: peer_exceptions,
         });
@@ -254,7 +244,16 @@ impl HandleIo for RustIOHandler {
     }
 
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
-        let mut paths: Vec<_> = fs::read_dir(self.get_block_dir())
+        debug!(
+            "loading blocks from dir : {:?}",
+            self.get_block_dir().to_string(),
+        );
+        let result = fs::read_dir(self.get_block_dir());
+        if result.is_err() {
+            debug!("no blocks found");
+            return Err(result.err().unwrap());
+        }
+        let mut paths: Vec<_> = result
             .unwrap()
             .map(|r| r.unwrap())
             .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
@@ -324,6 +323,10 @@ impl HandleIo for RustIOHandler {
                 unreachable!()
             }
         }
+    }
+
+    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+        todo!()
     }
 }
 

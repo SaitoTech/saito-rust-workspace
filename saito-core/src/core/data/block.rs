@@ -178,7 +178,7 @@ pub struct Block {
     /// total fees paid into block
     routing_work_for_creator: u64,
     /// Is Block on longest chain
-    lc: bool,
+    in_longest_chain: bool,
     // has golden ticket
     pub has_golden_ticket: bool,
     // has issuance transaction
@@ -228,7 +228,7 @@ impl Block {
             hash: [0; 32],
             total_fees: 0,
             routing_work_for_creator: 0,
-            lc: false,
+            in_longest_chain: false,
             has_golden_ticket: false,
             has_fee_transaction: false,
             has_issuance_transaction: false,
@@ -256,8 +256,8 @@ impl Block {
         self.hash
     }
 
-    pub fn get_lc(&self) -> bool {
-        self.lc
+    pub fn is_in_longest_chain(&self) -> bool {
+        self.in_longest_chain
     }
 
     pub fn get_id(&self) -> u64 {
@@ -397,8 +397,8 @@ impl Block {
         self.id = id;
     }
 
-    pub fn set_lc(&mut self, lc: bool) {
-        self.lc = lc;
+    pub fn set_in_longest_chain(&mut self, lc: bool) {
+        self.in_longest_chain = lc;
     }
 
     pub fn set_timestamp(&mut self, timestamp: u64) {
@@ -1579,6 +1579,8 @@ impl Block {
                     "ERROR 627428: block {} fee transaction doesn't match cv fee transaction",
                     self.get_id()
                 );
+                info!("fee transaction = {:?}", fee_transaction);
+                info!("tx : {:?}", self.transactions[ft_idx]);
                 return false;
             }
         }
@@ -1893,7 +1895,7 @@ mod tests {
         assert_eq!(block.transactions, vec![]);
         assert_eq!(block.hash, [0; 32]);
         assert_eq!(block.total_fees, 0);
-        assert_eq!(block.lc, false);
+        assert_eq!(block.in_longest_chain, false);
         assert_eq!(block.has_golden_ticket, false);
         assert_eq!(block.has_fee_transaction, false);
         assert_eq!(block.has_issuance_transaction, false);

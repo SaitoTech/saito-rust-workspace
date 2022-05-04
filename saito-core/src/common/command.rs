@@ -25,11 +25,9 @@ pub enum GlobalEvent {
 pub enum InterfaceEvent {
     OutgoingNetworkMessage {
         peer_index: u64,
-        message_name: String,
         buffer: Vec<u8>,
     },
     OutgoingNetworkMessageForAll {
-        message_name: String,
         buffer: Vec<u8>,
         exceptions: Vec<u64>,
     },
@@ -38,7 +36,6 @@ pub enum InterfaceEvent {
         message_name: String,
         buffer: Vec<u8>,
     },
-
     ConnectToPeer {
         peer_details: data::configuration::Peer,
     },
