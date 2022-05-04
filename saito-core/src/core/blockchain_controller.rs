@@ -171,19 +171,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
 
         match event {
             BlockchainEvent::NewBlockBundled(block) => {
-                trace!("waiting for the blockchain write lock");
-                {
-                    let mut blockchain = self.blockchain.write().await;
-                    trace!("acquired the blockchain write lock");
-                    blockchain
-                        .add_block(
-                            block,
-                            &mut self.io_handler,
-                            self.peers.clone(),
-                            self.sender_to_miner.clone(),
-                        )
-                        .await;
-                }
+                unreachable!()
             }
         }
 
@@ -192,16 +180,6 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn on_init(&mut self) {
-        debug!("on_init");
-        {
-            Storage::load_blocks_from_disk(
-                self.blockchain.clone(),
-                &mut self.io_handler,
-                self.peers.clone(),
-                self.sender_to_miner.clone(),
-            )
-            .await;
-        }
         // connect to peers
         self.connect_to_static_peers().await;
     }

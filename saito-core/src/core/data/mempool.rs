@@ -136,15 +136,12 @@ impl Mempool {
 
     pub async fn bundle_block(
         &mut self,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
+        blockchain : &mut Blockchain,
         current_timestamp: u64,
     ) -> Block {
         debug!("bundling block...");
         let previous_block_hash: SaitoHash;
         {
-            trace!("waiting for the blockchain read lock");
-            let blockchain = blockchain_lock.read().await;
-            trace!("acquired the blockchain read lock");
             previous_block_hash = blockchain.get_latest_block_hash();
         }
 
@@ -152,7 +149,7 @@ impl Mempool {
             &mut self.transactions,
             previous_block_hash,
             self.wallet_lock.clone(),
-            blockchain_lock.clone(),
+            blockchain,
             current_timestamp,
         )
         .await;

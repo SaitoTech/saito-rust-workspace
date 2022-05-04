@@ -1655,16 +1655,14 @@ impl Block {
         transactions: &mut Vec<Transaction>,
         previous_block_hash: SaitoHash,
         wallet_lock: Arc<RwLock<Wallet>>,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
+        blockchain: &mut Blockchain,
         current_timestamp: u64,
     ) -> Block {
         debug!(
             "Block::generate : previous block hash : {:?}",
             hex::encode(previous_block_hash)
         );
-        trace!("waiting for the blockchain read lock");
-        let blockchain = blockchain_lock.read().await;
-        trace!("acquired the blockchain read lock");
+
         let publickey;
         {
             trace!("waiting for the wallet read lock");

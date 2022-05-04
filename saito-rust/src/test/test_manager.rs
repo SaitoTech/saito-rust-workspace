@@ -3,16 +3,10 @@
 // help make tests more succinct.
 //
 
-use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{thread::sleep, time::Duration};
-
+use crate::test::test_io_handler::TestIOHandler;
 use ahash::AHashMap;
 use log::{debug, info};
 use rayon::prelude::*;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
-
 use saito_core::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoUTXOSetKey};
 use saito_core::common::handle_io::HandleIo;
 use saito_core::core::data::block::{Block, BlockType};
@@ -25,6 +19,12 @@ use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::miner_controller::MinerEvent;
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{thread::sleep, time::Duration};
+use std::borrow::BorrowMut;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::RwLock;
 
 use crate::test::test_io_handler::TestIOHandler;
 
@@ -294,7 +294,7 @@ impl TestManager {
             &mut transactions,
             parent_hash,
             self.wallet_lock.clone(),
-            self.blockchain_lock.clone(),
+            self.blockchain_lock.clone().write().await.borrow_mut(),
             timestamp,
         )
         .await;
@@ -376,7 +376,7 @@ impl TestManager {
         if can_bundle {
             let mempool = mempool.clone();
             let mut mempool = mempool.write().await;
-            let result = mempool.bundle_block(blockchain.clone(), timestamp).await;
+            let result = mempool.bundle_block(blockchain.clone().write().await.borrow_mut(), timestamp).await;
             return Some(result);
         }
         return None;

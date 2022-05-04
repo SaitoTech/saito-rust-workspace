@@ -43,15 +43,15 @@ pub enum FutureState {
 #[derive(Clone, Debug)]
 pub struct RustIOHandler {
     sender: Sender<IoEvent>,
-    // handler_id: u8,
+    handler_id: u8,
     // future_index_counter: u64,
 }
 
 impl RustIOHandler {
-    pub fn new(sender: Sender<IoEvent>) -> RustIOHandler {
+    pub fn new(sender: Sender<IoEvent>, handler_id : u8) -> RustIOHandler {
         RustIOHandler {
             sender,
-            // handler_id,
+            handler_id,
             // future_index_counter: 0,
         }
     }
@@ -339,7 +339,7 @@ mod tests {
     #[tokio::test]
     async fn test_write_value() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let mut io_handler = RustIOHandler::new(sender);
+        let mut io_handler = RustIOHandler::new(sender, 0);
 
         let result = io_handler
             .write_value("./data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())
@@ -355,7 +355,7 @@ mod tests {
     #[tokio::test]
     async fn file_exists_success() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let mut io_handler = RustIOHandler::new(sender);
+        let mut io_handler = RustIOHandler::new(sender, 0);
         let path = String::from("src/test/test_data/config_handler_tests.json");
 
         let result = io_handler
@@ -367,7 +367,7 @@ mod tests {
     #[tokio::test]
     async fn file_exists_fail() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let mut io_handler = RustIOHandler::new(sender);
+        let mut io_handler = RustIOHandler::new(sender, 0);
         let path = String::from("badfilename.json");
 
         let result = io_handler
