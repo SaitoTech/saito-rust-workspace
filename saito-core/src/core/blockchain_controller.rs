@@ -100,7 +100,11 @@ impl BlockchainController {
         }
         debug!("connected to peers");
     }
-    async fn handle_new_peer(&mut self, _peer: Option<data::configuration::Peer>, peer_index: u64) {
+    async fn handle_new_peer(
+        &mut self,
+        peer_data: Option<data::configuration::Peer>,
+        peer_index: u64,
+    ) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
         trace!("waiting for the peers write lock");
@@ -112,8 +116,12 @@ impl BlockchainController {
         //     }
         // }
         let mut peer = Peer::new(peer_index);
-        peer.initiate_handshake(&self.io_handler, self.wallet.clone())
-            .await;
+        if peer_data.is_none() {
+            // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
+            peer.initiate_handshake(&self.io_handler, self.wallet.clone())
+                .await
+                .unwrap();
+        }
 
         peers.index_to_peers.insert(peer_index, peer);
         info!("new peer added : {:?}", peer_index);

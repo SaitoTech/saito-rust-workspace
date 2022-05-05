@@ -149,11 +149,13 @@ impl HandleIo for RustIOHandler {
             event_id: event.event_id,
         };
         self.sender.send(event).await.unwrap();
-        let result = io_future.await;
-        if result.is_err() {
-            warn!("failed connecting to peer : {:?}", peer.host);
-            return Err(result.err().unwrap());
-        }
+        // let result = io_future.await;
+        //
+        // if result.is_err() {
+        //     warn!("failed connecting to peer : {:?}", peer.host);
+        //     return Err(result.err().unwrap());
+        // }
+        //
         Ok(())
     }
     //
@@ -351,16 +353,13 @@ mod tests {
         assert_eq!(result, [1, 2, 3, 4]);
     }
 
-
     #[tokio::test]
     async fn file_exists_success() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
         let mut io_handler = RustIOHandler::new(sender);
         let path = String::from("src/test/test_data/config_handler_tests.json");
 
-        let result = io_handler
-            .is_existing_file(path)
-            .await;
+        let result = io_handler.is_existing_file(path).await;
         assert!(result);
     }
 
@@ -370,10 +369,7 @@ mod tests {
         let mut io_handler = RustIOHandler::new(sender);
         let path = String::from("badfilename.json");
 
-        let result = io_handler
-            .is_existing_file(path)
-            .await;
+        let result = io_handler.is_existing_file(path).await;
         assert!(!result);
     }
-
 }
