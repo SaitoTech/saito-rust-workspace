@@ -43,9 +43,11 @@ impl Peer {
             challenge: generate_random_bytes(32).try_into().unwrap(),
         };
         self.challenge_for_peer = Some(challenge.challenge);
+        let message = Message::HandshakeChallenge(challenge);
         io_handler
-            .send_message(self.peer_index, challenge.serialize())
-            .await;
+            .send_message(self.peer_index, message.serialize())
+            .await
+            .unwrap();
         Ok(())
     }
     pub async fn handle_handshake_challenge(
@@ -70,8 +72,12 @@ impl Peer {
 
         self.challenge_for_peer = Some(response.challenge);
         io_handler
-            .send_message(self.peer_index, response.serialize())
-            .await;
+            .send_message(
+                self.peer_index,
+                Message::HandshakeResponse(response).serialize(),
+            )
+            .await
+            .unwrap();
         Ok(())
     }
     pub async fn handle_handshake_response(
@@ -106,8 +112,12 @@ impl Peer {
             signature: sign(&response.challenge, wallet.privatekey),
         };
         io_handler
-            .send_message(self.peer_index, response.serialize())
-            .await;
+            .send_message(
+                self.peer_index,
+                Message::HandshakeCompletion(response).serialize(),
+            )
+            .await
+            .unwrap();
         Ok(())
     }
     pub async fn handle_handshake_completion(
