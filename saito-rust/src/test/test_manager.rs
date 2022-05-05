@@ -26,8 +26,6 @@ use std::borrow::BorrowMut;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::test::test_io_handler::TestIOHandler;
-
 pub fn create_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
