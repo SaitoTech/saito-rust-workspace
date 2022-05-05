@@ -19,6 +19,7 @@ pub struct Peer {
     pub peer_public_key: SaitoPublicKey,
     pub static_peer_config: Option<data::configuration::Peer>,
     pub challenge_for_peer: Option<SaitoHash>,
+    pub handshake_done: bool,
 }
 
 impl Peer {
@@ -28,6 +29,7 @@ impl Peer {
             peer_public_key: [0; 33],
             static_peer_config: None,
             challenge_for_peer: None,
+            handshake_done: false,
         }
     }
     pub async fn initiate_handshake(
@@ -107,6 +109,8 @@ impl Peer {
         }
         self.challenge_for_peer = None;
         self.peer_public_key = response.public_key;
+        self.handshake_done = true;
+        debug!("peer handshake successful");
         let wallet = wallet.read().await;
         let response = HandshakeCompletion {
             signature: sign(&response.challenge, wallet.privatekey),
@@ -141,6 +145,8 @@ impl Peer {
             todo!()
         }
         self.challenge_for_peer = None;
+        self.handshake_done = true;
+        debug!("peer handshake successful");
         Ok(())
     }
     pub fn get_block_fetch_url(&self, block_hash: SaitoHash) -> String {

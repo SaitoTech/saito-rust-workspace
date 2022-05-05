@@ -144,7 +144,8 @@ impl BlockchainController {
                 }
                 let peer = peer.unwrap();
                 peer.handle_handshake_challenge(challenge, &self.io_handler, self.wallet.clone())
-                    .await;
+                    .await
+                    .unwrap();
             }
             Message::HandshakeResponse(response) => {
                 debug!("received handshake response");
@@ -155,7 +156,11 @@ impl BlockchainController {
                 }
                 let peer = peer.unwrap();
                 peer.handle_handshake_response(response, &self.io_handler, self.wallet.clone())
-                    .await;
+                    .await
+                    .unwrap();
+                if peer.handshake_done {
+                    // TODO :sync block data from peer
+                }
             }
             Message::HandshakeCompletion(response) => {
                 debug!("received handshake completion");
@@ -168,6 +173,9 @@ impl BlockchainController {
                 let result = peer
                     .handle_handshake_completion(response, &self.io_handler)
                     .await;
+                if peer.handshake_done {
+                    // TODO :sync block data from peer
+                }
             }
             Message::ApplicationMessage(_) => {
                 debug!("received buffer");
