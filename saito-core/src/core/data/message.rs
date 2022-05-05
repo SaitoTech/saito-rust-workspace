@@ -1,8 +1,11 @@
+use std::io::{Error, ErrorKind};
+
+use log::{info, warn};
+
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::handshake::{HandshakeChallenge, HandshakeCompletion, HandshakeResponse};
 use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;
-use std::io::{Error, ErrorKind};
 
 #[derive(Debug)]
 pub enum Message {
@@ -30,6 +33,7 @@ impl Message {
     pub fn deserialize(buffer: Vec<u8>) -> Result<Message, Error> {
         let message_type = buffer[0];
         let buffer = buffer[1..].to_vec();
+        info!("buffer size = {:?}", buffer.len());
         // TODO : remove hardcoded values into an enum
         match message_type {
             1 => {
@@ -54,6 +58,7 @@ impl Message {
                 todo!()
             }
             _ => {
+                warn!("message type : {:?} not valid", message_type);
                 return Err(Error::from(ErrorKind::InvalidData));
             }
         }

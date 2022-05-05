@@ -1,5 +1,7 @@
 use std::io::{Error, ErrorKind};
 
+use log::warn;
+
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
 use crate::core::data::serialize::Serialize;
 
@@ -25,11 +27,12 @@ pub struct HandshakeCompletion {
 impl Serialize<Self> for HandshakeChallenge {
     fn serialize(&self) -> Vec<u8> {
         let buffer = [self.public_key.to_vec(), self.challenge.to_vec()].concat();
-
+        assert_eq!(buffer.len(), 65);
         return buffer;
     }
     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
         if buffer.len() != 65 {
+            warn!("buffer size is :{:?}", buffer.len());
             return Err(Error::from(ErrorKind::InvalidData));
         }
         let mut challenge = HandshakeChallenge {
@@ -53,6 +56,7 @@ impl Serialize<Self> for HandshakeResponse {
     }
     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
         if buffer.len() != 129 {
+            warn!("buffer size is :{:?}", buffer.len());
             return Err(Error::from(ErrorKind::InvalidData));
         }
         Ok(HandshakeResponse {
@@ -69,6 +73,7 @@ impl Serialize<Self> for HandshakeCompletion {
     }
     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
         if buffer.len() != 64 {
+            warn!("buffer size is :{:?}", buffer.len());
             return Err(Error::from(ErrorKind::InvalidData));
         }
         Ok(HandshakeCompletion {
