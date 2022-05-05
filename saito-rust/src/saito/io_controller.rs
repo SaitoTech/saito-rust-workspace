@@ -9,6 +9,7 @@ use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -205,10 +206,12 @@ impl IoController {
                     }
                     let result = result.unwrap();
                     if result.is_err() {
-                        warn!("{:?}", result.err().unwrap());
-                        continue;
+                        // TODO : handle peer disconnections
+                        // warn!("failed receiving message [1] : {:?}", result.err().unwrap());
+                        break;
                     }
                     let result = result.unwrap();
+
                     if result.is_binary() {
                         let buffer = result.into_bytes();
                         let message = IoEvent {
@@ -231,7 +234,7 @@ impl IoController {
                     }
                     let result = result.unwrap();
                     if result.is_err() {
-                        warn!("{:?}", result.err().unwrap());
+                        warn!("failed receiving message [2] : {:?}", result.err().unwrap());
                         continue;
                     }
                     let result = result.unwrap();
