@@ -23,7 +23,7 @@ use saito_core::common::defs::SaitoHash;
 use saito_core::core::data;
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::Configuration;
+use saito_core::core::data::configuration::{Configuration, Peer};
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
 use crate::{InterfaceEvent, IoEvent};
@@ -110,6 +110,7 @@ impl IoController {
             PeerSender::Tungstenite(socket_sender),
             PeerReceiver::Tungstenite(socket_receiver),
             sender_to_controller,
+            Some(peer),
         )
         .await;
     }
@@ -163,6 +164,7 @@ impl IoController {
         sender: PeerSender,
         receiver: PeerReceiver,
         sender_to_core: Sender<IoEvent>,
+        peer_data: Option<Peer>,
     ) {
         let mut counter = peer_counter.lock().await;
         let next_index = counter.get_next_index();
@@ -180,7 +182,7 @@ impl IoController {
                 controller_id: 1,
                 event_id,
                 event: PeerConnectionResult {
-                    peer_details: None,
+                    peer_details: peer_data,
                     result: Ok(next_index),
                 },
             })
@@ -414,6 +416,7 @@ fn run_websocket_server(
                         PeerSender::Warp(sender),
                         PeerReceiver::Warp(receiver),
                         sender_to_io,
+                        None,
                     )
                     .await
                 })
