@@ -257,6 +257,7 @@ impl IoController {
                 },
             }
         });
+        // TODO : check why the thread is not starting without this line. probably the parent thread is blocked from somewhere.
         tokio::task::yield_now().await;
     }
 }
