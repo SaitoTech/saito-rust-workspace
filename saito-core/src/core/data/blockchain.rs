@@ -119,6 +119,8 @@ impl Blockchain {
                     if block.get_id() > earliest_block_id {
                         if block.source_connection_id.is_some() {
                             let url;
+                            let block_hash;
+                            let peer_index;
                             {
                                 let peers = peers.read().await;
                                 let peer = peers.find_peer_by_address(
@@ -126,9 +128,13 @@ impl Blockchain {
                                 );
 
                                 let peer = peer.unwrap();
-                                url = peer.get_block_fetch_url(block.get_previous_block_hash());
+                                block_hash = block.get_previous_block_hash();
+                                url = peer.get_block_fetch_url(block_hash);
+                                peer_index = peer.peer_index;
                             }
-                            let result = Block::fetch_missing_block(io_handler, url).await;
+                            let result =
+                                Block::fetch_missing_block(io_handler, url, block_hash, peer_index)
+                                    .await;
                             if result.is_err() {
                                 warn!(
                                     "couldn't fetch block : {:?}",
@@ -483,7 +489,7 @@ impl Blockchain {
 
         //
         // roll back to last even 10 blocks
-        //
+        // TODO : don't need the for loop just get the last 10's multiple [current_block_id = current_block_id - (current_block_id % 10)]
         for i in 0..10 {
             if (current_block_id - i) % 10 == 0 {
                 current_block_id -= i;

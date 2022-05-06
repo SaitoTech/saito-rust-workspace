@@ -181,9 +181,18 @@ impl HandleIo for RustIOHandler {
     //     todo!()
     // }
 
-    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
+    async fn fetch_block_from_peer(
+        &self,
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+    ) -> Result<Block, Error> {
         debug!("fetching block from peer : {:?}", url);
-        let event = IoEvent::new(InterfaceEvent::BlockFetchRequest { url: url.clone() });
+        let event = IoEvent::new(InterfaceEvent::BlockFetchRequest {
+            block_hash,
+            peer_index,
+            url: url.clone(),
+        });
         let io_future = IoFuture {
             event_id: event.event_id,
         };

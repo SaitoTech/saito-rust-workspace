@@ -33,7 +33,12 @@ pub trait HandleIo {
     ) -> Result<(), Error>;
     async fn connect_to_peer(&mut self, peer: data::configuration::Peer) -> Result<(), Error>;
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error>;
-    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error>;
+    async fn fetch_block_from_peer(
+        &self,
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+    ) -> Result<Block, Error>;
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error>;
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error>;

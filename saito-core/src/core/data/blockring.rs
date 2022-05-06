@@ -206,7 +206,7 @@ impl BlockRing {
         let insert_pos = (id % RING_BUFFER_LENGTH) as usize;
         match self.block_ring[insert_pos].lc_pos {
             Some(lc_pos) => self.block_ring[insert_pos].block_hashes[lc_pos],
-            None => [0; 32],
+            None => [0; 32], // TODO : is returning [0;32] correct or should we return Option::None ?
         }
     }
 
