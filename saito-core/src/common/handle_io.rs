@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::common::defs::SaitoHash;
 use crate::core::data;
 use crate::core::data::block::Block;
-use crate::core::data::message::Message;
+use crate::core::data::msg::message::Message;
 
 #[async_trait]
 pub trait HandleIo {

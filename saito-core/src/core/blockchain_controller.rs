@@ -15,7 +15,7 @@ use crate::core::data;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
-use crate::core::data::message::Message;
+use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
@@ -67,7 +67,7 @@ impl BlockchainController {
                 // TODO : handle
             }
             let block = block.unwrap();
-            buffer = block.serialize_for_net(BlockType::Full);
+            buffer = block.serialize_for_net(BlockType::Header);
 
             // finding block sender to avoid resending the block to that node
             if block.source_connection_id.is_some() {
@@ -125,8 +125,15 @@ impl BlockchainController {
 
         peers.index_to_peers.insert(peer_index, peer);
         info!("new peer added : {:?}", peer_index);
+
+        // start block syncing here
     }
+
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
+        todo!()
+    }
+    async fn request_blockchain_from_peer(&mut self, peer_index: u64) {
+        debug!("requesting blockchain from peer : {:?}", peer_index);
         todo!()
     }
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
@@ -186,6 +193,7 @@ impl BlockchainController {
             Message::Transaction(_) => {
                 debug!("received transaction");
             }
+            Message::BlockchainRequest(_) => {}
         }
     }
 }

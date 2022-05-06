@@ -86,7 +86,7 @@ impl Serialize<Self> for HandshakeCompletion {
 mod tests {
     use rand::Rng;
 
-    use crate::core::data::handshake::{
+    use crate::core::data::msg::handshake::{
         HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
     };
     use crate::core::data::serialize::Serialize;

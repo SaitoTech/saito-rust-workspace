@@ -8,8 +8,8 @@ use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::handle_io::HandleIo;
 use crate::core::data;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
-use crate::core::data::handshake::{HandshakeChallenge, HandshakeCompletion, HandshakeResponse};
-use crate::core::data::message::Message;
+use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeCompletion, HandshakeResponse};
+use crate::core::data::msg::message::Message;
 use crate::core::data::wallet::Wallet;
 
 #[derive(Debug, Clone)]

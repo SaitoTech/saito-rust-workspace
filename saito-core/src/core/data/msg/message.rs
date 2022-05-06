@@ -3,7 +3,10 @@ use std::io::{Error, ErrorKind};
 use log::{info, warn};
 
 use crate::core::data::block::{Block, BlockType};
-use crate::core::data::handshake::{HandshakeChallenge, HandshakeCompletion, HandshakeResponse};
+use crate::core::data::msg::block_request::BlockchainRequest;
+use crate::core::data::msg::handshake::{
+    HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
+};
 use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;
 
@@ -15,6 +18,7 @@ pub enum Message {
     ApplicationMessage(Vec<u8>),
     Block(Block),
     Transaction(Transaction),
+    BlockchainRequest(BlockchainRequest),
 }
 
 impl Message {
@@ -27,6 +31,7 @@ impl Message {
             Message::ApplicationMessage(data) => data.clone(),
             Message::Block(data) => data.serialize_for_net(BlockType::Full),
             Message::Transaction(data) => data.serialize_for_net(),
+            Message::BlockchainRequest(data) => data.serialize(),
         };
         [vec![message_type], internal_buffer].concat()
     }
@@ -57,6 +62,9 @@ impl Message {
             6 => {
                 todo!()
             }
+            7 => {
+                todo!()
+            }
             _ => {
                 warn!("message type : {:?} not valid", message_type);
                 return Err(Error::from(ErrorKind::InvalidData));
@@ -71,6 +79,7 @@ impl Message {
             Message::ApplicationMessage(_) => 4,
             Message::Block(_) => 5,
             Message::Transaction(_) => 6,
+            Message::BlockchainRequest(_) => 7,
         }
     }
 }

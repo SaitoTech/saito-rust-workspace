@@ -209,7 +209,7 @@ impl IoController {
                     let result = result.unwrap();
                     if result.is_err() {
                         // TODO : handle peer disconnections
-                        // warn!("failed receiving message [1] : {:?}", result.err().unwrap());
+                        warn!("failed receiving message [1] : {:?}", result.err().unwrap());
                         break;
                     }
                     let result = result.unwrap();
@@ -234,7 +234,7 @@ impl IoController {
                     let result = result.unwrap();
                     if result.is_err() {
                         warn!("failed receiving message [2] : {:?}", result.err().unwrap());
-                        continue;
+                        break;
                     }
                     let result = result.unwrap();
                     match result {
