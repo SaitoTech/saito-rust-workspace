@@ -4,13 +4,12 @@ use std::sync::Arc;
 use log::{debug, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
+use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::handle_io::HandleIo;
 use crate::core::data;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
 use crate::core::data::handshake::{HandshakeChallenge, HandshakeCompletion, HandshakeResponse};
 use crate::core::data::message::Message;
-use crate::core::data::serialize::Serialize;
 use crate::core::data::wallet::Wallet;
 
 #[derive(Debug, Clone)]
