@@ -473,7 +473,9 @@ impl Blockchain {
         }
     }
 
-    pub async fn add_block_failure(&mut self) {}
+    pub async fn add_block_failure(&mut self) {
+        // todo!()
+    }
 
     pub fn generate_fork_id(&self, block_id: u64) -> SaitoHash {
         let mut fork_id = [0; 32];
