@@ -1,4 +1,5 @@
 use std::borrow::BorrowMut;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -10,13 +11,17 @@ use tokio::sync::RwLock;
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::blockchain_controller::BlockchainEvent;
+use crate::core::blockchain_controller::{BlockchainEvent, StaticPeer};
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::core::miner_controller::MinerEvent;
+use crate::common::handle_io::HandleIo;
+use crate::core::data::peer::Peer;
+use crate::core::data::peer_collection::PeerCollection;
+use crate::core::data::storage::Storage;
 
 #[derive(Debug)]
 pub enum MempoolEvent {
@@ -34,22 +39,13 @@ pub struct MempoolController {
     pub tx_producing_timer: u128,
     pub generate_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
+    pub io_handler: Box<dyn HandleIo + Send + Sync>,
+    pub peers: Arc<RwLock<PeerCollection>>,
+    pub static_peers: Vec<StaticPeer>,
 }
 
 impl MempoolController {
-    // TODO : rename function
-    pub async fn send_blocks_to_blockchain(&mut self, mempool: &mut Mempool) {
-        debug!("send blocks to blockchain");
-        // TODO : refactor to use channel instead of directly calling the blockchain methods
-        while let Some(block) = mempool.blocks_queue.pop_front() {
-            mempool.delete_transactions(&block.get_transactions());
-            self.sender_to_blockchain
-                .send(BlockchainEvent::NewBlockBundled(block))
-                .await
-                .unwrap();
-        }
-        debug!("blocks sent to blockchain");
-    }
+
     async fn generate_tx(
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
@@ -193,12 +189,27 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
             trace!("waiting for the mempool write lock");
             let mut mempool = mempool.write().await;
             trace!("acquired the mempool write lock");
-            let result = mempool
-                .bundle_block(self.blockchain.clone(), timestamp)
-                .await;
+            trace!("waiting for the blockchain write lock");
+            let mut blockchain = self.blockchain.write().await;
+            trace!("acquired the blockchain write lock");
+            let result = mempool.bundle_block(blockchain.deref_mut(), timestamp).await;
             mempool.add_block(result);
-            // TODO : add this directly to the blockchain with write lock.
-            self.send_blocks_to_blockchain(mempool.borrow_mut()).await;
+
+            debug!("adding blocks to blockchain");
+
+            while let Some(block) = mempool.blocks_queue.pop_front() {
+                mempool.delete_transactions(&block.get_transactions());
+                blockchain
+                    .add_block(
+                        block,
+                        &mut self.io_handler,
+                        self.peers.clone(),
+                        self.sender_to_miner.clone(),
+                    )
+                    .await;
+            }
+            debug!("blocks added to blockchain");
+
             work_done = true;
         }
 
@@ -224,7 +235,18 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
         None
     }
 
-    async fn on_init(&mut self) {}
+    async fn on_init(&mut self) {
+        debug!("on_init");
+        {
+            Storage::load_blocks_from_disk(
+                self.blockchain.clone(),
+                &mut self.io_handler,
+                self.peers.clone(),
+                self.sender_to_miner.clone(),
+            )
+                .await;
+        }
+    }
 }
 
 #[cfg(test)]

@@ -30,6 +30,10 @@ use crate::saito::time_keeper::TimeKeeper;
 mod saito;
 mod test;
 
+const BLOCKCHAIN_CONTROLLER_ID: u8 = 1;
+const MEMPOOL_CONTROLLER_ID: u8 = 2;
+const MINER_CONTROLLER_ID: u8 = 3;
+
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
     mut global_receiver: tokio::sync::broadcast::Receiver<GlobalEvent>,
@@ -127,6 +131,8 @@ async fn run_miner_controller(
 }
 
 async fn run_mempool_controller(
+    sender_to_io_controller: tokio::sync::mpsc::Sender<IoEvent>,
+    configs: Arc<RwLock<Configuration>>,
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
     receiver_for_mempool: Receiver<MempoolEvent>,
@@ -138,7 +144,7 @@ async fn run_mempool_controller(
     if result.is_ok() {
         generate_test_tx = result.unwrap().eq("1");
     }
-    let mempool_controller = MempoolController {
+    let mut mempool_controller = MempoolController {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
         wallet: context.wallet.clone(),
@@ -149,7 +155,26 @@ async fn run_mempool_controller(
         block_producing_timer: 0,
         tx_producing_timer: 0,
         generate_test_tx,
+        io_handler: Box::new(RustIOHandler::new(
+            sender_to_io_controller.clone(),
+            MEMPOOL_CONTROLLER_ID,
+        )),
+        peers: context.peers.clone(),
+        static_peers: vec![],
     };
+    {
+        trace!("waiting for the configs write lock");
+        let configs = configs.read().await;
+        trace!("acquired the configs write lock");
+        let peers = &configs.peers;
+        for peer in peers {
+            mempool_controller.static_peers.push(StaticPeer {
+                peer_details: (*peer).clone(),
+                peer_state: PeerState::Disconnected,
+                peer_index: 0,
+            });
+        }
+    }
 
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
@@ -180,7 +205,7 @@ async fn run_blockchain_controller(
         sender_to_miner: sender_to_miner.clone(),
         io_handler: Box::new(RustIOHandler::new(
             sender_to_io_controller.clone(),
-            // BLOCKCHAIN_CONTROLLER_ID,
+            BLOCKCHAIN_CONTROLLER_ID,
         )),
         time_keeper: Box::new(TimeKeeper {}),
         peers: context.peers.clone(),
@@ -223,9 +248,7 @@ fn run_loop_thread(
     interface_sender_to_mempool: Sender<InterfaceEvent>,
     interface_sender_to_miner: Sender<InterfaceEvent>,
 ) -> JoinHandle<()> {
-    const BLOCKCHAIN_CONTROLLER_ID: u8 = 1;
-    const MEMPOOL_CONTROLLER_ID: u8 = 2;
-    const MINER_CONTROLLER_ID: u8 = 3;
+
 
     let loop_handle = tokio::spawn(async move {
         let mut work_done: bool;
@@ -323,7 +346,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1000);
 
     let (interface_sender_to_blockchain, blockchain_handle) = run_blockchain_controller(
-        sender_to_io_controller,
+        sender_to_io_controller.clone(),
         configs.clone(),
         &global_sender,
         &context,
@@ -334,6 +357,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     let (interface_sender_to_mempool, mempool_handle) = run_mempool_controller(
+        sender_to_io_controller.clone(),
+        configs.clone(),
         &global_sender,
         &context,
         receiver_for_mempool,

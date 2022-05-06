@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use std::borrow::BorrowMut;
     use std::sync::Arc;
 
     use log::info;
@@ -631,7 +632,7 @@ mod tests {
             &mut transactions,
             block1_hash,
             wallet_lock.clone(),
-            blockchain_lock.clone(),
+            blockchain_lock.clone().write().await.borrow_mut(),
             current_timestamp + 120000,
         )
         .await;
@@ -721,7 +722,7 @@ mod tests {
             &mut transactions,
             block5_hash,
             wallet_lock.clone(),
-            blockchain_lock.clone(),
+            blockchain_lock.clone().write().await.borrow_mut(),
             current_timestamp + 600000,
         )
         .await;
