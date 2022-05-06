@@ -8,7 +8,9 @@ use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::handle_io::HandleIo;
 use crate::core::data;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
-use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeCompletion, HandshakeResponse};
+use crate::core::data::msg::handshake::{
+    HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
+};
 use crate::core::data::msg::message::Message;
 use crate::core::data::wallet::Wallet;
 
@@ -109,7 +111,6 @@ impl Peer {
         self.challenge_for_peer = None;
         self.peer_public_key = response.public_key;
         self.handshake_done = true;
-        debug!("peer handshake successful");
         let wallet = wallet.read().await;
         let response = HandshakeCompletion {
             signature: sign(&response.challenge, wallet.privatekey),
@@ -145,9 +146,21 @@ impl Peer {
         }
         self.challenge_for_peer = None;
         self.handshake_done = true;
-        debug!("peer handshake successful");
         Ok(())
     }
+    /// Since each peer have a different url for a block to be fetched, this function will generate the correct url from a given block hash
+    ///
+    /// # Arguments
+    ///
+    /// * `block_hash`: hash of the block to be fetched
+    ///
+    /// returns: String
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     pub fn get_block_fetch_url(&self, block_hash: SaitoHash) -> String {
         let config = self.static_peer_config.as_ref().unwrap();
         format!(

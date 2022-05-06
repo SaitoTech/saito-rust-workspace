@@ -3,6 +3,7 @@ use std::io::Error;
 use async_trait::async_trait;
 
 use saito_core::common::command::InterfaceEvent;
+use saito_core::common::defs::SaitoHash;
 use saito_core::common::handle_io::HandleIo;
 use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Peer;
@@ -63,11 +64,16 @@ impl HandleIo for WasmIoHandler {
         "data/blocks/".to_string()
     }
 
-    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
+    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
         todo!()
     }
 
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+    async fn fetch_block_from_peer(
+        &self,
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+    ) -> Result<Block, Error> {
         todo!()
     }
 }

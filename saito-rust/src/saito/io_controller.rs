@@ -18,7 +18,6 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::command::InterfaceEvent::PeerConnectionResult;
 use saito_core::common::defs::SaitoHash;
 use saito_core::core::data;
 use saito_core::core::data::block::{Block, BlockType};
@@ -140,7 +139,13 @@ impl IoController {
         }
         trace!("message sent to all");
     }
-    pub async fn fetch_block(url: String, event_id: u64) {
+    pub async fn fetch_block(
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+        event_id: u64,
+        sender_to_core: Sender<IoEvent>,
+    ) {
         debug!("fetching block : {:?}", url);
 
         let result = reqwest::get(url).await;
@@ -154,8 +159,18 @@ impl IoController {
         }
         let result = result.unwrap();
         let buffer = result.to_vec();
-        let block = Block::deserialize_for_net(&buffer);
-        RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
+        // RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
+        sender_to_core
+            .send(IoEvent {
+                controller_id: 1,
+                event_id,
+                event: InterfaceEvent::BlockFetched {
+                    block_hash,
+                    peer_index,
+                    buffer,
+                },
+            })
+            .await;
     }
     pub async fn send_new_peer(
         event_id: u64,
@@ -171,24 +186,18 @@ impl IoController {
 
         sockets.insert(next_index, sender);
         debug!("sending new peer : {:?}", next_index);
-        // if event_id != 0 {
-        //     RustIOHandler::set_event_response(
-        //         event_id,
-        //         FutureState::PeerConnectionResult(Ok(next_index)),
-        //     );
-        // } else {
+
         sender_to_core
             .send(IoEvent {
                 controller_id: 1,
                 event_id,
-                event: PeerConnectionResult {
+                event: InterfaceEvent::PeerConnectionResult {
                     peer_details: peer_data,
                     result: Ok(next_index),
                 },
             })
             .await
             .expect("sending failed");
-        // }
 
         IoController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
     }
@@ -362,8 +371,21 @@ pub async fn run_io_controller(
                     }
                     InterfaceEvent::PeerDisconnected { peer_index } => {}
                     InterfaceEvent::IncomingNetworkMessage { .. } => {}
-                    InterfaceEvent::BlockFetchRequest { url } => {
-                        IoController::fetch_block(url, event_id).await
+                    InterfaceEvent::BlockFetchRequest {
+                        block_hash,
+                        peer_index,
+                        url,
+                    } => {
+                        let sender;
+                        {
+                            let mut io_controller = io_controller.read().await;
+                            sender = io_controller.sender_to_saito_controller.clone();
+                        }
+                        IoController::fetch_block(block_hash, peer_index, url, event_id, sender)
+                            .await
+                    }
+                    InterfaceEvent::BlockFetched { .. } => {
+                        unreachable!()
                     }
                 }
             }
