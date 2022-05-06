@@ -19,6 +19,7 @@ pub struct Peer {
     pub peer_public_key: SaitoPublicKey,
     pub static_peer_config: Option<data::configuration::Peer>,
     pub challenge_for_peer: Option<SaitoHash>,
+    pub handshake_done: bool,
 }
 
 impl Peer {
@@ -28,6 +29,7 @@ impl Peer {
             peer_public_key: [0; 33],
             static_peer_config: None,
             challenge_for_peer: None,
+            handshake_done: false,
         }
     }
     pub async fn initiate_handshake(
@@ -43,9 +45,11 @@ impl Peer {
             challenge: generate_random_bytes(32).try_into().unwrap(),
         };
         self.challenge_for_peer = Some(challenge.challenge);
+        let message = Message::HandshakeChallenge(challenge);
         io_handler
-            .send_message(self.peer_index, challenge.serialize())
-            .await;
+            .send_message(self.peer_index, message.serialize())
+            .await
+            .unwrap();
         Ok(())
     }
     pub async fn handle_handshake_challenge(
@@ -70,8 +74,12 @@ impl Peer {
 
         self.challenge_for_peer = Some(response.challenge);
         io_handler
-            .send_message(self.peer_index, response.serialize())
-            .await;
+            .send_message(
+                self.peer_index,
+                Message::HandshakeResponse(response).serialize(),
+            )
+            .await
+            .unwrap();
         Ok(())
     }
     pub async fn handle_handshake_response(
@@ -101,13 +109,19 @@ impl Peer {
         }
         self.challenge_for_peer = None;
         self.peer_public_key = response.public_key;
+        self.handshake_done = true;
+        debug!("peer handshake successful");
         let wallet = wallet.read().await;
         let response = HandshakeCompletion {
             signature: sign(&response.challenge, wallet.privatekey),
         };
         io_handler
-            .send_message(self.peer_index, response.serialize())
-            .await;
+            .send_message(
+                self.peer_index,
+                Message::HandshakeCompletion(response).serialize(),
+            )
+            .await
+            .unwrap();
         Ok(())
     }
     pub async fn handle_handshake_completion(
@@ -131,6 +145,8 @@ impl Peer {
             todo!()
         }
         self.challenge_for_peer = None;
+        self.handshake_done = true;
+        debug!("peer handshake successful");
         Ok(())
     }
     pub fn get_block_fetch_url(&self, block_hash: SaitoHash) -> String {

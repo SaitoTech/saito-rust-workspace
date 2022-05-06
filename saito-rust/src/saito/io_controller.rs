@@ -9,6 +9,7 @@ use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -22,7 +23,7 @@ use saito_core::common::defs::SaitoHash;
 use saito_core::core::data;
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::Configuration;
+use saito_core::core::data::configuration::{Configuration, Peer};
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
 use crate::{InterfaceEvent, IoEvent};
@@ -38,57 +39,33 @@ pub struct IoController {
 }
 
 impl IoController {
-    pub async fn send_outgoing_message(&self, peer_index: u64, buffer: Vec<u8>) {
+    pub async fn send_outgoing_message(&mut self, peer_index: u64, buffer: Vec<u8>) {
         debug!("sending outgoing message : peer = {:?}", peer_index);
-        let socket = self.sockets.get(&peer_index);
+        let socket = self.sockets.get_mut(&peer_index);
         if socket.is_none() {
-            // TODO : handle
+            todo!()
         }
         let socket = socket.unwrap();
+        match socket {
+            PeerSender::Warp(sender) => {
+                sender
+                    .send(warp::ws::Message::binary(buffer.clone()))
+                    .await
+                    .unwrap();
+                sender.flush().await.unwrap();
+            }
+            PeerSender::Tungstenite(sender) => {
+                sender
+                    .send(tokio_tungstenite::tungstenite::Message::Binary(
+                        buffer.clone(),
+                    ))
+                    .await
+                    .unwrap();
+                sender.flush().await.unwrap();
+            }
+        }
     }
-    // pub fn process_file_request(&self, file_request: InterfaceEvent) {}
-    // async fn write_to_file(
-    //     &self,
-    //     event_id: u64,
-    //     request_key: String,
-    //     filename: String,
-    //     buffer: Vec<u8>,
-    // ) -> Result<(), std::io::Error> {
-    //     debug!(
-    //         "writing to file : {:?} in {:?}",
-    //         filename,
-    //         std::env::current_dir().unwrap().to_str()
-    //     );
-    //
-    //     // TODO : run in a new thread with perf testing
-    //
-    //     if !Path::new(&filename).exists() {
-    //         let mut file = File::create(filename.clone()).unwrap();
-    //         let result = file.write_all(&buffer[..]);
-    //         if result.is_err() {
-    //             warn!("failed writing file : {:?}", filename);
-    //             let error = result.err().unwrap();
-    //             warn!("{:?}", error);
-    //             // self.sender_to_saito_controller.send(IoEvent::new(
-    //             //     InterfaceEvent::DataSaveResponse {
-    //             //         key: request_key,
-    //             //         result: Err(error),
-    //             //     },
-    //             // ));
-    //             RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Err(error)));
-    //             return Err(std::io::Error::from(ErrorKind::Other));
-    //         }
-    //     }
-    //     debug!("file written successfully : {:?}", filename);
-    //     RustIOHandler::set_event_response(event_id, FutureState::DataSaved(Ok(filename)));
-    //     // self.sender_to_saito_controller
-    //     //     .send(IoEvent::new(InterfaceEvent::DataSaveResponse {
-    //     //         key: request_key,
-    //     //         result: Ok(filename),
-    //     //     }))
-    //     //     .await;
-    //     Ok(())
-    // }
+
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<IoController>>,
@@ -133,6 +110,7 @@ impl IoController {
             PeerSender::Tungstenite(socket_sender),
             PeerReceiver::Tungstenite(socket_receiver),
             sender_to_controller,
+            Some(peer),
         )
         .await;
     }
@@ -186,40 +164,40 @@ impl IoController {
         sender: PeerSender,
         receiver: PeerReceiver,
         sender_to_core: Sender<IoEvent>,
+        peer_data: Option<Peer>,
     ) {
         let mut counter = peer_counter.lock().await;
         let next_index = counter.get_next_index();
 
         sockets.insert(next_index, sender);
         debug!("sending new peer : {:?}", next_index);
-        if event_id != 0 {
-            RustIOHandler::set_event_response(
+        // if event_id != 0 {
+        //     RustIOHandler::set_event_response(
+        //         event_id,
+        //         FutureState::PeerConnectionResult(Ok(next_index)),
+        //     );
+        // } else {
+        sender_to_core
+            .send(IoEvent {
+                controller_id: 1,
                 event_id,
-                FutureState::PeerConnectionResult(Ok(next_index)),
-            );
-        } else {
-            sender_to_core
-                .send(IoEvent {
-                    controller_id: 1,
-                    event_id,
-                    event: PeerConnectionResult {
-                        peer_details: None,
-                        result: Ok(next_index),
-                    },
-                })
-                .await
-                .expect("sending failed");
-        }
+                event: PeerConnectionResult {
+                    peer_details: peer_data,
+                    result: Ok(next_index),
+                },
+            })
+            .await
+            .expect("sending failed");
+        // }
 
         IoController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
-        debug!("new peer : {:?} processed successfully", next_index);
     }
     pub async fn receive_message_from_peer(
         mut receiver: PeerReceiver,
         sender: Sender<IoEvent>,
-        next_index: u64,
+        peer_index: u64,
     ) {
-        debug!("starting new task for reading from peer : {:?}", next_index);
+        debug!("starting new task for reading from peer : {:?}", peer_index);
         tokio::spawn(async move {
             debug!("new thread started for peer receiving");
             match receiver {
@@ -230,22 +208,22 @@ impl IoController {
                     }
                     let result = result.unwrap();
                     if result.is_err() {
-                        warn!("{:?}", result.err().unwrap());
-                        continue;
+                        // TODO : handle peer disconnections
+                        // warn!("failed receiving message [1] : {:?}", result.err().unwrap());
+                        break;
                     }
                     let result = result.unwrap();
+
                     if result.is_binary() {
                         let buffer = result.into_bytes();
                         let message = IoEvent {
                             controller_id: 1,
                             event_id: 0,
-                            event: InterfaceEvent::IncomingNetworkMessage {
-                                peer_index: next_index,
-                                message_name: "TEST".to_string(),
-                                buffer,
-                            },
+                            event: InterfaceEvent::IncomingNetworkMessage { peer_index, buffer },
                         };
                         sender.send(message).await.expect("sending failed");
+                    } else {
+                        todo!()
                     }
                 },
                 PeerReceiver::Tungstenite(mut receiver) => loop {
@@ -255,7 +233,7 @@ impl IoController {
                     }
                     let result = result.unwrap();
                     if result.is_err() {
-                        warn!("{:?}", result.err().unwrap());
+                        warn!("failed receiving message [2] : {:?}", result.err().unwrap());
                         continue;
                     }
                     let result = result.unwrap();
@@ -265,8 +243,7 @@ impl IoController {
                                 controller_id: 1,
                                 event_id: 0,
                                 event: InterfaceEvent::IncomingNetworkMessage {
-                                    peer_index: next_index,
-                                    message_name: "TEST".to_string(),
+                                    peer_index,
                                     buffer,
                                 },
                             };
@@ -274,11 +251,13 @@ impl IoController {
                         }
                         _ => {
                             // Not handling these scenarios
+                            todo!()
                         }
                     }
                 },
             }
         });
+        tokio::task::yield_now().await;
     }
 }
 
@@ -365,7 +344,7 @@ pub async fn run_io_controller(
                         buffer,
                     } => {
                         trace!("waiting for the io_controller write lock");
-                        let io_controller = io_controller.read().await;
+                        let mut io_controller = io_controller.write().await;
                         trace!("acquired the io controller write lock");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
@@ -437,6 +416,7 @@ fn run_websocket_server(
                         PeerSender::Warp(sender),
                         PeerReceiver::Warp(receiver),
                         sender_to_io,
+                        None,
                     )
                     .await
                 })

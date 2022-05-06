@@ -1,24 +1,17 @@
 use std::env;
 use std::io::Write;
 use std::sync::Arc;
-
-use tokio::sync::RwLock;
-use tracing::info;
-use tracing_subscriber;
-
-use saito_core::common::command::InterfaceEvent;
-
-use crate::saito::config_handler::ConfigHandler;
-use crate::saito::io_controller::run_io_controller;
-use crate::saito::io_event::IoEvent;
-
 use std::time::{Duration, Instant};
 
 use log::{debug, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use tracing::info;
+use tracing_subscriber;
 
 use saito_core::common::command::GlobalEvent;
+use saito_core::common::command::InterfaceEvent;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::blockchain_controller::{
     BlockchainController, BlockchainEvent, PeerState, StaticPeer,
@@ -28,6 +21,9 @@ use saito_core::core::data::context::Context;
 use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
+use crate::saito::config_handler::ConfigHandler;
+use crate::saito::io_controller::run_io_controller;
+use crate::saito::io_event::IoEvent;
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::time_keeper::TimeKeeper;
 
@@ -95,9 +91,9 @@ where
             if work_done {
                 work_done = false;
                 // std::thread::yield_now();
-                tokio::task::yield_now().await;
             } else {
-                std::thread::sleep(Duration::new(0, 1000_000));
+                tokio::task::yield_now().await;
+                // std::thread::sleep(Duration::new(0, 1000_000));
             }
         }
     })
@@ -264,6 +260,8 @@ fn run_loop_thread(
 
             if !work_done {
                 std::thread::sleep(Duration::new(1, 0));
+            } else {
+                tokio::task::yield_now().await;
             }
         }
     });

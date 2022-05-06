@@ -93,18 +93,18 @@ impl HandleIo for RustIOHandler {
         };
         self.sender.send(event).await.unwrap();
 
-        let result = io_future.await;
-        if result.is_err() {
-            // warn!("sending message failed : {:?}", result.err().unwrap());
-            return Err(result.err().unwrap());
-        }
-        let result = result.unwrap();
-        match result {
-            FutureState::DataSent(data) => {}
-            _ => {
-                unreachable!()
-            }
-        }
+        // let result = io_future.await;
+        // if result.is_err() {
+        //     // warn!("sending message failed : {:?}", result.err().unwrap());
+        //     return Err(result.err().unwrap());
+        // }
+        // let result = result.unwrap();
+        // match result {
+        //     FutureState::DataSent(data) => {}
+        //     _ => {
+        //         unreachable!()
+        //     }
+        // }
         Ok(())
     }
 
@@ -124,19 +124,19 @@ impl HandleIo for RustIOHandler {
         };
         self.sender.send(event).await.unwrap();
 
-        let result = io_future.await;
-        if result.is_err() {
-            // warn!("sending message failed : {:?}", result.err().unwrap());
-            return Err(result.err().unwrap());
-        }
-        debug!("message sent to all");
-        let result = result.unwrap();
-        match result {
-            FutureState::DataSent(data) => {}
-            _ => {
-                unreachable!()
-            }
-        }
+        // let result = io_future.await;
+        // if result.is_err() {
+        //     // warn!("sending message failed : {:?}", result.err().unwrap());
+        //     return Err(result.err().unwrap());
+        // }
+        // debug!("message sent to all");
+        // let result = result.unwrap();
+        // match result {
+        //     FutureState::DataSent(data) => {}
+        //     _ => {
+        //         unreachable!()
+        //     }
+        // }
         Ok(())
     }
 
@@ -149,17 +149,66 @@ impl HandleIo for RustIOHandler {
             event_id: event.event_id,
         };
         self.sender.send(event).await.unwrap();
-        let result = io_future.await;
-        if result.is_err() {
-            warn!("failed connecting to peer : {:?}", peer.host);
-            return Err(result.err().unwrap());
-        }
+        // let result = io_future.await;
+        //
+        // if result.is_err() {
+        //     warn!("failed connecting to peer : {:?}", peer.host);
+        //     return Err(result.err().unwrap());
+        // }
+        //
         Ok(())
     }
     //
     // async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
     //     todo!()
     // }
+
+    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+        todo!()
+    }
+    //
+    // fn set_write_result(
+    //     &mut self,
+    //     result_key: String,
+    //     result: Result<String, Error>,
+    // ) -> Result<(), Error> {
+    //     debug!("setting write result");
+    //     // let mut states = self.future_states.lock().unwrap();
+    //     // let mut wakers = self.future_wakers.lock().unwrap();
+    //     // let waker = wakers.remove(&index).expect("waker not found");
+    //     // states.insert(index, FutureState::DataSaved(result));
+    //     // waker.wake();
+    //     todo!()
+    // }
+
+    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
+        debug!("fetching block from peer : {:?}", url);
+        let event = IoEvent::new(InterfaceEvent::BlockFetchRequest { url: url.clone() });
+        let io_future = IoFuture {
+            event_id: event.event_id,
+        };
+        self.sender
+            .send(event)
+            .await
+            .expect("failed sending to io controller");
+
+        let result = io_future.await;
+        if result.is_err() {
+            let err = result.err().unwrap();
+            warn!("failed fetching block from peer : {:?}", err);
+            return Err(err);
+        }
+        let result = result.unwrap();
+        match result {
+            FutureState::BlockFetched(block) => {
+                trace!("block : {:?} fetched from peer", url);
+                return Ok(block);
+            }
+            _ => {
+                unreachable!()
+            }
+        }
+    }
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
@@ -213,20 +262,6 @@ impl HandleIo for RustIOHandler {
         //     }
         // }
     }
-    //
-    // fn set_write_result(
-    //     &mut self,
-    //     result_key: String,
-    //     result: Result<String, Error>,
-    // ) -> Result<(), Error> {
-    //     debug!("setting write result");
-    //     // let mut states = self.future_states.lock().unwrap();
-    //     // let mut wakers = self.future_wakers.lock().unwrap();
-    //     // let waker = wakers.remove(&index).expect("waker not found");
-    //     // states.insert(index, FutureState::DataSaved(result));
-    //     // waker.wake();
-    //     todo!()
-    // }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         let mut result = File::open(key).await;
@@ -295,39 +330,6 @@ impl HandleIo for RustIOHandler {
     fn get_block_dir(&self) -> String {
         BLOCKS_DIR_PATH.to_string()
     }
-
-    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
-        debug!("fetching block from peer : {:?}", url);
-        let event = IoEvent::new(InterfaceEvent::BlockFetchRequest { url: url.clone() });
-        let io_future = IoFuture {
-            event_id: event.event_id,
-        };
-        self.sender
-            .send(event)
-            .await
-            .expect("failed sending to io controller");
-
-        let result = io_future.await;
-        if result.is_err() {
-            let err = result.err().unwrap();
-            warn!("failed fetching block from peer : {:?}", err);
-            return Err(err);
-        }
-        let result = result.unwrap();
-        match result {
-            FutureState::BlockFetched(block) => {
-                trace!("block : {:?} fetched from peer", url);
-                return Ok(block);
-            }
-            _ => {
-                unreachable!()
-            }
-        }
-    }
-
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
-        todo!()
-    }
 }
 
 #[cfg(test)]
@@ -351,16 +353,13 @@ mod tests {
         assert_eq!(result, [1, 2, 3, 4]);
     }
 
-
     #[tokio::test]
     async fn file_exists_success() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
         let mut io_handler = RustIOHandler::new(sender);
         let path = String::from("src/test/test_data/config_handler_tests.json");
 
-        let result = io_handler
-            .is_existing_file(path)
-            .await;
+        let result = io_handler.is_existing_file(path).await;
         assert!(result);
     }
 
@@ -370,10 +369,7 @@ mod tests {
         let mut io_handler = RustIOHandler::new(sender);
         let path = String::from("badfilename.json");
 
-        let result = io_handler
-            .is_existing_file(path)
-            .await;
+        let result = io_handler.is_existing_file(path).await;
         assert!(!result);
     }
-
 }
