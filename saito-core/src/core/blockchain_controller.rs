@@ -339,8 +339,26 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                 }
             }
             InterfaceEvent::PeerDisconnected { .. } => {}
-            _ => {
+
+            InterfaceEvent::OutgoingNetworkMessageForAll { .. } => {
                 unreachable!()
+            }
+            InterfaceEvent::ConnectToPeer { .. } => {
+                unreachable!()
+            }
+            InterfaceEvent::BlockFetchRequest { .. } => {
+                unreachable!()
+            }
+            InterfaceEvent::BlockFetched {
+                block_hash,
+                peer_index,
+                buffer,
+            } => {
+                debug!("block received : {:?}", hex::encode(block_hash));
+                self.sender_to_mempool
+                    .send(MempoolEvent::BlockFetched { peer_index, buffer })
+                    .await
+                    .unwrap();
             }
         }
         None
