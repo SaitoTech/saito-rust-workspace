@@ -51,7 +51,7 @@ impl MempoolController {
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        debug!("generating mock transactions");
+        trace!("generating mock transactions");
 
         let mempool_lock_clone = mempool.clone();
         let wallet_lock_clone = wallet.clone();
@@ -127,7 +127,7 @@ impl MempoolController {
                     .await;
             }
         }
-        debug!("generated transaction count: {:?}", txs_to_generate);
+        trace!("generated transaction count: {:?}", txs_to_generate);
     }
 }
 
