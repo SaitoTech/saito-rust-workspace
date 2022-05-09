@@ -333,8 +333,8 @@ pub async fn run_io_controller(
             // sender_to_saito_controller.send(command).await;
             // info!("sending test message to saito controller");
 
-            let result = receiver.try_recv();
-            if result.is_ok() {
+            let result = receiver.recv().await;
+            if result.is_some() {
                 let event = result.unwrap();
                 let event_id = event.event_id;
                 let interface_event = event.event;
@@ -387,9 +387,9 @@ pub async fn run_io_controller(
                 }
             }
 
-            if !work_done {
-                std::thread::sleep(Duration::new(1, 0));
-            }
+            // if !work_done {
+            //     std::thread::sleep(Duration::new(1, 0));
+            // }
         }
     });
     let result = tokio::join!(server_handle, controller_handle);
