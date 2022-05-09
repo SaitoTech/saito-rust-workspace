@@ -159,6 +159,7 @@ impl IoController {
         }
         let result = result.unwrap();
         let buffer = result.to_vec();
+        debug!("block buffer received");
         // RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
         sender_to_core
             .send(IoEvent {
@@ -170,7 +171,8 @@ impl IoController {
                     buffer,
                 },
             })
-            .await;
+            .await
+            .unwrap();
     }
     pub async fn send_new_peer(
         event_id: u64,

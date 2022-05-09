@@ -21,6 +21,7 @@ use crate::core::miner_controller::MinerEvent;
 #[derive(Debug)]
 pub enum MempoolEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
+    BlockFetched { peer_index: u64, buffer: Vec<u8> },
 }
 
 pub struct MempoolController {
@@ -219,6 +220,9 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
                 let mut mempool = self.mempool.write().await;
                 trace!("acquired the mempool write lock");
                 mempool.add_golden_ticket(golden_ticket).await;
+            }
+            MempoolEvent::BlockFetched { peer_index, buffer } => {
+                todo!()
             }
         }
         None
