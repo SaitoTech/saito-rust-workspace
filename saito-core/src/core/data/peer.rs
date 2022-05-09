@@ -60,6 +60,8 @@ impl Peer {
             .send_message(self.peer_index, message.serialize())
             .await
             .unwrap();
+        debug!("handshake challenge sent for peer: {:?}", self.peer_index);
+
         Ok(())
     }
     pub async fn handle_handshake_challenge(
@@ -98,6 +100,8 @@ impl Peer {
             )
             .await
             .unwrap();
+        debug!("handshake response sent for peer: {:?}", self.peer_index);
+
         Ok(())
     }
     pub async fn handle_handshake_response(
@@ -140,6 +144,7 @@ impl Peer {
             )
             .await
             .unwrap();
+        debug!("handshake completion sent for peer: {:?}", self.peer_index);
         Ok(())
     }
     pub async fn handle_handshake_completion(
