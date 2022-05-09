@@ -19,6 +19,7 @@ use crate::core::data::wallet::Wallet;
 pub struct Peer {
     pub peer_index: u64,
     pub peer_public_key: SaitoPublicKey,
+    pub block_fetch_url: String,
     pub static_peer_config: Option<data::configuration::Peer>,
     pub challenge_for_peer: Option<SaitoHash>,
     pub handshake_done: bool,
@@ -29,6 +30,7 @@ impl Peer {
         Peer {
             peer_index,
             peer_public_key: [0; 33],
+            block_fetch_url: "".to_string(),
             static_peer_config: None,
             challenge_for_peer: None,
             handshake_done: false,
@@ -79,6 +81,7 @@ impl Peer {
         }
 
         self.peer_public_key = challenge.public_key;
+        self.block_fetch_url = challenge.block_fetch_url;
         let wallet = wallet.read().await;
         let response = HandshakeResponse {
             public_key: wallet.publickey,
@@ -124,6 +127,7 @@ impl Peer {
         }
         self.challenge_for_peer = None;
         self.peer_public_key = response.public_key;
+        self.block_fetch_url = response.block_fetch_url;
         self.handshake_done = true;
         let wallet = wallet.read().await;
         let response = HandshakeCompletion {
@@ -176,13 +180,7 @@ impl Peer {
     ///
     /// ```
     pub fn get_block_fetch_url(&self, block_hash: SaitoHash) -> String {
-        let config = self.static_peer_config.as_ref().unwrap();
-        format!(
-            "{:?}://{:?}:{:?}/block/{:?}",
-            config.protocol,
-            config.host,
-            config.port,
-            hex::encode(block_hash)
-        )
+        // TODO : generate the url with proper / escapes,etc...
+        self.block_fetch_url.to_string() + hex::encode(block_hash).as_str()
     }
 }
