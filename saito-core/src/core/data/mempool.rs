@@ -171,7 +171,7 @@ impl Mempool {
         if self.transactions.is_empty() {
             return false;
         }
-        debug!("can bundle block");
+        trace!("can bundle block");
 
         trace!("waiting for the blockchain read lock");
         let blockchain = blockchain_lock.read().await;
@@ -181,7 +181,7 @@ impl Mempool {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
             let time_elapsed = current_timestamp - previous_block.get_timestamp();
-            info!(
+            trace!(
                 "can_bundle_block. work available: {:?} -- work needed: {:?} -- time elapsed: {:?} ",
                 work_available,
                 work_needed,
