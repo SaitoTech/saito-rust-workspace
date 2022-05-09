@@ -109,6 +109,8 @@ impl BlockchainController {
                         peer.peer_index,
                         hex::encode(peer.peer_public_key)
                     );
+                    // start block syncing here
+                    self.request_blockchain_from_peer(peer_index).await;
                 }
             }
             Message::HandshakeCompletion(response) => {
@@ -128,6 +130,8 @@ impl BlockchainController {
                         peer.peer_index,
                         hex::encode(peer.peer_public_key)
                     );
+                    // start block syncing here
+                    self.request_blockchain_from_peer(peer_index).await;
                 }
             }
             Message::ApplicationMessage(_) => {
@@ -219,9 +223,6 @@ impl BlockchainController {
 
         peers.index_to_peers.insert(peer_index, peer);
         info!("new peer added : {:?}", peer_index);
-
-        // start block syncing here
-        self.request_blockchain_from_peer(peer_index).await;
     }
 
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
@@ -277,7 +278,10 @@ impl BlockchainController {
                 continue;
             }
             let buffer = Message::BlockHeaderHash(block_hash).serialize();
-            self.io_handler.send_message(peer_index, buffer).await;
+            self.io_handler
+                .send_message(peer_index, buffer)
+                .await
+                .unwrap();
         }
     }
     async fn process_incoming_block_hash(&self, block_hash: SaitoHash, peer_index: u64) {
@@ -301,9 +305,12 @@ impl BlockchainController {
                 .expect("peer not found");
             url = peer.get_block_fetch_url(block_hash);
         }
-        self.io_handler
-            .fetch_block_from_peer(block_hash, peer_index, url)
-            .await;
+        if !block_exists {
+            self.io_handler
+                .fetch_block_from_peer(block_hash, peer_index, url)
+                .await
+                .unwrap();
+        }
     }
 }
 
