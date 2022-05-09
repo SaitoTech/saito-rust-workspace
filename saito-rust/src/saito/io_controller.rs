@@ -375,11 +375,13 @@ pub async fn run_io_controller(
                     } => {
                         let sender;
                         {
-                            let mut io_controller = io_controller.read().await;
+                            let io_controller = io_controller.read().await;
                             sender = io_controller.sender_to_saito_controller.clone();
                         }
-                        IoController::fetch_block(block_hash, peer_index, url, event_id, sender)
-                            .await
+                        tokio::spawn(async move {
+                            IoController::fetch_block(block_hash, peer_index, url, event_id, sender)
+                                .await
+                        });
                     }
                     InterfaceEvent::BlockFetched { .. } => {
                         unreachable!()
