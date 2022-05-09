@@ -465,7 +465,6 @@ fn run_websocket_server(
                         let block = blockchain.get_block(&block_hash).await;
                         if block.is_none() {
                             debug!("block not found : {:?}", block_hash);
-                            buffer = vec![];
                             return Err(warp::reject::not_found());
                         }
                         // TODO : check if the full block is in memory or need to load from disk
