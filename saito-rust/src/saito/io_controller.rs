@@ -320,14 +320,9 @@ pub async fn run_io_controller(
         sender_clone.clone(),
         io_controller_clone.clone(),
         port,
+        blockchain.clone(),
     );
-    const WEB_SERVER_PORT_OFFSET: u16 = 1;
-    let web_server_handle = run_web_server(
-        sender_clone.clone(),
-        io_controller_clone.clone(),
-        port + WEB_SERVER_PORT_OFFSET,
-        blockchain,
-    );
+
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
         loop {
@@ -395,7 +390,7 @@ pub async fn run_io_controller(
             }
         }
     });
-    let result = tokio::join!(server_handle, controller_handle, web_server_handle);
+    let result = tokio::join!(server_handle, controller_handle);
 }
 
 pub enum PeerSender {
@@ -413,6 +408,7 @@ fn run_websocket_server(
     sender_clone: Sender<IoEvent>,
     io_controller: Arc<RwLock<IoController>>,
     port: u16,
+    blockchain: Arc<RwLock<Blockchain>>,
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
     tokio::spawn(async move {
@@ -444,26 +440,6 @@ fn run_websocket_server(
                     .await
                 })
             });
-
-        // let (_, server) =
-        //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-        //         // tokio::signal::ctrl_c().await.ok();
-        //     });
-        // server.await;
-        warp::serve(ws_route).run(([127, 0, 0, 1], port)).await;
-    })
-}
-
-fn run_web_server(
-    sender_clone: Sender<IoEvent>,
-    io_controller_clone: Arc<RwLock<IoController>>,
-    port: u16,
-    blockchain: Arc<RwLock<Blockchain>>,
-) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        debug!("running web server on : {:?}", port);
-        let blockchain = blockchain.clone();
-        // TODO : handle security aspect of the server connections
         let http_route = warp::path!("block" / String)
             .and(warp::any().map(move || blockchain.clone()))
             .and_then(
@@ -494,12 +470,12 @@ fn run_web_server(
                     Ok(warp::reply::with_status(buffer, StatusCode::OK))
                 },
             );
-        info!("starting web server");
+        let routes = http_route.or(ws_route);
         // let (_, server) =
-        //     warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
+        //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
         //         // tokio::signal::ctrl_c().await.ok();
         //     });
         // server.await;
-        warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
+        warp::serve(routes).run(([127, 0, 0, 1], port)).await;
     })
 }

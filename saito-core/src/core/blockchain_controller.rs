@@ -83,9 +83,14 @@ impl BlockchainController {
                     todo!()
                 }
                 let peer = peer.unwrap();
-                peer.handle_handshake_challenge(challenge, &self.io_handler, self.wallet.clone())
-                    .await
-                    .unwrap();
+                peer.handle_handshake_challenge(
+                    challenge,
+                    &self.io_handler,
+                    self.wallet.clone(),
+                    self.configs.clone(),
+                )
+                .await
+                .unwrap();
             }
             Message::HandshakeResponse(response) => {
                 debug!("received handshake response");
@@ -207,7 +212,7 @@ impl BlockchainController {
         let mut peer = Peer::new(peer_index);
         if peer_data.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-            peer.initiate_handshake(&self.io_handler, self.wallet.clone())
+            peer.initiate_handshake(&self.io_handler, self.wallet.clone(), self.configs.clone())
                 .await
                 .unwrap();
         }
