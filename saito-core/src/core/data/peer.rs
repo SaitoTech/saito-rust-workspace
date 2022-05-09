@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::handle_io::HandleIo;
 use crate::core::data;
+use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
 use crate::core::data::msg::handshake::{
     HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
@@ -37,13 +38,19 @@ impl Peer {
         &mut self,
         io_handler: &Box<dyn HandleIo + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
+        configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.peer_index);
         let wallet = wallet.read().await;
-
+        let block_fetch_url;
+        {
+            let configs = configs.read().await;
+            block_fetch_url = configs.get_block_fetch_url();
+        }
         let challenge = HandshakeChallenge {
             public_key: wallet.publickey,
             challenge: generate_random_bytes(32).try_into().unwrap(),
+            block_fetch_url,
         };
         self.challenge_for_peer = Some(challenge.challenge);
         let message = Message::HandshakeChallenge(challenge);
@@ -58,12 +65,18 @@ impl Peer {
         challenge: HandshakeChallenge,
         io_handler: &Box<dyn HandleIo + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
+        configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
         debug!(
             "handling handshake challenge : {:?} with address : {:?}",
             self.peer_index,
             hex::encode(challenge.public_key)
         );
+        let block_fetch_url;
+        {
+            let configs = configs.read().await;
+            block_fetch_url = configs.get_block_fetch_url();
+        }
 
         self.peer_public_key = challenge.public_key;
         let wallet = wallet.read().await;
@@ -71,6 +84,7 @@ impl Peer {
             public_key: wallet.publickey,
             signature: sign(&challenge.challenge.to_vec(), wallet.privatekey),
             challenge: generate_random_bytes(32).try_into().unwrap(),
+            block_fetch_url,
         };
 
         self.challenge_for_peer = Some(response.challenge);
