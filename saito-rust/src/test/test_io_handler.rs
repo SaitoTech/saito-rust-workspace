@@ -54,7 +54,7 @@ impl HandleIo for TestIOHandler {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
-    ) -> Result<Block, Error> {
+    ) -> Result<(), Error> {
         todo!()
     }
 

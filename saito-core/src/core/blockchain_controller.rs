@@ -151,6 +151,7 @@ impl BlockchainController {
                 self.process_incoming_block_hash(hash, peer_index).await;
             }
         }
+        debug!("incoming message processed");
     }
     async fn propagate_block_to_peers(&self, block_hash: SaitoHash) {
         debug!("propagating blocks to peers");
@@ -322,7 +323,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
-        debug!("processing new interface event");
+        debug!("processing new interface event : {:?}", event);
         match event {
             InterfaceEvent::OutgoingNetworkMessage { peer_index, buffer } => {
                 // TODO : remove this case if not being used

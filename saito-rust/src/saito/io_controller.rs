@@ -173,6 +173,7 @@ impl IoController {
             })
             .await
             .unwrap();
+        debug!("block buffer sent to blockchain controller");
     }
     pub async fn send_new_peer(
         event_id: u64,
@@ -366,8 +367,12 @@ pub async fn run_io_controller(
                     InterfaceEvent::PeerConnectionResult { .. } => {
                         unreachable!()
                     }
-                    InterfaceEvent::PeerDisconnected { peer_index } => {}
-                    InterfaceEvent::IncomingNetworkMessage { .. } => {}
+                    InterfaceEvent::PeerDisconnected { peer_index } => {
+                        unreachable!()
+                    }
+                    InterfaceEvent::IncomingNetworkMessage { .. } => {
+                        unreachable!()
+                    }
                     InterfaceEvent::BlockFetchRequest {
                         block_hash,
                         peer_index,
@@ -378,6 +383,7 @@ pub async fn run_io_controller(
                             let io_controller = io_controller.read().await;
                             sender = io_controller.sender_to_saito_controller.clone();
                         }
+                        // starting new thread to stop io controller from getting blocked
                         tokio::spawn(async move {
                             IoController::fetch_block(block_hash, peer_index, url, event_id, sender)
                                 .await

@@ -132,6 +132,7 @@ async fn run_mempool_controller(
     receiver_for_mempool: Receiver<MempoolEvent>,
     sender_to_blockchain: &Sender<BlockchainEvent>,
     sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
+    sender_to_io_controller: tokio::sync::mpsc::Sender<IoEvent>,
 ) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
     let mut generate_test_tx = false;
@@ -146,9 +147,14 @@ async fn run_mempool_controller(
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
         time_keeper: Box::new(TimeKeeper {}),
+        io_handler: Box::new(RustIOHandler::new(
+            sender_to_io_controller.clone(),
+            // BLOCKCHAIN_CONTROLLER_ID,
+        )),
         block_producing_timer: 0,
         tx_producing_timer: 0,
         generate_test_tx,
+        peers: context.peers.clone(),
     };
 
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
@@ -238,23 +244,28 @@ fn run_loop_thread(
                 // TODO : remove hard coded values
                 match command.controller_id {
                     BLOCKCHAIN_CONTROLLER_ID => {
+                        debug!(
+                            "routing event to blockchain controller : {:?}",
+                            command.event
+                        );
                         interface_sender_to_blockchain
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     MEMPOOL_CONTROLLER_ID => {
+                        debug!("routing event to mempool controller : {:?}", command.event);
                         interface_sender_to_mempool
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     MINER_CONTROLLER_ID => {
+                        debug!("routing event to miner controller : {:?}", command.event);
                         interface_sender_to_miner.send(command.event).await.unwrap();
                     }
-                    _ => {
-                        unreachable!()
-                    }
+
+                    _ => {}
                 }
             }
 
@@ -323,7 +334,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1000);
 
     let (interface_sender_to_blockchain, blockchain_handle) = run_blockchain_controller(
-        sender_to_io_controller,
+        sender_to_io_controller.clone(),
         configs.clone(),
         &global_sender,
         &context,
@@ -339,6 +350,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         receiver_for_mempool,
         &sender_to_blockchain,
         sender_to_miner,
+        sender_to_io_controller.clone(),
     )
     .await;
 
