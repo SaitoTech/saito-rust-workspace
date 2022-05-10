@@ -430,7 +430,10 @@ fn run_websocket_server(
                 ws.on_upgrade(move |socket| async move {
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
+
+                    trace!("waiting for the io controller write lock");
                     let mut controller = clone.write().await;
+                    trace!("acquired the io controller write lock");
 
                     IoController::send_new_peer(
                         0,
