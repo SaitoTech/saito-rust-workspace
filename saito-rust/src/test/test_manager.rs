@@ -8,7 +8,7 @@ use ahash::AHashMap;
 use log::{debug, info};
 use rayon::prelude::*;
 use saito_core::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoUTXOSetKey};
-use saito_core::common::handle_io::HandleIo;
+use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::burnfee::HEARTBEAT;
@@ -48,7 +48,7 @@ pub struct TestManager {
     pub blockchain_lock: Arc<RwLock<Blockchain>>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub latest_block_hash: SaitoHash,
-    pub io_handler: Box<dyn HandleIo + Send + Sync>,
+    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
     pub sender_to_miner: Sender<MinerEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
 }
@@ -148,7 +148,7 @@ impl TestManager {
     pub async fn add_block_to_blockchain(
         blockchain_lock: Arc<RwLock<Blockchain>>,
         block: Block,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
         sender: Sender<MinerEvent>,
     ) {

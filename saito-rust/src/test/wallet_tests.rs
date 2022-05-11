@@ -4,7 +4,7 @@ mod tests {
     use crate::test::test_io_handler::TestIOHandler;
     use crate::test::test_manager::TestManager;
     use log::info;
-    use saito_core::common::handle_io::HandleIo;
+    use saito_core::common::interface_io::InterfaceIO;
     use saito_core::core::data::wallet::Wallet;
 
     #[tokio::test]
@@ -16,7 +16,7 @@ mod tests {
         let publickey1 = wallet.get_publickey().clone();
         let privatekey1 = wallet.get_privatekey().clone();
 
-        let mut io_handler: Box<dyn HandleIo + Send + Sync> = Box::new(TestIOHandler::new());
+        let mut io_handler: Box<dyn InterfaceIO + Send + Sync> = Box::new(TestIOHandler::new());
 
         wallet.save(&mut io_handler).await;
 

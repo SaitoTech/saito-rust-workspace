@@ -4,14 +4,14 @@ use async_trait::async_trait;
 
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::defs::SaitoHash;
-use saito_core::common::handle_io::HandleIo;
+use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Peer;
 
 pub struct WasmIoHandler {}
 
 #[async_trait]
-impl HandleIo for WasmIoHandler {
+impl InterfaceIO for WasmIoHandler {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         todo!()
     }

@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::defs::SaitoHash;
-use crate::common::handle_io::HandleIo;
+use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data;
@@ -42,19 +42,19 @@ pub struct StaticPeer {
     pub peer_index: u64,
 }
 
-pub struct BlockchainController {
+pub struct RoutingController {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub sender_to_mempool: Sender<MempoolEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
     pub static_peers: Vec<StaticPeer>,
     pub configs: Arc<RwLock<Configuration>>,
-    pub io_handler: Box<dyn HandleIo + Send + Sync>,
+    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub wallet: Arc<RwLock<Wallet>>,
 }
 
-impl BlockchainController {
+impl RoutingController {
     ///
     ///
     /// # Arguments
@@ -316,7 +316,7 @@ impl BlockchainController {
 }
 
 #[async_trait]
-impl ProcessEvent<BlockchainEvent> for BlockchainController {
+impl ProcessEvent<BlockchainEvent> for RoutingController {
     async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         trace!("processing new global event");
         None

@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::blockchain_controller::{BlockchainController, BlockchainEvent};
+use saito_core::core::routing_controller::{RoutingController, BlockchainEvent};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
@@ -57,7 +57,7 @@ impl Future for NetworkResultFuture {
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    blockchain_controller: BlockchainController,
+    blockchain_controller: RoutingController,
     mempool_controller: MempoolController,
     miner_controller: MinerController,
     receiver_in_blockchain: Receiver<BlockchainEvent>,
@@ -92,7 +92,7 @@ pub fn new() -> SaitoWasm {
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
     SaitoWasm {
-        blockchain_controller: BlockchainController {
+        blockchain_controller: RoutingController {
             blockchain: context.blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
             sender_to_miner: sender_to_miner.clone(),

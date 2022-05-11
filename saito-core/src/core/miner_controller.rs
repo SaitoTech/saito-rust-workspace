@@ -10,7 +10,7 @@ use crate::common::command::{GlobalEvent, InterfaceEvent};
 use crate::common::defs::SaitoHash;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::blockchain_controller::BlockchainEvent;
+use crate::core::routing_controller::BlockchainEvent;
 use crate::core::data::miner::Miner;
 use crate::core::mempool_controller::MempoolEvent;
 

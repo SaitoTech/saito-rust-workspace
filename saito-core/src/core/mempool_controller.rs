@@ -9,10 +9,10 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
-use crate::common::handle_io::HandleIo;
+use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::blockchain_controller::BlockchainEvent;
+use crate::core::routing_controller::BlockchainEvent;
 use crate::core::data::block::Block;
 
 use crate::core::data::blockchain::Blockchain;
@@ -41,7 +41,7 @@ pub struct MempoolController {
     pub tx_producing_timer: u128,
     pub generate_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
-    pub io_handler: Box<dyn HandleIo + Send + Sync>,
+    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
     pub peers: Arc<RwLock<PeerCollection>>,
 }
 

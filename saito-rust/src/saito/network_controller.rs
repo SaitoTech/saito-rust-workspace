@@ -31,13 +31,13 @@ type SocketSender =
     SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
-pub struct IoController {
+pub struct NetworkController {
     sockets: HashMap<u64, PeerSender>,
     peer_counter: Arc<Mutex<PeerCounter>>,
     pub sender_to_saito_controller: Sender<IoEvent>,
 }
 
-impl IoController {
+impl NetworkController {
     pub async fn send_outgoing_message(&mut self, peer_index: u64, buffer: Vec<u8>) {
         debug!("sending outgoing message : peer = {:?}", peer_index);
         let socket = self.sockets.get_mut(&peer_index);
@@ -67,7 +67,7 @@ impl IoController {
 
     pub async fn connect_to_peer(
         event_id: u64,
-        io_controller: Arc<RwLock<IoController>>,
+        io_controller: Arc<RwLock<NetworkController>>,
         peer: data::configuration::Peer,
     ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
@@ -102,7 +102,7 @@ impl IoController {
         trace!("acquired the io controller write lock");
         let sender_to_controller = io_controller.sender_to_saito_controller.clone();
         let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
-        IoController::send_new_peer(
+        NetworkController::send_new_peer(
             event_id,
             io_controller.peer_counter.clone(),
             &mut io_controller.sockets,
@@ -202,7 +202,7 @@ impl IoController {
             .await
             .expect("sending failed");
 
-        IoController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
+        NetworkController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
     }
     pub async fn receive_message_from_peer(
         mut receiver: PeerReceiver,
@@ -310,7 +310,7 @@ pub async fn run_io_controller(
     let peer_counter_clone = peer_index_counter.clone();
     let sender_clone = sender_to_saito_controller.clone();
 
-    let io_controller = Arc::new(RwLock::new(IoController {
+    let io_controller = Arc::new(RwLock::new(NetworkController {
         sockets: Default::default(),
         sender_to_saito_controller,
         peer_counter: peer_index_counter.clone(),
@@ -357,7 +357,7 @@ pub async fn run_io_controller(
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
                     InterfaceEvent::ConnectToPeer { peer_details } => {
-                        IoController::connect_to_peer(
+                        NetworkController::connect_to_peer(
                             event_id,
                             io_controller.clone(),
                             peer_details,
@@ -385,7 +385,7 @@ pub async fn run_io_controller(
                         }
                         // starting new thread to stop io controller from getting blocked
                         tokio::spawn(async move {
-                            IoController::fetch_block(block_hash, peer_index, url, event_id, sender)
+                            NetworkController::fetch_block(block_hash, peer_index, url, event_id, sender)
                                 .await
                         });
                     }
@@ -416,7 +416,7 @@ pub enum PeerReceiver {
 fn run_websocket_server(
     peer_counter: Arc<Mutex<PeerCounter>>,
     sender_clone: Sender<IoEvent>,
-    io_controller: Arc<RwLock<IoController>>,
+    io_controller: Arc<RwLock<NetworkController>>,
     port: u16,
     blockchain: Arc<RwLock<Blockchain>>,
 ) -> JoinHandle<()> {
@@ -441,7 +441,7 @@ fn run_websocket_server(
                     let mut controller = clone.write().await;
                     trace!("acquired the io controller write lock");
 
-                    IoController::send_new_peer(
+                    NetworkController::send_new_peer(
                         0,
                         peer_counter,
                         &mut controller.sockets,

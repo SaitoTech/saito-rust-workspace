@@ -13,8 +13,8 @@ use tracing_subscriber;
 use saito_core::common::command::GlobalEvent;
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::blockchain_controller::{
-    BlockchainController, BlockchainEvent, PeerState, StaticPeer,
+use saito_core::core::routing_controller::{
+    RoutingController, BlockchainEvent, PeerState, StaticPeer,
 };
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
@@ -22,7 +22,7 @@ use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
 use crate::saito::config_handler::ConfigHandler;
-use crate::saito::io_controller::run_io_controller;
+use crate::saito::network_controller::run_io_controller;
 use crate::saito::io_event::IoEvent;
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::time_keeper::TimeKeeper;
@@ -186,7 +186,7 @@ async fn run_blockchain_controller(
     receiver_for_blockchain: Receiver<BlockchainEvent>,
     sender_to_miner: &Sender<MinerEvent>,
 ) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
-    let mut blockchain_controller = BlockchainController {
+    let mut blockchain_controller = RoutingController {
         blockchain: context.blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),

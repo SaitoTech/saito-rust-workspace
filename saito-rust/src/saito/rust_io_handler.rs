@@ -13,7 +13,7 @@ use tracing::field::debug;
 
 use saito_core::common::command::InterfaceEvent;
 use saito_core::common::defs::SaitoHash;
-use saito_core::common::handle_io::HandleIo;
+use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Peer;
 
@@ -84,7 +84,7 @@ impl RustIOHandler {
 }
 
 #[async_trait]
-impl HandleIo for RustIOHandler {
+impl InterfaceIO for RustIOHandler {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         // TODO : refactor to combine event and the future
         let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessage { peer_index, buffer });
@@ -328,7 +328,7 @@ impl HandleIo for RustIOHandler {
 
 #[cfg(test)]
 mod tests {
-    use saito_core::common::handle_io::HandleIo;
+    use saito_core::common::interface_io::InterfaceIO;
 
     use crate::saito::rust_io_handler::RustIOHandler;
 
