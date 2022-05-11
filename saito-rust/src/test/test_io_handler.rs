@@ -4,6 +4,7 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use log::{debug, info};
+use saito_core::common::defs::SaitoHash;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -44,6 +45,19 @@ impl HandleIo for TestIOHandler {
         Ok(())
     }
 
+    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn fetch_block_from_peer(
+        &self,
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+    ) -> Result<(), Error> {
+        todo!()
+    }
+
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
         let filename = key.as_str();
@@ -80,7 +94,6 @@ impl HandleIo for TestIOHandler {
         }
         Ok(encoded)
     }
-
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
         info!("current dir = {:?}", std::env::current_dir().unwrap());
         let result = fs::read_dir(self.get_block_dir());
@@ -115,6 +128,7 @@ impl HandleIo for TestIOHandler {
         }
         return false;
     }
+
     async fn remove_value(&self, key: String) -> Result<(), Error> {
         let result = tokio::fs::remove_file(key).await;
         return result;
@@ -122,13 +136,5 @@ impl HandleIo for TestIOHandler {
 
     fn get_block_dir(&self) -> String {
         "./data/blocks/".to_string()
-    }
-
-    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
-        todo!()
-    }
-
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
-        todo!()
     }
 }

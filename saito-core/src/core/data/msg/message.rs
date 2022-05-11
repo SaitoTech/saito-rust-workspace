@@ -1,9 +1,15 @@
 use std::io::{Error, ErrorKind};
 
 use log::{info, warn};
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 
+use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};
-use crate::core::data::handshake::{HandshakeChallenge, HandshakeCompletion, HandshakeResponse};
+use crate::core::data::msg::block_request::BlockchainRequest;
+use crate::core::data::msg::handshake::{
+    HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
+};
 use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;
 
@@ -15,6 +21,8 @@ pub enum Message {
     ApplicationMessage(Vec<u8>),
     Block(Block),
     Transaction(Transaction),
+    BlockchainRequest(BlockchainRequest),
+    BlockHeaderHash(SaitoHash),
 }
 
 impl Message {
@@ -27,13 +35,17 @@ impl Message {
             Message::ApplicationMessage(data) => data.clone(),
             Message::Block(data) => data.serialize_for_net(BlockType::Full),
             Message::Transaction(data) => data.serialize_for_net(),
+            Message::BlockchainRequest(data) => data.serialize(),
+            Message::BlockHeaderHash(data) => data.to_vec(),
         };
         [vec![message_type], internal_buffer].concat()
     }
     pub fn deserialize(buffer: Vec<u8>) -> Result<Message, Error> {
         let message_type = buffer[0];
         let buffer = buffer[1..].to_vec();
+
         info!("buffer size = {:?}", buffer.len());
+
         // TODO : remove hardcoded values into an enum
         match message_type {
             1 => {
@@ -57,6 +69,15 @@ impl Message {
             6 => {
                 todo!()
             }
+            7 => {
+                let result = BlockchainRequest::deserialize(&buffer)?;
+                return Ok(Message::BlockchainRequest(result));
+            }
+            8 => {
+                assert_eq!(buffer.len(), 32);
+                let result = buffer[0..32].to_vec().try_into().unwrap();
+                return Ok(Message::BlockHeaderHash(result));
+            }
             _ => {
                 warn!("message type : {:?} not valid", message_type);
                 return Err(Error::from(ErrorKind::InvalidData));
@@ -71,6 +92,8 @@ impl Message {
             Message::ApplicationMessage(_) => 4,
             Message::Block(_) => 5,
             Message::Transaction(_) => 6,
+            Message::BlockchainRequest(_) => 7,
+            Message::BlockHeaderHash(_) => 8,
         }
     }
 }

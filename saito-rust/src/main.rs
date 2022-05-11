@@ -131,13 +131,13 @@ async fn run_miner_controller(
 }
 
 async fn run_mempool_controller(
-    sender_to_io_controller: tokio::sync::mpsc::Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
     receiver_for_mempool: Receiver<MempoolEvent>,
     sender_to_blockchain: &Sender<BlockchainEvent>,
     sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
+    sender_to_io_controller: tokio::sync::mpsc::Sender<IoEvent>,
 ) -> (Sender<InterfaceEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
     let mut generate_test_tx = false;
@@ -152,6 +152,7 @@ async fn run_mempool_controller(
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
         time_keeper: Box::new(TimeKeeper {}),
+
         block_producing_timer: 0,
         tx_producing_timer: 0,
         generate_test_tx,
@@ -160,21 +161,7 @@ async fn run_mempool_controller(
             MEMPOOL_CONTROLLER_ID,
         )),
         peers: context.peers.clone(),
-        static_peers: vec![],
     };
-    {
-        trace!("waiting for the configs write lock");
-        let configs = configs.read().await;
-        trace!("acquired the configs write lock");
-        let peers = &configs.peers;
-        for peer in peers {
-            mempool_controller.static_peers.push(StaticPeer {
-                peer_details: (*peer).clone(),
-                peer_state: PeerState::Disconnected,
-                peer_index: 0,
-            });
-        }
-    }
 
     let (interface_sender_to_mempool, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<InterfaceEvent>(1000);
@@ -248,8 +235,6 @@ fn run_loop_thread(
     interface_sender_to_mempool: Sender<InterfaceEvent>,
     interface_sender_to_miner: Sender<InterfaceEvent>,
 ) -> JoinHandle<()> {
-
-
     let loop_handle = tokio::spawn(async move {
         let mut work_done: bool;
         loop {
@@ -261,23 +246,28 @@ fn run_loop_thread(
                 // TODO : remove hard coded values
                 match command.controller_id {
                     BLOCKCHAIN_CONTROLLER_ID => {
+                        debug!(
+                            "routing event to blockchain controller : {:?}",
+                            command.event
+                        );
                         interface_sender_to_blockchain
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     MEMPOOL_CONTROLLER_ID => {
+                        debug!("routing event to mempool controller : {:?}", command.event);
                         interface_sender_to_mempool
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     MINER_CONTROLLER_ID => {
+                        debug!("routing event to miner controller : {:?}", command.event);
                         interface_sender_to_miner.send(command.event).await.unwrap();
                     }
-                    _ => {
-                        unreachable!()
-                    }
+
+                    _ => {}
                 }
             }
 
@@ -357,13 +347,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     let (interface_sender_to_mempool, mempool_handle) = run_mempool_controller(
-        sender_to_io_controller.clone(),
         configs.clone(),
         &global_sender,
         &context,
         receiver_for_mempool,
         &sender_to_blockchain,
         sender_to_miner,
+        sender_to_io_controller.clone(),
     )
     .await;
 

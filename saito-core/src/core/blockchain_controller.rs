@@ -15,7 +15,8 @@ use crate::core::data;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
-use crate::core::data::message::Message;
+use crate::core::data::msg::block_request::BlockchainRequest;
+use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
@@ -54,6 +55,104 @@ pub struct BlockchainController {
 }
 
 impl BlockchainController {
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_index`:
+    /// * `message`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
+        debug!(
+            "processing incoming message type : {:?} from peer : {:?}",
+            message, peer_index
+        );
+        match message {
+            Message::HandshakeChallenge(challenge) => {
+                debug!("received handshake challenge");
+                let mut peers = self.peers.write().await;
+                let peer = peers.index_to_peers.get_mut(&peer_index);
+                if peer.is_none() {
+                    todo!()
+                }
+                let peer = peer.unwrap();
+                peer.handle_handshake_challenge(
+                    challenge,
+                    &self.io_handler,
+                    self.wallet.clone(),
+                    self.configs.clone(),
+                )
+                .await
+                .unwrap();
+            }
+            Message::HandshakeResponse(response) => {
+                debug!("received handshake response");
+                let mut peers = self.peers.write().await;
+                let peer = peers.index_to_peers.get_mut(&peer_index);
+                if peer.is_none() {
+                    todo!()
+                }
+                let peer = peer.unwrap();
+                peer.handle_handshake_response(response, &self.io_handler, self.wallet.clone())
+                    .await
+                    .unwrap();
+                if peer.handshake_done {
+                    debug!(
+                        "peer : {:?} handshake successful for peer : {:?}",
+                        peer.peer_index,
+                        hex::encode(peer.peer_public_key)
+                    );
+                    // start block syncing here
+                    self.request_blockchain_from_peer(peer_index).await;
+                }
+            }
+            Message::HandshakeCompletion(response) => {
+                debug!("received handshake completion");
+                let mut peers = self.peers.write().await;
+                let peer = peers.index_to_peers.get_mut(&peer_index);
+                if peer.is_none() {
+                    todo!()
+                }
+                let peer = peer.unwrap();
+                let result = peer
+                    .handle_handshake_completion(response, &self.io_handler)
+                    .await;
+                if peer.handshake_done {
+                    debug!(
+                        "peer : {:?} handshake successful for peer : {:?}",
+                        peer.peer_index,
+                        hex::encode(peer.peer_public_key)
+                    );
+                    // start block syncing here
+                    self.request_blockchain_from_peer(peer_index).await;
+                }
+            }
+            Message::ApplicationMessage(_) => {
+                debug!("received buffer");
+            }
+            Message::Block(_) => {
+                debug!("received block");
+            }
+            Message::Transaction(_) => {
+                debug!("received transaction");
+            }
+            Message::BlockchainRequest(request) => {
+                self.process_incoming_blockchain_request(request, peer_index)
+                    .await;
+            }
+            Message::BlockHeaderHash(hash) => {
+                self.process_incoming_block_hash(hash, peer_index).await;
+            }
+        }
+        debug!("incoming message processed");
+    }
     async fn propagate_block_to_peers(&self, block_hash: SaitoHash) {
         debug!("propagating blocks to peers");
         let buffer: Vec<u8>;
@@ -67,7 +166,7 @@ impl BlockchainController {
                 // TODO : handle
             }
             let block = block.unwrap();
-            buffer = block.serialize_for_net(BlockType::Full);
+            buffer = block.serialize_for_net(BlockType::Header);
 
             // finding block sender to avoid resending the block to that node
             if block.source_connection_id.is_some() {
@@ -118,7 +217,7 @@ impl BlockchainController {
         let mut peer = Peer::new(peer_index);
         if peer_data.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-            peer.initiate_handshake(&self.io_handler, self.wallet.clone())
+            peer.initiate_handshake(&self.io_handler, self.wallet.clone(), self.configs.clone())
                 .await
                 .unwrap();
         }
@@ -126,66 +225,92 @@ impl BlockchainController {
         peers.index_to_peers.insert(peer_index, peer);
         info!("new peer added : {:?}", peer_index);
     }
+
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         todo!()
     }
-    async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
+    async fn request_blockchain_from_peer(&self, peer_index: u64) {
+        debug!("requesting blockchain from peer : {:?}", peer_index);
+
+        // TODO : should this be moved inside peer ?
+        let request;
+        {
+            let blockchain = self.blockchain.read().await;
+            request = BlockchainRequest {
+                latest_block_id: blockchain.get_latest_block_id(),
+                latest_block_hash: blockchain.get_latest_block_hash(),
+                fork_id: blockchain.get_fork_id(),
+            };
+        }
+
+        let buffer = Message::BlockchainRequest(request).serialize();
+        self.io_handler
+            .send_message(peer_index, buffer)
+            .await
+            .unwrap();
+    }
+
+    pub async fn process_incoming_blockchain_request(
+        &self,
+        request: BlockchainRequest,
+        peer_index: u64,
+    ) {
         debug!(
-            "processing incoming message type : {:?} from peer : {:?}",
-            message, peer_index
+            "processing incoming blockchain request : {:?}-{:?}-{:?} from peer : {:?}",
+            request.latest_block_id,
+            hex::encode(request.latest_block_hash),
+            hex::encode(request.fork_id),
+            peer_index
         );
-        match message {
-            Message::HandshakeChallenge(challenge) => {
-                debug!("received handshake challenge");
-                let mut peers = self.peers.write().await;
-                let peer = peers.index_to_peers.get_mut(&peer_index);
-                if peer.is_none() {
-                    todo!()
-                }
-                let peer = peer.unwrap();
-                peer.handle_handshake_challenge(challenge, &self.io_handler, self.wallet.clone())
-                    .await
-                    .unwrap();
+        // TODO : can we ignore the functionality if it's a lite node ?
+
+        let blockchain = self.blockchain.read().await;
+
+        let last_shared_ancestor =
+            blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
+        debug!("last shared ancestor = {:?}", last_shared_ancestor);
+
+        for i in last_shared_ancestor..(blockchain.blockring.get_latest_block_id() + 1) {
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(i);
+            if block_hash == [0; 32] {
+                // TODO : can the block hash not be in the ring if we are going through the longest chain ?
+                continue;
             }
-            Message::HandshakeResponse(response) => {
-                debug!("received handshake response");
-                let mut peers = self.peers.write().await;
-                let peer = peers.index_to_peers.get_mut(&peer_index);
-                if peer.is_none() {
-                    todo!()
-                }
-                let peer = peer.unwrap();
-                peer.handle_handshake_response(response, &self.io_handler, self.wallet.clone())
-                    .await
-                    .unwrap();
-                if peer.handshake_done {
-                    // TODO :sync block data from peer
-                }
-            }
-            Message::HandshakeCompletion(response) => {
-                debug!("received handshake completion");
-                let mut peers = self.peers.write().await;
-                let peer = peers.index_to_peers.get_mut(&peer_index);
-                if peer.is_none() {
-                    todo!()
-                }
-                let peer = peer.unwrap();
-                let result = peer
-                    .handle_handshake_completion(response, &self.io_handler)
-                    .await;
-                if peer.handshake_done {
-                    // TODO :sync block data from peer
-                }
-            }
-            Message::ApplicationMessage(_) => {
-                debug!("received buffer");
-            }
-            Message::Block(_) => {
-                debug!("received block");
-            }
-            Message::Transaction(_) => {
-                debug!("received transaction");
-            }
+            let buffer = Message::BlockHeaderHash(block_hash).serialize();
+            self.io_handler
+                .send_message(peer_index, buffer)
+                .await
+                .unwrap();
+        }
+    }
+    async fn process_incoming_block_hash(&self, block_hash: SaitoHash, peer_index: u64) {
+        debug!(
+            "processing incoming block hash : {:?} from peer : {:?}",
+            hex::encode(block_hash),
+            peer_index
+        );
+
+        let block_exists;
+        {
+            let blockchain = self.blockchain.read().await;
+            block_exists = blockchain.is_block_indexed(block_hash);
+        }
+        let url;
+        {
+            let peers = self.peers.read().await;
+            let peer = peers
+                .index_to_peers
+                .get(&peer_index)
+                .expect("peer not found");
+            url = peer.get_block_fetch_url(block_hash);
+        }
+        if !block_exists {
+            self.io_handler
+                .fetch_block_from_peer(block_hash, peer_index, url)
+                .await
+                .unwrap();
         }
     }
 }
@@ -198,7 +323,7 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
     }
 
     async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
-        debug!("processing new interface event");
+        debug!("processing new interface event : {:?}", event);
         match event {
             InterfaceEvent::OutgoingNetworkMessage { peer_index, buffer } => {
                 // TODO : remove this case if not being used
@@ -222,8 +347,26 @@ impl ProcessEvent<BlockchainEvent> for BlockchainController {
                 }
             }
             InterfaceEvent::PeerDisconnected { .. } => {}
-            _ => {
+
+            InterfaceEvent::OutgoingNetworkMessageForAll { .. } => {
                 unreachable!()
+            }
+            InterfaceEvent::ConnectToPeer { .. } => {
+                unreachable!()
+            }
+            InterfaceEvent::BlockFetchRequest { .. } => {
+                unreachable!()
+            }
+            InterfaceEvent::BlockFetched {
+                block_hash,
+                peer_index,
+                buffer,
+            } => {
+                debug!("block received : {:?}", hex::encode(block_hash));
+                self.sender_to_mempool
+                    .send(MempoolEvent::BlockFetched { peer_index, buffer })
+                    .await
+                    .unwrap();
             }
         }
         None

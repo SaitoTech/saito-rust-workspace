@@ -181,9 +181,18 @@ impl HandleIo for RustIOHandler {
     //     todo!()
     // }
 
-    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error> {
+    async fn fetch_block_from_peer(
+        &self,
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+    ) -> Result<(), Error> {
         debug!("fetching block from peer : {:?}", url);
-        let event = IoEvent::new(InterfaceEvent::BlockFetchRequest { url: url.clone() });
+        let event = IoEvent::new(InterfaceEvent::BlockFetchRequest {
+            block_hash,
+            peer_index,
+            url: url.clone(),
+        });
         let io_future = IoFuture {
             event_id: event.event_id,
         };
@@ -192,22 +201,7 @@ impl HandleIo for RustIOHandler {
             .await
             .expect("failed sending to io controller");
 
-        let result = io_future.await;
-        if result.is_err() {
-            let err = result.err().unwrap();
-            warn!("failed fetching block from peer : {:?}", err);
-            return Err(err);
-        }
-        let result = result.unwrap();
-        match result {
-            FutureState::BlockFetched(block) => {
-                trace!("block : {:?} fetched from peer", url);
-                return Ok(block);
-            }
-            _ => {
-                unreachable!()
-            }
-        }
+        Ok(())
     }
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {

@@ -1,5 +1,6 @@
 use crate::common::defs::SaitoHash;
 use crate::core::data;
+use crate::core::data::block::Block;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::Transaction;
 
@@ -46,6 +47,13 @@ pub enum InterfaceEvent {
         peer_index: u64,
     },
     BlockFetchRequest {
+        block_hash: SaitoHash,
+        peer_index: u64,
         url: String,
+    },
+    BlockFetched {
+        block_hash: SaitoHash,
+        peer_index: u64,
+        buffer: Vec<u8>,
     },
 }

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::common::defs::SaitoHash;
 use crate::core::data;
 use crate::core::data::block::Block;
-use crate::core::data::message::Message;
+use crate::core::data::msg::message::Message;
 
 #[async_trait]
 pub trait HandleIo {
@@ -33,7 +33,12 @@ pub trait HandleIo {
     ) -> Result<(), Error>;
     async fn connect_to_peer(&mut self, peer: data::configuration::Peer) -> Result<(), Error>;
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error>;
-    async fn fetch_block_from_peer(&self, url: String) -> Result<Block, Error>;
+    async fn fetch_block_from_peer(
+        &self,
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+    ) -> Result<(), Error>;
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error>;
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error>;

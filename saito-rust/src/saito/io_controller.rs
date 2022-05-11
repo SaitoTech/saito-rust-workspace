@@ -18,7 +18,6 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::command::InterfaceEvent::PeerConnectionResult;
 use saito_core::common::defs::SaitoHash;
 use saito_core::core::data;
 use saito_core::core::data::block::{Block, BlockType};
@@ -140,7 +139,13 @@ impl IoController {
         }
         trace!("message sent to all");
     }
-    pub async fn fetch_block(url: String, event_id: u64) {
+    pub async fn fetch_block(
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+        event_id: u64,
+        sender_to_core: Sender<IoEvent>,
+    ) {
         debug!("fetching block : {:?}", url);
 
         let result = reqwest::get(url).await;
@@ -154,8 +159,21 @@ impl IoController {
         }
         let result = result.unwrap();
         let buffer = result.to_vec();
-        let block = Block::deserialize_for_net(&buffer);
-        RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
+        debug!("block buffer received");
+        // RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
+        sender_to_core
+            .send(IoEvent {
+                controller_id: 1,
+                event_id,
+                event: InterfaceEvent::BlockFetched {
+                    block_hash,
+                    peer_index,
+                    buffer,
+                },
+            })
+            .await
+            .unwrap();
+        debug!("block buffer sent to blockchain controller");
     }
     pub async fn send_new_peer(
         event_id: u64,
@@ -171,24 +189,18 @@ impl IoController {
 
         sockets.insert(next_index, sender);
         debug!("sending new peer : {:?}", next_index);
-        // if event_id != 0 {
-        //     RustIOHandler::set_event_response(
-        //         event_id,
-        //         FutureState::PeerConnectionResult(Ok(next_index)),
-        //     );
-        // } else {
+
         sender_to_core
             .send(IoEvent {
                 controller_id: 1,
                 event_id,
-                event: PeerConnectionResult {
+                event: InterfaceEvent::PeerConnectionResult {
                     peer_details: peer_data,
                     result: Ok(next_index),
                 },
             })
             .await
             .expect("sending failed");
-        // }
 
         IoController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
     }
@@ -209,7 +221,7 @@ impl IoController {
                     let result = result.unwrap();
                     if result.is_err() {
                         // TODO : handle peer disconnections
-                        // warn!("failed receiving message [1] : {:?}", result.err().unwrap());
+                        warn!("failed receiving message [1] : {:?}", result.err().unwrap());
                         break;
                     }
                     let result = result.unwrap();
@@ -234,7 +246,7 @@ impl IoController {
                     let result = result.unwrap();
                     if result.is_err() {
                         warn!("failed receiving message [2] : {:?}", result.err().unwrap());
-                        continue;
+                        break;
                     }
                     let result = result.unwrap();
                     match result {
@@ -258,7 +270,7 @@ impl IoController {
             }
         });
         // TODO : check why the thread is not starting without this line. probably the parent thread is blocked from somewhere.
-        tokio::task::yield_now().await;
+        // tokio::task::yield_now().await;
     }
 }
 
@@ -311,14 +323,9 @@ pub async fn run_io_controller(
         sender_clone.clone(),
         io_controller_clone.clone(),
         port,
+        blockchain.clone(),
     );
-    const WEB_SERVER_PORT_OFFSET: u16 = 1;
-    let web_server_handle = run_web_server(
-        sender_clone.clone(),
-        io_controller_clone.clone(),
-        port + WEB_SERVER_PORT_OFFSET,
-        blockchain,
-    );
+
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
         loop {
@@ -327,8 +334,8 @@ pub async fn run_io_controller(
             // sender_to_saito_controller.send(command).await;
             // info!("sending test message to saito controller");
 
-            let result = receiver.try_recv();
-            if result.is_ok() {
+            let result = receiver.recv().await;
+            if result.is_some() {
                 let event = result.unwrap();
                 let event_id = event.event_id;
                 let interface_event = event.event;
@@ -360,20 +367,40 @@ pub async fn run_io_controller(
                     InterfaceEvent::PeerConnectionResult { .. } => {
                         unreachable!()
                     }
-                    InterfaceEvent::PeerDisconnected { peer_index } => {}
-                    InterfaceEvent::IncomingNetworkMessage { .. } => {}
-                    InterfaceEvent::BlockFetchRequest { url } => {
-                        IoController::fetch_block(url, event_id).await
+                    InterfaceEvent::PeerDisconnected { peer_index } => {
+                        unreachable!()
+                    }
+                    InterfaceEvent::IncomingNetworkMessage { .. } => {
+                        unreachable!()
+                    }
+                    InterfaceEvent::BlockFetchRequest {
+                        block_hash,
+                        peer_index,
+                        url,
+                    } => {
+                        let sender;
+                        {
+                            let io_controller = io_controller.read().await;
+                            sender = io_controller.sender_to_saito_controller.clone();
+                        }
+                        // starting new thread to stop io controller from getting blocked
+                        tokio::spawn(async move {
+                            IoController::fetch_block(block_hash, peer_index, url, event_id, sender)
+                                .await
+                        });
+                    }
+                    InterfaceEvent::BlockFetched { .. } => {
+                        unreachable!()
                     }
                 }
             }
 
-            if !work_done {
-                std::thread::sleep(Duration::new(1, 0));
-            }
+            // if !work_done {
+            //     std::thread::sleep(Duration::new(1, 0));
+            // }
         }
     });
-    let result = tokio::join!(server_handle, controller_handle, web_server_handle);
+    let result = tokio::join!(server_handle, controller_handle);
 }
 
 pub enum PeerSender {
@@ -391,6 +418,7 @@ fn run_websocket_server(
     sender_clone: Sender<IoEvent>,
     io_controller: Arc<RwLock<IoController>>,
     port: u16,
+    blockchain: Arc<RwLock<Blockchain>>,
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
     tokio::spawn(async move {
@@ -408,7 +436,10 @@ fn run_websocket_server(
                 ws.on_upgrade(move |socket| async move {
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
+
+                    trace!("waiting for the io controller write lock");
                     let mut controller = clone.write().await;
+                    trace!("acquired the io controller write lock");
 
                     IoController::send_new_peer(
                         0,
@@ -422,26 +453,6 @@ fn run_websocket_server(
                     .await
                 })
             });
-
-        // let (_, server) =
-        //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-        //         // tokio::signal::ctrl_c().await.ok();
-        //     });
-        // server.await;
-        warp::serve(ws_route).run(([127, 0, 0, 1], port)).await;
-    })
-}
-
-fn run_web_server(
-    sender_clone: Sender<IoEvent>,
-    io_controller_clone: Arc<RwLock<IoController>>,
-    port: u16,
-    blockchain: Arc<RwLock<Blockchain>>,
-) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        debug!("running web server on : {:?}", port);
-        let blockchain = blockchain.clone();
-        // TODO : handle security aspect of the server connections
         let http_route = warp::path!("block" / String)
             .and(warp::any().map(move || blockchain.clone()))
             .and_then(
@@ -458,12 +469,13 @@ fn run_web_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
+                        trace!("waiting for the blockchain write lock");
                         // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
+                        trace!("acquired the blockchain write lock");
                         let block = blockchain.get_block(&block_hash).await;
                         if block.is_none() {
                             debug!("block not found : {:?}", block_hash);
-                            buffer = vec![];
                             return Err(warp::reject::not_found());
                         }
                         // TODO : check if the full block is in memory or need to load from disk
@@ -472,12 +484,12 @@ fn run_web_server(
                     Ok(warp::reply::with_status(buffer, StatusCode::OK))
                 },
             );
-        info!("starting web server");
+        let routes = http_route.or(ws_route);
         // let (_, server) =
-        //     warp::serve(http_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
+        //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
         //         // tokio::signal::ctrl_c().await.ok();
         //     });
         // server.await;
-        warp::serve(http_route).run(([127, 0, 0, 1], port)).await;
+        warp::serve(routes).run(([127, 0, 0, 1], port)).await;
     })
 }
