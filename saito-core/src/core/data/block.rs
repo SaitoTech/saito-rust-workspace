@@ -1860,7 +1860,7 @@ impl Block {
         url: String,
         block_hash: SaitoHash,
         peer_index: u64,
-    ) -> Result<Block, Error> {
+    ) -> Result<(), Error> {
         debug!("fetch missing block : block : {:?}", url);
         io_handler
             .fetch_block_from_peer(block_hash, peer_index, url)

@@ -38,7 +38,7 @@ pub trait HandleIo {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
-    ) -> Result<Block, Error>;
+    ) -> Result<(), Error>;
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error>;
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error>;

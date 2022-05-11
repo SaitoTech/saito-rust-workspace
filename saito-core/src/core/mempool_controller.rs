@@ -9,19 +9,20 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::command::{GlobalEvent, InterfaceEvent};
+use crate::common::handle_io::HandleIo;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::blockchain_controller::{BlockchainEvent, StaticPeer};
+use crate::core::blockchain_controller::BlockchainEvent;
+use crate::core::data::block::Block;
+
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
+use crate::core::data::peer_collection::PeerCollection;
+use crate::core::data::storage::Storage;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::core::miner_controller::MinerEvent;
-use crate::common::handle_io::HandleIo;
-use crate::core::data::peer::Peer;
-use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::storage::Storage;
 
 #[derive(Debug)]
 pub enum MempoolEvent {
@@ -42,11 +43,9 @@ pub struct MempoolController {
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub io_handler: Box<dyn HandleIo + Send + Sync>,
     pub peers: Arc<RwLock<PeerCollection>>,
-    pub static_peers: Vec<StaticPeer>,
 }
 
 impl MempoolController {
-
     async fn generate_tx(
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
@@ -193,7 +192,9 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
             trace!("waiting for the blockchain write lock");
             let mut blockchain = self.blockchain.write().await;
             trace!("acquired the blockchain write lock");
-            let result = mempool.bundle_block(blockchain.deref_mut(), timestamp).await;
+            let result = mempool
+                .bundle_block(blockchain.deref_mut(), timestamp)
+                .await;
             mempool.add_block(result);
 
             debug!("adding blocks to blockchain");
@@ -233,7 +234,16 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
                 mempool.add_golden_ticket(golden_ticket).await;
             }
             MempoolEvent::BlockFetched { peer_index, buffer } => {
-                todo!()
+                let mut blockchain = self.blockchain.write().await;
+                let block = Block::deserialize_for_net(&buffer);
+                blockchain
+                    .add_block(
+                        block,
+                        &mut self.io_handler,
+                        self.peers.clone(),
+                        self.sender_to_miner.clone(),
+                    )
+                    .await;
             }
         }
         None
@@ -248,7 +258,7 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
                 self.peers.clone(),
                 self.sender_to_miner.clone(),
             )
-                .await;
+            .await;
         }
     }
 }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Error;
 use std::sync::Arc;
 
@@ -142,16 +143,6 @@ impl Blockchain {
                                 );
                                 todo!()
                             }
-
-                            let result = result.unwrap();
-                            // adding the missing block before adding the new block. (will recursively add missing blocks)
-                            self.add_block(
-                                result,
-                                io_handler,
-                                peers.clone(),
-                                sender_to_miner.clone(),
-                            )
-                            .await;
                         }
                     }
                 }
