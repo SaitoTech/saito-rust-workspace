@@ -25,7 +25,7 @@ use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, Peer};
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
-use crate::{InterfaceEvent, IoEvent};
+use crate::{NetworkEvent, IoEvent};
 
 type SocketSender =
     SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>;
@@ -165,7 +165,7 @@ impl NetworkController {
             .send(IoEvent {
                 controller_id: 1,
                 event_id,
-                event: InterfaceEvent::BlockFetched {
+                event: NetworkEvent::BlockFetched {
                     block_hash,
                     peer_index,
                     buffer,
@@ -194,7 +194,7 @@ impl NetworkController {
             .send(IoEvent {
                 controller_id: 1,
                 event_id,
-                event: InterfaceEvent::PeerConnectionResult {
+                event: NetworkEvent::PeerConnectionResult {
                     peer_details: peer_data,
                     result: Ok(next_index),
                 },
@@ -231,7 +231,7 @@ impl NetworkController {
                         let message = IoEvent {
                             controller_id: 1,
                             event_id: 0,
-                            event: InterfaceEvent::IncomingNetworkMessage { peer_index, buffer },
+                            event: NetworkEvent::IncomingNetworkMessage { peer_index, buffer },
                         };
                         sender.send(message).await.expect("sending failed");
                     } else {
@@ -254,7 +254,7 @@ impl NetworkController {
                             let message = IoEvent {
                                 controller_id: 1,
                                 event_id: 0,
-                                event: InterfaceEvent::IncomingNetworkMessage {
+                                event: NetworkEvent::IncomingNetworkMessage {
                                     peer_index,
                                     buffer,
                                 },
@@ -286,9 +286,9 @@ impl PeerCounter {
 }
 
 // TODO : refactor to use ProcessEvent trait
-pub async fn run_io_controller(
+pub async fn run_network_controller(
     mut receiver: Receiver<IoEvent>,
-    sender_to_saito_controller: Sender<IoEvent>,
+    sender: Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
     blockchain: Arc<RwLock<Blockchain>>,
 ) {
@@ -306,13 +306,13 @@ pub async fn run_io_controller(
     }
 
     info!("starting server on : {:?}", url);
-    let listener: TcpListener = TcpListener::bind(url).await.unwrap();
+    //let listener: TcpListener = TcpListener::bind(url).await.unwrap();
     let peer_counter_clone = peer_index_counter.clone();
-    let sender_clone = sender_to_saito_controller.clone();
+    let sender_clone = sender.clone();
 
     let io_controller = Arc::new(RwLock::new(NetworkController {
         sockets: Default::default(),
-        sender_to_saito_controller,
+        sender_to_saito_controller: sender,
         peer_counter: peer_index_counter.clone(),
     }));
 
@@ -341,13 +341,13 @@ pub async fn run_io_controller(
                 let interface_event = event.event;
                 work_done = true;
                 match interface_event {
-                    InterfaceEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
+                    NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
                         trace!("waiting for the io controller write lock");
                         let mut io_controller = io_controller.write().await;
                         trace!("acquired the io controller write lock");
                         io_controller.send_to_all(buffer, exceptions).await;
                     }
-                    InterfaceEvent::OutgoingNetworkMessage {
+                    NetworkEvent::OutgoingNetworkMessage {
                         peer_index: index,
                         buffer,
                     } => {
@@ -356,7 +356,7 @@ pub async fn run_io_controller(
                         trace!("acquired the io controller write lock");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
-                    InterfaceEvent::ConnectToPeer { peer_details } => {
+                    NetworkEvent::ConnectToPeer { peer_details } => {
                         NetworkController::connect_to_peer(
                             event_id,
                             io_controller.clone(),
@@ -364,16 +364,16 @@ pub async fn run_io_controller(
                         )
                         .await;
                     }
-                    InterfaceEvent::PeerConnectionResult { .. } => {
+                    NetworkEvent::PeerConnectionResult { .. } => {
                         unreachable!()
                     }
-                    InterfaceEvent::PeerDisconnected { peer_index } => {
+                    NetworkEvent::PeerDisconnected { peer_index } => {
                         unreachable!()
                     }
-                    InterfaceEvent::IncomingNetworkMessage { .. } => {
+                    NetworkEvent::IncomingNetworkMessage { .. } => {
                         unreachable!()
                     }
-                    InterfaceEvent::BlockFetchRequest {
+                    NetworkEvent::BlockFetchRequest {
                         block_hash,
                         peer_index,
                         url,
@@ -389,7 +389,7 @@ pub async fn run_io_controller(
                                 .await
                         });
                     }
-                    InterfaceEvent::BlockFetched { .. } => {
+                    NetworkEvent::BlockFetched { .. } => {
                         unreachable!()
                     }
                 }

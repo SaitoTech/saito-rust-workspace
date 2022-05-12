@@ -2,7 +2,7 @@ use std::io::Error;
 
 use async_trait::async_trait;
 
-use saito_core::common::command::InterfaceEvent;
+use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;
 use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::Block;

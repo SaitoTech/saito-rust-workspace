@@ -11,7 +11,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 use tracing::field::debug;
 
-use saito_core::common::command::InterfaceEvent;
+use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;
 use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::Block;
@@ -87,7 +87,7 @@ impl RustIOHandler {
 impl InterfaceIO for RustIOHandler {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         // TODO : refactor to combine event and the future
-        let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessage { peer_index, buffer });
+        let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessage { peer_index, buffer });
         let io_future = IoFuture {
             event_id: event.event_id,
         };
@@ -115,7 +115,7 @@ impl InterfaceIO for RustIOHandler {
     ) -> Result<(), Error> {
         debug!("send message to all");
 
-        let event = IoEvent::new(InterfaceEvent::OutgoingNetworkMessageForAll {
+        let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessageForAll {
             buffer,
             exceptions: peer_exceptions,
         });
@@ -142,7 +142,7 @@ impl InterfaceIO for RustIOHandler {
 
     async fn connect_to_peer(&mut self, peer: Peer) -> Result<(), Error> {
         debug!("connecting to peer : {:?}", peer.host);
-        let event = IoEvent::new(InterfaceEvent::ConnectToPeer {
+        let event = IoEvent::new(NetworkEvent::ConnectToPeer {
             peer_details: peer.clone(),
         });
         let io_future = IoFuture {
@@ -188,7 +188,7 @@ impl InterfaceIO for RustIOHandler {
         url: String,
     ) -> Result<(), Error> {
         debug!("fetching block from peer : {:?}", url);
-        let event = IoEvent::new(InterfaceEvent::BlockFetchRequest {
+        let event = IoEvent::new(NetworkEvent::BlockFetchRequest {
             block_hash,
             peer_index,
             url: url.clone(),

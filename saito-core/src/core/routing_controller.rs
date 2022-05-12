@@ -6,7 +6,7 @@ use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::{GlobalEvent, InterfaceEvent};
+use crate::common::command::{GlobalEvent, NetworkEvent};
 use crate::common::defs::SaitoHash;
 use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
@@ -21,7 +21,7 @@ use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
 use crate::core::data::wallet::Wallet;
-use crate::core::mempool_controller::MempoolEvent;
+use crate::core::blockchain_controller::MempoolEvent;
 use crate::core::miner_controller::MinerEvent;
 
 #[derive(Debug)]
@@ -322,14 +322,14 @@ impl ProcessEvent<BlockchainEvent> for RoutingController {
         None
     }
 
-    async fn process_interface_event(&mut self, event: InterfaceEvent) -> Option<()> {
+    async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         debug!("processing new interface event : {:?}", event);
         match event {
-            InterfaceEvent::OutgoingNetworkMessage { peer_index, buffer } => {
+            NetworkEvent::OutgoingNetworkMessage { peer_index, buffer } => {
                 // TODO : remove this case if not being used
                 unreachable!()
             }
-            InterfaceEvent::IncomingNetworkMessage { peer_index, buffer } => {
+            NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
                 debug!("incoming message received from peer : {:?}", peer_index);
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
@@ -338,7 +338,7 @@ impl ProcessEvent<BlockchainEvent> for RoutingController {
                 self.process_incoming_message(peer_index, message.unwrap())
                     .await;
             }
-            InterfaceEvent::PeerConnectionResult {
+            NetworkEvent::PeerConnectionResult {
                 peer_details,
                 result,
             } => {
@@ -346,18 +346,18 @@ impl ProcessEvent<BlockchainEvent> for RoutingController {
                     self.handle_new_peer(peer_details, result.unwrap()).await;
                 }
             }
-            InterfaceEvent::PeerDisconnected { .. } => {}
+            NetworkEvent::PeerDisconnected { .. } => {}
 
-            InterfaceEvent::OutgoingNetworkMessageForAll { .. } => {
+            NetworkEvent::OutgoingNetworkMessageForAll { .. } => {
                 unreachable!()
             }
-            InterfaceEvent::ConnectToPeer { .. } => {
+            NetworkEvent::ConnectToPeer { .. } => {
                 unreachable!()
             }
-            InterfaceEvent::BlockFetchRequest { .. } => {
+            NetworkEvent::BlockFetchRequest { .. } => {
                 unreachable!()
             }
-            InterfaceEvent::BlockFetched {
+            NetworkEvent::BlockFetched {
                 block_hash,
                 peer_index,
                 buffer,

@@ -24,7 +24,7 @@ use saito_core::core::data::miner::Miner;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
+use saito_core::core::blockchain_controller::{BlockchainController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
 use crate::wasm_io_handler::WasmIoHandler;
@@ -58,7 +58,7 @@ impl Future for NetworkResultFuture {
 #[wasm_bindgen]
 pub struct SaitoWasm {
     blockchain_controller: RoutingController,
-    mempool_controller: MempoolController,
+    mempool_controller: BlockchainController,
     miner_controller: MinerController,
     receiver_in_blockchain: Receiver<BlockchainEvent>,
     receiver_in_mempool: Receiver<MempoolEvent>,
@@ -103,11 +103,11 @@ pub fn new() -> SaitoWasm {
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
         },
-        mempool_controller: MempoolController {
+        mempool_controller: BlockchainController {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
-            sender_to_blockchain: sender_to_blockchain.clone(),
+            sender_to_router: sender_to_blockchain.clone(),
             sender_to_miner: sender_to_miner.clone(),
             // sender_global: (),
             block_producing_timer: 0,

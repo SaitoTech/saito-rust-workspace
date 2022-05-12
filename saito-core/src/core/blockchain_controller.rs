@@ -8,7 +8,7 @@ use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::{GlobalEvent, InterfaceEvent};
+use crate::common::command::{GlobalEvent, NetworkEvent};
 use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -30,11 +30,11 @@ pub enum MempoolEvent {
     BlockFetched { peer_index: u64, buffer: Vec<u8> },
 }
 
-pub struct MempoolController {
+pub struct BlockchainController {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub wallet: Arc<RwLock<Wallet>>,
-    pub sender_to_blockchain: Sender<BlockchainEvent>,
+    pub sender_to_router: Sender<BlockchainEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
     // pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
     pub block_producing_timer: u128,
@@ -45,7 +45,7 @@ pub struct MempoolController {
     pub peers: Arc<RwLock<PeerCollection>>,
 }
 
-impl MempoolController {
+impl BlockchainController {
     async fn generate_tx(
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
@@ -132,13 +132,13 @@ impl MempoolController {
 }
 
 #[async_trait]
-impl ProcessEvent<MempoolEvent> for MempoolController {
+impl ProcessEvent<MempoolEvent> for BlockchainController {
     async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         trace!("processing new global event");
         None
     }
 
-    async fn process_interface_event(&mut self, _event: InterfaceEvent) -> Option<()> {
+    async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         debug!("processing new interface event");
 
         None
@@ -157,7 +157,7 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
             if self.tx_producing_timer >= 1_000_000 {
                 // TODO : Remove this transaction generation once testing is done
-                MempoolController::generate_tx(
+                BlockchainController::generate_tx(
                     self.mempool.clone(),
                     self.wallet.clone(),
                     self.blockchain.clone(),

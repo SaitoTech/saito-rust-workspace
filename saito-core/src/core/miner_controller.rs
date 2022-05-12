@@ -6,13 +6,13 @@ use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::{GlobalEvent, InterfaceEvent};
+use crate::common::command::{GlobalEvent, NetworkEvent};
 use crate::common::defs::SaitoHash;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::routing_controller::BlockchainEvent;
 use crate::core::data::miner::Miner;
-use crate::core::mempool_controller::MempoolEvent;
+use crate::core::blockchain_controller::MempoolEvent;
 
 #[derive(Debug)]
 pub enum MinerEvent {
@@ -35,7 +35,7 @@ impl ProcessEvent<MinerEvent> for MinerController {
         None
     }
 
-    async fn process_interface_event(&mut self, _event: InterfaceEvent) -> Option<()> {
+    async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         debug!("processing new interface event");
 
         None
