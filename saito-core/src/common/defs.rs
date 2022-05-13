@@ -6,4 +6,4 @@ pub type SaitoPublicKey = [u8; 33];
 pub type SaitoPrivateKey = [u8; 32];
 pub type SaitoHash = [u8; 32];
 pub type SaitoUTXOSetKey = [u8; 74];
-pub type UtxoSet = AHashMap<SaitoUTXOSetKey, u64>;
+pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;

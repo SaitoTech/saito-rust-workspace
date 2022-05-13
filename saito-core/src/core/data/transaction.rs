@@ -659,7 +659,7 @@ impl Transaction {
     }
 
     // runs when block is deleted for good
-    pub async fn delete(&self, utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>) -> bool {
+    pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
         self.inputs.iter().for_each(|input| {
             input.delete(utxoset);
         });
@@ -673,16 +673,16 @@ impl Transaction {
     /// Runs when the chain is re-organized
     pub fn on_chain_reorganization(
         &self,
-        utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>,
+        utxoset: &mut UtxoSet,
         longest_chain: bool,
         block_id: u64,
     ) {
-        let mut input_slip_value = 1;
-        let mut output_slip_value = 0;
+        let mut input_slip_value = true;
+        let mut output_slip_value = false;
 
         if longest_chain {
-            input_slip_value = block_id;
-            output_slip_value = 1;
+            input_slip_value = true;
+            output_slip_value = true;
         }
 
         self.inputs.iter().for_each(|input| {
@@ -795,6 +795,10 @@ impl Transaction {
     }
 
     pub fn validate(&self, utxoset: &UtxoSet, staking: &Staking) -> bool {
+        trace!(
+            "validating transaction : {:?}",
+            hex::encode(self.get_hash_for_signature().unwrap())
+        );
         //
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
