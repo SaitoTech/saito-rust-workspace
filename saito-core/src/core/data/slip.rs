@@ -58,7 +58,7 @@ impl Slip {
         if self.get_amount() > 0 {
             match utxoset.get(&self.utxoset_key) {
                 Some(value) => {
-                    if *value == 1 {
+                    if *value == true {
                         true
                     } else {
                         warn!(
@@ -85,17 +85,12 @@ impl Slip {
             true
         }
     }
-    pub fn on_chain_reorganization(
-        &self,
-        utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>,
-        _lc: bool,
-        slip_value: u64,
-    ) {
+    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.get_slip_type() == SlipType::StakerDeposit {
             if _lc == true {
                 info!(
                     " ====> update deposit to {}: {:?} -- {:?}",
-                    slip_value,
+                    spendable,
                     hex::encode(self.get_utxoset_key()),
                     self.get_slip_type()
                 );
@@ -105,7 +100,7 @@ impl Slip {
             if _lc == true {
                 info!(
                     " ====> update output to {}: {:?} -- {:?}",
-                    slip_value,
+                    spendable,
                     hex::encode(self.get_utxoset_key()),
                     self.get_slip_type(),
                 );
@@ -126,9 +121,9 @@ impl Slip {
             // entry().or_insert() does not update
             //
             if utxoset.contains_key(&self.utxoset_key) {
-                utxoset.insert(self.utxoset_key, slip_value);
+                utxoset.insert(self.utxoset_key, spendable);
             } else {
-                utxoset.entry(self.utxoset_key).or_insert(slip_value);
+                utxoset.entry(self.utxoset_key).or_insert(spendable);
             }
         }
     }
@@ -187,7 +182,7 @@ impl Slip {
     //
     // runs when block is purged for good or staking slip deleted
     //
-    pub fn delete(&self, utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>) -> bool {
+    pub fn delete(&self, utxoset: &mut UtxoSet) -> bool {
         if self.get_utxoset_key() == [0; 74] {
             error!("ERROR 572034: asked to remove a slip without its utxoset_key properly set!");
             false;
@@ -398,7 +393,7 @@ mod tests {
         slip.generate_utxoset_key();
 
         // add to utxoset
-        slip.on_chain_reorganization(&mut blockchain.utxoset, true, 2);
+        slip.on_chain_reorganization(&mut blockchain.utxoset, true, true);
         assert_eq!(
             blockchain.utxoset.contains_key(&slip.get_utxoset_key()),
             true

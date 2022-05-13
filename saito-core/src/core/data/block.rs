@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
 };
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
@@ -787,6 +787,7 @@ impl Block {
     // generate hashes and payouts and fee calculations
     //
     pub async fn generate_consensus_values(&self, blockchain: &Blockchain) -> ConsensusValues {
+        debug!("generate consensus values");
         let mut cv = ConsensusValues::new();
 
         //
@@ -1182,11 +1183,7 @@ impl Block {
         winner_pubkey
     }
 
-    pub fn on_chain_reorganization(
-        &self,
-        utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>,
-        longest_chain: bool,
-    ) -> bool {
+    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
         for tx in &self.transactions {
             tx.on_chain_reorganization(utxoset, longest_chain, self.get_id());
         }
@@ -1333,7 +1330,7 @@ impl Block {
     pub async fn validate(
         &self,
         blockchain: &Blockchain,
-        utxoset: &AHashMap<SaitoUTXOSetKey, u64>,
+        utxoset: &UtxoSet,
         staking: &Staking,
     ) -> bool {
         //
@@ -1848,7 +1845,7 @@ impl Block {
         block
     }
 
-    pub async fn delete(&self, utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>) -> bool {
+    pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
         for tx in &self.transactions {
             tx.delete(utxoset).await;
         }

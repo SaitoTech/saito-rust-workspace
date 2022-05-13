@@ -136,7 +136,7 @@ impl Mempool {
 
     pub async fn bundle_block(
         &mut self,
-        blockchain : &mut Blockchain,
+        blockchain: &mut Blockchain,
         current_timestamp: u64,
     ) -> Block {
         debug!("bundling block...");
@@ -178,7 +178,7 @@ impl Mempool {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
             let time_elapsed = current_timestamp - previous_block.get_timestamp();
-            trace!(
+            debug!(
                 "can_bundle_block. work available: {:?} -- work needed: {:?} -- time elapsed: {:?} ",
                 work_available,
                 work_needed,

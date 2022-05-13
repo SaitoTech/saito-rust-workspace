@@ -7,7 +7,7 @@ use async_recursion::async_recursion;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{SaitoHash, SaitoUTXOSetKey};
+use crate::common::defs::{SaitoHash, SaitoUTXOSetKey, UtxoSet};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
@@ -43,7 +43,7 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
     (top, bottom)
 }
 
-pub type UtxoSet = AHashMap<SaitoUTXOSetKey, u64>;
+// pub type UtxoSet = AHashMap<SaitoUTXOSetKey, u64>;
 
 #[derive(Debug)]
 pub struct Blockchain {
@@ -1058,10 +1058,10 @@ impl Blockchain {
             // is in the staking tables.
             //
             for i in 0..res_spend.len() {
-                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, 1);
+                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, true);
             }
             for i in 0..res_unspend.len() {
-                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, 0);
+                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, false);
             }
             for i in 0..res_delete.len() {
                 res_spend[i].delete(&mut self.utxoset);
@@ -1219,10 +1219,10 @@ impl Blockchain {
         // is in the staking tables.
         //
         for i in 0..res_spend.len() {
-            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, 1);
+            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, true);
         }
         for i in 0..res_unspend.len() {
-            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, 0);
+            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, false);
         }
         for i in 0..res_delete.len() {
             res_spend[i].delete(&mut self.utxoset);
