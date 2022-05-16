@@ -494,7 +494,10 @@ impl Transaction {
         with_payment: u64,
         with_fee: u64,
     ) -> Transaction {
-        trace!("generating transaction");
+        debug!(
+            "generating transaction : payment = {:?}, fee = {:?}",
+            with_payment, with_fee
+        );
         trace!("waiting for the wallet write lock");
         let mut wallet = wallet_lock.write().await;
         trace!("acquired the wallet write lock");
@@ -502,7 +505,10 @@ impl Transaction {
 
         let available_balance = wallet.get_available_balance();
         let total_requested = with_payment + with_fee;
-        // info!("in generate transaction ab: {} and pr: {} and fr: {}", available_balance, with_payment, with_fee);
+        debug!(
+            "in generate transaction. available: {} and payment: {} and fee: {}",
+            available_balance, with_payment, with_fee
+        );
 
         if available_balance >= total_requested {
             let mut transaction = Transaction::new();
@@ -600,6 +606,7 @@ impl Transaction {
         with_amount: u64,
         number_of_vip_slips: u64,
     ) -> Transaction {
+        debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::new();
         transaction.set_transaction_type(TransactionType::Vip);
 

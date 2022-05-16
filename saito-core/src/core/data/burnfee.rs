@@ -1,5 +1,5 @@
 /// TODO : rename to BLOCK_INTERVAL or a suitable name
-pub const HEARTBEAT: u64 = 10_000;
+pub const HEARTBEAT: u64 = 30_000;
 
 pub struct BurnFee {}
 
