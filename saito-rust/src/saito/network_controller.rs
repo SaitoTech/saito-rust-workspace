@@ -204,6 +204,22 @@ impl NetworkController {
 
         NetworkController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
     }
+
+    pub async fn send_peer_disconnect(sender_to_core: Sender<IoEvent>, peer_index : u64) {
+        debug!("sending peer disconnect : {:?}", peer_index);
+
+        sender_to_core
+            .send(IoEvent {
+                controller_id: 1,
+                event_id : 0,
+                event: NetworkEvent::PeerDisconnected {
+                    peer_index,
+                },
+            })
+            .await
+            .expect("sending failed");
+    }
+
     pub async fn receive_message_from_peer(
         mut receiver: PeerReceiver,
         sender: Sender<IoEvent>,
@@ -222,6 +238,7 @@ impl NetworkController {
                     if result.is_err() {
                         // TODO : handle peer disconnections
                         warn!("failed receiving message [1] : {:?}", result.err().unwrap());
+                        NetworkController::send_peer_disconnect(sender, peer_index);
                         break;
                     }
                     let result = result.unwrap();
