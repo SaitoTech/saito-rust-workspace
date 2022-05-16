@@ -8,7 +8,7 @@ use crate::core::data::block::Block;
 use crate::core::data::msg::message::Message;
 
 #[async_trait]
-pub trait HandleIo {
+pub trait InterfaceIO {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error>;
 
     /// Sends the given message buffer to all the peers except the ones specified

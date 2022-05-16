@@ -23,7 +23,7 @@ pub enum GlobalEvent {
 }
 
 #[derive(Debug)]
-pub enum InterfaceEvent {
+pub enum NetworkEvent {
     OutgoingNetworkMessage {
         peer_index: u64,
         buffer: Vec<u8>,
