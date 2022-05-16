@@ -156,7 +156,7 @@ async fn run_blockchain_controller(
         block_producing_timer: 0,
         tx_producing_timer: 0,
         generate_test_tx,
-        io_handler: Box::new(RustIOHandler::new(
+        io_interface: Box::new(RustIOHandler::new(
             sender_to_network_controller.clone(),
             BLOCKCHAIN_CONTROLLER_ID,
         )),
@@ -190,7 +190,7 @@ async fn run_routing_controller(
         blockchain: context.blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
-        io_handler: Box::new(RustIOHandler::new(
+        io_interface: Box::new(RustIOHandler::new(
             sender_to_io_controller.clone(),
             ROUTING_CONTROLLER_ID,
         )),

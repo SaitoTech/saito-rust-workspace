@@ -1,3 +1,4 @@
+use std::str::from_utf8;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -49,7 +50,7 @@ pub struct RoutingController {
     pub peers: Arc<RwLock<PeerCollection>>,
     pub static_peers: Vec<StaticPeer>,
     pub configs: Arc<RwLock<Configuration>>,
-    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
+    pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub wallet: Arc<RwLock<Wallet>>,
 }
@@ -85,7 +86,7 @@ impl RoutingController {
                 let peer = peer.unwrap();
                 peer.handle_handshake_challenge(
                     challenge,
-                    &self.io_handler,
+                    &self.io_interface,
                     self.wallet.clone(),
                     self.configs.clone(),
                 )
@@ -100,7 +101,7 @@ impl RoutingController {
                     todo!()
                 }
                 let peer = peer.unwrap();
-                peer.handle_handshake_response(response, &self.io_handler, self.wallet.clone())
+                peer.handle_handshake_response(response, &self.io_interface, self.wallet.clone())
                     .await
                     .unwrap();
                 if peer.handshake_done {
@@ -122,7 +123,7 @@ impl RoutingController {
                 }
                 let peer = peer.unwrap();
                 let result = peer
-                    .handle_handshake_completion(response, &self.io_handler)
+                    .handle_handshake_completion(response, &self.io_interface)
                     .await;
                 if peer.handshake_done {
                     debug!(
@@ -182,7 +183,7 @@ impl RoutingController {
             }
         }
 
-        self.io_handler
+        self.io_interface
             .send_message_to_all(buffer, exceptions)
             .await
             .unwrap();
@@ -195,7 +196,7 @@ impl RoutingController {
         trace!("acquired the configs read lock");
 
         for peer in &configs.peers {
-            self.io_handler.connect_to_peer(peer.clone()).await.unwrap();
+            self.io_interface.connect_to_peer(peer.clone()).await.unwrap();
         }
         debug!("connected to peers");
     }
@@ -217,7 +218,7 @@ impl RoutingController {
         let mut peer = Peer::new(peer_index);
         if peer_data.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-            peer.initiate_handshake(&self.io_handler, self.wallet.clone(), self.configs.clone())
+            peer.initiate_handshake(&self.io_interface, self.wallet.clone(), self.configs.clone())
                 .await
                 .unwrap();
         }
@@ -227,8 +228,33 @@ impl RoutingController {
     }
 
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
-        todo!()
+        let peers = self.peers.read().await;
+        let result = peers.find_peer_by_index(peer_index);
+
+        if result.is_some() {
+            let peer = result.unwrap();
+
+            if peer.static_peer_config.is_some() {
+                // This means the connection has been initiated from this side, therefore we must
+                // try to re-establish the connection again
+                todo!("Print a better identifier like the public key");
+                info!("Known peer disconnected, reconnecting .., Peer ID = {}",  peer.peer_index);
+
+                todo!("Make the reconnect interval configurable");
+                let reconnect_inverval = 5;
+                let mut delay = tokio::time::interval(std::time::Duration::from_secs(reconnect_inverval));
+                delay.tick().await;
+                self.io_interface.connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone()).await.unwrap();
+            }
+            else {
+                info!("Known peer disconnected, expecting a reconnection, Peer ID = {}",  peer.peer_index);
+            }
+        }
+        else {
+            todo!("Handle the unknown connection disconnect");
+        }
     }
+
     async fn request_blockchain_from_peer(&self, peer_index: u64) {
         debug!("requesting blockchain from peer : {:?}", peer_index);
 
@@ -244,7 +270,7 @@ impl RoutingController {
         }
 
         let buffer = Message::BlockchainRequest(request).serialize();
-        self.io_handler
+        self.io_interface
             .send_message(peer_index, buffer)
             .await
             .unwrap();
@@ -279,7 +305,7 @@ impl RoutingController {
                 continue;
             }
             let buffer = Message::BlockHeaderHash(block_hash).serialize();
-            self.io_handler
+            self.io_interface
                 .send_message(peer_index, buffer)
                 .await
                 .unwrap();
@@ -307,7 +333,7 @@ impl RoutingController {
             url = peer.get_block_fetch_url(block_hash);
         }
         if !block_exists {
-            self.io_handler
+            self.io_interface
                 .fetch_block_from_peer(block_hash, peer_index, url)
                 .await
                 .unwrap();
@@ -346,7 +372,9 @@ impl ProcessEvent<RoutingEvent> for RoutingController {
                     self.handle_new_peer(peer_details, result.unwrap()).await;
                 }
             }
-            NetworkEvent::PeerDisconnected { .. } => {}
+            NetworkEvent::PeerDisconnected {peer_index} => {
+                self.handle_peer_disconnect(peer_index);
+            }
 
             NetworkEvent::OutgoingNetworkMessageForAll { .. } => {
                 unreachable!()
