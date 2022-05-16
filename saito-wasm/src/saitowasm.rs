@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::routing_controller::{RoutingController, BlockchainEvent};
+use saito_core::core::routing_controller::{RoutingController, RoutingEvent};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
@@ -60,7 +60,7 @@ pub struct SaitoWasm {
     blockchain_controller: RoutingController,
     mempool_controller: BlockchainController,
     miner_controller: MinerController,
-    receiver_in_blockchain: Receiver<BlockchainEvent>,
+    receiver_in_blockchain: Receiver<RoutingEvent>,
     receiver_in_mempool: Receiver<MempoolEvent>,
     receiver_in_miner: Receiver<MinerEvent>,
     context: Context,

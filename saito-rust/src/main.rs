@@ -14,7 +14,7 @@ use saito_core::common::command::GlobalEvent;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::routing_controller::{
-    RoutingController, BlockchainEvent, PeerState, StaticPeer,
+    RoutingController, RoutingEvent, PeerState, StaticPeer,
 };
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
@@ -107,7 +107,7 @@ async fn run_miner_controller(
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
     sender_to_mempool: &tokio::sync::mpsc::Sender<MempoolEvent>,
-    sender_to_blockchain: &tokio::sync::mpsc::Sender<BlockchainEvent>,
+    sender_to_blockchain: &tokio::sync::mpsc::Sender<RoutingEvent>,
     receiver_for_miner: tokio::sync::mpsc::Receiver<MinerEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let miner_controller = MinerController {
@@ -135,7 +135,7 @@ async fn run_blockchain_controller(
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
     receiver_for_blockchain: Receiver<MempoolEvent>,
-    sender_to_routing: &Sender<BlockchainEvent>,
+    sender_to_routing: &Sender<RoutingEvent>,
     sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
     sender_to_network_controller: tokio::sync::mpsc::Sender<IoEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
@@ -183,7 +183,7 @@ async fn run_routing_controller(
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
     sender_to_mempool: &Sender<MempoolEvent>,
-    receiver_for_routing: Receiver<BlockchainEvent>,
+    receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MinerEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_controller = RoutingController {
@@ -331,7 +331,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::sync::mpsc::channel::<MempoolEvent>(1000);
 
     let (sender_to_routing, receiver_for_routing) =
-        tokio::sync::mpsc::channel::<BlockchainEvent>(1000);
+        tokio::sync::mpsc::channel::<RoutingEvent>(1000);
 
     let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1000);
 

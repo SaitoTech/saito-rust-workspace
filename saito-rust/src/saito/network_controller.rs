@@ -310,18 +310,18 @@ pub async fn run_network_controller(
     let peer_counter_clone = peer_index_counter.clone();
     let sender_clone = sender.clone();
 
-    let io_controller = Arc::new(RwLock::new(NetworkController {
+    let network_controller = Arc::new(RwLock::new(NetworkController {
         sockets: Default::default(),
         sender_to_saito_controller: sender,
         peer_counter: peer_index_counter.clone(),
     }));
 
-    let io_controller_clone = io_controller.clone();
+    let network_controller_clone = network_controller.clone();
 
     let server_handle = run_websocket_server(
         peer_counter_clone,
         sender_clone.clone(),
-        io_controller_clone.clone(),
+        network_controller_clone.clone(),
         port,
         blockchain.clone(),
     );
@@ -343,7 +343,7 @@ pub async fn run_network_controller(
                 match interface_event {
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
                         trace!("waiting for the io controller write lock");
-                        let mut io_controller = io_controller.write().await;
+                        let mut io_controller = network_controller.write().await;
                         trace!("acquired the io controller write lock");
                         io_controller.send_to_all(buffer, exceptions).await;
                     }
@@ -352,14 +352,14 @@ pub async fn run_network_controller(
                         buffer,
                     } => {
                         trace!("waiting for the io_controller write lock");
-                        let mut io_controller = io_controller.write().await;
+                        let mut io_controller = network_controller.write().await;
                         trace!("acquired the io controller write lock");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
                     NetworkEvent::ConnectToPeer { peer_details } => {
                         NetworkController::connect_to_peer(
                             event_id,
-                            io_controller.clone(),
+                            network_controller.clone(),
                             peer_details,
                         )
                         .await;
@@ -380,7 +380,7 @@ pub async fn run_network_controller(
                     } => {
                         let sender;
                         {
-                            let io_controller = io_controller.read().await;
+                            let io_controller = network_controller.read().await;
                             sender = io_controller.sender_to_saito_controller.clone();
                         }
                         // starting new thread to stop io controller from getting blocked

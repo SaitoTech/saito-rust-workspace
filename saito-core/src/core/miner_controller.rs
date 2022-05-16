@@ -10,7 +10,7 @@ use crate::common::command::{GlobalEvent, NetworkEvent};
 use crate::common::defs::SaitoHash;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::routing_controller::BlockchainEvent;
+use crate::core::routing_controller::RoutingEvent;
 use crate::core::data::miner::Miner;
 use crate::core::blockchain_controller::MempoolEvent;
 
@@ -21,7 +21,7 @@ pub enum MinerEvent {
 
 pub struct MinerController {
     pub miner: Arc<RwLock<Miner>>,
-    pub sender_to_blockchain: Sender<BlockchainEvent>,
+    pub sender_to_blockchain: Sender<RoutingEvent>,
     pub sender_to_mempool: Sender<MempoolEvent>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
 }

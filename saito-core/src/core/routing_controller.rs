@@ -25,7 +25,7 @@ use crate::core::blockchain_controller::MempoolEvent;
 use crate::core::miner_controller::MinerEvent;
 
 #[derive(Debug)]
-pub enum BlockchainEvent {
+pub enum RoutingEvent {
     NewBlockBundled(Block),
 }
 
@@ -316,7 +316,7 @@ impl RoutingController {
 }
 
 #[async_trait]
-impl ProcessEvent<BlockchainEvent> for RoutingController {
+impl ProcessEvent<RoutingEvent> for RoutingController {
     async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         trace!("processing new global event");
         None
@@ -377,11 +377,11 @@ impl ProcessEvent<BlockchainEvent> for RoutingController {
         None
     }
 
-    async fn process_event(&mut self, event: BlockchainEvent) -> Option<()> {
+    async fn process_event(&mut self, event: RoutingEvent) -> Option<()> {
         debug!("processing blockchain event");
 
         match event {
-            BlockchainEvent::NewBlockBundled(block) => {
+            RoutingEvent::NewBlockBundled(block) => {
                 unreachable!()
             }
         }

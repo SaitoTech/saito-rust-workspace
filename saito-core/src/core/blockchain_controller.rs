@@ -12,7 +12,7 @@ use crate::common::command::{GlobalEvent, NetworkEvent};
 use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::routing_controller::BlockchainEvent;
+use crate::core::routing_controller::RoutingEvent;
 use crate::core::data::block::Block;
 
 use crate::core::data::blockchain::Blockchain;
@@ -34,7 +34,7 @@ pub struct BlockchainController {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub wallet: Arc<RwLock<Wallet>>,
-    pub sender_to_router: Sender<BlockchainEvent>,
+    pub sender_to_router: Sender<RoutingEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
     // pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
     pub block_producing_timer: u128,
