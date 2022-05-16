@@ -14,7 +14,6 @@ use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::blockchain_controller::BlockchainEvent;
 use crate::core::data::block::Block;
-
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
@@ -51,7 +50,7 @@ impl MempoolController {
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        trace!("generating mock transactions");
+        debug!("generating mock transactions");
 
         let mempool_lock_clone = mempool.clone();
         let wallet_lock_clone = wallet.clone();
@@ -79,6 +78,7 @@ impl MempoolController {
         trace!("acquired the blockchain read lock");
 
         latest_block_id = blockchain.get_latest_block_id();
+        debug!("latest block id = {:?}", latest_block_id);
 
         {
             if latest_block_id == 0 {
@@ -112,20 +112,10 @@ impl MempoolController {
             transaction
                 .add_hop_to_path(wallet_lock_clone.clone(), publickey)
                 .await;
-            transaction
-                .add_hop_to_path(wallet_lock_clone.clone(), publickey)
+
+            mempool
+                .add_transaction_if_validates(transaction, &blockchain)
                 .await;
-            {
-                // trace!("waiting for the mempool write lock");
-                // let mut mempool = mempool_lock_clone.write().await;
-                // trace!("acquired the mempool write lock");
-                // trace!("waiting for the blockchain read lock");
-                // let blockchain = blockchain_lock_clone.read().await;
-                // trace!("acquired the blockchain read lock");
-                mempool
-                    .add_transaction_if_validates(transaction, &blockchain)
-                    .await;
-            }
         }
         trace!("generated transaction count: {:?}", txs_to_generate);
     }
@@ -156,7 +146,6 @@ impl ProcessEvent<MempoolEvent> for MempoolController {
         if self.generate_test_tx {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
             if self.tx_producing_timer >= 1_000_000 {
-                // TODO : Remove this transaction generation once testing is done
                 MempoolController::generate_tx(
                     self.mempool.clone(),
                     self.wallet.clone(),
