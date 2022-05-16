@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::blockchain_controller::{BlockchainController, BlockchainEvent};
+use saito_core::core::routing_controller::{RoutingController, RoutingEvent};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
@@ -24,7 +24,7 @@ use saito_core::core::data::miner::Miner;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::mempool_controller::{MempoolController, MempoolEvent};
+use saito_core::core::blockchain_controller::{BlockchainController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
 
 use crate::wasm_io_handler::WasmIoHandler;
@@ -57,10 +57,10 @@ impl Future for NetworkResultFuture {
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    blockchain_controller: BlockchainController,
-    mempool_controller: MempoolController,
+    blockchain_controller: RoutingController,
+    mempool_controller: BlockchainController,
     miner_controller: MinerController,
-    receiver_in_blockchain: Receiver<BlockchainEvent>,
+    receiver_in_blockchain: Receiver<RoutingEvent>,
     receiver_in_mempool: Receiver<MempoolEvent>,
     receiver_in_miner: Receiver<MinerEvent>,
     context: Context,
@@ -92,7 +92,7 @@ pub fn new() -> SaitoWasm {
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
     SaitoWasm {
-        blockchain_controller: BlockchainController {
+        blockchain_controller: RoutingController {
             blockchain: context.blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
             sender_to_miner: sender_to_miner.clone(),
@@ -103,11 +103,11 @@ pub fn new() -> SaitoWasm {
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
         },
-        mempool_controller: MempoolController {
+        mempool_controller: BlockchainController {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
-            sender_to_blockchain: sender_to_blockchain.clone(),
+            sender_to_router: sender_to_blockchain.clone(),
             sender_to_miner: sender_to_miner.clone(),
             // sender_global: (),
             block_producing_timer: 0,

@@ -8,7 +8,7 @@ use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoUTXOSetKey};
-use crate::common::handle_io::HandleIo;
+use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::mempool::Mempool;
@@ -90,7 +90,7 @@ impl Blockchain {
     pub async fn add_block(
         &mut self,
         mut block: Block,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
         sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
     ) {
@@ -395,7 +395,7 @@ impl Blockchain {
     pub async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -854,7 +854,7 @@ impl Blockchain {
         &mut self,
         new_chain: Vec<[u8; 32]>,
         old_chain: Vec<[u8; 32]>,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) -> bool {
         debug!("validating chains");
         //
@@ -952,7 +952,7 @@ impl Blockchain {
         old_chain: &Vec<[u8; 32]>,
         current_wind_index: usize,
         wind_failure: bool,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) -> bool {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
@@ -1188,7 +1188,7 @@ impl Blockchain {
         old_chain: &Vec<[u8; 32]>,
         current_unwind_index: usize,
         wind_failure: bool,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) -> bool {
         let block = &self.blocks[&old_chain[current_unwind_index]];
 
@@ -1278,7 +1278,7 @@ impl Blockchain {
         &mut self,
         block_id: u64,
         longest_chain: bool,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) {
         //
         // skip out if earlier than we need to be vis-a-vis last_block_id
@@ -1305,7 +1305,7 @@ impl Blockchain {
 
     pub async fn update_genesis_period(
         &mut self,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) {
         //
         // we need to make sure this is not a random block that is disconnected
@@ -1343,7 +1343,7 @@ impl Blockchain {
     pub async fn delete_blocks(
         &mut self,
         delete_block_id: u64,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) {
         trace!(
             "removing data including from disk at id {}",
@@ -1373,7 +1373,7 @@ impl Blockchain {
         &mut self,
         delete_block_id: u64,
         delete_block_hash: SaitoHash,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) {
         //
         // ask block to delete itself / utxo-wise

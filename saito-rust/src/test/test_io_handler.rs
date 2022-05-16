@@ -8,7 +8,7 @@ use saito_core::common::defs::SaitoHash;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use saito_core::common::handle_io::HandleIo;
+use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::Block;
 use saito_core::core::data::configuration::Peer;
 
@@ -22,7 +22,7 @@ impl TestIOHandler {
 }
 
 #[async_trait]
-impl HandleIo for TestIOHandler {
+impl InterfaceIO for TestIOHandler {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         // TODO : implement a way to check sent messages
 

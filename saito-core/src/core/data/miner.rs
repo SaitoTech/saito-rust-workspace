@@ -11,7 +11,7 @@ use crate::common::run_task::RunTask;
 use crate::core::data::crypto::{generate_random_bytes, hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::wallet::Wallet;
-use crate::core::mempool_controller::MempoolEvent;
+use crate::core::blockchain_controller::MempoolEvent;
 
 pub struct Miner {
     time_to_next_tick: u128,

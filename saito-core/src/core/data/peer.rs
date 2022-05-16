@@ -5,7 +5,7 @@ use log::{debug, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
-use crate::common::handle_io::HandleIo;
+use crate::common::interface_io::InterfaceIO;
 use crate::core::data;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
@@ -38,7 +38,7 @@ impl Peer {
     }
     pub async fn initiate_handshake(
         &mut self,
-        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
@@ -67,7 +67,7 @@ impl Peer {
     pub async fn handle_handshake_challenge(
         &mut self,
         challenge: HandshakeChallenge,
-        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
@@ -107,7 +107,7 @@ impl Peer {
     pub async fn handle_handshake_response(
         &mut self,
         response: HandshakeResponse,
-        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
     ) -> Result<(), Error> {
         debug!(
@@ -150,7 +150,7 @@ impl Peer {
     pub async fn handle_handshake_completion(
         &mut self,
         response: HandshakeCompletion,
-        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
     ) -> Result<(), Error> {
         debug!("handling handshake completion : {:?}", self.peer_index);
         if self.challenge_for_peer.is_none() {

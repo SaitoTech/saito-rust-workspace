@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
-use crate::common::handle_io::HandleIo;
+use crate::common::interface_io::InterfaceIO;
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
 use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::{hash, sign, verify};
@@ -457,7 +457,7 @@ impl Block {
     pub async fn upgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) -> bool {
         trace!("UPGRADE_BLOCK_TO_BLOCK_TYPE {:?}", self.block_type);
         if self.block_type == block_type {
@@ -1856,7 +1856,7 @@ impl Block {
     }
 
     pub async fn fetch_missing_block(
-        io_handler: &Box<dyn HandleIo + Send + Sync>,
+        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
         url: String,
         block_hash: SaitoHash,
         peer_index: u64,
