@@ -94,7 +94,7 @@ impl Mempool {
         transaction: Transaction,
         blockchain: &Blockchain,
     ) {
-        debug!(
+        trace!(
             "add transaction if validates : {:?}",
             hex::encode(transaction.get_hash_for_signature().unwrap())
         );
@@ -111,7 +111,7 @@ impl Mempool {
         }
     }
     pub async fn add_transaction(&mut self, mut transaction: Transaction) {
-        debug!(
+        trace!(
             "add_transaction {:?} : type = {:?}",
             hex::encode(transaction.get_hash_for_signature().unwrap()),
             transaction.get_transaction_type()
