@@ -72,7 +72,8 @@ impl RoutingController {
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
         debug!(
             "processing incoming message type : {:?} from peer : {:?}",
-            message, peer_index
+            message.get_type_value(),
+            peer_index
         );
         match message {
             Message::HandshakeChallenge(challenge) => {
