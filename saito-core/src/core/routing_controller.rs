@@ -217,7 +217,9 @@ impl RoutingController {
         //     }
         // }
         let mut peer = Peer::new(peer_index);
-        if peer_data.is_none() {
+        peer.static_peer_config = peer_data;
+
+        if peer.static_peer_config.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
             peer.initiate_handshake(&self.io_interface, self.wallet.clone(), self.configs.clone())
                 .await
@@ -238,21 +240,19 @@ impl RoutingController {
             if peer.static_peer_config.is_some() {
                 // This means the connection has been initiated from this side, therefore we must
                 // try to re-establish the connection again
-                todo!("Print a better identifier like the public key");
-                info!("Known peer disconnected, reconnecting .., Peer ID = {}",  peer.peer_index);
 
-                todo!("Make the reconnect interval configurable");
-                let reconnect_inverval = 5;
-                let mut delay = tokio::time::interval(std::time::Duration::from_secs(reconnect_inverval));
-                delay.tick().await;
+                info!("Static peer disconnected, reconnecting .., Peer ID = {}, Public Key = {:?}",
+                    peer.peer_index, hex::encode(peer.peer_public_key));
+
                 self.io_interface.connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone()).await.unwrap();
             }
             else {
-                info!("Known peer disconnected, expecting a reconnection, Peer ID = {}",  peer.peer_index);
+                info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
+                    peer.peer_index, hex::encode(peer.peer_public_key));
             }
         }
         else {
-            todo!("Handle the unknown connection disconnect");
+            todo!("Handle the unknown peer disconnect");
         }
     }
 
@@ -374,7 +374,7 @@ impl ProcessEvent<RoutingEvent> for RoutingController {
                 }
             }
             NetworkEvent::PeerDisconnected {peer_index} => {
-                self.handle_peer_disconnect(peer_index);
+                self.handle_peer_disconnect(peer_index).await;
             }
 
             NetworkEvent::OutgoingNetworkMessageForAll { .. } => {
