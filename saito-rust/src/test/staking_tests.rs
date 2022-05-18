@@ -232,8 +232,8 @@ mod tests {
             slip2.generate_utxoset_key();
 
             // add to utxoset
-            slip1.on_chain_reorganization(&mut blockchain.utxoset, true, 1);
-            slip2.on_chain_reorganization(&mut blockchain.utxoset, true, 1);
+            slip1.on_chain_reorganization(&mut blockchain.utxoset, true, true);
+            slip2.on_chain_reorganization(&mut blockchain.utxoset, true, true);
 
             blockchain.staking.add_deposit(slip1);
             blockchain.staking.add_deposit(slip2);
@@ -472,9 +472,9 @@ mod tests {
             slip3.generate_utxoset_key();
 
             // add to utxoset
-            slip1.on_chain_reorganization(&mut blockchain.utxoset, true, 1);
-            slip2.on_chain_reorganization(&mut blockchain.utxoset, true, 1);
-            slip3.on_chain_reorganization(&mut blockchain.utxoset, true, 1);
+            slip1.on_chain_reorganization(&mut blockchain.utxoset, true, true);
+            slip2.on_chain_reorganization(&mut blockchain.utxoset, true, true);
+            slip3.on_chain_reorganization(&mut blockchain.utxoset, true, true);
 
             blockchain.staking.add_deposit(slip1);
             blockchain.staking.add_deposit(slip2);

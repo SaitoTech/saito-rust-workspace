@@ -13,17 +13,17 @@ use tracing_subscriber;
 use saito_core::common::command::GlobalEvent;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::routing_controller::{
-    RoutingController, RoutingEvent, PeerState, StaticPeer,
-};
+use saito_core::core::blockchain_controller::{BlockchainController, MempoolEvent};
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
-use saito_core::core::blockchain_controller::{BlockchainController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
+use saito_core::core::routing_controller::{
+    PeerState, RoutingController, RoutingEvent, StaticPeer,
+};
 
 use crate::saito::config_handler::ConfigHandler;
-use crate::saito::network_controller::run_network_controller;
 use crate::saito::io_event::IoEvent;
+use crate::saito::network_controller::run_network_controller;
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::time_keeper::TimeKeeper;
 
@@ -63,11 +63,7 @@ where
             let result = network_event_receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();
-                if event_processor
-                    .process_network_event(event)
-                    .await
-                    .is_some()
-                {
+                if event_processor.process_network_event(event).await.is_some() {
                     work_done = true;
                 }
             }
@@ -246,10 +242,7 @@ fn run_loop_thread(
                 // TODO : remove hard coded values
                 match command.controller_id {
                     ROUTING_CONTROLLER_ID => {
-                        debug!(
-                            "routing event to blockchain controller : {:?}",
-                            command.event
-                        );
+                        debug!("routing event to blockchain controller  ",);
                         network_event_sender_to_routing
                             .send(command.event)
                             .await
@@ -264,7 +257,10 @@ fn run_loop_thread(
                     }
                     MINER_CONTROLLER_ID => {
                         debug!("routing event to miner controller : {:?}", command.event);
-                        network_event_sender_to_miner.send(command.event).await.unwrap();
+                        network_event_sender_to_miner
+                            .send(command.event)
+                            .await
+                            .unwrap();
                     }
 
                     _ => {}

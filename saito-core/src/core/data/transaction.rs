@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use bigint::U256;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use rayon::prelude::*;
@@ -66,6 +66,7 @@ impl Transaction {
             timestamp: 0,
             inputs: vec![],
             outputs: vec![],
+            // TODO : reset to vec![] after WASM implementation done
             message: vec![123, 125], // to match with JS {}
             transaction_type: TransactionType::Normal,
             signature: [0; 64],
@@ -99,21 +100,6 @@ impl Transaction {
         // add to path
         //
         self.path.push(hop);
-    }
-
-    pub async fn build_last_hop(
-        &mut self,
-        wallet_lock: Arc<RwLock<Wallet>>,
-        peer_pubkey: SaitoPublicKey,
-    ) -> Option<Hop> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.get_signature());
-        vbytes.extend(&peer_pubkey);
-        let hash_to_sign = hash(&vbytes);
-
-        let hop = Hop::generate_hop(wallet_lock.clone(), peer_pubkey, hash_to_sign).await;
-
-        Some(hop)
     }
 
     pub fn validate_routing_path(&self) -> bool {
@@ -494,7 +480,11 @@ impl Transaction {
         with_payment: u64,
         with_fee: u64,
     ) -> Transaction {
-        trace!("generating transaction");
+        trace!(
+            "generating transaction : payment = {:?}, fee = {:?}",
+            with_payment,
+            with_fee
+        );
         trace!("waiting for the wallet write lock");
         let mut wallet = wallet_lock.write().await;
         trace!("acquired the wallet write lock");
@@ -502,7 +492,12 @@ impl Transaction {
 
         let available_balance = wallet.get_available_balance();
         let total_requested = with_payment + with_fee;
-        // info!("in generate transaction ab: {} and pr: {} and fr: {}", available_balance, with_payment, with_fee);
+        trace!(
+            "in generate transaction. available: {} and payment: {} and fee: {}",
+            available_balance,
+            with_payment,
+            with_fee
+        );
 
         if available_balance >= total_requested {
             let mut transaction = Transaction::new();
@@ -600,6 +595,7 @@ impl Transaction {
         with_amount: u64,
         number_of_vip_slips: u64,
     ) -> Transaction {
+        debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::new();
         transaction.set_transaction_type(TransactionType::Vip);
 
@@ -659,7 +655,7 @@ impl Transaction {
     }
 
     // runs when block is deleted for good
-    pub async fn delete(&self, utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>) -> bool {
+    pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
         self.inputs.iter().for_each(|input| {
             input.delete(utxoset);
         });
@@ -673,16 +669,16 @@ impl Transaction {
     /// Runs when the chain is re-organized
     pub fn on_chain_reorganization(
         &self,
-        utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>,
+        utxoset: &mut UtxoSet,
         longest_chain: bool,
         block_id: u64,
     ) {
-        let mut input_slip_value = 1;
-        let mut output_slip_value = 0;
+        let mut input_slip_value = true;
+        let mut output_slip_value = false;
 
         if longest_chain {
-            input_slip_value = block_id;
-            output_slip_value = 1;
+            input_slip_value = true;
+            output_slip_value = true;
         }
 
         self.inputs.iter().for_each(|input| {
@@ -795,6 +791,10 @@ impl Transaction {
     }
 
     pub fn validate(&self, utxoset: &UtxoSet, staking: &Staking) -> bool {
+        trace!(
+            "validating transaction : {:?}",
+            hex::encode(self.get_hash_for_signature().unwrap())
+        );
         //
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
@@ -872,18 +872,17 @@ impl Transaction {
                 return false;
             }
 
-            //
+            // TODO : what happens to tokens when total_out < total_in
             // validate we're not creating tokens out of nothing
-            //
             if self.total_out > self.total_in
                 && self.get_transaction_type() != TransactionType::Fee
                 && self.get_transaction_type() != TransactionType::Vip
             {
-                info!("{} in and {} out", self.total_in, self.total_out);
+                warn!("{} in and {} out", self.total_in, self.total_out);
                 for z in self.get_outputs() {
                     info!("{:?} --- ", z.get_amount());
                 }
-                info!("ERROR 672941: transaction spends more than it has available");
+                error!("ERROR 672941: transaction spends more than it has available");
                 return false;
             }
         }
