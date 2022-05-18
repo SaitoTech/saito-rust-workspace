@@ -7,7 +7,7 @@ use async_recursion::async_recursion;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{SaitoHash, SaitoUTXOSetKey};
+use crate::common::defs::{SaitoHash, SaitoUTXOSetKey, UtxoSet};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
@@ -43,7 +43,7 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
     (top, bottom)
 }
 
-pub type UtxoSet = AHashMap<SaitoUTXOSetKey, u64>;
+// pub type UtxoSet = AHashMap<SaitoUTXOSetKey, u64>;
 
 #[derive(Debug)]
 pub struct Blockchain {
@@ -573,180 +573,69 @@ impl Blockchain {
     ) -> u64 {
         let my_latest_block_id = self.get_latest_block_id();
 
-        let mut pbid = peer_latest_block_id;
-        let mut mbid = my_latest_block_id;
+        let mut peer_block_id = peer_latest_block_id;
+        let mut my_block_id = my_latest_block_id;
 
+        let weights = vec![
+            0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
+        ];
         if peer_latest_block_id >= my_latest_block_id {
-            //
             // roll back to last even 10 blocks
-            //
-            for i in 0..10 {
-                if (pbid - i) % 10 == 0 {
-                    pbid -= i;
-                    break;
-                }
-            }
+            peer_block_id = peer_block_id - (peer_block_id % 10);
 
-            //
             // their fork id
-            //
-            for i in 0..16 {
-                if i == 0 {
-                    pbid -= 0;
+            for (index, weight) in weights.iter().enumerate() {
+                if peer_block_id <= *weight {
+                    return 0;
                 }
-                if i == 1 {
-                    pbid -= 10;
-                }
-                if i == 2 {
-                    pbid -= 10;
-                }
-                if i == 3 {
-                    pbid -= 10;
-                }
-                if i == 4 {
-                    pbid -= 10;
-                }
-                if i == 5 {
-                    pbid -= 10;
-                }
-                if i == 6 {
-                    pbid -= 25;
-                }
-                if i == 7 {
-                    pbid -= 25;
-                }
-                if i == 8 {
-                    pbid -= 100;
-                }
-                if i == 9 {
-                    pbid -= 300;
-                }
-                if i == 10 {
-                    pbid -= 500;
-                }
-                if i == 11 {
-                    pbid -= 4000;
-                }
-                if i == 12 {
-                    pbid -= 10000;
-                }
-                if i == 13 {
-                    pbid -= 20000;
-                }
-                if i == 14 {
-                    pbid -= 50000;
-                }
-                if i == 15 {
-                    pbid -= 100000;
-                }
+                peer_block_id -= weight;
 
-                //
                 // do not loop around if block id < 0
-                //
-                if pbid > peer_latest_block_id || pbid == 0 {
+                if peer_block_id > peer_latest_block_id {
                     return 0;
                 }
 
-                //
                 // index in fork_id hash
-                //
-                let idx = 2 * i;
+                let idx = 2 * index;
 
-                //
                 // compare input hash to my hash
-                //
-                if pbid <= mbid {
+                if peer_block_id <= my_block_id {
                     let block_hash = self
                         .blockring
-                        .get_longest_chain_block_hash_by_block_id(pbid);
+                        .get_longest_chain_block_hash_by_block_id(peer_block_id);
                     if fork_id[idx] == block_hash[idx] && fork_id[idx + 1] == block_hash[idx + 1] {
-                        return pbid;
+                        return peer_block_id;
                     }
                 }
             }
         } else {
-            //
-            // their fork id
-            //
-            for i in 0..16 {
-                if i == 0 {
-                    mbid -= 0;
+            for (index, weight) in weights.iter().enumerate() {
+                if my_block_id <= *weight {
+                    return 0;
                 }
-                if i == 1 {
-                    mbid -= 10;
-                }
-                if i == 2 {
-                    mbid -= 10;
-                }
-                if i == 3 {
-                    mbid -= 10;
-                }
-                if i == 4 {
-                    mbid -= 10;
-                }
-                if i == 5 {
-                    mbid -= 10;
-                }
-                if i == 6 {
-                    mbid -= 25;
-                }
-                if i == 7 {
-                    mbid -= 25;
-                }
-                if i == 8 {
-                    mbid -= 100;
-                }
-                if i == 9 {
-                    mbid -= 300;
-                }
-                if i == 10 {
-                    mbid -= 500;
-                }
-                if i == 11 {
-                    mbid -= 4000;
-                }
-                if i == 12 {
-                    mbid -= 10000;
-                }
-                if i == 13 {
-                    mbid -= 20000;
-                }
-                if i == 14 {
-                    mbid -= 50000;
-                }
-                if i == 15 {
-                    mbid -= 100000;
-                }
+                my_block_id -= weight;
 
-                //
                 // do not loop around if block id < 0
-                //
-                if mbid > my_latest_block_id || mbid == 0 {
+                if my_block_id > my_latest_block_id {
                     return 0;
                 }
 
-                //
                 // index in fork_id hash
-                //
-                let idx = 2 * i;
+                let idx = 2 * index;
 
-                //
                 // compare input hash to my hash
-                //
-                if pbid <= mbid {
+                if peer_block_id <= my_block_id {
                     let block_hash = self
                         .blockring
-                        .get_longest_chain_block_hash_by_block_id(pbid);
+                        .get_longest_chain_block_hash_by_block_id(peer_block_id);
                     if fork_id[idx] == block_hash[idx] && fork_id[idx + 1] == block_hash[idx + 1] {
-                        return pbid;
+                        return peer_block_id;
                     }
                 }
             }
         }
 
-        //
         // no match? return 0 -- no shared ancestor
-        //
         0
     }
     pub fn print(&self) {
@@ -1058,10 +947,10 @@ impl Blockchain {
             // is in the staking tables.
             //
             for i in 0..res_spend.len() {
-                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, 1);
+                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, true);
             }
             for i in 0..res_unspend.len() {
-                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, 0);
+                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, false);
             }
             for i in 0..res_delete.len() {
                 res_spend[i].delete(&mut self.utxoset);
@@ -1219,10 +1108,10 @@ impl Blockchain {
         // is in the staking tables.
         //
         for i in 0..res_spend.len() {
-            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, 1);
+            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, true);
         }
         for i in 0..res_unspend.len() {
-            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, 0);
+            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, false);
         }
         for i in 0..res_delete.len() {
             res_spend[i].delete(&mut self.utxoset);

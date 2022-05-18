@@ -12,9 +12,7 @@ use crate::common::command::{GlobalEvent, NetworkEvent};
 use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::routing_controller::RoutingEvent;
 use crate::core::data::block::Block;
-
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
@@ -23,6 +21,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::core::miner_controller::MinerEvent;
+use crate::core::routing_controller::RoutingEvent;
 
 #[derive(Debug)]
 pub enum MempoolEvent {
@@ -85,8 +84,8 @@ impl BlockchainController {
                 let mut vip_transaction = Transaction::generate_vip_transaction(
                     wallet_lock_clone.clone(),
                     publickey,
-                    100_000_000,
-                    10,
+                    50_000_000,
+                    20,
                 )
                 .await;
                 vip_transaction.sign(privatekey);
@@ -116,12 +115,6 @@ impl BlockchainController {
                 .add_hop_to_path(wallet_lock_clone.clone(), publickey)
                 .await;
             {
-                // trace!("waiting for the mempool write lock");
-                // let mut mempool = mempool_lock_clone.write().await;
-                // trace!("acquired the mempool write lock");
-                // trace!("waiting for the blockchain read lock");
-                // let blockchain = blockchain_lock_clone.read().await;
-                // trace!("acquired the blockchain read lock");
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)
                     .await;

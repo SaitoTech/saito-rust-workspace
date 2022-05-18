@@ -1,6 +1,8 @@
-pub const HEARTBEAT: u64 = 30_000;
+/// TODO : rename to BLOCK_INTERVAL or a suitable name
+pub const HEARTBEAT: u64 = 10_000;
 
 pub struct BurnFee {}
+
 impl BurnFee {
     ///
     /// Returns the amount of work needed to produce a block given the timestamp of

@@ -7,8 +7,11 @@ use crate::test::test_io_handler::TestIOHandler;
 use ahash::AHashMap;
 use log::{debug, info};
 use rayon::prelude::*;
-use saito_core::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoUTXOSetKey};
+use saito_core::common::defs::{
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet,
+};
 use saito_core::common::interface_io::InterfaceIO;
+
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::burnfee::HEARTBEAT;
@@ -19,10 +22,10 @@ use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::miner_controller::MinerEvent;
+use std::borrow::BorrowMut;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread::sleep, time::Duration};
-use std::borrow::BorrowMut;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -374,7 +377,9 @@ impl TestManager {
         if can_bundle {
             let mempool = mempool.clone();
             let mut mempool = mempool.write().await;
-            let result = mempool.bundle_block(blockchain.clone().write().await.borrow_mut(), timestamp).await;
+            let result = mempool
+                .bundle_block(blockchain.clone().write().await.borrow_mut(), timestamp)
+                .await;
             return Some(result);
         }
         return None;
@@ -431,7 +436,7 @@ impl TestManager {
     // chain and vice-versa.
     pub async fn check_utxoset(&self) {
         let blockchain = self.blockchain_lock.read().await;
-        let mut utxoset: AHashMap<SaitoUTXOSetKey, u64> = AHashMap::new();
+        let mut utxoset: UtxoSet = AHashMap::new();
         let latest_block_id = blockchain.get_latest_block_id();
 
         info!("----");
@@ -459,7 +464,7 @@ impl TestManager {
                     //
                     // everything spendable in blockchain.utxoset should be spendable on longest-chain
                     //
-                    if *value == 1 {
+                    if *value == true {
                         //info!("for key: {:?}", key);
                         //info!("comparing {} and {}", value, value2);
                         assert_eq!(value, value2);
@@ -467,15 +472,15 @@ impl TestManager {
                         //
                         // everything spent in blockchain.utxoset should be spent on longest-chain
                         //
-                        if *value > 1 {
-                            //info!("comparing key: {:?}", key);
-                            //info!("comparing blkchn {} and sanitycheck {}", value, value2);
-                            assert_eq!(value, value2);
-                        } else {
-                            //
-                            // unspendable (0) does not need to exist
-                            //
-                        }
+                        // if *value > 1 {
+                        //info!("comparing key: {:?}", key);
+                        //info!("comparing blkchn {} and sanitycheck {}", value, value2);
+                        // assert_eq!(value, value2);
+                        // } else {
+                        //
+                        // unspendable (0) does not need to exist
+                        //
+                        // }
                     }
                 }
                 None => {
@@ -486,7 +491,7 @@ impl TestManager {
                     // removed on purge, although we can look at deleting them on unwind
                     // as well if that is reasonably efficient.
                     //
-                    if *value > 0 {
+                    if *value == true {
                         //info!("Value does not exist in actual blockchain!");
                         //info!("comparing {:?} with on-chain value {}", key, value);
                         assert_eq!(1, 2);
@@ -505,21 +510,21 @@ impl TestManager {
                     //
                     // everything spendable in longest-chain should be spendable on blockchain.utxoset
                     //
-                    if *value == 1 {
+                    if *value == true {
                         //                        info!("comparing {} and {}", value, value2);
                         assert_eq!(value, value2);
                     } else {
                         //
                         // everything spent in longest-chain should be spendable on blockchain.utxoset
                         //
-                        if *value > 1 {
-                            //                            info!("comparing {} and {}", value, value2);
-                            assert_eq!(value, value2);
-                        } else {
-                            //
-                            // unspendable (0) does not need to exist
-                            //
-                        }
+                        // if *value > 1 {
+                        //     //                            info!("comparing {} and {}", value, value2);
+                        //     assert_eq!(value, value2);
+                        // } else {
+                        //     //
+                        //     // unspendable (0) does not need to exist
+                        //     //
+                        // }
                     }
                 }
                 None => {

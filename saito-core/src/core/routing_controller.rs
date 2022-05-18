@@ -11,6 +11,7 @@ use crate::common::defs::SaitoHash;
 use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
+use crate::core::blockchain_controller::MempoolEvent;
 use crate::core::data;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
@@ -21,7 +22,6 @@ use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
 use crate::core::data::wallet::Wallet;
-use crate::core::blockchain_controller::MempoolEvent;
 use crate::core::miner_controller::MinerEvent;
 
 #[derive(Debug)]
@@ -72,7 +72,8 @@ impl RoutingController {
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
         debug!(
             "processing incoming message type : {:?} from peer : {:?}",
-            message, peer_index
+            message.get_type_value(),
+            peer_index
         );
         match message {
             Message::HandshakeChallenge(challenge) => {
@@ -323,7 +324,7 @@ impl ProcessEvent<RoutingEvent> for RoutingController {
     }
 
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
-        debug!("processing new interface event : {:?}", event);
+        debug!("processing new interface event");
         match event {
             NetworkEvent::OutgoingNetworkMessage { peer_index, buffer } => {
                 // TODO : remove this case if not being used
