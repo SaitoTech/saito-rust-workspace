@@ -75,7 +75,7 @@ impl BurnFee {
         let burn_fee_previous_block_as_float: f64 = burn_fee_previous_block as f64 / 100_000_000.0;
 
         let res1: f64 = burn_fee_previous_block_as_float
-            * ((HEARTBEAT) as f64 / (timestamp_difference) as f64).sqrt();
+            * (HEARTBEAT as f64 / timestamp_difference as f64).sqrt();
         let new_burnfee: u64 = (res1 * 100_000_000.0).round() as u64;
 
         new_burnfee
