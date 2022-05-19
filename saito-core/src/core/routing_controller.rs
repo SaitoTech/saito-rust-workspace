@@ -25,9 +25,7 @@ use crate::core::data::wallet::Wallet;
 use crate::core::miner_controller::MinerEvent;
 
 #[derive(Debug)]
-pub enum RoutingEvent {
-    NewBlockBundled(Block),
-}
+pub enum RoutingEvent {}
 
 #[derive(Debug)]
 pub enum PeerState {
@@ -154,41 +152,41 @@ impl RoutingController {
         }
         debug!("incoming message processed");
     }
-    async fn propagate_block_to_peers(&self, block_hash: SaitoHash) {
-        debug!("propagating blocks to peers");
-        let buffer: Vec<u8>;
-        let mut exceptions = vec![];
-        {
-            trace!("waiting for the blockchain write lock");
-            let blockchain = self.blockchain.read().await;
-            trace!("acquired the blockchain write lock");
-            let block = blockchain.blocks.get(&block_hash);
-            if block.is_none() {
-                // TODO : handle
-            }
-            let block = block.unwrap();
-            buffer = block.serialize_for_net(BlockType::Header);
-
-            // finding block sender to avoid resending the block to that node
-            if block.source_connection_id.is_some() {
-                trace!("waiting for the peers read lock");
-                let peers = self.peers.read().await;
-                trace!("acquired the peers read lock");
-                let peer = peers
-                    .address_to_peers
-                    .get(&block.source_connection_id.unwrap());
-                if peer.is_some() {
-                    exceptions.push(*peer.unwrap());
-                }
-            }
-        }
-
-        self.io_handler
-            .send_message_to_all(buffer, exceptions)
-            .await
-            .unwrap();
-        debug!("block sent to peers");
-    }
+    // async fn propagate_block_to_peers(&self, block_hash: SaitoHash) {
+    //     debug!("propagating blocks to peers");
+    //     let buffer: Vec<u8>;
+    //     let mut exceptions = vec![];
+    //     {
+    //         trace!("waiting for the blockchain write lock");
+    //         let blockchain = self.blockchain.read().await;
+    //         trace!("acquired the blockchain write lock");
+    //         let block = blockchain.blocks.get(&block_hash);
+    //         if block.is_none() {
+    //             // TODO : handle
+    //         }
+    //         let block = block.unwrap();
+    //         buffer = block.serialize_for_net(BlockType::Header);
+    //
+    //         // finding block sender to avoid resending the block to that node
+    //         if block.source_connection_id.is_some() {
+    //             trace!("waiting for the peers read lock");
+    //             let peers = self.peers.read().await;
+    //             trace!("acquired the peers read lock");
+    //             let peer = peers
+    //                 .address_to_peers
+    //                 .get(&block.source_connection_id.unwrap());
+    //             if peer.is_some() {
+    //                 exceptions.push(*peer.unwrap());
+    //             }
+    //         }
+    //     }
+    //
+    //     self.io_handler
+    //         .send_message_to_all(buffer, exceptions)
+    //         .await
+    //         .unwrap();
+    //     debug!("block sent to peers");
+    // }
     async fn connect_to_static_peers(&mut self) {
         debug!("connect to peers from config",);
         trace!("waiting for the configs read lock");
@@ -381,11 +379,7 @@ impl ProcessEvent<RoutingEvent> for RoutingController {
     async fn process_event(&mut self, event: RoutingEvent) -> Option<()> {
         debug!("processing blockchain event");
 
-        match event {
-            RoutingEvent::NewBlockBundled(block) => {
-                unreachable!()
-            }
-        }
+        match event {}
 
         debug!("blockchain event processed successfully");
         None
