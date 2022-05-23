@@ -193,6 +193,10 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
             debug!("adding blocks to blockchain");
 
             while let Some(block) = mempool.blocks_queue.pop_front() {
+                trace!(
+                    "deleting transactions from block : {:?}",
+                    hex::encode(block.get_hash())
+                );
                 mempool.delete_transactions(&block.get_transactions());
                 blockchain
                     .add_block(

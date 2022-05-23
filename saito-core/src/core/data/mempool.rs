@@ -180,7 +180,7 @@ impl Mempool {
         if self.transactions.is_empty() {
             return false;
         }
-        debug!("can bundle block : timestamp = {:?}", current_timestamp);
+        trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
         trace!("waiting for the blockchain read lock");
         let blockchain = blockchain_lock.read().await;

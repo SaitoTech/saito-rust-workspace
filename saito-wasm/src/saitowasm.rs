@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::routing_controller::{RoutingController, RoutingEvent};
+use saito_core::core::blockchain_controller::{BlockchainController, MempoolEvent};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
@@ -24,8 +24,8 @@ use saito_core::core::data::miner::Miner;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::blockchain_controller::{BlockchainController, MempoolEvent};
 use saito_core::core::miner_controller::{MinerController, MinerEvent};
+use saito_core::core::routing_controller::{RoutingController, RoutingEvent};
 
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_slip::WasmSlip;
@@ -122,6 +122,8 @@ pub fn new() -> SaitoWasm {
             sender_to_blockchain: sender_to_blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
+            miner_timer: 0,
+            new_miner_event_received: false,
         },
         receiver_in_blockchain,
         receiver_in_mempool,
