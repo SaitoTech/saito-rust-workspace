@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use log::{debug, trace};
+use log::debug;
 
 use crate::saito::rust_io_handler::{FutureState, SHARED_CONTEXT};
 
@@ -29,7 +29,7 @@ impl Future for IoFuture {
             // debug!("waiting for event : {:?}", self.event_id);
             return Poll::Pending;
         }
-        debug!("event result found for : {:?}", self.event_id);
+        // debug!("event result found for : {:?}", self.event_id);
         Poll::Ready(Ok(result.unwrap()))
     }
 }

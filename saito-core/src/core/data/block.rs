@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::io::Error;
 use std::{mem, sync::Arc};
 
 use ahash::AHashMap;
@@ -9,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
 };
-use crate::common::handle_io::HandleIo;
+use crate::common::interface_io::InterfaceIO;
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
 use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::{hash, sign, verify};
@@ -167,7 +168,7 @@ pub struct Block {
     difficulty: u64,
     staking_treasury: u64,
     /// Transactions
-    transactions: Vec<Transaction>,
+    pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
     pre_hash: SaitoHash,
     /// Self-Calculated / Validated
@@ -177,7 +178,7 @@ pub struct Block {
     /// total fees paid into block
     routing_work_for_creator: u64,
     /// Is Block on longest chain
-    lc: bool,
+    in_longest_chain: bool,
     // has golden ticket
     pub has_golden_ticket: bool,
     // has issuance transaction
@@ -227,7 +228,7 @@ impl Block {
             hash: [0; 32],
             total_fees: 0,
             routing_work_for_creator: 0,
-            lc: false,
+            in_longest_chain: false,
             has_golden_ticket: false,
             has_fee_transaction: false,
             has_issuance_transaction: false,
@@ -255,8 +256,8 @@ impl Block {
         self.hash
     }
 
-    pub fn get_lc(&self) -> bool {
-        self.lc
+    pub fn is_in_longest_chain(&self) -> bool {
+        self.in_longest_chain
     }
 
     pub fn get_id(&self) -> u64 {
@@ -339,6 +340,10 @@ impl Block {
         self.routing_work_for_creator
     }
 
+    pub fn get_source_connection_id(&self) -> Option<SaitoPublicKey> {
+        self.source_connection_id
+    }
+
     pub fn set_routing_work_for_creator(&mut self, routing_work_for_creator: u64) {
         self.routing_work_for_creator = routing_work_for_creator;
     }
@@ -392,8 +397,8 @@ impl Block {
         self.id = id;
     }
 
-    pub fn set_lc(&mut self, lc: bool) {
-        self.lc = lc;
+    pub fn set_in_longest_chain(&mut self, lc: bool) {
+        self.in_longest_chain = lc;
     }
 
     pub fn set_timestamp(&mut self, timestamp: u64) {
@@ -449,7 +454,11 @@ impl Block {
     // data that is necessary for blocks of that type if possible. if this is
     // not possible, return false. if it is possible, return true once upgraded.
     //
-    pub async fn upgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
+    pub async fn upgrade_block_to_block_type(
+        &mut self,
+        block_type: BlockType,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
+    ) -> bool {
         trace!("UPGRADE_BLOCK_TO_BLOCK_TYPE {:?}", self.block_type);
         if self.block_type == block_type {
             return true;
@@ -465,10 +474,12 @@ impl Block {
         // load the block if it exists on disk.
         //
         if block_type == BlockType::Full {
-            let mut new_block =
-                Storage::load_block_from_disk(Storage::generate_block_filename(&self))
-                    .await
-                    .unwrap();
+            let mut new_block = Storage::load_block_from_disk(
+                Storage::generate_block_filename(&self, io_handler),
+                io_handler,
+            )
+            .await
+            .unwrap();
             let hash_for_signature = hash(&new_block.serialize_for_signature());
             new_block.set_pre_hash(hash_for_signature);
             let hash_for_hash = hash(&new_block.serialize_for_hash());
@@ -627,6 +638,7 @@ impl Block {
     /// [difficulty - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
     pub fn deserialize_for_net(bytes: &Vec<u8>) -> Block {
+        // TODO : return Option<Block> to support invalid buffers
         let transactions_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let id: u64 = u64::from_be_bytes(bytes[4..12].try_into().unwrap());
         let timestamp: u64 = u64::from_be_bytes(bytes[12..20].try_into().unwrap());
@@ -775,6 +787,7 @@ impl Block {
     // generate hashes and payouts and fee calculations
     //
     pub async fn generate_consensus_values(&self, blockchain: &Blockchain) -> ConsensusValues {
+        debug!("generate consensus values");
         let mut cv = ConsensusValues::new();
 
         //
@@ -1170,11 +1183,7 @@ impl Block {
         winner_pubkey
     }
 
-    pub fn on_chain_reorganization(
-        &self,
-        utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>,
-        longest_chain: bool,
-    ) -> bool {
+    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
         for tx in &self.transactions {
             tx.on_chain_reorganization(utxoset, longest_chain, self.get_id());
         }
@@ -1321,7 +1330,7 @@ impl Block {
     pub async fn validate(
         &self,
         blockchain: &Blockchain,
-        utxoset: &AHashMap<SaitoUTXOSetKey, u64>,
+        utxoset: &UtxoSet,
         staking: &Staking,
     ) -> bool {
         //
@@ -1567,6 +1576,8 @@ impl Block {
                     "ERROR 627428: block {} fee transaction doesn't match cv fee transaction",
                     self.get_id()
                 );
+                info!("fee transaction = {:?}", fee_transaction);
+                info!("tx : {:?}", self.transactions[ft_idx]);
                 return false;
             }
         }
@@ -1641,17 +1652,21 @@ impl Block {
         transactions: &mut Vec<Transaction>,
         previous_block_hash: SaitoHash,
         wallet_lock: Arc<RwLock<Wallet>>,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
+        blockchain: &mut Blockchain,
         current_timestamp: u64,
     ) -> Block {
         debug!(
             "Block::generate : previous block hash : {:?}",
             hex::encode(previous_block_hash)
         );
-        let blockchain = blockchain_lock.read().await;
-        let wallet = wallet_lock.read().await;
-        let publickey = wallet.get_publickey();
 
+        let publickey;
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
+            publickey = wallet.get_publickey();
+        }
         let mut previous_block_id = 0;
         let mut previous_block_burnfee = 0;
         let mut previous_block_timestamp = 0;
@@ -1748,8 +1763,12 @@ impl Block {
             let mut fee_tx = cv.fee_transaction.unwrap();
             let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
             fee_tx.set_hash_for_signature(hash_for_signature);
-            fee_tx.sign(wallet.get_privatekey());
-
+            {
+                trace!("waiting for the wallet read lock");
+                let wallet = wallet_lock.read().await;
+                trace!("acquired the wallet read lock");
+                fee_tx.sign(wallet.get_privatekey());
+            }
             //
             // and we add it to the block
             //
@@ -1816,12 +1835,17 @@ impl Block {
         let block_merkle_root = block.generate_merkle_root();
         block.set_merkle_root(block_merkle_root);
 
-        block.sign(wallet.get_publickey(), wallet.get_privatekey());
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
+            block.sign(wallet.get_publickey(), wallet.get_privatekey());
+        }
 
         block
     }
 
-    pub async fn delete(&self, utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>) -> bool {
+    pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
         for tx in &self.transactions {
             tx.delete(utxoset).await;
         }
@@ -1829,26 +1853,57 @@ impl Block {
     }
 
     pub async fn fetch_missing_block(
-        peer_index: u64,
+        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        url: String,
         block_hash: SaitoHash,
-        io_handler: &Box<dyn HandleIo + Send>,
-    ) {
-        debug!(
-            "fetch missing block : block : {:?}",
-            hex::encode(block_hash)
-        );
+        peer_index: u64,
+    ) -> Result<(), Error> {
+        debug!("fetch missing block : block : {:?}", url);
+        io_handler
+            .fetch_block_from_peer(block_hash, peer_index, url)
+            .await
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use hex::FromHex;
+    use log::{debug, trace};
+    use tokio::sync::RwLock;
 
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::verify;
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
+
+    #[test]
+    fn block_new_test() {
+        let block = Block::new();
+        assert_eq!(block.id, 0);
+        assert_eq!(block.timestamp, 0);
+        assert_eq!(block.previous_block_hash, [0; 32]);
+        assert_eq!(block.creator, [0; 33]);
+        assert_eq!(block.merkle_root, [0; 32]);
+        assert_eq!(block.signature, [0; 64]);
+        assert_eq!(block.treasury, 0);
+        assert_eq!(block.burnfee, 0);
+        assert_eq!(block.difficulty, 0);
+        assert_eq!(block.transactions, vec![]);
+        assert_eq!(block.hash, [0; 32]);
+        assert_eq!(block.total_fees, 0);
+        assert_eq!(block.in_longest_chain, false);
+        assert_eq!(block.has_golden_ticket, false);
+        assert_eq!(block.has_fee_transaction, false);
+        assert_eq!(block.has_issuance_transaction, false);
+        assert_eq!(block.issuance_transaction_idx, 0);
+        assert_eq!(block.fee_transaction_idx, 0);
+        assert_eq!(block.golden_ticket_idx, 0);
+        assert_eq!(block.routing_work_for_creator, 0);
+        // TestManager::check_block_consistency(&block);
+    }
 
     #[test]
     fn block_serialize_for_signature_hash_with_data() {
@@ -1992,5 +2047,62 @@ mod tests {
         );
         assert_ne!(block.get_hash(), [0; 32]);
         assert_ne!(block.get_signature(), [0; 64]);
+    }
+
+    #[test]
+    // test that we are properly generating pre_hash and hash
+    fn block_generate_hashes() {
+        let mut block = Block::new();
+        let hash = block.generate_hashes();
+        assert_ne!(hash, [0; 32]);
+        assert_ne!(block.get_pre_hash(), [0; 32]);
+        assert_ne!(block.get_hash(), [0; 32]);
+        // TestManager::check_block_consistency(&block);
+    }
+
+    #[test]
+    // confirm merkle root is being generated from transactions in block
+    fn block_merkle_root_test() {
+        let mut block = Block::new();
+        let wallet = Wallet::new();
+
+        let mut transactions = (0..5)
+            .into_iter()
+            .map(|_| {
+                let mut transaction = Transaction::new();
+                transaction.sign(wallet.get_privatekey());
+                transaction
+            })
+            .collect();
+
+        block.set_transactions(&mut transactions);
+        block.set_merkle_root(block.generate_merkle_root());
+
+        assert!(block.get_merkle_root().len() == 32);
+        assert_ne!(block.get_merkle_root(), [0; 32]);
+
+        // TestManager::check_block_consistency(&block);
+    }
+
+    // TODO It is not obvious that calling sign() would have the side effect of setting the hash.
+    //      The API of block.sign() and block.set_hash() should be clearer.
+    #[ignore]
+    #[tokio::test]
+    async fn signature_idempotency_test() {
+        let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
+        let publickey;
+        let privatekey;
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
+            publickey = wallet.get_publickey();
+            privatekey = wallet.get_privatekey();
+        }
+        let mut block = Block::new();
+        let block_hash_0 = block.get_hash();
+        block.sign(publickey, privatekey);
+        let block_hash_1 = block.get_hash();
+        assert_eq!(block_hash_0, block_hash_1);
     }
 }

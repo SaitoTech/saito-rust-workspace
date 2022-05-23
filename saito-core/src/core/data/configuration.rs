@@ -45,4 +45,13 @@ impl Configuration {
             peers: vec![],
         }
     }
+    pub fn get_block_fetch_url(&self) -> String {
+        let endpoint = &self.server.endpoint;
+        endpoint.protocol.to_string()
+            + "://"
+            + endpoint.host.as_str()
+            + ":"
+            + endpoint.port.to_string().as_str()
+            + "/block/"
+    }
 }
