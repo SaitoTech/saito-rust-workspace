@@ -360,7 +360,7 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
 
                 sender_to_miner
-                    .send(MinerEvent::Mine {
+                    .send(MinerEvent::LongestChainBlockAdded {
                         hash: block_hash,
                         difficulty,
                     })

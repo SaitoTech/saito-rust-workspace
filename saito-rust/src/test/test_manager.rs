@@ -5,7 +5,7 @@
 
 use crate::test::test_io_handler::TestIOHandler;
 use ahash::AHashMap;
-use log::{debug, info};
+use log::{debug, info, trace};
 use rayon::prelude::*;
 use saito_core::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet,
@@ -15,6 +15,7 @@ use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::burnfee::HEARTBEAT;
+use saito_core::core::data::crypto::{generate_random_bytes, hash};
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::miner::Miner;
@@ -224,7 +225,7 @@ impl TestManager {
     // generate block
     //
     pub async fn generate_block(
-        &self,
+        &mut self,
         parent_hash: SaitoHash,
         timestamp: u64,
         vip_transactions: usize,
@@ -276,9 +277,12 @@ impl TestManager {
             let blockchain = self.blockchain_lock.read().await;
             let blk = blockchain.get_block(&parent_hash).await.unwrap();
             let last_block_difficulty = blk.get_difficulty();
-            let golden_ticket: GoldenTicket = miner
-                .mine_on_block_until_golden_ticket_found(parent_hash, last_block_difficulty)
-                .await;
+            let golden_ticket: GoldenTicket = Self::mine_on_block_until_golden_ticket_found(
+                self.wallet_lock.clone(),
+                parent_hash,
+                last_block_difficulty,
+            )
+            .await;
             let mut tx2: Transaction;
             {
                 let mut wallet = self.wallet_lock.write().await;
@@ -302,9 +306,31 @@ impl TestManager {
 
         block
     }
+    pub async fn mine_on_block_until_golden_ticket_found(
+        wallet: Arc<RwLock<Wallet>>,
+        block_hash: SaitoHash,
+        block_difficulty: u64,
+    ) -> GoldenTicket {
+        let public_key;
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = wallet.read().await;
+            trace!("acquired the wallet read lock");
+            public_key = wallet.get_publickey();
+        }
+        let mut random_bytes = hash(&generate_random_bytes(32));
 
+        let mut solution = GoldenTicket::generate_solution(block_hash, random_bytes, public_key);
+
+        while !GoldenTicket::is_valid_solution(solution, block_difficulty) {
+            random_bytes = hash(&generate_random_bytes(32));
+            solution = GoldenTicket::generate_solution(block_hash, random_bytes, public_key);
+        }
+
+        GoldenTicket::new(block_hash, random_bytes, public_key)
+    }
     pub async fn generate_block_and_metadata(
-        &self,
+        &mut self,
         parent_hash: SaitoHash,
         timestamp: u64,
         vip_transactions: usize,

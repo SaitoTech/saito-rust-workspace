@@ -90,6 +90,7 @@ where
 
             if work_done {
                 work_done = false;
+                tokio::task::yield_now().await;
                 // std::thread::yield_now();
             } else {
                 tokio::task::yield_now().await;
@@ -102,15 +103,17 @@ where
 async fn run_miner_controller(
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
-    sender_to_mempool: &tokio::sync::mpsc::Sender<MempoolEvent>,
-    sender_to_blockchain: &tokio::sync::mpsc::Sender<RoutingEvent>,
-    receiver_for_miner: tokio::sync::mpsc::Receiver<MinerEvent>,
+    sender_to_mempool: &Sender<MempoolEvent>,
+    sender_to_blockchain: &Sender<RoutingEvent>,
+    receiver_for_miner: Receiver<MinerEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let miner_controller = MinerController {
         miner: context.miner.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
+        miner_timer: 0,
+        new_miner_event_received: false,
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
         tokio::sync::mpsc::channel::<NetworkEvent>(1000);
@@ -132,8 +135,8 @@ async fn run_blockchain_controller(
     context: &Context,
     receiver_for_blockchain: Receiver<MempoolEvent>,
     sender_to_routing: &Sender<RoutingEvent>,
-    sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
-    sender_to_network_controller: tokio::sync::mpsc::Sender<IoEvent>,
+    sender_to_miner: Sender<MinerEvent>,
+    sender_to_network_controller: Sender<IoEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
     let mut generate_test_tx = false;
@@ -174,7 +177,7 @@ async fn run_blockchain_controller(
 }
 
 async fn run_routing_controller(
-    sender_to_io_controller: tokio::sync::mpsc::Sender<IoEvent>,
+    sender_to_io_controller: Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
