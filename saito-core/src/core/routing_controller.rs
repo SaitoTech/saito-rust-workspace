@@ -231,6 +231,7 @@ impl RoutingController {
     }
 
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
+        trace!("handling peer disconnect, peer_index = {}", peer_index);
         let peers = self.peers.read().await;
         let result = peers.find_peer_by_index(peer_index);
 
@@ -240,7 +241,8 @@ impl RoutingController {
             if peer.static_peer_config.is_some() {
                 // This means the connection has been initiated from this side, therefore we must
                 // try to re-establish the connection again
-
+                // TODO : Add a delay so that there won't be a runaway issue with connects and
+                // disconnects, check the best place to add (here or network_controller)
                 info!("Static peer disconnected, reconnecting .., Peer ID = {}, Public Key = {:?}",
                     peer.peer_index, hex::encode(peer.peer_public_key));
 
