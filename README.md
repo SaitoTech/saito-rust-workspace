@@ -10,12 +10,17 @@
 
 ## Running rust node
 
-1. Copy saito-rust/configs/saito.config.template.json into saito.config.json and do the necessary changes.
-2. Go into saito-rust/ directory
-3. run cargo run
+1. Run `cp saito-rust/configs/saito.config.template.json saito-rust/configs/saito.config.json` and do the necessary changes in saito.config.json.
+2. Go into `cd saito-rust/` directory
+3. run `RUST_LOG=debug GEN_TX=1 cargo run`
+
+#### Environment Variables
+
+- RUST_LOG - `error,warn,info,debug,trace` Log level of the node
+- GEN_TX - If this is "1" will generate test transactions within the node
 
 ## Compiling WASM code
 
 1. Go to saito-wasm directory
-2. Execute "wasm-pack build --debug --target browser"
+2. Execute `wasm-pack build --debug --target browser`
 
