@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use bigint::U256;
-use log::{error, info};
+use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use rayon::prelude::*;
@@ -66,6 +66,7 @@ impl Transaction {
             timestamp: 0,
             inputs: vec![],
             outputs: vec![],
+            // TODO : reset to vec![] after WASM implementation done
             message: vec![123, 125], // to match with JS {}
             transaction_type: TransactionType::Normal,
             signature: [0; 64],
@@ -99,21 +100,6 @@ impl Transaction {
         // add to path
         //
         self.path.push(hop);
-    }
-
-    pub async fn build_last_hop(
-        &mut self,
-        wallet_lock: Arc<RwLock<Wallet>>,
-        peer_pubkey: SaitoPublicKey,
-    ) -> Option<Hop> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.get_signature());
-        vbytes.extend(&peer_pubkey);
-        let hash_to_sign = hash(&vbytes);
-
-        let hop = Hop::generate_hop(wallet_lock.clone(), peer_pubkey, hash_to_sign).await;
-
-        Some(hop)
     }
 
     pub fn validate_routing_path(&self) -> bool {
@@ -494,12 +480,24 @@ impl Transaction {
         with_payment: u64,
         with_fee: u64,
     ) -> Transaction {
+        trace!(
+            "generating transaction : payment = {:?}, fee = {:?}",
+            with_payment,
+            with_fee
+        );
+        trace!("waiting for the wallet write lock");
         let mut wallet = wallet_lock.write().await;
+        trace!("acquired the wallet write lock");
         let wallet_publickey = wallet.get_publickey();
 
         let available_balance = wallet.get_available_balance();
         let total_requested = with_payment + with_fee;
-        // info!("in generate transaction ab: {} and pr: {} and fr: {}", available_balance, with_payment, with_fee);
+        trace!(
+            "in generate transaction. available: {} and payment: {} and fee: {}",
+            available_balance,
+            with_payment,
+            with_fee
+        );
 
         if available_balance >= total_requested {
             let mut transaction = Transaction::new();
@@ -597,6 +595,7 @@ impl Transaction {
         with_amount: u64,
         number_of_vip_slips: u64,
     ) -> Transaction {
+        debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::new();
         transaction.set_transaction_type(TransactionType::Vip);
 
@@ -656,7 +655,7 @@ impl Transaction {
     }
 
     // runs when block is deleted for good
-    pub async fn delete(&self, utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>) -> bool {
+    pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
         self.inputs.iter().for_each(|input| {
             input.delete(utxoset);
         });
@@ -670,16 +669,16 @@ impl Transaction {
     /// Runs when the chain is re-organized
     pub fn on_chain_reorganization(
         &self,
-        utxoset: &mut AHashMap<SaitoUTXOSetKey, u64>,
+        utxoset: &mut UtxoSet,
         longest_chain: bool,
         block_id: u64,
     ) {
-        let mut input_slip_value = 1;
-        let mut output_slip_value = 0;
+        let mut input_slip_value = true;
+        let mut output_slip_value = false;
 
         if longest_chain {
-            input_slip_value = block_id;
-            output_slip_value = 1;
+            input_slip_value = true;
+            output_slip_value = true;
         }
 
         self.inputs.iter().for_each(|input| {
@@ -792,6 +791,10 @@ impl Transaction {
     }
 
     pub fn validate(&self, utxoset: &UtxoSet, staking: &Staking) -> bool {
+        trace!(
+            "validating transaction : {:?}",
+            hex::encode(self.get_hash_for_signature().unwrap())
+        );
         //
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
@@ -869,18 +872,17 @@ impl Transaction {
                 return false;
             }
 
-            //
+            // TODO : what happens to tokens when total_out < total_in
             // validate we're not creating tokens out of nothing
-            //
             if self.total_out > self.total_in
                 && self.get_transaction_type() != TransactionType::Fee
                 && self.get_transaction_type() != TransactionType::Vip
             {
-                info!("{} in and {} out", self.total_in, self.total_out);
+                warn!("{} in and {} out", self.total_in, self.total_out);
                 for z in self.get_outputs() {
                     info!("{:?} --- ", z.get_amount());
                 }
-                info!("ERROR 672941: transaction spends more than it has available");
+                error!("ERROR 672941: transaction spends more than it has available");
                 return false;
             }
         }
@@ -984,6 +986,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn transaction_new_test() {
+        let tx = Transaction::new();
+        assert_eq!(tx.timestamp, 0);
+        assert_eq!(tx.inputs, vec![]);
+        assert_eq!(tx.outputs, vec![]);
+        assert_eq!(tx.message, vec![123, 125]);
+        assert_eq!(tx.transaction_type, TransactionType::Normal);
+        assert_eq!(tx.signature, [0; 64]);
+        assert_eq!(tx.hash_for_signature, None);
+        assert_eq!(tx.total_in, 0);
+        assert_eq!(tx.total_out, 0);
+        assert_eq!(tx.total_fees, 0);
+        assert_eq!(tx.cumulative_fees, 0);
+        assert_eq!(tx.routing_work_for_me, 0);
+        assert_eq!(tx.routing_work_for_creator, 0);
+    }
+
+    #[test]
     fn transaction_sign_test() {
         let mut tx = Transaction::new();
         let wallet = Wallet::new();
@@ -1066,6 +1086,78 @@ mod tests {
                 116, 101, 115, 116, 34, 125,
             ]
         );
+    }
+
+    #[test]
+    fn tx_sign_with_data() {
+        let mut tx = Transaction::new();
+        tx.timestamp = 1637034582666;
+        tx.transaction_type = TransactionType::ATR;
+        tx.message = vec![
+            123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
+        ];
+
+        let mut input_slip = Slip::new();
+        input_slip.set_publickey(
+            <[u8; 33]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+            )
+            .unwrap(),
+        );
+        input_slip.set_uuid(
+            <[u8; 32]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+            )
+            .unwrap(),
+        );
+        input_slip.set_amount(123);
+        input_slip.set_slip_ordinal(10);
+        input_slip.set_slip_type(SlipType::ATR);
+
+        let mut output_slip = Slip::new();
+        output_slip.set_publickey(
+            <[u8; 33]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+            )
+            .unwrap(),
+        );
+        output_slip.set_uuid(
+            <[u8; 32]>::from_hex(
+                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+            )
+            .unwrap(),
+        );
+        output_slip.set_amount(345);
+        output_slip.set_slip_ordinal(23);
+        output_slip.set_slip_type(SlipType::Normal);
+
+        tx.inputs.push(input_slip);
+        tx.outputs.push(output_slip);
+
+        tx.sign(
+            <[u8; 32]>::from_hex(
+                "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
+            )
+            .unwrap(),
+        );
+
+        assert_eq!(tx.signature.len(), 64);
+        assert_eq!(
+            tx.signature,
+            [
+                209, 217, 122, 116, 63, 234, 152, 214, 162, 107, 132, 66, 7, 179, 237, 146, 138,
+                159, 205, 119, 94, 123, 207, 207, 130, 106, 48, 31, 101, 4, 62, 68, 122, 235, 103,
+                24, 158, 82, 178, 251, 91, 248, 236, 61, 188, 28, 219, 9, 15, 63, 5, 200, 4, 78,
+                193, 14, 84, 50, 203, 70, 102, 19, 205, 21
+            ]
+        );
+    }
+
+    #[test]
+    fn transaction_generate_metadata_cumulative_fees_test() {
+        let mut tx = Transaction::new();
+        tx.generate_metadata_cumulative_fees(1_0000);
+        assert_eq!(tx.cumulative_fees, 1_0000);
     }
 
     #[test]

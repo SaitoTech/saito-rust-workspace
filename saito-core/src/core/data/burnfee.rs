@@ -1,6 +1,8 @@
-pub const HEARTBEAT: u64 = 30_000;
+/// TODO : rename to BLOCK_INTERVAL or a suitable name
+pub const HEARTBEAT: u64 = 10_000;
 
 pub struct BurnFee {}
+
 impl BurnFee {
     ///
     /// Returns the amount of work needed to produce a block given the timestamp of
@@ -73,7 +75,7 @@ impl BurnFee {
         let burn_fee_previous_block_as_float: f64 = burn_fee_previous_block as f64 / 100_000_000.0;
 
         let res1: f64 = burn_fee_previous_block_as_float
-            * ((HEARTBEAT) as f64 / (timestamp_difference) as f64).sqrt();
+            * (HEARTBEAT as f64 / timestamp_difference as f64).sqrt();
         let new_burnfee: u64 = (res1 * 100_000_000.0).round() as u64;
 
         new_burnfee

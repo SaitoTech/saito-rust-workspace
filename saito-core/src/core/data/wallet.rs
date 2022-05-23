@@ -3,7 +3,7 @@ use log::info;
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
-use crate::common::handle_io::HandleIo;
+use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
     decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
@@ -64,13 +64,13 @@ impl Wallet {
         }
     }
 
-    pub async fn load(&mut self, io_handler: &mut Box<dyn HandleIo + Send + Sync>) {
+    pub async fn load(&mut self, io_handler: &mut Box<dyn InterfaceIO + Send + Sync>) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
-        if Storage::file_exists(&filename) {
+        if Storage::file_exists(&filename, io_handler).await {
             let password = self.get_password();
-            let encoded = Storage::read(&filename, io_handler).unwrap();
+            let encoded = Storage::read(&filename, io_handler).await.unwrap();
             let decrypted_encoded = decrypt_with_password(encoded, &password);
             self.deserialize_for_disk(&decrypted_encoded);
         } else {
@@ -85,14 +85,14 @@ impl Wallet {
         &mut self,
         wallet_path: &str,
         password: Option<&str>,
-        io_handler: &mut Box<dyn HandleIo + Send + Sync>,
+        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) {
         self.set_filename(wallet_path.to_string());
         self.set_password(password.unwrap().to_string());
         self.load(io_handler).await;
     }
 
-    pub async fn save(&mut self, io_handler: &mut Box<dyn HandleIo + Send + Sync>) {
+    pub async fn save(&mut self, io_handler: &mut Box<dyn InterfaceIO + Send + Sync>) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 

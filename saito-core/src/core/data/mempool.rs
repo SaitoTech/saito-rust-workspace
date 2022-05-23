@@ -31,7 +31,7 @@ pub enum MempoolMessage {
 /// the `Blockchain`
 #[derive(Debug)]
 pub struct Mempool {
-    pub(crate) blocks_queue: VecDeque<Block>,
+    pub blocks_queue: VecDeque<Block>,
     pub transactions: Vec<Transaction>,
     // vector so we just copy it over
     routing_work_in_mempool: u64,
@@ -70,9 +70,13 @@ impl Mempool {
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
         debug!("adding golden ticket");
-        let mut wallet = self.wallet_lock.write().await;
-        let transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
-
+        let transaction;
+        {
+            trace!("waiting for the wallet write lock");
+            let mut wallet = self.wallet_lock.write().await;
+            trace!("acquired the wallet write lock");
+            transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
+        }
         if self
             .transactions
             .iter()
@@ -82,6 +86,7 @@ impl Mempool {
             info!("adding golden ticket to mempool...");
             self.transactions.push(transaction);
         }
+        trace!("golden ticket added to mempool");
     }
 
     pub async fn add_transaction_if_validates(
@@ -89,15 +94,28 @@ impl Mempool {
         transaction: Transaction,
         blockchain: &Blockchain,
     ) {
+        trace!(
+            "add transaction if validates : {:?}",
+            hex::encode(transaction.get_hash_for_signature().unwrap())
+        );
         //
         // validate
         //
         if transaction.validate(&blockchain.utxoset, &blockchain.staking) {
             self.add_transaction(transaction).await;
+        } else {
+            debug!(
+                "transaction not valid : {:?}",
+                transaction.get_hash_for_signature().unwrap()
+            );
         }
     }
     pub async fn add_transaction(&mut self, mut transaction: Transaction) {
-        trace!("add_transaction {:?}", transaction.get_transaction_type());
+        trace!(
+            "add_transaction {:?} : type = {:?}",
+            hex::encode(transaction.get_hash_for_signature().unwrap()),
+            transaction.get_transaction_type()
+        );
         let tx_sig_to_insert = transaction.get_signature();
 
         //
@@ -107,7 +125,9 @@ impl Mempool {
         //
         let publickey;
         {
+            trace!("waiting for the wallet read lock");
             let wallet = self.wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
             publickey = wallet.get_publickey();
         }
         transaction.generate_metadata(publickey);
@@ -128,13 +148,12 @@ impl Mempool {
 
     pub async fn bundle_block(
         &mut self,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
+        blockchain: &mut Blockchain,
         current_timestamp: u64,
     ) -> Block {
         debug!("bundling block...");
         let previous_block_hash: SaitoHash;
         {
-            let blockchain = blockchain_lock.read().await;
             previous_block_hash = blockchain.get_latest_block_hash();
         }
 
@@ -142,7 +161,7 @@ impl Mempool {
             &mut self.transactions,
             previous_block_hash,
             self.wallet_lock.clone(),
-            blockchain_lock.clone(),
+            blockchain,
             current_timestamp,
         )
         .await;
@@ -161,15 +180,17 @@ impl Mempool {
         if self.transactions.is_empty() {
             return false;
         }
-        debug!("can bundle block");
+        trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
+        trace!("waiting for the blockchain read lock");
         let blockchain = blockchain_lock.read().await;
+        trace!("acquired the blockchain read lock");
 
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
             let time_elapsed = current_timestamp - previous_block.get_timestamp();
-            info!(
+            debug!(
                 "can_bundle_block. work available: {:?} -- work needed: {:?} -- time elapsed: {:?} ",
                 work_available,
                 work_needed,
