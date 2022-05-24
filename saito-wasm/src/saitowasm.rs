@@ -99,7 +99,7 @@ pub fn new() -> SaitoWasm {
             peers: context.peers.clone(),
             static_peers: vec![],
             configs: context.configuration.clone(),
-            io_handler: Box::new(WasmIoHandler {}),
+            io_interface: Box::new(WasmIoHandler {}),
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
         },
@@ -114,7 +114,7 @@ pub fn new() -> SaitoWasm {
             tx_producing_timer: 0,
             generate_test_tx: false,
             time_keeper: Box::new(WasmTimeKeeper {}),
-            io_handler: Box::new(WasmIoHandler {}),
+            io_interface: Box::new(WasmIoHandler {}),
             peers: context.peers.clone(),
         },
         miner_controller: MinerController {

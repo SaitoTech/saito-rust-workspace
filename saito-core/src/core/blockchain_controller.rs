@@ -40,7 +40,7 @@ pub struct BlockchainController {
     pub tx_producing_timer: u128,
     pub generate_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
-    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
+    pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
     pub peers: Arc<RwLock<PeerCollection>>,
 }
 
@@ -201,7 +201,7 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
                 blockchain
                     .add_block(
                         block,
-                        &mut self.io_handler,
+                        &mut self.io_interface,
                         self.peers.clone(),
                         self.sender_to_miner.clone(),
                     )
@@ -236,7 +236,7 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
                 blockchain
                     .add_block(
                         block,
-                        &mut self.io_handler,
+                        &mut self.io_interface,
                         self.peers.clone(),
                         self.sender_to_miner.clone(),
                     )
@@ -251,7 +251,7 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
         {
             Storage::load_blocks_from_disk(
                 self.blockchain.clone(),
-                &mut self.io_handler,
+                &mut self.io_interface,
                 self.peers.clone(),
                 self.sender_to_miner.clone(),
             )
