@@ -5,19 +5,23 @@ use std::sync::Arc;
 use ahash::AHashMap;
 use async_recursion::async_recursion;
 use log::{debug, error, info, trace, warn};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoHash, SaitoUTXOSetKey, UtxoSet};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::mempool::Mempool;
+use crate::core::data::msg::message::Message;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::staking::Staking;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
 use crate::core::data::wallet::Wallet;
 use crate::core::miner_controller::MinerEvent;
+use crate::core::routing_controller::RoutingEvent;
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 10;
@@ -332,7 +336,7 @@ impl Blockchain {
         if am_i_the_longest_chain {
             let does_new_chain_validate = self.validate(new_chain, old_chain, io_handler).await;
             if does_new_chain_validate {
-                self.add_block_success(block_hash, io_handler).await;
+                self.add_block_success(block_hash, io_handler, peers).await;
 
                 //
                 // TODO
@@ -356,12 +360,13 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
 
                 sender_to_miner
-                    .send(MinerEvent::Mine {
+                    .send(MinerEvent::LongestChainBlockAdded {
                         hash: block_hash,
                         difficulty,
                     })
                     .await
                     .unwrap();
+
                 debug!("event sent to miner");
                 // global_sender
                 //     .send(GlobalEvent::BlockchainNewLongestChainBlock {
@@ -396,6 +401,7 @@ impl Blockchain {
         &mut self,
         block_hash: SaitoHash,
         io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
+        peers: Arc<RwLock<PeerCollection>>,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -429,6 +435,31 @@ impl Blockchain {
         // propagate block to network
         //
         // TODO : notify other threads and propagate to other peers
+
+        {
+            // TODO : no need to access block multiple times. combine with previous call in block save call
+            let mut exceptions = vec![];
+            let block = self.get_mut_block(&block_hash).await;
+            // finding block sender to avoid resending the block to that node
+            if block.source_connection_id.is_some() {
+                trace!("waiting for the peers read lock");
+                let peers = peers.read().await;
+                trace!("acquired the peers read lock");
+                let peer = peers
+                    .address_to_peers
+                    .get(&block.source_connection_id.unwrap());
+                if peer.is_some() {
+                    exceptions.push(*peer.unwrap());
+                }
+            }
+            debug!("sending block : {:?} to peers", hex::encode(block_hash));
+            let message = Message::BlockHeaderHash(block_hash);
+            io_handler
+                .send_message_to_all(message.serialize(), exceptions)
+                .await
+                .unwrap();
+        }
+
         // global_sender
         //     .send(GlobalEvent::BlockchainSavedBlock { hash: block_hash })
         //     .expect("error: BlockchainSavedBlock message failed to send");

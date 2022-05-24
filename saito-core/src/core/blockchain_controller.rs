@@ -12,7 +12,7 @@ use crate::common::command::{GlobalEvent, NetworkEvent};
 use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::data::block::Block;
+use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
@@ -193,6 +193,10 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
             debug!("adding blocks to blockchain");
 
             while let Some(block) = mempool.blocks_queue.pop_front() {
+                trace!(
+                    "deleting transactions from block : {:?}",
+                    hex::encode(block.get_hash())
+                );
                 mempool.delete_transactions(&block.get_transactions());
                 blockchain
                     .add_block(
