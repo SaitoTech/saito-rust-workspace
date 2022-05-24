@@ -6,8 +6,10 @@
 ## Prerequisites
 
 1. Install Cargo/Rust [from here](https://www.rust-lang.org/tools/install)
-2. Install wasm-pack [from here](https://rustwasm.github.io/wasm-pack/installer/)
-
+1. Install wasm-pack [from here](https://rustwasm.github.io/wasm-pack/installer/)
+1. Install build tools
+   On ubuntu: sudo apt-get update && sudo apt install build-essential
+   
 ## Get the code
 
 git clone git@github.com:SaitoTech/saito-rust-workspace.git
