@@ -7,8 +7,8 @@
 
 1. Install Cargo/Rust [from here](https://www.rust-lang.org/tools/install)
 1. Install wasm-pack [from here](https://rustwasm.github.io/wasm-pack/installer/)
-1. Install build tools
-   On ubuntu: sudo apt-get update && sudo apt install build-essential
+1. Install build tools /
+   On ubuntu: sudo apt-get update && sudo apt install build-essential pkg-config libssl-dev
    
 ## Get the code
 
