@@ -8,6 +8,12 @@
 1. Install Cargo/Rust [from here](https://www.rust-lang.org/tools/install)
 2. Install wasm-pack [from here](https://rustwasm.github.io/wasm-pack/installer/)
 
+## Get the code
+
+git clone git@github.com:SaitoTech/saito-rust-workspace.git
+
+> Use https for deployment.
+
 ## Running rust node
 
 1. Run `cp saito-rust/configs/saito.config.template.json saito-rust/configs/saito.config.json` and do the necessary changes in saito.config.json.
