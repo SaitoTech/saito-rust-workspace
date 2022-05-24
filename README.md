@@ -16,9 +16,9 @@ git clone git@github.com:SaitoTech/saito-rust-workspace.git
 
 ## Running rust node
 
-1. Run `cp saito-rust/configs/saito.config.template.json saito-rust/configs/saito.config.json` and do the necessary changes in saito.config.json.
-2. Go into `cd saito-rust/` directory
-3. run `RUST_LOG=debug GEN_TX=1 cargo run`
+1. Navigate into the directory: `cd saito-rust-workspace/`
+1. Run `cp configs/saito.config.template.json configs/saito.config.json` and do the necessary changes in saito.config.json.
+1. run `RUST_LOG=debug GEN_TX=1 cargo run`
 
 #### Environment Variables
 
