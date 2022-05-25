@@ -13,12 +13,12 @@ use tracing_subscriber;
 use saito_core::common::command::GlobalEvent;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::blockchain_controller::{BlockchainController, MempoolEvent};
+use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
-use saito_core::core::miner_controller::{MinerController, MinerEvent};
-use saito_core::core::routing_controller::{
-    PeerState, RoutingController, RoutingEvent, StaticPeer,
+use saito_core::core::mining_event_processor::{MiningEvent, MiningEventProcessor};
+use saito_core::core::routing_event_processor::{
+    PeerState, RoutingEventProcessor, RoutingEvent, StaticPeer,
 };
 
 use crate::saito::config_handler::ConfigHandler;
@@ -103,11 +103,11 @@ where
 async fn run_miner_controller(
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
-    sender_to_mempool: &Sender<MempoolEvent>,
+    sender_to_mempool: &Sender<ConsensusEvent>,
     sender_to_blockchain: &Sender<RoutingEvent>,
-    receiver_for_miner: Receiver<MinerEvent>,
+    receiver_for_miner: Receiver<MiningEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let miner_controller = MinerController {
+    let miner_controller = MiningEventProcessor {
         miner: context.miner.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
@@ -133,9 +133,9 @@ async fn run_blockchain_controller(
     configs: Arc<RwLock<Configuration>>,
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
-    receiver_for_blockchain: Receiver<MempoolEvent>,
+    receiver_for_blockchain: Receiver<ConsensusEvent>,
     sender_to_routing: &Sender<RoutingEvent>,
-    sender_to_miner: Sender<MinerEvent>,
+    sender_to_miner: Sender<MiningEvent>,
     sender_to_network_controller: Sender<IoEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
@@ -143,7 +143,7 @@ async fn run_blockchain_controller(
     if result.is_ok() {
         generate_test_tx = result.unwrap().eq("1");
     }
-    let mut blockchain_controller = BlockchainController {
+    let mut blockchain_controller = ConsensusEventProcessor {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
         wallet: context.wallet.clone(),
@@ -181,11 +181,11 @@ async fn run_routing_controller(
     configs: Arc<RwLock<Configuration>>,
     global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
-    sender_to_mempool: &Sender<MempoolEvent>,
+    sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_routing: Receiver<RoutingEvent>,
-    sender_to_miner: &Sender<MinerEvent>,
+    sender_to_miner: &Sender<MiningEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let mut routing_controller = RoutingController {
+    let mut routing_controller = RoutingEventProcessor {
         blockchain: context.blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
@@ -327,12 +327,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let context = Context::new(configs.clone(), global_sender.clone());
 
     let (sender_to_mempool, receiver_for_mempool) =
-        tokio::sync::mpsc::channel::<MempoolEvent>(1000);
+        tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
 
     let (sender_to_routing, receiver_for_routing) =
         tokio::sync::mpsc::channel::<RoutingEvent>(1000);
 
-    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MinerEvent>(1000);
+    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(1000);
 
     let (network_event_sender_to_routing, routing_handle) = run_routing_controller(
         sender_to_network_controller.clone(),

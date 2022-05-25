@@ -10,31 +10,31 @@ use crate::common::command::{GlobalEvent, NetworkEvent};
 use crate::common::defs::SaitoHash;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::blockchain_controller::MempoolEvent;
+use crate::core::consensus_event_processor::ConsensusEvent;
 use crate::core::data::miner::Miner;
-use crate::core::routing_controller::RoutingEvent;
+use crate::core::routing_event_processor::RoutingEvent;
 
 const MINER_INTERVAL: u128 = 100_000;
 
 #[derive(Debug)]
-pub enum MinerEvent {
+pub enum MiningEvent {
     LongestChainBlockAdded { hash: SaitoHash, difficulty: u64 },
 }
 
 /// Manages the miner
-pub struct MinerController {
+pub struct MiningEventProcessor {
     pub miner: Arc<RwLock<Miner>>,
     pub sender_to_blockchain: Sender<RoutingEvent>,
-    pub sender_to_mempool: Sender<MempoolEvent>,
+    pub sender_to_mempool: Sender<ConsensusEvent>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub miner_timer: u128,
     pub new_miner_event_received: bool,
 }
 
-impl MinerController {}
+impl MiningEventProcessor {}
 
 #[async_trait]
-impl ProcessEvent<MinerEvent> for MinerController {
+impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         debug!("processing new global event");
         None
@@ -62,10 +62,10 @@ impl ProcessEvent<MinerEvent> for MinerController {
         None
     }
 
-    async fn process_event(&mut self, event: MinerEvent) -> Option<()> {
+    async fn process_event(&mut self, event: MiningEvent) -> Option<()> {
         debug!("event received : {:?}", event);
         match event {
-            MinerEvent::LongestChainBlockAdded { hash, difficulty } => {
+            MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
                 trace!("waiting for the miner read lock");
                 let mut miner = self.miner.write().await;
                 trace!("acquired the miner read lock");

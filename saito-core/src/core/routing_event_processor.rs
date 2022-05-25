@@ -12,7 +12,7 @@ use crate::common::defs::SaitoHash;
 use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::blockchain_controller::MempoolEvent;
+use crate::core::consensus_event_processor::ConsensusEvent;
 use crate::core::data;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
@@ -23,7 +23,7 @@ use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
 use crate::core::data::wallet::Wallet;
-use crate::core::miner_controller::MinerEvent;
+use crate::core::mining_event_processor::MiningEvent;
 
 #[derive(Debug)]
 pub enum RoutingEvent {}
@@ -42,10 +42,10 @@ pub struct StaticPeer {
 }
 
 /// Manages peers and routes messages to correct controller
-pub struct RoutingController {
+pub struct RoutingEventProcessor {
     pub blockchain: Arc<RwLock<Blockchain>>,
-    pub sender_to_mempool: Sender<MempoolEvent>,
-    pub sender_to_miner: Sender<MinerEvent>,
+    pub sender_to_mempool: Sender<ConsensusEvent>,
+    pub sender_to_miner: Sender<MiningEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
@@ -55,7 +55,7 @@ pub struct RoutingController {
     pub wallet: Arc<RwLock<Wallet>>,
 }
 
-impl RoutingController {
+impl RoutingEventProcessor {
     ///
     ///
     /// # Arguments
@@ -358,7 +358,7 @@ impl RoutingController {
 }
 
 #[async_trait]
-impl ProcessEvent<RoutingEvent> for RoutingController {
+impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         trace!("processing new global event");
         None
@@ -408,7 +408,7 @@ impl ProcessEvent<RoutingEvent> for RoutingController {
             } => {
                 debug!("block received : {:?}", hex::encode(block_hash));
                 self.sender_to_mempool
-                    .send(MempoolEvent::BlockFetched { peer_index, buffer })
+                    .send(ConsensusEvent::BlockFetched { peer_index, buffer })
                     .await
                     .unwrap();
             }
