@@ -20,8 +20,8 @@ use crate::core::data::staking::Staking;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
 use crate::core::data::wallet::Wallet;
-use crate::core::miner_controller::MinerEvent;
-use crate::core::routing_controller::RoutingEvent;
+use crate::core::mining_event_processor::MiningEvent;
+use crate::core::routing_event_processor::RoutingEvent;
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 10;
@@ -96,7 +96,7 @@ impl Blockchain {
         mut block: Block,
         io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
-        sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
+        sender_to_miner: Sender<MiningEvent>,
     ) {
         debug!("adding block to blockchain");
 
@@ -360,7 +360,7 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
 
                 sender_to_miner
-                    .send(MinerEvent::LongestChainBlockAdded {
+                    .send(MiningEvent::LongestChainBlockAdded {
                         hash: block_hash,
                         difficulty,
                     })

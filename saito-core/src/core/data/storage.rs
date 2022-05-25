@@ -8,7 +8,7 @@ use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::slip::Slip;
-use crate::core::miner_controller::MinerEvent;
+use crate::core::mining_event_processor::MiningEvent;
 
 pub struct Storage {}
 
@@ -88,7 +88,7 @@ impl Storage {
         blockchain_lock: Arc<RwLock<Blockchain>>,
         io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
-        sender_to_miner: tokio::sync::mpsc::Sender<MinerEvent>,
+        sender_to_miner: tokio::sync::mpsc::Sender<MiningEvent>,
     ) {
         debug!("loading blocks from disk");
         let file_names = io_handler.load_block_file_list().await;

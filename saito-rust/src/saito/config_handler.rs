@@ -15,7 +15,7 @@ impl ConfigHandler {
             config_file_path,
             std::env::current_dir()
         );
-
+        // TODO : add prompt with user friendly format
         let configs = Figment::new()
             .merge(Json::file(config_file_path))
             .extract::<Configuration>();
@@ -30,9 +30,9 @@ impl ConfigHandler {
 }
 
 mod test {
-    use std::io::ErrorKind;
-    use saito_core::core::data::configuration::Configuration;
     use crate::ConfigHandler;
+    use saito_core::core::data::configuration::Configuration;
+    use std::io::ErrorKind;
 
     #[test]
     fn load_config_from_existing_file() {
@@ -50,7 +50,8 @@ mod test {
 
     #[test]
     fn load_config_from_bad_file_format() {
-        let path = String::from("saito-rust/src/test/test_data/config_handler_tests_bad_format.xml");
+        let path =
+            String::from("saito-rust/src/test/test_data/config_handler_tests_bad_format.xml");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_err());
         assert_eq!(result.err().unwrap().kind(), ErrorKind::InvalidInput);

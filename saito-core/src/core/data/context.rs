@@ -12,6 +12,7 @@ use crate::core::data::miner::Miner;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::wallet::Wallet;
 
+#[derive(Clone)]
 pub struct Context {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub mempool: Arc<RwLock<Mempool>>,

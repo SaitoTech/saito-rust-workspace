@@ -22,7 +22,7 @@ use saito_core::core::data::miner::Miner;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::miner_controller::MinerEvent;
+use saito_core::core::mining_event_processor::MiningEvent;
 use std::borrow::BorrowMut;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -53,7 +53,7 @@ pub struct TestManager {
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub latest_block_hash: SaitoHash,
     pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
-    pub sender_to_miner: Sender<MinerEvent>,
+    pub sender_to_miner: Sender<MiningEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
 }
 
@@ -61,7 +61,7 @@ impl TestManager {
     pub fn new(
         blockchain_lock: Arc<RwLock<Blockchain>>,
         wallet_lock: Arc<RwLock<Wallet>>,
-        sender_to_miner: Sender<MinerEvent>,
+        sender_to_miner: Sender<MiningEvent>,
     ) -> Self {
         Self {
             mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet_lock.clone()))),
@@ -154,7 +154,7 @@ impl TestManager {
         block: Block,
         io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
-        sender: Sender<MinerEvent>,
+        sender: Sender<MiningEvent>,
     ) {
         let mut blockchain = blockchain_lock.write().await;
         blockchain

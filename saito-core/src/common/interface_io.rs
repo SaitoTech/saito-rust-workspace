@@ -28,7 +28,7 @@ pub trait InterfaceIO {
     async fn send_message_to_all(
         &self,
         buffer: Vec<u8>,
-        peer_exceptions: Vec<u64>,
+        excluded_peers: Vec<u64>,
     ) -> Result<(), Error>;
     /// Connects to the peer with given configuration
     ///

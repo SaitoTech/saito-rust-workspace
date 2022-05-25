@@ -20,23 +20,22 @@ use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
-use crate::core::miner_controller::MinerEvent;
-use crate::core::routing_controller::RoutingEvent;
+use crate::core::mining_event_processor::MiningEvent;
+use crate::core::routing_event_processor::RoutingEvent;
 
 #[derive(Debug)]
-pub enum MempoolEvent {
+pub enum ConsensusEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
     BlockFetched { peer_index: u64, buffer: Vec<u8> },
 }
 
 /// Manages blockchain and the mempool
-pub struct BlockchainController {
+pub struct ConsensusEventProcessor {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub sender_to_router: Sender<RoutingEvent>,
-    pub sender_to_miner: Sender<MinerEvent>,
-    // pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
+    pub sender_to_miner: Sender<MiningEvent>,
     pub block_producing_timer: u128,
     pub tx_producing_timer: u128,
     pub generate_test_tx: bool,
@@ -45,7 +44,7 @@ pub struct BlockchainController {
     pub peers: Arc<RwLock<PeerCollection>>,
 }
 
-impl BlockchainController {
+impl ConsensusEventProcessor {
     /// Test method to generate test transactions
     ///
     /// # Arguments
@@ -141,7 +140,7 @@ impl BlockchainController {
 }
 
 #[async_trait]
-impl ProcessEvent<MempoolEvent> for BlockchainController {
+impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
     async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
         trace!("processing new global event");
         None
@@ -166,7 +165,7 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
             if self.tx_producing_timer >= 1_000_000 {
                 // TODO : Remove this transaction generation once testing is done
-                BlockchainController::generate_tx(
+                ConsensusEventProcessor::generate_tx(
                     self.mempool.clone(),
                     self.wallet.clone(),
                     self.blockchain.clone(),
@@ -234,9 +233,9 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
         None
     }
 
-    async fn process_event(&mut self, event: MempoolEvent) -> Option<()> {
+    async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
         match event {
-            MempoolEvent::NewGoldenTicket { golden_ticket } => {
+            ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
                     "received new golden ticket : {:?}",
                     hex::encode(golden_ticket.get_target())
@@ -246,7 +245,7 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
                 trace!("acquired the mempool write lock");
                 mempool.add_golden_ticket(golden_ticket).await;
             }
-            MempoolEvent::BlockFetched { peer_index, buffer } => {
+            ConsensusEvent::BlockFetched { peer_index, buffer } => {
                 let mut blockchain = self.blockchain.write().await;
                 let block = Block::deserialize_for_net(&buffer);
                 blockchain
