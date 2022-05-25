@@ -41,11 +41,13 @@ pub struct StaticPeer {
     pub peer_index: u64,
 }
 
+/// Manages peers and routes messages to correct controller
 pub struct RoutingController {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub sender_to_mempool: Sender<MempoolEvent>,
     pub sender_to_miner: Sender<MinerEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
+    // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
     pub configs: Arc<RwLock<Configuration>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
@@ -197,7 +199,10 @@ impl RoutingController {
         trace!("acquired the configs read lock");
 
         for peer in &configs.peers {
-            self.io_interface.connect_to_peer(peer.clone()).await.unwrap();
+            self.io_interface
+                .connect_to_peer(peer.clone())
+                .await
+                .unwrap();
         }
         debug!("connected to peers");
     }
@@ -221,9 +226,13 @@ impl RoutingController {
 
         if peer.static_peer_config.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-            peer.initiate_handshake(&self.io_interface, self.wallet.clone(), self.configs.clone())
-                .await
-                .unwrap();
+            peer.initiate_handshake(
+                &self.io_interface,
+                self.wallet.clone(),
+                self.configs.clone(),
+            )
+            .await
+            .unwrap();
         }
 
         peers.index_to_peers.insert(peer_index, peer);
@@ -243,17 +252,21 @@ impl RoutingController {
                 // try to re-establish the connection again
                 // TODO : Add a delay so that there won't be a runaway issue with connects and
                 // disconnects, check the best place to add (here or network_controller)
-                info!("Static peer disconnected, reconnecting .., Peer ID = {}, Public Key = {:?}",
-                    peer.peer_index, hex::encode(peer.peer_public_key));
+                info!(
+                    "Static peer disconnected, reconnecting .., Peer ID = {}, Public Key = {:?}",
+                    peer.peer_index,
+                    hex::encode(peer.peer_public_key)
+                );
 
-                self.io_interface.connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone()).await.unwrap();
-            }
-            else {
+                self.io_interface
+                    .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
+                    .await
+                    .unwrap();
+            } else {
                 info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
                     peer.peer_index, hex::encode(peer.peer_public_key));
             }
-        }
-        else {
+        } else {
             todo!("Handle the unknown peer disconnect");
         }
     }
@@ -375,7 +388,7 @@ impl ProcessEvent<RoutingEvent> for RoutingController {
                     self.handle_new_peer(peer_details, result.unwrap()).await;
                 }
             }
-            NetworkEvent::PeerDisconnected {peer_index} => {
+            NetworkEvent::PeerDisconnected { peer_index } => {
                 self.handle_peer_disconnect(peer_index).await;
             }
 

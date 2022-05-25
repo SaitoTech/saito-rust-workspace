@@ -21,6 +21,7 @@ pub enum MinerEvent {
     LongestChainBlockAdded { hash: SaitoHash, difficulty: u64 },
 }
 
+/// Manages the miner
 pub struct MinerController {
     pub miner: Arc<RwLock<Miner>>,
     pub sender_to_blockchain: Sender<RoutingEvent>,

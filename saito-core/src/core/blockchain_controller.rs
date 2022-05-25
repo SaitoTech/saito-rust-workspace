@@ -29,6 +29,7 @@ pub enum MempoolEvent {
     BlockFetched { peer_index: u64, buffer: Vec<u8> },
 }
 
+/// Manages blockchain and the mempool
 pub struct BlockchainController {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
@@ -45,6 +46,21 @@ pub struct BlockchainController {
 }
 
 impl BlockchainController {
+    /// Test method to generate test transactions
+    ///
+    /// # Arguments
+    ///
+    /// * `mempool`:
+    /// * `wallet`:
+    /// * `blockchain`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     async fn generate_tx(
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
