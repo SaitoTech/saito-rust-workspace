@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ahash::AHashMap;
 use bigint::U256;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;

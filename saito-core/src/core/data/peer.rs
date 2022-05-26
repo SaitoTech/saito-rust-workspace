@@ -151,7 +151,7 @@ impl Peer {
     pub async fn handle_handshake_completion(
         &mut self,
         response: HandshakeCompletion,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        _io_handler: &Box<dyn InterfaceIO + Send + Sync>,
     ) -> Result<(), Error> {
         debug!("handling handshake completion : {:?}", self.peer_index);
         if self.challenge_for_peer.is_none() {

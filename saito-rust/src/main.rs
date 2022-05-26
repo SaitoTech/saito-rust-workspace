@@ -1,5 +1,3 @@
-use std::env;
-use std::io::Write;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -38,7 +36,6 @@ const MINER_CONTROLLER_ID: u8 = 3;
 
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
-    mut global_receiver: tokio::sync::broadcast::Receiver<GlobalEvent>,
     mut network_event_receiver: Receiver<NetworkEvent>,
     mut event_receiver: Receiver<T>,
 ) -> JoinHandle<()>
@@ -53,15 +50,6 @@ where
         event_processor.on_init().await;
 
         loop {
-            // TODO : refactor to support async calls
-            let result = global_receiver.try_recv();
-            if result.is_ok() {
-                let event = result.unwrap();
-                if event_processor.process_global_event(event).await.is_some() {
-                    work_done = true;
-                }
-            }
-
             let result = network_event_receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();
@@ -103,7 +91,6 @@ where
 }
 
 async fn run_miner_controller(
-    global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
     sender_to_mempool: &Sender<ConsensusEvent>,
     sender_to_blockchain: &Sender<RoutingEvent>,
@@ -123,7 +110,6 @@ async fn run_miner_controller(
     debug!("running miner thread");
     let _miner_handle = run_thread(
         Box::new(miner_controller),
-        global_sender.subscribe(),
         interface_receiver_for_miner,
         receiver_for_miner,
     )
@@ -133,7 +119,6 @@ async fn run_miner_controller(
 
 async fn run_blockchain_controller(
     configs: Arc<RwLock<Configuration>>,
-    global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
     sender_to_routing: &Sender<RoutingEvent>,
@@ -179,7 +164,6 @@ async fn run_blockchain_controller(
     debug!("running mempool thread");
     let blockchain_handle = run_thread(
         Box::new(blockchain_controller),
-        global_sender.subscribe(),
         interface_receiver_for_mempool,
         receiver_for_blockchain,
     )
@@ -191,7 +175,6 @@ async fn run_blockchain_controller(
 async fn run_routing_controller(
     sender_to_io_controller: Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
-    global_sender: &tokio::sync::broadcast::Sender<GlobalEvent>,
     context: &Context,
     sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_routing: Receiver<RoutingEvent>,
@@ -231,7 +214,6 @@ async fn run_routing_controller(
     debug!("running blockchain thread");
     let routing_handle = run_thread(
         Box::new(routing_controller),
-        global_sender.subscribe(),
         interface_receiver_for_routing,
         receiver_for_routing,
     )
@@ -334,9 +316,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("running saito controllers");
 
-    let (global_sender, global_receiver) = tokio::sync::broadcast::channel::<GlobalEvent>(1000);
-
-    let context = Context::new(configs.clone(), global_sender.clone());
+    let context = Context::new(configs.clone());
 
     let (sender_to_mempool, receiver_for_mempool) =
         tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
@@ -349,7 +329,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (network_event_sender_to_routing, routing_handle) = run_routing_controller(
         sender_to_network_controller.clone(),
         configs.clone(),
-        &global_sender,
         &context,
         &sender_to_mempool,
         receiver_for_routing,
@@ -359,7 +338,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (network_event_sender_to_blockchain, blockchain_handle) = run_blockchain_controller(
         configs.clone(),
-        &global_sender,
         &context,
         receiver_for_mempool,
         &sender_to_routing,
@@ -369,7 +347,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     let (network_event_sender_to_miner, miner_handle) = run_miner_controller(
-        &global_sender,
         &context,
         &sender_to_mempool,
         &sender_to_routing,

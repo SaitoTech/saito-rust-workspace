@@ -416,7 +416,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
         }
         None
     }
-    async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
+    async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
         None
