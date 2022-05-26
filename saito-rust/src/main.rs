@@ -16,9 +16,11 @@ use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
+use saito_core::core::data::network::Network;
+use saito_core::core::data::storage::Storage;
 use saito_core::core::mining_event_processor::{MiningEvent, MiningEventProcessor};
 use saito_core::core::routing_event_processor::{
-    PeerState, RoutingEventProcessor, RoutingEvent, StaticPeer,
+    PeerState, RoutingEvent, RoutingEventProcessor, StaticPeer,
 };
 
 use crate::saito::config_handler::ConfigHandler;
@@ -152,14 +154,24 @@ async fn run_blockchain_controller(
         // sender_global: global_sender.clone(),
         time_keeper: Box::new(TimeKeeper {}),
 
+        network: Network {
+            peers: context.peers.clone(),
+            io_handler: Box::new(RustIOHandler::new(
+                sender_to_network_controller.clone(),
+                BLOCKCHAIN_CONTROLLER_ID,
+            )),
+        },
         block_producing_timer: 0,
         tx_producing_timer: 0,
         generate_test_tx,
-        io_interface: Box::new(RustIOHandler::new(
-            sender_to_network_controller.clone(),
-            BLOCKCHAIN_CONTROLLER_ID,
-        )),
+
         peers: context.peers.clone(),
+        storage: Storage {
+            io_handler: Box::new(RustIOHandler::new(
+                sender_to_network_controller.clone(),
+                BLOCKCHAIN_CONTROLLER_ID,
+            )),
+        },
     };
 
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =

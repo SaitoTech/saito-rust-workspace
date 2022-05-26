@@ -21,11 +21,13 @@ use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::miner::Miner;
+use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
+use saito_core::core::data::storage::Storage;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_event_processor::{MiningEvent, MiningEventProcessor};
-use saito_core::core::routing_event_processor::{RoutingEventProcessor, RoutingEvent};
+use saito_core::core::routing_event_processor::{RoutingEvent, RoutingEventProcessor};
 
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_slip::WasmSlip;
@@ -114,8 +116,14 @@ pub fn new() -> SaitoWasm {
             tx_producing_timer: 0,
             generate_test_tx: false,
             time_keeper: Box::new(WasmTimeKeeper {}),
-            io_interface: Box::new(WasmIoHandler {}),
+            network: Network {
+                peers: context.peers.clone(),
+                io_handler: Box::new(WasmIoHandler {}),
+            },
             peers: context.peers.clone(),
+            storage: Storage {
+                io_handler: Box::new(WasmIoHandler {}),
+            },
         },
         miner_controller: MiningEventProcessor {
             miner: context.miner.clone(),

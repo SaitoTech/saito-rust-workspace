@@ -1,5 +1,7 @@
+use std::io::Error;
 use std::sync::Arc;
 
+use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use log::{debug, trace};
 use tokio::sync::RwLock;
 
@@ -16,7 +18,7 @@ pub struct Network {
 }
 
 impl Network {
-    pub async fn propagate_block(&self, block: Block) {
+    pub async fn propagate_block(&self, block: &Block) {
         debug!("propagating block : {:?}", hex::encode(block.get_hash()));
 
         let mut excluded_peers = vec![];
@@ -42,8 +44,31 @@ impl Network {
             .await
             .unwrap();
     }
-    pub async fn propagate_transaction(&self, transaction: Transaction) {
+    pub async fn propagate_transaction(&self, transaction: &Transaction) {
         debug!("propagating transaction");
         todo!()
+    }
+    pub async fn fetch_missing_block(
+        &self,
+        block_hash: SaitoHash,
+        public_key: &SaitoPublicKey,
+    ) -> Result<(), Error> {
+        debug!(
+            "fetch missing block : block : {:?} from : {:?}",
+            block_hash, public_key
+        );
+        let peer_index;
+        let url;
+        {
+            let peers = self.peers.read().await;
+            let peer = peers.find_peer_by_address(public_key);
+            let peer = peer.unwrap();
+            url = peer.get_block_fetch_url(block_hash);
+            peer_index = peer.peer_index;
+        }
+
+        self.io_handler
+            .fetch_block_from_peer(block_hash, peer_index, url)
+            .await
     }
 }

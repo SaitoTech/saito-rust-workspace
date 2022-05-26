@@ -295,8 +295,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block6_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -322,8 +322,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block7_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -349,8 +349,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block8_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -376,8 +376,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block9_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -403,8 +403,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block10_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -512,13 +512,14 @@ mod tests {
             sender_miner.clone(),
         );
 
-        Storage::load_blocks_from_disk(
-            blockchain_lock2.clone(),
-            &mut test_manager2.io_handler,
-            test_manager2.peers.clone(),
-            test_manager2.sender_to_miner.clone(),
-        )
-        .await;
+        test_manager2
+            .storage
+            .load_blocks_from_disk(
+                blockchain_lock2.clone(),
+                &mut test_manager2.network,
+                test_manager2.sender_to_miner.clone(),
+            )
+            .await;
 
         {
             let blockchain1 = blockchain_lock1.read().await;

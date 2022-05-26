@@ -169,8 +169,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block1,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -190,8 +190,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -211,8 +211,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block3,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -232,8 +232,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block4,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -253,8 +253,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block5,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -348,8 +348,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block1,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -370,8 +370,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;

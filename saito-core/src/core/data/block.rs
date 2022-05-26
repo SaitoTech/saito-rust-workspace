@@ -1,5 +1,4 @@
 use std::convert::TryInto;
-use std::io::Error;
 use std::{mem, sync::Arc};
 
 use ahash::AHashMap;
@@ -12,7 +11,6 @@ use tokio::sync::RwLock;
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
 };
-use crate::common::interface_io::InterfaceIO;
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
 use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::{hash, sign, verify};
@@ -457,7 +455,7 @@ impl Block {
     pub async fn upgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
+        storage: &Storage,
     ) -> bool {
         trace!("UPGRADE_BLOCK_TO_BLOCK_TYPE {:?}", self.block_type);
         if self.block_type == block_type {
@@ -474,12 +472,10 @@ impl Block {
         // load the block if it exists on disk.
         //
         if block_type == BlockType::Full {
-            let mut new_block = Storage::load_block_from_disk(
-                Storage::generate_block_filename(&self, io_handler),
-                io_handler,
-            )
-            .await
-            .unwrap();
+            let mut new_block = storage
+                .load_block_from_disk(storage.generate_block_filename(&self))
+                .await
+                .unwrap();
             let hash_for_signature = hash(&new_block.serialize_for_signature());
             new_block.set_pre_hash(hash_for_signature);
             let hash_for_hash = hash(&new_block.serialize_for_hash());
@@ -1850,18 +1846,6 @@ impl Block {
             tx.delete(utxoset).await;
         }
         true
-    }
-
-    pub async fn fetch_missing_block(
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
-        url: String,
-        block_hash: SaitoHash,
-        peer_index: u64,
-    ) -> Result<(), Error> {
-        debug!("fetch missing block : block : {:?}", url);
-        io_handler
-            .fetch_block_from_peer(block_hash, peer_index, url)
-            .await
     }
 }
 

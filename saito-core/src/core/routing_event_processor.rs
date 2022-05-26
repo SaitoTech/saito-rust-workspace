@@ -1,4 +1,3 @@
-use std::str::from_utf8;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,14 +13,13 @@ use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_event_processor::ConsensusEvent;
 use crate::core::data;
-use crate::core::data::block::{Block, BlockType};
+use crate::core::data::block::BlockType;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::storage::Storage;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
 
@@ -424,7 +422,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     async fn process_event(&mut self, event: RoutingEvent) -> Option<()> {
         debug!("processing blockchain event");
 
-        match event {}
+        // match event {}
 
         debug!("blockchain event processed successfully");
         None
