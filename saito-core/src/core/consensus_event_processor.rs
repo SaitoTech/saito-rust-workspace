@@ -245,7 +245,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 trace!("acquired the mempool write lock");
                 mempool.add_golden_ticket(golden_ticket).await;
             }
-            ConsensusEvent::BlockFetched { peer_index, buffer } => {
+            ConsensusEvent::BlockFetched {
+                peer_index: _,
+                buffer,
+            } => {
                 let mut blockchain = self.blockchain.write().await;
                 let block = Block::deserialize_for_net(&buffer);
                 blockchain

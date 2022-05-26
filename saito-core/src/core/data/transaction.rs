@@ -669,7 +669,7 @@ impl Transaction {
         &self,
         utxoset: &mut UtxoSet,
         longest_chain: bool,
-        block_id: u64,
+        _block_id: u64,
     ) {
         let mut input_slip_value = true;
         let mut output_slip_value = false;

@@ -1854,7 +1854,7 @@ mod tests {
     use std::sync::Arc;
 
     use hex::FromHex;
-    use log::{debug, trace};
+    use log::trace;
     use tokio::sync::RwLock;
 
     use crate::core::data::block::{Block, BlockType};

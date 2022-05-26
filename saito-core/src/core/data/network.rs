@@ -44,7 +44,7 @@ impl Network {
             .await
             .unwrap();
     }
-    pub async fn propagate_transaction(&self, transaction: &Transaction) {
+    pub async fn propagate_transaction(&self, _transaction: &Transaction) {
         debug!("propagating transaction");
         todo!()
     }
