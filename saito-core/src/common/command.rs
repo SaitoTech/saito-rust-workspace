@@ -16,10 +16,10 @@ pub enum NetworkEvent {
         buffer: Vec<u8>,
     },
     ConnectToPeer {
-        peer_details: data::configuration::Peer,
+        peer_details: data::configuration::PeerConfig,
     },
     PeerConnectionResult {
-        peer_details: Option<data::configuration::Peer>,
+        peer_details: Option<data::configuration::PeerConfig>,
         result: Result<u64, std::io::Error>,
     },
     PeerDisconnected {

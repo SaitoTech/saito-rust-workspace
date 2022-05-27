@@ -31,7 +31,6 @@ impl ConfigHandler {
 
 mod test {
     use crate::ConfigHandler;
-    use saito_core::core::data::configuration::Configuration;
     use std::io::ErrorKind;
 
     #[test]

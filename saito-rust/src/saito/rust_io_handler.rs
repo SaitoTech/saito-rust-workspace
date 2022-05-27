@@ -14,7 +14,7 @@ use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;
 use saito_core::common::interface_io::InterfaceIO;
 
-use saito_core::core::data::configuration::Peer;
+use saito_core::core::data::configuration::PeerConfig;
 
 use crate::saito::io_context::IoContext;
 
@@ -99,7 +99,7 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn connect_to_peer(&mut self, peer: Peer) -> Result<(), Error> {
+    async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
         debug!("connecting to peer : {:?}", peer.host);
         let event = IoEvent::new(NetworkEvent::ConnectToPeer {
             peer_details: peer.clone(),
@@ -158,7 +158,7 @@ impl InterfaceIO for RustIOHandler {
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        let mut result = File::open(key).await;
+        let result = File::open(key).await;
         if result.is_err() {
             todo!()
         }

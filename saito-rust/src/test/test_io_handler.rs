@@ -9,8 +9,8 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use saito_core::common::interface_io::InterfaceIO;
-use saito_core::core::data::block::Block;
-use saito_core::core::data::configuration::Peer;
+
+use saito_core::core::data::configuration::PeerConfig;
 
 #[derive(Clone, Debug)]
 pub struct TestIOHandler {}
@@ -39,7 +39,7 @@ impl InterfaceIO for TestIOHandler {
         Ok(())
     }
 
-    async fn connect_to_peer(&mut self, peer: Peer) -> Result<(), Error> {
+    async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
         debug!("connecting to peer : {:?}", peer.host);
 
         Ok(())

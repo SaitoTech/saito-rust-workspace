@@ -21,7 +21,7 @@ pub struct Peer {
     pub peer_public_key: SaitoPublicKey,
     pub block_fetch_url: String,
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
-    pub static_peer_config: Option<data::configuration::Peer>,
+    pub static_peer_config: Option<data::configuration::PeerConfig>,
     pub challenge_for_peer: Option<SaitoHash>,
     pub handshake_done: bool,
 }

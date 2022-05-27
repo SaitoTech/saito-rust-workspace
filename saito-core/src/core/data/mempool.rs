@@ -1,7 +1,7 @@
 use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 
 use log::{debug, info, trace};
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
 use crate::core::data::block::Block;

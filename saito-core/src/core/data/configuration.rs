@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone, Eq, PartialEq)]
-pub struct Peer {
+pub struct PeerConfig {
     pub host: String,
     pub port: u16,
     pub protocol: String,
@@ -26,7 +26,7 @@ pub struct Server {
 #[derive(Deserialize, Debug)]
 pub struct Configuration {
     pub server: Server,
-    pub peers: Vec<Peer>,
+    pub peers: Vec<PeerConfig>,
 }
 
 impl Configuration {

@@ -33,7 +33,7 @@ pub enum PeerState {
 }
 
 pub struct StaticPeer {
-    pub peer_details: data::configuration::Peer,
+    pub peer_details: data::configuration::PeerConfig,
     pub peer_state: PeerState,
     pub peer_index: u64,
 }
@@ -205,7 +205,7 @@ impl RoutingEventProcessor {
     }
     async fn handle_new_peer(
         &mut self,
-        peer_data: Option<data::configuration::Peer>,
+        peer_data: Option<data::configuration::PeerConfig>,
         peer_index: u64,
     ) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
