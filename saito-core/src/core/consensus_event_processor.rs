@@ -7,7 +7,7 @@ use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::{GlobalEvent, NetworkEvent};
+use crate::common::command::NetworkEvent;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::Block;
@@ -141,11 +141,6 @@ impl ConsensusEventProcessor {
 
 #[async_trait]
 impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
-    async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
-        trace!("processing new global event");
-        None
-    }
-
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         debug!("processing new interface event");
 

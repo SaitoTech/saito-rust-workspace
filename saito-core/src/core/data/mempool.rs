@@ -3,7 +3,6 @@ use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 use log::{debug, info, trace};
 use tokio::sync::{broadcast, RwLock};
 
-use crate::common::command::GlobalEvent;
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
@@ -36,7 +35,6 @@ pub struct Mempool {
     // vector so we just copy it over
     routing_work_in_mempool: u64,
     wallet_lock: Arc<RwLock<Wallet>>,
-    broadcast_channel_sender: Option<broadcast::Sender<GlobalEvent>>,
     mempool_publickey: SaitoPublicKey,
     mempool_privatekey: SaitoPrivateKey,
 }
@@ -49,7 +47,6 @@ impl Mempool {
             transactions: vec![],
             routing_work_in_mempool: 0,
             wallet_lock,
-            broadcast_channel_sender: None,
             mempool_publickey: [0; 33],
             mempool_privatekey: [0; 32],
         }
@@ -244,10 +241,6 @@ impl Mempool {
         );
 
         work_needed
-    }
-
-    pub fn set_broadcast_channel_sender(&mut self, bcs: broadcast::Sender<GlobalEvent>) {
-        self.broadcast_channel_sender = Some(bcs);
     }
 
     pub fn set_mempool_publickey(&mut self, publickey: SaitoPublicKey) {
