@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use bigint::uint::U256;
-use log::{debug, trace};
+use log::trace;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};

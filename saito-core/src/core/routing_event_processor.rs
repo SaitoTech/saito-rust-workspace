@@ -1,4 +1,3 @@
-use std::str::from_utf8;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,14 +13,13 @@ use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_event_processor::ConsensusEvent;
 use crate::core::data;
-use crate::core::data::block::{Block, BlockType};
+
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::storage::Storage;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
 
@@ -367,7 +365,10 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         debug!("processing new interface event");
         match event {
-            NetworkEvent::OutgoingNetworkMessage { peer_index, buffer } => {
+            NetworkEvent::OutgoingNetworkMessage {
+                peer_index: _,
+                buffer: _,
+            } => {
                 // TODO : remove this case if not being used
                 unreachable!()
             }
@@ -415,16 +416,16 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
         }
         None
     }
-    async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
+    async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
         None
     }
 
-    async fn process_event(&mut self, event: RoutingEvent) -> Option<()> {
+    async fn process_event(&mut self, _event: RoutingEvent) -> Option<()> {
         debug!("processing blockchain event");
 
-        match event {}
+        // match event {}
 
         debug!("blockchain event processed successfully");
         None

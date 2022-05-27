@@ -3,7 +3,6 @@ use log::info;
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
-use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
     decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
@@ -64,20 +63,20 @@ impl Wallet {
         }
     }
 
-    pub async fn load(&mut self, io_handler: &mut Box<dyn InterfaceIO + Send + Sync>) {
+    pub async fn load(&mut self, storage: &mut Storage) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
-        if Storage::file_exists(&filename, io_handler).await {
+        if storage.file_exists(&filename).await {
             let password = self.get_password();
-            let encoded = Storage::read(&filename, io_handler).await.unwrap();
+            let encoded = storage.read(&filename).await.unwrap();
             let decrypted_encoded = decrypt_with_password(encoded, &password);
             self.deserialize_for_disk(&decrypted_encoded);
         } else {
             //
             // new wallet, save to disk
             //
-            self.save(io_handler).await;
+            self.save(storage).await;
         }
     }
 
@@ -85,14 +84,14 @@ impl Wallet {
         &mut self,
         wallet_path: &str,
         password: Option<&str>,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
+        storage: &mut Storage,
     ) {
         self.set_filename(wallet_path.to_string());
         self.set_password(password.unwrap().to_string());
-        self.load(io_handler).await;
+        self.load(storage).await;
     }
 
-    pub async fn save(&mut self, io_handler: &mut Box<dyn InterfaceIO + Send + Sync>) {
+    pub async fn save(&mut self, storage: &mut Storage) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
@@ -100,7 +99,7 @@ impl Wallet {
         let byte_array: Vec<u8> = self.serialize_for_disk();
         let encrypted_wallet = encrypt_with_password((&byte_array[..]).to_vec(), &password);
 
-        Storage::write(encrypted_wallet, &filename, io_handler).await;
+        storage.write(encrypted_wallet, &filename).await;
     }
 
     /// [privatekey - 32 bytes]

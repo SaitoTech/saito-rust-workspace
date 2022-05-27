@@ -19,7 +19,9 @@ use saito_core::core::data::crypto::{generate_random_bytes, hash};
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::miner::Miner;
+use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
+use saito_core::core::data::storage::Storage;
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_event_processor::MiningEvent;
@@ -52,7 +54,8 @@ pub struct TestManager {
     pub blockchain_lock: Arc<RwLock<Blockchain>>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub latest_block_hash: SaitoHash,
-    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
+    pub network: Network,
+    pub storage: Storage,
     pub sender_to_miner: Sender<MiningEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
 }
@@ -63,14 +66,21 @@ impl TestManager {
         wallet_lock: Arc<RwLock<Wallet>>,
         sender_to_miner: Sender<MiningEvent>,
     ) -> Self {
+        let peers = Arc::new(RwLock::new(PeerCollection::new()));
         Self {
             mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet_lock.clone()))),
             blockchain_lock: blockchain_lock.clone(),
             wallet_lock: wallet_lock.clone(),
             latest_block_hash: [0; 32],
-            io_handler: Box::new(TestIOHandler::new()),
+            network: Network {
+                peers: peers.clone(),
+                io_handler: Box::new(TestIOHandler::new()),
+            },
             sender_to_miner,
-            peers: Arc::new(RwLock::new(PeerCollection::new())),
+            peers: peers.clone(),
+            storage: Storage {
+                io_handler: Box::new(TestIOHandler::new()),
+            },
         }
     }
     pub async fn clear_data_folder() {
@@ -142,8 +152,8 @@ impl TestManager {
         Self::add_block_to_blockchain(
             self.blockchain_lock.clone(),
             block,
-            &mut self.io_handler,
-            self.peers.clone(),
+            &mut self.network,
+            &mut self.storage,
             self.sender_to_miner.clone(),
         )
         .await;
@@ -152,13 +162,13 @@ impl TestManager {
     pub async fn add_block_to_blockchain(
         blockchain_lock: Arc<RwLock<Blockchain>>,
         block: Block,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-        peers: Arc<RwLock<PeerCollection>>,
+        network: &Network,
+        storage: &mut Storage,
         sender: Sender<MiningEvent>,
     ) {
         let mut blockchain = blockchain_lock.write().await;
         blockchain
-            .add_block(block, io_handler, peers.clone(), sender.clone())
+            .add_block(block, network, storage, sender.clone())
             .await;
     }
     //
@@ -861,8 +871,8 @@ impl TestManager {
             blockchain
                 .add_block(
                     block,
-                    &mut self.io_handler,
-                    self.peers.clone(),
+                    &mut self.network,
+                    &mut self.storage,
                     self.sender_to_miner.clone(),
                 )
                 .await;

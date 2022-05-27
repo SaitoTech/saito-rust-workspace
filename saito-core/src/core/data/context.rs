@@ -23,10 +23,7 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(
-        configs: Arc<RwLock<Configuration>>,
-        global_sender: tokio::sync::broadcast::Sender<GlobalEvent>,
-    ) -> Context {
+    pub fn new(configs: Arc<RwLock<Configuration>>) -> Context {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         Context {
             blockchain: Arc::new(RwLock::new(Blockchain::new(
@@ -40,7 +37,7 @@ impl Context {
             configuration: configs,
         }
     }
-    pub async fn init(&self, task_runner: &dyn RunTask) -> Result<(), Error> {
+    pub async fn init(&self, _task_runner: &dyn RunTask) -> Result<(), Error> {
         // self.miner.write().await.init(task_runner)?;
         // self.mempool.write().await.init(task_runner)?;
         // self.blockchain.write().await.init()?;

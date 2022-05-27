@@ -6,11 +6,13 @@ use tokio::sync::RwLock;
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
-use crate::core::data::peer_collection::PeerCollection;
+use crate::core::data::network::Network;
 use crate::core::data::slip::Slip;
 use crate::core::mining_event_processor::MiningEvent;
 
-pub struct Storage {}
+pub struct Storage {
+    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
+}
 
 pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
@@ -28,11 +30,8 @@ pub fn configure_storage() -> String {
 
 impl Storage {
     /// read from a path to a Vec<u8>
-    pub async fn read(
-        path: &str,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-    ) -> std::io::Result<Vec<u8>> {
-        let buffer = io_handler.read_value(path.to_string()).await;
+    pub async fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        let buffer = self.io_handler.read_value(path.to_string()).await;
         if buffer.is_err() {
             todo!()
         }
@@ -40,44 +39,31 @@ impl Storage {
         Ok(buffer)
     }
 
-    pub async fn write(
-        data: Vec<u8>,
-        filename: &str,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-    ) {
-        io_handler
+    pub async fn write(&mut self, data: Vec<u8>, filename: &str) {
+        self.io_handler
             .write_value(filename.to_string(), data)
             .await
             .expect("writing to storage failed");
     }
 
-    pub async fn file_exists(
-        filename: &str,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-    ) -> bool {
-        return io_handler.is_existing_file(filename.to_string()).await;
+    pub async fn file_exists(&self, filename: &str) -> bool {
+        return self.io_handler.is_existing_file(filename.to_string()).await;
     }
 
-    pub fn generate_block_filename(
-        block: &Block,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-    ) -> String {
+    pub fn generate_block_filename(&self, block: &Block) -> String {
         let timestamp = block.get_timestamp();
         let block_hash = block.get_hash();
-        io_handler.get_block_dir().to_string()
+        self.io_handler.get_block_dir().to_string()
             + timestamp.to_string().as_str()
             + "-"
             + hex::encode(block_hash).as_str()
             + ".block"
     }
-    pub async fn write_block_to_disk(
-        block: &Block,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-    ) -> String {
+    pub async fn write_block_to_disk(&mut self, block: &Block) -> String {
         let buffer = block.serialize_for_net(BlockType::Full);
-        let filename = Storage::generate_block_filename(block, io_handler);
+        let filename = self.generate_block_filename(block);
 
-        let result = io_handler.write_value(filename.clone(), buffer).await;
+        let result = self.io_handler.write_value(filename.clone(), buffer).await;
         if result.is_err() {
             todo!()
         }
@@ -85,13 +71,13 @@ impl Storage {
     }
 
     pub async fn load_blocks_from_disk(
+        &mut self,
         blockchain_lock: Arc<RwLock<Blockchain>>,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-        peers: Arc<RwLock<PeerCollection>>,
+        network: &Network,
         sender_to_miner: tokio::sync::mpsc::Sender<MiningEvent>,
     ) {
         debug!("loading blocks from disk");
-        let file_names = io_handler.load_block_file_list().await;
+        let file_names = self.io_handler.load_block_file_list().await;
         trace!("waiting for the blockchain write lock");
         let mut blockchain = blockchain_lock.write().await;
         trace!("acquired the blockchain write lock");
@@ -103,8 +89,9 @@ impl Storage {
         let file_names = file_names.unwrap();
         debug!("block file names : {:?}", file_names);
         for file_name in file_names {
-            let result = io_handler
-                .read_value(io_handler.get_block_dir() + file_name.as_str())
+            let result = self
+                .io_handler
+                .read_value(self.io_handler.get_block_dir() + file_name.as_str())
                 .await;
             if result.is_err() {
                 todo!()
@@ -113,17 +100,14 @@ impl Storage {
             let mut block = Block::deserialize_for_net(&buffer);
             block.generate_metadata();
             blockchain
-                .add_block(block, io_handler, peers.clone(), sender_to_miner.clone())
+                .add_block(block, network, self, sender_to_miner.clone())
                 .await;
         }
     }
 
-    pub async fn load_block_from_disk(
-        file_name: String,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-    ) -> Result<Block, std::io::Error> {
+    pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
         debug!("loading block {:?} from disk", file_name);
-        let result = io_handler.read_value(file_name).await;
+        let result = self.io_handler.read_value(file_name).await;
         if result.is_err() {
             todo!()
         }
@@ -131,17 +115,14 @@ impl Storage {
         Ok(Block::deserialize_for_net(&buffer))
     }
 
-    pub async fn delete_block_from_disk(
-        filename: String,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-    ) -> bool {
-        io_handler.remove_value(filename).await.is_ok()
+    pub async fn delete_block_from_disk(&self, filename: String) -> bool {
+        self.io_handler.remove_value(filename).await.is_ok()
     }
 
     //
     // token issuance functions below
     //
-    pub fn return_token_supply_slips_from_disk() -> Vec<Slip> {
+    pub fn return_token_supply_slips_from_disk(&self) -> Vec<Slip> {
         // let mut v: Vec<Slip> = vec![];
         // let mut tokens_issued = 0;
         //

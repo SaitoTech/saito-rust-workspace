@@ -38,7 +38,7 @@ mod tests {
             wallet_lock.clone(),
             sender_miner.clone(),
         );
-        Storage::write_block_to_disk(&mut block, &mut test_manager.io_handler).await;
+        test_manager.storage.write_block_to_disk(&mut block).await;
 
         assert_eq!(block.transactions.len(), 5);
         assert_eq!(block.get_block_type(), BlockType::Full);
@@ -51,7 +51,7 @@ mod tests {
         assert_eq!(block.get_block_type(), BlockType::Pruned);
 
         block
-            .upgrade_block_to_block_type(BlockType::Full, &mut test_manager.io_handler)
+            .upgrade_block_to_block_type(BlockType::Full, &mut test_manager.storage)
             .await;
 
         assert_eq!(block.get_block_type(), BlockType::Full);

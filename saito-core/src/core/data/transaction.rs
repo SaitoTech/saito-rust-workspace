@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ahash::AHashMap;
 use bigint::U256;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
@@ -9,9 +8,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
-};
+use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet};
 use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
@@ -671,7 +668,7 @@ impl Transaction {
         &self,
         utxoset: &mut UtxoSet,
         longest_chain: bool,
-        block_id: u64,
+        _block_id: u64,
     ) {
         let mut input_slip_value = true;
         let mut output_slip_value = false;

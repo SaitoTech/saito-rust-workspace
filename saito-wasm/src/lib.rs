@@ -1,4 +1,3 @@
-mod network_result_future;
 pub mod saitowasm;
 mod wasm_io_handler;
 mod wasm_slip;

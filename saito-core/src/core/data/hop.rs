@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::{debug, trace};
+use log::trace;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 

@@ -5,20 +5,19 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, info, trace, warn};
+use log::{debug, warn};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
-use tracing::field::debug;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;
 use saito_core::common::interface_io::InterfaceIO;
-use saito_core::core::data::block::Block;
+
 use saito_core::core::data::configuration::Peer;
 
 use crate::saito::io_context::IoContext;
-use crate::saito::io_future::IoFuture;
+
 use crate::IoEvent;
 
 lazy_static! {
@@ -34,28 +33,22 @@ pub fn configure_storage() -> String {
 }
 
 pub enum FutureState {
-    DataSaved(Result<String, std::io::Error>),
     DataSent(Vec<u8>),
-    BlockFetched(Block),
-    PeerConnectionResult(Result<u64, std::io::Error>),
+    PeerConnectionResult(Result<u64, Error>),
 }
 
 #[derive(Clone, Debug)]
 pub struct RustIOHandler {
     sender: Sender<IoEvent>,
     handler_id: u8,
-    // future_index_counter: u64,
 }
 
 impl RustIOHandler {
-    pub fn new(sender: Sender<IoEvent>, handler_id : u8) -> RustIOHandler {
-        RustIOHandler {
-            sender,
-            handler_id,
-            // future_index_counter: 0,
-        }
+    pub fn new(sender: Sender<IoEvent>, handler_id: u8) -> RustIOHandler {
+        RustIOHandler { sender, handler_id }
     }
 
+    // TODO : delete this if not required
     pub fn set_event_response(event_id: u64, response: FutureState) {
         // debug!("setting event response for : {:?}", event_id,);
         if event_id == 0 {
@@ -76,11 +69,6 @@ impl RustIOHandler {
             warn!("waker not found for event: {:?}", event_id);
         }
     }
-
-    // fn get_next_future_index(&mut self) -> u64 {
-    //     self.future_index_counter = self.future_index_counter + 1;
-    //     return self.future_index_counter;
-    // }
 }
 
 #[async_trait]
@@ -88,23 +76,9 @@ impl InterfaceIO for RustIOHandler {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         // TODO : refactor to combine event and the future
         let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessage { peer_index, buffer });
-        let io_future = IoFuture {
-            event_id: event.event_id,
-        };
+
         self.sender.send(event).await.unwrap();
 
-        // let result = io_future.await;
-        // if result.is_err() {
-        //     // warn!("sending message failed : {:?}", result.err().unwrap());
-        //     return Err(result.err().unwrap());
-        // }
-        // let result = result.unwrap();
-        // match result {
-        //     FutureState::DataSent(data) => {}
-        //     _ => {
-        //         unreachable!()
-        //     }
-        // }
         Ok(())
     }
 
@@ -119,24 +93,9 @@ impl InterfaceIO for RustIOHandler {
             buffer,
             exceptions: peer_exceptions,
         });
-        let io_future = IoFuture {
-            event_id: event.event_id,
-        };
+
         self.sender.send(event).await.unwrap();
 
-        // let result = io_future.await;
-        // if result.is_err() {
-        //     // warn!("sending message failed : {:?}", result.err().unwrap());
-        //     return Err(result.err().unwrap());
-        // }
-        // debug!("message sent to all");
-        // let result = result.unwrap();
-        // match result {
-        //     FutureState::DataSent(data) => {}
-        //     _ => {
-        //         unreachable!()
-        //     }
-        // }
         Ok(())
     }
 
@@ -145,41 +104,15 @@ impl InterfaceIO for RustIOHandler {
         let event = IoEvent::new(NetworkEvent::ConnectToPeer {
             peer_details: peer.clone(),
         });
-        let io_future = IoFuture {
-            event_id: event.event_id,
-        };
+
         self.sender.send(event).await.unwrap();
-        // let result = io_future.await;
-        //
-        // if result.is_err() {
-        //     warn!("failed connecting to peer : {:?}", peer.host);
-        //     return Err(result.err().unwrap());
-        // }
-        //
+
         Ok(())
     }
-    //
-    // async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
-    //     todo!()
-    // }
 
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
         todo!()
     }
-    //
-    // fn set_write_result(
-    //     &mut self,
-    //     result_key: String,
-    //     result: Result<String, Error>,
-    // ) -> Result<(), Error> {
-    //     debug!("setting write result");
-    //     // let mut states = self.future_states.lock().unwrap();
-    //     // let mut wakers = self.future_wakers.lock().unwrap();
-    //     // let waker = wakers.remove(&index).expect("waker not found");
-    //     // states.insert(index, FutureState::DataSaved(result));
-    //     // waker.wake();
-    //     todo!()
-    // }
 
     async fn fetch_block_from_peer(
         &self,
@@ -193,9 +126,7 @@ impl InterfaceIO for RustIOHandler {
             peer_index,
             url: url.clone(),
         });
-        let io_future = IoFuture {
-            event_id: event.event_id,
-        };
+
         self.sender
             .send(event)
             .await
@@ -224,37 +155,6 @@ impl InterfaceIO for RustIOHandler {
         }
 
         Ok(())
-        //
-        // let event = IoEvent::new(InterfaceEvent::DataSaveRequest {
-        //     key: result_key,
-        //     filename: key,
-        //     buffer: value,
-        // });
-        // let io_future = IoFuture {
-        //     event_id: event.event_id,
-        // };
-        // let result = self.sender.send(event).await;
-        //
-        // if result.is_err() {
-        //     warn!("{:?}", result.err().unwrap().to_string());
-        //     return Err(Error::from(ErrorKind::Other));
-        // }
-        //
-        // let result = io_future.await;
-        // if result.is_err() {
-        //     debug!("failed writing value for disk");
-        //     return Err(result.err().unwrap());
-        // }
-        // debug!("value written to disk");
-        // let result = result.unwrap();
-        // match result {
-        //     FutureState::DataSaved(result) => {
-        //         return result;
-        //     }
-        //     _ => {
-        //         unreachable!()
-        //     }
-        // }
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
@@ -305,14 +205,6 @@ impl InterfaceIO for RustIOHandler {
     }
 
     async fn is_existing_file(&self, key: String) -> bool {
-        /*
-        let result = tokio::fs::File::open(key).await;
-        if result.is_ok() {
-            return true;
-        }
-        return false;
-        */
-
         return Path::new(&key).exists();
     }
 

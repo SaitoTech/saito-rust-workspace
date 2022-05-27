@@ -1,5 +1,4 @@
-use std::borrow::BorrowMut;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -9,13 +8,13 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::command::{GlobalEvent, NetworkEvent};
-use crate::common::interface_io::InterfaceIO;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::data::block::{Block, BlockType};
+use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
+use crate::core::data::network::Network;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::Transaction;
@@ -40,7 +39,8 @@ pub struct ConsensusEventProcessor {
     pub tx_producing_timer: u128,
     pub generate_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
-    pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
+    pub network: Network,
+    pub storage: Storage,
     pub peers: Arc<RwLock<PeerCollection>>,
 }
 
@@ -216,8 +216,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 blockchain
                     .add_block(
                         block,
-                        &mut self.io_interface,
-                        self.peers.clone(),
+                        &mut self.network,
+                        &mut self.storage,
                         self.sender_to_miner.clone(),
                     )
                     .await;
@@ -245,14 +245,17 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 trace!("acquired the mempool write lock");
                 mempool.add_golden_ticket(golden_ticket).await;
             }
-            ConsensusEvent::BlockFetched { peer_index, buffer } => {
+            ConsensusEvent::BlockFetched {
+                peer_index: _,
+                buffer,
+            } => {
                 let mut blockchain = self.blockchain.write().await;
                 let block = Block::deserialize_for_net(&buffer);
                 blockchain
                     .add_block(
                         block,
-                        &mut self.io_interface,
-                        self.peers.clone(),
+                        &mut self.network,
+                        &mut self.storage,
                         self.sender_to_miner.clone(),
                     )
                     .await;
@@ -263,15 +266,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 
     async fn on_init(&mut self) {
         debug!("on_init");
-        {
-            Storage::load_blocks_from_disk(
+        self.storage
+            .load_blocks_from_disk(
                 self.blockchain.clone(),
-                &mut self.io_interface,
-                self.peers.clone(),
+                &self.network,
                 self.sender_to_miner.clone(),
             )
             .await;
-        }
     }
 }
 
