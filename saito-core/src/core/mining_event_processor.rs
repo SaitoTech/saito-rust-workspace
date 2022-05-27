@@ -6,7 +6,7 @@ use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::{GlobalEvent, NetworkEvent};
+use crate::common::command::NetworkEvent;
 use crate::common::defs::SaitoHash;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -35,11 +35,6 @@ impl MiningEventProcessor {}
 
 #[async_trait]
 impl ProcessEvent<MiningEvent> for MiningEventProcessor {
-    async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
-        debug!("processing new global event");
-        None
-    }
-
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         debug!("processing new interface event");
 

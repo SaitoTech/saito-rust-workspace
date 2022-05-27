@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 
-use crate::common::command::{GlobalEvent, NetworkEvent};
+use crate::common::command::NetworkEvent;
 
 /// Event Processing trait for the controllers. Handles both events from actions and timer
 #[async_trait]
@@ -10,22 +10,6 @@ pub trait ProcessEvent<T>
 where
     T: Send,
 {
-    /// Process an event from the global channel
-    /// TODO : to be removed if not required
-    ///
-    /// # Arguments
-    ///
-    /// * `event`:
-    ///
-    /// returns: Option<()>
-    ///
-    /// # Examples
-    ///
-    /// ```
-    ///
-    /// ```
-    async fn process_global_event(&mut self, event: GlobalEvent) -> Option<()>;
-
     /// Processes an event coming from other peers via network controller
     ///
     /// # Arguments

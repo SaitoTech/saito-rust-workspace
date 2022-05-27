@@ -8,7 +8,6 @@ use tokio::task::JoinHandle;
 use tracing::info;
 use tracing_subscriber;
 
-use saito_core::common::command::GlobalEvent;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};

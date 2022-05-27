@@ -2014,6 +2014,7 @@ mod tests {
     }
 
     // signs and verifies the signature of a block
+    #[test]
     fn block_sign_test() {
         let wallet = Wallet::new();
         let mut block = Block::new();
