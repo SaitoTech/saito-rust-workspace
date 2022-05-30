@@ -8,7 +8,7 @@ use saito_core::common::command::NetworkEvent;
 #[derive(Debug)]
 pub struct IoEvent {
     // TODO : remove controller id if not used
-    pub controller_id: u8,
+    pub event_processor_id: u8,
     pub event_id: u64,
     pub event: NetworkEvent,
 }
@@ -24,7 +24,7 @@ impl IoEvent {
         assert_ne!(*value, 0);
         debug!("new event created : {:?}", *value);
         IoEvent {
-            controller_id: 0,
+            event_processor_id: 0,
             event_id: value.clone(),
             event,
         }

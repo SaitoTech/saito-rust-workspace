@@ -161,7 +161,7 @@ impl NetworkController {
         // RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
         sender_to_core
             .send(IoEvent {
-                controller_id: 1,
+                event_processor_id: 1,
                 event_id,
                 event: NetworkEvent::BlockFetched {
                     block_hash,
@@ -190,7 +190,7 @@ impl NetworkController {
 
         sender_to_core
             .send(IoEvent {
-                controller_id: 1,
+                event_processor_id: 1,
                 event_id,
                 event: NetworkEvent::PeerConnectionResult {
                     peer_details: peer_data,
@@ -209,7 +209,7 @@ impl NetworkController {
 
         sender_to_core
             .send(IoEvent {
-                controller_id: 1,
+                event_processor_id: 1,
                 event_id: 0,
                 event: NetworkEvent::PeerDisconnected { peer_index },
             })
@@ -243,7 +243,7 @@ impl NetworkController {
                     if result.is_binary() {
                         let buffer = result.into_bytes();
                         let message = IoEvent {
-                            controller_id: 1,
+                            event_processor_id: 1,
                             event_id: 0,
                             event: NetworkEvent::IncomingNetworkMessage { peer_index, buffer },
                         };
@@ -267,7 +267,7 @@ impl NetworkController {
                     match result {
                         tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
                             let message = IoEvent {
-                                controller_id: 1,
+                                event_processor_id: 1,
                                 event_id: 0,
                                 event: NetworkEvent::IncomingNetworkMessage { peer_index, buffer },
                             };
