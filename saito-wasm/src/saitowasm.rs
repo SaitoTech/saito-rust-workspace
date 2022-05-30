@@ -59,9 +59,9 @@ impl Future for NetworkResultFuture {
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    blockchain_controller: RoutingEventProcessor,
-    mempool_controller: ConsensusEventProcessor,
-    miner_controller: MiningEventProcessor,
+    consensus_event_processor: RoutingEventProcessor,
+    routing_event_processor: ConsensusEventProcessor,
+    mining_event_processor: MiningEventProcessor,
     receiver_in_blockchain: Receiver<RoutingEvent>,
     receiver_in_mempool: Receiver<ConsensusEvent>,
     receiver_in_miner: Receiver<MiningEvent>,
@@ -94,7 +94,7 @@ pub fn new() -> SaitoWasm {
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
     SaitoWasm {
-        blockchain_controller: RoutingEventProcessor {
+        consensus_event_processor: RoutingEventProcessor {
             blockchain: context.blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
             sender_to_miner: sender_to_miner.clone(),
@@ -105,7 +105,7 @@ pub fn new() -> SaitoWasm {
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
         },
-        mempool_controller: ConsensusEventProcessor {
+        routing_event_processor: ConsensusEventProcessor {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
@@ -125,7 +125,7 @@ pub fn new() -> SaitoWasm {
                 io_handler: Box::new(WasmIoHandler {}),
             },
         },
-        miner_controller: MiningEventProcessor {
+        mining_event_processor: MiningEventProcessor {
             miner: context.miner.clone(),
             sender_to_blockchain: sender_to_blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
@@ -196,21 +196,21 @@ pub async fn process_timer_event(duration: u64) {
     let result = saito.receiver_in_blockchain.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.blockchain_controller.process_event(event).await;
+        let result = saito.consensus_event_processor.process_event(event).await;
     }
 
     saito
-        .blockchain_controller
+        .consensus_event_processor
         .process_timer_event(duration.clone())
         .await;
     // mempool controller
     let result = saito.receiver_in_mempool.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.mempool_controller.process_event(event).await;
+        let result = saito.routing_event_processor.process_event(event).await;
     }
     saito
-        .mempool_controller
+        .routing_event_processor
         .process_timer_event(duration.clone())
         .await;
 
@@ -218,7 +218,9 @@ pub async fn process_timer_event(duration: u64) {
     let result = saito.receiver_in_miner.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.miner_controller.process_event(event).await;
+        let result = saito.mining_event_processor.process_event(event).await;
     }
-    saito.miner_controller.process_timer_event(duration.clone());
+    saito
+        .mining_event_processor
+        .process_timer_event(duration.clone());
 }

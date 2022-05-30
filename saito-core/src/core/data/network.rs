@@ -11,8 +11,8 @@ use crate::core::data::msg::message::Message;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::transaction::Transaction;
 
-// TODO : rename to a better name
 pub struct Network {
+    // TODO : manage peers from network
     pub peers: Arc<RwLock<PeerCollection>>,
     pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
 }

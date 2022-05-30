@@ -29,9 +29,9 @@ use crate::saito::time_keeper::TimeKeeper;
 mod saito;
 mod test;
 
-const ROUTING_CONTROLLER_ID: u8 = 1;
-const BLOCKCHAIN_CONTROLLER_ID: u8 = 2;
-const MINER_CONTROLLER_ID: u8 = 3;
+const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
+const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
+const MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
@@ -89,13 +89,13 @@ where
     })
 }
 
-async fn run_miner_controller(
+async fn run_mining_event_processor(
     context: &Context,
     sender_to_mempool: &Sender<ConsensusEvent>,
     sender_to_blockchain: &Sender<RoutingEvent>,
     receiver_for_miner: Receiver<MiningEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let miner_controller = MiningEventProcessor {
+    let mining_event_processor = MiningEventProcessor {
         miner: context.miner.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
@@ -108,7 +108,7 @@ async fn run_miner_controller(
 
     debug!("running miner thread");
     let _miner_handle = run_thread(
-        Box::new(miner_controller),
+        Box::new(mining_event_processor),
         interface_receiver_for_miner,
         receiver_for_miner,
     )
@@ -116,7 +116,7 @@ async fn run_miner_controller(
     (interface_sender_to_miner, _miner_handle)
 }
 
-async fn run_blockchain_controller(
+async fn run_consensus_event_processor(
     configs: Arc<RwLock<Configuration>>,
     context: &Context,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
@@ -129,7 +129,7 @@ async fn run_blockchain_controller(
     if result.is_ok() {
         generate_test_tx = result.unwrap().eq("1");
     }
-    let mut blockchain_controller = ConsensusEventProcessor {
+    let consensus_event_processor = ConsensusEventProcessor {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
         wallet: context.wallet.clone(),
@@ -142,7 +142,7 @@ async fn run_blockchain_controller(
             peers: context.peers.clone(),
             io_handler: Box::new(RustIOHandler::new(
                 sender_to_network_controller.clone(),
-                BLOCKCHAIN_CONTROLLER_ID,
+                CONSENSUS_EVENT_PROCESSOR_ID,
             )),
         },
         block_producing_timer: 0,
@@ -153,7 +153,7 @@ async fn run_blockchain_controller(
         storage: Storage {
             io_handler: Box::new(RustIOHandler::new(
                 sender_to_network_controller.clone(),
-                BLOCKCHAIN_CONTROLLER_ID,
+                CONSENSUS_EVENT_PROCESSOR_ID,
             )),
         },
     };
@@ -162,7 +162,7 @@ async fn run_blockchain_controller(
         tokio::sync::mpsc::channel::<NetworkEvent>(1000);
     debug!("running mempool thread");
     let blockchain_handle = run_thread(
-        Box::new(blockchain_controller),
+        Box::new(consensus_event_processor),
         interface_receiver_for_mempool,
         receiver_for_blockchain,
     )
@@ -171,7 +171,7 @@ async fn run_blockchain_controller(
     (interface_sender_to_blockchain, blockchain_handle)
 }
 
-async fn run_routing_controller(
+async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
     context: &Context,
@@ -179,13 +179,13 @@ async fn run_routing_controller(
     receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MiningEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let mut routing_controller = RoutingEventProcessor {
+    let mut routing_event_processor = RoutingEventProcessor {
         blockchain: context.blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         io_interface: Box::new(RustIOHandler::new(
             sender_to_io_controller.clone(),
-            ROUTING_CONTROLLER_ID,
+            ROUTING_EVENT_PROCESSOR_ID,
         )),
         time_keeper: Box::new(TimeKeeper {}),
         peers: context.peers.clone(),
@@ -199,7 +199,7 @@ async fn run_routing_controller(
         trace!("acquired the configs write lock");
         let peers = &configs.peers;
         for peer in peers {
-            routing_controller.static_peers.push(StaticPeer {
+            routing_event_processor.static_peers.push(StaticPeer {
                 peer_details: (*peer).clone(),
                 peer_state: PeerState::Disconnected,
                 peer_index: 0,
@@ -212,7 +212,7 @@ async fn run_routing_controller(
 
     debug!("running blockchain thread");
     let routing_handle = run_thread(
-        Box::new(routing_controller),
+        Box::new(routing_event_processor),
         interface_receiver_for_routing,
         receiver_for_routing,
     )
@@ -221,6 +221,7 @@ async fn run_routing_controller(
     (interface_sender_to_routing, routing_handle)
 }
 
+// TODO : to be moved to routing event processor
 fn run_loop_thread(
     mut receiver: Receiver<IoEvent>,
     network_event_sender_to_routing: Sender<NetworkEvent>,
@@ -236,22 +237,22 @@ fn run_loop_thread(
             if result.is_ok() {
                 let command = result.unwrap();
                 // TODO : remove hard coded values
-                match command.controller_id {
-                    ROUTING_CONTROLLER_ID => {
+                match command.event_processor_id {
+                    ROUTING_EVENT_PROCESSOR_ID => {
                         debug!("routing event to blockchain controller  ",);
                         network_event_sender_to_routing
                             .send(command.event)
                             .await
                             .unwrap();
                     }
-                    BLOCKCHAIN_CONTROLLER_ID => {
+                    CONSENSUS_EVENT_PROCESSOR_ID => {
                         debug!("routing event to mempool controller : {:?}", command.event);
                         network_event_sender_to_blockchain
                             .send(command.event)
                             .await
                             .unwrap();
                     }
-                    MINER_CONTROLLER_ID => {
+                    MINING_EVENT_PROCESSOR_ID => {
                         debug!("routing event to miner controller : {:?}", command.event);
                         network_event_sender_to_miner
                             .send(command.event)
@@ -274,7 +275,7 @@ fn run_loop_thread(
     loop_handle
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Running saito");
 
@@ -325,7 +326,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(1000);
 
-    let (network_event_sender_to_routing, routing_handle) = run_routing_controller(
+    let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),
         configs.clone(),
         &context,
@@ -335,7 +336,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (network_event_sender_to_blockchain, blockchain_handle) = run_blockchain_controller(
+    let (network_event_sender_to_blockchain, blockchain_handle) = run_consensus_event_processor(
         configs.clone(),
         &context,
         receiver_for_mempool,
@@ -345,7 +346,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (network_event_sender_to_miner, miner_handle) = run_miner_controller(
+    let (network_event_sender_to_miner, miner_handle) = run_mining_event_processor(
         &context,
         &sender_to_mempool,
         &sender_to_routing,
