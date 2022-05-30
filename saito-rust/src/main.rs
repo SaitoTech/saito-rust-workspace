@@ -89,7 +89,7 @@ where
     })
 }
 
-async fn run_miner_controller(
+async fn run_mining_event_processor(
     context: &Context,
     sender_to_mempool: &Sender<ConsensusEvent>,
     sender_to_blockchain: &Sender<RoutingEvent>,
@@ -116,7 +116,7 @@ async fn run_miner_controller(
     (interface_sender_to_miner, _miner_handle)
 }
 
-async fn run_blockchain_controller(
+async fn run_consensus_event_processor(
     configs: Arc<RwLock<Configuration>>,
     context: &Context,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
@@ -171,7 +171,7 @@ async fn run_blockchain_controller(
     (interface_sender_to_blockchain, blockchain_handle)
 }
 
-async fn run_routing_controller(
+async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
     context: &Context,
@@ -221,6 +221,7 @@ async fn run_routing_controller(
     (interface_sender_to_routing, routing_handle)
 }
 
+// TODO : to be moved to routing event processor
 fn run_loop_thread(
     mut receiver: Receiver<IoEvent>,
     network_event_sender_to_routing: Sender<NetworkEvent>,
@@ -274,7 +275,7 @@ fn run_loop_thread(
     loop_handle
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Running saito");
 
@@ -325,7 +326,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(1000);
 
-    let (network_event_sender_to_routing, routing_handle) = run_routing_controller(
+    let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),
         configs.clone(),
         &context,
@@ -335,7 +336,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (network_event_sender_to_blockchain, blockchain_handle) = run_blockchain_controller(
+    let (network_event_sender_to_blockchain, blockchain_handle) = run_consensus_event_processor(
         configs.clone(),
         &context,
         receiver_for_mempool,
@@ -345,7 +346,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (network_event_sender_to_miner, miner_handle) = run_miner_controller(
+    let (network_event_sender_to_miner, miner_handle) = run_mining_event_processor(
         &context,
         &sender_to_mempool,
         &sender_to_routing,

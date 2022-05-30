@@ -272,29 +272,4 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::VecDeque;
-    use std::sync::Arc;
-
-    use tokio::sync::RwLock;
-
-    use crate::core::data::block::Block;
-
-    use super::*;
-
-    #[test]
-    fn mempool_new_test() {
-        let wallet = Wallet::new();
-        let mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
-        assert_eq!(mempool.blocks_queue, VecDeque::new());
-    }
-
-    #[test]
-    fn mempool_add_block_test() {
-        let wallet = Wallet::new();
-        let mut mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
-        let block = Block::new();
-        mempool.add_block(block.clone());
-        assert_eq!(Some(block), mempool.blocks_queue.pop_front())
-    }
-}
+mod tests {}
