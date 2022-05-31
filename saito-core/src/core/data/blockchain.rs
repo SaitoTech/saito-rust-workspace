@@ -41,8 +41,6 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
     (top, bottom)
 }
 
-// pub type UtxoSet = AHashMap<SaitoUTXOSetKey, u64>;
-
 #[derive(Debug)]
 pub struct Blockchain {
     pub staking: Staking,

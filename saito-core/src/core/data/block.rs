@@ -522,6 +522,10 @@ impl Block {
         false
     }
 
+    //
+    // we may want to separate the signing of the block from the setting of the necessary hash
+    // we do this together out of convenience only
+    //
     pub fn sign(&mut self, publickey: SaitoPublicKey, privatekey: SaitoPrivateKey) {
         //
         // we set final data
@@ -534,7 +538,6 @@ impl Block {
     pub fn generate_hash(&mut self) -> SaitoHash {
         let hash_for_hash = hash(&self.serialize_for_hash());
         self.set_hash(hash_for_hash);
-
         hash_for_hash
     }
     pub fn generate_pre_hash(&mut self) {
@@ -1857,11 +1860,15 @@ mod tests {
     use log::trace;
     use tokio::sync::RwLock;
 
+    use ahash::AHashMap;
+
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::verify;
     use crate::core::data::slip::Slip;
+    use crate::core::data::staking::Staking;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
+
 
     #[test]
     fn block_new_test() {
@@ -1876,21 +1883,46 @@ mod tests {
         assert_eq!(block.burnfee, 0);
         assert_eq!(block.difficulty, 0);
         assert_eq!(block.transactions, vec![]);
+        assert_eq!(block.pre_hash, [0; 32]);
         assert_eq!(block.hash, [0; 32]);
         assert_eq!(block.total_fees, 0);
+        assert_eq!(block.routing_work_for_creator, 0);
         assert_eq!(block.in_longest_chain, false);
         assert_eq!(block.has_golden_ticket, false);
-        assert_eq!(block.has_fee_transaction, false);
         assert_eq!(block.has_issuance_transaction, false);
         assert_eq!(block.issuance_transaction_idx, 0);
+        assert_eq!(block.has_fee_transaction, false);
         assert_eq!(block.fee_transaction_idx, 0);
         assert_eq!(block.golden_ticket_idx, 0);
-        assert_eq!(block.routing_work_for_creator, 0);
-        // TestManager::check_block_consistency(&block);
+        assert_eq!(block.total_rebroadcast_slips, 0);
+        assert_eq!(block.total_rebroadcast_nolan, 0);
+        assert_eq!(block.rebroadcast_hash, [0; 32]);
+        assert_eq!(block.block_type, BlockType::Full);
+        assert_eq!(block.slips_spent_this_block, AHashMap::new());
+        assert_eq!(block.created_hashmap_of_slips_spent_this_block, false);
+        assert_eq!(block.source_connection_id, None);
     }
 
     #[test]
-    fn block_serialize_for_signature_hash_with_data() {
+    fn block_generate_metadata_test() {
+
+      let mut block = Block::new();
+      block.generate_metadata();
+
+      // block hashes should have updated
+      assert_ne!(block.pre_hash, [0; 32]);
+      assert_ne!(block.hash, [0; 32]);
+      assert_ne!(block.get_pre_hash(), [0; 32]);
+      assert_ne!(block.get_hash(), [0; 32]);
+      assert_eq!(block.get_pre_hash(), block.pre_hash);
+      assert_eq!(block.get_hash(), block.hash);
+
+    }
+  
+
+    #[test]
+    fn block_signature_test() {
+
         let mut block = Block::new();
 
         block.id = 10;
@@ -1915,7 +1947,6 @@ mod tests {
 
         let serialized_body = block.serialize_for_signature();
         assert_eq!(serialized_body.len(), 145);
-        // TestManager::check_block_consistency(&block);
 
         block.sign(
             <[u8; 33]>::from_hex(
@@ -1940,10 +1971,11 @@ mod tests {
     }
 
     #[test]
-    // confirm serialization / deserialization does not modify block content
-    fn block_serialize_for_net_test() {
+    fn block_serialization_and_deserialization_test() {
+
         let mock_input = Slip::new();
         let mock_output = Slip::new();
+
         let mut mock_tx = Transaction::new();
         mock_tx.set_timestamp(0);
         mock_tx.add_input(mock_input.clone());
@@ -1984,6 +2016,7 @@ mod tests {
             block.serialize_for_net(BlockType::Full),
             deserialized_block.serialize_for_net(BlockType::Full)
         );
+
         assert_eq!(deserialized_block.get_id(), 1);
         assert_eq!(deserialized_block.get_timestamp(), timestamp);
         assert_eq!(deserialized_block.get_previous_block_hash(), [1; 32]);
@@ -1998,6 +2031,7 @@ mod tests {
             deserialized_block_header.serialize_for_net(BlockType::Full),
             deserialized_block.serialize_for_net(BlockType::Header)
         );
+
         assert_eq!(deserialized_block_header.get_id(), 1);
         assert_eq!(deserialized_block_header.get_timestamp(), timestamp);
         assert_eq!(deserialized_block_header.get_previous_block_hash(), [1; 32]);
@@ -2008,14 +2042,12 @@ mod tests {
         assert_eq!(deserialized_block_header.get_burnfee(), 2);
         assert_eq!(deserialized_block_header.get_difficulty(), 3);
 
-        // TestManager::check_block_consistency(&block);
-        // TestManager::check_block_consistency(&deserialized_block);
-        // TestManager::check_block_consistency(&deserialized_block_header);
     }
 
-    // signs and verifies the signature of a block
+
     #[test]
-    fn block_sign_test() {
+    fn block_sign_and_verify_test() {
+
         let wallet = Wallet::new();
         let mut block = Block::new();
 
@@ -2035,19 +2067,8 @@ mod tests {
     }
 
     #[test]
-    // test that we are properly generating pre_hash and hash
-    fn block_generate_hashes() {
-        let mut block = Block::new();
-        let hash = block.generate_hashes();
-        assert_ne!(hash, [0; 32]);
-        assert_ne!(block.get_pre_hash(), [0; 32]);
-        assert_ne!(block.get_hash(), [0; 32]);
-        // TestManager::check_block_consistency(&block);
-    }
-
-    #[test]
-    // confirm merkle root is being generated from transactions in block
     fn block_merkle_root_test() {
+
         let mut block = Block::new();
         let wallet = Wallet::new();
 
@@ -2066,28 +2087,6 @@ mod tests {
         assert!(block.get_merkle_root().len() == 32);
         assert_ne!(block.get_merkle_root(), [0; 32]);
 
-        // TestManager::check_block_consistency(&block);
     }
 
-    // TODO It is not obvious that calling sign() would have the side effect of setting the hash.
-    //      The API of block.sign() and block.set_hash() should be clearer.
-    #[ignore]
-    #[tokio::test]
-    async fn signature_idempotency_test() {
-        let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
-        let publickey;
-        let privatekey;
-        {
-            trace!("waiting for the wallet read lock");
-            let wallet = wallet_lock.read().await;
-            trace!("acquired the wallet read lock");
-            publickey = wallet.get_publickey();
-            privatekey = wallet.get_privatekey();
-        }
-        let mut block = Block::new();
-        let block_hash_0 = block.get_hash();
-        block.sign(publickey, privatekey);
-        let block_hash_1 = block.get_hash();
-        assert_eq!(block_hash_0, block_hash_1);
-    }
 }
