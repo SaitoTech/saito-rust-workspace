@@ -1,34 +1,21 @@
-# saito-rust-workspace
-<todo: introduction>
 
-# How to run the node
+# Welcome to Saito
 
-## Prerequisites
+This distribution contains an implementation of Saito Consensus in the Rust programming language. It includes the core code needed to run Saito in any language. It contains three main components organized by three main sub-directories: saito-core, saito-rust, and saito-wasm.
 
-1. Install Cargo/Rust [from here](https://www.rust-lang.org/tools/install)
-1. Install wasm-pack [from here](https://rustwasm.github.io/wasm-pack/installer/)
-1. Install build tools /
-   On ubuntu: sudo apt-get update && sudo apt install build-essential pkg-config libssl-dev
-   
-## Get the code
+*** Saito-Core ***
 
-git clone git@github.com:SaitoTech/saito-rust-workspace.git
+This is the place to start if you are interested in understanding Saito Consensus. The code in this directory is used by all versions of Saito. It constitutes the basic classes (blocks, transactions, mempool) that process the blockchain as well as the universal local for processing the events that run the blockchain and keep the network in sync.
 
-> Use https for deployment.
 
-## Running rust node
+*** Saito-Rust ***
 
-1. Navigate into the directory: `cd saito-rust-workspace/`
-1. Run `cp configs/saito.config.template.json configs/saito.config.json` and do the necessary changes in saito.config.json.
-1. run `RUST_LOG=debug GEN_TX=1 cargo run`
+The Saito Rust directory contains the code needed to provide storage and network services in the Rust language. These handlers are passed into Saito-Core, where the core software will occasionally call them in order to process network or storage requests such as saving blocks to disk or sending messages to other peers on the network.
 
-#### Environment Variables
+You should only need to modify these files if you are developing features that affect storage or network functionality in the Rust-only client.
 
-- RUST_LOG - `error,warn,info,debug,trace` Log level of the node
-- GEN_TX - If this is "1" will generate test transactions within the node
 
-## Compiling WASM code
+*** Saito-Wasm ***
 
-1. Go to saito-wasm directory
-2. Execute `wasm-pack build --debug --target browser`
+Saito provides a way to compile our shared library into WASM, a type of binary code that can be executed in many other languages and other platforms. An example of this is compiling Saito into WASM for deployment in a browser -- allowing the network and browser code to run lite-clients that use the same underlying code so as to prevent accidental forks.
 
