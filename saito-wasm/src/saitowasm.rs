@@ -81,11 +81,11 @@ pub fn new() -> SaitoWasm {
     let wallet = Arc::new(RwLock::new(Wallet::new()));
     let configuration = Arc::new(RwLock::new(Configuration::new()));
 
+    let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
         blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
         mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet: wallet.clone(),
-        peers: Arc::new(RwLock::new(PeerCollection::new())),
         miner: Arc::new(RwLock::new(Miner::new(wallet.clone()))),
         configuration: configuration.clone(),
     };
@@ -98,12 +98,15 @@ pub fn new() -> SaitoWasm {
             blockchain: context.blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
             sender_to_miner: sender_to_miner.clone(),
-            peers: context.peers.clone(),
             static_peers: vec![],
             configs: context.configuration.clone(),
-            io_interface: Box::new(WasmIoHandler {}),
+
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
+            network: Network {
+                peers: peers.clone(),
+                io_interface: Box::new(WasmIoHandler {}),
+            },
         },
         routing_event_processor: ConsensusEventProcessor {
             mempool: context.mempool.clone(),
@@ -117,10 +120,9 @@ pub fn new() -> SaitoWasm {
             generate_test_tx: false,
             time_keeper: Box::new(WasmTimeKeeper {}),
             network: Network {
-                peers: context.peers.clone(),
-                io_handler: Box::new(WasmIoHandler {}),
+                peers: peers.clone(),
+                io_interface: Box::new(WasmIoHandler {}),
             },
-            peers: context.peers.clone(),
             storage: Storage {
                 io_handler: Box::new(WasmIoHandler {}),
             },

@@ -17,8 +17,8 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
+use crate::core::data::network::Network;
 use crate::core::data::peer::Peer;
-use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
 
@@ -43,13 +43,12 @@ pub struct RoutingEventProcessor {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub sender_to_mempool: Sender<ConsensusEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
-    pub peers: Arc<RwLock<PeerCollection>>,
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
     pub configs: Arc<RwLock<Configuration>>,
-    pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub wallet: Arc<RwLock<Wallet>>,
+    pub network: Network,
 }
 
 impl RoutingEventProcessor {
@@ -76,7 +75,7 @@ impl RoutingEventProcessor {
         match message {
             Message::HandshakeChallenge(challenge) => {
                 debug!("received handshake challenge");
-                let mut peers = self.peers.write().await;
+                let mut peers = self.network.peers.write().await;
                 let peer = peers.index_to_peers.get_mut(&peer_index);
                 if peer.is_none() {
                     todo!()
@@ -84,7 +83,7 @@ impl RoutingEventProcessor {
                 let peer = peer.unwrap();
                 peer.handle_handshake_challenge(
                     challenge,
-                    &self.io_interface,
+                    &self.network.io_interface,
                     self.wallet.clone(),
                     self.configs.clone(),
                 )
@@ -93,15 +92,19 @@ impl RoutingEventProcessor {
             }
             Message::HandshakeResponse(response) => {
                 debug!("received handshake response");
-                let mut peers = self.peers.write().await;
+                let mut peers = self.network.peers.write().await;
                 let peer = peers.index_to_peers.get_mut(&peer_index);
                 if peer.is_none() {
                     todo!()
                 }
                 let peer = peer.unwrap();
-                peer.handle_handshake_response(response, &self.io_interface, self.wallet.clone())
-                    .await
-                    .unwrap();
+                peer.handle_handshake_response(
+                    response,
+                    &self.network.io_interface,
+                    self.wallet.clone(),
+                )
+                .await
+                .unwrap();
                 if peer.handshake_done {
                     debug!(
                         "peer : {:?} handshake successful for peer : {:?}",
@@ -114,14 +117,14 @@ impl RoutingEventProcessor {
             }
             Message::HandshakeCompletion(response) => {
                 debug!("received handshake completion");
-                let mut peers = self.peers.write().await;
+                let mut peers = self.network.peers.write().await;
                 let peer = peers.index_to_peers.get_mut(&peer_index);
                 if peer.is_none() {
                     todo!()
                 }
                 let peer = peer.unwrap();
                 let result = peer
-                    .handle_handshake_completion(response, &self.io_interface)
+                    .handle_handshake_completion(response, &self.network.io_interface)
                     .await;
                 if peer.handshake_done {
                     debug!(
@@ -196,7 +199,8 @@ impl RoutingEventProcessor {
         trace!("acquired the configs read lock");
 
         for peer in &configs.peers {
-            self.io_interface
+            self.network
+                .io_interface
                 .connect_to_peer(peer.clone())
                 .await
                 .unwrap();
@@ -211,7 +215,7 @@ impl RoutingEventProcessor {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
         trace!("waiting for the peers write lock");
-        let mut peers = self.peers.write().await;
+        let mut peers = self.network.peers.write().await;
         trace!("acquired the peers write lock");
         // for mut static_peer in &mut self.static_peers {
         //     if static_peer.peer_details == peer {
@@ -224,7 +228,7 @@ impl RoutingEventProcessor {
         if peer.static_peer_config.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
             peer.initiate_handshake(
-                &self.io_interface,
+                &self.network.io_interface,
                 self.wallet.clone(),
                 self.configs.clone(),
             )
@@ -238,7 +242,7 @@ impl RoutingEventProcessor {
 
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
-        let peers = self.peers.read().await;
+        let peers = self.network.peers.read().await;
         let result = peers.find_peer_by_index(peer_index);
 
         if result.is_some() {
@@ -255,7 +259,8 @@ impl RoutingEventProcessor {
                     hex::encode(peer.peer_public_key)
                 );
 
-                self.io_interface
+                self.network
+                    .io_interface
                     .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
                     .await
                     .unwrap();
@@ -283,7 +288,8 @@ impl RoutingEventProcessor {
         }
 
         let buffer = Message::BlockchainRequest(request).serialize();
-        self.io_interface
+        self.network
+            .io_interface
             .send_message(peer_index, buffer)
             .await
             .unwrap();
@@ -318,7 +324,8 @@ impl RoutingEventProcessor {
                 continue;
             }
             let buffer = Message::BlockHeaderHash(block_hash).serialize();
-            self.io_interface
+            self.network
+                .io_interface
                 .send_message(peer_index, buffer)
                 .await
                 .unwrap();
@@ -338,7 +345,7 @@ impl RoutingEventProcessor {
         }
         let url;
         {
-            let peers = self.peers.read().await;
+            let peers = self.network.peers.read().await;
             let peer = peers
                 .index_to_peers
                 .get(&peer_index)
@@ -346,7 +353,8 @@ impl RoutingEventProcessor {
             url = peer.get_block_fetch_url(block_hash);
         }
         if !block_exists {
-            self.io_interface
+            self.network
+                .io_interface
                 .fetch_block_from_peer(block_hash, peer_index, url)
                 .await
                 .unwrap();

@@ -14,10 +14,16 @@ use crate::core::data::transaction::Transaction;
 pub struct Network {
     // TODO : manage peers from network
     pub peers: Arc<RwLock<PeerCollection>>,
-    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
+    pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
 
 impl Network {
+    pub fn new(io_handler: Box<dyn InterfaceIO + Send + Sync>) -> Network {
+        Network {
+            peers: Arc::new(RwLock::new(PeerCollection::new())),
+            io_interface: io_handler,
+        }
+    }
     pub async fn propagate_block(&self, block: &Block) {
         debug!("propagating block : {:?}", hex::encode(block.get_hash()));
 
@@ -39,7 +45,7 @@ impl Network {
             hex::encode(block.get_hash())
         );
         let message = Message::BlockHeaderHash(block.get_hash());
-        self.io_handler
+        self.io_interface
             .send_message_to_all(message.serialize(), excluded_peers)
             .await
             .unwrap();
@@ -67,7 +73,7 @@ impl Network {
             peer_index = peer.peer_index;
         }
 
-        self.io_handler
+        self.io_interface
             .fetch_block_from_peer(block_hash, peer_index, url)
             .await
     }

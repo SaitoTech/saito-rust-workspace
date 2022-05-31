@@ -74,7 +74,7 @@ impl TestManager {
             latest_block_hash: [0; 32],
             network: Network {
                 peers: peers.clone(),
-                io_handler: Box::new(TestIOHandler::new()),
+                io_interface: Box::new(TestIOHandler::new()),
             },
             sender_to_miner,
             peers: peers.clone(),
