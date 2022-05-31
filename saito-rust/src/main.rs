@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -94,7 +93,6 @@ where
 async fn run_mining_event_processor(
     context: &Context,
     sender_to_mempool: &Sender<ConsensusEvent>,
-    peers: Arc<RwLock<PeerCollection>>,
     sender_to_blockchain: &Sender<RoutingEvent>,
     receiver_for_miner: Receiver<MiningEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
@@ -120,7 +118,6 @@ async fn run_mining_event_processor(
 }
 
 async fn run_consensus_event_processor(
-    configs: Arc<RwLock<Configuration>>,
     context: &Context,
     peers: Arc<RwLock<PeerCollection>>,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
@@ -342,7 +339,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     let (network_event_sender_to_blockchain, blockchain_handle) = run_consensus_event_processor(
-        configs.clone(),
         &context,
         peers.clone(),
         receiver_for_mempool,
@@ -355,7 +351,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (network_event_sender_to_miner, miner_handle) = run_mining_event_processor(
         &context,
         &sender_to_mempool,
-        peers.clone(),
         &sender_to_routing,
         receiver_for_miner,
     )
