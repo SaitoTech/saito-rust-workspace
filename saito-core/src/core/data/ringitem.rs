@@ -28,13 +28,13 @@ impl RingItem {
         }
     }
 
-    pub fn contains_block_hash(&self, hash: SaitoHash) -> bool {
-        self.block_hashes.iter().any(|&i| i == hash)
-    }
-
     pub fn add_block(&mut self, block_id: u64, hash: SaitoHash) {
         self.block_hashes.push(hash);
         self.block_ids.push(block_id);
+    }
+
+    pub fn contains_block_hash(&self, hash: SaitoHash) -> bool {
+        self.block_hashes.iter().any(|&i| i == hash)
     }
 
     pub fn delete_block(&mut self, block_id: u64, hash: SaitoHash) {
@@ -85,6 +85,32 @@ mod tests {
         assert_eq!(ringitem.block_hashes.len() as u64, 0);
         assert_eq!(ringitem.block_ids.len() as u64, 0);
         assert_eq!(ringitem.lc_pos, None);
+    }
+
+    #[test]
+    fn ringitem_add_and_delete_block() {
+        let mut ringitem = RingItem::new();
+        let mut block = Block::new();
+        block.generate_hash();
+        let block_id = block.get_id();
+        let block_hash = block.get_hash();
+
+        assert_eq!(ringitem.contains_block_hash(block_hash), false);
+        assert_eq!(ringitem.block_hashes.len() as u64, 0);
+        assert_eq!(ringitem.block_ids.len() as u64, 0);
+
+	ringitem.add_block(block.get_id(), block.get_hash());
+
+        assert_eq!(ringitem.contains_block_hash(block_hash), true);
+        assert_eq!(ringitem.block_hashes.len() as u64, 1);
+        assert_eq!(ringitem.block_ids.len() as u64, 1);
+
+	ringitem.delete_block(block_id, block_hash);
+
+        assert_eq!(ringitem.contains_block_hash(block_hash), false);
+        assert_eq!(ringitem.block_hashes.len() as u64, 0);
+        assert_eq!(ringitem.block_ids.len() as u64, 0);
+
     }
 
 }
