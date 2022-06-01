@@ -71,13 +71,11 @@ impl RingItem {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
 
-    use crate::core::data::ringitem::RingItem;
     use crate::core::data::block::{Block, BlockType};
+    use crate::core::data::ringitem::RingItem;
 
     #[test]
     fn ringitem_new_test() {
@@ -99,19 +97,16 @@ mod tests {
         assert_eq!(ringitem.block_hashes.len() as u64, 0);
         assert_eq!(ringitem.block_ids.len() as u64, 0);
 
-	ringitem.add_block(block.get_id(), block.get_hash());
+        ringitem.add_block(block.get_id(), block.get_hash());
 
         assert_eq!(ringitem.contains_block_hash(block_hash), true);
         assert_eq!(ringitem.block_hashes.len() as u64, 1);
         assert_eq!(ringitem.block_ids.len() as u64, 1);
 
-	ringitem.delete_block(block_id, block_hash);
+        ringitem.delete_block(block_id, block_hash);
 
         assert_eq!(ringitem.contains_block_hash(block_hash), false);
         assert_eq!(ringitem.block_hashes.len() as u64, 0);
         assert_eq!(ringitem.block_ids.len() as u64, 0);
-
     }
-
 }
-

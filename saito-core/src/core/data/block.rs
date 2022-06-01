@@ -1869,7 +1869,6 @@ mod tests {
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
 
-
     #[test]
     fn block_new_test() {
         let block = Block::new();
@@ -1905,24 +1904,20 @@ mod tests {
 
     #[test]
     fn block_generate_metadata_test() {
+        let mut block = Block::new();
+        block.generate_metadata();
 
-      let mut block = Block::new();
-      block.generate_metadata();
-
-      // block hashes should have updated
-      assert_ne!(block.pre_hash, [0; 32]);
-      assert_ne!(block.hash, [0; 32]);
-      assert_ne!(block.get_pre_hash(), [0; 32]);
-      assert_ne!(block.get_hash(), [0; 32]);
-      assert_eq!(block.get_pre_hash(), block.pre_hash);
-      assert_eq!(block.get_hash(), block.hash);
-
+        // block hashes should have updated
+        assert_ne!(block.pre_hash, [0; 32]);
+        assert_ne!(block.hash, [0; 32]);
+        assert_ne!(block.get_pre_hash(), [0; 32]);
+        assert_ne!(block.get_hash(), [0; 32]);
+        assert_eq!(block.get_pre_hash(), block.pre_hash);
+        assert_eq!(block.get_hash(), block.hash);
     }
-  
 
     #[test]
     fn block_signature_test() {
-
         let mut block = Block::new();
 
         block.id = 10;
@@ -1972,7 +1967,6 @@ mod tests {
 
     #[test]
     fn block_serialization_and_deserialization_test() {
-
         let mock_input = Slip::new();
         let mock_output = Slip::new();
 
@@ -2041,13 +2035,10 @@ mod tests {
         assert_eq!(deserialized_block_header.get_treasury(), 1);
         assert_eq!(deserialized_block_header.get_burnfee(), 2);
         assert_eq!(deserialized_block_header.get_difficulty(), 3);
-
     }
-
 
     #[test]
     fn block_sign_and_verify_test() {
-
         let wallet = Wallet::new();
         let mut block = Block::new();
 
@@ -2068,7 +2059,6 @@ mod tests {
 
     #[test]
     fn block_merkle_root_test() {
-
         let mut block = Block::new();
         let wallet = Wallet::new();
 
@@ -2086,7 +2076,5 @@ mod tests {
 
         assert!(block.get_merkle_root().len() == 32);
         assert_ne!(block.get_merkle_root(), [0; 32]);
-
     }
-
 }

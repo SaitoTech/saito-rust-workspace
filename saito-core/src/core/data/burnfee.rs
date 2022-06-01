@@ -1,6 +1,19 @@
-/// TODO : rename to BLOCK_INTERVAL or a suitable name
+//
+// our target blocktime
+//
 pub const HEARTBEAT: u64 = 10_000;
 
+//
+// Burn Fee
+//
+// The burn fee algorithms determine how much ROUTING WORK needs to be in any block
+// in order for that block to be valid according to consensus rules. There are two
+// functions that are needed.
+//
+// - determine routing work needed (to produce block)
+// - determine burnfee variable (to include in block)
+//
+// Both of these functions are
 pub struct BurnFee {}
 
 impl BurnFee {
@@ -51,6 +64,7 @@ impl BurnFee {
     /// * `start` - The starting burn fee
     /// * `current_block_timestamp` - The timestamp of the current `Block`
     /// * `previous_block_timestamp` - The timestamp of the previous `Block`
+    ///
     pub fn return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
         burn_fee_previous_block: u64,
         current_block_timestamp: u64,
