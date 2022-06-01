@@ -17,7 +17,6 @@ use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
-
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
 
@@ -122,18 +121,9 @@ impl RoutingEventProcessor {
 
     async fn connect_to_static_peers(&mut self) {
         debug!("connect to peers from config",);
-        trace!("waiting for the configs read lock");
-        let configs = self.configs.read().await;
-        trace!("acquired the configs read lock");
-
-        for peer in &configs.peers {
-            self.network
-                .io_interface
-                .connect_to_peer(peer.clone())
-                .await
-                .unwrap();
-        }
-        debug!("connected to peers");
+        self.network
+            .connect_to_static_peers(self.configs.clone())
+            .await;
     }
     async fn handle_new_peer(
         &mut self,
@@ -198,28 +188,9 @@ impl RoutingEventProcessor {
             hex::encode(block_hash),
             peer_index
         );
-
-        let block_exists;
-        {
-            let blockchain = self.blockchain.read().await;
-            block_exists = blockchain.is_block_indexed(block_hash);
-        }
-        let url;
-        {
-            let peers = self.network.peers.read().await;
-            let peer = peers
-                .index_to_peers
-                .get(&peer_index)
-                .expect("peer not found");
-            url = peer.get_block_fetch_url(block_hash);
-        }
-        if !block_exists {
-            self.network
-                .io_interface
-                .fetch_block_from_peer(block_hash, peer_index, url)
-                .await
-                .unwrap();
-        }
+        self.network
+            .process_incoming_block_hash(block_hash, peer_index, self.blockchain.clone())
+            .await;
     }
 }
 

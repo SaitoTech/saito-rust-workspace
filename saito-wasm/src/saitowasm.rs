@@ -100,13 +100,9 @@ pub fn new() -> SaitoWasm {
             sender_to_miner: sender_to_miner.clone(),
             static_peers: vec![],
             configs: context.configuration.clone(),
-
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
-            network: Network {
-                peers: peers.clone(),
-                io_interface: Box::new(WasmIoHandler {}),
-            },
+            network: Network::new(Box::new(WasmIoHandler {}), peers.clone()),
         },
         routing_event_processor: ConsensusEventProcessor {
             mempool: context.mempool.clone(),
@@ -119,13 +115,8 @@ pub fn new() -> SaitoWasm {
             tx_producing_timer: 0,
             generate_test_tx: false,
             time_keeper: Box::new(WasmTimeKeeper {}),
-            network: Network {
-                peers: peers.clone(),
-                io_interface: Box::new(WasmIoHandler {}),
-            },
-            storage: Storage {
-                io_handler: Box::new(WasmIoHandler {}),
-            },
+            network: Network::new(Box::new(WasmIoHandler {}), peers.clone()),
+            storage: Storage::new(Box::new(WasmIoHandler {})),
         },
         mining_event_processor: MiningEventProcessor {
             miner: context.miner.clone(),

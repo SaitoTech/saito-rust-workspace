@@ -72,15 +72,10 @@ impl TestManager {
             blockchain_lock: blockchain_lock.clone(),
             wallet_lock: wallet_lock.clone(),
             latest_block_hash: [0; 32],
-            network: Network {
-                peers: peers.clone(),
-                io_interface: Box::new(TestIOHandler::new()),
-            },
+            network: Network::new(Box::new(TestIOHandler::new()), peers.clone()),
             sender_to_miner,
             peers: peers.clone(),
-            storage: Storage {
-                io_handler: Box::new(TestIOHandler::new()),
-            },
+            storage: Storage::new(Box::new(TestIOHandler::new())),
         }
     }
     pub async fn clear_data_folder() {

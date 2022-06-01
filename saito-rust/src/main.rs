@@ -138,22 +138,20 @@ async fn run_consensus_event_processor(
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
         time_keeper: Box::new(TimeKeeper {}),
-        network: Network {
-            peers: peers.clone(),
-            io_interface: Box::new(RustIOHandler::new(
+        network: Network::new(
+            Box::new(RustIOHandler::new(
                 sender_to_network_controller.clone(),
                 CONSENSUS_EVENT_PROCESSOR_ID,
             )),
-        },
+            peers.clone(),
+        ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
         generate_test_tx,
-        storage: Storage {
-            io_handler: Box::new(RustIOHandler::new(
-                sender_to_network_controller.clone(),
-                CONSENSUS_EVENT_PROCESSOR_ID,
-            )),
-        },
+        storage: Storage::new(Box::new(RustIOHandler::new(
+            sender_to_network_controller.clone(),
+            CONSENSUS_EVENT_PROCESSOR_ID,
+        ))),
     };
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(1000);
@@ -185,13 +183,13 @@ async fn run_routing_event_processor(
         static_peers: vec![],
         configs: configs.clone(),
         wallet: context.wallet.clone(),
-        network: Network {
-            peers,
-            io_interface: Box::new(RustIOHandler::new(
+        network: Network::new(
+            Box::new(RustIOHandler::new(
                 sender_to_io_controller.clone(),
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
-        },
+            peers.clone(),
+        ),
     };
     {
         trace!("waiting for the configs write lock");

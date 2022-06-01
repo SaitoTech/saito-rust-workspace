@@ -22,14 +22,17 @@ use crate::core::data::wallet::Wallet;
 
 pub struct Network {
     // TODO : manage peers from network
-    pub peers: Arc<RwLock<PeerCollection>>,
+    peers: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
 
 impl Network {
-    pub fn new(io_handler: Box<dyn InterfaceIO + Send + Sync>) -> Network {
+    pub fn new(
+        io_handler: Box<dyn InterfaceIO + Send + Sync>,
+        peers: Arc<RwLock<PeerCollection>>,
+    ) -> Network {
         Network {
-            peers: Arc::new(RwLock::new(PeerCollection::new())),
+            peers,
             io_interface: io_handler,
         }
     }
@@ -242,5 +245,46 @@ impl Network {
             .send_message(peer_index, buffer)
             .await
             .unwrap();
+    }
+    pub async fn process_incoming_block_hash(
+        &self,
+        block_hash: SaitoHash,
+        peer_index: u64,
+        blockchain: Arc<RwLock<Blockchain>>,
+    ) {
+        let block_exists;
+        {
+            let blockchain = blockchain.read().await;
+            block_exists = blockchain.is_block_indexed(block_hash);
+        }
+        let url;
+        {
+            let peers = self.peers.read().await;
+            let peer = peers
+                .index_to_peers
+                .get(&peer_index)
+                .expect("peer not found");
+            url = peer.get_block_fetch_url(block_hash);
+        }
+        if !block_exists {
+            self.io_interface
+                .fetch_block_from_peer(block_hash, peer_index, url)
+                .await
+                .unwrap();
+        }
+    }
+    pub async fn connect_to_static_peers(&mut self, configs: Arc<RwLock<Configuration>>) {
+        debug!("connect to peers from config",);
+        trace!("waiting for the configs read lock");
+        let configs = configs.read().await;
+        trace!("acquired the configs read lock");
+
+        for peer in &configs.peers {
+            self.io_interface
+                .connect_to_peer(peer.clone())
+                .await
+                .unwrap();
+        }
+        debug!("connected to peers");
     }
 }

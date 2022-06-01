@@ -18,7 +18,7 @@ mod tests {
         let privatekey1 = wallet.get_privatekey().clone();
 
         let mut storage = Storage {
-            io_handler: Box::new(TestIOHandler::new()),
+            io_interface: Box::new(TestIOHandler::new()),
         };
         wallet.save(&mut storage).await;
 
