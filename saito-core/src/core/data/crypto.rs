@@ -138,11 +138,11 @@ mod tests {
         let msg = <[u8; 32]>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
-            .unwrap();
+        .unwrap();
         let private_key: SaitoPrivateKey = <[u8; 32]>::from_hex(
             "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
         )
-            .unwrap();
+        .unwrap();
 
         let result = sign(&msg, private_key);
         assert_eq!(result.len(), 64);

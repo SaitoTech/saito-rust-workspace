@@ -7,20 +7,16 @@ pub const HEARTBEAT: u64 = 10_000;
 // Burn Fee
 //
 // The burn fee algorithms determine how much ROUTING WORK needs to be in any block
-// in order for that block to be valid according to consensus rules. There are two 
+// in order for that block to be valid according to consensus rules. There are two
 // functions that are needed.
 //
-// - determine routing work needed (to produce block) 
+// - determine routing work needed (to produce block)
 // - determine burnfee variable (to include in block)
 //
-// Both of these functions are 
+// Both of these functions are
 pub struct BurnFee {}
 
-
-
-
 impl BurnFee {
-
     ///
     /// Returns the amount of work needed to produce a block given the timestamp of
     /// the previous block, the current timestamp, and the y-axis of the burn fee
@@ -99,7 +95,6 @@ impl BurnFee {
         new_burnfee
     }
 }
-
 
 #[cfg(test)]
 mod tests {

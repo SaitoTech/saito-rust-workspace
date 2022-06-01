@@ -9,7 +9,7 @@ pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
 
 //
 // TODO -- shift to a RingBuffer ? or Slice-VecDeque so that we can have
-// contiguous entries for rapid lookups, inserts and updates? we want to 
+// contiguous entries for rapid lookups, inserts and updates? we want to
 // have fast access to elements in random positions in the data structure
 //
 #[derive(Debug)]
@@ -26,7 +26,6 @@ impl BlockRing {
     /// Create new `BlockRing`
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-
         let mut init_ring: Vec<RingItem> = vec![];
         for _i in 0..RING_BUFFER_LENGTH {
             init_ring.push(RingItem::new());
@@ -51,7 +50,9 @@ impl BlockRing {
     pub fn get_latest_block_hash(&self) -> SaitoHash {
         match self.lc_pos {
             Some(lc_pos_block_ring) => match self.ring[lc_pos_block_ring].lc_pos {
-                Some(lc_pos_block_item) => self.ring[lc_pos_block_ring].block_hashes[lc_pos_block_item],
+                Some(lc_pos_block_item) => {
+                    self.ring[lc_pos_block_ring].block_hashes[lc_pos_block_item]
+                }
                 None => [0; 32],
             },
             None => [0; 32],
@@ -61,7 +62,9 @@ impl BlockRing {
     pub fn get_latest_block_id(&self) -> u64 {
         match self.lc_pos {
             Some(lc_pos_block_ring) => match self.ring[lc_pos_block_ring].lc_pos {
-                Some(lc_pos_block_item) => self.ring[lc_pos_block_ring].block_ids[lc_pos_block_item],
+                Some(lc_pos_block_item) => {
+                    self.ring[lc_pos_block_ring].block_ids[lc_pos_block_item]
+                }
                 None => 0,
             },
             None => 0,
@@ -80,7 +83,7 @@ impl BlockRing {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         for i in 0..self.ring[(insert_pos as usize)].block_hashes.len() {
             if self.ring[(insert_pos as usize)].block_hashes[i] == block_hash {
-               return true;
+                return true;
             }
         }
         return false;
@@ -89,7 +92,6 @@ impl BlockRing {
     pub fn is_empty(&self) -> bool {
         return self.lc_pos.is_none();
     }
-
 
     pub fn delete_block(&mut self, block_id: u64, block_hash: SaitoHash) {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
@@ -121,8 +123,8 @@ impl BlockRing {
             // position if available. this adds some complexity to unwinding
             // the chain but should ensure that in most situations there is
             // always a known longest-chain position. this is not guaranteed
-	    // behavior, so the blockring should not be treated as something
-	    // that guarantees correctness of lc_pos in situations like this.
+            // behavior, so the blockring should not be treated as something
+            // that guarantees correctness of lc_pos in situations like this.
             //
             if let Some(lc_pos) = self.lc_pos {
                 if lc_pos == insert_pos as usize {
@@ -142,11 +144,9 @@ impl BlockRing {
                     if let Some(previous_block_idx_lc_pos) =
                         self.ring[previous_block_idx as usize].lc_pos
                     {
-                        if self.ring[previous_block_idx].block_ids.len()
-                            > previous_block_idx_lc_pos
+                        if self.ring[previous_block_idx].block_ids.len() > previous_block_idx_lc_pos
                         {
-                            if self.ring[previous_block_idx].block_ids
-                                [previous_block_idx_lc_pos]
+                            if self.ring[previous_block_idx].block_ids[previous_block_idx_lc_pos]
                                 == block_id - 1
                             {
                                 self.lc_pos = Some(previous_block_idx);
@@ -172,12 +172,11 @@ impl BlockRing {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
-    use crate::core::data::blockring::BlockRing;
     use crate::core::data::block::{Block, BlockType};
+    use crate::core::data::blockring::BlockRing;
     use crate::core::data::ringitem::RingItem;
 
     use crate::core::data::blockchain::GENESIS_PERIOD;
@@ -192,65 +191,81 @@ mod tests {
 
     #[test]
     fn blockring_add_block_test() {
-
         let mut blockring = BlockRing::new();
         let mut block = Block::new();
         block.generate_hash();
-	let block_hash = block.get_hash();
-	let block_id = block.get_id();
+        let block_hash = block.get_hash();
+        let block_id = block.get_id();
 
+        // everything is empty to start
+        assert_eq!(blockring.is_empty(), true);
+        assert_eq!(blockring.get_latest_block_hash(), [0; 32]);
+        assert_eq!(blockring.get_latest_block_id(), 0);
+        assert_eq!(
+            blockring.get_longest_chain_block_hash_by_block_id(0),
+            [0; 32]
+        );
+        assert_eq!(
+            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            false
+        );
 
-	// everything is empty to start
-	assert_eq!(blockring.is_empty(), true);
-	assert_eq!(blockring.get_latest_block_hash(), [0; 32]);
-	assert_eq!(blockring.get_latest_block_id(), 0);
-	assert_eq!(blockring.get_longest_chain_block_hash_by_block_id(0), [0; 32]);
-	assert_eq!(blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()), false);
+        blockring.add_block(&block);
+        blockring.on_chain_reorganization(block.get_id(), block.get_hash(), true);
 
-	blockring.add_block(&block);
-	blockring.on_chain_reorganization(block.get_id(), block.get_hash(), true);
-
-	assert_eq!(blockring.is_empty(), false);
-	assert_eq!(blockring.get_latest_block_hash(), block_hash);
-	assert_eq!(blockring.get_latest_block_id(), block_id);
-	assert_eq!(blockring.get_longest_chain_block_hash_by_block_id(block_id), block_hash);
-	assert_eq!(blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()), true);
-
+        assert_eq!(blockring.is_empty(), false);
+        assert_eq!(blockring.get_latest_block_hash(), block_hash);
+        assert_eq!(blockring.get_latest_block_id(), block_id);
+        assert_eq!(
+            blockring.get_longest_chain_block_hash_by_block_id(block_id),
+            block_hash
+        );
+        assert_eq!(
+            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            true
+        );
     }
-
 
     #[test]
     fn blockring_delete_block_test() {
-
         let mut blockring = BlockRing::new();
         let mut block = Block::new();
         block.generate_hash();
-	let block_hash = block.get_hash();
-	let block_id = block.get_id();
+        let block_hash = block.get_hash();
+        let block_id = block.get_id();
 
+        // everything is empty to start
+        assert_eq!(blockring.is_empty(), true);
+        assert_eq!(blockring.get_latest_block_hash(), [0; 32]);
+        assert_eq!(blockring.get_latest_block_id(), 0);
+        assert_eq!(
+            blockring.get_longest_chain_block_hash_by_block_id(0),
+            [0; 32]
+        );
+        assert_eq!(
+            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            false
+        );
 
-	// everything is empty to start
-	assert_eq!(blockring.is_empty(), true);
-	assert_eq!(blockring.get_latest_block_hash(), [0; 32]);
-	assert_eq!(blockring.get_latest_block_id(), 0);
-	assert_eq!(blockring.get_longest_chain_block_hash_by_block_id(0), [0; 32]);
-	assert_eq!(blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()), false);
+        blockring.add_block(&block);
+        blockring.on_chain_reorganization(block.get_id(), block.get_hash(), true);
 
-	blockring.add_block(&block);
-	blockring.on_chain_reorganization(block.get_id(), block.get_hash(), true);
+        assert_eq!(blockring.is_empty(), false);
+        assert_eq!(blockring.get_latest_block_hash(), block_hash);
+        assert_eq!(blockring.get_latest_block_id(), block_id);
+        assert_eq!(
+            blockring.get_longest_chain_block_hash_by_block_id(block_id),
+            block_hash
+        );
+        assert_eq!(
+            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            true
+        );
 
-	assert_eq!(blockring.is_empty(), false);
-	assert_eq!(blockring.get_latest_block_hash(), block_hash);
-	assert_eq!(blockring.get_latest_block_id(), block_id);
-	assert_eq!(blockring.get_longest_chain_block_hash_by_block_id(block_id), block_hash);
-	assert_eq!(blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()), true);
-
-	blockring.delete_block(block.get_id(), block.get_hash());
-	assert_eq!(blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()), false);
-
+        blockring.delete_block(block.get_id(), block.get_hash());
+        assert_eq!(
+            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            false
+        );
     }
-
-
-
 }
-

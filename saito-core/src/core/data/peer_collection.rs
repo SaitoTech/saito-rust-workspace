@@ -26,7 +26,7 @@ impl PeerCollection {
         return self.find_peer_by_index(*result.unwrap());
     }
 
-    pub fn find_peer_by_index(&self, peer_index : u64) -> Option<&Peer> {
-       return self.index_to_peers.get(&peer_index);
+    pub fn find_peer_by_index(&self, peer_index: u64) -> Option<&Peer> {
+        return self.index_to_peers.get(&peer_index);
     }
 }
