@@ -14,6 +14,7 @@ pub mod msg;
 pub mod network;
 pub mod peer;
 pub mod peer_collection;
+pub mod ringitem;
 pub mod serialize;
 pub mod slip;
 pub mod staking;
