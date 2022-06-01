@@ -8,7 +8,6 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::miner::Miner;
-use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::wallet::Wallet;
 
 #[derive(Clone)]
@@ -16,7 +15,6 @@ pub struct Context {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub mempool: Arc<RwLock<Mempool>>,
     pub wallet: Arc<RwLock<Wallet>>,
-    pub peers: Arc<RwLock<PeerCollection>>,
     pub miner: Arc<RwLock<Miner>>,
     pub configuration: Arc<RwLock<Configuration>>,
 }
@@ -31,7 +29,6 @@ impl Context {
             ))),
             mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
             wallet: wallet.clone(),
-            peers: Arc::new(RwLock::new(PeerCollection::new())),
             miner: Arc::new(RwLock::new(Miner::new(wallet.clone()))),
             configuration: configs,
         }

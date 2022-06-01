@@ -14,6 +14,7 @@ use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEvent
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::network::Network;
+use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::mining_event_processor::{MiningEvent, MiningEventProcessor};
 use saito_core::core::routing_event_processor::{
@@ -117,8 +118,8 @@ async fn run_mining_event_processor(
 }
 
 async fn run_consensus_event_processor(
-    configs: Arc<RwLock<Configuration>>,
     context: &Context,
+    peers: Arc<RwLock<PeerCollection>>,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
     sender_to_routing: &Sender<RoutingEvent>,
     sender_to_miner: Sender<MiningEvent>,
@@ -137,27 +138,21 @@ async fn run_consensus_event_processor(
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
         time_keeper: Box::new(TimeKeeper {}),
-
-        network: Network {
-            peers: context.peers.clone(),
-            io_handler: Box::new(RustIOHandler::new(
+        network: Network::new(
+            Box::new(RustIOHandler::new(
                 sender_to_network_controller.clone(),
                 CONSENSUS_EVENT_PROCESSOR_ID,
             )),
-        },
+            peers.clone(),
+        ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
         generate_test_tx,
-
-        peers: context.peers.clone(),
-        storage: Storage {
-            io_handler: Box::new(RustIOHandler::new(
-                sender_to_network_controller.clone(),
-                CONSENSUS_EVENT_PROCESSOR_ID,
-            )),
-        },
+        storage: Storage::new(Box::new(RustIOHandler::new(
+            sender_to_network_controller.clone(),
+            CONSENSUS_EVENT_PROCESSOR_ID,
+        ))),
     };
-
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(1000);
     debug!("running mempool thread");
@@ -175,6 +170,7 @@ async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
     configs: Arc<RwLock<Configuration>>,
     context: &Context,
+    peers: Arc<RwLock<PeerCollection>>,
     sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MiningEvent>,
@@ -183,15 +179,17 @@ async fn run_routing_event_processor(
         blockchain: context.blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
-        io_interface: Box::new(RustIOHandler::new(
-            sender_to_io_controller.clone(),
-            ROUTING_EVENT_PROCESSOR_ID,
-        )),
         time_keeper: Box::new(TimeKeeper {}),
-        peers: context.peers.clone(),
         static_peers: vec![],
         configs: configs.clone(),
         wallet: context.wallet.clone(),
+        network: Network::new(
+            Box::new(RustIOHandler::new(
+                sender_to_io_controller.clone(),
+                ROUTING_EVENT_PROCESSOR_ID,
+            )),
+            peers.clone(),
+        ),
     };
     {
         trace!("waiting for the configs write lock");
@@ -317,6 +315,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("running saito controllers");
 
     let context = Context::new(configs.clone());
+    let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_mempool, receiver_for_mempool) =
         tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
@@ -330,6 +329,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_network_controller.clone(),
         configs.clone(),
         &context,
+        peers.clone(),
         &sender_to_mempool,
         receiver_for_routing,
         &sender_to_miner,
@@ -337,8 +337,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     let (network_event_sender_to_blockchain, blockchain_handle) = run_consensus_event_processor(
-        configs.clone(),
         &context,
+        peers.clone(),
         receiver_for_mempool,
         &sender_to_routing,
         sender_to_miner,
