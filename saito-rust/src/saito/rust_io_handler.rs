@@ -242,7 +242,7 @@ mod tests {
     #[tokio::test]
     async fn file_exists_success() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let mut io_handler = RustIOHandler::new(sender, 0);
+        let io_handler = RustIOHandler::new(sender, 0);
         let path = String::from("src/test/test_data/config_handler_tests.json");
 
         let result = io_handler.is_existing_file(path).await;
@@ -252,7 +252,7 @@ mod tests {
     #[tokio::test]
     async fn file_exists_fail() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let mut io_handler = RustIOHandler::new(sender, 0);
+        let io_handler = RustIOHandler::new(sender, 0);
         let path = String::from("badfilename.json");
 
         let result = io_handler.is_existing_file(path).await;
