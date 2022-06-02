@@ -44,10 +44,12 @@ impl Network {
             .await
             .unwrap();
     }
+
     pub async fn propagate_transaction(&self, _transaction: &Transaction) {
         debug!("propagating transaction");
         todo!()
     }
+
     pub async fn fetch_missing_block(
         &self,
         block_hash: SaitoHash,
