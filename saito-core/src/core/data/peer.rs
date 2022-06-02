@@ -190,3 +190,22 @@ impl Peer {
         self.block_fetch_url.to_string() + hex::encode(block_hash).as_str()
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::core::data::peer::Peer;
+
+    #[test]
+    fn peer_new_test() {
+        let peer = Peer::new(1);
+
+        assert_eq!(peer.peer_index, 1);
+        assert_eq!(peer.peer_public_key, [0; 33]);
+        assert_eq!(peer.block_fetch_url, "".to_string());
+        assert_eq!(peer.static_peer_config, None);
+        assert_eq!(peer.challenge_for_peer, None);
+        assert_eq!(peer.handshake_done, false);
+    }
+}
