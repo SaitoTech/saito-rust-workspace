@@ -175,9 +175,8 @@ impl BlockRing {
 #[cfg(test)]
 mod tests {
 
-    use crate::core::data::block::{Block, BlockType};
+    use crate::core::data::block::Block;
     use crate::core::data::blockring::BlockRing;
-    use crate::core::data::ringitem::RingItem;
 
     use crate::core::data::blockchain::GENESIS_PERIOD;
     pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;

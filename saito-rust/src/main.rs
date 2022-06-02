@@ -368,7 +368,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         context.blockchain.clone(),
     ));
 
-    let result = tokio::join!(
+    let _result = tokio::join!(
         routing_handle,
         blockchain_handle,
         miner_handle,
