@@ -270,6 +270,3 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             .await;
     }
 }
-
-#[cfg(test)]
-mod tests {}
