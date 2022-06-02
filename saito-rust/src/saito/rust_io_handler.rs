@@ -110,7 +110,7 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+    async fn disconnect_from_peer(&mut self, _peer_index: u64) -> Result<(), Error> {
         todo!()
     }
 

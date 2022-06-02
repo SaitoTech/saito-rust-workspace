@@ -8,9 +8,9 @@ use ahash::AHashMap;
 use log::{debug, info, trace};
 use rayon::prelude::*;
 use saito_core::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet,
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet,
 };
-use saito_core::common::interface_io::InterfaceIO;
+
 
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;
@@ -239,7 +239,7 @@ impl TestManager {
         additional_transactions: Vec<Transaction>,
     ) -> Block {
         let mut transactions: Vec<Transaction> = vec![];
-        let mut miner = Miner::new(self.wallet_lock.clone());
+        let _miner = Miner::new(self.wallet_lock.clone());
         let privatekey: SaitoPrivateKey;
         let publickey: SaitoPublicKey;
 
