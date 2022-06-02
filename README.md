@@ -1,5 +1,6 @@
 
 # Welcome to Saito
+[![Rust](https://github.com/SaitoTech/saito-rust-workspace/actions/workflows/rust.yml/badge.svg)](https://github.com/SaitoTech/saito-rust-workspace/actions/workflows/rust.yml)
 
 This distribution contains an implementation of Saito Consensus in the Rust programming language. It includes the core code needed to run Saito in any language. It contains three main components organized by three main sub-directories: saito-core, saito-rust, and saito-wasm.
 
