@@ -372,9 +372,8 @@ impl Staking {
             //
             // grab random input from golden ticket
             //
-            let golden_ticket: GoldenTicket = GoldenTicket::deserialize_for_transaction(
-                golden_ticket_transaction.get_message().to_vec(),
-            );
+            let golden_ticket: GoldenTicket =
+                GoldenTicket::deserialize(golden_ticket_transaction.get_message().to_vec());
 
             // pick router and burn one
             let mut next_random_number = hash(&golden_ticket.get_random().to_vec());
