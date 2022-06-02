@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn keypair_restoration_from_privatekey_test() {
         let (publickey, privatekey) = generate_keys();
-	let (publickey2, privatekey2) = generate_keypair_from_privatekey(&privatekey);
+        let (publickey2, privatekey2) = generate_keypair_from_privatekey(&privatekey);
         assert_eq!(publickey, publickey2);
         assert_eq!(privatekey, privatekey2);
     }
