@@ -83,19 +83,7 @@ impl Transaction {
         wallet_lock: Arc<RwLock<Wallet>>,
         to_publickey: SaitoPublicKey,
     ) {
-        //
-        // msg is transaction signature and next peer
-        //
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.get_signature());
-        vbytes.extend(&to_publickey);
-        let hash_to_sign = hash(&vbytes);
-
-        let hop = Hop::generate_hop(wallet_lock.clone(), to_publickey, hash_to_sign).await;
-
-        //
-        // add to path
-        //
+        let hop = Hop::generate(wallet_lock.clone(), to_publickey, self).await;
         self.path.push(hop);
     }
 
