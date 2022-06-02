@@ -49,8 +49,10 @@ impl BlockRing {
 
     pub fn get_latest_block_hash(&self) -> SaitoHash {
         match self.lc_pos {
-            Some(lc_pos) => match self.ring[lc_pos].lc_pos {
-                Some(lc_pos) => self.ring[lc_pos].block_hashes[lc_pos],
+            Some(lc_pos_block_ring) => match self.ring[lc_pos_block_ring].lc_pos {
+                Some(lc_pos_block_item) => {
+                    self.ring[lc_pos_block_ring].block_hashes[lc_pos_block_item]
+                }
                 None => [0; 32],
             },
             None => [0; 32],
@@ -59,8 +61,10 @@ impl BlockRing {
 
     pub fn get_latest_block_id(&self) -> u64 {
         match self.lc_pos {
-            Some(lc_pos) => match self.ring[lc_pos].lc_pos {
-                Some(lc_pos) => self.ring[lc_pos].block_ids[lc_pos],
+            Some(lc_pos_block_ring) => match self.ring[lc_pos_block_ring].lc_pos {
+                Some(lc_pos_block_item) => {
+                    self.ring[lc_pos_block_ring].block_ids[lc_pos_block_item]
+                }
                 None => 0,
             },
             None => 0,
@@ -172,8 +176,8 @@ impl BlockRing {
 mod tests {
 
     use crate::core::data::block::Block;
-    use crate::core::data::blockchain::GENESIS_PERIOD;
     use crate::core::data::blockring::BlockRing;
+    use crate::core::data::blockchain::GENESIS_PERIOD;
     pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
 
     #[test]

@@ -15,7 +15,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
-use crate::core::data::peer_collection::PeerCollection;
+
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
@@ -41,7 +41,6 @@ pub struct ConsensusEventProcessor {
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub network: Network,
     pub storage: Storage,
-    pub peers: Arc<RwLock<PeerCollection>>,
 }
 
 impl ConsensusEventProcessor {
