@@ -124,12 +124,11 @@ mod tests {
     //
     // test symmetrical encryption works properly
     //
-    fn symmetrical_encryption_works_test() {
+    fn symmetrical_encryption_test() {
         let text = "This is our unencrypted text";
         let e = encrypt_with_password(text.as_bytes().to_vec(), "asdf");
         let d = decrypt_with_password(e, "asdf");
         let dtext = str::from_utf8(&d).unwrap();
-
         assert_eq!(text, dtext);
     }
 
@@ -138,13 +137,13 @@ mod tests {
         let msg = <[u8; 32]>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
-            .unwrap();
-        let private_key: SaitoPrivateKey = <[u8; 32]>::from_hex(
+        .unwrap();
+        let privatekey: SaitoPrivateKey = <[u8; 32]>::from_hex(
             "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
         )
-            .unwrap();
+        .unwrap();
 
-        let result = sign(&msg, private_key);
+        let result = sign(&msg, privatekey);
         assert_eq!(result.len(), 64);
         assert_eq!(
             result,
@@ -155,5 +154,21 @@ mod tests {
                 9, 150, 237, 116, 236, 2, 146, 210, 39, 69
             ]
         );
+    }
+
+    #[test]
+    fn verify_message_test() {
+        let msg = <[u8; 32]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        )
+        .unwrap();
+
+        let (publickey, privatekey) = generate_keys();
+        let (publickey2, privatekey2) = generate_keys();
+
+        assert_eq!(verify(&msg, sign(&msg, privatekey), publickey), true);
+        assert_eq!(verify(&msg, sign(&msg, privatekey2), publickey2), true);
+        assert_eq!(verify(&msg, sign(&msg, privatekey), publickey2), false);
+        assert_eq!(verify(&msg, sign(&msg, privatekey2), publickey), false);
     }
 }

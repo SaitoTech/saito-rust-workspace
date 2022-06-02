@@ -903,9 +903,8 @@ impl Block {
         // calculate payments to miners / routers / stakers
         //
         if let Some(gt_idx) = cv.gt_idx {
-            let golden_ticket: GoldenTicket = GoldenTicket::deserialize_for_transaction(
-                self.transactions[gt_idx].get_message().to_vec(),
-            );
+            let golden_ticket: GoldenTicket =
+                GoldenTicket::deserialize(self.transactions[gt_idx].get_message().to_vec());
             // generate input hash for router
             let mut next_random_number = hash(&golden_ticket.get_random().to_vec());
             let _miner_publickey = golden_ticket.get_publickey();
@@ -1486,15 +1485,15 @@ impl Block {
             // we find that out now, and it invalidates the block.
             //
             if let Some(gt_idx) = cv.gt_idx {
-                let golden_ticket: GoldenTicket = GoldenTicket::deserialize_for_transaction(
+                let golden_ticket: GoldenTicket = GoldenTicket::deserialize(
                     self.get_transactions()[gt_idx].get_message().to_vec(),
                 );
-                let solution = GoldenTicket::generate_solution(
+                let solution = GoldenTicket::generate(
                     previous_block.get_hash(),
                     golden_ticket.get_random(),
                     golden_ticket.get_publickey(),
                 );
-                if !GoldenTicket::is_valid_solution(solution, previous_block.get_difficulty()) {
+                if !GoldenTicket::validate(solution, previous_block.get_difficulty()) {
                     error!(
                         "ERROR: Golden Ticket solution does not validate against previous block hash and difficulty"
                     );
@@ -1869,7 +1868,6 @@ mod tests {
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
 
-
     #[test]
     fn block_new_test() {
         let block = Block::new();
@@ -1905,24 +1903,20 @@ mod tests {
 
     #[test]
     fn block_generate_metadata_test() {
+        let mut block = Block::new();
+        block.generate_metadata();
 
-      let mut block = Block::new();
-      block.generate_metadata();
-
-      // block hashes should have updated
-      assert_ne!(block.pre_hash, [0; 32]);
-      assert_ne!(block.hash, [0; 32]);
-      assert_ne!(block.get_pre_hash(), [0; 32]);
-      assert_ne!(block.get_hash(), [0; 32]);
-      assert_eq!(block.get_pre_hash(), block.pre_hash);
-      assert_eq!(block.get_hash(), block.hash);
-
+        // block hashes should have updated
+        assert_ne!(block.pre_hash, [0; 32]);
+        assert_ne!(block.hash, [0; 32]);
+        assert_ne!(block.get_pre_hash(), [0; 32]);
+        assert_ne!(block.get_hash(), [0; 32]);
+        assert_eq!(block.get_pre_hash(), block.pre_hash);
+        assert_eq!(block.get_hash(), block.hash);
     }
-  
 
     #[test]
     fn block_signature_test() {
-
         let mut block = Block::new();
 
         block.id = 10;
@@ -1972,7 +1966,6 @@ mod tests {
 
     #[test]
     fn block_serialization_and_deserialization_test() {
-
         let mock_input = Slip::new();
         let mock_output = Slip::new();
 
@@ -2041,13 +2034,10 @@ mod tests {
         assert_eq!(deserialized_block_header.get_treasury(), 1);
         assert_eq!(deserialized_block_header.get_burnfee(), 2);
         assert_eq!(deserialized_block_header.get_difficulty(), 3);
-
     }
-
 
     #[test]
     fn block_sign_and_verify_test() {
-
         let wallet = Wallet::new();
         let mut block = Block::new();
 
@@ -2068,7 +2058,6 @@ mod tests {
 
     #[test]
     fn block_merkle_root_test() {
-
         let mut block = Block::new();
         let wallet = Wallet::new();
 
@@ -2086,7 +2075,5 @@ mod tests {
 
         assert!(block.get_merkle_root().len() == 32);
         assert_ne!(block.get_merkle_root(), [0; 32]);
-
     }
-
 }
