@@ -7,10 +7,7 @@ use crate::test::test_io_handler::TestIOHandler;
 use ahash::AHashMap;
 use log::{debug, info, trace};
 use rayon::prelude::*;
-use saito_core::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet,
-};
-
+use saito_core::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet};
 
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;

@@ -1,8 +1,4 @@
-
-
 use crate::common::defs::SaitoHash;
-
-
 
 //
 // This is an index with shorthand information on the block_ids and hashes of the blocks
@@ -74,7 +70,7 @@ impl RingItem {
 #[cfg(test)]
 mod tests {
 
-    use crate::core::data::block::{Block};
+    use crate::core::data::block::Block;
     use crate::core::data::ringitem::RingItem;
 
     #[test]
