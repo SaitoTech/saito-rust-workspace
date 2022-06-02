@@ -194,7 +194,6 @@ impl Peer {
 #[cfg(test)]
 mod tests {
 
-    use super::*;
     use crate::core::data::peer::Peer;
 
     #[test]

@@ -162,8 +162,7 @@ impl GoldenTicket {
 #[cfg(test)]
 mod tests {
 
-    use crate::common::defs::{SaitoHash, SaitoPublicKey};
-    use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify};
+    use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
 
@@ -175,7 +174,6 @@ mod tests {
         let target = hash(&random.to_vec());
         let publickey = wallet.get_publickey();
 
-        let golden_ticket = GoldenTicket::new(target, random, publickey);
         let solution = GoldenTicket::generate(target, random, publickey);
 
         assert_eq!(GoldenTicket::validate(solution, 0), true);
