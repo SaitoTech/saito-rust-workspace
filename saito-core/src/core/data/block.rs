@@ -168,9 +168,9 @@ pub struct Block {
     /// Transactions
     pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
-    pre_hash: SaitoHash,
+    pre_hash: Option<SaitoHash>,
     /// Self-Calculated / Validated
-    hash: SaitoHash,
+    hash: Option<SaitoHash>,
     /// total fees paid into block
     total_fees: u64,
     /// total fees paid into block
@@ -222,8 +222,8 @@ impl Block {
             difficulty: 0,
             staking_treasury: 0,
             transactions: vec![],
-            pre_hash: [0; 32],
-            hash: [0; 32],
+            pre_hash: None,
+            hash: None,
             total_fees: 0,
             routing_work_for_creator: 0,
             in_longest_chain: false,
@@ -252,6 +252,7 @@ impl Block {
 
     pub fn get_hash(&self) -> SaitoHash {
         self.hash
+            .unwrap_or_else(|| hash(&self.serialize_for_hash()))
     }
 
     pub fn is_in_longest_chain(&self) -> bool {
@@ -328,6 +329,7 @@ impl Block {
 
     pub fn get_pre_hash(&self) -> SaitoHash {
         self.pre_hash
+            .unwrap_or_else(|| hash(&self.serialize_for_signature()))
     }
 
     pub fn get_total_fees(&self) -> u64 {
@@ -374,17 +376,9 @@ impl Block {
         self.total_fees = total_fees;
     }
 
-    // TODO refactor: All of these setters which are setting something which is included
-    // in the pre_hash or hash are dangerous. The purpose of the set/get paradigm is for
-    // a class/unit to be able to enforce an API which guarantees it's consistency to
-    // those using it. To be correct, each of these setters should call generate_hashes()
-    // after it sets the state. However, this would be ridiculous because everytime we
-    // construct a new Block, we call all these one after the other. A comprimise might
-    // be to remove them and at least just set the private fields directly, or make the
-    // setters private, but this misses the point. We want to encapsulate any state
-    // changes into a single black-box so that state is easier to reason about.
     pub fn set_transactions(&mut self, transactions: &mut Vec<Transaction>) {
         self.transactions = transactions.to_vec();
+        self.hash = None;
     }
 
     pub fn set_block_type(&mut self, block_type: BlockType) {
@@ -393,6 +387,8 @@ impl Block {
 
     pub fn set_id(&mut self, id: u64) {
         self.id = id;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_in_longest_chain(&mut self, lc: bool) {
@@ -401,50 +397,61 @@ impl Block {
 
     pub fn set_timestamp(&mut self, timestamp: u64) {
         self.timestamp = timestamp;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_previous_block_hash(&mut self, previous_block_hash: SaitoHash) {
         self.previous_block_hash = previous_block_hash;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_creator(&mut self, creator: SaitoPublicKey) {
         self.creator = creator;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_merkle_root(&mut self, merkle_root: SaitoHash) {
         self.merkle_root = merkle_root;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_signature(&mut self, signature: SaitoSignature) {
         self.signature = signature;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_staking_treasury(&mut self, staking_treasury: u64) {
         self.staking_treasury = staking_treasury;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_treasury(&mut self, treasury: u64) {
         self.treasury = treasury;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_burnfee(&mut self, burnfee: u64) {
         self.burnfee = burnfee;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn set_difficulty(&mut self, difficulty: u64) {
         self.difficulty = difficulty;
-    }
-
-    pub fn set_pre_hash(&mut self, pre_hash: SaitoHash) {
-        self.pre_hash = pre_hash;
-    }
-
-    pub fn set_hash(&mut self, hash: SaitoHash) {
-        self.hash = hash;
+        self.pre_hash = None;
+        self.hash = None;
     }
 
     pub fn add_transaction(&mut self, tx: Transaction) {
         self.transactions.push(tx);
+        self.hash = None;
     }
 
     //
@@ -476,10 +483,8 @@ impl Block {
                 .load_block_from_disk(storage.generate_block_filename(&self))
                 .await
                 .unwrap();
-            let hash_for_signature = hash(&new_block.serialize_for_signature());
-            new_block.set_pre_hash(hash_for_signature);
-            let hash_for_hash = hash(&new_block.serialize_for_hash());
-            new_block.set_hash(hash_for_hash);
+
+            new_block.generate_hashes();
 
             //
             // in-memory swap copying txs in block from mempool
@@ -536,14 +541,17 @@ impl Block {
         self.generate_hash();
     }
     pub fn generate_hash(&mut self) -> SaitoHash {
-        let hash_for_hash = hash(&self.serialize_for_hash());
-        self.set_hash(hash_for_hash);
-        hash_for_hash
+        let hash = self.get_hash();
+        self.hash = Some(hash);
+        hash
     }
-    pub fn generate_pre_hash(&mut self) {
-        let hash_for_signature = hash(&self.serialize_for_signature());
-        self.set_pre_hash(hash_for_signature);
+
+    pub fn generate_pre_hash(&mut self) -> SaitoHash {
+        let pre_hash = self.get_pre_hash();
+        self.pre_hash = Some(pre_hash);
+        pre_hash
     }
+
     pub fn generate_hashes(&mut self) -> SaitoHash {
         self.generate_pre_hash();
         self.generate_hash()
@@ -1882,8 +1890,8 @@ mod tests {
         assert_eq!(block.burnfee, 0);
         assert_eq!(block.difficulty, 0);
         assert_eq!(block.transactions, vec![]);
-        assert_eq!(block.pre_hash, [0; 32]);
-        assert_eq!(block.hash, [0; 32]);
+        assert_eq!(block.pre_hash, None);
+        assert_eq!(block.hash, None);
         assert_eq!(block.total_fees, 0);
         assert_eq!(block.routing_work_for_creator, 0);
         assert_eq!(block.in_longest_chain, false);
@@ -1908,12 +1916,8 @@ mod tests {
         block.generate_metadata();
 
         // block hashes should have updated
-        assert_ne!(block.pre_hash, [0; 32]);
-        assert_ne!(block.hash, [0; 32]);
-        assert_ne!(block.get_pre_hash(), [0; 32]);
-        assert_ne!(block.get_hash(), [0; 32]);
-        assert_eq!(block.get_pre_hash(), block.pre_hash);
-        assert_eq!(block.get_hash(), block.hash);
+        assert_ne!(block.pre_hash, None);
+        assert_ne!(block.hash, None);
     }
 
     #[test]
