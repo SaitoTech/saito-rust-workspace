@@ -537,8 +537,9 @@ mod tests {
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
     }
 
+    #[test]
     fn wallet_serialize_and_deserialize_test() {
-        let mut wallet1 = Wallet::new();
+        let wallet1 = Wallet::new();
         let mut wallet2 = Wallet::new();
         let serialized = wallet1.serialize_for_disk();
         wallet2.deserialize_from_disk(&serialized);

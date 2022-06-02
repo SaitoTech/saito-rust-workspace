@@ -4,7 +4,7 @@ use log::trace;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
+use crate::common::defs::{SaitoPublicKey, SaitoSignature};
 use crate::core::data::crypto::{hash, sign};
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
@@ -106,7 +106,7 @@ impl Hop {
 mod tests {
 
     use super::*;
-    use crate::core::data::crypto::{generate_keys, hash, sign};
+    use crate::core::data::crypto::generate_keys;
     use crate::core::data::hop::Hop;
 
     #[test]
@@ -120,7 +120,7 @@ mod tests {
     #[tokio::test]
     async fn generate_test() {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
-        let mut sender_publickey: SaitoPublicKey;
+        let sender_publickey: SaitoPublicKey;
 
         {
             let w = wallet.read().await;
@@ -128,7 +128,7 @@ mod tests {
         }
 
         let tx = Transaction::new();
-        let (receiver_publickey, receiver_privatekey) = generate_keys();
+        let (receiver_publickey, _receiver_privatekey) = generate_keys();
 
         let hop = Hop::generate(wallet, receiver_publickey, &tx).await;
 
@@ -140,8 +140,7 @@ mod tests {
     async fn serialize_and_deserialize_test() {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         let tx = Transaction::new();
-        let (sender_publickey, sender_privatekey) = generate_keys();
-        let (receiver_publickey, receiver_privatekey) = generate_keys();
+        let (receiver_publickey, _receiver_privatekey) = generate_keys();
 
         let hop = Hop::generate(wallet, receiver_publickey, &tx).await;
 
