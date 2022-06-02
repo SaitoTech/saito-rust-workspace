@@ -133,6 +133,14 @@ mod tests {
     }
 
     #[test]
+    fn keypair_restoration_from_privatekey_test() {
+        let (publickey, privatekey) = generate_keys();
+	let (publickey2, privatekey2) = generate_keypair_from_privatekey(&privatekey);
+        assert_eq!(publickey, publickey2);
+        assert_eq!(privatekey, privatekey2);
+    }
+
+    #[test]
     fn sign_message_test() {
         let msg = <[u8; 32]>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
