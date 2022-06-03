@@ -5,10 +5,9 @@ mod tests {
     use tokio::sync::RwLock;
 
     use saito_core::core::data::blockchain::{Blockchain, MAX_TOKEN_SUPPLY};
-    use saito_core::core::data::storage::Storage;
+
     use saito_core::core::data::wallet::Wallet;
 
-    use crate::test::test_manager;
     use crate::test::test_manager::{create_timestamp, TestManager};
 
     // impl Drop for Blockchain {
@@ -40,9 +39,9 @@ mod tests {
     fn read_issuance_file_test() {
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
 
-        let mut test_manager = TestManager::new(
+        let test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
             sender_miner.clone(),
@@ -63,7 +62,7 @@ mod tests {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),

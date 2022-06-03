@@ -7,7 +7,7 @@ mod tests {
 
     use saito_core::core::data::block::{Block, BlockType};
     use saito_core::core::data::blockchain::Blockchain;
-    use saito_core::core::data::storage::Storage;
+
     use saito_core::core::data::transaction::Transaction;
     use saito_core::core::data::wallet::Wallet;
 
@@ -32,7 +32,7 @@ mod tests {
         .to_vec();
         block.set_transactions(&mut transactions);
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),

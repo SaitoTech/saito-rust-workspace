@@ -1861,6 +1861,10 @@ mod tests {
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::verify;
     use crate::core::data::slip::Slip;
+<<<<<<< tests/test_review
+=======
+
+>>>>>>> develop
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
 
