@@ -12,7 +12,6 @@ use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSigna
 use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
-use crate::core::data::staking::Staking;
 use crate::core::data::wallet::Wallet;
 
 pub const TRANSACTION_SIZE: usize = 89;
@@ -24,8 +23,6 @@ pub enum TransactionType {
     GoldenTicket,
     ATR,
     Vip,
-    StakerDeposit,
-    StakerWithdrawal,
     Issuance,
     SPV,
 }
@@ -125,11 +122,12 @@ impl Transaction {
         transaction_to_rebroadcast: &Transaction,
         output_slip_to_rebroadcast: &Slip,
         with_fee: u64,
+        with_staking_subsidy: u64,
     ) -> Transaction {
         let mut transaction = Transaction::new();
         let mut output_payment = 0;
         if output_slip_to_rebroadcast.get_amount() > with_fee {
-            output_payment = output_slip_to_rebroadcast.get_amount() - with_fee;
+            output_payment = output_slip_to_rebroadcast.get_amount() - with_fee + with_staking_subsidy;
         }
 
         transaction.set_transaction_type(TransactionType::ATR);
@@ -891,29 +889,6 @@ impl Transaction {
         // golden ticket transactions
         //
         if transaction_type == TransactionType::GoldenTicket {}
-
-        //
-        // Staking Withdrawal Transactions
-        //
-        if transaction_type == TransactionType::StakerWithdrawal {
-            for i in 0..self.inputs.len() {
-                info!("{}", i);
-                if self.inputs[i].get_slip_type() == SlipType::StakerWithdrawalPending {
-                    if !staking.validate_slip_in_pending(self.inputs[i].clone()) {
-                        info!("Staking Withdrawal Pending input slip is not in Pending thus transaction invalid!");
-                        return false;
-                    }
-                }
-                if self.inputs[i].get_slip_type() == SlipType::StakerWithdrawalStaking {
-                    if !staking.validate_slip_in_stakers(self.inputs[i].clone()) {
-                        info!("Staking Withdrawal Staker input slip is not in Staker thus transaction invalid!");
-                        info!("STAKING SLIP WE HAVE: {:?}", self.inputs[i]);
-                        info!("STAKING TABLE: {:?}", staking.stakers);
-                        return false;
-                    }
-                }
-            }
-        }
 
         //
         // vip transactions
