@@ -14,6 +14,12 @@ use crate::core::data::msg::handshake::{
 };
 use crate::core::data::msg::message::Message;
 use crate::core::data::wallet::Wallet;
+use async_trait::async_trait;
+
+#[async_trait]
+pub trait PeerConnection {
+    async fn send_message(&self, buffer: Vec<u8>) -> Result<(), Error>;
+}
 
 #[derive(Debug, Clone)]
 pub struct Peer {
@@ -39,7 +45,7 @@ impl Peer {
     }
     pub async fn initiate_handshake(
         &mut self,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        connection: &Box<dyn PeerConnection + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
@@ -57,10 +63,7 @@ impl Peer {
         };
         self.challenge_for_peer = Some(challenge.challenge);
         let message = Message::HandshakeChallenge(challenge);
-        io_handler
-            .send_message(self.peer_index, message.serialize())
-            .await
-            .unwrap();
+        connection.send_message(message.serialize()).await.unwrap();
         debug!("handshake challenge sent for peer: {:?}", self.peer_index);
 
         Ok(())
@@ -68,7 +71,7 @@ impl Peer {
     pub async fn handle_handshake_challenge(
         &mut self,
         challenge: HandshakeChallenge,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        connection: &Box<dyn PeerConnection + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
@@ -94,11 +97,8 @@ impl Peer {
         };
 
         self.challenge_for_peer = Some(response.challenge);
-        io_handler
-            .send_message(
-                self.peer_index,
-                Message::HandshakeResponse(response).serialize(),
-            )
+        connection
+            .send_message(Message::HandshakeResponse(response).serialize())
             .await
             .unwrap();
         debug!("handshake response sent for peer: {:?}", self.peer_index);
@@ -108,7 +108,7 @@ impl Peer {
     pub async fn handle_handshake_response(
         &mut self,
         response: HandshakeResponse,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        connection: &Box<dyn PeerConnection + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
     ) -> Result<(), Error> {
         debug!(
@@ -138,11 +138,8 @@ impl Peer {
         let response = HandshakeCompletion {
             signature: sign(&response.challenge, wallet.private_key),
         };
-        io_handler
-            .send_message(
-                self.peer_index,
-                Message::HandshakeCompletion(response).serialize(),
-            )
+        connection
+            .send_message(Message::HandshakeCompletion(response).serialize())
             .await
             .unwrap();
         debug!("handshake completion sent for peer: {:?}", self.peer_index);
@@ -151,7 +148,6 @@ impl Peer {
     pub async fn handle_handshake_completion(
         &mut self,
         response: HandshakeCompletion,
-        _io_handler: &Box<dyn InterfaceIO + Send + Sync>,
     ) -> Result<(), Error> {
         debug!("handling handshake completion : {:?}", self.peer_index);
         if self.challenge_for_peer.is_none() {

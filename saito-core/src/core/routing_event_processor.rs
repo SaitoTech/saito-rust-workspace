@@ -73,31 +73,31 @@ impl RoutingEventProcessor {
         match message {
             Message::HandshakeChallenge(challenge) => {
                 debug!("received handshake challenge");
-                self.network
-                    .handle_handshake_challenge(
-                        peer_index,
-                        challenge,
-                        self.wallet.clone(),
-                        self.configs.clone(),
-                    )
-                    .await;
+                // self.network
+                //     .handle_handshake_challenge(
+                //         peer_index,
+                //         challenge,
+                //         self.wallet.clone(),
+                //         self.configs.clone(),
+                //     )
+                //     .await;
             }
             Message::HandshakeResponse(response) => {
                 debug!("received handshake response");
-                self.network
-                    .handle_handshake_response(
-                        peer_index,
-                        response,
-                        self.wallet.clone(),
-                        self.blockchain.clone(),
-                    )
-                    .await;
+                // self.network
+                //     .handle_handshake_response(
+                //         peer_index,
+                //         response,
+                //         self.wallet.clone(),
+                //         self.blockchain.clone(),
+                //     )
+                //     .await;
             }
             Message::HandshakeCompletion(response) => {
                 debug!("received handshake completion");
-                self.network
-                    .handle_handshake_completion(peer_index, response, self.blockchain.clone())
-                    .await;
+                // self.network
+                //     .handle_handshake_completion(peer_index, response, self.blockchain.clone())
+                //     .await;
             }
             Message::ApplicationMessage(_) => {
                 debug!("received buffer");
@@ -109,11 +109,18 @@ impl RoutingEventProcessor {
                 debug!("received transaction");
             }
             Message::BlockchainRequest(request) => {
-                self.process_incoming_blockchain_request(request, peer_index)
+                self.network
+                    .process_incoming_blockchain_request(
+                        request,
+                        peer_index,
+                        self.blockchain.clone(),
+                    )
                     .await;
             }
             Message::BlockHeaderHash(hash) => {
-                self.process_incoming_block_hash(hash, peer_index).await;
+                self.network
+                    .process_incoming_block_hash(hash, peer_index, self.blockchain.clone())
+                    .await;
             }
         }
         debug!("incoming message processed");
@@ -131,66 +138,19 @@ impl RoutingEventProcessor {
         peer_index: u64,
     ) {
         trace!("handling new peer : {:?}", peer_index);
-        self.network
-            .handle_new_peer(
-                peer_data,
-                peer_index,
-                self.wallet.clone(),
-                self.configs.clone(),
-            )
-            .await;
+        // self.network
+        //     .handle_new_peer(
+        //         peer_data,
+        //         peer_index,
+        //         self.wallet.clone(),
+        //         self.configs.clone(),
+        //     )
+        //     .await;
     }
 
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
         self.network.handle_peer_disconnect(peer_index).await;
-    }
-
-    pub async fn process_incoming_blockchain_request(
-        &self,
-        request: BlockchainRequest,
-        peer_index: u64,
-    ) {
-        debug!(
-            "processing incoming blockchain request : {:?}-{:?}-{:?} from peer : {:?}",
-            request.latest_block_id,
-            hex::encode(request.latest_block_hash),
-            hex::encode(request.fork_id),
-            peer_index
-        );
-        // TODO : can we ignore the functionality if it's a lite node ?
-
-        let blockchain = self.blockchain.read().await;
-
-        let last_shared_ancestor =
-            blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
-        debug!("last shared ancestor = {:?}", last_shared_ancestor);
-
-        for i in last_shared_ancestor..(blockchain.blockring.get_latest_block_id() + 1) {
-            let block_hash = blockchain
-                .blockring
-                .get_longest_chain_block_hash_by_block_id(i);
-            if block_hash == [0; 32] {
-                // TODO : can the block hash not be in the ring if we are going through the longest chain ?
-                continue;
-            }
-            let buffer = Message::BlockHeaderHash(block_hash).serialize();
-            self.network
-                .io_interface
-                .send_message(peer_index, buffer)
-                .await
-                .unwrap();
-        }
-    }
-    async fn process_incoming_block_hash(&self, block_hash: SaitoHash, peer_index: u64) {
-        debug!(
-            "processing incoming block hash : {:?} from peer : {:?}",
-            hex::encode(block_hash),
-            peer_index
-        );
-        self.network
-            .process_incoming_block_hash(block_hash, peer_index, self.blockchain.clone())
-            .await;
     }
 }
 
