@@ -1940,7 +1940,7 @@ impl Block {
 #[cfg(test)]
 mod tests {
 
-    use hex::{ToHex, FromHex};
+    use hex::FromHex;
 
     use ahash::AHashMap;
 
