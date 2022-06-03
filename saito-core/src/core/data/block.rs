@@ -36,7 +36,7 @@ pub struct ConsensusValues {
     // number of issuance transactions if exists
     pub it_num: u8,
     // index of issuance transactions if exists
-    /pub it_idx: Option<usize>,
+    pub it_idx: Option<usize>,
     // number of FEE in transactions if exists
     pub ft_num: u8,
     // index of FEE in transactions if exists
@@ -263,19 +263,19 @@ impl Block {
     }
 
     pub fn get_avg_income(&self) -> u64 {
-        &self.avg_income
+        self.avg_income
     }
 
     pub fn get_avg_atr_income(&self) -> u64 {
-        &self.avg_atr_income
+        self.avg_atr_income
     }
 
     pub fn get_avg_variance(&self) -> u64 {
-        &self.avg_variange
+        self.avg_variance
     }
 
     pub fn get_avg_atr_variance(&self) -> u64 {
-        &self.avg_atr_variance
+        self.avg_atr_variance
     }
 
     pub fn get_transactions(&self) -> &Vec<Transaction> {
@@ -382,11 +382,11 @@ impl Block {
         self.avg_atr_income = x;
     }
 
-    pub fn set_avg_variance(&mut self, x: 64) {
+    pub fn set_avg_variance(&mut self, x: u64) {
         self.avg_variance = x; 
     }
 
-    pub fn set_avg_atr_variance(&mut self) -> y64 {
+    pub fn set_avg_atr_variance(&mut self, x: u64) {
         self.avg_atr_variance = x;
     }
 
@@ -972,25 +972,25 @@ impl Block {
             cv.avg_atr_income = previous_block.get_avg_atr_income();
             cv.avg_atr_variance = previous_block.get_avg_atr_variance();
 
-            if previous_block.block.avg_income > cv.total_fees {
-        	let adjustment = (previous_block.block.avg_income - cv.total_fees) / GENESIS_PERIOD;
-        	if (adjustment > 0) { cv.avg_income -= adjustment; }
+            if previous_block.get_avg_income() > cv.total_fees {
+        	let adjustment = (previous_block.get_avg_income() - cv.total_fees) / GENESIS_PERIOD;
+        	if adjustment > 0 { cv.avg_income -= adjustment; }
       	    }
-      	    if previous_block.block.avg_income < cv.total_fees {
-        	let adjustment = (cv.total_fees - previous_block.block.avg_income) / GENESIS_PERIOD;
-        	if (adjustment > 0) { cv.avg_income += adjustment; }
+      	    if previous_block.get_avg_income() < cv.total_fees {
+        	let adjustment = (cv.total_fees - previous_block.get_avg_income()) / GENESIS_PERIOD;
+        	if adjustment > 0 { cv.avg_income += adjustment; }
             }
 
       	    //
             // average atr income and variance adjusts slowly.
             //
-       	    if previous_block.block.avg_atr_income > cv.total_rebroadcast_nolan {
-        	let adjustment = (previous_block.block.avg_atr_income - cv.total_rebroadcast_nolan) / GENESIS_PERIOD;
-        	if (adjustment > 0) { cv.avg_atr_income -= adjustment; }
+       	    if previous_block.get_avg_atr_income() > cv.total_rebroadcast_nolan {
+        	let adjustment = (previous_block.get_avg_atr_income() - cv.total_rebroadcast_nolan) / GENESIS_PERIOD;
+        	if adjustment > 0 { cv.avg_atr_income -= adjustment; }
       	    }
-      	    if previous_block.block.avg_atr_income < cv.total_rebroadcast_nolan {
-        	let adjustment = (cv.total_rebroadcast_nolan - previous_block.block.avg_atr_income) / GENESIS_PERIOD;
-        	if (adjustment > 0) { cv.avg_atr_income += adjustment; }
+      	    if previous_block.get_avg_atr_income() < cv.total_rebroadcast_nolan {
+        	let adjustment = (cv.total_rebroadcast_nolan - previous_block.get_avg_atr_income()) / GENESIS_PERIOD;
+        	if adjustment > 0 { cv.avg_atr_income += adjustment; }
             }
 
 
@@ -1035,16 +1035,16 @@ impl Block {
 	    	//
       	    	// limit previous block payout to avg income
       	    	//
-      	    	let previous_block_payout = previous_block.get_total_fees();
-      	    	if (
-        	    previous_block_payout > (previous_block.block.avg_income * 1.25) &&
-        	    previous_block_payout > 50
-      	    	) {
-        	    previous_block_payout = previous_block.block.avg_income * 1.24;
+      	    	let mut previous_block_payout = previous_block.get_total_fees();
+      	    	if
+        	    previous_block_payout > (previous_block.get_avg_income() as f64 * 1.25) as u64 && 
+	       	    previous_block_payout > 50
+      	    	{
+        	    previous_block_payout = (previous_block.get_avg_income() as f64 * 1.24) as u64;
       	    	}
 
                 let miner_payment = previous_block_payout / 2;
-                let router_payment = previous_block_payout - miner_payout;
+                let router_payment = previous_block_payout - miner_payment;
 
                 //
                 // calculate miner and router payments
@@ -1105,12 +1105,12 @@ impl Block {
                                 // be withheld for the staker treasury, which is what previous_staker_
                                 // payment is measuring.
                                 //
-                		let previous_staking_block_payout = staking_block.get_total_fees();
-                		if (
-                		    previous_staking_block_payout > (staking_block.get_avg_income() * 1.25) &&
+                		let mut previous_staking_block_payout = staking_block.get_total_fees();
+                		if
+                		    previous_staking_block_payout > (staking_block.get_avg_income() as f64 * 1.25) as u64 &&
                 		    previous_staking_block_payout > 50
-                		) {
-                		    previous_staking_block_payout = staking_block.get_avg_income() * 1.24;
+                		{
+                		    previous_staking_block_payout = (staking_block.get_avg_income() as f64 * 1.24) as u64;
                 		}
 
 
@@ -1416,7 +1416,6 @@ impl Block {
         &self,
         blockchain: &Blockchain,
         utxoset: &UtxoSet,
-        staking: &Staking,
     ) -> bool {
         //
         // no transactions? no thank you
@@ -1717,7 +1716,7 @@ impl Block {
         // debugging output works.
         //
         for i in 0..self.transactions.len() {
-            let transactions_valid2 = self.transactions[i].validate(utxoset, staking);
+            let transactions_valid2 = self.transactions[i].validate(utxoset);
             if !transactions_valid2 {
                 info!("Type: {:?}", self.transactions[i].get_transaction_type());
                 info!("Data {:?}", self.transactions[i]);
@@ -1728,7 +1727,7 @@ impl Block {
         let transactions_valid = self
             .transactions
             .par_iter()
-            .all(|tx| tx.validate(utxoset, staking));
+            .all(|tx| tx.validate(utxoset));
 
         transactions_valid
     }
@@ -1941,7 +1940,7 @@ impl Block {
 #[cfg(test)]
 mod tests {
 
-    use hex::FromHex;
+    use hex::{ToHex, FromHex};
 
     use ahash::AHashMap;
 
@@ -2000,6 +1999,7 @@ mod tests {
 
     #[test]
     fn block_signature_test() {
+
         let mut block = Block::new();
 
         block.id = 10;
@@ -2035,6 +2035,7 @@ mod tests {
             )
             .unwrap(),
         );
+
         assert_eq!(block.signature.len(), 64);
         assert_eq!(
             block.signature,

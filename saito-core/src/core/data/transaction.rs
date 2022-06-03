@@ -773,7 +773,7 @@ impl Transaction {
         true
     }
 
-    pub fn validate(&self, utxoset: &UtxoSet, staking: &Staking) -> bool {
+    pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         trace!(
             "validating transaction : {:?}",
             hex::encode(self.get_hash_for_signature().unwrap())

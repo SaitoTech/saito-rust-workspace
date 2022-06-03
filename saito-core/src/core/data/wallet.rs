@@ -1,4 +1,3 @@
-use log::info;
 
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
@@ -8,8 +7,7 @@ use crate::core::data::crypto::{
     decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
 };
 use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::slip::{Slip, SlipType};
-use crate::core::data::staking::Staking;
+use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 
@@ -45,7 +43,6 @@ pub struct Wallet {
     pub publickey: SaitoPublicKey,
     pub privatekey: SaitoPrivateKey,
     slips: Vec<WalletSlip>,
-    staked_slips: Vec<WalletSlip>,
     filename: String,
     filepass: String,
 }
@@ -57,7 +54,6 @@ impl Wallet {
             publickey,
             privatekey,
             slips: vec![],
-            staked_slips: vec![],
             filename: "default".to_string(),
             filepass: "password".to_string(),
         }
@@ -125,15 +121,7 @@ impl Wallet {
             for tx in block.get_transactions() {
                 for input in tx.get_inputs() {
                     if input.get_amount() > 0 && input.get_publickey() == self.get_publickey() {
-                        if input.get_slip_type() == SlipType::StakerDeposit
-                            || input.get_slip_type() == SlipType::StakerOutput
-                            || input.get_slip_type() == SlipType::StakerWithdrawalStaking
-                            || input.get_slip_type() == SlipType::StakerWithdrawalPending
-                        {
-                            self.delete_staked_slip(input);
-                        } else {
-                            self.delete_slip(input);
-                        }
+                        self.delete_slip(input);
                     }
                 }
                 for output in tx.get_outputs() {
@@ -184,20 +172,7 @@ impl Wallet {
         wallet_slip.set_block_id(block.get_id());
         wallet_slip.set_block_hash(block.get_hash());
         wallet_slip.set_lc(lc);
-
-        if slip.get_slip_type() == SlipType::StakerDeposit
-            || slip.get_slip_type() == SlipType::StakerOutput
-        {
-            self.staked_slips.push(wallet_slip);
-        } else {
-            self.slips.push(wallet_slip);
-        }
-    }
-
-    pub fn delete_staked_slip(&mut self, slip: &Slip) {
-        self.staked_slips.retain(|x| {
-            x.get_uuid() != slip.get_uuid() || x.get_slip_ordinal() != slip.get_slip_ordinal()
-        });
+        self.slips.push(wallet_slip);
     }
 
     pub fn delete_slip(&mut self, slip: &Slip) {
@@ -353,95 +328,6 @@ impl Wallet {
         transaction
     }
 
-    //
-    // creates a transaction that will deposit tokens into the staking system in the
-    // amount specified, if possible. the transaction will be invalid if there is not
-    // enough UTXO in the wallet to make the payment.
-    //
-    pub async fn create_staking_deposit_transaction(
-        &mut self,
-        total_requested: u64,
-    ) -> Transaction {
-        let mut transaction = Transaction::new();
-
-        transaction.set_transaction_type(TransactionType::StakerDeposit);
-
-        let (mut input_slips, mut output_slips) = self.generate_slips(total_requested);
-        let input_len = input_slips.len();
-        let output_len = output_slips.len();
-
-        // add the staking deposit
-        let mut output = Slip::new();
-        output.set_publickey(self.get_publickey());
-        output.set_amount(total_requested);
-        output.set_slip_type(SlipType::StakerDeposit);
-        transaction.add_output(output);
-
-        for _i in 0..input_len {
-            transaction.add_input(input_slips.remove(0));
-        }
-        for _i in 0..output_len {
-            transaction.add_output(output_slips.remove(0));
-        }
-
-        let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
-        transaction.set_hash_for_signature(hash_for_signature);
-        transaction.sign(self.get_privatekey());
-
-        transaction
-    }
-
-    //
-    // creates a staking withdrawal transaction if possible that removes a slip from
-    // the staking table. this function is primarily used for testing and as a reference
-    // for how these transactions should be formatted, so we will just withdraw the first
-    // staking slip.
-    //
-    pub async fn create_staking_withdrawal_transaction(
-        &mut self,
-        staking: &Staking,
-    ) -> Transaction {
-        let mut transaction = Transaction::new();
-        transaction.set_transaction_type(TransactionType::StakerWithdrawal);
-
-        if self.staked_slips.is_empty() {
-            return transaction;
-        }
-
-        let slip = self.staked_slips[0].clone();
-
-        let mut input = Slip::new();
-        input.set_publickey(self.get_publickey());
-        input.set_amount(slip.get_amount());
-        input.set_uuid(slip.get_uuid());
-        input.set_slip_ordinal(slip.get_slip_ordinal());
-        input.set_slip_type(SlipType::StakerWithdrawalStaking);
-
-        if staking.validate_slip_in_stakers(input.clone()) {
-            info!("this slip is in stakers");
-            input.set_slip_type(SlipType::StakerWithdrawalStaking);
-        }
-        if staking.validate_slip_in_pending(input.clone()) {
-            info!("this slip is in pending");
-            input.set_slip_type(SlipType::StakerWithdrawalPending);
-        }
-
-        let mut output = input.clone();
-        output.set_slip_type(SlipType::Normal);
-
-        // just convert to a normal transaction
-        transaction.add_input(input);
-        transaction.add_output(output);
-
-        let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
-        transaction.set_hash_for_signature(hash_for_signature);
-        transaction.sign(self.get_privatekey());
-
-        // and remember it is spent!
-        self.staked_slips[0].set_spent(true);
-
-        transaction
-    }
 }
 
 impl WalletSlip {

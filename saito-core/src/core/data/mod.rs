@@ -17,7 +17,6 @@ pub mod peer_collection;
 pub mod ringitem;
 pub mod serialize;
 pub mod slip;
-pub mod staking;
 pub mod storage;
 pub mod transaction;
 pub mod wallet;
