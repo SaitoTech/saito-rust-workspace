@@ -1853,20 +1853,13 @@ impl Block {
 
 #[cfg(test)]
 mod tests {
-
-    use hex::FromHex;
-
-    use ahash::AHashMap;
-
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::verify;
     use crate::core::data::slip::Slip;
-<<<<<<< tests/test_review
-=======
-
->>>>>>> develop
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
+    use ahash::AHashMap;
+    use hex::FromHex;
 
     #[test]
     fn block_new_test() {
