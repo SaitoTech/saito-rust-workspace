@@ -100,10 +100,10 @@ impl ConsensusValues {
             nolan_falling_off_chain: 0,
             staking_treasury: 0,
             block_payout: vec![],
-    	    avg_income: 0,
-    	    avg_variance: 0,
-    	    avg_atr_income: 0,
-    	    avg_atr_variance: 0,
+            avg_income: 0,
+            avg_variance: 0,
+            avg_atr_income: 0,
+            avg_atr_variance: 0,
         }
     }
 }
@@ -233,10 +233,10 @@ impl Block {
             burnfee: 0,
             difficulty: 0,
             staking_treasury: 0,
-    	    avg_income: 0,
-    	    avg_variance: 0,
-    	    avg_atr_income: 0,
-    	    avg_atr_variance: 0,
+            avg_income: 0,
+            avg_variance: 0,
+            avg_atr_income: 0,
+            avg_atr_variance: 0,
             transactions: vec![],
             pre_hash: [0; 32],
             hash: [0; 32],
@@ -383,7 +383,7 @@ impl Block {
     }
 
     pub fn set_avg_variance(&mut self, x: u64) {
-        self.avg_variance = x; 
+        self.avg_variance = x;
     }
 
     pub fn set_avg_atr_variance(&mut self, x: u64) {
@@ -671,7 +671,6 @@ impl Block {
         vbytes.extend(&self.avg_atr_income.to_be_bytes());
         vbytes.extend(&self.avg_atr_variance.to_be_bytes());
 
-
         let mut serialized_txs = vec![];
 
         // block headers do not get tx data
@@ -882,12 +881,10 @@ impl Block {
             idx += 1;
         }
 
-
         //
         // calculate automatic transaction rebroadcasts / ATR / atr
         //
         if self.get_id() > GENESIS_PERIOD {
-
             let pruned_block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(self.get_id() - 2);
@@ -902,23 +899,19 @@ impl Block {
                 // identify all unspent transactions
                 //
                 for transaction in &pruned_block.transactions {
-
                     for output in transaction.get_outputs() {
-
-
-	 	        //
-            	        // these need to be calculated dynamically based on the
-            	        // value of the UTTX and the byte-size of the transaction
-            	        //
-            		let REBROADCAST_FEE = 200_000_000;
-            		let STAKING_SUBSIDY = 100_000_000;
-            		let UTXO_ADJUSTMENT = REBROADCAST_FEE - STAKING_SUBSIDY;
+                        //
+                        // these need to be calculated dynamically based on the
+                        // value of the UTTX and the byte-size of the transaction
+                        //
+                        let REBROADCAST_FEE = 200_000_000;
+                        let STAKING_SUBSIDY = 100_000_000;
+                        let UTXO_ADJUSTMENT = REBROADCAST_FEE - STAKING_SUBSIDY;
 
                         //
                         // valid means spendable and non-zero
                         //HACK
                         if output.validate(&blockchain.utxoset) {
-
                             if output.get_amount() > UTXO_ADJUSTMENT {
                                 cv.total_rebroadcast_nolan += output.get_amount();
                                 cv.total_rebroadcast_fees_nolan += REBROADCAST_FEE;
@@ -933,7 +926,7 @@ impl Block {
                                         &transaction,
                                         output,
                                         REBROADCAST_FEE,
-					STAKING_SUBSIDY,
+                                        STAKING_SUBSIDY,
                                     );
 
                                 //
@@ -961,38 +954,45 @@ impl Block {
             }
         }
 
-
         //
         // burn fee, difficulty and avg_income figures
         //
         if let Some(previous_block) = blockchain.blocks.get(&self.get_previous_block_hash()) {
-
-      	    cv.avg_income = previous_block.get_avg_income();
+            cv.avg_income = previous_block.get_avg_income();
             cv.avg_variance = previous_block.get_avg_variance();
             cv.avg_atr_income = previous_block.get_avg_atr_income();
             cv.avg_atr_variance = previous_block.get_avg_atr_variance();
 
             if previous_block.get_avg_income() > cv.total_fees {
-        	let adjustment = (previous_block.get_avg_income() - cv.total_fees) / GENESIS_PERIOD;
-        	if adjustment > 0 { cv.avg_income -= adjustment; }
-      	    }
-      	    if previous_block.get_avg_income() < cv.total_fees {
-        	let adjustment = (cv.total_fees - previous_block.get_avg_income()) / GENESIS_PERIOD;
-        	if adjustment > 0 { cv.avg_income += adjustment; }
+                let adjustment = (previous_block.get_avg_income() - cv.total_fees) / GENESIS_PERIOD;
+                if adjustment > 0 {
+                    cv.avg_income -= adjustment;
+                }
+            }
+            if previous_block.get_avg_income() < cv.total_fees {
+                let adjustment = (cv.total_fees - previous_block.get_avg_income()) / GENESIS_PERIOD;
+                if adjustment > 0 {
+                    cv.avg_income += adjustment;
+                }
             }
 
-      	    //
+            //
             // average atr income and variance adjusts slowly.
             //
-       	    if previous_block.get_avg_atr_income() > cv.total_rebroadcast_nolan {
-        	let adjustment = (previous_block.get_avg_atr_income() - cv.total_rebroadcast_nolan) / GENESIS_PERIOD;
-        	if adjustment > 0 { cv.avg_atr_income -= adjustment; }
-      	    }
-      	    if previous_block.get_avg_atr_income() < cv.total_rebroadcast_nolan {
-        	let adjustment = (cv.total_rebroadcast_nolan - previous_block.get_avg_atr_income()) / GENESIS_PERIOD;
-        	if adjustment > 0 { cv.avg_atr_income += adjustment; }
+            if previous_block.get_avg_atr_income() > cv.total_rebroadcast_nolan {
+                let adjustment = (previous_block.get_avg_atr_income() - cv.total_rebroadcast_nolan)
+                    / GENESIS_PERIOD;
+                if adjustment > 0 {
+                    cv.avg_atr_income -= adjustment;
+                }
             }
-
+            if previous_block.get_avg_atr_income() < cv.total_rebroadcast_nolan {
+                let adjustment = (cv.total_rebroadcast_nolan - previous_block.get_avg_atr_income())
+                    / GENESIS_PERIOD;
+                if adjustment > 0 {
+                    cv.avg_atr_income += adjustment;
+                }
+            }
 
             let difficulty = previous_block.get_difficulty();
             if !previous_block.get_has_golden_ticket() && cv.gt_num == 0 {
@@ -1008,12 +1008,12 @@ impl Block {
             //
             // if there is no previous block, the burn fee is not adjusted. validation
             // rules will cause the block to fail unless it is the first block. average
-	    // income is set to whatever the block avg_income is set to.
+            // income is set to whatever the block avg_income is set to.
             //
-      	    cv.avg_income = self.get_avg_income();
-      	    cv.avg_variance = self.get_avg_variance();
-	    cv.avg_atr_income = self.get_avg_atr_income();
-      	    cv.avg_atr_variance = self.get_avg_atr_variance();
+            cv.avg_income = self.get_avg_income();
+            cv.avg_variance = self.get_avg_variance();
+            cv.avg_atr_income = self.get_avg_atr_income();
+            cv.avg_atr_variance = self.get_avg_atr_variance();
         }
 
         //
@@ -1030,18 +1030,15 @@ impl Block {
             // miner payout is fees from previous block, no staking treasury
             //
             if let Some(previous_block) = blockchain.blocks.get(&self.get_previous_block_hash()) {
-
-
-	    	//
-      	    	// limit previous block payout to avg income
-      	    	//
-      	    	let mut previous_block_payout = previous_block.get_total_fees();
-      	    	if
-        	    previous_block_payout > (previous_block.get_avg_income() as f64 * 1.25) as u64 && 
-	       	    previous_block_payout > 50
-      	    	{
-        	    previous_block_payout = (previous_block.get_avg_income() as f64 * 1.24) as u64;
-      	    	}
+                //
+                // limit previous block payout to avg income
+                //
+                let mut previous_block_payout = previous_block.get_total_fees();
+                if previous_block_payout > (previous_block.get_avg_income() as f64 * 1.25) as u64
+                    && previous_block_payout > 50
+                {
+                    previous_block_payout = (previous_block.get_avg_income() as f64 * 1.24) as u64;
+                }
 
                 let miner_payment = previous_block_payout / 2;
                 let router_payment = previous_block_payout - miner_payment;
@@ -1058,9 +1055,9 @@ impl Block {
                 payout.router_payout = router_payment;
                 cv.block_payout.push(payout);
 
-		//
+                //
                 // these two from find_winning_router - 3, 4
-		//
+                //
                 next_random_number = hash(&next_random_number.to_vec());
                 next_random_number = hash(&next_random_number.to_vec());
 
@@ -1105,14 +1102,15 @@ impl Block {
                                 // be withheld for the staker treasury, which is what previous_staker_
                                 // payment is measuring.
                                 //
-                		let mut previous_staking_block_payout = staking_block.get_total_fees();
-                		if
-                		    previous_staking_block_payout > (staking_block.get_avg_income() as f64 * 1.25) as u64 &&
-                		    previous_staking_block_payout > 50
-                		{
-                		    previous_staking_block_payout = (staking_block.get_avg_income() as f64 * 1.24) as u64;
-                		}
-
+                                let mut previous_staking_block_payout =
+                                    staking_block.get_total_fees();
+                                if previous_staking_block_payout
+                                    > (staking_block.get_avg_income() as f64 * 1.25) as u64
+                                    && previous_staking_block_payout > 50
+                                {
+                                    previous_staking_block_payout =
+                                        (staking_block.get_avg_income() as f64 * 1.24) as u64;
+                                }
 
                                 let sp = previous_staking_block_payout / 2;
                                 let rp = previous_staking_block_payout - sp;
@@ -1412,11 +1410,7 @@ impl Block {
         true
     }
 
-    pub async fn validate(
-        &self,
-        blockchain: &Blockchain,
-        utxoset: &UtxoSet,
-    ) -> bool {
+    pub async fn validate(&self, blockchain: &Blockchain, utxoset: &UtxoSet) -> bool {
         //
         // no transactions? no thank you
         //
@@ -1724,10 +1718,7 @@ impl Block {
         }
         //true
 
-        let transactions_valid = self
-            .transactions
-            .par_iter()
-            .all(|tx| tx.validate(utxoset));
+        let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
 
         transactions_valid
     }
@@ -1999,7 +1990,6 @@ mod tests {
 
     #[test]
     fn block_signature_test() {
-
         let mut block = Block::new();
 
         block.id = 10;

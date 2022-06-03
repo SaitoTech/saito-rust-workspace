@@ -1,4 +1,3 @@
-
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
@@ -327,7 +326,6 @@ impl Wallet {
 
         transaction
     }
-
 }
 
 impl WalletSlip {
