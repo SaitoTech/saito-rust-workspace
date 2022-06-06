@@ -1574,7 +1574,7 @@ impl Block {
 		// actually valid in the context of our blockchain, and not just
 		// internally consistent in the blockchain of the sender.
 		//
-                let gt = GoldenTicket::generate(
+                let gt = GoldenTicket::create(
                     previous_block.get_hash(),
                     golden_ticket.get_random(),
                     golden_ticket.get_publickey(),

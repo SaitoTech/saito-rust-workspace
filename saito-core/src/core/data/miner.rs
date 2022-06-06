@@ -38,7 +38,7 @@ impl Miner {
             publickey = wallet.get_publickey();
         }
         let random_bytes = hash(&generate_random_bytes(32));
-        let gt = GoldenTicket::generate(self.target, random_bytes, publickey);
+        let gt = GoldenTicket::create(self.target, random_bytes, publickey);
         if gt.validate(self.difficulty) {
 
             debug!(

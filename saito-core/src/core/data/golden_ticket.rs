@@ -27,20 +27,20 @@ impl GoldenTicket {
         };
     }
 
-    pub fn deserialize_from_net(bytes: Vec<u8>) -> GoldenTicket {
-        let target: SaitoHash = bytes[0..32].try_into().unwrap();
-        let random: SaitoHash = bytes[32..64].try_into().unwrap();
-        let publickey: SaitoPublicKey = bytes[64..97].try_into().unwrap();
-        GoldenTicket::new(target, random, publickey)
-    }
-
-    pub fn generate(
+    pub fn create(
         previous_block_hash: SaitoHash,
         random_bytes: SaitoHash,
         publickey: SaitoPublicKey,
     ) -> GoldenTicket {
         let mut gt = GoldenTicket::new(previous_block_hash, random_bytes, publickey);
 	gt
+    }
+
+    pub fn deserialize_from_net(bytes: Vec<u8>) -> GoldenTicket {
+        let target: SaitoHash = bytes[0..32].try_into().unwrap();
+        let random: SaitoHash = bytes[32..64].try_into().unwrap();
+        let publickey: SaitoPublicKey = bytes[64..97].try_into().unwrap();
+        GoldenTicket::new(target, random, publickey)
     }
 
     pub fn get_target(&self) -> SaitoHash {
@@ -175,7 +175,7 @@ mod tests {
         let target = hash(&random.to_vec());
         let publickey = wallet.get_publickey();
 
-        let gt = GoldenTicket::generate(target, random, publickey);
+        let gt = GoldenTicket::create(target, random, publickey);
 
         assert_eq!(gt.validate(0), true);
         assert_eq!(gt.validate(256), false);
