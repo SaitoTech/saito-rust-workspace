@@ -70,8 +70,7 @@ impl GoldenTicket {
     // comparisons in binary.
     //
     pub fn validate(&self, difficulty: u64) -> bool {
-
-	let solution = hash(&self.serialize_for_net());
+        let solution = hash(&self.serialize_for_net());
 
         let leading_zeroes_required: u64 = difficulty / 16;
         let final_digit: u8 = 15 - ((difficulty % 16) as u8);
@@ -177,7 +176,6 @@ mod tests {
 
         assert_eq!(gt.validate(0), true);
         assert_eq!(gt.validate(256), false);
-
     }
 
     #[test]
