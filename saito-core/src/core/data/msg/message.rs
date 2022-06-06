@@ -1,8 +1,6 @@
 use std::io::{Error, ErrorKind};
 
 use log::{info, warn};
-use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};

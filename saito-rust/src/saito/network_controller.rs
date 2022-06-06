@@ -1,34 +1,32 @@
 use std::collections::HashMap;
-use std::fs::File;
+
 use std::io::{Error, ErrorKind, Write};
-use std::path::Path;
+
 use std::sync::Arc;
-use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, trace, warn};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::select;
+use tokio::net::TcpStream;
+
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
-use tokio_tungstenite::{accept_async, connect_async, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
 use saito_core::common::defs::SaitoHash;
 use saito_core::core::data;
-use saito_core::core::data::block::{Block, BlockType};
+use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::{Configuration, Peer};
+use saito_core::core::data::configuration::{Configuration, PeerConfig};
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
-use crate::{NetworkEvent, IoEvent};
+use crate::{IoEvent, NetworkEvent};
 
-type SocketSender =
-    SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>;
+type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 pub struct NetworkController {
@@ -68,7 +66,7 @@ impl NetworkController {
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<NetworkController>>,
-        peer: data::configuration::Peer,
+        peer: data::configuration::PeerConfig,
     ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
 
@@ -85,7 +83,7 @@ impl NetworkController {
         debug!("connecting to peer : {:?}", url);
         let result = connect_async(url.clone()).await;
         if result.is_err() {
-            warn!("failed connecting to peer : {:?}", peer);
+            warn!("failed connecting to peer : {:?}", peer); //TODO : Retry connecting after an interval
             error!("{:?}", result.err());
             RustIOHandler::set_event_response(
                 event_id,
@@ -163,7 +161,7 @@ impl NetworkController {
         // RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
         sender_to_core
             .send(IoEvent {
-                controller_id: 1,
+                event_processor_id: 1,
                 event_id,
                 event: NetworkEvent::BlockFetched {
                     block_hash,
@@ -182,7 +180,7 @@ impl NetworkController {
         sender: PeerSender,
         receiver: PeerReceiver,
         sender_to_core: Sender<IoEvent>,
-        peer_data: Option<Peer>,
+        peer_data: Option<PeerConfig>,
     ) {
         let mut counter = peer_counter.lock().await;
         let next_index = counter.get_next_index();
@@ -192,7 +190,7 @@ impl NetworkController {
 
         sender_to_core
             .send(IoEvent {
-                controller_id: 1,
+                event_processor_id: 1,
                 event_id,
                 event: NetworkEvent::PeerConnectionResult {
                     peer_details: peer_data,
@@ -202,10 +200,25 @@ impl NetworkController {
             .await
             .expect("sending failed");
 
-        NetworkController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index).await;
+        NetworkController::receive_message_from_peer(receiver, sender_to_core.clone(), next_index)
+            .await;
     }
+
+    pub async fn send_peer_disconnect(sender_to_core: Sender<IoEvent>, peer_index: u64) {
+        debug!("sending peer disconnect : {:?}", peer_index);
+
+        sender_to_core
+            .send(IoEvent {
+                event_processor_id: 1,
+                event_id: 0,
+                event: NetworkEvent::PeerDisconnected { peer_index },
+            })
+            .await
+            .expect("sending failed");
+    }
+
     pub async fn receive_message_from_peer(
-        mut receiver: PeerReceiver,
+        receiver: PeerReceiver,
         sender: Sender<IoEvent>,
         peer_index: u64,
     ) {
@@ -222,6 +235,7 @@ impl NetworkController {
                     if result.is_err() {
                         // TODO : handle peer disconnections
                         warn!("failed receiving message [1] : {:?}", result.err().unwrap());
+                        NetworkController::send_peer_disconnect(sender, peer_index).await;
                         break;
                     }
                     let result = result.unwrap();
@@ -229,7 +243,7 @@ impl NetworkController {
                     if result.is_binary() {
                         let buffer = result.into_bytes();
                         let message = IoEvent {
-                            controller_id: 1,
+                            event_processor_id: 1,
                             event_id: 0,
                             event: NetworkEvent::IncomingNetworkMessage { peer_index, buffer },
                         };
@@ -246,18 +260,16 @@ impl NetworkController {
                     let result = result.unwrap();
                     if result.is_err() {
                         warn!("failed receiving message [2] : {:?}", result.err().unwrap());
+                        NetworkController::send_peer_disconnect(sender, peer_index).await;
                         break;
                     }
                     let result = result.unwrap();
                     match result {
                         tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
                             let message = IoEvent {
-                                controller_id: 1,
+                                event_processor_id: 1,
                                 event_id: 0,
-                                event: NetworkEvent::IncomingNetworkMessage {
-                                    peer_index,
-                                    buffer,
-                                },
+                                event: NetworkEvent::IncomingNetworkMessage { peer_index, buffer },
                             };
                             sender.send(message).await.expect("sending failed");
                         }
@@ -304,7 +316,6 @@ pub async fn run_network_controller(
     }
 
     info!("starting server on : {:?}", url);
-    //let listener: TcpListener = TcpListener::bind(url).await.unwrap();
     let peer_counter_clone = peer_index_counter.clone();
     let sender_clone = sender.clone();
 
@@ -365,7 +376,7 @@ pub async fn run_network_controller(
                     NetworkEvent::PeerConnectionResult { .. } => {
                         unreachable!()
                     }
-                    NetworkEvent::PeerDisconnected { peer_index } => {
+                    NetworkEvent::PeerDisconnected { peer_index: _ } => {
                         unreachable!()
                     }
                     NetworkEvent::IncomingNetworkMessage { .. } => {
@@ -383,8 +394,10 @@ pub async fn run_network_controller(
                         }
                         // starting new thread to stop io controller from getting blocked
                         tokio::spawn(async move {
-                            NetworkController::fetch_block(block_hash, peer_index, url, event_id, sender)
-                                .await
+                            NetworkController::fetch_block(
+                                block_hash, peer_index, url, event_id, sender,
+                            )
+                            .await
                         });
                     }
                     NetworkEvent::BlockFetched { .. } => {
@@ -398,7 +411,7 @@ pub async fn run_network_controller(
             // }
         }
     });
-    let result = tokio::join!(server_handle, controller_handle);
+    let _result = tokio::join!(server_handle, controller_handle);
 }
 
 pub enum PeerSender {

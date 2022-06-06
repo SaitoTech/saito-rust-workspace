@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use bigint::uint::U256;
-use log::{debug, trace};
+use log::trace;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
@@ -18,6 +18,7 @@ pub struct GoldenTicket {
 
 impl GoldenTicket {
     #[allow(clippy::new_without_default)]
+
     pub fn new(target: SaitoHash, random: SaitoHash, publickey: SaitoPublicKey) -> Self {
         return Self {
             target,
@@ -26,8 +27,14 @@ impl GoldenTicket {
         };
     }
 
-    // TODO - review exact solution generated and mechanism to determine validity
-    pub fn generate_solution(
+    pub fn deserialize(bytes: Vec<u8>) -> GoldenTicket {
+        let target: SaitoHash = bytes[0..32].try_into().unwrap();
+        let random: SaitoHash = bytes[32..64].try_into().unwrap();
+        let publickey: SaitoPublicKey = bytes[64..97].try_into().unwrap();
+        GoldenTicket::new(target, random, publickey)
+    }
+
+    pub fn generate(
         previous_block_hash: SaitoHash,
         random_bytes: SaitoHash,
         publickey: SaitoPublicKey,
@@ -39,8 +46,34 @@ impl GoldenTicket {
         hash(&vbytes)
     }
 
-    // TODO - review exact algorithm in use here
-    pub fn is_valid_solution(solution: SaitoHash, difficulty: u64) -> bool {
+    pub fn get_target(&self) -> SaitoHash {
+        self.target
+    }
+
+    pub fn get_random(&self) -> SaitoHash {
+        self.random
+    }
+
+    pub fn get_publickey(&self) -> SaitoPublicKey {
+        self.publickey
+    }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut vbytes: Vec<u8> = vec![];
+        vbytes.extend(&self.target);
+        vbytes.extend(&self.random);
+        vbytes.extend(&self.publickey);
+        vbytes
+    }
+
+    //
+    // TODO - switch to full binary difficulty algorithm
+    //
+    // this algorithm is quite old but maintained in this form for compatibility with
+    // javascript clients in the short-term. we should update this to have it handle
+    // comparisons in binary.
+    //
+    pub fn validate(solution: SaitoHash, difficulty: u64) -> bool {
         let leading_zeroes_required: u64 = difficulty / 16;
         let final_digit: u8 = 15 - ((difficulty % 16) as u8);
 
@@ -124,31 +157,42 @@ impl GoldenTicket {
         );
         return false;
     }
+}
 
-    pub fn get_target(&self) -> SaitoHash {
-        self.target
+#[cfg(test)]
+mod tests {
+
+    use crate::core::data::crypto::{generate_random_bytes, hash};
+    use crate::core::data::golden_ticket::GoldenTicket;
+    use crate::core::data::wallet::Wallet;
+
+    #[test]
+    fn golden_ticket_extremes_test() {
+        let wallet = Wallet::new();
+
+        let random = hash(&generate_random_bytes(32));
+        let target = hash(&random.to_vec());
+        let publickey = wallet.get_publickey();
+
+        let solution = GoldenTicket::generate(target, random, publickey);
+
+        assert_eq!(GoldenTicket::validate(solution, 0), true);
+        assert_eq!(GoldenTicket::validate(solution, 256), false);
     }
 
-    pub fn get_random(&self) -> SaitoHash {
-        self.random
-    }
+    #[test]
+    fn golden_ticket_difficulty_test() {
 
-    pub fn get_publickey(&self) -> SaitoPublicKey {
-        self.publickey
-    }
+        // GIVEN - a known hash
+        // WHEN - tested against exactly the appropriate difficulty
+        // THEN - valid solution
 
-    pub fn serialize_for_transaction(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.target);
-        vbytes.extend(&self.random);
-        vbytes.extend(&self.publickey);
-        vbytes
-    }
+        // GIVEN - a known hash
+        // WHEN - tested against one difficulty easier
+        // THEN - valid solution
 
-    pub fn deserialize_for_transaction(bytes: Vec<u8>) -> GoldenTicket {
-        let target: SaitoHash = bytes[0..32].try_into().unwrap();
-        let random: SaitoHash = bytes[32..64].try_into().unwrap();
-        let publickey: SaitoPublicKey = bytes[64..97].try_into().unwrap();
-        GoldenTicket::new(target, random, publickey)
+        // GIVEN - a known hash
+        // WHEN - tested against one difficulty easier
+        // THEN - invalid solution
     }
 }

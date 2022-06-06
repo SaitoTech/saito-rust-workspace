@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
     use crate::test::test_manager::{create_timestamp, TestManager};
-    use crate::IoEvent;
+
     use log::info;
     use saito_core::core::data::blockchain::Blockchain;
-    use saito_core::core::data::storage::Storage;
+
     use saito_core::core::data::wallet::Wallet;
     use std::sync::Arc;
     use tokio::sync::RwLock;
@@ -18,7 +18,7 @@ mod tests {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
@@ -68,7 +68,7 @@ mod tests {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
@@ -130,7 +130,7 @@ mod tests {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
@@ -192,7 +192,7 @@ mod tests {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
@@ -295,8 +295,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block6_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -322,8 +322,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block7_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -349,8 +349,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block8_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -376,8 +376,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block9_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -403,8 +403,8 @@ mod tests {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block10_2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -488,7 +488,7 @@ mod tests {
         TestManager::clear_data_folder().await;
         let wallet_lock1 = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock1 = Arc::new(RwLock::new(Blockchain::new(wallet_lock1.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager1 = TestManager::new(
             blockchain_lock1.clone(),
             wallet_lock1.clone(),
@@ -512,13 +512,14 @@ mod tests {
             sender_miner.clone(),
         );
 
-        Storage::load_blocks_from_disk(
-            blockchain_lock2.clone(),
-            &mut test_manager2.io_handler,
-            test_manager2.peers.clone(),
-            test_manager2.sender_to_miner.clone(),
-        )
-        .await;
+        test_manager2
+            .storage
+            .load_blocks_from_disk(
+                blockchain_lock2.clone(),
+                &mut test_manager2.network,
+                test_manager2.sender_to_miner.clone(),
+            )
+            .await;
 
         {
             let blockchain1 = blockchain_lock1.read().await;

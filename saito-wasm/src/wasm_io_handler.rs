@@ -6,7 +6,7 @@ use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;
 use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::Block;
-use saito_core::core::data::configuration::Peer;
+use saito_core::core::data::configuration::PeerConfig;
 
 pub struct WasmIoHandler {}
 
@@ -24,7 +24,7 @@ impl InterfaceIO for WasmIoHandler {
         todo!()
     }
 
-    async fn connect_to_peer(&mut self, peer: Peer) -> Result<(), Error> {
+    async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
         todo!()
     }
 

@@ -3,7 +3,6 @@ use log::info;
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
-use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
     decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
@@ -27,7 +26,7 @@ pub const WALLET_SIZE: usize = 65;
 /// are spent on one fork are not recaptured on chains, for instance, and once
 /// a slip is spent it is marked as spent.
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WalletSlip {
     uuid: SaitoHash,
     utxokey: SaitoUTXOSetKey,
@@ -41,7 +40,7 @@ pub struct WalletSlip {
 
 /// The `Wallet` manages the public and private keypair of the node and holds the
 /// slips that are used to form transactions on the network.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Wallet {
     pub publickey: SaitoPublicKey,
     pub privatekey: SaitoPrivateKey,
@@ -64,20 +63,20 @@ impl Wallet {
         }
     }
 
-    pub async fn load(&mut self, io_handler: &mut Box<dyn InterfaceIO + Send + Sync>) {
+    pub async fn load(&mut self, storage: &mut Storage) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
-        if Storage::file_exists(&filename, io_handler).await {
+        if storage.file_exists(&filename).await {
             let password = self.get_password();
-            let encoded = Storage::read(&filename, io_handler).await.unwrap();
+            let encoded = storage.read(&filename).await.unwrap();
             let decrypted_encoded = decrypt_with_password(encoded, &password);
-            self.deserialize_for_disk(&decrypted_encoded);
+            self.deserialize_from_disk(&decrypted_encoded);
         } else {
             //
             // new wallet, save to disk
             //
-            self.save(io_handler).await;
+            self.save(storage).await;
         }
     }
 
@@ -85,14 +84,14 @@ impl Wallet {
         &mut self,
         wallet_path: &str,
         password: Option<&str>,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
+        storage: &mut Storage,
     ) {
         self.set_filename(wallet_path.to_string());
         self.set_password(password.unwrap().to_string());
-        self.load(io_handler).await;
+        self.load(storage).await;
     }
 
-    pub async fn save(&mut self, io_handler: &mut Box<dyn InterfaceIO + Send + Sync>) {
+    pub async fn save(&mut self, storage: &mut Storage) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
@@ -100,7 +99,7 @@ impl Wallet {
         let byte_array: Vec<u8> = self.serialize_for_disk();
         let encrypted_wallet = encrypt_with_password((&byte_array[..]).to_vec(), &password);
 
-        Storage::write(encrypted_wallet, &filename, io_handler).await;
+        storage.write(encrypted_wallet, &filename).await;
     }
 
     /// [privatekey - 32 bytes]
@@ -116,7 +115,7 @@ impl Wallet {
 
     /// [privatekey - 32 bytes
     /// [publickey - 33 bytes]
-    pub fn deserialize_for_disk(&mut self, bytes: &Vec<u8>) {
+    pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
         self.privatekey = bytes[0..32].try_into().unwrap();
         self.publickey = bytes[32..65].try_into().unwrap();
     }
@@ -331,7 +330,7 @@ impl Wallet {
 
         // for now we'll use bincode to de/serialize
         transaction.set_transaction_type(TransactionType::GoldenTicket);
-        transaction.set_message(golden_ticket.serialize_for_transaction());
+        transaction.set_message(golden_ticket.serialize());
 
         let mut input1 = Slip::new();
         input1.set_publickey(self.get_publickey());
@@ -528,6 +527,7 @@ impl WalletSlip {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::data::wallet::Wallet;
 
     #[test]
     fn wallet_new_test() {
@@ -537,23 +537,12 @@ mod tests {
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
     }
 
-    // TODO : fix this test. need a custom io handler which directly writes to disk
-    // #[test]
-    // fn save_and_restore_wallet_test() {
-    //     let mut wallet = Wallet::new();
-    //     let publickey1 = wallet.get_publickey().clone();
-    //     let privatekey1 = wallet.get_privatekey().clone();
-    //
-    //     wallet.save();
-    //
-    //     wallet = Wallet::new();
-    //
-    //     assert_ne!(wallet.get_publickey(), publickey1);
-    //     assert_ne!(wallet.get_privatekey(), privatekey1);
-    //
-    //     wallet.load();
-    //
-    //     assert_eq!(wallet.get_publickey(), publickey1);
-    //     assert_eq!(wallet.get_privatekey(), privatekey1);
-    // }
+    #[test]
+    fn wallet_serialize_and_deserialize_test() {
+        let wallet1 = Wallet::new();
+        let mut wallet2 = Wallet::new();
+        let serialized = wallet1.serialize_for_disk();
+        wallet2.deserialize_from_disk(&serialized);
+        assert_eq!(wallet1, wallet2);
+    }
 }

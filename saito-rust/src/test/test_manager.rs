@@ -7,10 +7,7 @@ use crate::test::test_io_handler::TestIOHandler;
 use ahash::AHashMap;
 use log::{debug, info, trace};
 use rayon::prelude::*;
-use saito_core::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet,
-};
-use saito_core::common::interface_io::InterfaceIO;
+use saito_core::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet};
 
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;
@@ -19,10 +16,12 @@ use saito_core::core::data::crypto::{generate_random_bytes, hash};
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::miner::Miner;
+use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
+use saito_core::core::data::storage::Storage;
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::miner_controller::MinerEvent;
+use saito_core::core::mining_event_processor::MiningEvent;
 use std::borrow::BorrowMut;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -52,8 +51,9 @@ pub struct TestManager {
     pub blockchain_lock: Arc<RwLock<Blockchain>>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub latest_block_hash: SaitoHash,
-    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
-    pub sender_to_miner: Sender<MinerEvent>,
+    pub network: Network,
+    pub storage: Storage,
+    pub sender_to_miner: Sender<MiningEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
 }
 
@@ -61,16 +61,18 @@ impl TestManager {
     pub fn new(
         blockchain_lock: Arc<RwLock<Blockchain>>,
         wallet_lock: Arc<RwLock<Wallet>>,
-        sender_to_miner: Sender<MinerEvent>,
+        sender_to_miner: Sender<MiningEvent>,
     ) -> Self {
+        let peers = Arc::new(RwLock::new(PeerCollection::new()));
         Self {
             mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet_lock.clone()))),
             blockchain_lock: blockchain_lock.clone(),
             wallet_lock: wallet_lock.clone(),
             latest_block_hash: [0; 32],
-            io_handler: Box::new(TestIOHandler::new()),
+            network: Network::new(Box::new(TestIOHandler::new()), peers.clone()),
             sender_to_miner,
-            peers: Arc::new(RwLock::new(PeerCollection::new())),
+            peers: peers.clone(),
+            storage: Storage::new(Box::new(TestIOHandler::new())),
         }
     }
     pub async fn clear_data_folder() {
@@ -142,8 +144,8 @@ impl TestManager {
         Self::add_block_to_blockchain(
             self.blockchain_lock.clone(),
             block,
-            &mut self.io_handler,
-            self.peers.clone(),
+            &mut self.network,
+            &mut self.storage,
             self.sender_to_miner.clone(),
         )
         .await;
@@ -152,13 +154,13 @@ impl TestManager {
     pub async fn add_block_to_blockchain(
         blockchain_lock: Arc<RwLock<Blockchain>>,
         block: Block,
-        io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
-        peers: Arc<RwLock<PeerCollection>>,
-        sender: Sender<MinerEvent>,
+        network: &Network,
+        storage: &mut Storage,
+        sender: Sender<MiningEvent>,
     ) {
         let mut blockchain = blockchain_lock.write().await;
         blockchain
-            .add_block(block, io_handler, peers.clone(), sender.clone())
+            .add_block(block, network, storage, sender.clone())
             .await;
     }
     //
@@ -234,7 +236,7 @@ impl TestManager {
         additional_transactions: Vec<Transaction>,
     ) -> Block {
         let mut transactions: Vec<Transaction> = vec![];
-        let mut miner = Miner::new(self.wallet_lock.clone());
+        let _miner = Miner::new(self.wallet_lock.clone());
         let privatekey: SaitoPrivateKey;
         let publickey: SaitoPublicKey;
 
@@ -320,11 +322,11 @@ impl TestManager {
         }
         let mut random_bytes = hash(&generate_random_bytes(32));
 
-        let mut solution = GoldenTicket::generate_solution(block_hash, random_bytes, public_key);
+        let mut solution = GoldenTicket::generate(block_hash, random_bytes, public_key);
 
-        while !GoldenTicket::is_valid_solution(solution, block_difficulty) {
+        while !GoldenTicket::validate(solution, block_difficulty) {
             random_bytes = hash(&generate_random_bytes(32));
-            solution = GoldenTicket::generate_solution(block_hash, random_bytes, public_key);
+            solution = GoldenTicket::generate(block_hash, random_bytes, public_key);
         }
 
         GoldenTicket::new(block_hash, random_bytes, public_key)
@@ -861,8 +863,8 @@ impl TestManager {
             blockchain
                 .add_block(
                     block,
-                    &mut self.io_handler,
-                    self.peers.clone(),
+                    &mut self.network,
+                    &mut self.storage,
                     self.sender_to_miner.clone(),
                 )
                 .await;

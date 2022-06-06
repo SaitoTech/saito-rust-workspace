@@ -1,10 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::saito::rust_io_handler::RustIOHandler;
+
     use crate::test::test_io_handler::TestIOHandler;
     use crate::test::test_manager::TestManager;
     use log::info;
-    use saito_core::common::interface_io::InterfaceIO;
+
+    use saito_core::core::data::storage::Storage;
     use saito_core::core::data::wallet::Wallet;
 
     #[tokio::test]
@@ -16,16 +17,17 @@ mod tests {
         let publickey1 = wallet.get_publickey().clone();
         let privatekey1 = wallet.get_privatekey().clone();
 
-        let mut io_handler: Box<dyn InterfaceIO + Send + Sync> = Box::new(TestIOHandler::new());
-
-        wallet.save(&mut io_handler).await;
+        let mut storage = Storage {
+            io_interface: Box::new(TestIOHandler::new()),
+        };
+        wallet.save(&mut storage).await;
 
         wallet = Wallet::new();
 
         assert_ne!(wallet.get_publickey(), publickey1);
         assert_ne!(wallet.get_privatekey(), privatekey1);
 
-        wallet.load(&mut io_handler).await;
+        wallet.load(&mut storage).await;
 
         assert_eq!(wallet.get_publickey(), publickey1);
         assert_eq!(wallet.get_privatekey(), privatekey1);

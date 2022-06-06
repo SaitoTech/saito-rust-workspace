@@ -9,9 +9,6 @@ mod test {
     use saito_core::core::data::wallet::Wallet;
 
     use crate::test::test_manager::{create_timestamp, TestManager};
-    use crate::IoEvent;
-
-    use super::*;
 
     #[tokio::test]
     #[serial_test::serial]
@@ -20,7 +17,7 @@ mod test {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
@@ -152,7 +149,7 @@ mod test {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
@@ -169,8 +166,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block1,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -190,8 +187,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -211,8 +208,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block3,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -232,8 +229,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block4,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -253,8 +250,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block5,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -327,7 +324,7 @@ mod test {
         TestManager::clear_data_folder().await;
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (sender_miner, receiver_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
         let mut test_manager = TestManager::new(
             blockchain_lock.clone(),
             wallet_lock.clone(),
@@ -348,8 +345,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block1,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
@@ -370,8 +367,8 @@ mod test {
         TestManager::add_block_to_blockchain(
             blockchain_lock.clone(),
             block2,
-            &mut test_manager.io_handler,
-            test_manager.peers.clone(),
+            &mut test_manager.network,
+            &mut test_manager.storage,
             test_manager.sender_to_miner.clone(),
         )
         .await;
