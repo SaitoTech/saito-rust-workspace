@@ -23,7 +23,7 @@ impl TestIOHandler {
 
 #[async_trait]
 impl InterfaceIO for TestIOHandler {
-    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
+    async fn send_message(&self, _peer_index: u64, _buffer: Vec<u8>) -> Result<(), Error> {
         // TODO : implement a way to check sent messages
 
         Ok(())
@@ -31,8 +31,8 @@ impl InterfaceIO for TestIOHandler {
 
     async fn send_message_to_all(
         &self,
-        buffer: Vec<u8>,
-        peer_exceptions: Vec<u64>,
+        _buffer: Vec<u8>,
+        _peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
         debug!("send message to all");
 
@@ -45,15 +45,15 @@ impl InterfaceIO for TestIOHandler {
         Ok(())
     }
 
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+    async fn disconnect_from_peer(&mut self, _peer_index: u64) -> Result<(), Error> {
         todo!()
     }
 
     async fn fetch_block_from_peer(
         &self,
-        block_hash: SaitoHash,
-        peer_index: u64,
-        url: String,
+        _block_hash: SaitoHash,
+        _peer_index: u64,
+        _url: String,
     ) -> Result<(), Error> {
         todo!()
     }
@@ -81,7 +81,7 @@ impl InterfaceIO for TestIOHandler {
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        let mut result = File::open(key).await;
+        let result = File::open(key).await;
         if result.is_err() {
             todo!()
         }

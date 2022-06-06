@@ -40,7 +40,6 @@ impl Miner {
         let random_bytes = hash(&generate_random_bytes(32));
         let gt = GoldenTicket::create(self.target, random_bytes, publickey);
         if gt.validate(self.difficulty) {
-
             debug!(
                 "golden ticket found. sending to mempool : {:?}",
                 hex::encode(gt.get_target())

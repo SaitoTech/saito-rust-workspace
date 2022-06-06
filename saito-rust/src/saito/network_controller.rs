@@ -411,7 +411,7 @@ pub async fn run_network_controller(
             // }
         }
     });
-    let result = tokio::join!(server_handle, controller_handle);
+    let _result = tokio::join!(server_handle, controller_handle);
 }
 
 pub enum PeerSender {

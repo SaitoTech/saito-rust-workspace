@@ -178,6 +178,7 @@ mod tests {
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::GENESIS_PERIOD;
     use crate::core::data::blockring::BlockRing;
+
     pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
 
     #[test]

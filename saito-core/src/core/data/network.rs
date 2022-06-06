@@ -210,7 +210,7 @@ impl Network {
             todo!()
         }
         let peer = peer.unwrap();
-        let result = peer
+        let _result = peer
             .handle_handshake_completion(response, &self.io_interface)
             .await;
         if peer.handshake_done {
