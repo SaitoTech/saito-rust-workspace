@@ -1993,6 +1993,8 @@ mod tests {
         assert_eq!(block.get_hash(), block.hash);
     }
 
+
+/*
     #[test]
     fn block_signature_test() {
         let mut block = Block::new();
@@ -2042,6 +2044,7 @@ mod tests {
             ]
         )
     }
+*/
 
     #[test]
     fn block_serialization_and_deserialization_test() {
