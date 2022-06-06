@@ -1,4 +1,3 @@
-use ahash::AHashMap;
 use bigint::U256;
 use log::{error, info, warn};
 use num_derive::FromPrimitive;
@@ -318,7 +317,7 @@ impl Slip {
 mod tests {
     use std::sync::Arc;
 
-    use log::{debug, trace};
+    use log::trace;
     use tokio::sync::RwLock;
 
     use crate::core::data::blockchain::Blockchain;

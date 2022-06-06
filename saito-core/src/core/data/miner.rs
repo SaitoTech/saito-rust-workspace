@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
 
-use crate::core::blockchain_controller::MempoolEvent;
+use crate::core::consensus_event_processor::ConsensusEvent;
 use crate::core::data::crypto::{generate_random_bytes, hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::wallet::Wallet;
@@ -26,7 +26,7 @@ impl Miner {
         }
     }
 
-    pub async fn mine(&self, sender_to_mempool: Sender<MempoolEvent>) {
+    pub async fn mine(&self, sender_to_mempool: Sender<ConsensusEvent>) {
         debug!("mining for golden ticket");
 
         let publickey: SaitoPublicKey;
@@ -38,8 +38,8 @@ impl Miner {
             publickey = wallet.get_publickey();
         }
         let random_bytes = hash(&generate_random_bytes(32));
-        let solution = GoldenTicket::generate_solution(self.target, random_bytes, publickey);
-        if GoldenTicket::is_valid_solution(solution, self.difficulty) {
+        let solution = GoldenTicket::generate(self.target, random_bytes, publickey);
+        if GoldenTicket::validate(solution, self.difficulty) {
             let gt = GoldenTicket::new(self.target, random_bytes, publickey);
 
             debug!(
@@ -47,7 +47,7 @@ impl Miner {
                 hex::encode(gt.get_target())
             );
             sender_to_mempool
-                .send(MempoolEvent::NewGoldenTicket { golden_ticket: gt })
+                .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
                 .await
                 .expect("sending to mempool failed");
         }

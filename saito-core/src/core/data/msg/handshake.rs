@@ -110,7 +110,6 @@ impl Serialize<Self> for HandshakeCompletion {
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
 
     use crate::core::data::msg::handshake::{
         HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
@@ -121,11 +120,11 @@ mod tests {
     fn test_handshake() {
         let crypto = secp256k1::Secp256k1::new();
 
-        let (secret_key_1, public_key_1) =
+        let (_secret_key_1, public_key_1) =
             crypto.generate_keypair(&mut secp256k1::rand::thread_rng());
         let (secret_key_2, public_key_2) =
             crypto.generate_keypair(&mut secp256k1::rand::thread_rng());
-        let mut challenge = HandshakeChallenge {
+        let challenge = HandshakeChallenge {
             public_key: public_key_1.serialize(),
             challenge: rand::random(),
             block_fetch_url: "http://url/test".to_string(),
@@ -141,7 +140,7 @@ mod tests {
             &secp256k1::Message::from_slice(&challenge.challenge).unwrap(),
             &secret_key_2,
         );
-        let mut response = HandshakeResponse {
+        let response = HandshakeResponse {
             public_key: public_key_2.serialize(),
             signature: signature.serialize_compact(),
             challenge: rand::random(),

@@ -2,8 +2,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use log::debug;
-
 use crate::saito::rust_io_handler::{FutureState, SHARED_CONTEXT};
 
 pub struct IoFuture {

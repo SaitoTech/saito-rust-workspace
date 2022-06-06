@@ -1,5 +1,4 @@
-use std::borrow::BorrowMut;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,43 +7,58 @@ use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::{GlobalEvent, NetworkEvent};
-use crate::common::interface_io::InterfaceIO;
+use crate::common::command::NetworkEvent;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::data::block::{Block, BlockType};
+use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
-use crate::core::data::peer_collection::PeerCollection;
+use crate::core::data::network::Network;
+
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
-use crate::core::miner_controller::MinerEvent;
-use crate::core::routing_controller::RoutingEvent;
+use crate::core::mining_event_processor::MiningEvent;
+use crate::core::routing_event_processor::RoutingEvent;
 
 #[derive(Debug)]
-pub enum MempoolEvent {
+pub enum ConsensusEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
     BlockFetched { peer_index: u64, buffer: Vec<u8> },
 }
 
-pub struct BlockchainController {
+/// Manages blockchain and the mempool
+pub struct ConsensusEventProcessor {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub sender_to_router: Sender<RoutingEvent>,
-    pub sender_to_miner: Sender<MinerEvent>,
-    // pub sender_global: tokio::sync::broadcast::Sender<GlobalEvent>,
+    pub sender_to_miner: Sender<MiningEvent>,
     pub block_producing_timer: u128,
     pub tx_producing_timer: u128,
     pub generate_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
-    pub io_handler: Box<dyn InterfaceIO + Send + Sync>,
-    pub peers: Arc<RwLock<PeerCollection>>,
+    pub network: Network,
+    pub storage: Storage,
 }
 
-impl BlockchainController {
+impl ConsensusEventProcessor {
+    /// Test method to generate test transactions
+    ///
+    /// # Arguments
+    ///
+    /// * `mempool`:
+    /// * `wallet`:
+    /// * `blockchain`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     async fn generate_tx(
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
@@ -125,12 +139,7 @@ impl BlockchainController {
 }
 
 #[async_trait]
-impl ProcessEvent<MempoolEvent> for BlockchainController {
-    async fn process_global_event(&mut self, _event: GlobalEvent) -> Option<()> {
-        trace!("processing new global event");
-        None
-    }
-
+impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         debug!("processing new interface event");
 
@@ -150,7 +159,7 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
             if self.tx_producing_timer >= 1_000_000 {
                 // TODO : Remove this transaction generation once testing is done
-                BlockchainController::generate_tx(
+                ConsensusEventProcessor::generate_tx(
                     self.mempool.clone(),
                     self.wallet.clone(),
                     self.blockchain.clone(),
@@ -201,8 +210,8 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
                 blockchain
                     .add_block(
                         block,
-                        &mut self.io_handler,
-                        self.peers.clone(),
+                        &mut self.network,
+                        &mut self.storage,
                         self.sender_to_miner.clone(),
                     )
                     .await;
@@ -218,9 +227,9 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
         None
     }
 
-    async fn process_event(&mut self, event: MempoolEvent) -> Option<()> {
+    async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
         match event {
-            MempoolEvent::NewGoldenTicket { golden_ticket } => {
+            ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
                     "received new golden ticket : {:?}",
                     hex::encode(golden_ticket.get_target())
@@ -230,14 +239,17 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
                 trace!("acquired the mempool write lock");
                 mempool.add_golden_ticket(golden_ticket).await;
             }
-            MempoolEvent::BlockFetched { peer_index, buffer } => {
+            ConsensusEvent::BlockFetched {
+                peer_index: _,
+                buffer,
+            } => {
                 let mut blockchain = self.blockchain.write().await;
                 let block = Block::deserialize_for_net(&buffer);
                 blockchain
                     .add_block(
                         block,
-                        &mut self.io_handler,
-                        self.peers.clone(),
+                        &mut self.network,
+                        &mut self.storage,
                         self.sender_to_miner.clone(),
                     )
                     .await;
@@ -248,42 +260,12 @@ impl ProcessEvent<MempoolEvent> for BlockchainController {
 
     async fn on_init(&mut self) {
         debug!("on_init");
-        {
-            Storage::load_blocks_from_disk(
+        self.storage
+            .load_blocks_from_disk(
                 self.blockchain.clone(),
-                &mut self.io_handler,
-                self.peers.clone(),
+                &self.network,
                 self.sender_to_miner.clone(),
             )
             .await;
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::VecDeque;
-    use std::sync::Arc;
-
-    use tokio::sync::RwLock;
-
-    use crate::core::data::block::Block;
-
-    use super::*;
-
-    #[test]
-    fn mempool_new_test() {
-        let wallet = Wallet::new();
-        let mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
-        assert_eq!(mempool.blocks_queue, VecDeque::new());
-    }
-
-    #[test]
-    fn mempool_add_block_test() {
-        let wallet = Wallet::new();
-        let mut mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
-        let block = Block::new();
-        mempool.add_block(block.clone());
-        assert_eq!(Some(block), mempool.blocks_queue.pop_front())
     }
 }

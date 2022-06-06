@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ahash::AHashMap;
 use bigint::U256;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
@@ -9,9 +8,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
-};
+use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet};
 use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
@@ -86,19 +83,7 @@ impl Transaction {
         wallet_lock: Arc<RwLock<Wallet>>,
         to_publickey: SaitoPublicKey,
     ) {
-        //
-        // msg is transaction signature and next peer
-        //
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.get_signature());
-        vbytes.extend(&to_publickey);
-        let hash_to_sign = hash(&vbytes);
-
-        let hop = Hop::generate_hop(wallet_lock.clone(), to_publickey, hash_to_sign).await;
-
-        //
-        // add to path
-        //
+        let hop = Hop::generate(wallet_lock.clone(), to_publickey, self).await;
         self.path.push(hop);
     }
 
@@ -671,7 +656,7 @@ impl Transaction {
         &self,
         utxoset: &mut UtxoSet,
         longest_chain: bool,
-        block_id: u64,
+        _block_id: u64,
     ) {
         let mut input_slip_value = true;
         let mut output_slip_value = false;
@@ -1161,7 +1146,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_for_net_test() {
+    fn serialize_and_deserialize_for_net_test() {
         let mock_input = Slip::new();
         let mock_output = Slip::new();
         let mut mock_hop = Hop::new();

@@ -15,17 +15,19 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::blockchain_controller::{BlockchainController, MempoolEvent};
+use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::miner::Miner;
+use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
+use saito_core::core::data::storage::Storage;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::miner_controller::{MinerController, MinerEvent};
-use saito_core::core::routing_controller::{RoutingController, RoutingEvent};
+use saito_core::core::mining_event_processor::{MiningEvent, MiningEventProcessor};
+use saito_core::core::routing_event_processor::{RoutingEvent, RoutingEventProcessor};
 
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_slip::WasmSlip;
@@ -57,12 +59,12 @@ impl Future for NetworkResultFuture {
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    blockchain_controller: RoutingController,
-    mempool_controller: BlockchainController,
-    miner_controller: MinerController,
+    consensus_event_processor: RoutingEventProcessor,
+    routing_event_processor: ConsensusEventProcessor,
+    mining_event_processor: MiningEventProcessor,
     receiver_in_blockchain: Receiver<RoutingEvent>,
-    receiver_in_mempool: Receiver<MempoolEvent>,
-    receiver_in_miner: Receiver<MinerEvent>,
+    receiver_in_mempool: Receiver<ConsensusEvent>,
+    receiver_in_miner: Receiver<MiningEvent>,
     context: Context,
     wakers: HashMap<u64, Waker>,
     results: HashMap<u64, Result<Vec<u8>, Error>>,
@@ -79,11 +81,11 @@ pub fn new() -> SaitoWasm {
     let wallet = Arc::new(RwLock::new(Wallet::new()));
     let configuration = Arc::new(RwLock::new(Configuration::new()));
 
+    let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
         blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
         mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet: wallet.clone(),
-        peers: Arc::new(RwLock::new(PeerCollection::new())),
         miner: Arc::new(RwLock::new(Miner::new(wallet.clone()))),
         configuration: configuration.clone(),
     };
@@ -92,18 +94,17 @@ pub fn new() -> SaitoWasm {
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
     SaitoWasm {
-        blockchain_controller: RoutingController {
+        consensus_event_processor: RoutingEventProcessor {
             blockchain: context.blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
             sender_to_miner: sender_to_miner.clone(),
-            peers: context.peers.clone(),
             static_peers: vec![],
             configs: context.configuration.clone(),
-            io_handler: Box::new(WasmIoHandler {}),
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
+            network: Network::new(Box::new(WasmIoHandler {}), peers.clone()),
         },
-        mempool_controller: BlockchainController {
+        routing_event_processor: ConsensusEventProcessor {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
@@ -114,10 +115,10 @@ pub fn new() -> SaitoWasm {
             tx_producing_timer: 0,
             generate_test_tx: false,
             time_keeper: Box::new(WasmTimeKeeper {}),
-            io_handler: Box::new(WasmIoHandler {}),
-            peers: context.peers.clone(),
+            network: Network::new(Box::new(WasmIoHandler {}), peers.clone()),
+            storage: Storage::new(Box::new(WasmIoHandler {})),
         },
-        miner_controller: MinerController {
+        mining_event_processor: MiningEventProcessor {
             miner: context.miner.clone(),
             sender_to_blockchain: sender_to_blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
@@ -188,21 +189,21 @@ pub async fn process_timer_event(duration: u64) {
     let result = saito.receiver_in_blockchain.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.blockchain_controller.process_event(event).await;
+        let result = saito.consensus_event_processor.process_event(event).await;
     }
 
     saito
-        .blockchain_controller
+        .consensus_event_processor
         .process_timer_event(duration.clone())
         .await;
     // mempool controller
     let result = saito.receiver_in_mempool.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.mempool_controller.process_event(event).await;
+        let result = saito.routing_event_processor.process_event(event).await;
     }
     saito
-        .mempool_controller
+        .routing_event_processor
         .process_timer_event(duration.clone())
         .await;
 
@@ -210,7 +211,9 @@ pub async fn process_timer_event(duration: u64) {
     let result = saito.receiver_in_miner.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.miner_controller.process_event(event).await;
+        let result = saito.mining_event_processor.process_event(event).await;
     }
-    saito.miner_controller.process_timer_event(duration.clone());
+    saito
+        .mining_event_processor
+        .process_timer_event(duration.clone());
 }
