@@ -98,7 +98,7 @@ impl Mempool {
         //
         // validate
         //
-        if transaction.validate(&blockchain.utxoset, &blockchain.staking) {
+        if transaction.validate(&blockchain.utxoset) {
             self.add_transaction(transaction).await;
         } else {
             debug!(

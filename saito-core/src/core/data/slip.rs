@@ -19,10 +19,7 @@ pub enum SlipType {
     MinerOutput,
     RouterInput,
     RouterOutput,
-    StakerOutput,
-    StakerDeposit,
-    StakerWithdrawalPending,
-    StakerWithdrawalStaking,
+    Other,
 }
 
 #[serde_with::serde_as]
@@ -30,11 +27,10 @@ pub enum SlipType {
 pub struct Slip {
     #[serde_as(as = "[_; 33]")]
     publickey: SaitoPublicKey,
-    uuid: SaitoHash,
     amount: u64,
-    payout: u64,
     slip_ordinal: u8,
     slip_type: SlipType,
+    uuid: SaitoHash,
     #[serde_as(as = "[_; 74]")]
     utxoset_key: SaitoUTXOSetKey,
     is_utxoset_key_set: bool,
@@ -44,15 +40,15 @@ impl Slip {
     pub fn new() -> Self {
         Self {
             publickey: [0; 33],
-            uuid: [0; 32],
             amount: 0,
-            payout: 0,
             slip_ordinal: 0,
             slip_type: SlipType::Normal,
+            uuid: [0; 32],
             utxoset_key: [0; 74],
             is_utxoset_key_set: false,
         }
     }
+
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         if self.get_amount() > 0 {
             match utxoset.get(&self.utxoset_key) {
@@ -84,40 +80,11 @@ impl Slip {
             true
         }
     }
-    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
-        if self.get_slip_type() == SlipType::StakerDeposit {
-            if _lc == true {
-                info!(
-                    " ====> update deposit to {}: {:?} -- {:?}",
-                    spendable,
-                    hex::encode(self.get_utxoset_key()),
-                    self.get_slip_type()
-                );
-            }
-        }
-        if self.get_slip_type() == SlipType::StakerOutput {
-            if _lc == true {
-                info!(
-                    " ====> update output to {}: {:?} -- {:?}",
-                    spendable,
-                    hex::encode(self.get_utxoset_key()),
-                    self.get_slip_type(),
-                );
-            }
-        }
 
+    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.get_amount() > 0 {
             //
-            // TODO cleanup once ready
-            //
-            //info!("update utxoset: {:?} value {} lc -> {}", self.utxoset_key, slip_value, _lc);
-            //info!("slip_ordinal: {}", self.get_slip_ordinal());
-            //info!("slip_amount: {}", self.get_amount());
-            //utxoset.entry(self.utxoset_key).or_insert(slip_value);
-            //
-            // TODO find more efficient update operation
-            //
-            // entry().or_insert() does not update
+            // TODO - improve efficiency (especially of entry(x).or_insert)
             //
             if utxoset.contains_key(&self.utxoset_key) {
                 utxoset.insert(self.utxoset_key, spendable);
@@ -138,10 +105,6 @@ impl Slip {
         self.amount
     }
 
-    pub fn get_payout(&self) -> u64 {
-        self.payout
-    }
-
     pub fn get_uuid(&self) -> SaitoHash {
         self.uuid
     }
@@ -160,10 +123,6 @@ impl Slip {
 
     pub fn set_amount(&mut self, amount: u64) {
         self.amount = amount;
-    }
-
-    pub fn set_payout(&mut self, payout: u64) {
-        self.payout = payout;
     }
 
     pub fn set_uuid(&mut self, uuid: SaitoHash) {

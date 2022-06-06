@@ -11,7 +11,6 @@ use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::network::Network;
-use crate::core::data::staking::Staking;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
 use crate::core::data::wallet::Wallet;
@@ -43,7 +42,6 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
 
 #[derive(Debug)]
 pub struct Blockchain {
-    pub staking: Staking,
     pub utxoset: UtxoSet,
     pub blockring: BlockRing,
     pub blocks: AHashMap<SaitoHash, Block>,
@@ -60,7 +58,6 @@ impl Blockchain {
         // sender: tokio::sync::broadcast::Sender<GlobalEvent>,
     ) -> Self {
         Blockchain {
-            staking: Staking::new(),
             utxoset: AHashMap::new(),
             blockring: BlockRing::new(),
             blocks: AHashMap::new(),
@@ -884,7 +881,7 @@ impl Blockchain {
 
         let block = self.blocks.get(&new_chain[current_wind_index]).unwrap();
         // trace!(" ... before block.validate:      {:?}", create_timestamp());
-        let does_block_validate = block.validate(&self, &self.utxoset, &self.staking).await;
+        let does_block_validate = block.validate(&self, &self.utxoset).await;
 
         // trace!(
         //     " ... after block.validate:       {:?} {}",
@@ -903,10 +900,6 @@ impl Blockchain {
             // blockring update
             self.blockring
                 .on_chain_reorganization(block.get_id(), block.get_hash(), true);
-
-            // staking tables update
-            let (res_spend, res_unspend, res_delete) =
-                self.staking.on_chain_reorganization(block, true);
 
             //
             // TODO - wallet update should be optional, as core routing nodes
@@ -927,23 +920,6 @@ impl Blockchain {
 
             let block_id = block.get_id();
             self.on_chain_reorganization(block_id, true, storage).await;
-
-            //
-            // we cannot pass the UTXOSet into the staking object to update as that would
-            // require multiple mutable borrows of the blockchain object, so we receive
-            // return vectors of the slips that need to be inserted, spent or deleted and
-            // handle this after-the-fact. this keeps the UTXOSet up-to-date with whatever
-            // is in the staking tables.
-            //
-            for i in 0..res_spend.len() {
-                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, true);
-            }
-            for i in 0..res_unspend.len() {
-                res_spend[i].on_chain_reorganization(&mut self.utxoset, true, false);
-            }
-            for i in 0..res_delete.len() {
-                res_spend[i].delete(&mut self.utxoset);
-            }
 
             //
             // we have received the first entry in new_blocks() which means we
@@ -1071,33 +1047,12 @@ impl Blockchain {
         self.blockring
             .on_chain_reorganization(block.get_id(), block.get_hash(), false);
 
-        // staking tables
-        let (res_spend, res_unspend, res_delete) =
-            self.staking.on_chain_reorganization(block, false);
-
         // wallet update
         {
             trace!("waiting for the wallet write lock");
             let mut wallet = self.wallet_lock.write().await;
             trace!("acquired the wallet write lock");
             wallet.on_chain_reorganization(&block, false);
-        }
-
-        //
-        // we cannot pass the UTXOSet into the staking object to update as that would
-        // require multiple mutable borrows of the blockchain object, so we receive
-        // return vectors of the slips that need to be inserted, spent or deleted and
-        // handle this after-the-fact. this keeps the UTXOSet up-to-date with whatever
-        // is in the staking tables.
-        //
-        for i in 0..res_spend.len() {
-            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, true);
-        }
-        for i in 0..res_unspend.len() {
-            res_spend[i].on_chain_reorganization(&mut self.utxoset, true, false);
-        }
-        for i in 0..res_delete.len() {
-            res_spend[i].delete(&mut self.utxoset);
         }
 
         if current_unwind_index == old_chain.len() - 1 {
