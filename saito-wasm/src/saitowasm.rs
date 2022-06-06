@@ -20,7 +20,6 @@ use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::mempool::Mempool;
-use saito_core::core::data::miner::Miner;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
@@ -86,7 +85,6 @@ pub fn new() -> SaitoWasm {
         blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
         mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet: wallet.clone(),
-        miner: Arc::new(RwLock::new(Miner::new(wallet.clone()))),
         configuration: configuration.clone(),
     };
 
@@ -119,12 +117,14 @@ pub fn new() -> SaitoWasm {
             storage: Storage::new(Box::new(WasmIoHandler {})),
         },
         mining_event_processor: MiningEventProcessor {
-            miner: context.miner.clone(),
+            wallet: context.wallet.clone(),
             sender_to_blockchain: sender_to_blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
             miner_timer: 0,
             new_miner_event_received: false,
+            target: [0; 32],
+            difficulty: 0,
         },
         receiver_in_blockchain,
         receiver_in_mempool,

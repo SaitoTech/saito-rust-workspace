@@ -15,7 +15,6 @@ use saito_core::core::data::burnfee::HEARTBEAT;
 use saito_core::core::data::crypto::{generate_random_bytes, hash};
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
-use saito_core::core::data::miner::Miner;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
@@ -236,7 +235,6 @@ impl TestManager {
         additional_transactions: Vec<Transaction>,
     ) -> Block {
         let mut transactions: Vec<Transaction> = vec![];
-        let _miner = Miner::new(self.wallet_lock.clone());
         let privatekey: SaitoPrivateKey;
         let publickey: SaitoPublicKey;
 
