@@ -32,8 +32,7 @@ impl GoldenTicket {
         random_bytes: SaitoHash,
         publickey: SaitoPublicKey,
     ) -> GoldenTicket {
-        let mut gt = GoldenTicket::new(previous_block_hash, random_bytes, publickey);
-	gt
+        GoldenTicket::new(previous_block_hash, random_bytes, publickey)
     }
 
     pub fn deserialize_from_net(bytes: Vec<u8>) -> GoldenTicket {
