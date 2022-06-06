@@ -1947,8 +1947,6 @@ mod tests {
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
-    use ahash::AHashMap;
-    use hex::FromHex;
 
     #[test]
     fn block_new_test() {
@@ -2022,7 +2020,7 @@ mod tests {
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 145);
+        assert_eq!(serialized_body.len(), 177);
 
         block.sign(
             <[u8; 33]>::from_hex(
@@ -2039,10 +2037,10 @@ mod tests {
         assert_eq!(
             block.signature,
             [
-                235, 76, 9, 192, 163, 53, 245, 3, 41, 25, 140, 231, 66, 149, 218, 232, 130, 66,
-                162, 91, 12, 246, 188, 58, 41, 42, 69, 192, 250, 81, 161, 87, 94, 145, 108, 115,
-                200, 186, 242, 204, 221, 100, 154, 75, 35, 162, 39, 224, 116, 76, 252, 208, 27, 32,
-                110, 80, 199, 139, 141, 134, 125, 246, 6, 155
+                181, 196, 195, 189, 82, 225, 56, 124, 169, 36, 245, 199, 95, 50, 182, 135, 95, 153,
+                228, 2, 162, 21, 248, 254, 42, 1, 106, 1, 25, 208, 145, 191, 21, 187, 69, 52, 225,
+                214, 86, 94, 116, 168, 14, 58, 70, 186, 16, 164, 215, 211, 153, 107, 226, 236, 231,
+                190, 0, 62, 12, 122, 68, 24, 2, 109
             ]
         )
     }
