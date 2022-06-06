@@ -9,7 +9,6 @@ pub mod golden_ticket;
 pub mod hop;
 pub mod mempool;
 pub mod merkle;
-pub mod miner;
 pub mod msg;
 pub mod network;
 pub mod peer;

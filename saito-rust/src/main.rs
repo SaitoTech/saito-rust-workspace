@@ -97,12 +97,14 @@ async fn run_mining_event_processor(
     receiver_for_miner: Receiver<MiningEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mining_event_processor = MiningEventProcessor {
-        miner: context.miner.clone(),
+        wallet: context.wallet.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         miner_timer: 0,
         new_miner_event_received: false,
+        target: [0; 32],
+        difficulty: 0,
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
         tokio::sync::mpsc::channel::<NetworkEvent>(1000);
