@@ -38,9 +38,8 @@ impl Miner {
             publickey = wallet.get_publickey();
         }
         let random_bytes = hash(&generate_random_bytes(32));
-        let solution = GoldenTicket::generate(self.target, random_bytes, publickey);
-        if GoldenTicket::validate(solution, self.difficulty) {
-            let gt = GoldenTicket::new(self.target, random_bytes, publickey);
+        let gt = GoldenTicket::generate(self.target, random_bytes, publickey);
+        if gt.validate(self.difficulty) {
 
             debug!(
                 "golden ticket found. sending to mempool : {:?}",

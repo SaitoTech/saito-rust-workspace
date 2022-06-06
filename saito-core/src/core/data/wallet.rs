@@ -304,7 +304,7 @@ impl Wallet {
 
         // for now we'll use bincode to de/serialize
         transaction.set_transaction_type(TransactionType::GoldenTicket);
-        transaction.set_message(golden_ticket.serialize());
+        transaction.set_message(golden_ticket.serialize_for_net());
 
         let mut input1 = Slip::new();
         input1.set_publickey(self.get_publickey());

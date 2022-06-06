@@ -27,7 +27,7 @@ impl GoldenTicket {
         };
     }
 
-    pub fn deserialize(bytes: Vec<u8>) -> GoldenTicket {
+    pub fn deserialize_from_net(bytes: Vec<u8>) -> GoldenTicket {
         let target: SaitoHash = bytes[0..32].try_into().unwrap();
         let random: SaitoHash = bytes[32..64].try_into().unwrap();
         let publickey: SaitoPublicKey = bytes[64..97].try_into().unwrap();
@@ -38,12 +38,9 @@ impl GoldenTicket {
         previous_block_hash: SaitoHash,
         random_bytes: SaitoHash,
         publickey: SaitoPublicKey,
-    ) -> SaitoHash {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&previous_block_hash);
-        vbytes.extend(&random_bytes);
-        vbytes.extend(&publickey);
-        hash(&vbytes)
+    ) -> GoldenTicket {
+        let mut gt = GoldenTicket::new(previous_block_hash, random_bytes, publickey);
+	gt
     }
 
     pub fn get_target(&self) -> SaitoHash {
@@ -58,7 +55,7 @@ impl GoldenTicket {
         self.publickey
     }
 
-    pub fn serialize(&self) -> Vec<u8> {
+    pub fn serialize_for_net(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&self.target);
         vbytes.extend(&self.random);
@@ -73,7 +70,11 @@ impl GoldenTicket {
     // javascript clients in the short-term. we should update this to have it handle
     // comparisons in binary.
     //
-    pub fn validate(solution: SaitoHash, difficulty: u64) -> bool {
+    pub fn validate(&self, difficulty: u64) -> bool {
+
+	let solution = hash(&self.serialize_for_net());
+
+
         let leading_zeroes_required: u64 = difficulty / 16;
         let final_digit: u8 = 15 - ((difficulty % 16) as u8);
 
@@ -174,10 +175,10 @@ mod tests {
         let target = hash(&random.to_vec());
         let publickey = wallet.get_publickey();
 
-        let solution = GoldenTicket::generate(target, random, publickey);
+        let gt = GoldenTicket::generate(target, random, publickey);
 
-        assert_eq!(GoldenTicket::validate(solution, 0), true);
-        assert_eq!(GoldenTicket::validate(solution, 256), false);
+        assert_eq!(gt.validate(0), true);
+        assert_eq!(gt.validate(256), false);
     }
 
     #[test]

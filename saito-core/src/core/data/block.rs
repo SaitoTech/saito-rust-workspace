@@ -1021,7 +1021,7 @@ impl Block {
         //
         if let Some(gt_idx) = cv.gt_idx {
             let golden_ticket: GoldenTicket =
-                GoldenTicket::deserialize(self.transactions[gt_idx].get_message().to_vec());
+                GoldenTicket::deserialize_from_net(self.transactions[gt_idx].get_message().to_vec());
             // generate input hash for router
             let mut next_random_number = hash(&golden_ticket.get_random().to_vec());
             let _miner_publickey = golden_ticket.get_publickey();
@@ -1565,15 +1565,21 @@ impl Block {
             // we find that out now, and it invalidates the block.
             //
             if let Some(gt_idx) = cv.gt_idx {
-                let golden_ticket: GoldenTicket = GoldenTicket::deserialize(
+                let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
                     self.get_transactions()[gt_idx].get_message().to_vec(),
                 );
-                let solution = GoldenTicket::generate(
+		//
+		// we already have a golden ticket, but create a new one pulling the
+		// target hash from our previous block to ensure that this ticket is
+		// actually valid in the context of our blockchain, and not just
+		// internally consistent in the blockchain of the sender.
+		//
+                let gt = GoldenTicket::generate(
                     previous_block.get_hash(),
                     golden_ticket.get_random(),
                     golden_ticket.get_publickey(),
                 );
-                if !GoldenTicket::validate(solution, previous_block.get_difficulty()) {
+                if !gt.validate(previous_block.get_difficulty()) {
                     error!(
                         "ERROR: Golden Ticket solution does not validate against previous block hash and difficulty"
                     );
