@@ -270,9 +270,3 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
         self.connect_to_static_peers().await;
     }
 }
-
-#[cfg(test)]
-mod tests {
-    #[tokio::test]
-    async fn process_new_transaction() {}
-}

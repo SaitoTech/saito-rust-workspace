@@ -322,11 +322,11 @@ impl TestManager {
         }
         let mut random_bytes = hash(&generate_random_bytes(32));
 
-        let mut solution = GoldenTicket::generate_solution(block_hash, random_bytes, public_key);
+        let mut solution = GoldenTicket::generate(block_hash, random_bytes, public_key);
 
-        while !GoldenTicket::is_valid_solution(solution, block_difficulty) {
+        while !GoldenTicket::validate(solution, block_difficulty) {
             random_bytes = hash(&generate_random_bytes(32));
-            solution = GoldenTicket::generate_solution(block_hash, random_bytes, public_key);
+            solution = GoldenTicket::generate(block_hash, random_bytes, public_key);
         }
 
         GoldenTicket::new(block_hash, random_bytes, public_key)
