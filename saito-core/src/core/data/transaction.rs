@@ -1122,7 +1122,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_and_deserialize_for_net_test() {
+    fn serialize_for_net_and_deserialize_from_net_test() {
         let mock_input = Slip::new();
         let mock_output = Slip::new();
         let mut mock_hop = Hop::new();

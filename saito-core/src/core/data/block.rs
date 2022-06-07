@@ -583,6 +583,12 @@ impl Block {
         self.set_signature(sign(&self.get_pre_hash(), privatekey));
         self.generate_hash();
     }
+
+    pub fn generate(&mut self) {
+        self.generate_pre_hash();
+	self.generate_hash();
+    }
+
     pub fn generate_hash(&mut self) -> SaitoHash {
         let hash_for_hash = hash(&self.serialize_for_hash());
         self.set_hash(hash_for_hash);
@@ -591,10 +597,6 @@ impl Block {
     pub fn generate_pre_hash(&mut self) {
         let hash_for_signature = hash(&self.serialize_for_signature());
         self.set_pre_hash(hash_for_signature);
-    }
-    pub fn generate_hashes(&mut self) -> SaitoHash {
-        self.generate_pre_hash();
-        self.generate_hash()
     }
 
     // serialize the pre_hash and the signature_for_source into a
@@ -696,7 +698,7 @@ impl Block {
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
-    pub fn deserialize_for_net(bytes: &Vec<u8>) -> Block {
+    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Block {
         // TODO : return Option<Block> to support invalid buffers
         let transactions_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let id: u64 = u64::from_be_bytes(bytes[4..12].try_into().unwrap());
@@ -771,7 +773,9 @@ impl Block {
         if transactions_len == 0 {
             block.set_block_type(BlockType::Header);
         }
-        block.generate_hashes();
+
+        // generate dynamic
+        block.generate();
         block
     }
 
@@ -1730,7 +1734,7 @@ impl Block {
         transactions_valid
     }
 
-    pub async fn generate(
+    pub async fn create(
         transactions: &mut Vec<Transaction>,
         previous_block_hash: SaitoHash,
         wallet_lock: Arc<RwLock<Wallet>>,
@@ -1738,7 +1742,7 @@ impl Block {
         current_timestamp: u64,
     ) -> Block {
         debug!(
-            "Block::generate : previous block hash : {:?}",
+            "Block::create : previous block hash : {:?}",
             hex::encode(previous_block_hash)
         );
 
@@ -1922,6 +1926,7 @@ impl Block {
             let wallet = wallet_lock.read().await;
             trace!("acquired the wallet read lock");
             block.sign(wallet.get_publickey(), wallet.get_privatekey());
+            block.generate();
         }
 
         block
@@ -2078,10 +2083,10 @@ mod tests {
         block.set_transactions(&mut vec![mock_tx, mock_tx2]);
 
         let serialized_block = block.serialize_for_net(BlockType::Full);
-        let deserialized_block = Block::deserialize_for_net(&serialized_block);
+        let deserialized_block = Block::deserialize_from_net(&serialized_block);
 
         let serialized_block_header = block.serialize_for_net(BlockType::Header);
-        let deserialized_block_header = Block::deserialize_for_net(&serialized_block_header);
+        let deserialized_block_header = Block::deserialize_from_net(&serialized_block_header);
 
         assert_eq!(
             block.serialize_for_net(BlockType::Full),
