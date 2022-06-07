@@ -110,20 +110,19 @@ impl BlockRing {
     }
 
     pub fn on_chain_reorganization(&mut self, block_id: u64, hash: SaitoHash, lc: bool) -> bool {
-
-println!("OCR in blockRinG");
+        println!("OCR in blockRinG");
 
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         if !self.ring[(insert_pos as usize)].on_chain_reorganization(hash, lc) {
-println!("failure to run OCR on ringitem");
+            println!("failure to run OCR on ringitem");
             return false;
         }
         if lc {
-println!("second option");
+            println!("second option");
             self.lc_pos = Some(insert_pos as usize);
         } else {
             //
-println!("third option");
+            println!("third option");
             // if we are unsetting the longest-chain, we automatically
             // roll backwards and set the longest-chain to the previous
             // position if available. this adds some complexity to unwinding
@@ -150,9 +149,11 @@ println!("third option");
                     if let Some(previous_block_index_lc_pos) =
                         self.ring[previous_block_index as usize].lc_pos
                     {
-                        if self.ring[previous_block_index].block_ids.len() > previous_block_index_lc_pos
+                        if self.ring[previous_block_index].block_ids.len()
+                            > previous_block_index_lc_pos
                         {
-                            if self.ring[previous_block_index].block_ids[previous_block_index_lc_pos]
+                            if self.ring[previous_block_index].block_ids
+                                [previous_block_index_lc_pos]
                                 == block_id - 1
                             {
                                 self.lc_pos = Some(previous_block_index);
@@ -198,7 +199,7 @@ mod tests {
     fn blockring_add_block_test() {
         let mut blockring = BlockRing::new();
         let mut block = Block::new();
-	block.set_id(1);
+        block.set_id(1);
         block.generate_hash();
         let block_hash = block.get_hash();
         let block_id = block.get_id();

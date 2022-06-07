@@ -276,7 +276,6 @@ impl Block {
         blockchain: &mut Blockchain,
         current_timestamp: u64,
     ) -> Block {
-
         debug!(
             "Block::create : previous block hash : {:?}",
             hex::encode(previous_block_hash)
@@ -459,7 +458,6 @@ impl Block {
         let block_merkle_root = block.generate_merkle_root();
         block.set_merkle_root(block_merkle_root);
 
-
         {
             trace!("waiting for the wallet read lock");
             let wallet = wallet_lock.read().await;
@@ -467,15 +465,13 @@ impl Block {
             block.sign(wallet.get_privatekey());
         }
 
-	//
-	// hash includes pre-hash and sig, so update
-	//
-	block.generate_hash();
+        //
+        // hash includes pre-hash and sig, so update
+        //
+        block.generate_hash();
 
         block
     }
-
-
 
     //
     // runs when block deleted
@@ -486,7 +482,6 @@ impl Block {
         }
         true
     }
-
 
     /// Deserialize from bytes to a Block.
     /// [len of transactions - 4 bytes - u32]
@@ -664,13 +659,11 @@ impl Block {
         winner_pubkey
     }
 
-
-
     //
     // generate ancillary data
     //
     // this function generates all of the ancillary data needed to process or
-    // validate blocks. this includes the various hashes and other dynamic 
+    // validate blocks. this includes the various hashes and other dynamic
     // values that are not provided on the creation of the block object itself
     // but must be calculated from information such as the set of transactions
     // and the presence / absence of golden tickets, etc.
@@ -680,7 +673,6 @@ impl Block {
     // cumulative block fees they contain.
     //
     pub fn generate(&mut self) -> bool {
-
         // trace!(" ... block.prevalid - pre hash:  {:?}", create_timestamp());
 
         //
@@ -726,7 +718,6 @@ impl Block {
         // commitment for all of our rebroadcasts.
         //
         for i in 0..self.transactions.len() {
-
             let transaction = &mut self.transactions[i];
 
             cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
@@ -1369,7 +1360,6 @@ impl Block {
         true
     }
 
-
     pub fn set_avg_income(&mut self, x: u64) {
         self.avg_income = x;
     }
@@ -1585,24 +1575,25 @@ impl Block {
         vbytes
     }
 
-    pub async fn update_block_to_block_type(&mut self, block_type: BlockType, storage: &Storage) -> bool {
-
+    pub async fn update_block_to_block_type(
+        &mut self,
+        block_type: BlockType,
+        storage: &Storage,
+    ) -> bool {
         if self.block_type == block_type {
             return true;
         }
 
         if block_type == BlockType::Full {
-	    return self.upgrade_block_to_block_type(block_type, storage).await;
-	}
+            return self.upgrade_block_to_block_type(block_type, storage).await;
+        }
 
         if block_type == BlockType::Pruned {
-	    return self.upgrade_block_to_block_type(block_type, storage).await;
-	}
+            return self.upgrade_block_to_block_type(block_type, storage).await;
+        }
 
-	return false;
-
+        return false;
     }
-
 
     //
     // if the block is not at the proper type, try to upgrade it to have the
@@ -1972,9 +1963,6 @@ impl Block {
 
         transactions_valid
     }
-
-
-
 }
 
 #[cfg(test)]
@@ -2062,8 +2050,9 @@ mod tests {
         assert_eq!(serialized_body.len(), 177);
 
         block.creator = <[u8; 33]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
-            ).unwrap();
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+        )
+        .unwrap();
 
         block.sign(
             <[u8; 32]>::from_hex(
@@ -2075,7 +2064,12 @@ mod tests {
         assert_eq!(block.signature.len(), 64);
         assert_eq!(
             block.signature,
-            [ 79, 111, 17, 122, 189, 142, 78, 252, 111, 231, 122, 86, 129, 151, 99, 71, 245, 34, 33, 254, 104, 138, 238, 136, 230, 45, 113, 171, 146, 105, 138, 64, 43, 25, 204, 186, 169, 208, 222, 5, 89, 64, 83, 32, 102, 18, 114, 20, 171, 0, 97, 232, 158, 108, 185, 37, 225, 233, 33, 97, 222, 132, 218, 120]
+            [
+                79, 111, 17, 122, 189, 142, 78, 252, 111, 231, 122, 86, 129, 151, 99, 71, 245, 34,
+                33, 254, 104, 138, 238, 136, 230, 45, 113, 171, 146, 105, 138, 64, 43, 25, 204,
+                186, 169, 208, 222, 5, 89, 64, 83, 32, 102, 18, 114, 20, 171, 0, 97, 232, 158, 108,
+                185, 37, 225, 233, 33, 97, 222, 132, 218, 120
+            ]
         )
     }
 

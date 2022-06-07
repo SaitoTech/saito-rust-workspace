@@ -94,7 +94,6 @@ impl Slip {
         res.extend(&self.get_slip_index().to_be_bytes());
 
         res[0..74].try_into().unwrap()
-
     }
 
     //
@@ -129,7 +128,6 @@ impl Slip {
             }
         }
     }
-
 
     pub fn set_publickey(&mut self, publickey: SaitoPublicKey) {
         self.publickey = publickey;
@@ -212,8 +210,6 @@ impl Slip {
             true
         }
     }
-
-
 }
 
 #[cfg(test)]

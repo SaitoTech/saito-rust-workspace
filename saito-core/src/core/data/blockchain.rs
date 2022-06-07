@@ -52,9 +52,7 @@ pub struct Blockchain {
 
 impl Blockchain {
     #[allow(clippy::new_without_default)]
-    pub fn new(
-        wallet_lock: Arc<RwLock<Wallet>>,
-    ) -> Self {
+    pub fn new(wallet_lock: Arc<RwLock<Wallet>>) -> Self {
         Blockchain {
             utxoset: AHashMap::new(),
             blockring: BlockRing::new(),
@@ -114,16 +112,14 @@ impl Blockchain {
             return;
         }
 
-
-
-	//
-	// TODO -- david review -- should be no need for recursive fetch
-	// as each block will fetch the parent on arrival and processing
-	// and we may want to tag and use the degree of distance to impose
-	// penalities on routing peers.
-	//
+        //
+        // TODO -- david review -- should be no need for recursive fetch
+        // as each block will fetch the parent on arrival and processing
+        // and we may want to tag and use the degree of distance to impose
+        // penalities on routing peers.
+        //
         // get missing block
-	//
+        //
         if self.blockring.get_latest_block_id() > 0 {
             let mut earliest_block_id = 1;
             if self.get_latest_block_id() > GENESIS_PERIOD {
@@ -165,8 +161,6 @@ impl Blockchain {
                 }
             }
         }
-
-
 
         //
         // pre-validation
@@ -260,8 +254,7 @@ impl Blockchain {
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
-
-println!("shared ancestor found");
+            println!("shared ancestor found");
 
             loop {
                 if new_chain_hash == old_chain_hash {
@@ -283,8 +276,7 @@ println!("shared ancestor found");
                 }
             }
         } else {
-
-println!("block without parent");
+            println!("block without parent");
 
             //
             // we have a block without a parent.
@@ -295,8 +287,7 @@ println!("block without parent");
             // of creating a separate variable to manually track entries.
             //
             if self.blockring.is_empty() {
-
-println!("blockring is empty");
+                println!("blockring is empty");
 
                 //
                 // no need for action as fall-through will result in proper default
@@ -331,15 +322,12 @@ println!("blockring is empty");
         // viable.
         //
         if am_i_the_longest_chain {
-
-println!("i am the longest chain");
+            println!("i am the longest chain");
 
             let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
 
-
             if does_new_chain_validate {
-
-println!("new chain validates!");
+                println!("new chain validates!");
 
                 self.add_block_success(block_hash, network, storage).await;
 
@@ -388,7 +376,6 @@ println!("new chain validates!");
                 //     .expect("error: BlockchainAddBlockFailure message failed to send");
             }
         } else {
-
             self.add_block_failure().await;
 
             // TODO : send with related channel
@@ -622,7 +609,9 @@ println!("new chain validates!");
                     let block_hash = self
                         .blockring
                         .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[index] == block_hash[index] && fork_id[index + 1] == block_hash[index + 1] {
+                    if fork_id[index] == block_hash[index]
+                        && fork_id[index + 1] == block_hash[index + 1]
+                    {
                         return peer_block_id;
                     }
                 }
@@ -647,7 +636,9 @@ println!("new chain validates!");
                     let block_hash = self
                         .blockring
                         .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[index] == block_hash[index] && fork_id[index + 1] == block_hash[index + 1] {
+                    if fork_id[index] == block_hash[index]
+                        && fork_id[index + 1] == block_hash[index + 1]
+                    {
                         return peer_block_id;
                     }
                 }
@@ -764,7 +755,6 @@ println!("new chain validates!");
         old_chain: Vec<[u8; 32]>,
         storage: &Storage,
     ) -> bool {
-
         debug!("validating chains");
         //
         // ensure new chain has adequate mining support to be considered as
@@ -816,21 +806,21 @@ println!("new chain validates!");
         }
 
         if !old_chain.is_empty() {
-println!("old chain not empty...");
+            println!("old chain not empty...");
             let res = self
                 .unwind_chain(&new_chain, &old_chain, 0, true, storage)
                 //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
                 .await;
             res
         } else if !new_chain.is_empty() {
-println!("new chain not empty...");
+            println!("new chain not empty...");
             let res = self
                 .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
                 .await;
-println!("is blockring empty {}", self.blockring.is_empty());
+            println!("is blockring empty {}", self.blockring.is_empty());
             res
         } else {
-println!("old chain and new chain are both empty...");
+            println!("old chain and new chain are both empty...");
             true
         }
     }

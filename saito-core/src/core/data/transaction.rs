@@ -56,7 +56,6 @@ pub struct Transaction {
     pub cumulative_fees: u64,
     // cumulative work for this tx-in-block
     pub cumulative_work: u64,
-
 }
 
 impl Transaction {
@@ -103,7 +102,6 @@ impl Transaction {
     pub fn add_output(&mut self, output_slip: Slip) {
         self.outputs.push(output_slip);
     }
-
 
     //
     // this function exists largely for testing. It attempts to attach the requested fee
@@ -392,17 +390,15 @@ impl Transaction {
     // generates all non-cumulative
     //
     pub fn generate(&mut self, publickey: SaitoPublicKey) -> bool {
+        //
+        // nolan_in, nolan_out, total fees
+        //
+        self.generate_total_fees();
 
-	//
-	// nolan_in, nolan_out, total fees
-	//
-	self.generate_total_fees();
-
-
-	//
-	// routing work for asserted publickey
-	//
-	self.generate_total_work(publickey);
+        //
+        // routing work for asserted publickey
+        //
+        self.generate_total_work(publickey);
 
         //
         // ensure hash exists for signing
@@ -424,19 +420,18 @@ impl Transaction {
     //
     pub fn generate_cumulative_work(&mut self, cumulative_work: u64) -> u64 {
         self.cumulative_work = cumulative_work + self.cumulative_work;
-	self.cumulative_work
+        self.cumulative_work
     }
     //
     // calculate total fees in block
     //
     pub fn generate_total_fees(&mut self) {
-
-	//
-	// TODO - remove for uuid work
-	// generate tx signature hash
-	//
-	self.generate_hash_for_signature();
-	let hash_for_signature = self.get_hash_for_signature();
+        //
+        // TODO - remove for uuid work
+        // generate tx signature hash
+        //
+        self.generate_hash_for_signature();
+        let hash_for_signature = self.get_hash_for_signature();
 
         //
         // calculate nolan in / out, fees
@@ -477,31 +472,29 @@ impl Transaction {
         if nolan_in > nolan_out {
             self.total_fees = nolan_in - nolan_out;
         }
-
     }
     //
     // calculate cumulative routing work in block
     //
-    pub fn generate_total_work(&mut self, publickey : SaitoPublicKey) {
-
-	//
+    pub fn generate_total_work(&mut self, publickey: SaitoPublicKey) {
+        //
         // if there is no routing path, then the transaction contains
-	// no usable work for producing a block, and any payout associated
-	// with the transaction will simply be issued to the creator of 
-	// the transaction itself.
-	//
+        // no usable work for producing a block, and any payout associated
+        // with the transaction will simply be issued to the creator of
+        // the transaction itself.
+        //
         if self.path.is_empty() {
             self.total_work = 0;
-	    return;
+            return;
         }
 
-	//
+        //
         // something is wrong if we are not the last routing node
-	//
+        //
         let last_hop = &self.path[self.path.len() - 1];
         if last_hop.get_to() != publickey {
             self.total_work = 0;
-	    return;
+            return;
         }
 
         let total_fees = self.get_total_fees();
@@ -513,7 +506,7 @@ impl Transaction {
         //
         for _i in 1..self.path.len() {
             if self.path[_i].get_to() != self.path[_i - 1].get_from() {
-		self.total_work = 0;
+                self.total_work = 0;
                 return;
             }
 
@@ -522,10 +515,8 @@ impl Transaction {
             routing_work_available_to_publickey -= half_of_routing_work;
         }
 
-	self.total_work = routing_work_available_to_publickey;
-
+        self.total_work = routing_work_available_to_publickey;
     }
-
 
     //
     // generate hash used for signing the tx
@@ -613,11 +604,11 @@ impl Transaction {
         // of routing work that it is possible for this transaction
         // to contain (2x the fee).
         //
-	// aggregate routing work is only calculated in this function
-	// as it is only needed when determining payouts. it should
-	// not be confused with total_work which represents the amount
-	// of work available in the transaction itself.
-	//
+        // aggregate routing work is only calculated in this function
+        // as it is only needed when determining payouts. it should
+        // not be confused with total_work which represents the amount
+        // of work available in the transaction itself.
+        //
         let mut aggregate_routing_work: u64 = self.get_total_fees();
         let mut routing_work_this_hop: u64 = aggregate_routing_work;
         let mut work_by_hop: Vec<u64> = vec![];
@@ -767,7 +758,6 @@ impl Transaction {
     }
 
     pub fn sign(&mut self, privatekey: SaitoPrivateKey) {
-
         //
         // we set slip ordinals when signing
         //
@@ -861,7 +851,6 @@ impl Transaction {
                 error!("ERROR 482033: routing paths do not validate, transaction invalid");
                 return false;
             }
-
 
             // TODO : what happens to tokens when total_out < total_in
             // validate we're not creating tokens out of nothing
@@ -974,7 +963,6 @@ impl Transaction {
 
         true
     }
-
 }
 
 #[cfg(test)]

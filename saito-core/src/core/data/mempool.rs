@@ -128,9 +128,9 @@ impl Mempool {
             publickey = wallet.get_publickey();
         }
 
-	//
-	// generates hashes, total fees, routing work for me, etc.
-	//
+        //
+        // generates hashes, total fees, routing work for me, etc.
+        //
         transaction.generate(publickey);
 
         if self
