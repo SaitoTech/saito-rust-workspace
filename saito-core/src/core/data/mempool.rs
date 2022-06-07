@@ -213,8 +213,7 @@ impl Mempool {
             .retain(|x| tx_hashmap.contains_key(&x.get_hash_for_signature()) != true);
 
         for transaction in &self.transactions {
-            self.routing_work_in_mempool +=
-                transaction.get_routing_work_for_publickey(self.mempool_publickey);
+            self.routing_work_in_mempool += transaction.get_total_work();
         }
     }
 
