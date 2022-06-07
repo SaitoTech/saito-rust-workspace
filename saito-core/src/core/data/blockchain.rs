@@ -46,7 +46,6 @@ pub struct Blockchain {
     pub blockring: BlockRing,
     pub blocks: AHashMap<SaitoHash, Block>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
-    // broadcast_channel_sender: broadcast::Sender<GlobalEvent>,
     genesis_block_id: u64,
     fork_id: SaitoHash,
 }
@@ -55,14 +54,12 @@ impl Blockchain {
     #[allow(clippy::new_without_default)]
     pub fn new(
         wallet_lock: Arc<RwLock<Wallet>>,
-        // sender: tokio::sync::broadcast::Sender<GlobalEvent>,
     ) -> Self {
         Blockchain {
             utxoset: AHashMap::new(),
             blockring: BlockRing::new(),
             blocks: AHashMap::new(),
             wallet_lock,
-            // broadcast_channel_sender: sender,
             genesis_block_id: 0,
             fork_id: [0; 32],
         }
@@ -89,9 +86,8 @@ impl Blockchain {
     ) {
         debug!("adding block to blockchain");
 
-
         //
-        // first things first, confirm hashes OK
+        // confirm hash first
         //
         block.generate_pre_hash();
         block.generate_hash();

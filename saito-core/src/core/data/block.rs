@@ -964,7 +964,7 @@ impl Block {
                                         output,
                                         REBROADCAST_FEE,
                                         STAKING_SUBSIDY,
-                                    ).await;
+                                    );
 
                                 //
                                 // update cryptographic hash of all ATRs

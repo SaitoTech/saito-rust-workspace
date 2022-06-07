@@ -225,7 +225,7 @@ impl Transaction {
         }
     }
 
-    pub async fn create_vip_transaction(
+    pub fn create_vip_transaction(
         to_publickey: SaitoPublicKey,
         with_amount: u64,
         number_of_vip_slips: u64,
@@ -248,7 +248,7 @@ impl Transaction {
     //
     // create rebroadcast transaction
     //
-    pub async fn create_rebroadcast_transaction(
+    pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
         output_slip_to_rebroadcast: &Slip,
         with_fee: u64,
