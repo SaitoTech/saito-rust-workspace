@@ -62,107 +62,61 @@ impl GoldenTicket {
         vbytes
     }
 
-    //
-    // TODO - switch to full binary difficulty algorithm
-    //
-    // this algorithm is quite old but maintained in this form for compatibility with
-    // javascript clients in the short-term. we should update this to have it handle
-    // comparisons in binary.
-    //
     pub fn validate(&self, difficulty: u64) -> bool {
-        let solution = hash(&self.serialize_for_net());
+        let solution_hash = hash(&self.serialize_for_net());
+        return GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty);
+    }
 
-        let leading_zeroes_required: u64 = difficulty / 16;
-        let final_digit: u8 = 15 - ((difficulty % 16) as u8);
+    pub fn validate_hashing_difficulty(solution_hash: &SaitoHash, difficulty: u64) -> bool {
+        let solution = U256::from_big_endian(solution_hash);
 
-        let mut target_string = String::from("");
+        if solution.leading_zeros() >= difficulty as u32 {
+            trace!(
+                "GT : difficulty : {:?} solution : {:?} ",
+                difficulty,
+                hex::encode(solution_hash)
+            );
 
-        //
-        // decidely ungainly
-        //
-        for i in 0..64 {
-            if (i as u64) < leading_zeroes_required {
-                target_string.push('0');
-            } else {
-                if (i as u64) == leading_zeroes_required {
-                    if final_digit == 0 {
-                        target_string.push('0');
-                    }
-                    if final_digit == 1 {
-                        target_string.push('1');
-                    }
-                    if final_digit == 2 {
-                        target_string.push('2');
-                    }
-                    if final_digit == 3 {
-                        target_string.push('3');
-                    }
-                    if final_digit == 4 {
-                        target_string.push('4');
-                    }
-                    if final_digit == 5 {
-                        target_string.push('5');
-                    }
-                    if final_digit == 6 {
-                        target_string.push('6');
-                    }
-                    if final_digit == 7 {
-                        target_string.push('7');
-                    }
-                    if final_digit == 8 {
-                        target_string.push('8');
-                    }
-                    if final_digit == 9 {
-                        target_string.push('9');
-                    }
-                    if final_digit == 10 {
-                        target_string.push('A');
-                    }
-                    if final_digit == 11 {
-                        target_string.push('B');
-                    }
-                    if final_digit == 12 {
-                        target_string.push('C');
-                    }
-                    if final_digit == 13 {
-                        target_string.push('D');
-                    }
-                    if final_digit == 14 {
-                        target_string.push('E');
-                    }
-                    if final_digit == 15 {
-                        target_string.push('F');
-                    }
-                } else {
-                    target_string.push('F');
-                }
-            }
-        }
-
-        let target_hash = hex::decode(target_string).expect("error generating target bytes array");
-
-        let sol = U256::from_big_endian(&solution);
-        let tgt = U256::from_big_endian(&target_hash);
-
-        if sol <= tgt {
             return true;
         }
 
-        trace!(
-            "GT : solution : {:?} target : {:?}",
-            hex::encode(solution),
-            hex::encode(target_hash)
-        );
         return false;
     }
 }
 
 #[cfg(test)]
 mod tests {
-
+    use crate::common::defs::SaitoHash;
     use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
+
+    #[test]
+    fn golden_ticket_validate_hashing_difficulty() {
+        let hash: SaitoHash = [0u8; 32];
+        let mut hash2: SaitoHash = [255u8; 32];
+
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash, 0));
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash, 10));
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash, 256));
+        assert_eq!(
+            GoldenTicket::validate_hashing_difficulty(&hash, 1000000),
+            false
+        );
+
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash2, 0));
+        assert_eq!(GoldenTicket::validate_hashing_difficulty(&hash2, 10), false);
+        assert_eq!(
+            GoldenTicket::validate_hashing_difficulty(&hash2, 256),
+            false
+        );
+
+        hash2[0] = 15u8;
+
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash2, 3));
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash2, 4));
+        assert_eq!(GoldenTicket::validate_hashing_difficulty(&hash2, 5), false);
+    }
 
     #[test]
     fn golden_ticket_extremes_test() {
@@ -176,21 +130,5 @@ mod tests {
 
         assert_eq!(gt.validate(0), true);
         assert_eq!(gt.validate(256), false);
-    }
-
-    #[test]
-    fn golden_ticket_difficulty_test() {
-
-        // GIVEN - a known hash
-        // WHEN - tested against exactly the appropriate difficulty
-        // THEN - valid solution
-
-        // GIVEN - a known hash
-        // WHEN - tested against one difficulty easier
-        // THEN - valid solution
-
-        // GIVEN - a known hash
-        // WHEN - tested against one difficulty easier
-        // THEN - invalid solution
     }
 }
