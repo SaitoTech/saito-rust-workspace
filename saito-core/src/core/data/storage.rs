@@ -107,7 +107,7 @@ impl Storage {
             }
             let buffer = result.unwrap();
             let mut block = Block::deserialize_from_net(&buffer);
-            block.generate_metadata();
+            block.generate();
             blockchain
                 .add_block(block, network, self, sender_to_miner.clone())
                 .await;

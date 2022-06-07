@@ -127,10 +127,11 @@ impl Mempool {
             trace!("acquired the wallet read lock");
             publickey = wallet.get_publickey();
         }
-        transaction.generate_metadata(publickey);
 
-        let routing_work_available_for_me =
-            transaction.get_routing_work_for_publickey(self.mempool_publickey);
+	//
+	// generates hashes, total fees, routing work for me, etc.
+	//
+        transaction.generate(publickey);
 
         if self
             .transactions
@@ -138,8 +139,8 @@ impl Mempool {
             .any(|transaction| transaction.get_signature() == tx_sig_to_insert)
         {
         } else {
+            self.routing_work_in_mempool += transaction.get_total_work();
             self.transactions.push(transaction);
-            self.routing_work_in_mempool += routing_work_available_for_me;
         }
     }
 
@@ -154,7 +155,7 @@ impl Mempool {
             previous_block_hash = blockchain.get_latest_block_hash();
         }
 
-        let mut block = Block::generate(
+        let mut block = Block::create(
             &mut self.transactions,
             previous_block_hash,
             self.wallet_lock.clone(),
@@ -162,7 +163,7 @@ impl Mempool {
             current_timestamp,
         )
         .await;
-        block.generate_metadata();
+        block.generate();
 
         self.routing_work_in_mempool = 0;
 

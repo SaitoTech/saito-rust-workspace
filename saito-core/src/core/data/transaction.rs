@@ -41,16 +41,22 @@ pub struct Transaction {
     signature: SaitoSignature,
     path: Vec<Hop>,
 
-    // hash used for merkle_root (does not include signature), and slip uuid
+    // hash used for merkle_root (does not include signature) and slip uuid
     hash_for_signature: Option<SaitoHash>,
 
+    // total nolan in input slips
     pub total_in: u64,
+    // total nolan in output slips
     pub total_out: u64,
+    // total fees
     pub total_fees: u64,
+    // total work to creator
+    pub total_work: u64,
+    // cumulative fees for this tx-in-block
     pub cumulative_fees: u64,
+    // cumulative work for this tx-in-block
+    pub cumulative_work: u64,
 
-    pub routing_work_for_me: u64,
-    pub routing_work_for_creator: u64,
 }
 
 impl Transaction {
@@ -69,9 +75,9 @@ impl Transaction {
             total_in: 0,
             total_out: 0,
             total_fees: 0,
+            total_work: 0,
             cumulative_fees: 0,
-            routing_work_for_me: 0,
-            routing_work_for_creator: 0,
+            cumulative_work: 0,
         }
     }
 
@@ -118,7 +124,7 @@ impl Transaction {
     //
     // this assumes that the
     //
-    pub fn generate_rebroadcast_transaction(
+    pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
         output_slip_to_rebroadcast: &Slip,
         with_fee: u64,
@@ -169,6 +175,7 @@ impl Transaction {
     }
 
     pub fn get_routing_work_for_publickey(&self, publickey: SaitoPublicKey) -> u64 {
+
         // there is not routing path
         if self.path.is_empty() {
             return 0;
@@ -231,6 +238,10 @@ impl Transaction {
 
     pub fn get_total_fees(&self) -> u64 {
         self.total_fees
+    }
+
+    pub fn get_total_work(&self) -> u64 {
+        self.total_work
     }
 
     pub fn get_timestamp(&self) -> u64 {
@@ -365,6 +376,7 @@ impl Transaction {
     }
 
     pub fn sign(&mut self, privatekey: SaitoPrivateKey) {
+
         //
         // we set slip ordinals when signing
         //
@@ -373,8 +385,8 @@ impl Transaction {
         }
 
         let hash_for_signature = hash(&self.serialize_for_signature());
-        self.set_signature(sign(&hash_for_signature, privatekey));
         self.set_hash_for_signature(hash_for_signature);
+        self.set_signature(sign(&hash_for_signature, privatekey));
     }
 
     pub fn serialize_for_signature(&self) -> Vec<u8> {
@@ -458,7 +470,7 @@ impl Transaction {
     // to the transaction if possible. If not possible it reverts back to a transaction
     // with 1 zero-fee input and 1 zero-fee output.
     //
-    pub async fn generate_transaction(
+    pub async fn create(
         wallet_lock: Arc<RwLock<Wallet>>,
         to_publickey: SaitoPublicKey,
         with_payment: u64,
@@ -573,7 +585,7 @@ impl Transaction {
         }
     }
     // TODO : move from this class
-    pub async fn generate_vip_transaction(
+    pub async fn create_vip_transaction(
         _wallet_lock: Arc<RwLock<Wallet>>,
         to_publickey: SaitoPublicKey,
         with_amount: u64,
@@ -676,20 +688,21 @@ impl Transaction {
     //
     // calculate cumulative fee share in block
     //
-    pub fn generate_metadata_cumulative_fees(&mut self, cumulative_fees: u64) -> u64 {
+    pub fn generate_cumulative_fees(&mut self, cumulative_fees: u64) -> u64 {
         self.cumulative_fees = cumulative_fees + self.total_fees;
         self.cumulative_fees
     }
     //
     // calculate cumulative routing work in block
     //
-    pub fn generate_metadata_cumulative_work(&mut self, cumulative_work: u64) -> u64 {
-        cumulative_work + self.routing_work_for_creator
+    pub fn generate_cumulative_work(&mut self, cumulative_work: u64) -> u64 {
+        self.cumulative_work = cumulative_work + self.cumulative_work;
+	self.cumulative_work
     }
     //
-    // calculate hashes used in signatures
+    // generate hash used for signing the tx
     //
-    pub fn generate_metadata_hashes(&mut self) -> bool {
+    pub fn generate_hash_for_signature(&mut self) {
         //
         // and save the hash_for_signature so we can use it later...
         //
@@ -699,43 +712,39 @@ impl Transaction {
         //
         let hash_for_signature: SaitoHash = hash(&self.serialize_for_signature());
         self.set_hash_for_signature(hash_for_signature);
-
-        true
     }
+
     //
     // calculate abstract metadata for fees
     //
     // note that this expects the hash_for_signature to have already
     // been calculated.
     //
-    pub fn generate_metadata_fees_and_slips(&mut self, publickey: SaitoPublicKey) -> bool {
+    pub fn generate(&mut self, publickey: SaitoPublicKey) -> bool {
+
         //
         // calculate nolan in / out, fees
         //
         let mut nolan_in: u64 = 0;
         let mut nolan_out: u64 = 0;
+
+	//
+	// ensure hash exists for signing
+	//
+        self.generate_hash_for_signature();
         let hash_for_signature = self.get_hash_for_signature();
 
+	//
+	// generate utxoset key for every slip
+	//
         for input in &mut self.inputs {
             nolan_in += input.get_amount();
-
-            // generate utxoset key cache
-
-            //
-            // ATR txs have uuid already set
-            // Fee txs have uuid already set
-            //
-            if input.get_slip_type() != SlipType::ATR {}
-
             input.generate_utxoset_key();
         }
         for output in &mut self.outputs {
             nolan_out += output.get_amount();
-
             //
-            // generate utxoset key cache
-            // and set the UUID needed for insertion to shashmap
-            // skip for ATR slips
+	    // new outbound slips
             //
             if let Some(hash_for_signature) = hash_for_signature {
                 if output.get_slip_type() != SlipType::ATR {
@@ -759,18 +768,11 @@ impl Transaction {
             self.total_fees = nolan_in - nolan_out;
         }
 
-        //
-        // we also need to know how much routing work exists and is available
-        // for the block producer, to ensure that they have met the conditions
-        // required by the burn fee for block production.
-        //
-        self.routing_work_for_creator = self.get_routing_work_for_publickey(publickey);
+	//
+	// calculate total work available for submitted publickey / creator
+	//
+	self.total_work = self.get_routing_work_for_publickey(publickey);
 
-        true
-    }
-    pub fn generate_metadata(&mut self, publickey: SaitoPublicKey) -> bool {
-        self.generate_metadata_hashes();
-        self.generate_metadata_fees_and_slips(publickey);
         true
     }
 
@@ -960,8 +962,7 @@ mod tests {
         assert_eq!(tx.total_out, 0);
         assert_eq!(tx.total_fees, 0);
         assert_eq!(tx.cumulative_fees, 0);
-        assert_eq!(tx.routing_work_for_me, 0);
-        assert_eq!(tx.routing_work_for_creator, 0);
+        assert_eq!(tx.cumulative_work, 0);
     }
 
     #[test]
@@ -1115,9 +1116,9 @@ mod tests {
     }
 
     #[test]
-    fn transaction_generate_metadata_cumulative_fees_test() {
+    fn transaction_generate_cumulative_fees_test() {
         let mut tx = Transaction::new();
-        tx.generate_metadata_cumulative_fees(1_0000);
+        tx.generate_cumulative_fees(1_0000);
         assert_eq!(tx.cumulative_fees, 1_0000);
     }
 

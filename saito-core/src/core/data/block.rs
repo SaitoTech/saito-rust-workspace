@@ -536,7 +536,7 @@ impl Block {
             //
             // transactions need hashes
             //
-            self.generate_metadata();
+            self.generate();
             self.set_block_type(BlockType::Full);
 
             return true;
@@ -574,19 +574,11 @@ impl Block {
     // we may want to separate the signing of the block from the setting of the necessary hash
     // we do this together out of convenience only
     //
-    pub fn sign(&mut self, publickey: SaitoPublicKey, privatekey: SaitoPrivateKey) {
+    pub fn sign(&mut self, privatekey: SaitoPrivateKey) {
         //
         // we set final data
         //
-        self.set_creator(publickey);
-        self.generate_pre_hash();
         self.set_signature(sign(&self.get_pre_hash(), privatekey));
-        self.generate_hash();
-    }
-
-    pub fn generate(&mut self) {
-        self.generate_pre_hash();
-	self.generate_hash();
     }
 
     pub fn generate_hash(&mut self) -> SaitoHash {
@@ -774,8 +766,6 @@ impl Block {
             block.set_block_type(BlockType::Header);
         }
 
-        // generate dynamic
-        block.generate();
         block
     }
 
@@ -926,7 +916,7 @@ impl Block {
                                 // create rebroadcast transaction
                                 //
                                 let rebroadcast_transaction =
-                                    Transaction::generate_rebroadcast_transaction(
+                                    Transaction::create_rebroadcast_transaction(
                                         &transaction,
                                         output,
                                         REBROADCAST_FEE,
@@ -1290,11 +1280,9 @@ impl Block {
     // sweeping through the transactions to find out what percentage of the
     // cumulative block fees they contain.
     //
-    pub fn generate_metadata(&mut self) -> bool {
-        // trace!(" ... block.prevalid - pre hash:  {:?}", create_timestamp());
+    pub fn generate(&mut self) -> bool {
 
-        // ensure hashes correct
-        self.generate_hashes();
+        // trace!(" ... block.prevalid - pre hash:  {:?}", create_timestamp());
 
         //
         // if we are generating the metadata for a block, we use the
@@ -1303,10 +1291,14 @@ impl Block {
         //
         let creator_publickey = self.get_creator();
 
+        // ensure hashes correct
+        self.generate_pre_hash();
+        self.generate_hash();
+
         let _transactions_pre_calculated = &self
             .transactions
             .par_iter_mut()
-            .all(|tx| tx.generate_metadata(creator_publickey));
+            .all(|tx| tx.generate(creator_publickey));
 
         // trace!(" ... block.prevalid - pst hash:  {:?}", create_timestamp());
 
@@ -1335,10 +1327,11 @@ impl Block {
         // commitment for all of our rebroadcasts.
         //
         for i in 0..self.transactions.len() {
+
             let transaction = &mut self.transactions[i];
 
-            cumulative_fees = transaction.generate_metadata_cumulative_fees(cumulative_fees);
-            cumulative_work = transaction.generate_metadata_cumulative_work(cumulative_work);
+            cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
+            cumulative_work = transaction.generate_cumulative_work(cumulative_work);
 
             //
             // update slips_spent_this_block so that we have a record of
@@ -1656,7 +1649,7 @@ impl Block {
             // block-specific data in the same way that all of the transactions in
             // the block have been. we must do this prior to comparing them.
             //
-            fee_transaction.generate_metadata(self.get_creator());
+            fee_transaction.generate(self.get_creator());
 
             let hash1 = hash(&fee_transaction.serialize_for_signature());
             let hash2 = hash(&self.transactions[ft_idx].serialize_for_signature());
@@ -1741,6 +1734,7 @@ impl Block {
         blockchain: &mut Blockchain,
         current_timestamp: u64,
     ) -> Block {
+
         debug!(
             "Block::create : previous block hash : {:?}",
             hex::encode(previous_block_hash)
@@ -1783,6 +1777,9 @@ impl Block {
         block.set_burnfee(current_burnfee);
         block.set_timestamp(current_timestamp);
         block.set_difficulty(previous_block_difficulty);
+
+        block.set_creator(publickey);
+
 
         //
         // in-memory swap copying txs in block from mempool
@@ -1830,7 +1827,7 @@ impl Block {
         // than iterating through the entire transaction set here.
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
             .par_iter_mut()
-            .all(|tx| tx.generate_metadata(publickey));
+            .all(|tx| tx.generate(publickey));
         if rlen > 0 {
             block.transactions.append(&mut cv.rebroadcasts);
         }
@@ -1921,13 +1918,18 @@ impl Block {
         let block_merkle_root = block.generate_merkle_root();
         block.set_merkle_root(block_merkle_root);
 
+
         {
             trace!("waiting for the wallet read lock");
             let wallet = wallet_lock.read().await;
             trace!("acquired the wallet read lock");
-            block.sign(wallet.get_publickey(), wallet.get_privatekey());
-            block.generate();
+            block.sign(wallet.get_privatekey());
         }
+
+	//
+	// hash includes pre-hash and sig, so update
+	//
+	block.generate_hash();
 
         block
     }
@@ -1984,9 +1986,9 @@ mod tests {
     }
 
     #[test]
-    fn block_generate_metadata_test() {
+    fn block_generate_test() {
         let mut block = Block::new();
-        block.generate_metadata();
+        block.generate();
 
         // block hashes should have updated
         assert_ne!(block.pre_hash, [0; 32]);
@@ -2024,11 +2026,11 @@ mod tests {
         let serialized_body = block.serialize_for_signature();
         assert_eq!(serialized_body.len(), 177);
 
-        block.sign(
-            <[u8; 33]>::from_hex(
+        block.creator = <[u8; 33]>::from_hex(
                 "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
-            )
-            .unwrap(),
+            ).unwrap();
+
+        block.sign(
             <[u8; 32]>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
@@ -2038,12 +2040,7 @@ mod tests {
         assert_eq!(block.signature.len(), 64);
         assert_eq!(
             block.signature,
-            [
-                181, 196, 195, 189, 82, 225, 56, 124, 169, 36, 245, 199, 95, 50, 182, 135, 95, 153,
-                228, 2, 162, 21, 248, 254, 42, 1, 106, 1, 25, 208, 145, 191, 21, 187, 69, 52, 225,
-                214, 86, 94, 116, 168, 14, 58, 70, 186, 16, 164, 215, 211, 153, 107, 226, 236, 231,
-                190, 0, 62, 12, 122, 68, 24, 2, 109
-            ]
+            [ 79, 111, 17, 122, 189, 142, 78, 252, 111, 231, 122, 86, 129, 151, 99, 71, 245, 34, 33, 254, 104, 138, 238, 136, 230, 45, 113, 171, 146, 105, 138, 64, 43, 25, 204, 186, 169, 208, 222, 5, 89, 64, 83, 32, 102, 18, 114, 20, 171, 0, 97, 232, 158, 108, 185, 37, 225, 233, 33, 97, 222, 132, 218, 120]
         )
     }
 
@@ -2123,8 +2120,10 @@ mod tests {
     fn block_sign_and_verify_test() {
         let wallet = Wallet::new();
         let mut block = Block::new();
-
-        block.sign(wallet.get_publickey(), wallet.get_privatekey());
+        block.creator = wallet.get_publickey();
+        block.generate();
+        block.sign(wallet.get_privatekey());
+        block.generate_hash();
 
         assert_eq!(block.creator, wallet.get_publickey());
         assert_eq!(

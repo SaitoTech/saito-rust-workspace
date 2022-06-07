@@ -89,11 +89,48 @@ impl Blockchain {
     ) {
         debug!("adding block to blockchain");
 
+
+        //
+        // first things first, confirm hashes OK
+        //
+        block.generate_pre_hash();
+        block.generate_hash();
+
+        info!("add_block {:?}", &hex::encode(&block.get_hash()));
+
+        //
+        // start by extracting some variables that we will use
+        // repeatedly in the course of adding this block to the
+        // blockchain and our various indices.
+        //
+        let block_hash = block.get_hash();
+        let block_id = block.get_id();
+        let previous_block_hash = self.blockring.get_latest_block_hash();
+
+        //
+        // sanity checks
+        //
+        if self.blocks.contains_key(&block_hash) {
+            error!(
+                "ERROR: block exists in blockchain {:?}",
+                &hex::encode(&block.get_hash())
+            );
+            return;
+        }
+
+
+
+	//
+	// TODO -- david review -- should be no need for recursive fetch
+	// as each block will fetch the parent on arrival and processing
+	// and we may want to tag and use the degree of distance to impose
+	// penalities on routing peers.
+	//
         // get missing block
+	//
         if self.blockring.get_latest_block_id() > 0 {
             let mut earliest_block_id = 1;
             if self.get_latest_block_id() > GENESIS_PERIOD {
-                // if the ring is full
                 earliest_block_id = self.get_latest_block_id() - GENESIS_PERIOD;
             }
             trace!("earliest_block_id {}", earliest_block_id);
@@ -133,32 +170,7 @@ impl Blockchain {
             }
         }
 
-        //
-        // first things first, confirm hashes OK
-        //
-        block.generate_hashes();
 
-        info!("add_block {:?}", &hex::encode(&block.get_hash()));
-
-        //
-        // start by extracting some variables that we will use
-        // repeatedly in the course of adding this block to the
-        // blockchain and our various indices.
-        //
-        let block_hash = block.get_hash();
-        let block_id = block.get_id();
-        let previous_block_hash = self.blockring.get_latest_block_hash();
-
-        //
-        // sanity checks
-        //
-        if self.blocks.contains_key(&block_hash) {
-            error!(
-                "ERROR: block exists in blockchain {:?}",
-                &hex::encode(&block.get_hash())
-            );
-            return;
-        }
 
         //
         // pre-validation
@@ -252,6 +264,9 @@ impl Blockchain {
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
+
+println!("shared ancestor found");
+
             loop {
                 if new_chain_hash == old_chain_hash {
                     break;
@@ -272,6 +287,9 @@ impl Blockchain {
                 }
             }
         } else {
+
+println!("block without parent");
+
             //
             // we have a block without a parent.
             //
@@ -281,13 +299,16 @@ impl Blockchain {
             // of creating a separate variable to manually track entries.
             //
             if self.blockring.is_empty() {
+
+println!("blockring is empty");
+
                 //
                 // no need for action as fall-through will result in proper default
                 // behavior. we have the comparison here to separate expected from
                 // unexpected / edge-case issues around block receipt.
                 //
             } else {
-                //•
+                //
                 // TODO - implement logic to handle once nodes can connect
                 //
                 // if this not our first block, handle edge-case around receiving
@@ -314,8 +335,16 @@ impl Blockchain {
         // viable.
         //
         if am_i_the_longest_chain {
+
+println!("i am the longest chain");
+
             let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
+
+
             if does_new_chain_validate {
+
+println!("new chain validates!");
+
                 self.add_block_success(block_hash, network, storage).await;
 
                 //
@@ -363,6 +392,7 @@ impl Blockchain {
                 //     .expect("error: BlockchainAddBlockFailure message failed to send");
             }
         } else {
+
             self.add_block_failure().await;
 
             // TODO : send with related channel
@@ -738,6 +768,7 @@ impl Blockchain {
         old_chain: Vec<[u8; 32]>,
         storage: &Storage,
     ) -> bool {
+
         debug!("validating chains");
         //
         // ensure new chain has adequate mining support to be considered as
@@ -789,17 +820,21 @@ impl Blockchain {
         }
 
         if !old_chain.is_empty() {
+println!("old chain not empty...");
             let res = self
                 .unwind_chain(&new_chain, &old_chain, 0, true, storage)
                 //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
                 .await;
             res
         } else if !new_chain.is_empty() {
+println!("new chain not empty...");
             let res = self
                 .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
                 .await;
+println!("is blockring empty {}", self.blockring.is_empty());
             res
         } else {
+println!("old chain and new chain are both empty...");
             true
         }
     }
@@ -854,7 +889,7 @@ impl Blockchain {
         //
         {
             let mut block = self.get_mut_block(&new_chain[current_wind_index]).await;
-            block.generate_metadata();
+            block.generate();
 
             let latest_block_id = block.get_id();
 
