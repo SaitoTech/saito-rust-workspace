@@ -36,15 +36,15 @@ pub struct ConsensusValues {
     // number of issuance transactions if exists
     pub it_num: u8,
     // index of issuance transactions if exists
-    pub it_idx: Option<usize>,
+    pub it_index: Option<usize>,
     // number of FEE in transactions if exists
     pub ft_num: u8,
     // index of FEE in transactions if exists
-    pub ft_idx: Option<usize>,
+    pub ft_index: Option<usize>,
     // number of GT in transactions if exists
     pub gt_num: u8,
     // index of GT in transactions if exists
-    pub gt_idx: Option<usize>,
+    pub gt_index: Option<usize>,
     // total fees in block
     pub total_fees: u64,
     // expected difficulty
@@ -83,11 +83,11 @@ impl ConsensusValues {
         ConsensusValues {
             fee_transaction: None,
             it_num: 0,
-            it_idx: None,
+            it_index: None,
             ft_num: 0,
-            ft_idx: None,
+            ft_index: None,
             gt_num: 0,
-            gt_idx: None,
+            gt_index: None,
             total_fees: 0,
             expected_difficulty: 0,
             rebroadcasts: vec![],
@@ -185,8 +185,8 @@ pub struct Block {
     hash: SaitoHash,
     /// total fees paid into block
     total_fees: u64,
-    /// total fees paid into block
-    routing_work_for_creator: u64,
+    /// total routing work in block, given creator
+    total_work: u64,
     /// Is Block on longest chain
     in_longest_chain: bool,
     // has golden ticket
@@ -194,13 +194,13 @@ pub struct Block {
     // has issuance transaction
     pub has_issuance_transaction: bool,
     // issuance transaction index
-    pub issuance_transaction_idx: u64,
+    pub issuance_transaction_index: u64,
     // has fee transaction
     has_fee_transaction: bool,
     // golden ticket index
-    golden_ticket_idx: u64,
+    golden_ticket_index: u64,
     // fee transaction index
-    fee_transaction_idx: u64,
+    fee_transaction_index: u64,
     // number of rebroadcast slips
     total_rebroadcast_slips: u64,
     // number of rebroadcast txs
@@ -241,14 +241,14 @@ impl Block {
             pre_hash: [0; 32],
             hash: [0; 32],
             total_fees: 0,
-            routing_work_for_creator: 0,
+            total_work: 0,
             in_longest_chain: false,
             has_golden_ticket: false,
             has_fee_transaction: false,
             has_issuance_transaction: false,
-            issuance_transaction_idx: 0,
-            golden_ticket_idx: 0,
-            fee_transaction_idx: 0,
+            issuance_transaction_index: 0,
+            golden_ticket_index: 0,
+            fee_transaction_index: 0,
             total_rebroadcast_slips: 0,
             total_rebroadcast_nolan: 0,
             // must be initialized zeroed-out for proper hashing
@@ -711,9 +711,9 @@ impl Block {
         let mut has_golden_ticket = false;
         let mut has_fee_transaction = false;
         let mut has_issuance_transaction = false;
-        let mut issuance_transaction_idx = 0;
-        let mut golden_ticket_idx = 0;
-        let mut fee_transaction_idx = 0;
+        let mut issuance_transaction_index = 0;
+        let mut golden_ticket_index = 0;
+        let mut fee_transaction_index = 0;
 
         //
         // we have to do a single sweep through all of the transactions in
@@ -761,15 +761,15 @@ impl Block {
             match transaction.get_transaction_type() {
                 TransactionType::Issuance => {
                     has_issuance_transaction = true;
-                    issuance_transaction_idx = i as u64;
+                    issuance_transaction_index = i as u64;
                 }
                 TransactionType::Fee => {
                     has_fee_transaction = true;
-                    fee_transaction_idx = i as u64;
+                    fee_transaction_index = i as u64;
                 }
                 TransactionType::GoldenTicket => {
                     has_golden_ticket = true;
-                    golden_ticket_idx = i as u64;
+                    golden_ticket_index = i as u64;
                 }
                 TransactionType::ATR => {
                     let mut vbytes: Vec<u8> = vec![];
@@ -788,15 +788,15 @@ impl Block {
         self.set_has_fee_transaction(has_fee_transaction);
         self.set_has_golden_ticket(has_golden_ticket);
         self.set_has_issuance_transaction(has_issuance_transaction);
-        self.set_fee_transaction_idx(fee_transaction_idx);
-        self.set_golden_ticket_idx(golden_ticket_idx);
-        self.set_issuance_transaction_idx(issuance_transaction_idx);
+        self.set_fee_transaction_index(fee_transaction_index);
+        self.set_golden_ticket_index(golden_ticket_index);
+        self.set_issuance_transaction_index(issuance_transaction_index);
 
         //
         // update block with total fees
         //
         self.set_total_fees(cumulative_fees);
-        self.set_routing_work_for_creator(cumulative_work);
+        self.set_total_work(cumulative_work);
 
         // trace!(
         //     " ... block.pre_validation_done:  {:?}",
@@ -899,23 +899,23 @@ impl Block {
         //
         // calculate total fees
         //
-        let mut idx: usize = 0;
+        let mut index: usize = 0;
         for transaction in &self.transactions {
             if !transaction.is_fee_transaction() {
                 cv.total_fees += transaction.get_total_fees();
             } else {
                 cv.ft_num += 1;
-                cv.ft_idx = Some(idx);
+                cv.ft_index = Some(index);
             }
             if transaction.is_golden_ticket() {
                 cv.gt_num += 1;
-                cv.gt_idx = Some(idx);
+                cv.gt_index = Some(index);
             }
             if transaction.is_issuance_transaction() {
                 cv.it_num += 1;
-                cv.it_idx = Some(idx);
+                cv.it_index = Some(index);
             }
-            idx += 1;
+            index += 1;
         }
 
         //
@@ -964,7 +964,7 @@ impl Block {
                                         output,
                                         REBROADCAST_FEE,
                                         STAKING_SUBSIDY,
-                                    );
+                                    ).await;
 
                                 //
                                 // update cryptographic hash of all ATRs
@@ -1056,9 +1056,9 @@ impl Block {
         //
         // calculate payments to miners / routers / stakers
         //
-        if let Some(gt_idx) = cv.gt_idx {
+        if let Some(gt_index) = cv.gt_index {
             let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
-                self.transactions[gt_idx].get_message().to_vec(),
+                self.transactions[gt_index].get_message().to_vec(),
             );
             // generate input hash for router
             let mut next_random_number = hash(&golden_ticket.get_random().to_vec());
@@ -1103,7 +1103,7 @@ impl Block {
                 // loop backwards until MAX recursion OR golden ticket
                 //
                 let mut cont = 1;
-                let mut loop_idx = 0;
+                let mut loop_index = 0;
                 let mut did_the_block_before_our_staking_block_have_a_golden_ticket =
                     previous_block.get_has_golden_ticket();
                 //
@@ -1112,14 +1112,14 @@ impl Block {
                 let mut staking_block_hash = previous_block.get_previous_block_hash();
 
                 while cont == 1 {
-                    loop_idx += 1;
+                    loop_index += 1;
 
                     //
                     // we start with the second block, so once loop_IDX hits the same
                     // number as MAX_STAKER_RECURSION we have processed N blocks where
                     // N is MAX_STAKER_RECURSION.
                     //
-                    if loop_idx >= MAX_STAKER_RECURSION {
+                    if loop_index >= MAX_STAKER_RECURSION {
                         cont = 0;
                     } else {
                         if let Some(staking_block) = blockchain.blocks.get(&staking_block_hash) {
@@ -1173,7 +1173,7 @@ impl Block {
             //
             // now create fee transaction using the block payout data
             //
-            let mut slip_ordinal = 0;
+            let mut slip_index = 0;
             let mut transaction = Transaction::new();
             transaction.set_transaction_type(TransactionType::Fee);
 
@@ -1183,18 +1183,18 @@ impl Block {
                     output.set_publickey(cv.block_payout[i].miner);
                     output.set_amount(cv.block_payout[i].miner_payout);
                     output.set_slip_type(SlipType::MinerOutput);
-                    output.set_slip_ordinal(slip_ordinal);
+                    output.set_slip_index(slip_index);
                     transaction.add_output(output.clone());
-                    slip_ordinal += 1;
+                    slip_index += 1;
                 }
                 if cv.block_payout[i].router != [0; 33] {
                     let mut output = Slip::new();
                     output.set_publickey(cv.block_payout[i].router);
                     output.set_amount(cv.block_payout[i].router_payout);
                     output.set_slip_type(SlipType::RouterOutput);
-                    output.set_slip_ordinal(slip_ordinal);
+                    output.set_slip_index(slip_index);
                     transaction.add_output(output.clone());
-                    slip_ordinal += 1;
+                    slip_index += 1;
                 }
             }
 
@@ -1330,16 +1330,16 @@ impl Block {
         self.has_fee_transaction
     }
 
-    pub fn get_golden_ticket_idx(&self) -> u64 {
-        self.golden_ticket_idx
+    pub fn get_golden_ticket_index(&self) -> u64 {
+        self.golden_ticket_index
     }
 
-    pub fn get_issuance_transaction_idx(&self) -> u64 {
-        self.issuance_transaction_idx
+    pub fn get_issuance_transaction_index(&self) -> u64 {
+        self.issuance_transaction_index
     }
 
-    pub fn get_fee_transaction_idx(&self) -> u64 {
-        self.fee_transaction_idx
+    pub fn get_fee_transaction_index(&self) -> u64 {
+        self.fee_transaction_index
     }
 
     pub fn get_pre_hash(&self) -> SaitoHash {
@@ -1350,8 +1350,8 @@ impl Block {
         self.total_fees
     }
 
-    pub fn get_routing_work_for_creator(&self) -> u64 {
-        self.routing_work_for_creator
+    pub fn get_total_work(&self) -> u64 {
+        self.total_work
     }
 
     pub fn get_source_connection_id(&self) -> Option<SaitoPublicKey> {
@@ -1386,8 +1386,8 @@ impl Block {
         self.avg_atr_variance = x;
     }
 
-    pub fn set_routing_work_for_creator(&mut self, routing_work_for_creator: u64) {
-        self.routing_work_for_creator = routing_work_for_creator;
+    pub fn set_total_work(&mut self, x: u64) {
+        self.total_work = x;
     }
 
     pub fn set_has_issuance_transaction(&mut self, hit: bool) {
@@ -1402,16 +1402,16 @@ impl Block {
         self.has_fee_transaction = hft;
     }
 
-    pub fn set_issuance_transaction_idx(&mut self, idx: u64) {
-        self.issuance_transaction_idx = idx;
+    pub fn set_issuance_transaction_index(&mut self, index: u64) {
+        self.issuance_transaction_index = index;
     }
 
-    pub fn set_golden_ticket_idx(&mut self, idx: u64) {
-        self.golden_ticket_idx = idx;
+    pub fn set_golden_ticket_index(&mut self, index: u64) {
+        self.golden_ticket_index = index;
     }
 
-    pub fn set_fee_transaction_idx(&mut self, idx: u64) {
-        self.fee_transaction_idx = idx;
+    pub fn set_fee_transaction_index(&mut self, index: u64) {
+        self.fee_transaction_index = index;
     }
 
     pub fn set_total_fees(&mut self, total_fees: u64) {
@@ -1787,7 +1787,7 @@ impl Block {
                     self.get_timestamp(),
                     previous_block.get_timestamp(),
                 );
-            if self.routing_work_for_creator < amount_of_routing_work_needed {
+            if self.total_work < amount_of_routing_work_needed {
                 error!("Error 510293: block lacking adequate routing work from creator");
                 return false;
             }
@@ -1808,9 +1808,9 @@ impl Block {
             // which was generated using this solution. If the solution is invalid
             // we find that out now, and it invalidates the block.
             //
-            if let Some(gt_idx) = cv.gt_idx {
+            if let Some(gt_index) = cv.gt_index {
                 let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
-                    self.get_transactions()[gt_idx].get_message().to_vec(),
+                    self.get_transactions()[gt_index].get_message().to_vec(),
                 );
                 //
                 // we already have a golden ticket, but create a new one pulling the
@@ -1881,11 +1881,11 @@ impl Block {
         // that stretches back into previous blocks and finds the winning nodes
         // that should collect payment.
         //
-        if let (Some(ft_idx), Some(mut fee_transaction)) = (cv.ft_idx, cv.fee_transaction) {
+        if let (Some(ft_index), Some(mut fee_transaction)) = (cv.ft_index, cv.fee_transaction) {
             //
             // no golden ticket? invalid
             //
-            if cv.gt_idx.is_none() {
+            if cv.gt_index.is_none() {
                 error!("ERROR 48203: block appears to have fee transaction without golden ticket");
                 return false;
             }
@@ -1898,14 +1898,14 @@ impl Block {
             fee_transaction.generate(self.get_creator());
 
             let hash1 = hash(&fee_transaction.serialize_for_signature());
-            let hash2 = hash(&self.transactions[ft_idx].serialize_for_signature());
+            let hash2 = hash(&self.transactions[ft_index].serialize_for_signature());
             if hash1 != hash2 {
                 error!(
                     "ERROR 627428: block {} fee transaction doesn't match cv fee transaction",
                     self.get_id()
                 );
                 info!("fee transaction = {:?}", fee_transaction);
-                info!("tx : {:?}", self.transactions[ft_idx]);
+                info!("tx : {:?}", self.transactions[ft_index]);
                 return false;
             }
         }
@@ -2003,14 +2003,14 @@ mod tests {
         assert_eq!(block.pre_hash, [0; 32]);
         assert_eq!(block.hash, [0; 32]);
         assert_eq!(block.total_fees, 0);
-        assert_eq!(block.routing_work_for_creator, 0);
+        assert_eq!(block.total_work, 0);
         assert_eq!(block.in_longest_chain, false);
         assert_eq!(block.has_golden_ticket, false);
         assert_eq!(block.has_issuance_transaction, false);
-        assert_eq!(block.issuance_transaction_idx, 0);
+        assert_eq!(block.issuance_transaction_index, 0);
         assert_eq!(block.has_fee_transaction, false);
-        assert_eq!(block.fee_transaction_idx, 0);
-        assert_eq!(block.golden_ticket_idx, 0);
+        assert_eq!(block.fee_transaction_index, 0);
+        assert_eq!(block.golden_ticket_index, 0);
         assert_eq!(block.total_rebroadcast_slips, 0);
         assert_eq!(block.total_rebroadcast_nolan, 0);
         assert_eq!(block.rebroadcast_hash, [0; 32]);

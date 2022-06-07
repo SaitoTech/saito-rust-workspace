@@ -28,7 +28,7 @@ pub struct Slip {
     #[serde_as(as = "[_; 33]")]
     publickey: SaitoPublicKey,
     amount: u64,
-    slip_ordinal: u8,
+    slip_index: u8,
     slip_type: SlipType,
     uuid: SaitoHash,
     #[serde_as(as = "[_; 74]")]
@@ -41,7 +41,7 @@ impl Slip {
         Self {
             publickey: [0; 33],
             amount: 0,
-            slip_ordinal: 0,
+            slip_index: 0,
             slip_type: SlipType::Normal,
             uuid: [0; 32],
             utxoset_key: [0; 74],
@@ -70,7 +70,7 @@ impl Slip {
                         "value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
                         hex::encode(self.utxoset_key),
                         self.get_slip_type(),
-                        self.get_slip_ordinal(),
+                        self.get_slip_index(),
                         self.get_amount()
                     );
                     false
@@ -109,8 +109,8 @@ impl Slip {
         self.uuid
     }
 
-    pub fn get_slip_ordinal(&self) -> u8 {
-        self.slip_ordinal
+    pub fn get_slip_index(&self) -> u8 {
+        self.slip_index
     }
 
     pub fn get_slip_type(&self) -> SlipType {
@@ -129,8 +129,8 @@ impl Slip {
         self.uuid = uuid;
     }
 
-    pub fn set_slip_ordinal(&mut self, slip_ordinal: u8) {
-        self.slip_ordinal = slip_ordinal;
+    pub fn set_slip_index(&mut self, slip_index: u8) {
+        self.slip_index = slip_index;
     }
 
     pub fn set_slip_type(&mut self, slip_type: SlipType) {
@@ -197,7 +197,7 @@ impl Slip {
         vbytes.extend(&self.publickey);
         vbytes.extend(&self.uuid);
         vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&(self.slip_ordinal.to_be_bytes()));
+        vbytes.extend(&(self.slip_index.to_be_bytes()));
         vbytes.extend(&(self.slip_type as u32).to_be_bytes());
         vbytes
     }
@@ -219,7 +219,7 @@ impl Slip {
         vbytes.extend(&self.publickey);
         vbytes.extend(&[0; 32]);
         vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&(self.slip_ordinal.to_be_bytes()));
+        vbytes.extend(&(self.slip_index.to_be_bytes()));
         vbytes.extend(&(self.slip_type as u32).to_be_bytes());
         vbytes
     }
@@ -232,13 +232,13 @@ impl Slip {
     // 33 bytes publickey
     // 32 bytes uuid
     // 8 bytes amount
-    // 1 byte slip_ordinal
+    // 1 byte slip_index
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
         let mut res: Vec<u8> = vec![];
         res.extend(&self.get_publickey());
         res.extend(&self.get_uuid());
         res.extend(&self.get_amount().to_be_bytes());
-        res.extend(&self.get_slip_ordinal().to_be_bytes());
+        res.extend(&self.get_slip_index().to_be_bytes());
 
         res[0..74].try_into().unwrap()
 
@@ -249,14 +249,14 @@ impl Slip {
         let publickey: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let uuid: SaitoHash = bytes[33..65].try_into().unwrap();
         let amount: u64 = u64::from_be_bytes(bytes[65..73].try_into().unwrap());
-        let slip_ordinal: u8 = bytes[73];
+        let slip_index: u8 = bytes[73];
         let slip_type: SlipType = FromPrimitive::from_u8(bytes[SLIP_SIZE - 1]).unwrap();
         let mut slip = Slip::new();
 
         slip.set_publickey(publickey);
         slip.set_uuid(uuid);
         slip.set_amount(amount);
-        slip.set_slip_ordinal(slip_ordinal);
+        slip.set_slip_index(slip_index);
         slip.set_slip_type(slip_type);
 
         slip
@@ -266,7 +266,7 @@ impl Slip {
         vbytes.extend(&self.publickey);
         vbytes.extend(&self.uuid);
         vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&self.slip_ordinal.to_be_bytes());
+        vbytes.extend(&self.slip_index.to_be_bytes());
         vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
@@ -291,7 +291,7 @@ mod tests {
         assert_eq!(slip.get_uuid(), [0; 32]);
         assert_eq!(slip.get_amount(), 0);
         assert_eq!(slip.get_slip_type(), SlipType::Normal);
-        assert_eq!(slip.get_slip_ordinal(), 0);
+        assert_eq!(slip.get_slip_index(), 0);
 
         slip.set_publickey([1; 33]);
         assert_eq!(slip.get_publickey(), [1; 33]);
@@ -302,8 +302,8 @@ mod tests {
         slip.set_uuid([30; 32]);
         assert_eq!(slip.get_uuid(), [30; 32]);
 
-        slip.set_slip_ordinal(1);
-        assert_eq!(slip.get_slip_ordinal(), 1);
+        slip.set_slip_index(1);
+        assert_eq!(slip.get_slip_index(), 1);
 
         slip.set_slip_type(SlipType::MinerInput);
         assert_eq!(slip.get_slip_type(), SlipType::MinerInput);

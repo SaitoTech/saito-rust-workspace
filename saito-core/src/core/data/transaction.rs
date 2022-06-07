@@ -225,7 +225,7 @@ impl Transaction {
         }
     }
 
-    pub fn create_vip_transaction(
+    pub async fn create_vip_transaction(
         to_publickey: SaitoPublicKey,
         with_amount: u64,
         number_of_vip_slips: u64,
@@ -248,7 +248,7 @@ impl Transaction {
     //
     // create rebroadcast transaction
     //
-    pub fn create_rebroadcast_transaction(
+    pub async fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
         output_slip_to_rebroadcast: &Slip,
         with_fee: u64,
@@ -772,7 +772,7 @@ impl Transaction {
         // we set slip ordinals when signing
         //
         for (i, output) in self.get_mut_outputs().iter_mut().enumerate() {
-            output.set_slip_ordinal(i as u8);
+            output.set_slip_index(i as u8);
         }
 
         let hash_for_signature = hash(&self.serialize_for_signature());
@@ -1008,7 +1008,7 @@ mod tests {
         tx.set_outputs(vec![Slip::new()]);
         tx.sign(wallet.get_privatekey());
 
-        assert_eq!(tx.get_outputs()[0].get_slip_ordinal(), 0);
+        assert_eq!(tx.get_outputs()[0].get_slip_index(), 0);
         assert_ne!(tx.get_signature(), [0; 64]);
         assert_ne!(tx.get_hash_for_signature(), Some([0; 32]));
     }
@@ -1045,7 +1045,7 @@ mod tests {
             .unwrap(),
         );
         input_slip.set_amount(123);
-        input_slip.set_slip_ordinal(10);
+        input_slip.set_slip_index(10);
         input_slip.set_slip_type(SlipType::ATR);
 
         let mut output_slip = Slip::new();
@@ -1062,7 +1062,7 @@ mod tests {
             .unwrap(),
         );
         output_slip.set_amount(345);
-        output_slip.set_slip_ordinal(23);
+        output_slip.set_slip_index(23);
         output_slip.set_slip_type(SlipType::Normal);
 
         tx.inputs.push(input_slip);
@@ -1108,7 +1108,7 @@ mod tests {
             .unwrap(),
         );
         input_slip.set_amount(123);
-        input_slip.set_slip_ordinal(10);
+        input_slip.set_slip_index(10);
         input_slip.set_slip_type(SlipType::ATR);
 
         let mut output_slip = Slip::new();
@@ -1125,7 +1125,7 @@ mod tests {
             .unwrap(),
         );
         output_slip.set_amount(345);
-        output_slip.set_slip_ordinal(23);
+        output_slip.set_slip_index(23);
         output_slip.set_slip_type(SlipType::Normal);
 
         tx.inputs.push(input_slip);

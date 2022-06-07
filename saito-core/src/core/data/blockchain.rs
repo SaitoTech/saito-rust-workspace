@@ -574,7 +574,7 @@ println!("new chain validates!");
             //
             // index to update
             //
-            let idx = 2 * i;
+            let index = 2 * i;
 
             //
             //
@@ -582,8 +582,8 @@ println!("new chain validates!");
             let block_hash = self
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(current_block_id);
-            fork_id[idx] = block_hash[idx];
-            fork_id[idx + 1] = block_hash[idx + 1];
+            fork_id[index] = block_hash[index];
+            fork_id[index + 1] = block_hash[index + 1];
         }
 
         fork_id
@@ -619,14 +619,14 @@ println!("new chain validates!");
                 }
 
                 // index in fork_id hash
-                let idx = 2 * index;
+                let index = 2 * index;
 
                 // compare input hash to my hash
                 if peer_block_id <= my_block_id {
                     let block_hash = self
                         .blockring
                         .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[idx] == block_hash[idx] && fork_id[idx + 1] == block_hash[idx + 1] {
+                    if fork_id[index] == block_hash[index] && fork_id[index + 1] == block_hash[index + 1] {
                         return peer_block_id;
                     }
                 }
@@ -644,14 +644,14 @@ println!("new chain validates!");
                 }
 
                 // index in fork_id hash
-                let idx = 2 * index;
+                let index = 2 * index;
 
                 // compare input hash to my hash
                 if peer_block_id <= my_block_id {
                     let block_hash = self
                         .blockring
                         .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[idx] == block_hash[idx] && fork_id[idx + 1] == block_hash[idx + 1] {
+                    if fork_id[index] == block_hash[index] && fork_id[index + 1] == block_hash[index + 1] {
                         return peer_block_id;
                     }
                 }
@@ -776,11 +776,11 @@ println!("new chain validates!");
         // it in wind_chain as we only need to check once for the entire chain
         //
         let mut golden_tickets_found = 0;
-        let mut search_depth_idx = 0;
+        let mut search_depth_index = 0;
         let mut latest_block_hash = new_chain[0];
 
         for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR {
-            search_depth_idx += 1;
+            search_depth_index += 1;
 
             if let Some(block) = self.get_block_sync(&latest_block_hash) {
                 if i == 0 {
@@ -803,7 +803,7 @@ println!("new chain validates!");
         }
 
         if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
-            && search_depth_idx >= MIN_GOLDEN_TICKETS_DENOMINATOR
+            && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
         {
             let mut return_value = false;
             if let Some(block) = self.get_block_sync(&new_chain[0]) {
