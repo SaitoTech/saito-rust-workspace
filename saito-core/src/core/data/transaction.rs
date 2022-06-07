@@ -700,27 +700,16 @@ impl Transaction {
 	self.cumulative_work
     }
     //
-    // generate hash used for signing the tx
+    // calculate cumulative routing work in block
     //
-    pub fn generate_hash_for_signature(&mut self) {
-        //
-        // and save the hash_for_signature so we can use it later...
-        //
-        // note that we must generate the HASH before we change the UUID in the
-        // output slips created in this blog. Otherwise, our hash for the transaction
-        // will change since the slips will be generated with a different UUID.
-        //
-        let hash_for_signature: SaitoHash = hash(&self.serialize_for_signature());
-        self.set_hash_for_signature(hash_for_signature);
-    }
+    pub fn generate_total_fees(&mut self) {
 
-    //
-    // calculate abstract metadata for fees
-    //
-    // note that this expects the hash_for_signature to have already
-    // been calculated.
-    //
-    pub fn generate(&mut self, publickey: SaitoPublicKey) -> bool {
+	//
+	// TODO - remove for uuid work
+	// generate tx signature hash
+	//
+	self.generate_hash_for_signature();
+	let hash_for_signature = self.get_hash_for_signature();
 
         //
         // calculate nolan in / out, fees
@@ -728,15 +717,9 @@ impl Transaction {
         let mut nolan_in: u64 = 0;
         let mut nolan_out: u64 = 0;
 
-	//
-	// ensure hash exists for signing
-	//
-        self.generate_hash_for_signature();
-        let hash_for_signature = self.get_hash_for_signature();
-
-	//
-	// generate utxoset key for every slip
-	//
+        //
+        // generate utxoset key for every slip
+        //
         for input in &mut self.inputs {
             nolan_in += input.get_amount();
             input.generate_utxoset_key();
@@ -744,7 +727,7 @@ impl Transaction {
         for output in &mut self.outputs {
             nolan_out += output.get_amount();
             //
-	    // new outbound slips
+            // new outbound slips
             //
             if let Some(hash_for_signature) = hash_for_signature {
                 if output.get_slip_type() != SlipType::ATR {
@@ -768,10 +751,45 @@ impl Transaction {
             self.total_fees = nolan_in - nolan_out;
         }
 
-	//
-	// calculate total work available for submitted publickey / creator
-	//
+    }
+    //
+    // calculate cumulative routing work in block
+    //
+    pub fn generate_total_work(&mut self, publickey : SaitoPublicKey) {
 	self.total_work = self.get_routing_work_for_publickey(publickey);
+    }
+
+
+    //
+    // generate hash used for signing the tx
+    //
+    pub fn generate_hash_for_signature(&mut self) {
+        self.set_hash_for_signature(hash(&self.serialize_for_signature()));
+    }
+
+    //
+    // calculate abstract metadata for fees
+    //
+    // note that this expects the hash_for_signature to have already
+    // been calculated.
+    //
+    pub fn generate(&mut self, publickey: SaitoPublicKey) -> bool {
+
+	//
+	// nolan_in, nolan_out, total fees
+	//
+	self.generate_total_fees();
+
+
+	//
+	// routing work for asserted publickey
+	//
+	self.generate_total_work(publickey);
+
+        //
+        // ensure hash exists for signing
+        //
+        self.generate_hash_for_signature();
 
         true
     }
