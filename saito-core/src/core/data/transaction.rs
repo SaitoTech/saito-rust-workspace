@@ -1014,7 +1014,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_for_signature() {
+    fn serialize_for_signature_test() {
         let tx = Transaction::new();
         assert_eq!(
             tx.serialize_for_signature(),
@@ -1023,7 +1023,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_for_signature_with_data() {
+    fn serialize_for_signature_with_data_test() {
         let mut tx = Transaction::new();
         tx.timestamp = 1637034582666;
         tx.transaction_type = TransactionType::ATR;

@@ -262,421 +262,232 @@ impl Block {
         }
     }
 
-    pub fn get_avg_income(&self) -> u64 {
-        self.avg_income
-    }
-
-    pub fn get_avg_atr_income(&self) -> u64 {
-        self.avg_atr_income
-    }
-
-    pub fn get_avg_variance(&self) -> u64 {
-        self.avg_variance
-    }
-
-    pub fn get_avg_atr_variance(&self) -> u64 {
-        self.avg_atr_variance
-    }
-
-    pub fn get_transactions(&self) -> &Vec<Transaction> {
-        &self.transactions
-    }
-
-    pub fn get_hash(&self) -> SaitoHash {
-        self.hash
-    }
-
-    pub fn is_in_longest_chain(&self) -> bool {
-        self.in_longest_chain
-    }
-
-    pub fn get_id(&self) -> u64 {
-        self.id
-    }
-
-    pub fn get_timestamp(&self) -> u64 {
-        self.timestamp
-    }
-
-    pub fn get_previous_block_hash(&self) -> SaitoHash {
-        self.previous_block_hash
-    }
-
-    pub fn get_creator(&self) -> SaitoPublicKey {
-        self.creator
-    }
-
-    pub fn get_merkle_root(&self) -> SaitoHash {
-        self.merkle_root
-    }
-
-    pub fn get_signature(&self) -> SaitoSignature {
-        self.signature
-    }
-
-    pub fn get_treasury(&self) -> u64 {
-        self.treasury
-    }
-
-    pub fn get_staking_treasury(&self) -> u64 {
-        self.staking_treasury
-    }
-
-    pub fn get_burnfee(&self) -> u64 {
-        self.burnfee
-    }
-
-    pub fn get_block_type(&self) -> BlockType {
-        self.block_type
-    }
-
-    pub fn get_difficulty(&self) -> u64 {
-        self.difficulty
-    }
-
-    pub fn get_has_golden_ticket(&self) -> bool {
-        self.has_golden_ticket
-    }
-
-    pub fn get_has_issuance_transaction(&self) -> bool {
-        self.has_issuance_transaction
-    }
-
-    pub fn get_has_fee_transaction(&self) -> bool {
-        self.has_fee_transaction
-    }
-
-    pub fn get_golden_ticket_idx(&self) -> u64 {
-        self.golden_ticket_idx
-    }
-
-    pub fn get_issuance_transaction_idx(&self) -> u64 {
-        self.issuance_transaction_idx
-    }
-
-    pub fn get_fee_transaction_idx(&self) -> u64 {
-        self.fee_transaction_idx
-    }
-
-    pub fn get_pre_hash(&self) -> SaitoHash {
-        self.pre_hash
-    }
-
-    pub fn get_total_fees(&self) -> u64 {
-        self.total_fees
-    }
-
-    pub fn get_routing_work_for_creator(&self) -> u64 {
-        self.routing_work_for_creator
-    }
-
-    pub fn get_source_connection_id(&self) -> Option<SaitoPublicKey> {
-        self.source_connection_id
-    }
-
-    pub fn set_avg_income(&mut self, x: u64) {
-        self.avg_income = x;
-    }
-
-    pub fn set_avg_atr_income(&mut self, x: u64) {
-        self.avg_atr_income = x;
-    }
-
-    pub fn set_avg_variance(&mut self, x: u64) {
-        self.avg_variance = x;
-    }
-
-    pub fn set_avg_atr_variance(&mut self, x: u64) {
-        self.avg_atr_variance = x;
-    }
-
-    pub fn set_routing_work_for_creator(&mut self, routing_work_for_creator: u64) {
-        self.routing_work_for_creator = routing_work_for_creator;
-    }
-
-    pub fn set_has_issuance_transaction(&mut self, hit: bool) {
-        self.has_issuance_transaction = hit;
-    }
-
-    pub fn set_has_golden_ticket(&mut self, hgt: bool) {
-        self.has_golden_ticket = hgt;
-    }
-
-    pub fn set_has_fee_transaction(&mut self, hft: bool) {
-        self.has_fee_transaction = hft;
-    }
-
-    pub fn set_issuance_transaction_idx(&mut self, idx: u64) {
-        self.issuance_transaction_idx = idx;
-    }
-
-    pub fn set_golden_ticket_idx(&mut self, idx: u64) {
-        self.golden_ticket_idx = idx;
-    }
-
-    pub fn set_fee_transaction_idx(&mut self, idx: u64) {
-        self.fee_transaction_idx = idx;
-    }
-
-    pub fn set_total_fees(&mut self, total_fees: u64) {
-        self.total_fees = total_fees;
-    }
-
-    // TODO refactor: All of these setters which are setting something which is included
-    // in the pre_hash or hash are dangerous. The purpose of the set/get paradigm is for
-    // a class/unit to be able to enforce an API which guarantees it's consistency to
-    // those using it. To be correct, each of these setters should call generate_hashes()
-    // after it sets the state. However, this would be ridiculous because everytime we
-    // construct a new Block, we call all these one after the other. A comprimise might
-    // be to remove them and at least just set the private fields directly, or make the
-    // setters private, but this misses the point. We want to encapsulate any state
-    // changes into a single black-box so that state is easier to reason about.
-    pub fn set_transactions(&mut self, transactions: &mut Vec<Transaction>) {
-        self.transactions = transactions.to_vec();
-    }
-
-    pub fn set_block_type(&mut self, block_type: BlockType) {
-        self.block_type = block_type;
-    }
-
-    pub fn set_id(&mut self, id: u64) {
-        self.id = id;
-    }
-
-    pub fn set_in_longest_chain(&mut self, lc: bool) {
-        self.in_longest_chain = lc;
-    }
-
-    pub fn set_timestamp(&mut self, timestamp: u64) {
-        self.timestamp = timestamp;
-    }
-
-    pub fn set_previous_block_hash(&mut self, previous_block_hash: SaitoHash) {
-        self.previous_block_hash = previous_block_hash;
-    }
-
-    pub fn set_creator(&mut self, creator: SaitoPublicKey) {
-        self.creator = creator;
-    }
-
-    pub fn set_merkle_root(&mut self, merkle_root: SaitoHash) {
-        self.merkle_root = merkle_root;
-    }
-
-    pub fn set_signature(&mut self, signature: SaitoSignature) {
-        self.signature = signature;
-    }
-
-    pub fn set_staking_treasury(&mut self, staking_treasury: u64) {
-        self.staking_treasury = staking_treasury;
-    }
-
-    pub fn set_treasury(&mut self, treasury: u64) {
-        self.treasury = treasury;
-    }
-
-    pub fn set_burnfee(&mut self, burnfee: u64) {
-        self.burnfee = burnfee;
-    }
-
-    pub fn set_difficulty(&mut self, difficulty: u64) {
-        self.difficulty = difficulty;
-    }
-
-    pub fn set_pre_hash(&mut self, pre_hash: SaitoHash) {
-        self.pre_hash = pre_hash;
-    }
-
-    pub fn set_hash(&mut self, hash: SaitoHash) {
-        self.hash = hash;
-    }
-
     pub fn add_transaction(&mut self, tx: Transaction) {
         self.transactions.push(tx);
     }
 
     //
-    // if the block is not at the proper type, try to upgrade it to have the
-    // data that is necessary for blocks of that type if possible. if this is
-    // not possible, return false. if it is possible, return true once upgraded.
+    // returns valid block
     //
-    pub async fn upgrade_block_to_block_type(
-        &mut self,
-        block_type: BlockType,
-        storage: &Storage,
-    ) -> bool {
-        trace!("UPGRADE_BLOCK_TO_BLOCK_TYPE {:?}", self.block_type);
-        if self.block_type == block_type {
-            return true;
+    pub async fn create(
+        transactions: &mut Vec<Transaction>,
+        previous_block_hash: SaitoHash,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        blockchain: &mut Blockchain,
+        current_timestamp: u64,
+    ) -> Block {
+
+        debug!(
+            "Block::create : previous block hash : {:?}",
+            hex::encode(previous_block_hash)
+        );
+
+        let publickey;
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
+            publickey = wallet.get_publickey();
+        }
+        let mut previous_block_id = 0;
+        let mut previous_block_burnfee = 0;
+        let mut previous_block_timestamp = 0;
+        let mut previous_block_difficulty = 0;
+        let mut previous_block_treasury = 0;
+        let mut previous_block_staking_treasury = 0;
+
+        if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
+            previous_block_id = previous_block.get_id();
+            previous_block_burnfee = previous_block.get_burnfee();
+            previous_block_timestamp = previous_block.get_timestamp();
+            previous_block_difficulty = previous_block.get_difficulty();
+            previous_block_treasury = previous_block.get_treasury();
+            previous_block_staking_treasury = previous_block.get_staking_treasury();
+        }
+
+        let mut block = Block::new();
+
+        let current_burnfee: u64 =
+            BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
+                previous_block_burnfee,
+                current_timestamp,
+                previous_block_timestamp,
+            );
+
+        block.set_id(previous_block_id + 1);
+        block.set_previous_block_hash(previous_block_hash);
+        block.set_burnfee(current_burnfee);
+        block.set_timestamp(current_timestamp);
+        block.set_difficulty(previous_block_difficulty);
+
+        block.set_creator(publickey);
+
+        //
+        // in-memory swap copying txs in block from mempool
+        //
+        mem::swap(&mut block.transactions, transactions);
+
+        //
+        // update slips_spent_this_block so that we have a record of
+        // how many times input slips are spent in this block. we will
+        // use this later to ensure there are no duplicates. this include
+        // during the fee transaction, so that we cannot pay a staker
+        // that is also paid this block otherwise.
+        //
+        // this will not include the fee transaction or the ATR txs
+        // because they have not been added to teh block yet, but they
+        // permit us to avoid paying out StakerWithdrawal slips when we
+        // generate the fee payment.
+        //
+        // note -- no need to have an exception for the FEE TX here as
+        // we have not added it yet.
+        //
+        if !block.created_hashmap_of_slips_spent_this_block {
+            for transaction in &block.transactions {
+                for input in transaction.get_inputs() {
+                    block
+                        .slips_spent_this_block
+                        .entry(input.get_utxoset_key())
+                        .and_modify(|e| *e += 1)
+                        .or_insert(1);
+                }
+                block.created_hashmap_of_slips_spent_this_block = true;
+            }
         }
 
         //
-        // TODO - if the block does not exist on disk, we have to
-        // attempt a remote fetch.
+        // contextual values
         //
+        let mut cv: ConsensusValues = block.generate_consensus_values(&blockchain).await;
 
         //
-        // if the block type needed is full and we are not,
-        // load the block if it exists on disk.
+        // ATR transactions
         //
-        if block_type == BlockType::Full {
-            let mut new_block = storage
-                .load_block_from_disk(storage.generate_block_filename(&self))
-                .await
-                .unwrap();
-            let hash_for_signature = hash(&new_block.serialize_for_signature());
-            new_block.set_pre_hash(hash_for_signature);
-            let hash_for_hash = hash(&new_block.serialize_for_hash());
-            new_block.set_hash(hash_for_hash);
+        let rlen = cv.rebroadcasts.len();
+        // TODO -- figure out if there is a more efficient solution
+        // than iterating through the entire transaction set here.
+        let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
+            .par_iter_mut()
+            .all(|tx| tx.generate(publickey));
+        if rlen > 0 {
+            block.transactions.append(&mut cv.rebroadcasts);
+        }
 
+        //
+        // fee transactions
+        //
+        // if a golden ticket is included in THIS block Saito uses the randomness
+        // associated with that golden ticket to create a fair output for the
+        // previous block.
+        //
+        if cv.fee_transaction.is_some() {
             //
-            // in-memory swap copying txs in block from mempool
+            // creator signs fee transaction
             //
-            mem::swap(&mut new_block.transactions, &mut self.transactions);
+            let mut fee_tx = cv.fee_transaction.unwrap();
+            let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
+            fee_tx.set_hash_for_signature(hash_for_signature);
+            {
+                trace!("waiting for the wallet read lock");
+                let wallet = wallet_lock.read().await;
+                trace!("acquired the wallet read lock");
+                fee_tx.sign(wallet.get_privatekey());
+            }
             //
-            // transactions need hashes
+            // and we add it to the block
             //
-            self.generate();
-            self.set_block_type(BlockType::Full);
-
-            return true;
-        }
-
-        false
-    }
-
-    //
-    // if the block is not at the proper type, try to downgrade it by removing elements
-    // that take up significant amounts of data / memory. if this is possible return
-    // true, otherwise return false.
-    //
-    pub async fn downgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
-        info!("BLOCK_ID {:?}", self.get_id());
-
-        if self.block_type == block_type {
-            return true;
+            block.add_transaction(fee_tx);
         }
 
         //
-        // if the block type needed is full and we are not,
-        // load the block if it exists on disk.
+        // update slips_spent_this_block so that we have a record of
+        // how many times input slips are spent in this block. we will
+        // use this later to ensure there are no duplicates. this include
+        // during the fee transaction, so that we cannot pay a staker
+        // that is also paid this block otherwise.
         //
-        if block_type == BlockType::Pruned {
-            self.transactions = vec![];
-            self.set_block_type(BlockType::Pruned);
-            return true;
+        for transaction in &block.transactions {
+            if transaction.get_transaction_type() != TransactionType::Fee {
+                for input in transaction.get_inputs() {
+                    block
+                        .slips_spent_this_block
+                        .entry(input.get_utxoset_key())
+                        .and_modify(|e| *e += 1)
+                        .or_insert(1);
+                }
+            }
+        }
+        block.created_hashmap_of_slips_spent_this_block = true;
+
+        //
+        // set difficulty
+        //
+        block.set_difficulty(cv.expected_difficulty);
+
+        //
+        // set treasury
+        //
+        if cv.nolan_falling_off_chain != 0 {
+            block.set_treasury(previous_block_treasury + cv.nolan_falling_off_chain);
         }
 
-        false
+        //
+        // set staking treasury
+        //
+        if cv.staking_treasury != 0 {
+            let mut adjusted_staking_treasury = previous_block_staking_treasury;
+            if cv.staking_treasury < 0 {
+                let x = cv.staking_treasury * -1;
+                if adjusted_staking_treasury > x as u64 {
+                    adjusted_staking_treasury -= x as u64;
+                } else {
+                    adjusted_staking_treasury = 0;
+                }
+            } else {
+                adjusted_staking_treasury += cv.staking_treasury as u64;
+            }
+            // info!(
+            //     "adjusted staking treasury written into block {}",
+            //     adjusted_staking_treasury
+            // );
+            block.set_staking_treasury(adjusted_staking_treasury);
+        }
+
+        //
+        // generate merkle root
+        //
+        let block_merkle_root = block.generate_merkle_root();
+        block.set_merkle_root(block_merkle_root);
+
+
+        {
+            trace!("waiting for the wallet read lock");
+            let wallet = wallet_lock.read().await;
+            trace!("acquired the wallet read lock");
+            block.sign(wallet.get_privatekey());
+        }
+
+	//
+	// hash includes pre-hash and sig, so update
+	//
+	block.generate_hash();
+
+        block
     }
+
+
 
     //
-    // we may want to separate the signing of the block from the setting of the necessary hash
-    // we do this together out of convenience only
+    // runs when block deleted
     //
-    pub fn sign(&mut self, privatekey: SaitoPrivateKey) {
-        //
-        // we set final data
-        //
-        self.set_signature(sign(&self.get_pre_hash(), privatekey));
-    }
-
-    pub fn generate_hash(&mut self) -> SaitoHash {
-        let hash_for_hash = hash(&self.serialize_for_hash());
-        self.set_hash(hash_for_hash);
-        hash_for_hash
-    }
-    pub fn generate_pre_hash(&mut self) {
-        let hash_for_signature = hash(&self.serialize_for_signature());
-        self.set_pre_hash(hash_for_signature);
-    }
-
-    // serialize the pre_hash and the signature_for_source into a
-    // bytes array that can be hashed and then have the hash set.
-    pub fn serialize_for_hash(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.get_pre_hash());
-        vbytes.extend(&self.get_signature());
-        vbytes.extend(&self.get_previous_block_hash());
-        vbytes
-    }
-
-    // serialize major block components for block signature
-    // this will manually calculate the merkle_root if necessary
-    // but it is advised that the merkle_root be already calculated
-    // to avoid speed issues.
-    pub fn serialize_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.id.to_be_bytes());
-        vbytes.extend(&self.timestamp.to_be_bytes());
-        vbytes.extend(&self.previous_block_hash);
-        vbytes.extend(&self.creator);
-        vbytes.extend(&self.merkle_root);
-        vbytes.extend(&self.treasury.to_be_bytes());
-        vbytes.extend(&self.staking_treasury.to_be_bytes());
-        vbytes.extend(&self.burnfee.to_be_bytes());
-        vbytes.extend(&self.difficulty.to_be_bytes());
-        vbytes.extend(&self.avg_income.to_be_bytes());
-        vbytes.extend(&self.avg_variance.to_be_bytes());
-        vbytes.extend(&self.avg_atr_income.to_be_bytes());
-        vbytes.extend(&self.avg_atr_variance.to_be_bytes());
-        vbytes
-    }
-
-    /// Serialize a Block for transport or disk.
-    /// [len of transactions - 4 bytes - u32]
-    /// [id - 8 bytes - u64]
-    /// [timestamp - 8 bytes - u64]
-    /// [previous_block_hash - 32 bytes - SHA 256 hash]
-    /// [creator - 33 bytes - Secp25k1 pubkey compact format]
-    /// [merkle_root - 32 bytes - SHA 256 hash
-    /// [signature - 64 bytes - Secp25k1 sig]
-    /// [treasury - 8 bytes - u64]
-    /// [staking_treasury - 8 bytes - u64]
-    /// [burnfee - 8 bytes - u64]
-    /// [difficulty - 8 bytes - u64]
-    /// [avg_income - 8 bytes - u64]
-    /// [avg_variance - 8 bytes - u64]
-    /// [avg_atr_income - 8 bytes - u64]
-    /// [avg_atr_variance - 8 bytes - u64]
-    /// [transaction][transaction][transaction]...
-    pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-
-        // block headers do not get tx data
-        if block_type == BlockType::Header {
-            vbytes.extend(&(0 as u32).to_be_bytes());
-        } else {
-            vbytes.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
+    pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
+        for tx in &self.transactions {
+            tx.delete(utxoset).await;
         }
-
-        vbytes.extend(&self.id.to_be_bytes());
-        vbytes.extend(&self.timestamp.to_be_bytes());
-        vbytes.extend(&self.previous_block_hash);
-        vbytes.extend(&self.creator);
-        vbytes.extend(&self.merkle_root);
-        vbytes.extend(&self.signature);
-        vbytes.extend(&self.treasury.to_be_bytes());
-        vbytes.extend(&self.staking_treasury.to_be_bytes());
-        vbytes.extend(&self.burnfee.to_be_bytes());
-        vbytes.extend(&self.difficulty.to_be_bytes());
-        vbytes.extend(&self.avg_income.to_be_bytes());
-        vbytes.extend(&self.avg_variance.to_be_bytes());
-        vbytes.extend(&self.avg_atr_income.to_be_bytes());
-        vbytes.extend(&self.avg_atr_variance.to_be_bytes());
-
-        let mut serialized_txs = vec![];
-
-        // block headers do not get tx data
-        if block_type != BlockType::Header {
-            self.transactions.iter().for_each(|transaction| {
-                serialized_txs.extend(transaction.serialize_for_net());
-            });
-            vbytes.extend(serialized_txs);
-        }
-
-        vbytes
+        true
     }
+
+
     /// Deserialize from bytes to a Block.
     /// [len of transactions - 4 bytes - u32]
     /// [id - 8 bytes - u64]
@@ -768,9 +579,241 @@ impl Block {
 
         block
     }
+    //
+    // downgrade block
+    //
+    pub async fn downgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
+        info!("BLOCK_ID {:?}", self.get_id());
+
+        if self.block_type == block_type {
+            return true;
+        }
+
+        //
+        // if the block type needed is full and we are not,
+        // load the block if it exists on disk.
+        //
+        if block_type == BlockType::Pruned {
+            self.transactions = vec![];
+            self.set_block_type(BlockType::Pruned);
+            return true;
+        }
+
+        false
+    }
 
     //
-    // TODO - this logic should probably be in the merkle-root class
+    // find winning router in block path
+    //
+    pub fn find_winning_router(&self, random_number: SaitoHash) -> SaitoPublicKey {
+        let winner_pubkey: SaitoPublicKey;
+
+        //
+        // find winning nolan
+        //
+        let x = U256::from_big_endian(&random_number);
+        //
+        // fee calculation should be the same used in block when
+        // generating the fee transaction.
+        //
+        let y = self.get_total_fees();
+
+        //
+        // if there are no fees, payout to burn address
+        //
+        if y == 0 {
+            winner_pubkey = [0; 33];
+            return winner_pubkey;
+        }
+
+        let z = U256::from_big_endian(&y.to_be_bytes());
+        let (zy, _bolres) = x.overflowing_rem(z);
+        let winning_nolan = zy.low_u64();
+        // we may need function-timelock object if we need to recreate
+        // an ATR transaction to pick the winning routing node.
+        let winning_tx_placeholder: Transaction;
+        let mut winning_tx: &Transaction;
+
+        //
+        // winning TX contains the winning nolan
+        //
+        // either a fee-paying transaction or an ATR transaction
+        //
+        winning_tx = &self.transactions[0];
+        for transaction in &self.transactions {
+            if transaction.cumulative_fees > winning_nolan {
+                break;
+            }
+            winning_tx = &transaction;
+        }
+
+        //
+        // if winner is atr, we take inside TX
+        //
+        if winning_tx.get_transaction_type() == TransactionType::ATR {
+            let tmptx = winning_tx.get_message().to_vec();
+            winning_tx_placeholder = Transaction::deserialize_from_net(tmptx);
+            winning_tx = &winning_tx_placeholder;
+        }
+
+        //
+        // hash random number to pick routing node
+        //
+        winner_pubkey = winning_tx.get_winning_routing_node(hash(&random_number.to_vec()));
+
+        winner_pubkey
+    }
+
+
+
+    //
+    // generate ancillary data
+    //
+    // this function generates all of the ancillary data needed to process or
+    // validate blocks. this includes the various hashes and other dynamic 
+    // values that are not provided on the creation of the block object itself
+    // but must be calculated from information such as the set of transactions
+    // and the presence / absence of golden tickets, etc.
+    //
+    // we first calculate as much information as we can in parallel before
+    // sweeping through the transactions to find out what percentage of the
+    // cumulative block fees they contain.
+    //
+    pub fn generate(&mut self) -> bool {
+
+        // trace!(" ... block.prevalid - pre hash:  {:?}", create_timestamp());
+
+        //
+        // if we are generating the metadata for a block, we use the
+        // publickey of the block creator when we calculate the fees
+        // and the routing work.
+        //
+        let creator_publickey = self.get_creator();
+
+        // ensure hashes correct
+        self.generate_pre_hash();
+        self.generate_hash();
+
+        let _transactions_pre_calculated = &self
+            .transactions
+            .par_iter_mut()
+            .all(|tx| tx.generate(creator_publickey));
+
+        // trace!(" ... block.prevalid - pst hash:  {:?}", create_timestamp());
+
+        //
+        // we need to calculate the cumulative figures AFTER the
+        // original figures.
+        //
+        let mut cumulative_fees = 0;
+        let mut cumulative_work = 0;
+
+        let mut has_golden_ticket = false;
+        let mut has_fee_transaction = false;
+        let mut has_issuance_transaction = false;
+        let mut issuance_transaction_idx = 0;
+        let mut golden_ticket_idx = 0;
+        let mut fee_transaction_idx = 0;
+
+        //
+        // we have to do a single sweep through all of the transactions in
+        // non-parallel to do things like generate the cumulative order of the
+        // transactions in the block for things like work and fee calculations
+        // for the lottery.
+        //
+        // we take advantage of the sweep to perform other pre-validation work
+        // like counting up our ATR transactions and generating the hash
+        // commitment for all of our rebroadcasts.
+        //
+        for i in 0..self.transactions.len() {
+
+            let transaction = &mut self.transactions[i];
+
+            cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
+            cumulative_work = transaction.generate_cumulative_work(cumulative_work);
+
+            //
+            // update slips_spent_this_block so that we have a record of
+            // how many times input slips are spent in this block. we will
+            // use this later to ensure there are no duplicates.
+            //
+            // we skip the fee transaction as otherwise we have trouble
+            // validating the staker slips if we have received a block from
+            // someone else -- i.e. we will think the slip is spent in the
+            // block when generating the FEE TX to check against the in-block
+            // fee tx.
+            //
+            if !self.created_hashmap_of_slips_spent_this_block {
+                if transaction.get_transaction_type() != TransactionType::Fee {
+                    for input in transaction.get_inputs() {
+                        self.slips_spent_this_block
+                            .entry(input.get_utxoset_key())
+                            .and_modify(|e| *e += 1)
+                            .or_insert(1);
+                    }
+                    self.created_hashmap_of_slips_spent_this_block = true;
+                }
+            }
+
+            //
+            // also check the transactions for golden ticket and fees
+            //
+            match transaction.get_transaction_type() {
+                TransactionType::Issuance => {
+                    has_issuance_transaction = true;
+                    issuance_transaction_idx = i as u64;
+                }
+                TransactionType::Fee => {
+                    has_fee_transaction = true;
+                    fee_transaction_idx = i as u64;
+                }
+                TransactionType::GoldenTicket => {
+                    has_golden_ticket = true;
+                    golden_ticket_idx = i as u64;
+                }
+                TransactionType::ATR => {
+                    let mut vbytes: Vec<u8> = vec![];
+                    vbytes.extend(&self.rebroadcast_hash);
+                    vbytes.extend(&transaction.serialize_for_signature());
+                    self.rebroadcast_hash = hash(&vbytes);
+
+                    for input in transaction.get_inputs() {
+                        self.total_rebroadcast_slips += 1;
+                        self.total_rebroadcast_nolan += input.get_amount();
+                    }
+                }
+                _ => {}
+            };
+        }
+        self.set_has_fee_transaction(has_fee_transaction);
+        self.set_has_golden_ticket(has_golden_ticket);
+        self.set_has_issuance_transaction(has_issuance_transaction);
+        self.set_fee_transaction_idx(fee_transaction_idx);
+        self.set_golden_ticket_idx(golden_ticket_idx);
+        self.set_issuance_transaction_idx(issuance_transaction_idx);
+
+        //
+        // update block with total fees
+        //
+        self.set_total_fees(cumulative_fees);
+        self.set_routing_work_for_creator(cumulative_work);
+
+        // trace!(
+        //     " ... block.pre_validation_done:  {:?}",
+        //     create_timestamp(),
+        //     // tracing_tracker.time_since_last();
+        // );
+
+        true
+    }
+
+    pub fn generate_hash(&mut self) -> SaitoHash {
+        let hash_for_hash = hash(&self.serialize_for_hash());
+        self.set_hash(hash_for_hash);
+        hash_for_hash
+    }
+    //
+    // TODO REFACTOR - this logic should probably be in the merkle-root class
     //
     pub fn generate_merkle_root(&self) -> SaitoHash {
         if self.transactions.is_empty() {
@@ -847,7 +890,7 @@ impl Block {
     }
 
     //
-    // generate hashes and payouts and fee calculations
+    // generate dynamic consensus values
     //
     pub async fn generate_consensus_values(&self, blockchain: &Blockchain) -> ConsensusValues {
         debug!("generate consensus values");
@@ -1202,65 +1245,121 @@ impl Block {
 
         cv
     }
+    pub fn generate_pre_hash(&mut self) {
+        let hash_for_signature = hash(&self.serialize_for_signature());
+        self.set_pre_hash(hash_for_signature);
+    }
 
-    // consumes two hashes every time
-    pub fn find_winning_router(&self, random_number: SaitoHash) -> SaitoPublicKey {
-        let winner_pubkey: SaitoPublicKey;
+    pub fn get_avg_income(&self) -> u64 {
+        self.avg_income
+    }
 
-        //
-        // find winning nolan
-        //
-        let x = U256::from_big_endian(&random_number);
-        //
-        // fee calculation should be the same used in block when
-        // generating the fee transaction.
-        //
-        let y = self.get_total_fees();
+    pub fn get_avg_atr_income(&self) -> u64 {
+        self.avg_atr_income
+    }
 
-        //
-        // if there are no fees, payout to burn address
-        //
-        if y == 0 {
-            winner_pubkey = [0; 33];
-            return winner_pubkey;
-        }
+    pub fn get_avg_variance(&self) -> u64 {
+        self.avg_variance
+    }
 
-        let z = U256::from_big_endian(&y.to_be_bytes());
-        let (zy, _bolres) = x.overflowing_rem(z);
-        let winning_nolan = zy.low_u64();
-        // we may need function-timelock object if we need to recreate
-        // an ATR transaction to pick the winning routing node.
-        let winning_tx_placeholder: Transaction;
-        let mut winning_tx: &Transaction;
+    pub fn get_avg_atr_variance(&self) -> u64 {
+        self.avg_atr_variance
+    }
 
-        //
-        // winning TX contains the winning nolan
-        //
-        // either a fee-paying transaction or an ATR transaction
-        //
-        winning_tx = &self.transactions[0];
-        for transaction in &self.transactions {
-            if transaction.cumulative_fees > winning_nolan {
-                break;
-            }
-            winning_tx = &transaction;
-        }
+    pub fn get_transactions(&self) -> &Vec<Transaction> {
+        &self.transactions
+    }
 
-        //
-        // if winner is atr, we take inside TX
-        //
-        if winning_tx.get_transaction_type() == TransactionType::ATR {
-            let tmptx = winning_tx.get_message().to_vec();
-            winning_tx_placeholder = Transaction::deserialize_from_net(tmptx);
-            winning_tx = &winning_tx_placeholder;
-        }
+    pub fn get_hash(&self) -> SaitoHash {
+        self.hash
+    }
 
-        //
-        // hash random number to pick routing node
-        //
-        winner_pubkey = winning_tx.get_winning_routing_node(hash(&random_number.to_vec()));
+    pub fn get_id(&self) -> u64 {
+        self.id
+    }
 
-        winner_pubkey
+    pub fn get_timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    pub fn get_previous_block_hash(&self) -> SaitoHash {
+        self.previous_block_hash
+    }
+
+    pub fn get_creator(&self) -> SaitoPublicKey {
+        self.creator
+    }
+
+    pub fn get_merkle_root(&self) -> SaitoHash {
+        self.merkle_root
+    }
+
+    pub fn get_signature(&self) -> SaitoSignature {
+        self.signature
+    }
+
+    pub fn get_treasury(&self) -> u64 {
+        self.treasury
+    }
+
+    pub fn get_staking_treasury(&self) -> u64 {
+        self.staking_treasury
+    }
+
+    pub fn get_burnfee(&self) -> u64 {
+        self.burnfee
+    }
+
+    pub fn get_block_type(&self) -> BlockType {
+        self.block_type
+    }
+
+    pub fn get_difficulty(&self) -> u64 {
+        self.difficulty
+    }
+
+    pub fn get_has_golden_ticket(&self) -> bool {
+        self.has_golden_ticket
+    }
+
+    pub fn get_has_issuance_transaction(&self) -> bool {
+        self.has_issuance_transaction
+    }
+
+    pub fn get_has_fee_transaction(&self) -> bool {
+        self.has_fee_transaction
+    }
+
+    pub fn get_golden_ticket_idx(&self) -> u64 {
+        self.golden_ticket_idx
+    }
+
+    pub fn get_issuance_transaction_idx(&self) -> u64 {
+        self.issuance_transaction_idx
+    }
+
+    pub fn get_fee_transaction_idx(&self) -> u64 {
+        self.fee_transaction_idx
+    }
+
+    pub fn get_pre_hash(&self) -> SaitoHash {
+        self.pre_hash
+    }
+
+    pub fn get_total_fees(&self) -> u64 {
+        self.total_fees
+    }
+
+    pub fn get_routing_work_for_creator(&self) -> u64 {
+        self.routing_work_for_creator
+    }
+
+    pub fn get_source_connection_id(&self) -> Option<SaitoPublicKey> {
+        self.source_connection_id
+    }
+
+    pub fn is_in_longest_chain(&self) -> bool {
+        self.in_longest_chain
     }
 
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
@@ -1270,142 +1369,289 @@ impl Block {
         true
     }
 
+
+    pub fn set_avg_income(&mut self, x: u64) {
+        self.avg_income = x;
+    }
+
+    pub fn set_avg_atr_income(&mut self, x: u64) {
+        self.avg_atr_income = x;
+    }
+
+    pub fn set_avg_variance(&mut self, x: u64) {
+        self.avg_variance = x;
+    }
+
+    pub fn set_avg_atr_variance(&mut self, x: u64) {
+        self.avg_atr_variance = x;
+    }
+
+    pub fn set_routing_work_for_creator(&mut self, routing_work_for_creator: u64) {
+        self.routing_work_for_creator = routing_work_for_creator;
+    }
+
+    pub fn set_has_issuance_transaction(&mut self, hit: bool) {
+        self.has_issuance_transaction = hit;
+    }
+
+    pub fn set_has_golden_ticket(&mut self, hgt: bool) {
+        self.has_golden_ticket = hgt;
+    }
+
+    pub fn set_has_fee_transaction(&mut self, hft: bool) {
+        self.has_fee_transaction = hft;
+    }
+
+    pub fn set_issuance_transaction_idx(&mut self, idx: u64) {
+        self.issuance_transaction_idx = idx;
+    }
+
+    pub fn set_golden_ticket_idx(&mut self, idx: u64) {
+        self.golden_ticket_idx = idx;
+    }
+
+    pub fn set_fee_transaction_idx(&mut self, idx: u64) {
+        self.fee_transaction_idx = idx;
+    }
+
+    pub fn set_total_fees(&mut self, total_fees: u64) {
+        self.total_fees = total_fees;
+    }
+
+    // TODO refactor: All of these setters which are setting something which is included
+    // in the pre_hash or hash are dangerous. The purpose of the set/get paradigm is for
+    // a class/unit to be able to enforce an API which guarantees it's consistency to
+    // those using it. To be correct, each of these setters should call generate_hashes()
+    // after it sets the state. However, this would be ridiculous because everytime we
+    // construct a new Block, we call all these one after the other. A comprimise might
+    // be to remove them and at least just set the private fields directly, or make the
+    // setters private, but this misses the point. We want to encapsulate any state
+    // changes into a single black-box so that state is easier to reason about.
+    pub fn set_transactions(&mut self, transactions: &mut Vec<Transaction>) {
+        self.transactions = transactions.to_vec();
+    }
+
+    pub fn set_block_type(&mut self, block_type: BlockType) {
+        self.block_type = block_type;
+    }
+
+    pub fn set_id(&mut self, id: u64) {
+        self.id = id;
+    }
+
+    pub fn set_in_longest_chain(&mut self, lc: bool) {
+        self.in_longest_chain = lc;
+    }
+
+    pub fn set_timestamp(&mut self, timestamp: u64) {
+        self.timestamp = timestamp;
+    }
+
+    pub fn set_previous_block_hash(&mut self, previous_block_hash: SaitoHash) {
+        self.previous_block_hash = previous_block_hash;
+    }
+
+    pub fn set_creator(&mut self, creator: SaitoPublicKey) {
+        self.creator = creator;
+    }
+
+    pub fn set_merkle_root(&mut self, merkle_root: SaitoHash) {
+        self.merkle_root = merkle_root;
+    }
+
+    pub fn set_signature(&mut self, signature: SaitoSignature) {
+        self.signature = signature;
+    }
+
+    pub fn set_staking_treasury(&mut self, staking_treasury: u64) {
+        self.staking_treasury = staking_treasury;
+    }
+
+    pub fn set_treasury(&mut self, treasury: u64) {
+        self.treasury = treasury;
+    }
+
+    pub fn set_burnfee(&mut self, burnfee: u64) {
+        self.burnfee = burnfee;
+    }
+
+    pub fn set_difficulty(&mut self, difficulty: u64) {
+        self.difficulty = difficulty;
+    }
+
+    pub fn set_pre_hash(&mut self, pre_hash: SaitoHash) {
+        self.pre_hash = pre_hash;
+    }
+
+    pub fn set_hash(&mut self, hash: SaitoHash) {
+        self.hash = hash;
+    }
+
     //
-    // before we validate the block we need to generate some information such
-    // as the hash of the transaction message data that is used to generate
-    // the signature. because this requires mutable access to the transactions
-    // Rust forces us to do it in a separate function.
+    // we may want to separate the signing of the block from the setting of the necessary hash
+    // we do this together out of convenience only
     //
-    // we first calculate as much information as we can in parallel before
-    // sweeping through the transactions to find out what percentage of the
-    // cumulative block fees they contain.
-    //
-    pub fn generate(&mut self) -> bool {
-
-        // trace!(" ... block.prevalid - pre hash:  {:?}", create_timestamp());
-
+    pub fn sign(&mut self, privatekey: SaitoPrivateKey) {
         //
-        // if we are generating the metadata for a block, we use the
-        // publickey of the block creator when we calculate the fees
-        // and the routing work.
+        // we set final data
         //
-        let creator_publickey = self.get_creator();
+        self.set_signature(sign(&self.get_pre_hash(), privatekey));
+    }
 
-        // ensure hashes correct
-        self.generate_pre_hash();
-        self.generate_hash();
+    // serialize the pre_hash and the signature_for_source into a
+    // bytes array that can be hashed and then have the hash set.
+    pub fn serialize_for_hash(&self) -> Vec<u8> {
+        let mut vbytes: Vec<u8> = vec![];
+        vbytes.extend(&self.get_pre_hash());
+        vbytes.extend(&self.get_signature());
+        vbytes.extend(&self.get_previous_block_hash());
+        vbytes
+    }
 
-        let _transactions_pre_calculated = &self
-            .transactions
-            .par_iter_mut()
-            .all(|tx| tx.generate(creator_publickey));
+    // serialize major block components for block signature
+    // this will manually calculate the merkle_root if necessary
+    // but it is advised that the merkle_root be already calculated
+    // to avoid speed issues.
+    pub fn serialize_for_signature(&self) -> Vec<u8> {
+        let mut vbytes: Vec<u8> = vec![];
+        vbytes.extend(&self.id.to_be_bytes());
+        vbytes.extend(&self.timestamp.to_be_bytes());
+        vbytes.extend(&self.previous_block_hash);
+        vbytes.extend(&self.creator);
+        vbytes.extend(&self.merkle_root);
+        vbytes.extend(&self.treasury.to_be_bytes());
+        vbytes.extend(&self.staking_treasury.to_be_bytes());
+        vbytes.extend(&self.burnfee.to_be_bytes());
+        vbytes.extend(&self.difficulty.to_be_bytes());
+        vbytes.extend(&self.avg_income.to_be_bytes());
+        vbytes.extend(&self.avg_variance.to_be_bytes());
+        vbytes.extend(&self.avg_atr_income.to_be_bytes());
+        vbytes.extend(&self.avg_atr_variance.to_be_bytes());
+        vbytes
+    }
 
-        // trace!(" ... block.prevalid - pst hash:  {:?}", create_timestamp());
+    /// Serialize a Block for transport or disk.
+    /// [len of transactions - 4 bytes - u32]
+    /// [id - 8 bytes - u64]
+    /// [timestamp - 8 bytes - u64]
+    /// [previous_block_hash - 32 bytes - SHA 256 hash]
+    /// [creator - 33 bytes - Secp25k1 pubkey compact format]
+    /// [merkle_root - 32 bytes - SHA 256 hash
+    /// [signature - 64 bytes - Secp25k1 sig]
+    /// [treasury - 8 bytes - u64]
+    /// [staking_treasury - 8 bytes - u64]
+    /// [burnfee - 8 bytes - u64]
+    /// [difficulty - 8 bytes - u64]
+    /// [avg_income - 8 bytes - u64]
+    /// [avg_variance - 8 bytes - u64]
+    /// [avg_atr_income - 8 bytes - u64]
+    /// [avg_atr_variance - 8 bytes - u64]
+    /// [transaction][transaction][transaction]...
+    pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
+        let mut vbytes: Vec<u8> = vec![];
 
-        //
-        // we need to calculate the cumulative figures AFTER the
-        // original figures.
-        //
-        let mut cumulative_fees = 0;
-        let mut cumulative_work = 0;
-
-        let mut has_golden_ticket = false;
-        let mut has_fee_transaction = false;
-        let mut has_issuance_transaction = false;
-        let mut issuance_transaction_idx = 0;
-        let mut golden_ticket_idx = 0;
-        let mut fee_transaction_idx = 0;
-
-        //
-        // we have to do a single sweep through all of the transactions in
-        // non-parallel to do things like generate the cumulative order of the
-        // transactions in the block for things like work and fee calculations
-        // for the lottery.
-        //
-        // we take advantage of the sweep to perform other pre-validation work
-        // like counting up our ATR transactions and generating the hash
-        // commitment for all of our rebroadcasts.
-        //
-        for i in 0..self.transactions.len() {
-
-            let transaction = &mut self.transactions[i];
-
-            cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
-            cumulative_work = transaction.generate_cumulative_work(cumulative_work);
-
-            //
-            // update slips_spent_this_block so that we have a record of
-            // how many times input slips are spent in this block. we will
-            // use this later to ensure there are no duplicates.
-            //
-            // we skip the fee transaction as otherwise we have trouble
-            // validating the staker slips if we have received a block from
-            // someone else -- i.e. we will think the slip is spent in the
-            // block when generating the FEE TX to check against the in-block
-            // fee tx.
-            //
-            if !self.created_hashmap_of_slips_spent_this_block {
-                if transaction.get_transaction_type() != TransactionType::Fee {
-                    for input in transaction.get_inputs() {
-                        self.slips_spent_this_block
-                            .entry(input.get_utxoset_key())
-                            .and_modify(|e| *e += 1)
-                            .or_insert(1);
-                    }
-                    self.created_hashmap_of_slips_spent_this_block = true;
-                }
-            }
-
-            //
-            // also check the transactions for golden ticket and fees
-            //
-            match transaction.get_transaction_type() {
-                TransactionType::Issuance => {
-                    has_issuance_transaction = true;
-                    issuance_transaction_idx = i as u64;
-                }
-                TransactionType::Fee => {
-                    has_fee_transaction = true;
-                    fee_transaction_idx = i as u64;
-                }
-                TransactionType::GoldenTicket => {
-                    has_golden_ticket = true;
-                    golden_ticket_idx = i as u64;
-                }
-                TransactionType::ATR => {
-                    let mut vbytes: Vec<u8> = vec![];
-                    vbytes.extend(&self.rebroadcast_hash);
-                    vbytes.extend(&transaction.serialize_for_signature());
-                    self.rebroadcast_hash = hash(&vbytes);
-
-                    for input in transaction.get_inputs() {
-                        self.total_rebroadcast_slips += 1;
-                        self.total_rebroadcast_nolan += input.get_amount();
-                    }
-                }
-                _ => {}
-            };
+        // block headers do not get tx data
+        if block_type == BlockType::Header {
+            vbytes.extend(&(0 as u32).to_be_bytes());
+        } else {
+            vbytes.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
         }
-        self.set_has_fee_transaction(has_fee_transaction);
-        self.set_has_golden_ticket(has_golden_ticket);
-        self.set_has_issuance_transaction(has_issuance_transaction);
-        self.set_fee_transaction_idx(fee_transaction_idx);
-        self.set_golden_ticket_idx(golden_ticket_idx);
-        self.set_issuance_transaction_idx(issuance_transaction_idx);
+
+        vbytes.extend(&self.id.to_be_bytes());
+        vbytes.extend(&self.timestamp.to_be_bytes());
+        vbytes.extend(&self.previous_block_hash);
+        vbytes.extend(&self.creator);
+        vbytes.extend(&self.merkle_root);
+        vbytes.extend(&self.signature);
+        vbytes.extend(&self.treasury.to_be_bytes());
+        vbytes.extend(&self.staking_treasury.to_be_bytes());
+        vbytes.extend(&self.burnfee.to_be_bytes());
+        vbytes.extend(&self.difficulty.to_be_bytes());
+        vbytes.extend(&self.avg_income.to_be_bytes());
+        vbytes.extend(&self.avg_variance.to_be_bytes());
+        vbytes.extend(&self.avg_atr_income.to_be_bytes());
+        vbytes.extend(&self.avg_atr_variance.to_be_bytes());
+
+        let mut serialized_txs = vec![];
+
+        // block headers do not get tx data
+        if block_type != BlockType::Header {
+            self.transactions.iter().for_each(|transaction| {
+                serialized_txs.extend(transaction.serialize_for_net());
+            });
+            vbytes.extend(serialized_txs);
+        }
+
+        vbytes
+    }
+
+    pub async fn update_block_to_block_type(&mut self, block_type: BlockType, storage: &Storage) -> bool {
+
+        if self.block_type == block_type {
+            return true;
+        }
+
+        if block_type == BlockType::Full {
+	    return self.upgrade_block_to_block_type(block_type, storage).await;
+	}
+
+        if block_type == BlockType::Pruned {
+	    return self.upgrade_block_to_block_type(block_type, storage).await;
+	}
+
+	return false;
+
+    }
+
+
+    //
+    // if the block is not at the proper type, try to upgrade it to have the
+    // data that is necessary for blocks of that type if possible. if this is
+    // not possible, return false. if it is possible, return true once upgraded.
+    //
+    pub async fn upgrade_block_to_block_type(
+        &mut self,
+        block_type: BlockType,
+        storage: &Storage,
+    ) -> bool {
+        trace!("UPGRADE_BLOCK_TO_BLOCK_TYPE {:?}", self.block_type);
+        if self.block_type == block_type {
+            return true;
+        }
 
         //
-        // update block with total fees
+        // TODO - if the block does not exist on disk, we have to
+        // attempt a remote fetch.
         //
-        self.set_total_fees(cumulative_fees);
-        self.set_routing_work_for_creator(cumulative_work);
 
-        // trace!(
-        //     " ... block.pre_validation_done:  {:?}",
-        //     create_timestamp(),
-        //     // tracing_tracker.time_since_last();
-        // );
+        //
+        // if the block type needed is full and we are not,
+        // load the block if it exists on disk.
+        //
+        if block_type == BlockType::Full {
+            let mut new_block = storage
+                .load_block_from_disk(storage.generate_block_filename(&self))
+                .await
+                .unwrap();
+            let hash_for_signature = hash(&new_block.serialize_for_signature());
+            new_block.set_pre_hash(hash_for_signature);
+            let hash_for_hash = hash(&new_block.serialize_for_hash());
+            new_block.set_hash(hash_for_hash);
 
-        true
+            //
+            // in-memory swap copying txs in block from mempool
+            //
+            mem::swap(&mut new_block.transactions, &mut self.transactions);
+            //
+            // transactions need hashes
+            //
+            self.generate();
+            self.set_block_type(BlockType::Full);
+
+            return true;
+        }
+
+        false
     }
 
     pub async fn validate(&self, blockchain: &Blockchain, utxoset: &UtxoSet) -> bool {
@@ -1727,219 +1973,8 @@ impl Block {
         transactions_valid
     }
 
-    pub async fn create(
-        transactions: &mut Vec<Transaction>,
-        previous_block_hash: SaitoHash,
-        wallet_lock: Arc<RwLock<Wallet>>,
-        blockchain: &mut Blockchain,
-        current_timestamp: u64,
-    ) -> Block {
-
-        debug!(
-            "Block::create : previous block hash : {:?}",
-            hex::encode(previous_block_hash)
-        );
-
-        let publickey;
-        {
-            trace!("waiting for the wallet read lock");
-            let wallet = wallet_lock.read().await;
-            trace!("acquired the wallet read lock");
-            publickey = wallet.get_publickey();
-        }
-        let mut previous_block_id = 0;
-        let mut previous_block_burnfee = 0;
-        let mut previous_block_timestamp = 0;
-        let mut previous_block_difficulty = 0;
-        let mut previous_block_treasury = 0;
-        let mut previous_block_staking_treasury = 0;
-
-        if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
-            previous_block_id = previous_block.get_id();
-            previous_block_burnfee = previous_block.get_burnfee();
-            previous_block_timestamp = previous_block.get_timestamp();
-            previous_block_difficulty = previous_block.get_difficulty();
-            previous_block_treasury = previous_block.get_treasury();
-            previous_block_staking_treasury = previous_block.get_staking_treasury();
-        }
-
-        let mut block = Block::new();
-
-        let current_burnfee: u64 =
-            BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-                previous_block_burnfee,
-                current_timestamp,
-                previous_block_timestamp,
-            );
-
-        block.set_id(previous_block_id + 1);
-        block.set_previous_block_hash(previous_block_hash);
-        block.set_burnfee(current_burnfee);
-        block.set_timestamp(current_timestamp);
-        block.set_difficulty(previous_block_difficulty);
-
-        block.set_creator(publickey);
 
 
-        //
-        // in-memory swap copying txs in block from mempool
-        //
-        mem::swap(&mut block.transactions, transactions);
-
-        //
-        // update slips_spent_this_block so that we have a record of
-        // how many times input slips are spent in this block. we will
-        // use this later to ensure there are no duplicates. this include
-        // during the fee transaction, so that we cannot pay a staker
-        // that is also paid this block otherwise.
-        //
-        // this will not include the fee transaction or the ATR txs
-        // because they have not been added to teh block yet, but they
-        // permit us to avoid paying out StakerWithdrawal slips when we
-        // generate the fee payment.
-        //
-        // note -- no need to have an exception for the FEE TX here as
-        // we have not added it yet.
-        //
-        if !block.created_hashmap_of_slips_spent_this_block {
-            for transaction in &block.transactions {
-                for input in transaction.get_inputs() {
-                    block
-                        .slips_spent_this_block
-                        .entry(input.get_utxoset_key())
-                        .and_modify(|e| *e += 1)
-                        .or_insert(1);
-                }
-                block.created_hashmap_of_slips_spent_this_block = true;
-            }
-        }
-
-        //
-        // contextual values
-        //
-        let mut cv: ConsensusValues = block.generate_consensus_values(&blockchain).await;
-
-        //
-        // ATR transactions
-        //
-        let rlen = cv.rebroadcasts.len();
-        // TODO -- figure out if there is a more efficient solution
-        // than iterating through the entire transaction set here.
-        let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
-            .par_iter_mut()
-            .all(|tx| tx.generate(publickey));
-        if rlen > 0 {
-            block.transactions.append(&mut cv.rebroadcasts);
-        }
-
-        //
-        // fee transactions
-        //
-        // if a golden ticket is included in THIS block Saito uses the randomness
-        // associated with that golden ticket to create a fair output for the
-        // previous block.
-        //
-        if cv.fee_transaction.is_some() {
-            //
-            // creator signs fee transaction
-            //
-            let mut fee_tx = cv.fee_transaction.unwrap();
-            let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
-            fee_tx.set_hash_for_signature(hash_for_signature);
-            {
-                trace!("waiting for the wallet read lock");
-                let wallet = wallet_lock.read().await;
-                trace!("acquired the wallet read lock");
-                fee_tx.sign(wallet.get_privatekey());
-            }
-            //
-            // and we add it to the block
-            //
-            block.add_transaction(fee_tx);
-        }
-
-        //
-        // update slips_spent_this_block so that we have a record of
-        // how many times input slips are spent in this block. we will
-        // use this later to ensure there are no duplicates. this include
-        // during the fee transaction, so that we cannot pay a staker
-        // that is also paid this block otherwise.
-        //
-        for transaction in &block.transactions {
-            if transaction.get_transaction_type() != TransactionType::Fee {
-                for input in transaction.get_inputs() {
-                    block
-                        .slips_spent_this_block
-                        .entry(input.get_utxoset_key())
-                        .and_modify(|e| *e += 1)
-                        .or_insert(1);
-                }
-            }
-        }
-        block.created_hashmap_of_slips_spent_this_block = true;
-
-        //
-        // set difficulty
-        //
-        block.set_difficulty(cv.expected_difficulty);
-
-        //
-        // set treasury
-        //
-        if cv.nolan_falling_off_chain != 0 {
-            block.set_treasury(previous_block_treasury + cv.nolan_falling_off_chain);
-        }
-
-        //
-        // set staking treasury
-        //
-        if cv.staking_treasury != 0 {
-            let mut adjusted_staking_treasury = previous_block_staking_treasury;
-            if cv.staking_treasury < 0 {
-                let x = cv.staking_treasury * -1;
-                if adjusted_staking_treasury > x as u64 {
-                    adjusted_staking_treasury -= x as u64;
-                } else {
-                    adjusted_staking_treasury = 0;
-                }
-            } else {
-                adjusted_staking_treasury += cv.staking_treasury as u64;
-            }
-            // info!(
-            //     "adjusted staking treasury written into block {}",
-            //     adjusted_staking_treasury
-            // );
-            block.set_staking_treasury(adjusted_staking_treasury);
-        }
-
-        //
-        // generate merkle root
-        //
-        let block_merkle_root = block.generate_merkle_root();
-        block.set_merkle_root(block_merkle_root);
-
-
-        {
-            trace!("waiting for the wallet read lock");
-            let wallet = wallet_lock.read().await;
-            trace!("acquired the wallet read lock");
-            block.sign(wallet.get_privatekey());
-        }
-
-	//
-	// hash includes pre-hash and sig, so update
-	//
-	block.generate_hash();
-
-        block
-    }
-
-    pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
-        for tx in &self.transactions {
-            tx.delete(utxoset).await;
-        }
-        true
-    }
 }
 
 #[cfg(test)]
