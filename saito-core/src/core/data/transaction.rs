@@ -223,23 +223,15 @@ impl Transaction {
         }
     }
 
-    pub fn create_vip_transaction(
-        to_publickey: SaitoPublicKey,
-        with_amount: u64,
-        number_of_vip_slips: u64,
-    ) -> Transaction {
+    pub fn create_vip_transaction(to_publickey: SaitoPublicKey, with_amount: u64) -> Transaction {
         debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::new();
         transaction.set_transaction_type(TransactionType::Vip);
-
-        for _i in 0..number_of_vip_slips {
-            let mut output = Slip::new();
-            output.set_publickey(to_publickey);
-            output.set_amount(with_amount);
-            output.set_slip_type(SlipType::VipOutput);
-            transaction.add_output(output);
-        }
-
+        let mut output = Slip::new();
+        output.set_publickey(to_publickey);
+        output.set_amount(with_amount);
+        output.set_slip_type(SlipType::VipOutput);
+        transaction.add_output(output);
         transaction
     }
 

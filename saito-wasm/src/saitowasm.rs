@@ -111,7 +111,7 @@ pub fn new() -> SaitoWasm {
             // sender_global: (),
             block_producing_timer: 0,
             tx_producing_timer: 0,
-            generate_test_tx: false,
+            create_test_tx: false,
             time_keeper: Box::new(WasmTimeKeeper {}),
             network: Network::new(Box::new(WasmIoHandler {}), peers.clone()),
             storage: Storage::new(Box::new(WasmIoHandler {})),
