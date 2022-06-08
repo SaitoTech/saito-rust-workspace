@@ -254,7 +254,7 @@ impl Blockchain {
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
-            println!("shared ancestor found");
+            debug!("shared ancestor found");
 
             loop {
                 if new_chain_hash == old_chain_hash {
@@ -276,7 +276,7 @@ impl Blockchain {
                 }
             }
         } else {
-            println!("block without parent");
+            debug!("block without parent");
 
             //
             // we have a block without a parent.
@@ -900,6 +900,7 @@ impl Blockchain {
             }
         }
 
+debug!("here");
         let block = self.blocks.get(&new_chain[current_wind_index]).unwrap();
         // trace!(" ... before block.validate:      {:?}", create_timestamp());
         let does_block_validate = block.validate(&self, &self.utxoset).await;
@@ -910,17 +911,23 @@ impl Blockchain {
         //     does_block_validate
         // );
 
+debug!("before does block validate!");
+
         if does_block_validate {
+
             // trace!(" ... before block ocr            {:?}", create_timestamp());
 
             // utxoset update
             block.on_chain_reorganization(&mut self.utxoset, true);
 
             // trace!(" ... before blockring ocr:       {:?}", create_timestamp());
+debug!("before does block validate 2!");
 
             // blockring update
             self.blockring
                 .on_chain_reorganization(block.get_id(), block.get_hash(), true);
+
+println!("before does block validate 3 !");
 
             //
             // TODO - wallet update should be optional, as core routing nodes
