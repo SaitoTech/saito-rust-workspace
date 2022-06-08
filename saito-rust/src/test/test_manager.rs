@@ -65,6 +65,7 @@ pub struct TestManager {
 }
 
 impl TestManager {
+
     pub fn new() -> Self {
         let peers = Arc::new(RwLock::new(PeerCollection::new()));
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
@@ -111,9 +112,12 @@ impl TestManager {
         txs_fee: u64,
         include_valid_golden_ticket: bool,
     ) -> Block {
+
         let mut transactions: Vec<Transaction> = vec![];
         let privatekey: SaitoPrivateKey;
         let publickey: SaitoPublicKey;
+
+println!("TRANSACTIONS NUM: {}", txs_number);
 
         {
             let wallet = self.wallet_lock.read().await;
@@ -128,6 +132,9 @@ impl TestManager {
             transaction.generate(publickey);
             transactions.push(transaction);
         }
+
+println!("TRANSACTIONS NUM 2: {}", txs_number);
+
 
         if include_valid_golden_ticket {
             let blockchain = self.blockchain_lock.read().await;
@@ -147,10 +154,12 @@ impl TestManager {
             transactions.push(gttx);
         }
 
+println!("TRANSACTIONS NUM 3: {}", txs_number);
+
         //
         // create block
         //
-        let block = Block::create(
+        let mut block = Block::create(
             &mut transactions,
             parent_hash,
             self.wallet_lock.clone(),
@@ -158,6 +167,8 @@ impl TestManager {
             timestamp,
         )
         .await;
+	block.generate();
+	block.sign(privatekey);
 
         block
     }
@@ -231,6 +242,14 @@ impl TestManager {
             block.add_transaction(tx);
         }
 
+	//
+	// we have added VIP, so need to regenerate the merkle-root
+	//
+	block.set_merkle_root(block.generate_merkle_root());
+	block.generate();
+	block.sign(privatekey);
+	
+
         //
         // and add first block to blockchain
         //
@@ -263,51 +282,6 @@ impl TestManager {
             block
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        //
-        // add block at end of longest chain
-        //
-        pub async fn add_block(
-            &mut self,
-            timestamp: u64,
-            vip_txs: usize,
-            normal_txs: usize,
-            has_golden_ticket: bool,
-            additional_txs: Vec<Transaction>,
-        ) -> SaitoHash {
-            let parent_hash = self.latest_block_hash;
-            //info!("ADDING BLOCK 2! {:?}", parent_hash);
-            let _block = self
-                .add_block_on_hash(
-                    timestamp,
-                    vip_txs,
-                    normal_txs,
-                    has_golden_ticket,
-                    additional_txs,
-                    parent_hash,
-                )
-                .await;
-            _block
-        }
 
         //
         // add block on parent hash
