@@ -89,12 +89,14 @@ impl TestManager {
     //
     pub async fn add_block(&mut self, block: Block) {
         let mut blockchain = self.blockchain_lock.write().await;
-        blockchain.add_block(
-            block,
-            &mut self.network,
-            &mut self.storage,
-            self.sender_to_miner.clone(),
-        );
+        blockchain
+            .add_block(
+                block,
+                &mut self.network,
+                &mut self.storage,
+                self.sender_to_miner.clone(),
+            )
+            .await;
     }
 
     //
@@ -232,7 +234,7 @@ impl TestManager {
         //
         // and add first block to blockchain
         //
-        self.add_block(block);
+        self.add_block(block).await;
     }
 
     /***********************

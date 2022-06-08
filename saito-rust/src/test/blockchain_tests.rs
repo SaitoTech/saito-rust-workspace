@@ -18,7 +18,7 @@ mod tests {
         // create block #1, with 100 VIP txs each of which
         // contains 1_000_000_000 NOLAN.
         //
-        t.initialize(100, 1_000_000_000);
+        t.initialize(100, 1_000_000_000).await;
 
         let blockchain = t.blockchain_lock.read().await;
 
