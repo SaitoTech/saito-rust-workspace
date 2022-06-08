@@ -90,14 +90,14 @@ impl TestManager {
     // add block to blockchain
     //
     pub async fn add_block(
-       &self,
+       &mut self,
        block: Block
     ) {
 
         let mut blockchain = self.blockchain_lock.write().await;
         blockchain.add_block(
 	    block,
-	    &self.network,
+	    &mut self.network,
 	    &mut self.storage,
 	    self.sender_to_miner.clone(),
 	);
