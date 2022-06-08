@@ -41,10 +41,10 @@ use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_event_processor::MiningEvent;
 use std::borrow::BorrowMut;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread::sleep, time::Duration};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
 
 pub fn create_timestamp() -> u64 {
     SystemTime::now()
@@ -60,30 +60,48 @@ pub struct TestManager {
     pub latest_block_hash: SaitoHash,
     pub network: Network,
     pub storage: Storage,
-    pub sender_to_miner: Sender<MiningEvent>,
     pub peers: Arc<RwLock<PeerCollection>>,
-    pub pregenerated_transactions: Vec<Transaction>,
+    pub sender_to_miner: Sender<MiningEvent>,
 }
 
 impl TestManager {
 
-    pub fn new(
-        blockchain_lock: Arc<RwLock<Blockchain>>,
-        wallet_lock: Arc<RwLock<Wallet>>,
-        sender_to_miner: Sender<MiningEvent>,
-    ) -> Self {
+    pub fn new() -> Self {
         let peers = Arc::new(RwLock::new(PeerCollection::new()));
+	let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
+        let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
+        let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
+        let (sender_to_miner, _receiver_from_miner) = tokio::sync::mpsc::channel(10);
+
         Self {
-            mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet_lock.clone()))),
-            blockchain_lock: blockchain_lock.clone(),
-            wallet_lock: wallet_lock.clone(),
+	    wallet_lock: wallet_lock,
+            blockchain_lock: blockchain_lock,
+            mempool_lock: mempool_lock,
             latest_block_hash: [0; 32],
             network: Network::new(Box::new(TestIOHandler::new()), peers.clone()),
-            sender_to_miner,
             peers: peers.clone(),
             storage: Storage::new(Box::new(TestIOHandler::new())),
-	    pregenerated_transactions: vec![],
+	    sender_to_miner: sender_to_miner.clone(),
         }
+    }
+
+
+    //
+    // add block to blockchain
+    //
+    pub async fn add_block(
+       &self,
+       block: Block
+    ) {
+
+        let mut blockchain = self.blockchain_lock.write().await;
+        blockchain.add_block(
+	    block,
+	    &self.network,
+	    &mut self.storage,
+	    self.sender_to_miner.clone(),
+	);
+
     }
 
 
@@ -95,10 +113,10 @@ impl TestManager {
         &mut self,
         parent_hash: SaitoHash,
         timestamp: u64,
-        vip_transactions: usize,
-        normal_transactions: usize,
-        golden_ticket: bool,
-        additional_transactions: Vec<Transaction>,
+        txs_number: usize,
+        txs_amount: u64,
+        txs_fee: u64,
+        include_valid_golden_ticket: bool,
     ) -> Block {
 
         let mut transactions: Vec<Transaction> = vec![];
@@ -111,53 +129,30 @@ impl TestManager {
             privatekey = wallet.get_privatekey();
         }
 
-        if 0 < vip_transactions {
-            let mut tx = Transaction::create_vip_transaction(
-                self.wallet_lock.clone(),
-                publickey,
-                10_000_000,
-                vip_transactions as u64,
-            );
-            tx.generate(publickey);
-            tx.sign(privatekey);
-            transactions.push(tx);
-        }
 
-
-
-        for _i in 0..normal_transactions {
-            let mut transaction =
-                Transaction::generate_transaction(self.wallet_lock.clone(), publickey, 5000, 5000)
-                    .await;
-            // sign ...
+        for _i in 0..txs_number {
+            let mut transaction = Transaction::create(self.wallet_lock.clone(), publickey, txs_amount, txs_fee).await;
             transaction.sign(privatekey);
-            transaction.generate_metadata(publickey);
+            transaction.generate(publickey);
             transactions.push(transaction);
         }
 
-        for i in 0..additional_transactions.len() {
-            transactions.push(additional_transactions[i].clone());
-        }
-
-        info!("parent hash {:?}", parent_hash);
-
-        if golden_ticket {
+        if include_valid_golden_ticket {
             let blockchain = self.blockchain_lock.read().await;
-            let blk = blockchain.get_block(&parent_hash).await.unwrap();
-            let last_block_difficulty = blk.get_difficulty();
-            let golden_ticket: GoldenTicket = Self::mine_on_block_until_golden_ticket_found(
+            let block = blockchain.get_block(&parent_hash).await.unwrap();
+            let golden_ticket: GoldenTicket = Self::create_golden_ticket(
                 self.wallet_lock.clone(),
                 parent_hash,
-                last_block_difficulty,
+                block.get_difficulty(),
             )
             .await;
-            let mut tx2: Transaction;
+            let mut gttx: Transaction;
             {
                 let mut wallet = self.wallet_lock.write().await;
-                tx2 = wallet.create_golden_ticket_transaction(golden_ticket).await;
+                gttx = wallet.create_golden_ticket_transaction(golden_ticket).await;
             }
-            tx2.generate_metadata(publickey);
-            transactions.push(tx2);
+            gttx.generate(publickey);
+            transactions.push(gttx);
         }
 
         //
@@ -176,71 +171,12 @@ impl TestManager {
     }
 
 
-
-    //
-    // create valid utxoslips
-    //
-    pub async fn prepare_utxo(&self, amount: u64, fee: u64, num: u64) {
-
-        let publickey: SaitoPublicKey;
-        let privatekey: SaitoPrivateKey;
-
-        {
-            let wallet = self.wallet_lock.read().await;
-            publickey = wallet.get_publickey();
-            privatekey = wallet.get_privatekey();
-        }
-
-        if 0 < num {
-            let mut tx = Transaction::create_vip_transaction(
-                self.wallet_lock.clone(),
-                publickey,
-                (amount+fee),
-                num,
-            );
-            tx.generate(publickey);
-            tx.sign(privatekey);
-        }
-
-	tx
-    }
-
-
-    //
-    // create valid transactions
-    //
-    pub async fn prepare_transactions(&self, amount: u64, fee: u64, num: u64) {
-
-        let publickey: SaitoPublicKey;
-        let privatekey: SaitoPrivateKey;
-
-        {
-            let wallet = self.wallet_lock.read().await;
-            publickey = wallet.get_publickey();
-            privatekey = wallet.get_privatekey();
-        }
-
-        for t in 0..num {
-          let mut transaction = Transaction::create(self.wallet_lock.clone(), publickey, amount, fee).await;
-          transaction.sign(privatekey);
-	  self.pregenerated_transactions.push(transaction);
-        }
-
-    }
-
-
-
-
-
-
-/***********************
-
-
-    pub async fn mine_on_block_until_golden_ticket_found(
+    pub async fn create_golden_ticket(
         wallet: Arc<RwLock<Wallet>>,
         block_hash: SaitoHash,
         block_difficulty: u64,
     ) -> GoldenTicket {
+
         let public_key;
         {
             trace!("waiting for the wallet read lock");
@@ -258,7 +194,75 @@ impl TestManager {
         }
 
         GoldenTicket::new(block_hash, random_bytes, public_key)
+
     }
+
+
+    //
+    // initialize chain
+    //
+    // creates and adds the first block to the blockchain, with however many VIP
+    // transactions are necessary 
+    pub async fn initialize(
+        &mut self,
+        timestamp: u64,
+        vip_transactions: u64,
+        vip_amount: u64,
+    ) {
+
+	//
+	// reset data dirs
+	//
+        tokio::fs::remove_dir_all("data/blocks").await;
+        tokio::fs::create_dir_all("data/blocks").await.unwrap();
+        tokio::fs::remove_dir_all("data/wallets").await;
+        tokio::fs::create_dir_all("data/wallets").await.unwrap();
+
+	//
+	// create initial transactions
+	//
+        let privatekey: SaitoPrivateKey;
+        let publickey: SaitoPublicKey;
+        {
+            let wallet = self.wallet_lock.read().await;
+            publickey = wallet.get_publickey();
+            privatekey = wallet.get_privatekey();
+        }
+
+	//
+	// create first block
+	//
+	let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
+	
+	//
+	// generate UTXO-carrying VIP transactions
+	//
+        if 0 < vip_transactions {
+            let mut tx = Transaction::create_vip_transaction(
+                publickey,
+                vip_amount,
+            );
+            tx.generate(publickey);
+            tx.sign(privatekey);
+            block.add_transaction(tx);
+        }
+
+	//
+	// and add first block to blockchain
+	// 
+	self.add_block(block);
+
+
+    }
+
+
+
+
+
+
+/***********************
+
+
     pub async fn generate_block_and_metadata(
         &mut self,
         parent_hash: SaitoHash,
@@ -301,12 +305,6 @@ impl TestManager {
 
 
 
-    pub async fn clear_data_folder() {
-        tokio::fs::remove_dir_all("data/blocks").await;
-        tokio::fs::create_dir_all("data/blocks").await.unwrap();
-        tokio::fs::remove_dir_all("data/wallets").await;
-        tokio::fs::create_dir_all("data/wallets").await.unwrap();
-    }
 
     //
     // add block at end of longest chain
@@ -374,7 +372,6 @@ impl TestManager {
             block,
             &mut self.network,
             &mut self.storage,
-            self.sender_to_miner.clone(),
         )
         .await;
         self.latest_block_hash
@@ -940,7 +937,6 @@ impl TestManager {
                     block,
                     &mut self.network,
                     &mut self.storage,
-                    self.sender_to_miner.clone(),
                 )
                 .await;
         }
