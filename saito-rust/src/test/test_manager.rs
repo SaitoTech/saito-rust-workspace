@@ -43,7 +43,7 @@ use std::borrow::BorrowMut;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{thread::sleep, time::Duration};
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
 pub fn create_timestamp() -> u64 {
@@ -62,6 +62,7 @@ pub struct TestManager {
     pub storage: Storage,
     pub peers: Arc<RwLock<PeerCollection>>,
     pub sender_to_miner: Sender<MiningEvent>,
+    pub receiver_in_miner: Receiver<MiningEvent>,
 }
 
 impl TestManager {
@@ -70,7 +71,7 @@ impl TestManager {
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
-        let (sender_to_miner, _receiver_from_miner) = tokio::sync::mpsc::channel(10);
+        let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
 
         Self {
             wallet_lock: wallet_lock,
@@ -81,7 +82,15 @@ impl TestManager {
             peers: peers.clone(),
             storage: Storage::new(Box::new(TestIOHandler::new())),
             sender_to_miner: sender_to_miner.clone(),
+            receiver_in_miner,
         }
+    }
+
+    pub async fn wait_for_mining_event(&mut self) {
+        self.receiver_in_miner
+            .recv()
+            .await
+            .expect("mining event receive failed");
     }
 
     //
