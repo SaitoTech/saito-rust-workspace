@@ -20,7 +20,7 @@ mod tests {
         // contains 1_000_000_000 NOLAN.
         //
         t.initialize(100, 1_000_000_000).await;
-        t.wait_for_mining_event();
+        t.wait_for_mining_event().await;
 
         let blockchain = t.blockchain_lock.read().await;
 
