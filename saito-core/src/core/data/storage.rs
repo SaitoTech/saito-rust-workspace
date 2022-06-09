@@ -106,8 +106,8 @@ impl Storage {
                 todo!()
             }
             let buffer = result.unwrap();
-            let mut block = Block::deserialize_for_net(&buffer);
-            block.generate_metadata();
+            let mut block = Block::deserialize_from_net(&buffer);
+            block.generate();
             blockchain
                 .add_block(block, network, self, sender_to_miner.clone())
                 .await;
@@ -121,7 +121,7 @@ impl Storage {
             todo!()
         }
         let buffer = result.unwrap();
-        Ok(Block::deserialize_for_net(&buffer))
+        Ok(Block::deserialize_from_net(&buffer))
     }
 
     pub async fn delete_block_from_disk(&self, filename: String) -> bool {

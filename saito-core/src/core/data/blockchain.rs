@@ -46,23 +46,18 @@ pub struct Blockchain {
     pub blockring: BlockRing,
     pub blocks: AHashMap<SaitoHash, Block>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
-    // broadcast_channel_sender: broadcast::Sender<GlobalEvent>,
     genesis_block_id: u64,
     fork_id: SaitoHash,
 }
 
 impl Blockchain {
     #[allow(clippy::new_without_default)]
-    pub fn new(
-        wallet_lock: Arc<RwLock<Wallet>>,
-        // sender: tokio::sync::broadcast::Sender<GlobalEvent>,
-    ) -> Self {
+    pub fn new(wallet_lock: Arc<RwLock<Wallet>>) -> Self {
         Blockchain {
             utxoset: AHashMap::new(),
             blockring: BlockRing::new(),
             blocks: AHashMap::new(),
             wallet_lock,
-            // broadcast_channel_sender: sender,
             genesis_block_id: 0,
             fork_id: [0; 32],
         }
@@ -89,11 +84,45 @@ impl Blockchain {
     ) {
         debug!("adding block to blockchain");
 
+        //
+        // confirm hash first
+        //
+        block.generate_pre_hash();
+        block.generate_hash();
+
+        info!("add_block {:?}", &hex::encode(&block.get_hash()));
+
+        //
+        // start by extracting some variables that we will use
+        // repeatedly in the course of adding this block to the
+        // blockchain and our various indices.
+        //
+        let block_hash = block.get_hash();
+        let block_id = block.get_id();
+        let previous_block_hash = self.blockring.get_latest_block_hash();
+
+        //
+        // sanity checks
+        //
+        if self.blocks.contains_key(&block_hash) {
+            error!(
+                "ERROR: block exists in blockchain {:?}",
+                &hex::encode(&block.get_hash())
+            );
+            return;
+        }
+
+        //
+        // TODO -- david review -- should be no need for recursive fetch
+        // as each block will fetch the parent on arrival and processing
+        // and we may want to tag and use the degree of distance to impose
+        // penalities on routing peers.
+        //
         // get missing block
+        //
         if self.blockring.get_latest_block_id() > 0 {
             let mut earliest_block_id = 1;
             if self.get_latest_block_id() > GENESIS_PERIOD {
-                // if the ring is full
                 earliest_block_id = self.get_latest_block_id() - GENESIS_PERIOD;
             }
             trace!("earliest_block_id {}", earliest_block_id);
@@ -131,33 +160,6 @@ impl Blockchain {
                     }
                 }
             }
-        }
-
-        //
-        // first things first, confirm hashes OK
-        //
-        block.generate_hashes();
-
-        info!("add_block {:?}", &hex::encode(&block.get_hash()));
-
-        //
-        // start by extracting some variables that we will use
-        // repeatedly in the course of adding this block to the
-        // blockchain and our various indices.
-        //
-        let block_hash = block.get_hash();
-        let block_id = block.get_id();
-        let previous_block_hash = self.blockring.get_latest_block_hash();
-
-        //
-        // sanity checks
-        //
-        if self.blocks.contains_key(&block_hash) {
-            error!(
-                "ERROR: block exists in blockchain {:?}",
-                &hex::encode(&block.get_hash())
-            );
-            return;
         }
 
         //
@@ -252,6 +254,8 @@ impl Blockchain {
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
+            debug!("shared ancestor found");
+
             loop {
                 if new_chain_hash == old_chain_hash {
                     break;
@@ -272,6 +276,8 @@ impl Blockchain {
                 }
             }
         } else {
+            debug!("block without parent");
+
             //
             // we have a block without a parent.
             //
@@ -281,13 +287,15 @@ impl Blockchain {
             // of creating a separate variable to manually track entries.
             //
             if self.blockring.is_empty() {
+                println!("blockring is empty");
+
                 //
                 // no need for action as fall-through will result in proper default
                 // behavior. we have the comparison here to separate expected from
                 // unexpected / edge-case issues around block receipt.
                 //
             } else {
-                //•
+                //
                 // TODO - implement logic to handle once nodes can connect
                 //
                 // if this not our first block, handle edge-case around receiving
@@ -314,8 +322,13 @@ impl Blockchain {
         // viable.
         //
         if am_i_the_longest_chain {
+            println!("i am the longest chain");
+
             let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
+
             if does_new_chain_validate {
+                println!("new chain validates!");
+
                 self.add_block_success(block_hash, network, storage).await;
 
                 //
@@ -544,7 +557,7 @@ impl Blockchain {
             //
             // index to update
             //
-            let idx = 2 * i;
+            let index = 2 * i;
 
             //
             //
@@ -552,8 +565,8 @@ impl Blockchain {
             let block_hash = self
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(current_block_id);
-            fork_id[idx] = block_hash[idx];
-            fork_id[idx + 1] = block_hash[idx + 1];
+            fork_id[index] = block_hash[index];
+            fork_id[index + 1] = block_hash[index + 1];
         }
 
         fork_id
@@ -589,14 +602,16 @@ impl Blockchain {
                 }
 
                 // index in fork_id hash
-                let idx = 2 * index;
+                let index = 2 * index;
 
                 // compare input hash to my hash
                 if peer_block_id <= my_block_id {
                     let block_hash = self
                         .blockring
                         .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[idx] == block_hash[idx] && fork_id[idx + 1] == block_hash[idx + 1] {
+                    if fork_id[index] == block_hash[index]
+                        && fork_id[index + 1] == block_hash[index + 1]
+                    {
                         return peer_block_id;
                     }
                 }
@@ -614,14 +629,16 @@ impl Blockchain {
                 }
 
                 // index in fork_id hash
-                let idx = 2 * index;
+                let index = 2 * index;
 
                 // compare input hash to my hash
                 if peer_block_id <= my_block_id {
                     let block_hash = self
                         .blockring
                         .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[idx] == block_hash[idx] && fork_id[idx + 1] == block_hash[idx + 1] {
+                    if fork_id[index] == block_hash[index]
+                        && fork_id[index + 1] == block_hash[index + 1]
+                    {
                         return peer_block_id;
                     }
                 }
@@ -745,11 +762,11 @@ impl Blockchain {
         // it in wind_chain as we only need to check once for the entire chain
         //
         let mut golden_tickets_found = 0;
-        let mut search_depth_idx = 0;
+        let mut search_depth_index = 0;
         let mut latest_block_hash = new_chain[0];
 
         for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR {
-            search_depth_idx += 1;
+            search_depth_index += 1;
 
             if let Some(block) = self.get_block_sync(&latest_block_hash) {
                 if i == 0 {
@@ -772,7 +789,7 @@ impl Blockchain {
         }
 
         if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
-            && search_depth_idx >= MIN_GOLDEN_TICKETS_DENOMINATOR
+            && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
         {
             let mut return_value = false;
             if let Some(block) = self.get_block_sync(&new_chain[0]) {
@@ -789,17 +806,21 @@ impl Blockchain {
         }
 
         if !old_chain.is_empty() {
+            println!("old chain not empty...");
             let res = self
                 .unwind_chain(&new_chain, &old_chain, 0, true, storage)
                 //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
                 .await;
             res
         } else if !new_chain.is_empty() {
+            println!("new chain not empty...");
             let res = self
                 .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
                 .await;
+            println!("is blockring empty {}", self.blockring.is_empty());
             res
         } else {
+            println!("old chain and new chain are both empty...");
             true
         }
     }
@@ -854,7 +875,7 @@ impl Blockchain {
         //
         {
             let mut block = self.get_mut_block(&new_chain[current_wind_index]).await;
-            block.generate_metadata();
+            block.generate();
 
             let latest_block_id = block.get_id();
 
@@ -879,6 +900,7 @@ impl Blockchain {
             }
         }
 
+        debug!("here");
         let block = self.blocks.get(&new_chain[current_wind_index]).unwrap();
         // trace!(" ... before block.validate:      {:?}", create_timestamp());
         let does_block_validate = block.validate(&self, &self.utxoset).await;
@@ -889,6 +911,8 @@ impl Blockchain {
         //     does_block_validate
         // );
 
+        debug!("before does block validate!");
+
         if does_block_validate {
             // trace!(" ... before block ocr            {:?}", create_timestamp());
 
@@ -896,10 +920,13 @@ impl Blockchain {
             block.on_chain_reorganization(&mut self.utxoset, true);
 
             // trace!(" ... before blockring ocr:       {:?}", create_timestamp());
+            debug!("before does block validate 2!");
 
             // blockring update
             self.blockring
                 .on_chain_reorganization(block.get_id(), block.get_hash(), true);
+
+            println!("before does block validate 3 !");
 
             //
             // TODO - wallet update should be optional, as core routing nodes

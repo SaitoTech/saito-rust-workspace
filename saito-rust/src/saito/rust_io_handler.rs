@@ -243,7 +243,7 @@ mod tests {
     async fn file_exists_success() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
         let io_handler = RustIOHandler::new(sender, 0);
-        let path = String::from("src/test/test_data/config_handler_tests.json");
+        let path = String::from("src/test/data/config_handler_tests.json");
 
         let result = io_handler.is_existing_file(path).await;
         assert!(result);

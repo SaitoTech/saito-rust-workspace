@@ -131,9 +131,9 @@ async fn run_consensus_event_processor(
     sender_to_network_controller: Sender<IoEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
-    let mut generate_test_tx = false;
+    let mut create_test_tx = false;
     if result.is_ok() {
-        generate_test_tx = result.unwrap().eq("1");
+        create_test_tx = result.unwrap().eq("1");
     }
     let consensus_event_processor = ConsensusEventProcessor {
         mempool: context.mempool.clone(),
@@ -152,7 +152,7 @@ async fn run_consensus_event_processor(
         ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
-        generate_test_tx,
+        create_test_tx,
         storage: Storage::new(Box::new(RustIOHandler::new(
             sender_to_network_controller.clone(),
             CONSENSUS_EVENT_PROCESSOR_ID,

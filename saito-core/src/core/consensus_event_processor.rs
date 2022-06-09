@@ -37,7 +37,7 @@ pub struct ConsensusEventProcessor {
     pub sender_to_miner: Sender<MiningEvent>,
     pub block_producing_timer: u128,
     pub tx_producing_timer: u128,
-    pub generate_test_tx: bool,
+    pub create_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub network: Network,
     pub storage: Storage,
@@ -95,13 +95,8 @@ impl ConsensusEventProcessor {
 
         {
             if latest_block_id == 0 {
-                let mut vip_transaction = Transaction::generate_vip_transaction(
-                    wallet_lock_clone.clone(),
-                    publickey,
-                    50_000_000,
-                    20,
-                )
-                .await;
+                let mut vip_transaction =
+                    Transaction::create_vip_transaction(publickey, 50_000_000);
                 vip_transaction.sign(privatekey);
 
                 mempool.add_transaction(vip_transaction).await;
@@ -110,23 +105,21 @@ impl ConsensusEventProcessor {
 
         for _i in 0..txs_to_generate {
             let mut transaction =
-                Transaction::generate_transaction(wallet_lock_clone.clone(), publickey, 5000, 5000)
-                    .await;
+                Transaction::create(wallet_lock_clone.clone(), publickey, 5000, 5000).await;
             transaction.set_message(
                 (0..bytes_per_tx)
                     .into_iter()
                     .map(|_| rand::random::<u8>())
                     .collect(),
             );
+            transaction.generate(publickey);
             transaction.sign(privatekey);
-            // before validation!
-            transaction.generate_metadata(publickey);
 
             transaction
-                .add_hop_to_path(wallet_lock_clone.clone(), publickey)
+                .add_hop(wallet_lock_clone.clone(), publickey)
                 .await;
             transaction
-                .add_hop_to_path(wallet_lock_clone.clone(), publickey)
+                .add_hop(wallet_lock_clone.clone(), publickey)
                 .await;
             {
                 mempool
@@ -155,7 +148,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         let duration_value = duration.as_micros();
 
         // generate test transactions
-        if self.generate_test_tx {
+        if self.create_test_tx {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
             if self.tx_producing_timer >= 1_000_000 {
                 // TODO : Remove this transaction generation once testing is done
@@ -244,7 +237,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 buffer,
             } => {
                 let mut blockchain = self.blockchain.write().await;
-                let block = Block::deserialize_for_net(&buffer);
+                let block = Block::deserialize_from_net(&buffer);
                 blockchain
                     .add_block(
                         block,

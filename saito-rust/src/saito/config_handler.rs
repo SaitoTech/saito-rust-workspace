@@ -35,7 +35,7 @@ mod test {
 
     #[test]
     fn load_config_from_existing_file() {
-        let path = String::from("saito-rust/src/test/test_data/config_handler_tests.json");
+        let path = String::from("saito-rust/src/test/data/config_handler_tests.json");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_ok());
         let configs = result.unwrap();
@@ -49,8 +49,7 @@ mod test {
 
     #[test]
     fn load_config_from_bad_file_format() {
-        let path =
-            String::from("saito-rust/src/test/test_data/config_handler_tests_bad_format.xml");
+        let path = String::from("saito-rust/src/test/data/config_handler_tests_bad_format.xml");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_err());
         assert_eq!(result.err().unwrap().kind(), ErrorKind::InvalidInput);
