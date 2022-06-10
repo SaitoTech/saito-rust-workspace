@@ -98,7 +98,6 @@ impl TestManager {
     //
     pub async fn add_block(&mut self, block: Block) {
         let mut blockchain = self.blockchain_lock.write().await;
-        println!("adding block to blockchain in test manager");
         blockchain
             .add_block(
                 block,
@@ -107,7 +106,6 @@ impl TestManager {
                 self.sender_to_miner.clone(),
             )
             .await;
-        println!("and done...");
     }
 
     //
@@ -402,7 +400,6 @@ impl TestManager {
         }
 
         if include_valid_golden_ticket {
-println!("including valid golden ticket when building atop: {:?}", parent_hash);
             let blockchain = self.blockchain_lock.read().await;
             let block = blockchain.get_block(&parent_hash).await.unwrap();
             let golden_ticket: GoldenTicket = Self::create_golden_ticket(
@@ -417,11 +414,9 @@ println!("including valid golden ticket when building atop: {:?}", parent_hash);
                 gttx = wallet.create_golden_ticket_transaction(golden_ticket).await;
             }
             gttx.generate(publickey);
-println!("txs len: {}", transactions.len());
             transactions.push(gttx);
         }
 
-println!("txs len 2: {}", transactions.len());
 
         //
         // create block
