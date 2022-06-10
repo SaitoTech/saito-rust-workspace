@@ -15,130 +15,681 @@ mod tests {
     async fn initialize_blockchain_test() {
         let mut t = TestManager::new();
 
-        //
-        // create block #1, with 100 VIP txs each of which
-        // contains 1_000_000_000 NOLAN.
-        //
+        // create first block, with 100 VIP txs with 1_000_000_000 NOLAN each
         t.initialize(100, 1_000_000_000).await;
         t.wait_for_mining_event().await;
 
         let blockchain = t.blockchain_lock.read().await;
-
         assert_eq!(1, blockchain.get_latest_block_id());
+
+        t.check_blockchain().await;
+        t.check_utxoset().await;
+        t.check_token_supply().await;
     }
 
-    /*******
-        #[tokio::test]
-        #[serial_test::serial]
+    #[tokio::test]
+    #[serial_test::serial]
+    //
+    // test we can produce five blocks in a row
+    //
+    async fn add_five_good_blocks() {
+        let mut t = TestManager::new();
+        let mut block1;
+        let mut block1_id;
+        let mut block1_hash;
+        let mut ts;
+
         //
-        // test we can produce five blocks in a row
+        // block 1
         //
-        async fn add_five_good_blocks() {
-            TestManager::clear_data_folder().await;
-            let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
-            let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-            let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
-            let mut test_manager = TestManager::new(
-                blockchain_lock.clone(),
-                wallet_lock.clone(),
-                sender_miner.clone(),
-            );
+        t.initialize(100, 1_000_000_000).await;
 
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            block1 = blockchain.get_latest_block().unwrap();
+            block1_id = block1.get_id();
+            block1_hash = block1.get_hash();
+            ts = block1.get_timestamp();
 
-            // BLOCK 1
-            test_manager
-                .add_block(current_timestamp, 3, 0, false, vec![])
-                .await;
-
-            // BLOCK 2
-            test_manager
-                .add_block(current_timestamp + 120000, 0, 1, false, vec![])
-                .await;
-
-            // BLOCK 3
-            test_manager
-                .add_block(current_timestamp + 240000, 0, 1, false, vec![])
-                .await;
-
-            // BLOCK 4
-            test_manager
-                .add_block(current_timestamp + 360000, 0, 1, false, vec![])
-                .await;
-
-            // BLOCK 5
-            test_manager
-                .add_block(current_timestamp + 480000, 0, 1, false, vec![])
-                .await;
-
-            let blockchain = blockchain_lock.read().await;
-
-            assert_eq!(5, blockchain.get_latest_block_id());
-
-            test_manager.check_utxoset().await;
-            test_manager.check_token_supply().await;
-        }
-        #[tokio::test]
-        #[serial_test::serial]
-        //
-        // test we do not add blocks 6 and 7 because of insuffient mining
-        //
-        async fn add_seven_good_blocks_but_no_golden_tickets() {
-            TestManager::clear_data_folder().await;
-            let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
-            let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-            let (sender_miner, _receiver_miner) = tokio::sync::mpsc::channel(10);
-            let mut test_manager = TestManager::new(
-                blockchain_lock.clone(),
-                wallet_lock.clone(),
-                sender_miner.clone(),
-            );
-
-            let current_timestamp = create_timestamp();
-
-            // BLOCK 1
-            test_manager
-                .add_block(current_timestamp, 3, 0, false, vec![])
-                .await;
-
-            // BLOCK 2
-            test_manager
-                .add_block(current_timestamp + 120000, 0, 1, false, vec![])
-                .await;
-
-            // BLOCK 3
-            test_manager
-                .add_block(current_timestamp + 240000, 0, 1, false, vec![])
-                .await;
-
-            // BLOCK 4
-            test_manager
-                .add_block(current_timestamp + 360000, 0, 1, false, vec![])
-                .await;
-
-            // BLOCK 5
-            test_manager
-                .add_block(current_timestamp + 480000, 0, 1, false, vec![])
-                .await;
-
-            // BLOCK 6
-            test_manager
-                .add_block(current_timestamp + 600000, 0, 1, false, vec![])
-                .await;
-
-            // BLOCK 7
-            test_manager
-                .add_block(current_timestamp + 720000, 0, 1, false, vec![])
-                .await;
-
-            let blockchain = blockchain_lock.read().await;
-
-            assert_eq!(5, blockchain.get_latest_block_id());
-            assert_ne!(7, blockchain.get_latest_block_id());
-
-            test_manager.check_utxoset().await;
-            test_manager.check_token_supply().await;
+            assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block1_id);
+            assert_eq!(blockchain.get_latest_block_id(), 1);
         }
 
+        //
+        // block 2
+        //
+        let mut block2 = t
+            .create_block(
+                block1_hash, // hash of parent block
+                ts + 120000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+            )
+            .await;
+        block2.generate(); // generate hashes
+
+        let block2_hash = block2.get_hash();
+        let block2_id = block2.get_id();
+
+        t.add_block(block2).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block2_id);
+            assert_eq!(blockchain.get_latest_block_id(), 2);
+        }
+
+        //
+        // block 3
+        //
+        let mut block3 = t
+            .create_block(
+                block2_hash, // hash of parent block
+                ts + 240000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+            )
+            .await;
+        block3.generate(); // generate hashes
+
+        let block3_hash = block3.get_hash();
+        let block3_id = block3.get_id();
+
+        t.add_block(block3).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block3_id);
+            assert_eq!(blockchain.get_latest_block_id(), 3);
+        }
+
+        //
+        // block 4
+        //
+        let mut block4 = t
+            .create_block(
+                block3_hash, // hash of parent block
+                ts + 360000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+            )
+            .await;
+        block4.generate(); // generate hashes
+
+        let block4_hash = block4.get_hash();
+        let block4_id = block4.get_id();
+
+        t.add_block(block4).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block4_id);
+            assert_eq!(blockchain.get_latest_block_id(), 4);
+        }
+
+        //
+        // block 5
+        //
+        let mut block5 = t
+            .create_block(
+                block4_hash, // hash of parent block
+                ts + 480000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+            )
+            .await;
+        block5.generate(); // generate hashes
+
+        let block5_hash = block5.get_hash();
+        let block5_id = block5.get_id();
+
+        t.add_block(block5).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block4_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block5_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block5_id);
+            assert_eq!(blockchain.get_latest_block_id(), 5);
+        }
+
+        t.check_blockchain().await;
+        t.check_utxoset().await;
+        t.check_token_supply().await;
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    //
+    // test we do not add blocks because of insufficient mining
+    //
+    async fn insufficient_golden_tickets_test() {
+
+        let mut t = TestManager::new();
+        let mut block1;
+        let mut block1_id;
+        let mut block1_hash;
+        let mut ts;
+
+        //
+        // block 1
+        //
+        t.initialize(100, 1_000_000_000).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            block1 = blockchain.get_latest_block().unwrap();
+            block1_id = block1.get_id();
+            block1_hash = block1.get_hash();
+            ts = block1.get_timestamp();
+
+            assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block1_id);
+            assert_eq!(blockchain.get_latest_block_id(), 1);
+        }
+
+        //
+        // block 2
+        //
+        let mut block2 = t
+            .create_block(
+                block1_hash, // hash of parent block
+                ts + 120000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block2.generate(); // generate hashes
+
+        let block2_hash = block2.get_hash();
+        let block2_id = block2.get_id();
+
+        t.add_block(block2).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block2_id);
+            assert_eq!(blockchain.get_latest_block_id(), 2);
+        }
+
+        //
+        // block 3
+        //
+        let mut block3 = t
+            .create_block(
+                block2_hash, // hash of parent block
+                ts + 240000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block3.generate(); // generate hashes
+
+        let block3_hash = block3.get_hash();
+        let block3_id = block3.get_id();
+
+println!("HASH OF BLOCK THREE IS: {:?}", block3.get_hash());
+
+        t.add_block(block3).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block3_id);
+            assert_eq!(blockchain.get_latest_block_id(), 3);
+        }
+
+        //
+        // block 4
+        //
+        let mut block4 = t
+            .create_block(
+                block3_hash, // hash of parent block
+                ts + 360000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block4.generate(); // generate hashes
+
+        let block4_hash = block4.get_hash();
+        let block4_id = block4.get_id();
+
+println!("HASH OF BLOCK FOUR IS: {:?}", block4.get_hash());
+
+        t.add_block(block4).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block4_id);
+            assert_eq!(blockchain.get_latest_block_id(), 4);
+        }
+
+        //
+        // block 5
+        //
+        let mut block5 = t
+            .create_block(
+                block4_hash, // hash of parent block
+                ts + 480000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block5.generate(); // generate hashes
+
+        let block5_hash = block5.get_hash();
+        let block5_id = block5.get_id();
+
+println!("HASH OF BLOCK FIVE IS: {:?}", block5.get_hash());
+
+        t.add_block(block5).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block4_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block5_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block5_id);
+            assert_eq!(blockchain.get_latest_block_id(), 5);
+        }
+
+        //
+        // block 6
+        //
+        let mut block6 = t
+            .create_block(
+                block5_hash, // hash of parent block
+                ts + 480000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block6.generate(); // generate hashes
+
+println!("ID OF BLOCK SIX IS: {}", block6.get_id());
+println!("HASH OF BLOCK SIX IS: {:?}", block6.get_hash());
+
+        let block6_hash = block6.get_hash();
+        let block6_id = block6.get_id();
+
+        t.add_block(block6).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block4_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block5_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block5_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block6_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block6_id);
+            assert_eq!(blockchain.get_latest_block_id(), 5);
+        }
+
+
+        //
+        // block 7
+        //
+        let mut block7 = t
+            .create_block(
+                block6_hash, // hash of parent block
+                ts + 480000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block7.generate(); // generate hashes
+
+        let block7_hash = block7.get_hash();
+        let block7_id = block7.get_id();
+
+        t.add_block(block7).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block4_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block5_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block5_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block6_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block6_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block7_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block7_id);
+            assert_eq!(blockchain.get_latest_block_id(), 5);
+        }
+
+
+        t.check_blockchain().await;
+        t.check_utxoset().await;
+        t.check_token_supply().await;
+    }
+
+
+    #[tokio::test]
+    #[serial_test::serial]
+    //
+    // test we do not add blocks because of insufficient mining
+    //
+    async fn seven_blocks_with_sufficient_golden_tickets_test() {
+
+        let mut t = TestManager::new();
+        let mut block1;
+        let mut block1_id;
+        let mut block1_hash;
+        let mut ts;
+
+        //
+        // block 1
+        //
+        t.initialize(100, 1_000_000_000).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            block1 = blockchain.get_latest_block().unwrap();
+            block1_id = block1.get_id();
+            block1_hash = block1.get_hash();
+            ts = block1.get_timestamp();
+
+            assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block1_id);
+            assert_eq!(blockchain.get_latest_block_id(), 1);
+        }
+
+        //
+        // block 2
+        //
+        let mut block2 = t
+            .create_block(
+                block1_hash, // hash of parent block
+                ts + 120000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+            )
+            .await;
+        block2.generate(); // generate hashes
+
+        let block2_hash = block2.get_hash();
+        let block2_id = block2.get_id();
+
+        t.add_block(block2).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block2_id);
+            assert_eq!(blockchain.get_latest_block_id(), 2);
+        }
+
+        //
+        // block 3
+        //
+        let mut block3 = t
+            .create_block(
+                block2_hash, // hash of parent block
+                ts + 240000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block3.generate(); // generate hashes
+
+        let block3_hash = block3.get_hash();
+        let block3_id = block3.get_id();
+
+        t.add_block(block3).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block3_id);
+            assert_eq!(blockchain.get_latest_block_id(), 3);
+        }
+
+        //
+        // block 4
+        //
+        let mut block4 = t
+            .create_block(
+                block3_hash, // hash of parent block
+                ts + 360000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+            )
+            .await;
+        block4.generate(); // generate hashes
+
+        let block4_hash = block4.get_hash();
+        let block4_id = block4.get_id();
+
+        t.add_block(block4).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block4_id);
+            assert_eq!(blockchain.get_latest_block_id(), 4);
+        }
+
+        //
+        // block 5
+        //
+        let mut block5 = t
+            .create_block(
+                block4_hash, // hash of parent block
+                ts + 480000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block5.generate(); // generate hashes
+
+        let block5_hash = block5.get_hash();
+        let block5_id = block5.get_id();
+
+        t.add_block(block5).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block4_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block5_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block5_id);
+            assert_eq!(blockchain.get_latest_block_id(), 5);
+        }
+
+        //
+        // block 6
+        //
+        let mut block6 = t
+            .create_block(
+                block5_hash, // hash of parent block
+                ts + 600000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+            )
+            .await;
+        block6.generate(); // generate hashes
+
+        let block6_hash = block6.get_hash();
+        let block6_id = block6.get_id();
+
+        t.add_block(block6).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block4_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block5_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block5_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block6_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block6_id);
+            assert_eq!(blockchain.get_latest_block_id(), 6);
+        }
+
+
+        //
+        // block 7
+        //
+        let mut block7 = t
+            .create_block(
+                block6_hash, // hash of parent block
+                ts + 720000, // timestamp
+                1,           // num transactions
+                0,           // amount
+                0,           // fee
+                false,        // mine golden ticket
+            )
+            .await;
+        block7.generate(); // generate hashes
+
+        let block7_hash = block7.get_hash();
+        let block7_id = block7.get_id();
+
+        t.add_block(block7).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block1_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block2_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block3_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block4_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block5_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block5_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block6_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block6_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block7_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block7_id);
+            assert_eq!(blockchain.get_latest_block_id(), 7);
+        }
+
+
+        t.check_blockchain().await;
+        t.check_utxoset().await;
+        t.check_token_supply().await;
+    }
+
+
+
+
+
+
+
+
+
+/**************************
         #[tokio::test]
         #[serial_test::serial]
         //
@@ -564,5 +1115,5 @@ mod tests {
                 }
             }
         }
-    *****/
+**************/
 }
