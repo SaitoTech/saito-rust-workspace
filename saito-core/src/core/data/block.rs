@@ -324,10 +324,6 @@ impl Block {
         //
         // in-memory swap copying txs in block from mempool
         //
-        println!(
-            "creating block with transactions in length: {}",
-            transactions.len()
-        );
         mem::swap(&mut block.transactions, transactions);
 
         //
@@ -811,24 +807,15 @@ impl Block {
     // TODO REFACTOR - this logic should probably be in the merkle-root class
     //
     pub fn generate_merkle_root(&self) -> SaitoHash {
-        println!("generating the merkle root 1");
-        println!(
-            "generating the merkle root len: {}",
-            self.transactions.len()
-        );
-
         if self.transactions.is_empty() {
             return [0; 32];
         }
-
-        println!("generating the merkle root 2");
 
         let tx_sig_hashes: Vec<SaitoHash> = self
             .transactions
             .iter()
             .map(|tx| tx.get_hash_for_signature().unwrap())
             .collect();
-        println!("generating the merkle root 3");
 
         let mut mrv: Vec<MerkleTreeLayer> = vec![];
 
@@ -849,12 +836,10 @@ impl Block {
                 mrv.push(MerkleTreeLayer::new(tx_sig_hashes[i], [0; 32], leaf_depth));
             }
         }
-        println!("generating the merkle root 4");
 
         let mut start_point = 0;
         let mut stop_point = mrv.len();
         let mut keep_looping = true;
-        println!("generating the merkle root 5");
 
         while keep_looping {
             // processing new layer
@@ -892,9 +877,6 @@ impl Block {
         // hash the final leaf
         //
         mrv[start_point].hash();
-
-        println!("generating the merkle root 5");
-
         mrv[start_point].get_hash()
     }
 
@@ -1464,7 +1446,6 @@ impl Block {
     }
 
     pub fn set_merkle_root(&mut self, merkle_root: SaitoHash) {
-        println!("setting merkle root to: {:?}", merkle_root);
         self.merkle_root = merkle_root;
     }
 
@@ -1665,18 +1646,13 @@ impl Block {
     }
 
     pub async fn validate(&self, blockchain: &Blockchain, utxoset: &UtxoSet) -> bool {
-        println!("validating block!");
-
         //
         // no transactions? no thank you
         //
         if self.transactions.is_empty() {
-            println!("validating block! pre 1");
             error!("ERROR 424342: block does not validate as it has no transactions",);
             return false;
         }
-
-        println!("validating block 1!");
 
         //
         // trace!(
@@ -1693,12 +1669,9 @@ impl Block {
             self.get_signature(),
             self.get_creator(),
         ) {
-            println!("error is here!");
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
-
-        println!("block validates ZZZ 1!");
 
         //
         // Consensus Values
@@ -1715,7 +1688,6 @@ impl Block {
         //
         let cv = self.generate_consensus_values(&blockchain).await;
 
-        println!("block validates ZZZ 2!");
         //
         // only block #1 can have an issuance transaction
         //
@@ -1723,7 +1695,6 @@ impl Block {
             error!("ERROR: blockchain contains issuance after block 1 in chain",);
             return false;
         }
-        println!("block validates ZZZ 3!");
 
         //
         // Previous Block
@@ -1854,8 +1825,6 @@ impl Block {
             // trace!(" ... golden ticket: (validated)  {:?}", create_timestamp());
         }
 
-        println!("block validates ZZZ 4");
-
         // trace!(" ... block.validate: (merkle rt) {:?}", create_timestamp());
 
         //
@@ -1875,17 +1844,14 @@ impl Block {
             error!("ERROR 624442: rebroadcast slips total incorrect");
             return false;
         }
-        println!("block validates ZZZ 5");
         if cv.total_rebroadcast_nolan != self.total_rebroadcast_nolan {
             error!("ERROR 294018: rebroadcast nolan amount incorrect");
             return false;
         }
-        println!("block validates ZZZ 6");
         if cv.rebroadcast_hash != self.rebroadcast_hash {
             error!("ERROR 123422: hash of rebroadcast transactions incorrect");
             return false;
         }
-        println!("block validates ZZZ 7");
 
         //
         // validate merkle root
@@ -1893,12 +1859,9 @@ impl Block {
         if self.get_merkle_root() == [0; 32]
             && self.get_merkle_root() != self.generate_merkle_root()
         {
-            println!("merkle root is invalid");
             error!("merkle root is unset or is invalid false 1");
             return false;
         }
-
-        println!("block validates 2!");
 
         // trace!(" ... block.validate: (cv-data)   {:?}", create_timestamp());
 
@@ -1961,8 +1924,6 @@ impl Block {
             return false;
         }
 
-        println!("block validates 3!");
-
         // trace!(" ... block.validate: (txs valid) {:?}", create_timestamp());
 
         //
@@ -1999,11 +1960,7 @@ impl Block {
         }
         //true
 
-        println!("block validates 4!");
-
         let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
-
-        println!("block validates 5! {}", transactions_valid);
 
         transactions_valid
     }

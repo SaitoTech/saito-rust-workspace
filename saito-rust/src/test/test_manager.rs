@@ -115,7 +115,6 @@ impl TestManager {
         let blockchain = self.blockchain_lock.read().await;
 
         for i in 1..blockchain.blocks.len() {
-
             let block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(i as u64);
@@ -127,12 +126,9 @@ impl TestManager {
             let block = blockchain.get_block_sync(&block_hash);
             let previous_block = blockchain.get_block_sync(&previous_block_hash);
 
-	    if block_hash == [0; 32] {
-
+            if block_hash == [0; 32] {
                 assert_eq!(block.is_none(), true);
-
-	    } else {
-
+            } else {
                 assert_eq!(block.is_none(), false);
                 if i != 1 && previous_block_hash != [0; 32] {
                     assert_eq!(previous_block.is_none(), false);
@@ -140,8 +136,7 @@ impl TestManager {
                         block.unwrap().get_previous_block_hash(),
                         previous_block.unwrap().get_hash()
                     );
-	        }
-
+                }
             }
         }
     }
@@ -151,7 +146,6 @@ impl TestManager {
     // chain and vice-versa.
     //
     pub async fn check_utxoset(&self) {
-
         let blockchain = self.blockchain_lock.read().await;
         let mut utxoset: UtxoSet = AHashMap::new();
         let latest_block_id = blockchain.get_latest_block_id();
@@ -416,7 +410,6 @@ impl TestManager {
             gttx.generate(publickey);
             transactions.push(gttx);
         }
-
 
         //
         // create block

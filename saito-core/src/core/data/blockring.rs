@@ -110,19 +110,14 @@ impl BlockRing {
     }
 
     pub fn on_chain_reorganization(&mut self, block_id: u64, hash: SaitoHash, lc: bool) -> bool {
-        println!("OCR in blockRinG");
-
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         if !self.ring[(insert_pos as usize)].on_chain_reorganization(hash, lc) {
-            println!("failure to run OCR on ringitem");
             return false;
         }
         if lc {
-            println!("second option");
             self.lc_pos = Some(insert_pos as usize);
         } else {
             //
-            println!("third option");
             // if we are unsetting the longest-chain, we automatically
             // roll backwards and set the longest-chain to the previous
             // position if available. this adds some complexity to unwinding
