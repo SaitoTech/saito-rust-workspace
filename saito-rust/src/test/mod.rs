@@ -1,4 +1,4 @@
-//mod block_tests;
+mod block_tests;
 mod blockchain_tests;
 //mod blockring_tests;
 //mod mempool_tests;
