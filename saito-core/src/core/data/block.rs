@@ -1589,7 +1589,7 @@ impl Block {
         }
 
         if block_type == BlockType::Pruned {
-            return self.upgrade_block_to_block_type(block_type, storage).await;
+            return self.downgrade_block_to_block_type(block_type).await;
         }
 
         return false;
