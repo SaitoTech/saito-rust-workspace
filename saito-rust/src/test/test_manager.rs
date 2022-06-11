@@ -86,6 +86,18 @@ impl TestManager {
         }
     }
 
+    pub fn get_mempool_lock(&self) -> Arc<RwLock<Mempool>> {
+      return self.mempool_lock.clone();
+    }
+
+    pub fn get_wallet_lock(&self) -> Arc<RwLock<Wallet>> {
+      return self.wallet_lock.clone();
+    }
+
+    pub fn get_blockchain_lock(&self) -> Arc<RwLock<Blockchain>> {
+      return self.blockchain_lock.clone();
+    }
+
     pub async fn wait_for_mining_event(&mut self) {
         self.receiver_in_miner
             .recv()

@@ -1,6 +1,6 @@
 mod block_tests;
 mod blockchain_tests;
-//mod blockring_tests;
+mod blockring_tests;
 //mod mempool_tests;
 //mod storage_tests;
 mod test_io_handler;
