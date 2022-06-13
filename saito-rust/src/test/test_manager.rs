@@ -502,7 +502,7 @@ impl TestManager {
         //
         // generate UTXO-carrying VIP transactions
         //
-        if 0 < vip_transactions {
+	for i in 0..vip_transactions {
             let mut tx = Transaction::create_vip_transaction(publickey, vip_amount);
             tx.generate(publickey);
             tx.sign(privatekey);
