@@ -23,7 +23,7 @@ mod tests {
 
 	{
 	    let mut t = TestManager::new();
-            t.initialize(100, 820_000).await;
+            t.initialize(100, 720_000).await;
             t.wait_for_mining_event().await;
 
 	    wallet_lock = t.get_wallet_lock();
@@ -52,7 +52,7 @@ mod tests {
 
 	    {
 		let mut wallet = wallet_lock.write().await;
-	        let (inputs, outputs) = wallet.generate_slips(820_000);
+	        let (inputs, outputs) = wallet.generate_slips(720_000);
 	        tx.inputs = inputs;
 	        tx.outputs = outputs;
 		// _i prevents sig from being identical during test
@@ -69,7 +69,7 @@ mod tests {
 	}
 
 	assert_eq!(mempool.transactions.len(), 5);
-	assert_eq!(mempool.get_routing_work_available(), 4_100_000);
+	assert_eq!(mempool.get_routing_work_available(), 3_600_000);
 
 	assert_eq!(mempool.can_bundle_block(blockchain_lock.clone(), ts).await, false);
 	assert_eq!(mempool.can_bundle_block(blockchain_lock.clone(), ts + 120000).await, true);
