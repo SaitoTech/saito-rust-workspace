@@ -9,24 +9,22 @@ use rayon::prelude::*;
 // rayon parallelization.
 //
 #[derive(PartialEq, Debug, Clone)]
-pub struct MerkleTreeLayer {
+pub struct MerkleTreeNode {
     left: SaitoHash,
     right: SaitoHash,
     hash: SaitoHash,
-    level: u8,
 }
 
-impl MerkleTreeLayer {
-    pub fn new(left: SaitoHash, right: SaitoHash, level: u8) -> MerkleTreeLayer {
-        MerkleTreeLayer {
+impl MerkleTreeNode {
+    pub fn new(left: SaitoHash, right: SaitoHash) -> MerkleTreeNode {
+        MerkleTreeNode {
             left,
             right,
-            level,
             hash: [0; 32],
         }
     }
 
-    pub fn hash(&mut self) -> bool {
+    pub fn generate_hash(&mut self) -> bool {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&self.left);
         vbytes.extend(&self.right);
@@ -47,72 +45,40 @@ impl MerkleTree {
             return [0; 32];
         }
 
-        let tx_sig_hashes: Vec<SaitoHash> = transactions
+        // Logic: a single node will be created per two leaves, each node will generate
+        // a hash by combining the hashes of the two leaves, in the next loop
+        // those node hashes will used as the leaves for the next set of nodes,
+        // i.e. leaf count is reduced by half on each loop, eventually ending up in 1
+
+        let mut leaves: Vec<SaitoHash> = transactions
             .iter()
             .map(|tx| tx.get_hash_for_signature().unwrap())
             .collect();
 
-        let mut mrv: Vec<MerkleTreeLayer> = vec![];
+        let mut nodes: Vec<MerkleTreeNode> = vec![];
 
-        //
-        // or let's try another approach
-        //
-        let tsh_len = tx_sig_hashes.len();
-        let mut leaf_depth = 0;
-
-        for i in 0..tsh_len {
-            if (i + 1) < tsh_len {
-                mrv.push(MerkleTreeLayer::new(
-                    tx_sig_hashes[i],
-                    tx_sig_hashes[i + 1],
-                    leaf_depth,
+        while leaves.len() > 1 {
+            // Create a node per two leaves
+            nodes.clear();
+            for i in (0..leaves.len()).step_by(2) {
+                nodes.push(MerkleTreeNode::new(
+                    leaves[i],
+                    if (i + 1) < leaves.len() {
+                        leaves[i + 1]
+                    } else {
+                        [0; 32]
+                    },
                 ));
-            } else {
-                mrv.push(MerkleTreeLayer::new(tx_sig_hashes[i], [0; 32], leaf_depth));
             }
+
+            // Compute the node hashes in parallel
+            nodes.par_iter_mut().all(|node| node.generate_hash());
+            // Collect the next set of leaves for the computation
+            leaves.clear();
+            nodes.iter().for_each(|leaf| leaves.push(leaf.get_hash()));
         }
 
-        let mut start_point = 0;
-        let mut stop_point = mrv.len();
-        let mut keep_looping = true;
-
-        while keep_looping {
-            // processing new layer
-            leaf_depth += 1;
-
-            // hash the parent in parallel
-            mrv[start_point..stop_point]
-                .par_iter_mut()
-                .all(|leaf| leaf.hash());
-
-            let start_point_old = start_point;
-            start_point = mrv.len();
-
-            for i in (start_point_old..stop_point).step_by(2) {
-                if (i + 1) < stop_point {
-                    mrv.push(MerkleTreeLayer::new(
-                        mrv[i].get_hash(),
-                        mrv[i + 1].get_hash(),
-                        leaf_depth,
-                    ));
-                } else {
-                    mrv.push(MerkleTreeLayer::new(mrv[i].get_hash(), [0; 32], leaf_depth));
-                }
-            }
-
-            stop_point = mrv.len();
-            if stop_point > 0 {
-                keep_looping = start_point < stop_point - 1;
-            } else {
-                keep_looping = false;
-            }
-        }
-
-        //
-        // hash the final leaf
-        //
-        mrv[start_point].hash();
-        return mrv[start_point].get_hash();
+        return leaves[0];
     }
 }
 
