@@ -18,14 +18,16 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait PeerConnection {
-    async fn send_message(&self, buffer: Vec<u8>) -> Result<(), Error>;
+    async fn send_message(&self, buffer: Vec<u8>);
 }
 
 #[derive(Debug, Clone)]
 pub struct Peer {
+    wallet: Arc<RwLock<Wallet>>,
+    configs: Arc<RwLock<Configuration>>,
     pub peer_index: u64,
     pub peer_public_key: SaitoPublicKey,
-    pub block_fetch_url: String,
+    pub peer_block_fetch_url: String,
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
     pub static_peer_config: Option<data::configuration::PeerConfig>,
     pub challenge_for_peer: Option<SaitoHash>,
@@ -33,11 +35,17 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub fn new(peer_index: u64) -> Peer {
+    pub fn new(
+        wallet: Arc<RwLock<Wallet>>,
+        configs: Arc<RwLock<Configuration>>,
+        peer_index: u64,
+    ) -> Peer {
         Peer {
+            wallet,
+            configs,
             peer_index,
             peer_public_key: [0; 33],
-            block_fetch_url: "".to_string(),
+            peer_block_fetch_url: "".to_string(),
             static_peer_config: None,
             challenge_for_peer: None,
             handshake_done: false,
@@ -46,24 +54,22 @@ impl Peer {
     pub async fn initiate_handshake(
         &mut self,
         connection: &Box<dyn PeerConnection + Send + Sync>,
-        wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.peer_index);
-        let wallet = wallet.read().await;
+        let wallet = self.wallet.read().await;
         let block_fetch_url;
         {
-            let configs = configs.read().await;
+            let configs = self.configs.read().await;
             block_fetch_url = configs.get_block_fetch_url();
         }
         let challenge = HandshakeChallenge {
-            public_key: wallet.public_key,
+            public_key: self.wallet.public_key,
             challenge: generate_random_bytes(32).try_into().unwrap(),
             block_fetch_url,
         };
         self.challenge_for_peer = Some(challenge.challenge);
         let message = Message::HandshakeChallenge(challenge);
-        connection.send_message(message.serialize()).await.unwrap();
+        connection.send_message(message.serialize()).await;
         debug!("handshake challenge sent for peer: {:?}", self.peer_index);
 
         Ok(())
@@ -72,8 +78,6 @@ impl Peer {
         &mut self,
         challenge: HandshakeChallenge,
         connection: &Box<dyn PeerConnection + Send + Sync>,
-        wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
         debug!(
             "handling handshake challenge : {:?} with address : {:?}",
@@ -82,13 +86,13 @@ impl Peer {
         );
         let block_fetch_url;
         {
-            let configs = configs.read().await;
+            let configs = self.configs.read().await;
             block_fetch_url = configs.get_block_fetch_url();
         }
 
         self.peer_public_key = challenge.public_key;
-        self.block_fetch_url = challenge.block_fetch_url;
-        let wallet = wallet.read().await;
+        self.peer_block_fetch_url = challenge.block_fetch_url;
+        let wallet = self.wallet.read().await;
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(&challenge.challenge.to_vec(), wallet.private_key),
@@ -99,8 +103,7 @@ impl Peer {
         self.challenge_for_peer = Some(response.challenge);
         connection
             .send_message(Message::HandshakeResponse(response).serialize())
-            .await
-            .unwrap();
+            .await;
         debug!("handshake response sent for peer: {:?}", self.peer_index);
 
         Ok(())
@@ -109,7 +112,6 @@ impl Peer {
         &mut self,
         response: HandshakeResponse,
         connection: &Box<dyn PeerConnection + Send + Sync>,
-        wallet: Arc<RwLock<Wallet>>,
     ) -> Result<(), Error> {
         debug!(
             "handling handshake response :{:?} with address : {:?}",
@@ -132,7 +134,7 @@ impl Peer {
         }
         self.challenge_for_peer = None;
         self.peer_public_key = response.public_key;
-        self.block_fetch_url = response.block_fetch_url;
+        self.peer_block_fetch_url = response.block_fetch_url;
         self.handshake_done = true;
         let wallet = wallet.read().await;
         let response = HandshakeCompletion {
@@ -140,8 +142,8 @@ impl Peer {
         };
         connection
             .send_message(Message::HandshakeCompletion(response).serialize())
-            .await
-            .unwrap();
+            .await;
+
         debug!("handshake completion sent for peer: {:?}", self.peer_index);
         Ok(())
     }
@@ -183,23 +185,6 @@ impl Peer {
     /// ```
     pub fn get_block_fetch_url(&self, block_hash: SaitoHash) -> String {
         // TODO : generate the url with proper / escapes,etc...
-        self.block_fetch_url.to_string() + hex::encode(block_hash).as_str()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::core::data::peer::Peer;
-
-    #[test]
-    fn peer_new_test() {
-        let peer = Peer::new(1);
-
-        assert_eq!(peer.peer_index, 1);
-        assert_eq!(peer.peer_public_key, [0; 33]);
-        assert_eq!(peer.block_fetch_url, "".to_string());
-        assert_eq!(peer.static_peer_config, None);
-        assert_eq!(peer.challenge_for_peer, None);
-        assert_eq!(peer.handshake_done, false);
+        self.peer_block_fetch_url.to_string() + hex::encode(block_hash).as_str()
     }
 }
