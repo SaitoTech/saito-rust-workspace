@@ -11,11 +11,11 @@ mod tests {
 
 
     #[ignore]
-    #[test]
-    fn read_issuance_file_test() {
+    #[tokio::test]
+    async fn read_issuance_file_test() {
 
         let mut t = TestManager::new();
-	t.initialize(100, 100_000_000);
+	t.initialize(100, 100_000_000).await;
 
         let slips = t.storage.return_token_supply_slips_from_disk();
         let mut total_issuance = 0;
