@@ -3,25 +3,28 @@
   "version": "0.0.1",
   "description": "js wrappings around saito-core using wasm",
   "scripts": {
-    "test": "node_modules/.bin/jest",
-    "start": "node_modules/.bin/ts-node-dev index.ts",
+    "test": "./node_modules/.bin/jest",
+    "start": "ts-node-dev index.ts",
     "build": "webpack",
     "serve": "webpack-dev-server"
   },
+  "main": "dist/index.node.js",
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@babel/preset-env": "^7.16.11",
-    "@babel/preset-typescript": "^7.16.7",
-    "@types/jest": "^27.4.1",
+    "@babel/preset-env": "^7.18.2",
+    "@babel/preset-typescript": "^7.17.12",
+    "@types/jest": "^28.1.1",
     "@wasm-tool/wasm-pack-plugin": "1.6.0",
     "html-webpack-plugin": "^5.5.0",
-    "jest": "^27.5.1",
+    "jest": "^28.1.1",
     "text-encoding": "^0.7.0",
-    "ts-loader": "^9.2.8",
+    "ts-loader": "^9.3.0",
     "ts-node-dev": "^1.1.8",
-    "typescript": "^4.6.2",
-    "webpack": "^5.70.0",
-    "webpack-cli": "^4.9.2"
+    "typescript": "^4.7.3",
+    "webpack": "^5.73.0",
+    "webpack-cli": "^4.10.0",
+    "webpack-merge": "^5.8.0",
+    "webpack-dev-server": "^4.9.2"
   }
 }
