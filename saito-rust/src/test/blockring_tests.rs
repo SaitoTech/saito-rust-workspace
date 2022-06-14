@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
     use log::info;
+    use std::sync::Arc;
     use tokio::sync::RwLock;
 
     use saito_core::core::data::block::Block;
@@ -17,26 +17,25 @@ mod test {
     // does reorg update blockring view of longest-chain
     //
     async fn blockring_manual_reorganization_test() {
+        let mut block1 = Block::new();
+        let mut block2 = Block::new();
+        let mut block3 = Block::new();
+        let mut block4 = Block::new();
+        let mut block5 = Block::new();
 
-	let mut block1 = Block::new();
-	let mut block2 = Block::new();
-	let mut block3 = Block::new();
-	let mut block4 = Block::new();
-	let mut block5 = Block::new();
+        block1.set_id(1);
+        block2.set_id(2);
+        block3.set_id(3);
+        block4.set_id(4);
+        block5.set_id(5);
 
-	block1.set_id(1);
-	block2.set_id(2);
-	block3.set_id(3);
-	block4.set_id(4);
-	block5.set_id(5);
+        block1.generate();
+        block2.generate();
+        block3.generate();
+        block4.generate();
+        block5.generate();
 
-	block1.generate();
-	block2.generate();
-	block3.generate();
-	block4.generate();
-	block5.generate();
-
-	let mut blockring = BlockRing::new();
+        let mut blockring = BlockRing::new();
 
         blockring.add_block(&block1);
         blockring.add_block(&block2);
@@ -97,5 +96,4 @@ mod test {
         blockring.on_chain_reorganization(2, block2.get_hash(), true);
         assert_eq!(blockring.get_latest_block_id(), 2);
     }
-
 }

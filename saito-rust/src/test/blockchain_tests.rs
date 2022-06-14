@@ -882,13 +882,12 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
-
         let mut t = TestManager::new();
         let mut t2 = TestManager::new();
-	let mut block1;
-	let mut block1_id;
-	let mut block1_hash;
-	let mut ts;
+        let mut block1;
+        let mut block1_id;
+        let mut block1_hash;
+        let mut ts;
 
         //
         // block 1

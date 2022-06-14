@@ -11,10 +11,9 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn save_and_restore_wallet_test() {
-
         info!("current dir = {:?}", std::env::current_dir().unwrap());
 
-	let mut t = TestManager::new();
+        let mut t = TestManager::new();
 
         let mut wallet = Wallet::new();
         let publickey1 = wallet.get_publickey().clone();

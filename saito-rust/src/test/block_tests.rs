@@ -17,8 +17,7 @@ mod tests {
     #[serial_test::serial]
     // downgrade and upgrade a block with transactions
     async fn block_downgrade_upgrade_test() {
-
-	let mut t = TestManager::new();
+        let mut t = TestManager::new();
         let mut wallet_lock = t.wallet_lock.clone();
         let mut block = Block::new();
         let mut transactions = join_all((0..5).into_iter().map(|_| async {
@@ -27,25 +26,29 @@ mod tests {
             transaction.sign(wallet.get_privatekey());
             transaction
         }))
-	.await
+        .await
         .to_vec();
 
-	block.transactions = transactions;
-	block.generate();
+        block.transactions = transactions;
+        block.generate();
 
-	// save to disk
+        // save to disk
         t.storage.write_block_to_disk(&mut block).await;
 
         assert_eq!(block.transactions.len(), 5);
         assert_eq!(block.get_block_type(), BlockType::Full);
 
         let serialized_full_block = block.serialize_for_net(BlockType::Full);
-        block.update_block_to_block_type(BlockType::Pruned, &mut t.storage).await;
+        block
+            .update_block_to_block_type(BlockType::Pruned, &mut t.storage)
+            .await;
 
         assert_eq!(block.transactions.len(), 0);
         assert_eq!(block.get_block_type(), BlockType::Pruned);
 
-        block.update_block_to_block_type(BlockType::Full, &mut t.storage).await;
+        block
+            .update_block_to_block_type(BlockType::Full, &mut t.storage)
+            .await;
 
         assert_eq!(block.transactions.len(), 5);
         assert_eq!(block.get_block_type(), BlockType::Full);
