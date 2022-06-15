@@ -1,0 +1,37 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+start
+: Generate **hash** of the **new block** and check for **duplicates** in the **blockchain**;
+if (Blockchain does not contain a duplicate hash) then (true)
+  :Add the new block to the BlockRing;
+  :Add the new block to the Blocks hashmap;
+  if (isForward?) then (no)
+    :Process controls;
+    if (continue processing?) then (no)
+      stop
+    endif
+
+    if (isPost?) then (yes)
+      :Page.onPost();
+    else (no)
+      :Page.onGet();
+    endif
+    :Page.onRender();
+  endif
+else (false)
+endif
+
+if (do redirect?) then (yes)
+  :redirect process;
+else
+  if (do forward?) then (yes)
+    :Forward request;
+  else (no)
+    :Render page template;
+  endif
+endif
+
+stop
+
+@enduml
