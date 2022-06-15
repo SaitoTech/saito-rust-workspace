@@ -815,7 +815,10 @@ impl Block {
             self.transactions.len()
         );
 
-        MerkleTree::generate_root(&self.transactions)
+        match MerkleTree::generate(&self.transactions) {
+            None => [0u8; 32],
+            Some(tree) => tree.get_root_hash(),
+        }
     }
 
     //
