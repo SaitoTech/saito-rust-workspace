@@ -6,13 +6,17 @@ const {merge} = require("webpack-merge");
 
 let common = {
     entry: "./index.ts",
-    devtool: "inline-source-map",
+    devtool: "eval",
+    output: {
+        path: path.resolve(__dirname, "dist"),
+        filename: "index.js",
+    },
     plugins: [
         new HtmlWebpackPlugin(),
-        new WasmPackPlugin({
-            crateDirectory: __dirname,
-            extraArgs: '--target bundler',
-        }),
+        // new WasmPackPlugin({
+        //     crateDirectory: __dirname,
+        //     extraArgs: '--target bundler',
+        // }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
             TextEncoder: ['text-encoding', 'TextEncoder']
@@ -23,15 +27,37 @@ let common = {
             test: /\.tsx?$/,
             loader: "ts-loader",
             exclude: /(node_modules)/
-        }]
+        },
+            {
+                test: /\.js$/,
+                use: [
+                    "source-map-loader",
+                    {
+                        loader: "babel-loader",
+                        options: {
+                            presets: ["@babel/preset-env"],
+                            sourceMaps: true
+                        }
+                    }
+                ],
+                exclude: /(node_modules)/
+            },
+            {
+                test: /\.wasm$/,
+                type: "javascript/auto",
+                loader: "file-loader",
+                options: {
+                    publicPath: "dist/"
+                }
+            },]
     },
-    resolve: {
-        extensions: ['.ts', '.js', '.wasm']
-    },
+    // resolve: {
+    //     extensions: ['.ts', '.tsx', '.js', '.wasm', '...']
+    // },
     experiments: {
         asyncWebAssembly: true,
-        topLevelAwait: true,
-        // syncWebAssembly: true
+        // topLevelAwait: true,
+        syncWebAssembly: true
     },
     mode: "development"
 };
@@ -48,7 +74,7 @@ let webConfigs = merge(common, {
         path: path.resolve(__dirname, "dist"),
         filename: "index.web.js",
     },
-    target: "web"
+    target: "web",
 });
 
-module.exports = [nodeConfigs];
+module.exports = [common];

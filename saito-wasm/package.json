@@ -8,7 +8,6 @@
     "build": "webpack",
     "serve": "webpack-dev-server"
   },
-  "main": "dist/index.node.js",
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -18,6 +17,9 @@
     "@wasm-tool/wasm-pack-plugin": "1.6.0",
     "html-webpack-plugin": "^5.5.0",
     "jest": "^28.1.1",
+    "babel-loader": "^8.2.5",
+    "file-loader": "^6.2.0",
+    "source-map-loader": "^4.0.0",
     "text-encoding": "^0.7.0",
     "ts-loader": "^9.3.0",
     "ts-node-dev": "^1.1.8",
