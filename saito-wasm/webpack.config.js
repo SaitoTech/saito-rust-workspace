@@ -13,21 +13,17 @@ let common = {
     },
     plugins: [
         new HtmlWebpackPlugin(),
-        // new WasmPackPlugin({
-        //     crateDirectory: __dirname,
-        //     extraArgs: '--target bundler',
-        // }),
+        new WasmPackPlugin({
+            crateDirectory: __dirname,
+            extraArgs: '--target web',
+        }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
             TextEncoder: ['text-encoding', 'TextEncoder']
         })
     ],
     module: {
-        rules: [{
-            test: /\.tsx?$/,
-            loader: "ts-loader",
-            exclude: /(node_modules)/
-        },
+        rules: [
             {
                 test: /\.js$/,
                 use: [
@@ -43,13 +39,19 @@ let common = {
                 exclude: /(node_modules)/
             },
             {
+                test: /\.tsx?$/,
+                loader: "ts-loader",
+                exclude: /(node_modules)/
+            },
+            {
                 test: /\.wasm$/,
                 type: "javascript/auto",
                 loader: "file-loader",
                 options: {
                     publicPath: "dist/"
                 }
-            },]
+            },
+        ]
     },
     // resolve: {
     //     extensions: ['.ts', '.tsx', '.js', '.wasm', '...']
@@ -65,16 +67,16 @@ let common = {
 let nodeConfigs = merge(common, {
     output: {
         path: path.resolve(__dirname, "dist"),
-        filename: "index.node.js",
+        filename: "server.js",
     },
     target: "node"
 });
 let webConfigs = merge(common, {
     output: {
         path: path.resolve(__dirname, "dist"),
-        filename: "index.web.js",
+        filename: "browser.js",
     },
     target: "web",
 });
 
-module.exports = [common];
+module.exports = [nodeConfigs, webConfigs];
