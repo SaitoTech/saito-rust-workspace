@@ -5,23 +5,25 @@ const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 const {merge} = require("webpack-merge");
 
 let common = {
-    entry: "./index.ts",
     devtool: "eval",
+    // entry: [
+    //     path.resolve(__dirname, "./index.js"),
+    // ],
     output: {
         path: path.resolve(__dirname, "dist"),
         filename: "index.js",
     },
-    plugins: [
-        new HtmlWebpackPlugin(),
-        new WasmPackPlugin({
-            crateDirectory: __dirname,
-            extraArgs: '--target web',
-        }),
-        new webpack.ProvidePlugin({
-            TextDecoder: ['text-encoding', 'TextDecoder'],
-            TextEncoder: ['text-encoding', 'TextEncoder']
-        })
-    ],
+    // plugins: [
+    //     new HtmlWebpackPlugin(),
+    //     new WasmPackPlugin({
+    //         crateDirectory: __dirname,
+    //         extraArgs: '--target web',
+    //     }),
+    //     new webpack.ProvidePlugin({
+    //         TextDecoder: ['text-encoding', 'TextDecoder'],
+    //         TextEncoder: ['text-encoding', 'TextEncoder']
+    //     })
+    // ],
     module: {
         rules: [
             {
@@ -39,42 +41,93 @@ let common = {
                 exclude: /(node_modules)/
             },
             {
+                test: /\.mjs$/,
+                include: /node_modules/,
+                type: "javascript/auto"
+            },
+            {
                 test: /\.tsx?$/,
                 loader: "ts-loader",
                 exclude: /(node_modules)/
             },
+            // {
+            //     test: /\.wasm$/,
+            //     type: "javascript/auto",
+            //     loader: "file-loader",
+            //     options: {
+            //         publicPath: "dist/"
+            //     }
+            // },
             {
                 test: /\.wasm$/,
-                type: "javascript/auto",
-                loader: "file-loader",
-                options: {
-                    publicPath: "dist/"
-                }
+                type: "asset/inline",
             },
-        ]
+        ],
+        parser: {
+            javascript: {
+                dynamicImportMode: 'eager'
+            }
+        }
     },
-    // resolve: {
-    //     extensions: ['.ts', '.tsx', '.js', '.wasm', '...']
-    // },
+    resolve: {
+        extensions: ['.ts', '.tsx', '.js', '.wasm', '...'],
+        fallback: {
+            "buffer": require.resolve("buffer")
+        }
+    },
     experiments: {
         asyncWebAssembly: true,
         // topLevelAwait: true,
-        syncWebAssembly: true
+        syncWebAssembly: true,
+        // lazyCompilation: false,
+        // outputModule: false,
     },
-    mode: "development"
+    mode: "production",
 };
 
 let nodeConfigs = merge(common, {
+    entry: [
+        'babel-regenerator-runtime',
+        path.resolve(__dirname, "./index.node.js"),
+    ],
+    plugins: [
+        new HtmlWebpackPlugin(),
+        new WasmPackPlugin({
+            crateDirectory: __dirname,
+            outDir: "./pkg/node",
+            extraArgs: '--target nodejs',
+        }),
+        new webpack.ProvidePlugin({
+            TextDecoder: ['text-encoding', 'TextDecoder'],
+            TextEncoder: ['text-encoding', 'TextEncoder']
+        })
+    ],
     output: {
-        path: path.resolve(__dirname, "dist"),
-        filename: "server.js",
+        path: path.resolve(__dirname, "dist/server"),
+        filename: "index.js",
     },
     target: "node"
 });
 let webConfigs = merge(common, {
+    entry: [
+        'babel-regenerator-runtime',
+        path.resolve(__dirname, "./index.web.js"),
+    ],
+    plugins: [
+        new HtmlWebpackPlugin(),
+        new WasmPackPlugin({
+            crateDirectory: __dirname,
+            outDir: "./pkg/web",
+            extraArgs: '--target web',
+        }),
+        new webpack.ProvidePlugin({
+            TextDecoder: ['text-encoding', 'TextDecoder'],
+            TextEncoder: ['text-encoding', 'TextEncoder']
+        })
+    ],
     output: {
-        path: path.resolve(__dirname, "dist"),
-        filename: "browser.js",
+        path: path.resolve(__dirname, "dist/browser"),
+        filename: "index.js",
     },
     target: "web",
 });

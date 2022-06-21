@@ -11,7 +11,7 @@
     // "disableReferencedProjectLoad": true,             /* Reduce the number of projects loaded automatically by TypeScript. */
 
     /* Language and Environment */
-    "target": "esnext",
+    "target": "es6",
     /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
     // "lib": [],                                        /* Specify a set of bundled library declaration files that describe the target runtime environment. */
     // "jsx": "preserve",                                /* Specify what JSX code is generated. */
@@ -25,7 +25,7 @@
     // "useDefineForClassFields": true,                  /* Emit ECMAScript-standard-compliant class fields. */
 
     /* Modules */
-    "module": "esnext",
+    "module": "commonjs",
     /* Specify what module code is generated. */
     // "rootDir": "./",                                  /* Specify the root folder within your source files. */
     "moduleResolution": "node",
