@@ -1,6 +1,7 @@
 use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
 use crate::core::data::transaction::Transaction;
+use blake3::IncrementCounter::No;
 use rayon::prelude::*;
 use std::collections::LinkedList;
 
@@ -15,64 +16,25 @@ pub struct MerkleTreeNode {
     left: Option<Box<MerkleTreeNode>>,
     right: Option<Box<MerkleTreeNode>>,
     hash: Option<SaitoHash>,
-    prune: bool,
+    transaction: bool,
     count: usize,
 }
 
 impl MerkleTreeNode {
-    pub fn new(
+    fn new(
         left: Option<Box<MerkleTreeNode>>,
         right: Option<Box<MerkleTreeNode>>,
         hash: Option<SaitoHash>,
-        prune: bool,
+        transaction: bool,
+        count: usize,
     ) -> MerkleTreeNode {
         MerkleTreeNode {
             left,
             right,
             hash,
-            prune,
-            count: 1 as usize,
+            transaction,
+            count,
         }
-    }
-
-    fn generate(&mut self) -> bool {
-        if self.hash.is_some() {
-            return true;
-        }
-
-        let mut vbytes: Vec<u8> = vec![];
-
-        match self.left.as_ref() {
-            Some(node) => {
-                vbytes.extend(node.hash.unwrap());
-                self.prune &= node.prune;
-                self.count += node.count;
-            }
-            None => {
-                vbytes.extend(&[0u8; 32]);
-            }
-        }
-
-        match self.right.as_ref() {
-            Some(node) => {
-                vbytes.extend(node.hash.unwrap());
-                self.prune &= node.prune;
-                self.count += node.count;
-            }
-            None => {
-                vbytes.extend(&[0u8; 32]);
-            }
-        }
-
-        self.hash = Some(hash(&vbytes));
-
-        if self.prune {
-            self.left = None;
-            self.right = None;
-            self.count = 1 as usize;
-        }
-
-        return true;
     }
 }
 
@@ -94,13 +56,6 @@ impl MerkleTree {
     }
 
     pub fn generate(transactions: &Vec<Transaction>) -> Option<Box<MerkleTree>> {
-        return MerkleTree::generate_with_pruning(transactions, |tx| false);
-    }
-
-    pub fn generate_with_pruning(
-        transactions: &Vec<Transaction>,
-        prune_func: fn(&Transaction) -> bool,
-    ) -> Option<Box<MerkleTree>> {
         if transactions.is_empty() {
             return None;
         }
@@ -117,7 +72,8 @@ impl MerkleTree {
                     None,
                     None,
                     tx.get_hash_for_signature(),
-                    prune_func(tx),
+                    true,
+                    1 as usize,
                 ))
             })
             .collect();
@@ -127,16 +83,16 @@ impl MerkleTree {
 
             // Create a node per two leaves
             while !leaves.is_empty() {
-                nodes.push_back(MerkleTreeNode::new(
-                    leaves.pop_front(),
-                    leaves.pop_front(),
-                    None,
-                    true,
-                ));
+                let left = leaves.pop_front();
+                let right = leaves.pop_front(); //Can be None, this is expected
+                let count = MerkleTree::calculate_child_count(&left, &right);
+                nodes.push_back(MerkleTreeNode::new(left, right, None, false, count));
             }
 
             // Compute the node hashes in parallel
-            nodes.par_iter_mut().all(|node| node.generate());
+            nodes
+                .par_iter_mut()
+                .all(|node| MerkleTree::generate_hash(node));
             // Collect the next set of leaves for the computation
             leaves.clear();
 
@@ -149,11 +105,132 @@ impl MerkleTree {
             root: leaves.pop_front().unwrap(),
         }));
     }
+
+    pub fn traverse(&self, read_func: impl Fn(&MerkleTreeNode)) {
+        MerkleTree::traverse_node(&self.root, &read_func);
+    }
+
+    pub fn create_clone(&self) -> Box<MerkleTree> {
+        return Box::new(MerkleTree {
+            root: MerkleTree::clone_node(Some(&self.root)).unwrap(),
+        });
+    }
+
+    pub fn prune(&mut self, prune_func: impl Fn(&SaitoHash) -> bool) {
+        MerkleTree::prune_node(Some(&mut self.root), &prune_func);
+    }
+
+    fn calculate_child_count(
+        left: &Option<Box<MerkleTreeNode>>,
+        right: &Option<Box<MerkleTreeNode>>,
+    ) -> usize {
+        let mut count = 1 as usize;
+
+        if left.is_some() {
+            count += left.as_ref().unwrap().count;
+        }
+
+        if right.is_some() {
+            count += right.as_ref().unwrap().count;
+        }
+
+        return count;
+    }
+
+    fn generate_hash(node: &mut MerkleTreeNode) -> bool {
+        if node.hash.is_some() {
+            return true;
+        }
+
+        let mut vbytes: Vec<u8> = vec![];
+
+        match node.left.as_ref() {
+            Some(left) => {
+                vbytes.extend(left.hash.unwrap());
+            }
+            None => {
+                vbytes.extend(&[0u8; 32]);
+            }
+        }
+
+        match node.right.as_ref() {
+            Some(right) => {
+                vbytes.extend(right.hash.unwrap());
+            }
+            None => {
+                vbytes.extend(&[0u8; 32]);
+            }
+        }
+
+        node.hash = Some(hash(&vbytes));
+
+        return true;
+    }
+
+    fn traverse_node(node: &MerkleTreeNode, read_func: &impl Fn(&MerkleTreeNode)) {
+        if node.left.is_some() {
+            MerkleTree::traverse_node(&node.left.as_ref().unwrap(), read_func);
+        }
+
+        if node.right.is_some() {
+            MerkleTree::traverse_node(&node.right.as_ref().unwrap(), read_func);
+        }
+
+        read_func(node);
+    }
+
+    fn clone_node(node: Option<&Box<MerkleTreeNode>>) -> Option<Box<MerkleTreeNode>> {
+        match node {
+            None => None,
+            Some(source) => Some(Box::new(MerkleTreeNode::new(
+                MerkleTree::clone_node(source.left.as_ref()),
+                MerkleTree::clone_node(source.right.as_ref()),
+                source.hash,
+                source.transaction,
+                source.count,
+            ))),
+        }
+    }
+
+    fn prune_node(
+        node: Option<&mut Box<MerkleTreeNode>>,
+        prune_func: &impl Fn(&SaitoHash) -> bool,
+    ) -> bool {
+        return if node.is_some() {
+            let mut node = node.unwrap();
+            if node.transaction {
+                prune_func(&node.hash.unwrap())
+            } else {
+                let mut prune = true;
+
+                if node.left.is_some() {
+                    prune &= MerkleTree::prune_node(node.left.as_mut(), prune_func);
+                }
+
+                if node.right.is_some() {
+                    prune &= MerkleTree::prune_node(node.right.as_mut(), prune_func);
+                }
+
+                if prune {
+                    node.left = None;
+                    node.right = None;
+                    node.count = 1;
+                } else {
+                    node.count = MerkleTree::calculate_child_count(&node.left, &node.right);
+                }
+
+                prune
+            }
+        } else {
+            true
+        };
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::common::defs::SaitoHash;
+    use crate::core::data::crypto::hash;
     use crate::core::data::merkle::{MerkleTree, MerkleTreeNode};
     use crate::core::data::transaction::Transaction;
     use crate::core::data::wallet::Wallet;
@@ -173,50 +250,67 @@ mod tests {
             transactions.push(transaction);
         }
 
-        let root1 = MerkleTree::generate(&transactions).unwrap().get_root_hash();
+        let tree1 = MerkleTree::generate(&transactions).unwrap();
 
         transactions[0].set_timestamp(10);
         transactions[0].sign(wallet.get_privatekey());
-        let root2 = MerkleTree::generate(&transactions).unwrap().get_root_hash();
+        let tree2 = MerkleTree::generate(&transactions).unwrap();
 
         transactions[4].set_timestamp(11);
         transactions[4].sign(wallet.get_privatekey());
-        let root3 = MerkleTree::generate(&transactions).unwrap().get_root_hash();
+        let tree3 = MerkleTree::generate(&transactions).unwrap();
 
         transactions[2].set_timestamp(12);
         transactions[2].sign(wallet.get_privatekey());
-        let tree1 = MerkleTree::generate_with_pruning(&transactions, |tx| false).unwrap();
-        let root4 = tree1.get_root_hash();
-        let tree2 = MerkleTree::generate_with_pruning(&transactions, |tx| true).unwrap();
-        let root5 = tree2.get_root_hash();
+        let tree4 = MerkleTree::generate(&transactions).unwrap();
+        let tree5 = MerkleTree::generate(&transactions).unwrap();
 
-        transactions[0].set_timestamp(100);
-        transactions[0].sign(wallet.get_privatekey());
-        let tree3 =
-            MerkleTree::generate_with_pruning(&transactions, |tx| tx.get_timestamp() != 100)
-                .unwrap();
-        let root6 = tree2.get_root_hash();
+        assert_ne!(tree1.get_root_hash(), tree2.get_root_hash());
+        assert_ne!(tree2.get_root_hash(), tree3.get_root_hash());
+        assert_ne!(tree3.get_root_hash(), tree4.get_root_hash());
 
-        assert_eq!(root1.len(), 32);
-        assert_ne!(root1, [0; 32]);
+        assert_eq!(tree4.get_root_hash(), tree5.get_root_hash());
 
-        assert_eq!(root2.len(), 32);
-        assert_ne!(root2, [0; 32]);
-
-        assert_eq!(root3.len(), 32);
-        assert_ne!(root3, [0; 32]);
-
-        assert_eq!(root4.len(), 32);
-        assert_ne!(root4, [0; 32]);
-
-        assert_ne!(root1, root2);
-        assert_ne!(root2, root3);
-        assert_ne!(root3, root4);
-
-        assert_eq!(root4, root5);
-        assert_eq!(root5, root6);
         assert_eq!(tree1.len(), 11);
-        assert_eq!(tree2.len(), 1);
-        assert_eq!(tree3.len(), 7);
+        assert_eq!(tree2.len(), 11);
+        assert_eq!(tree3.len(), 11);
+        assert_eq!(tree4.len(), 11);
+        assert_eq!(tree5.len(), 11);
+    }
+
+    #[test]
+    fn merkle_tree_pruning_test() {
+        let wallet = Wallet::new();
+
+        let mut transactions = vec![];
+
+        for i in 0..5 {
+            let mut transaction = Transaction::new();
+            transaction.set_timestamp(i);
+            transaction.sign(wallet.get_privatekey());
+            transactions.push(transaction);
+        }
+
+        let target_hash = transactions[0].get_hash_for_signature().unwrap();
+
+        let tree = MerkleTree::generate(&transactions).unwrap();
+        let cloned_tree = tree.create_clone();
+        let mut pruned_tree = tree.create_clone();
+        pruned_tree.prune(|hash| target_hash != *hash);
+
+        assert_eq!(tree.get_root_hash(), cloned_tree.get_root_hash());
+        assert_eq!(cloned_tree.get_root_hash(), pruned_tree.get_root_hash());
+        assert_eq!(tree.len(), 11);
+        assert_eq!(cloned_tree.len(), tree.len());
+        assert_eq!(pruned_tree.len(), 7);
+
+        println!("\ntree");
+        tree.traverse(|node| print!("{}, ", hex::encode(node.hash.unwrap())));
+
+        println!("\ncloned_tree");
+        cloned_tree.traverse(|node| print!("{}, ", hex::encode(node.hash.unwrap())));
+
+        println!("\npruned_tree");
+        pruned_tree.traverse(|node| print!("{}, ", hex::encode(node.hash.unwrap())));
     }
 }
