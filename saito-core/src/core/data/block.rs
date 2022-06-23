@@ -16,7 +16,7 @@ use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::{hash, sign, verify};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
-use crate::core::data::merkle::MerkleTreeLayer;
+use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
@@ -803,81 +803,18 @@ impl Block {
         self.set_hash(hash_for_hash);
         hash_for_hash
     }
-    //
-    // TODO REFACTOR - this logic should probably be in the merkle-root class
-    //
+
     pub fn generate_merkle_root(&self) -> SaitoHash {
-        if self.transactions.is_empty() {
-            return [0; 32];
+        println!("generating the merkle root 1");
+        println!(
+            "generating the merkle root len: {}",
+            self.transactions.len()
+        );
+
+        match MerkleTree::generate(&self.transactions) {
+            None => [0u8; 32],
+            Some(tree) => tree.get_root_hash(),
         }
-
-        let tx_sig_hashes: Vec<SaitoHash> = self
-            .transactions
-            .iter()
-            .map(|tx| tx.get_hash_for_signature().unwrap())
-            .collect();
-
-        let mut mrv: Vec<MerkleTreeLayer> = vec![];
-
-        //
-        // or let's try another approach
-        //
-        let tsh_len = tx_sig_hashes.len();
-        let mut leaf_depth = 0;
-
-        for i in 0..tsh_len {
-            if (i + 1) < tsh_len {
-                mrv.push(MerkleTreeLayer::new(
-                    tx_sig_hashes[i],
-                    tx_sig_hashes[i + 1],
-                    leaf_depth,
-                ));
-            } else {
-                mrv.push(MerkleTreeLayer::new(tx_sig_hashes[i], [0; 32], leaf_depth));
-            }
-        }
-
-        let mut start_point = 0;
-        let mut stop_point = mrv.len();
-        let mut keep_looping = true;
-
-        while keep_looping {
-            // processing new layer
-            leaf_depth += 1;
-
-            // hash the parent in parallel
-            mrv[start_point..stop_point]
-                .par_iter_mut()
-                .all(|leaf| leaf.hash());
-
-            let start_point_old = start_point;
-            start_point = mrv.len();
-
-            for i in (start_point_old..stop_point).step_by(2) {
-                if (i + 1) < stop_point {
-                    mrv.push(MerkleTreeLayer::new(
-                        mrv[i].get_hash(),
-                        mrv[i + 1].get_hash(),
-                        leaf_depth,
-                    ));
-                } else {
-                    mrv.push(MerkleTreeLayer::new(mrv[i].get_hash(), [0; 32], leaf_depth));
-                }
-            }
-
-            stop_point = mrv.len();
-            if stop_point > 0 {
-                keep_looping = start_point < stop_point - 1;
-            } else {
-                keep_looping = false;
-            }
-        }
-
-        //
-        // hash the final leaf
-        //
-        mrv[start_point].hash();
-        mrv[start_point].get_hash()
     }
 
     //

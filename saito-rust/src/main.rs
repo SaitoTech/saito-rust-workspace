@@ -1,7 +1,10 @@
+use std::panic;
+use std::process;
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
 
-use log::{debug, trace};
+use log::{debug, error, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -277,6 +280,23 @@ fn run_loop_thread(
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let orig_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
+        if let Some(location) = panic_info.location() {
+            error!(
+                "panic occurred in file '{}' at line {}, exiting ..",
+                location.file(),
+                location.line()
+            );
+        } else {
+            error!("panic occurred but can't get location information, exiting ..");
+        }
+
+        // invoke the default handler and exit the process
+        orig_hook(panic_info);
+        process::exit(99);
+    }));
+
     println!("Running saito");
 
     // pretty_env_logger::init();
