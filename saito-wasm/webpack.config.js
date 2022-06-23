@@ -3,9 +3,10 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 const {merge} = require("webpack-merge");
+const CopyPlugin = require("copy-webpack-plugin");
 
 let common = {
-    devtool: "eval",
+    devtool: false,
     // entry: [
     //     path.resolve(__dirname, "./index.js"),
     // ],
@@ -77,18 +78,18 @@ let common = {
     },
     experiments: {
         asyncWebAssembly: true,
-        // topLevelAwait: true,
+        topLevelAwait: true,
         syncWebAssembly: true,
         // lazyCompilation: false,
         // outputModule: false,
     },
-    mode: "production",
+    mode: "development",
 };
 
 let nodeConfigs = merge(common, {
     entry: [
         'babel-regenerator-runtime',
-        path.resolve(__dirname, "./index.node.js"),
+        path.resolve(__dirname, "./index.node.ts"),
     ],
     plugins: [
         new HtmlWebpackPlugin(),
@@ -100,11 +101,23 @@ let nodeConfigs = merge(common, {
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
             TextEncoder: ['text-encoding', 'TextEncoder']
+        }),
+        new CopyPlugin({
+            patterns: [{
+                from: "./pkg/node/index_bg.wasm",
+                to: "./index_bg.wasm",
+            }, {
+                from: "./pkg/node/index.d.ts",
+                to: "./index.d.ts"
+            }]
         })
     ],
     output: {
         path: path.resolve(__dirname, "dist/server"),
         filename: "index.js",
+        library: {
+            type: "commonjs2"
+        },
     },
     target: "node"
 });
@@ -123,11 +136,20 @@ let webConfigs = merge(common, {
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
             TextEncoder: ['text-encoding', 'TextEncoder']
+        }),
+        new CopyPlugin({
+            patterns: [{
+                from: "./pkg/node/index.d.ts",
+                to: "./index.d.ts"
+            }]
         })
     ],
     output: {
         path: path.resolve(__dirname, "dist/browser"),
         filename: "index.js",
+        library: {
+            type: "commonjs2"
+        },
     },
     target: "web",
 });

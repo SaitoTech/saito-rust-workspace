@@ -21,12 +21,12 @@ export default import("./pkg/web")
         console.log("saito default : ", saito.default);
         return saito.default(undefined).then(() => saito);
     })
-    .then(saito => {
-        console.log("s = ", saito);
-        let result = saito.initialize_sync();
-        console.log("result = ", result);
-        return saito;
-    })
+    // .then(saito => {
+    //     console.log("s = ", saito);
+    //     let result = saito.initialize_sync();
+    //     console.log("result = ", result);
+    //     return saito;
+    // })
     .catch(error => {
         console.error(error);
     })
