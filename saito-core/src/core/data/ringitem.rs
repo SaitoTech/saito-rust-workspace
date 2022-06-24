@@ -58,10 +58,8 @@ impl RingItem {
 
     pub fn on_chain_reorganization(&mut self, hash: SaitoHash, lc: bool) -> bool {
         if !lc {
-            println!("cannot find hash in ringitem");
             self.lc_pos = None;
         } else {
-            println!("find and set hash");
             self.lc_pos = self.block_hashes.iter().position(|b_hash| b_hash == &hash);
         }
 

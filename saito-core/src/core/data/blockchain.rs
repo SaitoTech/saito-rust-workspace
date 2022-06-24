@@ -287,7 +287,6 @@ impl Blockchain {
             // of creating a separate variable to manually track entries.
             //
             if self.blockring.is_empty() {
-                println!("blockring is empty");
 
                 //
                 // no need for action as fall-through will result in proper default
@@ -322,13 +321,9 @@ impl Blockchain {
         // viable.
         //
         if am_i_the_longest_chain {
-            println!("i am the longest chain");
-
             let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
 
             if does_new_chain_validate {
-                println!("new chain validates!");
-
                 self.add_block_success(block_hash, network, storage).await;
 
                 //
@@ -726,7 +721,12 @@ impl Blockchain {
             old_bf += self.blocks.get(hash).unwrap().get_burnfee();
         }
         for hash in new_chain.iter() {
-            new_bf += self.blocks.get(hash).unwrap().get_burnfee();
+            if let Some(x) = self.blocks.get(hash) {
+                new_bf += x.get_burnfee();
+            } else {
+                return false;
+            }
+            //new_bf += self.blocks.get(hash).unwrap().get_burnfee();
         }
         //
         // new chain must have more accumulated work AND be longer
@@ -806,21 +806,17 @@ impl Blockchain {
         }
 
         if !old_chain.is_empty() {
-            println!("old chain not empty...");
             let res = self
                 .unwind_chain(&new_chain, &old_chain, 0, true, storage)
                 //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
                 .await;
             res
         } else if !new_chain.is_empty() {
-            println!("new chain not empty...");
             let res = self
                 .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
                 .await;
-            println!("is blockring empty {}", self.blockring.is_empty());
             res
         } else {
-            println!("old chain and new chain are both empty...");
             true
         }
     }
@@ -925,8 +921,6 @@ impl Blockchain {
             // blockring update
             self.blockring
                 .on_chain_reorganization(block.get_id(), block.get_hash(), true);
-
-            println!("before does block validate 3 !");
 
             //
             // TODO - wallet update should be optional, as core routing nodes

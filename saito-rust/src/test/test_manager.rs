@@ -86,6 +86,18 @@ impl TestManager {
         }
     }
 
+    pub fn get_mempool_lock(&self) -> Arc<RwLock<Mempool>> {
+        return self.mempool_lock.clone();
+    }
+
+    pub fn get_wallet_lock(&self) -> Arc<RwLock<Wallet>> {
+        return self.wallet_lock.clone();
+    }
+
+    pub fn get_blockchain_lock(&self) -> Arc<RwLock<Blockchain>> {
+        return self.blockchain_lock.clone();
+    }
+
     pub async fn wait_for_mining_event(&mut self) {
         self.receiver_in_miner
             .recv()
@@ -109,6 +121,261 @@ impl TestManager {
     }
 
     //
+    // check that the blockchain connects properly
+    //
+    pub async fn check_blockchain(&self) {
+        let blockchain = self.blockchain_lock.read().await;
+
+        for i in 1..blockchain.blocks.len() {
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(i as u64);
+
+            let previous_block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id((i as u64) - 1);
+
+            let block = blockchain.get_block_sync(&block_hash);
+            let previous_block = blockchain.get_block_sync(&previous_block_hash);
+
+            if block_hash == [0; 32] {
+                assert_eq!(block.is_none(), true);
+            } else {
+                assert_eq!(block.is_none(), false);
+                if i != 1 && previous_block_hash != [0; 32] {
+                    assert_eq!(previous_block.is_none(), false);
+                    assert_eq!(
+                        block.unwrap().get_previous_block_hash(),
+                        previous_block.unwrap().get_hash()
+                    );
+                }
+            }
+        }
+    }
+
+    //
+    // check that everything spendable in the main UTXOSET is spendable on the longest
+    // chain and vice-versa.
+    //
+    pub async fn check_utxoset(&self) {
+        let blockchain = self.blockchain_lock.read().await;
+        let mut utxoset: UtxoSet = AHashMap::new();
+        let latest_block_id = blockchain.get_latest_block_id();
+
+        info!("----");
+        info!("----");
+        info!("---- check utxoset ");
+        info!("----");
+        info!("----");
+        for i in 1..=latest_block_id {
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(i as u64);
+            info!("WINDING ID HASH - {} {:?}", i, block_hash);
+            let block = blockchain.get_block(&block_hash).await.unwrap();
+            for j in 0..block.get_transactions().len() {
+                block.get_transactions()[j].on_chain_reorganization(&mut utxoset, true, i as u64);
+            }
+        }
+
+        //
+        // check main utxoset matches longest-chain
+        //
+        for (key, value) in &blockchain.utxoset {
+            match utxoset.get(key) {
+                Some(value2) => {
+                    //
+                    // everything spendable in blockchain.utxoset should be spendable on longest-chain
+                    //
+                    if *value == true {
+                        //info!("for key: {:?}", key);
+                        //info!("comparing {} and {}", value, value2);
+                        assert_eq!(value, value2);
+                    } else {
+                        //
+                        // everything spent in blockchain.utxoset should be spent on longest-chain
+                        //
+                        // if *value > 1 {
+                        //info!("comparing key: {:?}", key);
+                        //info!("comparing blkchn {} and sanitycheck {}", value, value2);
+                        // assert_eq!(value, value2);
+                        // } else {
+                        //
+                        // unspendable (0) does not need to exist
+                        //
+                        // }
+                    }
+                }
+                None => {
+                    //
+                    // if the value is 0, the token is unspendable on the main chain and
+                    // it may still be in the UTXOSET simply because it was not removed
+                    // but rather set to an unspendable value. These entries will be
+                    // removed on purge, although we can look at deleting them on unwind
+                    // as well if that is reasonably efficient.
+                    //
+                    if *value == true {
+                        //info!("Value does not exist in actual blockchain!");
+                        //info!("comparing {:?} with on-chain value {}", key, value);
+                        assert_eq!(1, 2);
+                    }
+                }
+            }
+        }
+
+        //
+        // check longest-chain matches utxoset
+        //
+        for (key, value) in &utxoset {
+            //info!("{:?} / {}", key, value);
+            match blockchain.utxoset.get(key) {
+                Some(value2) => {
+                    //
+                    // everything spendable in longest-chain should be spendable on blockchain.utxoset
+                    //
+                    if *value == true {
+                        //                        info!("comparing {} and {}", value, value2);
+                        assert_eq!(value, value2);
+                    } else {
+                        //
+                        // everything spent in longest-chain should be spendable on blockchain.utxoset
+                        //
+                        // if *value > 1 {
+                        //     //                            info!("comparing {} and {}", value, value2);
+                        //     assert_eq!(value, value2);
+                        // } else {
+                        //     //
+                        //     // unspendable (0) does not need to exist
+                        //     //
+                        // }
+                    }
+                }
+                None => {
+                    info!("comparing {:?} with expected value {}", key, value);
+                    info!("Value does not exist in actual blockchain!");
+                    assert_eq!(1, 2);
+                }
+            }
+        }
+    }
+
+    pub async fn check_token_supply(&self) {
+        let mut token_supply: u64 = 0;
+        let mut current_supply: u64 = 0;
+        let mut block_inputs: u64;
+        let mut block_outputs: u64;
+        let mut previous_block_treasury: u64;
+        let mut current_block_treasury: u64 = 0;
+        let mut unpaid_but_uncollected: u64 = 0;
+        let mut block_contains_fee_tx: u64;
+        let mut block_fee_tx_idx: usize = 0;
+
+        let blockchain = self.blockchain_lock.read().await;
+        let latest_block_id = blockchain.get_latest_block_id();
+
+        for i in 1..=latest_block_id {
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(i as u64);
+            let block = blockchain.get_block(&block_hash).await.unwrap();
+
+            block_inputs = 0;
+            block_outputs = 0;
+            block_contains_fee_tx = 0;
+
+            previous_block_treasury = current_block_treasury;
+            current_block_treasury = block.get_treasury();
+
+            for t in 0..block.get_transactions().len() {
+                //
+                // we ignore the inputs in staking / fee transactions as they have
+                // been pulled from the staking treasury and are already technically
+                // counted in the money supply as an output from a previous slip.
+                // we only care about the difference in token supply represented by
+                // the difference in the staking_treasury.
+                //
+                if block.get_transactions()[t].get_transaction_type() == TransactionType::Fee {
+                    block_contains_fee_tx = 1;
+                    block_fee_tx_idx = t as usize;
+                } else {
+                    for z in 0..block.get_transactions()[t].inputs.len() {
+                        block_inputs += block.get_transactions()[t].inputs[z].get_amount();
+                    }
+                    for z in 0..block.get_transactions()[t].outputs.len() {
+                        block_outputs += block.get_transactions()[t].outputs[z].get_amount();
+                    }
+                }
+
+                //
+                // block one sets circulation
+                //
+                if i == 1 {
+                    token_supply =
+                        block_outputs + block.get_treasury() + block.get_staking_treasury();
+                    current_supply = token_supply;
+                } else {
+                    //
+                    // figure out how much is in circulation
+                    //
+                    if block_contains_fee_tx == 0 {
+                        current_supply -= block_inputs;
+                        current_supply += block_outputs;
+
+                        unpaid_but_uncollected += block_inputs;
+                        unpaid_but_uncollected -= block_outputs;
+
+                        //
+                        // treasury increases must come here uncollected
+                        //
+                        if current_block_treasury > previous_block_treasury {
+                            unpaid_but_uncollected -=
+                                current_block_treasury - previous_block_treasury;
+                        }
+                    } else {
+                        //
+                        // calculate total amount paid
+                        //
+                        let mut total_fees_paid: u64 = 0;
+                        let fee_transaction = &block.get_transactions()[block_fee_tx_idx];
+                        for output in fee_transaction.get_outputs() {
+                            total_fees_paid += output.get_amount();
+                        }
+
+                        current_supply -= block_inputs;
+                        current_supply += block_outputs;
+                        current_supply += total_fees_paid;
+
+                        unpaid_but_uncollected += block_inputs;
+                        unpaid_but_uncollected -= block_outputs;
+                        unpaid_but_uncollected -= total_fees_paid;
+
+                        //
+                        // treasury increases must come here uncollected
+                        //
+                        if current_block_treasury > previous_block_treasury {
+                            unpaid_but_uncollected -=
+                                current_block_treasury - previous_block_treasury;
+                        }
+                    }
+
+                    //
+                    // token supply should be constant
+                    //
+                    let total_in_circulation = current_supply
+                        + unpaid_but_uncollected
+                        + block.get_treasury()
+                        + block.get_staking_treasury();
+
+                    //
+                    // we check that overall token supply has not changed
+                    //
+                    assert_eq!(total_in_circulation, token_supply);
+                }
+            }
+        }
+    }
+
+    //
     // create block
     //
     pub async fn create_block(
@@ -124,8 +391,6 @@ impl TestManager {
         let privatekey: SaitoPrivateKey;
         let publickey: SaitoPublicKey;
 
-        println!("TRANSACTIONS NUM: {}", txs_number);
-
         {
             let wallet = self.wallet_lock.read().await;
             publickey = wallet.get_publickey();
@@ -139,8 +404,6 @@ impl TestManager {
             transaction.generate(publickey);
             transactions.push(transaction);
         }
-
-        println!("TRANSACTIONS NUM 2: {}", txs_number);
 
         if include_valid_golden_ticket {
             let blockchain = self.blockchain_lock.read().await;
@@ -159,8 +422,6 @@ impl TestManager {
             gttx.generate(publickey);
             transactions.push(gttx);
         }
-
-        println!("TRANSACTIONS NUM 3: {}", txs_number);
 
         //
         // create block
@@ -241,7 +502,7 @@ impl TestManager {
         //
         // generate UTXO-carrying VIP transactions
         //
-        if 0 < vip_transactions {
+        for i in 0..vip_transactions {
             let mut tx = Transaction::create_vip_transaction(publickey, vip_amount);
             tx.generate(publickey);
             tx.sign(privatekey);
@@ -463,253 +724,7 @@ impl TestManager {
             }
             return None;
         }
-        //
-        // check that the blockchain connects properly
-        //
-        pub async fn check_blockchain(&self) {
-            let blockchain = self.blockchain_lock.read().await;
 
-            for i in 1..blockchain.blocks.len() {
-                let block_hash = blockchain
-                    .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
-                let previous_block_hash = blockchain
-                    .blockring
-                    .get_longest_chain_block_hash_by_block_id((i as u64) - 1);
-
-                let block = blockchain.get_block_sync(&block_hash);
-                let previous_block = blockchain.get_block_sync(&previous_block_hash);
-
-                assert_eq!(block.is_none(), false);
-                if i != 1 && previous_block_hash != [0; 32] {
-                    assert_eq!(previous_block.is_none(), false);
-                    assert_eq!(
-                        block.unwrap().get_previous_block_hash(),
-                        previous_block.unwrap().get_hash()
-                    );
-                }
-            }
-        }
-
-        // check that everything spendable in the main UTXOSET is spendable on the longest
-        // chain and vice-versa.
-        pub async fn check_utxoset(&self) {
-            let blockchain = self.blockchain_lock.read().await;
-            let mut utxoset: UtxoSet = AHashMap::new();
-            let latest_block_id = blockchain.get_latest_block_id();
-
-            info!("----");
-            info!("----");
-            info!("---- check utxoset ");
-            info!("----");
-            info!("----");
-            for i in 1..=latest_block_id {
-                let block_hash = blockchain
-                    .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
-                info!("WINDING ID HASH - {} {:?}", i, block_hash);
-                let block = blockchain.get_block(&block_hash).await.unwrap();
-                for j in 0..block.get_transactions().len() {
-                    block.get_transactions()[j].on_chain_reorganization(&mut utxoset, true, i as u64);
-                }
-            }
-
-            //
-            // check main utxoset matches longest-chain
-            //
-            for (key, value) in &blockchain.utxoset {
-                match utxoset.get(key) {
-                    Some(value2) => {
-                        //
-                        // everything spendable in blockchain.utxoset should be spendable on longest-chain
-                        //
-                        if *value == true {
-                            //info!("for key: {:?}", key);
-                            //info!("comparing {} and {}", value, value2);
-                            assert_eq!(value, value2);
-                        } else {
-                            //
-                            // everything spent in blockchain.utxoset should be spent on longest-chain
-                            //
-                            // if *value > 1 {
-                            //info!("comparing key: {:?}", key);
-                            //info!("comparing blkchn {} and sanitycheck {}", value, value2);
-                            // assert_eq!(value, value2);
-                            // } else {
-                            //
-                            // unspendable (0) does not need to exist
-                            //
-                            // }
-                        }
-                    }
-                    None => {
-                        //
-                        // if the value is 0, the token is unspendable on the main chain and
-                        // it may still be in the UTXOSET simply because it was not removed
-                        // but rather set to an unspendable value. These entries will be
-                        // removed on purge, although we can look at deleting them on unwind
-                        // as well if that is reasonably efficient.
-                        //
-                        if *value == true {
-                            //info!("Value does not exist in actual blockchain!");
-                            //info!("comparing {:?} with on-chain value {}", key, value);
-                            assert_eq!(1, 2);
-                        }
-                    }
-                }
-            }
-
-            //
-            // check longest-chain matches utxoset
-            //
-            for (key, value) in &utxoset {
-                //info!("{:?} / {}", key, value);
-                match blockchain.utxoset.get(key) {
-                    Some(value2) => {
-                        //
-                        // everything spendable in longest-chain should be spendable on blockchain.utxoset
-                        //
-                        if *value == true {
-                            //                        info!("comparing {} and {}", value, value2);
-                            assert_eq!(value, value2);
-                        } else {
-                            //
-                            // everything spent in longest-chain should be spendable on blockchain.utxoset
-                            //
-                            // if *value > 1 {
-                            //     //                            info!("comparing {} and {}", value, value2);
-                            //     assert_eq!(value, value2);
-                            // } else {
-                            //     //
-                            //     // unspendable (0) does not need to exist
-                            //     //
-                            // }
-                        }
-                    }
-                    None => {
-                        info!("comparing {:?} with expected value {}", key, value);
-                        info!("Value does not exist in actual blockchain!");
-                        assert_eq!(1, 2);
-                    }
-                }
-            }
-        }
-
-        pub async fn check_token_supply(&self) {
-            let mut token_supply: u64 = 0;
-            let mut current_supply: u64 = 0;
-            let mut block_inputs: u64;
-            let mut block_outputs: u64;
-            let mut previous_block_treasury: u64;
-            let mut current_block_treasury: u64 = 0;
-            let mut unpaid_but_uncollected: u64 = 0;
-            let mut block_contains_fee_tx: u64;
-            let mut block_fee_tx_idx: usize = 0;
-
-            let blockchain = self.blockchain_lock.read().await;
-            let latest_block_id = blockchain.get_latest_block_id();
-
-            for i in 1..=latest_block_id {
-                let block_hash = blockchain
-                    .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
-                let block = blockchain.get_block(&block_hash).await.unwrap();
-
-                block_inputs = 0;
-                block_outputs = 0;
-                block_contains_fee_tx = 0;
-
-                previous_block_treasury = current_block_treasury;
-                current_block_treasury = block.get_treasury();
-
-                for t in 0..block.get_transactions().len() {
-                    //
-                    // we ignore the inputs in staking / fee transactions as they have
-                    // been pulled from the staking treasury and are already technically
-                    // counted in the money supply as an output from a previous slip.
-                    // we only care about the difference in token supply represented by
-                    // the difference in the staking_treasury.
-                    //
-                    if block.get_transactions()[t].get_transaction_type() == TransactionType::Fee {
-                        block_contains_fee_tx = 1;
-                        block_fee_tx_idx = t as usize;
-                    } else {
-                        for z in 0..block.get_transactions()[t].inputs.len() {
-                            block_inputs += block.get_transactions()[t].inputs[z].get_amount();
-                        }
-                        for z in 0..block.get_transactions()[t].outputs.len() {
-                            block_outputs += block.get_transactions()[t].outputs[z].get_amount();
-                        }
-                    }
-
-                    //
-                    // block one sets circulation
-                    //
-                    if i == 1 {
-                        token_supply =
-                            block_outputs + block.get_treasury() + block.get_staking_treasury();
-                        current_supply = token_supply;
-                    } else {
-                        //
-                        // figure out how much is in circulation
-                        //
-                        if block_contains_fee_tx == 0 {
-                            current_supply -= block_inputs;
-                            current_supply += block_outputs;
-
-                            unpaid_but_uncollected += block_inputs;
-                            unpaid_but_uncollected -= block_outputs;
-
-                            //
-                            // treasury increases must come here uncollected
-                            //
-                            if current_block_treasury > previous_block_treasury {
-                                unpaid_but_uncollected -=
-                                    current_block_treasury - previous_block_treasury;
-                            }
-                        } else {
-                            //
-                            // calculate total amount paid
-                            //
-                            let mut total_fees_paid: u64 = 0;
-                            let fee_transaction = &block.get_transactions()[block_fee_tx_idx];
-                            for output in fee_transaction.get_outputs() {
-                                total_fees_paid += output.get_amount();
-                            }
-
-                            current_supply -= block_inputs;
-                            current_supply += block_outputs;
-                            current_supply += total_fees_paid;
-
-                            unpaid_but_uncollected += block_inputs;
-                            unpaid_but_uncollected -= block_outputs;
-                            unpaid_but_uncollected -= total_fees_paid;
-
-                            //
-                            // treasury increases must come here uncollected
-                            //
-                            if current_block_treasury > previous_block_treasury {
-                                unpaid_but_uncollected -=
-                                    current_block_treasury - previous_block_treasury;
-                            }
-                        }
-
-                        //
-                        // token supply should be constant
-                        //
-                        let total_in_circulation = current_supply
-                            + unpaid_but_uncollected
-                            + block.get_treasury()
-                            + block.get_staking_treasury();
-
-                        //
-                        // we check that overall token supply has not changed
-                        //
-                        assert_eq!(total_in_circulation, token_supply);
-                    }
-                }
-            }
-        }
 
         pub fn check_block_consistency(block: &Block) {
             //
