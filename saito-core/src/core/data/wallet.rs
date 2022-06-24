@@ -411,7 +411,10 @@ impl WalletSlip {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::test_io_handler::test::TestIOHandler;
+    use crate::common::test_manager::test::TestManager;
     use crate::core::data::wallet::Wallet;
+    use log::info;
 
     #[test]
     fn wallet_new_test() {
@@ -428,5 +431,31 @@ mod tests {
         let serialized = wallet1.serialize_for_disk();
         wallet2.deserialize_from_disk(&serialized);
         assert_eq!(wallet1, wallet2);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn save_and_restore_wallet_test() {
+        info!("current dir = {:?}", std::env::current_dir().unwrap());
+
+        let mut t = TestManager::new();
+
+        let mut wallet = Wallet::new();
+        let publickey1 = wallet.get_publickey().clone();
+        let privatekey1 = wallet.get_privatekey().clone();
+
+        let mut storage = Storage {
+            io_interface: Box::new(TestIOHandler::new()),
+        };
+        wallet.save(&mut storage).await;
+
+        wallet = Wallet::new();
+
+        assert_ne!(wallet.get_publickey(), publickey1);
+        assert_ne!(wallet.get_privatekey(), privatekey1);
+
+        wallet.load(&mut storage).await;
+
+        assert_eq!(wallet.get_publickey(), publickey1);
+        assert_eq!(wallet.get_privatekey(), privatekey1);
     }
 }
