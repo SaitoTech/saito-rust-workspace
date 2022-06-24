@@ -1444,6 +1444,7 @@ dependencies = [
  "bigint",
  "blake3",
  "block-modes",
+ "futures",
  "getrandom",
  "hex",
  "log",
