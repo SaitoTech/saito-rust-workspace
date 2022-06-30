@@ -867,7 +867,7 @@ impl Block {
                     for output in transaction.get_outputs() {
                         //
                         // these need to be calculated dynamically based on the
-                        // value of the UTTX and the byte-size of the transaction
+                        // value of the UTXO and the byte-size of the transaction
                         //
                         let REBROADCAST_FEE = 200_000_000;
                         let STAKING_SUBSIDY = 100_000_000;
