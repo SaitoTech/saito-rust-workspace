@@ -34,18 +34,18 @@ pub enum TransactionType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Transaction {
     // the bulk of the consensus transaction data
-    timestamp: u64,
+    pub(crate) timestamp: u64,
     pub inputs: Vec<Slip>,
     pub outputs: Vec<Slip>,
     // #[serde(with = "serde_bytes")] TODO : check this for performance
-    message: Vec<u8>,
-    transaction_type: TransactionType,
+    pub(crate) message: Vec<u8>,
+    pub(crate) transaction_type: TransactionType,
     #[serde_as(as = "[_; 64]")]
-    signature: SaitoSignature,
+    pub(crate) signature: SaitoSignature,
     path: Vec<Hop>,
 
-    /// hash used for merkle_root (does not include signature) and slip uuid
-    hash_for_signature: Option<SaitoHash>,
+    // hash used for merkle_root (does not include signature) and slip uuid
+    pub(crate) hash_for_signature: Option<SaitoHash>,
 
     /// total nolan in input slips
     total_in: u64,
@@ -277,7 +277,7 @@ impl Transaction {
     pub fn create_vip_transaction(to_public_key: SaitoPublicKey, with_amount: u64) -> Transaction {
         debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::new();
-        transaction.set_transaction_type(TransactionType::Vip);
+        transaction.transaction_type = TransactionType::Vip;
         let mut output = Slip::new();
         output.public_key = to_public_key;
         output.amount = with_amount;
@@ -314,7 +314,7 @@ impl Transaction {
             output_payment = output_slip_to_rebroadcast.amount - with_fee + with_staking_subsidy;
         }
 
-        transaction.set_transaction_type(TransactionType::ATR);
+        transaction.transaction_type = TransactionType::ATR;
 
         let mut output = Slip::new();
         output.public_key = output_slip_to_rebroadcast.public_key;
@@ -334,9 +334,9 @@ impl Transaction {
         // by definition already in the previous TX message space.
         //
         if output_slip_to_rebroadcast.slip_type == SlipType::ATR {
-            transaction.set_message(transaction_to_rebroadcast.get_message().to_vec());
+            transaction.message = transaction_to_rebroadcast.message.to_vec();
         } else {
-            transaction.set_message(transaction_to_rebroadcast.serialize_for_net().to_vec());
+            transaction.message = transaction_to_rebroadcast.serialize_for_net().to_vec();
         }
 
         transaction.add_output(output);
@@ -346,7 +346,7 @@ impl Transaction {
         // will fail its signature check and then get analysed as
         // a rebroadcast transaction because of its transaction type.
         //
-        transaction.set_signature(transaction_to_rebroadcast.get_signature());
+        transaction.signature = transaction_to_rebroadcast.signature;
 
         transaction
     }
@@ -415,13 +415,13 @@ impl Transaction {
         }
 
         let mut transaction = Transaction::new();
-        transaction.set_timestamp(timestamp);
-        transaction.set_inputs(inputs);
-        transaction.set_outputs(outputs);
-        transaction.set_message(message);
-        transaction.set_transaction_type(transaction_type);
-        transaction.set_signature(signature);
-        transaction.set_path(path);
+        transaction.timestamp = timestamp;
+        transaction.inputs = inputs;
+        transaction.outputs = outputs;
+        transaction.message = message;
+        transaction.transaction_type = transaction_type;
+        transaction.signature = signature;
+        transaction.path = path;
         transaction
     }
 
@@ -486,7 +486,7 @@ impl Transaction {
         // generate tx signature hash
         //
         self.generate_hash_for_signature();
-        let hash_for_signature = self.get_hash_for_signature();
+        let hash_for_signature = self.hash_for_signature;
 
         //
         // calculate nolan in / out, fees
@@ -547,12 +547,12 @@ impl Transaction {
         // something is wrong if we are not the last routing node
         //
         let last_hop = &self.path[self.path.len() - 1];
-        if last_hop.get_to() != public_key {
+        if last_hop.to != public_key {
             self.total_work = 0;
             return;
         }
 
-        let total_fees = self.get_total_fees();
+        let total_fees = self.total_fees;
         let mut routing_work_available_to_public_key = total_fees;
 
         //
@@ -560,7 +560,7 @@ impl Transaction {
         // halving from the 2nd hop in the routing path
         //
         for _i in 1..self.path.len() {
-            if self.path[_i].get_to() != self.path[_i - 1].get_from() {
+            if self.path[_i].to != self.path[_i - 1].from {
                 self.total_work = 0;
                 return;
             }
@@ -577,55 +577,7 @@ impl Transaction {
     // generate hash used for signing the tx
     //
     pub fn generate_hash_for_signature(&mut self) {
-        self.set_hash_for_signature(hash(&self.serialize_for_signature()));
-    }
-
-    pub fn get_path(&self) -> &Vec<Hop> {
-        &self.path
-    }
-
-    pub fn get_total_fees(&self) -> u64 {
-        self.total_fees
-    }
-
-    pub fn get_total_work(&self) -> u64 {
-        self.total_work
-    }
-
-    pub fn get_timestamp(&self) -> u64 {
-        self.timestamp
-    }
-
-    pub fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type
-    }
-
-    pub fn get_inputs(&self) -> &Vec<Slip> {
-        &self.inputs
-    }
-
-    pub fn get_mut_inputs(&mut self) -> &mut Vec<Slip> {
-        &mut self.inputs
-    }
-
-    pub fn get_mut_outputs(&mut self) -> &mut Vec<Slip> {
-        &mut self.outputs
-    }
-
-    pub fn get_outputs(&self) -> &Vec<Slip> {
-        &self.outputs
-    }
-
-    pub fn get_message(&self) -> &Vec<u8> {
-        &self.message
-    }
-
-    pub fn get_hash_for_signature(&self) -> Option<SaitoHash> {
-        self.hash_for_signature
-    }
-
-    pub fn get_signature(&self) -> [u8; 64] {
-        self.signature
+        self.hash_for_signature = Some(hash(&self.serialize_for_signature()));
     }
 
     pub fn get_winning_routing_node(&self, random_hash: SaitoHash) -> SaitoPublicKey {
@@ -650,7 +602,7 @@ impl Transaction {
         //
         // burn these fees for the sake of safety.
         //
-        if self.get_total_fees() == 0 {
+        if self.total_fees == 0 {
             return [0; 33];
         }
 
@@ -664,7 +616,7 @@ impl Transaction {
         // not be confused with total_work which represents the amount
         // of work available in the transaction itself.
         //
-        let mut aggregate_routing_work: u64 = self.get_total_fees();
+        let mut aggregate_routing_work: u64 = self.total_fees;
         let mut routing_work_this_hop: u64 = aggregate_routing_work;
         let mut work_by_hop: Vec<u64> = vec![];
         work_by_hop.push(aggregate_routing_work);
@@ -686,7 +638,7 @@ impl Transaction {
 
         for i in 0..work_by_hop.len() {
             if winning_routing_work_in_nolan <= work_by_hop[i] {
-                return self.path[i].get_to();
+                return self.path[i].to;
             }
         }
 
@@ -780,55 +732,24 @@ impl Transaction {
 
         vbytes
     }
-    pub fn set_timestamp(&mut self, timestamp: u64) {
-        self.timestamp = timestamp;
-    }
-
-    pub fn set_transaction_type(&mut self, transaction_type: TransactionType) {
-        self.transaction_type = transaction_type;
-    }
-
-    pub fn set_inputs(&mut self, inputs: Vec<Slip>) {
-        self.inputs = inputs;
-    }
-
-    pub fn set_outputs(&mut self, outputs: Vec<Slip>) {
-        self.outputs = outputs;
-    }
-
-    pub fn set_message(&mut self, message: Vec<u8>) {
-        self.message = message;
-    }
-
-    pub fn set_signature(&mut self, sig: SaitoSignature) {
-        self.signature = sig;
-    }
-
-    pub fn set_path(&mut self, path: Vec<Hop>) {
-        self.path = path;
-    }
-
-    pub fn set_hash_for_signature(&mut self, hash: SaitoHash) {
-        self.hash_for_signature = Some(hash);
-    }
 
     pub fn sign(&mut self, private_key: SaitoPrivateKey) {
         //
         // we set slip ordinals when signing
         //
-        for (i, output) in self.get_mut_outputs().iter_mut().enumerate() {
+        for (i, output) in self.outputs.iter_mut().enumerate() {
             output.slip_index = i as u8;
         }
 
         let hash_for_signature = hash(&self.serialize_for_signature());
-        self.set_hash_for_signature(hash_for_signature);
-        self.set_signature(sign(&hash_for_signature, private_key));
+        self.hash_for_signature = Some(hash_for_signature);
+        self.signature = sign(&hash_for_signature, private_key);
     }
 
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         trace!(
             "validating transaction : {:?}",
-            hex::encode(self.get_hash_for_signature().unwrap())
+            hex::encode(self.hash_for_signature.unwrap())
         );
         //
         // Fee Transactions are validated in the block class. There can only
@@ -837,7 +758,7 @@ impl Transaction {
         // their input slips as their input slips are records of what to do
         // when reversing/unwinding the chain and have been spent previously.
         //
-        if self.get_transaction_type() == TransactionType::Fee {
+        if self.transaction_type == TransactionType::Fee {
             return true;
         }
 
@@ -859,7 +780,7 @@ impl Transaction {
         // at the bottom is the validation criteria applied to ALL
         // transaction types.
         //
-        let transaction_type = self.get_transaction_type();
+        let transaction_type = self.transaction_type;
 
         if transaction_type != TransactionType::Fee
             && transaction_type != TransactionType::ATR
@@ -869,10 +790,10 @@ impl Transaction {
             //
             // validate signature
             //
-            if let Some(hash_for_signature) = self.get_hash_for_signature() {
-                let sig: SaitoSignature = self.get_signature();
-                let public_key: SaitoPublicKey = self.get_inputs()[0].public_key;
-                if !verify(&hash_for_signature, sig, public_key) {
+            if let Some(hash_for_signature) = &self.hash_for_signature {
+                let sig: SaitoSignature = self.signature;
+                let public_key: SaitoPublicKey = self.inputs[0].public_key;
+                if !verify(hash_for_signature, sig, public_key) {
                     error!("message verifies not");
                     return false;
                 }
@@ -890,7 +811,7 @@ impl Transaction {
             //
             // validate sender exists
             //
-            if self.get_inputs().is_empty() {
+            if self.inputs.is_empty() {
                 error!("ERROR 582039: less than 1 input in transaction");
                 return false;
             }
@@ -910,11 +831,11 @@ impl Transaction {
             // TODO : what happens to tokens when total_out < total_in
             // validate we're not creating tokens out of nothing
             if self.total_out > self.total_in
-                && self.get_transaction_type() != TransactionType::Fee
-                && self.get_transaction_type() != TransactionType::Vip
+                && self.transaction_type != TransactionType::Fee
+                && self.transaction_type != TransactionType::Vip
             {
                 warn!("{} in and {} out", self.total_in, self.total_out);
-                for z in self.get_outputs() {
+                for z in self.outputs.iter() {
                     info!("{:?} --- ", z.amount);
                 }
                 error!("ERROR 672941: transaction spends more than it has available");
@@ -964,7 +885,7 @@ impl Transaction {
         //
         // all transactions must have outputs
         //
-        if self.get_outputs().is_empty() {
+        if self.outputs.is_empty() {
             error!("ERROR 582039: less than 1 output in transaction");
             return false;
         }
@@ -996,21 +917,17 @@ impl Transaction {
             // msg is transaction signature and next peer
             //
             let mut vbytes: Vec<u8> = vec![];
-            vbytes.extend(&self.get_signature());
-            vbytes.extend(&self.path[i].get_to());
+            vbytes.extend(&self.signature);
+            vbytes.extend(&self.path[i].to);
 
             // check sig is valid
-            if !verify(
-                &hash(&vbytes),
-                self.path[i].get_sig(),
-                self.path[i].get_from(),
-            ) {
+            if !verify(&hash(&vbytes), self.path[i].sig, self.path[i].from) {
                 return false;
             }
 
             // check path is continuous
             if i > 0 {
-                if self.path[i].get_from() != self.path[i - 1].get_to() {
+                if self.path[i].from != self.path[i - 1].to {
                     return false;
                 }
             }
@@ -1048,12 +965,12 @@ mod tests {
         let mut tx = Transaction::new();
         let wallet = Wallet::new();
 
-        tx.set_outputs(vec![Slip::new()]);
+        tx.outputs = vec![Slip::new()];
         tx.sign(wallet.private_key);
 
-        assert_eq!(tx.get_outputs()[0].slip_index, 0);
-        assert_ne!(tx.get_signature(), [0; 64]);
-        assert_ne!(tx.get_hash_for_signature(), Some([0; 32]));
+        assert_eq!(tx.outputs[0].slip_index, 0);
+        assert_ne!(tx.signature, [0; 64]);
+        assert_ne!(tx.hash_for_signature, Some([0; 32]));
     }
 
     #[test]
@@ -1189,21 +1106,21 @@ mod tests {
         let mock_input = Slip::new();
         let mock_output = Slip::new();
         let mut mock_hop = Hop::new();
-        mock_hop.set_from([0; 33]);
-        mock_hop.set_to([0; 33]);
-        mock_hop.set_sig([0; 64]);
+        mock_hop.from = [0; 33];
+        mock_hop.to = [0; 33];
+        mock_hop.sig = [0; 64];
         let mut mock_tx = Transaction::new();
         let mut mock_path: Vec<Hop> = vec![];
         mock_path.push(mock_hop);
         let ctimestamp = 0;
 
-        mock_tx.set_timestamp(ctimestamp);
+        mock_tx.timestamp = ctimestamp;
         mock_tx.add_input(mock_input);
         mock_tx.add_output(mock_output);
-        mock_tx.set_message(vec![104, 101, 108, 108, 111]);
-        mock_tx.set_transaction_type(TransactionType::Normal);
-        mock_tx.set_signature([1; 64]);
-        mock_tx.set_path(mock_path);
+        mock_tx.message = vec![104, 101, 108, 108, 111];
+        mock_tx.transaction_type = TransactionType::Normal;
+        mock_tx.signature = [1; 64];
+        mock_tx.path = mock_path;
 
         let serialized_tx = mock_tx.serialize_for_net();
 

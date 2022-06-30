@@ -343,7 +343,7 @@ impl Block {
         //
         if !block.created_hashmap_of_slips_spent_this_block {
             for transaction in &block.transactions {
-                for input in transaction.get_inputs() {
+                for input in transaction.inputs.iter() {
                     block
                         .slips_spent_this_block
                         .entry(input.get_utxoset_key())
@@ -385,7 +385,7 @@ impl Block {
             //
             let mut fee_tx = cv.fee_transaction.unwrap();
             let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
-            fee_tx.set_hash_for_signature(hash_for_signature);
+            fee_tx.hash_for_signature = Some(hash_for_signature);
             {
                 trace!("waiting for the wallet read lock");
                 let wallet = wallet_lock.read().await;
@@ -406,8 +406,8 @@ impl Block {
         // that is also paid this block otherwise.
         //
         for transaction in &block.transactions {
-            if transaction.get_transaction_type() != TransactionType::Fee {
-                for input in transaction.get_inputs() {
+            if transaction.transaction_type != TransactionType::Fee {
+                for input in transaction.inputs.iter() {
                     block
                         .slips_spent_this_block
                         .entry(input.get_utxoset_key())
@@ -645,8 +645,8 @@ impl Block {
         //
         // if winner is atr, we take inside TX
         //
-        if winning_tx.get_transaction_type() == TransactionType::ATR {
-            let tmptx = winning_tx.get_message().to_vec();
+        if winning_tx.transaction_type == TransactionType::ATR {
+            let tmptx = winning_tx.message.to_vec();
             winning_tx_placeholder = Transaction::deserialize_from_net(tmptx);
             winning_tx = &winning_tx_placeholder;
         }
@@ -735,8 +735,8 @@ impl Block {
             // fee tx.
             //
             if !self.created_hashmap_of_slips_spent_this_block {
-                if transaction.get_transaction_type() != TransactionType::Fee {
-                    for input in transaction.get_inputs() {
+                if transaction.transaction_type != TransactionType::Fee {
+                    for input in transaction.inputs.iter() {
                         self.slips_spent_this_block
                             .entry(input.get_utxoset_key())
                             .and_modify(|e| *e += 1)
@@ -749,7 +749,7 @@ impl Block {
             //
             // also check the transactions for golden ticket and fees
             //
-            match transaction.get_transaction_type() {
+            match transaction.transaction_type {
                 TransactionType::Issuance => {
                     has_issuance_transaction = true;
                     issuance_transaction_index = i as u64;
@@ -768,7 +768,7 @@ impl Block {
                     vbytes.extend(&transaction.serialize_for_signature());
                     self.rebroadcast_hash = hash(&vbytes);
 
-                    for input in transaction.get_inputs() {
+                    for input in transaction.inputs.iter() {
                         self.total_rebroadcast_slips += 1;
                         self.total_rebroadcast_nolan += input.amount;
                     }
@@ -830,7 +830,7 @@ impl Block {
         let mut index: usize = 0;
         for transaction in &self.transactions {
             if !transaction.is_fee_transaction() {
-                cv.total_fees += transaction.get_total_fees();
+                cv.total_fees += transaction.total_fees;
             } else {
                 cv.ft_num += 1;
                 cv.ft_index = Some(index);
@@ -864,7 +864,7 @@ impl Block {
                 // identify all unspent transactions
                 //
                 for transaction in &pruned_block.transactions {
-                    for output in transaction.get_outputs() {
+                    for output in transaction.outputs.iter() {
                         //
                         // these need to be calculated dynamically based on the
                         // value of the UTXO and the byte-size of the transaction
@@ -985,9 +985,8 @@ impl Block {
         // calculate payments to miners / routers / stakers
         //
         if let Some(gt_index) = cv.gt_index {
-            let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
-                self.transactions[gt_index].get_message().to_vec(),
-            );
+            let golden_ticket: GoldenTicket =
+                GoldenTicket::deserialize_from_net(self.transactions[gt_index].message.to_vec());
             // generate input hash for router
             let mut next_random_number = hash(&golden_ticket.random.to_vec());
             let _miner_public_key = golden_ticket.public_key;
@@ -1103,7 +1102,7 @@ impl Block {
             //
             let mut slip_index = 0;
             let mut transaction = Transaction::new();
-            transaction.set_transaction_type(TransactionType::Fee);
+            transaction.transaction_type = TransactionType::Fee;
 
             for i in 0..cv.block_payout.len() {
                 if cv.block_payout[i].miner != [0; 33] {
@@ -1739,7 +1738,7 @@ impl Block {
             //
             if let Some(gt_index) = cv.gt_index {
                 let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
-                    self.get_transactions()[gt_index].get_message().to_vec(),
+                    self.get_transactions()[gt_index].message.to_vec(),
                 );
                 //
                 // we already have a golden ticket, but create a new one pulling the
@@ -1891,7 +1890,7 @@ impl Block {
         for i in 0..self.transactions.len() {
             let transactions_valid2 = self.transactions[i].validate(utxoset);
             if !transactions_valid2 {
-                info!("Type: {:?}", self.transactions[i].get_transaction_type());
+                info!("Type: {:?}", self.transactions[i].transaction_type);
                 info!("Data {:?}", self.transactions[i]);
             }
         }
@@ -2020,20 +2019,20 @@ mod tests {
         let mock_output = Slip::new();
 
         let mut mock_tx = Transaction::new();
-        mock_tx.set_timestamp(0);
+        mock_tx.timestamp = 0;
         mock_tx.add_input(mock_input.clone());
         mock_tx.add_output(mock_output.clone());
-        mock_tx.set_message(vec![104, 101, 108, 111]);
-        mock_tx.set_transaction_type(TransactionType::Normal);
-        mock_tx.set_signature([1; 64]);
+        mock_tx.message = vec![104, 101, 108, 111];
+        mock_tx.transaction_type = TransactionType::Normal;
+        mock_tx.signature = [1; 64];
 
         let mut mock_tx2 = Transaction::new();
-        mock_tx2.set_timestamp(0);
+        mock_tx2.timestamp = 0;
         mock_tx2.add_input(mock_input);
         mock_tx2.add_output(mock_output);
-        mock_tx2.set_message(vec![]);
-        mock_tx2.set_transaction_type(TransactionType::Normal);
-        mock_tx2.set_signature([2; 64]);
+        mock_tx2.message = vec![];
+        mock_tx2.transaction_type = TransactionType::Normal;
+        mock_tx2.signature = [2; 64];
 
         let timestamp = 0;
 

@@ -301,7 +301,7 @@ pub mod test {
                     // we only care about the difference in token supply represented by
                     // the difference in the staking_treasury.
                     //
-                    if block.get_transactions()[t].get_transaction_type() == TransactionType::Fee {
+                    if block.get_transactions()[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = 1;
                         block_fee_tx_idx = t as usize;
                     } else {
@@ -344,7 +344,7 @@ pub mod test {
                             //
                             let mut total_fees_paid: u64 = 0;
                             let fee_transaction = &block.get_transactions()[block_fee_tx_idx];
-                            for output in fee_transaction.get_outputs() {
+                            for output in fee_transaction.outputs.iter() {
                                 total_fees_paid += output.amount;
                             }
 

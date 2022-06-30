@@ -15,11 +15,11 @@ pub const HOP_SIZE: usize = 130;
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Hop {
     #[serde_as(as = "[_; 33]")]
-    from: SaitoPublicKey,
+    pub(crate) from: SaitoPublicKey,
     #[serde_as(as = "[_; 33]")]
-    to: SaitoPublicKey,
+    pub(crate) to: SaitoPublicKey,
     #[serde_as(as = "[_; 64]")]
-    sig: SaitoSignature,
+    pub(crate) sig: SaitoSignature,
 }
 
 impl Hop {
@@ -45,39 +45,15 @@ impl Hop {
         // msg-to-sign is hash of transaction signature + next_peer.public_key
         //
         let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(tx.get_signature());
+        vbytes.extend(tx.signature);
         vbytes.extend(&to_public_key);
         let hash_to_sign = hash(&vbytes);
 
-        hop.set_from(wallet.public_key);
-        hop.set_to(to_public_key);
-        hop.set_sig(sign(&hash_to_sign, wallet.private_key));
+        hop.from = wallet.public_key;
+        hop.to = to_public_key;
+        hop.sig = sign(&hash_to_sign, wallet.private_key);
 
         hop
-    }
-
-    pub fn get_from(&self) -> SaitoPublicKey {
-        self.from
-    }
-
-    pub fn get_to(&self) -> SaitoPublicKey {
-        self.to
-    }
-
-    pub fn get_sig(&self) -> SaitoSignature {
-        self.sig
-    }
-
-    pub fn set_from(&mut self, from: SaitoPublicKey) {
-        self.from = from
-    }
-
-    pub fn set_to(&mut self, to: SaitoPublicKey) {
-        self.to = to
-    }
-
-    pub fn set_sig(&mut self, sig: SaitoSignature) {
-        self.sig = sig
     }
 
     pub fn deserialize_from_net(bytes: Vec<u8>) -> Hop {
@@ -86,28 +62,28 @@ impl Hop {
         let sig: SaitoSignature = bytes[66..130].try_into().unwrap();
 
         let mut hop = Hop::new();
-        hop.set_from(from);
-        hop.set_to(to);
-        hop.set_sig(sig);
+        hop.from = from;
+        hop.to = to;
+        hop.sig = sig;
 
         hop
     }
 
     pub fn serialize_for_net(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.get_from());
-        vbytes.extend(&self.get_to());
-        vbytes.extend(&self.get_sig());
+        vbytes.extend(&self.from);
+        vbytes.extend(&self.to);
+        vbytes.extend(&self.sig);
         vbytes
     }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use super::*;
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::hop::Hop;
+
+    use super::*;
 
     #[test]
     fn hop_new_test() {

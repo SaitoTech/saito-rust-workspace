@@ -118,12 +118,12 @@ impl Wallet {
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
         if lc {
             for tx in block.get_transactions() {
-                for input in tx.get_inputs() {
+                for input in tx.inputs.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         self.delete_slip(input);
                     }
                 }
-                for output in tx.get_outputs() {
+                for output in tx.outputs.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
                         self.add_slip(block, tx, output, true);
                     }
@@ -131,12 +131,12 @@ impl Wallet {
             }
         } else {
             for tx in block.get_transactions() {
-                for input in tx.get_inputs() {
+                for input in tx.inputs.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         self.add_slip(block, tx, input, true);
                     }
                 }
-                for output in tx.get_outputs() {
+                for output in tx.outputs.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
                         self.delete_slip(output);
                     }
@@ -150,10 +150,10 @@ impl Wallet {
     //
     pub fn delete_block(&mut self, block: &Block) {
         for tx in block.get_transactions() {
-            for input in tx.get_inputs() {
+            for input in tx.inputs.iter() {
                 self.delete_slip(input);
             }
-            for output in tx.get_outputs() {
+            for output in tx.outputs.iter() {
                 if output.amount > 0 {
                     self.delete_slip(output);
                 }
@@ -164,7 +164,7 @@ impl Wallet {
     pub fn add_slip(&mut self, block: &Block, transaction: &Transaction, slip: &Slip, lc: bool) {
         let mut wallet_slip = WalletSlip::new();
 
-        wallet_slip.uuid = transaction.get_hash_for_signature().unwrap();
+        wallet_slip.uuid = transaction.hash_for_signature.unwrap();
         wallet_slip.utxokey = slip.get_utxoset_key();
         wallet_slip.amount = slip.amount;
         wallet_slip.slip_index = slip.slip_index;
@@ -270,8 +270,8 @@ impl Wallet {
         let mut transaction = Transaction::new();
 
         // for now we'll use bincode to de/serialize
-        transaction.set_transaction_type(TransactionType::GoldenTicket);
-        transaction.set_message(golden_ticket.serialize_for_net());
+        transaction.transaction_type = TransactionType::GoldenTicket;
+        transaction.message = golden_ticket.serialize_for_net();
 
         let mut input1 = Slip::new();
         input1.public_key = self.public_key;
@@ -287,7 +287,7 @@ impl Wallet {
         transaction.add_output(output1);
 
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
-        transaction.set_hash_for_signature(hash_for_signature);
+        transaction.hash_for_signature = Some(hash_for_signature);
 
         transaction.sign(self.private_key);
 

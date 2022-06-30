@@ -93,7 +93,7 @@ impl Mempool {
     ) {
         trace!(
             "add transaction if validates : {:?}",
-            hex::encode(transaction.get_hash_for_signature().unwrap())
+            hex::encode(transaction.hash_for_signature.unwrap())
         );
         //
         // validate
@@ -103,17 +103,17 @@ impl Mempool {
         } else {
             debug!(
                 "transaction not valid : {:?}",
-                transaction.get_hash_for_signature().unwrap()
+                transaction.hash_for_signature.unwrap()
             );
         }
     }
     pub async fn add_transaction(&mut self, mut transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
-            hex::encode(transaction.get_hash_for_signature().unwrap()),
-            transaction.get_transaction_type()
+            hex::encode(transaction.hash_for_signature.unwrap()),
+            transaction.transaction_type
         );
-        let tx_sig_to_insert = transaction.get_signature();
+        let tx_sig_to_insert = transaction.signature;
 
         //
         // this assigns the amount of routing work that this transaction
@@ -136,11 +136,11 @@ impl Mempool {
         if self
             .transactions
             .iter()
-            .any(|transaction| transaction.get_signature() == tx_sig_to_insert)
+            .any(|transaction| transaction.signature == tx_sig_to_insert)
         {
         } else {
-            println!("Here we are with sig 2: {}", transaction.get_total_work());
-            self.routing_work_in_mempool += transaction.get_total_work();
+            println!("Here we are with sig 2: {}", transaction.total_work);
+            self.routing_work_in_mempool += transaction.total_work;
             println!("Here we are with sig 3: {}", self.routing_work_in_mempool);
             self.transactions.push(transaction);
         }
@@ -209,17 +209,17 @@ impl Mempool {
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         let mut tx_hashmap = HashMap::new();
         for transaction in transactions {
-            let hash = transaction.get_hash_for_signature();
+            let hash = transaction.hash_for_signature;
             tx_hashmap.entry(hash).or_insert(true);
         }
 
         self.routing_work_in_mempool = 0;
 
         self.transactions
-            .retain(|x| tx_hashmap.contains_key(&x.get_hash_for_signature()) != true);
+            .retain(|x| tx_hashmap.contains_key(&x.hash_for_signature) != true);
 
         for transaction in &self.transactions {
-            self.routing_work_in_mempool += transaction.get_total_work();
+            self.routing_work_in_mempool += transaction.total_work;
         }
     }
 
@@ -260,7 +260,7 @@ impl Mempool {
     pub fn transaction_exists(&self, tx_hash: Option<SaitoHash>) -> bool {
         self.transactions
             .iter()
-            .any(|transaction| transaction.get_hash_for_signature() == tx_hash)
+            .any(|transaction| transaction.hash_for_signature == tx_hash)
     }
 }
 
@@ -334,7 +334,7 @@ mod tests {
                 tx.outputs = outputs;
                 // _i prevents sig from being identical during test
                 // and thus from being auto-rejected from mempool
-                tx.set_timestamp(ts + 120000 + _i);
+                tx.timestamp = ts + 120000 + _i;
                 tx.generate(public_key);
                 tx.sign(private_key);
             }

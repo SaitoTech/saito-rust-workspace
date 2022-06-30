@@ -794,7 +794,7 @@ impl Blockchain {
             let mut return_value = false;
             if let Some(block) = self.get_block_sync(&new_chain[0]) {
                 for transaction in block.get_transactions() {
-                    if transaction.get_transaction_type() == TransactionType::GoldenTicket {
+                    if transaction.transaction_type == TransactionType::GoldenTicket {
                         return_value = true;
                         break;
                     }

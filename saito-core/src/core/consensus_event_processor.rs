@@ -106,12 +106,10 @@ impl ConsensusEventProcessor {
         for _i in 0..txs_to_generate {
             let mut transaction =
                 Transaction::create(wallet_lock_clone.clone(), public_key, 5000, 5000).await;
-            transaction.set_message(
-                (0..bytes_per_tx)
-                    .into_iter()
-                    .map(|_| rand::random::<u8>())
-                    .collect(),
-            );
+            transaction.message = (0..bytes_per_tx)
+                .into_iter()
+                .map(|_| rand::random::<u8>())
+                .collect();
             transaction.generate(public_key);
             transaction.sign(private_key);
 
