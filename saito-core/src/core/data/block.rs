@@ -770,7 +770,7 @@ impl Block {
 
                     for input in transaction.get_inputs() {
                         self.total_rebroadcast_slips += 1;
-                        self.total_rebroadcast_nolan += input.get_amount();
+                        self.total_rebroadcast_nolan += input.amount;
                     }
                 }
                 _ => {}
@@ -877,8 +877,8 @@ impl Block {
                         // valid means spendable and non-zero
                         //HACK
                         if output.validate(&blockchain.utxoset) {
-                            if output.get_amount() > UTXO_ADJUSTMENT {
-                                cv.total_rebroadcast_nolan += output.get_amount();
+                            if output.amount > UTXO_ADJUSTMENT {
+                                cv.total_rebroadcast_nolan += output.amount;
                                 cv.total_rebroadcast_fees_nolan += REBROADCAST_FEE;
                                 cv.total_rebroadcast_staking_payouts_nolan += STAKING_SUBSIDY;
                                 cv.total_rebroadcast_slips += 1;
@@ -911,7 +911,7 @@ impl Block {
                                 // change this if the DUST becomes a significant enough amount
                                 // each block to reduce consensus security.
                                 //
-                                cv.total_rebroadcast_fees_nolan += output.get_amount();
+                                cv.total_rebroadcast_fees_nolan += output.amount;
                             }
                         }
                     }
@@ -1108,19 +1108,19 @@ impl Block {
             for i in 0..cv.block_payout.len() {
                 if cv.block_payout[i].miner != [0; 33] {
                     let mut output = Slip::new();
-                    output.set_publickey(cv.block_payout[i].miner);
-                    output.set_amount(cv.block_payout[i].miner_payout);
-                    output.set_slip_type(SlipType::MinerOutput);
-                    output.set_slip_index(slip_index);
+                    output.public_key = cv.block_payout[i].miner;
+                    output.amount = cv.block_payout[i].miner_payout;
+                    output.slip_type = SlipType::MinerOutput;
+                    output.slip_index = slip_index;
                     transaction.add_output(output.clone());
                     slip_index += 1;
                 }
                 if cv.block_payout[i].router != [0; 33] {
                     let mut output = Slip::new();
-                    output.set_publickey(cv.block_payout[i].router);
-                    output.set_amount(cv.block_payout[i].router_payout);
-                    output.set_slip_type(SlipType::RouterOutput);
-                    output.set_slip_index(slip_index);
+                    output.public_key = cv.block_payout[i].router;
+                    output.amount = cv.block_payout[i].router_payout;
+                    output.slip_type = SlipType::RouterOutput;
+                    output.slip_index = slip_index;
                     transaction.add_output(output.clone());
                     slip_index += 1;
                 }
@@ -1905,15 +1905,16 @@ impl Block {
 
 #[cfg(test)]
 mod tests {
+    use ahash::AHashMap;
+    use futures::future::join_all;
+    use hex::FromHex;
+
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::verify;
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
-    use ahash::AHashMap;
-    use futures::future::join_all;
-    use hex::FromHex;
 
     #[test]
     fn block_new_test() {
@@ -2127,6 +2128,7 @@ mod tests {
         assert!(block.get_merkle_root().len() == 32);
         assert_ne!(block.get_merkle_root(), [0; 32]);
     }
+
     #[tokio::test]
     #[serial_test::serial]
     // downgrade and upgrade a block with transactions

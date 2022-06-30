@@ -306,10 +306,10 @@ pub mod test {
                         block_fee_tx_idx = t as usize;
                     } else {
                         for z in 0..block.get_transactions()[t].inputs.len() {
-                            block_inputs += block.get_transactions()[t].inputs[z].get_amount();
+                            block_inputs += block.get_transactions()[t].inputs[z].amount;
                         }
                         for z in 0..block.get_transactions()[t].outputs.len() {
-                            block_outputs += block.get_transactions()[t].outputs[z].get_amount();
+                            block_outputs += block.get_transactions()[t].outputs[z].amount;
                         }
                     }
 
@@ -345,7 +345,7 @@ pub mod test {
                             let mut total_fees_paid: u64 = 0;
                             let fee_transaction = &block.get_transactions()[block_fee_tx_idx];
                             for output in fee_transaction.get_outputs() {
-                                total_fees_paid += output.get_amount();
+                                total_fees_paid += output.amount;
                             }
 
                             current_supply -= block_inputs;

@@ -25,32 +25,32 @@ pub const WALLET_SIZE: usize = 65;
 ///
 #[derive(Clone, Debug, PartialEq)]
 pub struct WalletSlip {
-    uuid: SaitoHash,
-    utxokey: SaitoUTXOSetKey,
-    amount: u64,
-    block_id: u64,
-    block_hash: SaitoHash,
-    lc: bool,
-    slip_index: u8,
-    spent: bool,
+    pub uuid: SaitoHash,
+    pub utxokey: SaitoUTXOSetKey,
+    pub amount: u64,
+    pub block_id: u64,
+    pub block_hash: SaitoHash,
+    pub lc: bool,
+    pub slip_index: u8,
+    pub spent: bool,
 }
 
 /// The `Wallet` manages the public and private keypair of the node and holds the
 /// slips that are used to form transactions on the network.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Wallet {
-    pub publickey: SaitoPublicKey,
+    pub public_key: SaitoPublicKey,
     pub privatekey: SaitoPrivateKey,
     slips: Vec<WalletSlip>,
-    filename: String,
-    filepass: String,
+    pub filename: String,
+    pub filepass: String,
 }
 
 impl Wallet {
     pub fn new() -> Wallet {
         let (publickey, privatekey) = generate_keys();
         Wallet {
-            publickey,
+            public_key: publickey,
             privatekey,
             slips: vec![],
             filename: "default".to_string(),
@@ -81,7 +81,7 @@ impl Wallet {
         password: Option<&str>,
         storage: &mut Storage,
     ) {
-        self.set_filename(wallet_path.to_string());
+        self.filename = wallet_path.to_string();
         self.set_password(password.unwrap().to_string());
         self.load(storage).await;
     }
@@ -103,7 +103,7 @@ impl Wallet {
         let mut vbytes: Vec<u8> = vec![];
 
         vbytes.extend(&self.privatekey);
-        vbytes.extend(&self.publickey);
+        vbytes.extend(&self.public_key);
 
         vbytes
     }
@@ -112,19 +112,19 @@ impl Wallet {
     /// [publickey - 33 bytes]
     pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
         self.privatekey = bytes[0..32].try_into().unwrap();
-        self.publickey = bytes[32..65].try_into().unwrap();
+        self.public_key = bytes[32..65].try_into().unwrap();
     }
 
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
         if lc {
             for tx in block.get_transactions() {
                 for input in tx.get_inputs() {
-                    if input.get_amount() > 0 && input.get_publickey() == self.get_publickey() {
+                    if input.amount > 0 && input.public_key == self.get_publickey() {
                         self.delete_slip(input);
                     }
                 }
                 for output in tx.get_outputs() {
-                    if output.get_amount() > 0 && output.get_publickey() == self.get_publickey() {
+                    if output.amount > 0 && output.public_key == self.get_publickey() {
                         self.add_slip(block, tx, output, true);
                     }
                 }
@@ -132,12 +132,12 @@ impl Wallet {
         } else {
             for tx in block.get_transactions() {
                 for input in tx.get_inputs() {
-                    if input.get_amount() > 0 && input.get_publickey() == self.get_publickey() {
+                    if input.amount > 0 && input.public_key == self.get_publickey() {
                         self.add_slip(block, tx, input, true);
                     }
                 }
                 for output in tx.get_outputs() {
-                    if output.get_amount() > 0 && output.get_publickey() == self.get_publickey() {
+                    if output.amount > 0 && output.public_key == self.get_publickey() {
                         self.delete_slip(output);
                     }
                 }
@@ -154,7 +154,7 @@ impl Wallet {
                 self.delete_slip(input);
             }
             for output in tx.get_outputs() {
-                if output.get_amount() > 0 {
+                if output.amount > 0 {
                     self.delete_slip(output);
                 }
             }
@@ -164,20 +164,19 @@ impl Wallet {
     pub fn add_slip(&mut self, block: &Block, transaction: &Transaction, slip: &Slip, lc: bool) {
         let mut wallet_slip = WalletSlip::new();
 
-        wallet_slip.set_uuid(transaction.get_hash_for_signature().unwrap());
-        wallet_slip.set_utxokey(slip.get_utxoset_key());
-        wallet_slip.set_amount(slip.get_amount());
-        wallet_slip.set_slip_index(slip.get_slip_index());
-        wallet_slip.set_block_id(block.get_id());
-        wallet_slip.set_block_hash(block.get_hash());
-        wallet_slip.set_lc(lc);
+        wallet_slip.uuid = transaction.get_hash_for_signature().unwrap();
+        wallet_slip.utxokey = slip.get_utxoset_key();
+        wallet_slip.amount = slip.amount;
+        wallet_slip.slip_index = slip.slip_index;
+        wallet_slip.block_id = block.get_id();
+        wallet_slip.block_hash = block.get_hash();
+        wallet_slip.lc = lc;
         self.slips.push(wallet_slip);
     }
 
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.slips.retain(|x| {
-            x.get_uuid() != slip.get_uuid() || x.get_slip_index() != slip.get_slip_index()
-        });
+        self.slips
+            .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
     pub fn get_privatekey(&self) -> SaitoPrivateKey {
@@ -185,19 +184,7 @@ impl Wallet {
     }
 
     pub fn get_publickey(&self) -> SaitoPublicKey {
-        self.publickey
-    }
-
-    pub fn set_privatekey(&mut self, privatekey: SaitoPrivateKey) {
-        self.privatekey = privatekey;
-    }
-
-    pub fn set_publickey(&mut self, publickey: SaitoPublicKey) {
-        self.publickey = publickey;
-    }
-
-    pub fn set_filename(&mut self, filename: String) {
-        self.filename = filename;
+        self.public_key
     }
 
     pub fn set_password(&mut self, filepass: String) {
@@ -215,8 +202,8 @@ impl Wallet {
     pub fn get_available_balance(&self) -> u64 {
         let mut available_balance: u64 = 0;
         for slip in &self.slips {
-            if !slip.get_spent() {
-                available_balance += slip.get_amount();
+            if !slip.spent {
+                available_balance += slip.amount;
             }
         }
         available_balance
@@ -236,18 +223,18 @@ impl Wallet {
         // grab inputs
         //
         for slip in &mut self.slips {
-            if !slip.get_spent() {
+            if !slip.spent {
                 if nolan_in < nolan_requested {
-                    nolan_in += slip.get_amount();
+                    nolan_in += slip.amount;
 
                     let mut input = Slip::new();
-                    input.set_publickey(my_publickey);
-                    input.set_amount(slip.get_amount());
-                    input.set_uuid(slip.get_uuid());
-                    input.set_slip_index(slip.get_slip_index());
+                    input.public_key = my_publickey;
+                    input.amount = slip.amount;
+                    input.uuid = slip.uuid;
+                    input.slip_index = slip.slip_index;
                     inputs.push(input);
 
-                    slip.set_spent(true);
+                    slip.spent = true;
                 }
             }
         }
@@ -263,8 +250,8 @@ impl Wallet {
         // add change address
         //
         let mut output = Slip::new();
-        output.set_publickey(my_publickey);
-        output.set_amount(nolan_out);
+        output.public_key = my_publickey;
+        output.amount = nolan_out;
         outputs.push(output);
 
         //
@@ -272,16 +259,16 @@ impl Wallet {
         //
         if inputs.is_empty() {
             let mut input = Slip::new();
-            input.set_publickey(my_publickey);
-            input.set_amount(0);
-            input.set_uuid([0; 32]);
+            input.public_key = my_publickey;
+            input.amount = 0;
+            input.uuid = [0; 32];
             inputs.push(input);
         }
         if outputs.is_empty() {
             let mut output = Slip::new();
-            output.set_publickey(my_publickey);
-            output.set_amount(0);
-            output.set_uuid([0; 32]);
+            output.public_key = my_publickey;
+            output.amount = 0;
+            output.uuid = [0; 32];
             outputs.push(output);
         }
 
@@ -307,14 +294,14 @@ impl Wallet {
         transaction.set_message(golden_ticket.serialize_for_net());
 
         let mut input1 = Slip::new();
-        input1.set_publickey(self.get_publickey());
-        input1.set_amount(0);
-        input1.set_uuid([0; 32]);
+        input1.public_key = self.get_publickey();
+        input1.amount = 0;
+        input1.uuid = [0; 32];
 
         let mut output1 = Slip::new();
-        output1.set_publickey(self.get_publickey());
-        output1.set_amount(0);
-        output1.set_uuid([0; 32]);
+        output1.public_key = self.get_publickey();
+        output1.amount = 0;
+        output1.uuid = [0; 32];
 
         transaction.add_input(input1);
         transaction.add_output(output1);
@@ -342,79 +329,17 @@ impl WalletSlip {
             spent: false,
         }
     }
-
-    pub fn get_uuid(&self) -> SaitoHash {
-        self.uuid
-    }
-
-    pub fn get_utxokey(&self) -> &SaitoUTXOSetKey {
-        &self.utxokey
-    }
-
-    pub fn get_amount(&self) -> u64 {
-        self.amount
-    }
-
-    pub fn get_block_id(&self) -> u64 {
-        self.block_id
-    }
-
-    pub fn get_block_hash(&self) -> SaitoHash {
-        self.block_hash
-    }
-
-    pub fn get_lc(&self) -> bool {
-        self.lc
-    }
-
-    pub fn get_slip_index(&self) -> u8 {
-        self.slip_index
-    }
-
-    pub fn get_spent(&self) -> bool {
-        self.spent
-    }
-
-    pub fn set_spent(&mut self, spent: bool) {
-        self.spent = spent;
-    }
-
-    pub fn set_uuid(&mut self, hash: SaitoHash) {
-        self.uuid = hash;
-    }
-
-    pub fn set_utxokey(&mut self, utxokey: SaitoUTXOSetKey) {
-        self.utxokey = utxokey;
-    }
-
-    pub fn set_amount(&mut self, amount: u64) {
-        self.amount = amount;
-    }
-
-    pub fn set_block_id(&mut self, id: u64) {
-        self.block_id = id;
-    }
-
-    pub fn set_block_hash(&mut self, hash: SaitoHash) {
-        self.block_hash = hash;
-    }
-
-    pub fn set_lc(&mut self, lc: bool) {
-        self.lc = lc;
-    }
-
-    pub fn set_slip_index(&mut self, slip_index: u8) {
-        self.slip_index = slip_index;
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use log::info;
+
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::wallet::Wallet;
-    use log::info;
+
+    use super::*;
 
     #[test]
     fn wallet_new_test() {
@@ -432,6 +357,7 @@ mod tests {
         wallet2.deserialize_from_disk(&serialized);
         assert_eq!(wallet1, wallet2);
     }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn save_and_restore_wallet_test() {

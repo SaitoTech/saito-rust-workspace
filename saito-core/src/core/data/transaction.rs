@@ -186,8 +186,8 @@ impl Transaction {
 
             // add the payment
             let mut output = Slip::new();
-            output.set_publickey(to_publickey);
-            output.set_amount(with_payment);
+            output.public_key = to_publickey;
+            output.amount = with_payment;
             transaction.add_output(output);
 
             transaction
@@ -209,8 +209,8 @@ impl Transaction {
 
                 // add the payment
                 let mut output = Slip::new();
-                output.set_publickey(to_publickey);
-                output.set_amount(with_payment);
+                output.public_key = to_publickey;
+                output.amount = with_payment;
                 transaction.add_output(output);
 
                 return transaction;
@@ -242,15 +242,15 @@ impl Transaction {
             let mut transaction = Transaction::new();
 
             let mut input1 = Slip::new();
-            input1.set_publickey(to_publickey);
-            input1.set_amount(0);
+            input1.public_key = to_publickey;
+            input1.amount = 0;
             let random_uuid = hash(&generate_random_bytes(32));
-            input1.set_uuid(random_uuid);
+            input1.uuid = random_uuid;
 
             let mut output1 = Slip::new();
-            output1.set_publickey(wallet_publickey);
-            output1.set_amount(0);
-            output1.set_uuid([0; 32]);
+            output1.public_key = wallet_publickey;
+            output1.amount = 0;
+            output1.uuid = [0; 32];
 
             transaction.add_input(input1);
             transaction.add_output(output1);
@@ -278,9 +278,9 @@ impl Transaction {
         let mut transaction = Transaction::new();
         transaction.set_transaction_type(TransactionType::Vip);
         let mut output = Slip::new();
-        output.set_publickey(to_publickey);
-        output.set_amount(with_amount);
-        output.set_slip_type(SlipType::VipOutput);
+        output.public_key = to_publickey;
+        output.amount = with_amount;
+        output.slip_type = SlipType::VipOutput;
         transaction.add_output(output);
         transaction
     }
@@ -309,18 +309,17 @@ impl Transaction {
     ) -> Transaction {
         let mut transaction = Transaction::new();
         let mut output_payment = 0;
-        if output_slip_to_rebroadcast.get_amount() > with_fee {
-            output_payment =
-                output_slip_to_rebroadcast.get_amount() - with_fee + with_staking_subsidy;
+        if output_slip_to_rebroadcast.amount > with_fee {
+            output_payment = output_slip_to_rebroadcast.amount - with_fee + with_staking_subsidy;
         }
 
         transaction.set_transaction_type(TransactionType::ATR);
 
         let mut output = Slip::new();
-        output.set_publickey(output_slip_to_rebroadcast.get_publickey());
-        output.set_amount(output_payment);
-        output.set_slip_type(SlipType::ATR);
-        output.set_uuid(output_slip_to_rebroadcast.get_uuid());
+        output.public_key = output_slip_to_rebroadcast.public_key;
+        output.amount = output_payment;
+        output.slip_type = SlipType::ATR;
+        output.uuid = output_slip_to_rebroadcast.uuid;
 
         //
         // if this is the FIRST time we are rebroadcasting, we copy the
@@ -333,7 +332,7 @@ impl Transaction {
         // the message field with the original transaction (which is
         // by definition already in the previous TX message space.
         //
-        if output_slip_to_rebroadcast.get_slip_type() == SlipType::ATR {
+        if output_slip_to_rebroadcast.slip_type == SlipType::ATR {
             transaction.set_message(transaction_to_rebroadcast.get_message().to_vec());
         } else {
             transaction.set_message(transaction_to_rebroadcast.serialize_for_net().to_vec());
@@ -498,17 +497,17 @@ impl Transaction {
         // generate utxoset key for every slip
         //
         for input in &mut self.inputs {
-            nolan_in += input.get_amount();
+            nolan_in += input.amount;
             input.generate_utxoset_key();
         }
         for output in &mut self.outputs {
-            nolan_out += output.get_amount();
+            nolan_out += output.amount;
             //
             // new outbound slips
             //
             if let Some(hash_for_signature) = hash_for_signature {
-                if output.get_slip_type() != SlipType::ATR {
-                    output.set_uuid(hash_for_signature);
+                if output.slip_type != SlipType::ATR {
+                    output.uuid = hash_for_signature;
                 }
             }
             output.generate_utxoset_key();
@@ -637,7 +636,7 @@ impl Transaction {
         //
         if self.path.is_empty() {
             if !self.inputs.is_empty() {
-                return self.inputs[0].get_publickey();
+                return self.inputs[0].public_key;
             } else {
                 return [0; 33];
             }
@@ -817,7 +816,7 @@ impl Transaction {
         // we set slip ordinals when signing
         //
         for (i, output) in self.get_mut_outputs().iter_mut().enumerate() {
-            output.set_slip_index(i as u8);
+            output.slip_index = i as u8;
         }
 
         let hash_for_signature = hash(&self.serialize_for_signature());
@@ -871,7 +870,7 @@ impl Transaction {
             //
             if let Some(hash_for_signature) = self.get_hash_for_signature() {
                 let sig: SaitoSignature = self.get_signature();
-                let publickey: SaitoPublicKey = self.get_inputs()[0].get_publickey();
+                let publickey: SaitoPublicKey = self.get_inputs()[0].public_key;
                 if !verify(&hash_for_signature, sig, publickey) {
                     error!("message verifies not");
                     return false;
@@ -915,7 +914,7 @@ impl Transaction {
             {
                 warn!("{} in and {} out", self.total_in, self.total_out);
                 for z in self.get_outputs() {
-                    info!("{:?} --- ", z.get_amount());
+                    info!("{:?} --- ", z.amount);
                 }
                 error!("ERROR 672941: transaction spends more than it has available");
                 return false;
@@ -1051,7 +1050,7 @@ mod tests {
         tx.set_outputs(vec![Slip::new()]);
         tx.sign(wallet.get_privatekey());
 
-        assert_eq!(tx.get_outputs()[0].get_slip_index(), 0);
+        assert_eq!(tx.get_outputs()[0].slip_index, 0);
         assert_ne!(tx.get_signature(), [0; 64]);
         assert_ne!(tx.get_hash_for_signature(), Some([0; 32]));
     }
@@ -1075,38 +1074,30 @@ mod tests {
         ];
 
         let mut input_slip = Slip::new();
-        input_slip.set_publickey(
-            <[u8; 33]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
-            )
-            .unwrap(),
-        );
-        input_slip.set_uuid(
-            <[u8; 32]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-            )
-            .unwrap(),
-        );
-        input_slip.set_amount(123);
-        input_slip.set_slip_index(10);
-        input_slip.set_slip_type(SlipType::ATR);
+        input_slip.public_key = <[u8; 33]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+        )
+        .unwrap();
+        input_slip.uuid = <[u8; 32]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        )
+        .unwrap();
+        input_slip.amount = 123;
+        input_slip.slip_index = 10;
+        input_slip.slip_type = SlipType::ATR;
 
         let mut output_slip = Slip::new();
-        output_slip.set_publickey(
-            <[u8; 33]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
-            )
-            .unwrap(),
-        );
-        output_slip.set_uuid(
-            <[u8; 32]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-            )
-            .unwrap(),
-        );
-        output_slip.set_amount(345);
-        output_slip.set_slip_index(23);
-        output_slip.set_slip_type(SlipType::Normal);
+        output_slip.public_key = <[u8; 33]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+        )
+        .unwrap();
+        output_slip.uuid = <[u8; 32]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        )
+        .unwrap();
+        output_slip.amount = 345;
+        output_slip.slip_index = 23;
+        output_slip.slip_type = SlipType::Normal;
 
         tx.inputs.push(input_slip);
         tx.outputs.push(output_slip);
@@ -1138,38 +1129,30 @@ mod tests {
         ];
 
         let mut input_slip = Slip::new();
-        input_slip.set_publickey(
-            <[u8; 33]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
-            )
-            .unwrap(),
-        );
-        input_slip.set_uuid(
-            <[u8; 32]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-            )
-            .unwrap(),
-        );
-        input_slip.set_amount(123);
-        input_slip.set_slip_index(10);
-        input_slip.set_slip_type(SlipType::ATR);
+        input_slip.public_key = <[u8; 33]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+        )
+        .unwrap();
+        input_slip.uuid = <[u8; 32]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        )
+        .unwrap();
+        input_slip.amount = 123;
+        input_slip.slip_index = 10;
+        input_slip.slip_type = SlipType::ATR;
 
         let mut output_slip = Slip::new();
-        output_slip.set_publickey(
-            <[u8; 33]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
-            )
-            .unwrap(),
-        );
-        output_slip.set_uuid(
-            <[u8; 32]>::from_hex(
-                "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-            )
-            .unwrap(),
-        );
-        output_slip.set_amount(345);
-        output_slip.set_slip_index(23);
-        output_slip.set_slip_type(SlipType::Normal);
+        output_slip.public_key = <[u8; 33]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
+        )
+        .unwrap();
+        output_slip.uuid = <[u8; 32]>::from_hex(
+            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        )
+        .unwrap();
+        output_slip.amount = 345;
+        output_slip.slip_index = 23;
+        output_slip.slip_type = SlipType::Normal;
 
         tx.inputs.push(input_slip);
         tx.outputs.push(output_slip);

@@ -25,20 +25,20 @@ pub enum SlipType {
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Slip {
     #[serde_as(as = "[_; 33]")]
-    publickey: SaitoPublicKey,
-    amount: u64,
-    slip_index: u8,
-    slip_type: SlipType,
-    uuid: SaitoHash,
+    pub public_key: SaitoPublicKey,
+    pub amount: u64,
+    pub slip_index: u8,
+    pub slip_type: SlipType,
+    pub uuid: SaitoHash,
     #[serde_as(as = "[_; 74]")]
-    utxoset_key: SaitoUTXOSetKey,
-    is_utxoset_key_set: bool,
+    pub utxoset_key: SaitoUTXOSetKey,
+    pub is_utxoset_key_set: bool,
 }
 
 impl Slip {
     pub fn new() -> Self {
         Self {
-            publickey: [0; 33],
+            public_key: [0; 33],
             amount: 0,
             slip_index: 0,
             slip_type: SlipType::Normal,
@@ -68,11 +68,11 @@ impl Slip {
         let slip_type: SlipType = FromPrimitive::from_u8(bytes[SLIP_SIZE - 1]).unwrap();
         let mut slip = Slip::new();
 
-        slip.set_publickey(publickey);
-        slip.set_uuid(uuid);
-        slip.set_amount(amount);
-        slip.set_slip_index(slip_index);
-        slip.set_slip_type(slip_type);
+        slip.public_key = publickey;
+        slip.uuid = uuid;
+        slip.amount = amount;
+        slip.slip_index = slip_index;
+        slip.slip_type = slip_type;
 
         slip
     }
@@ -88,39 +88,16 @@ impl Slip {
     // 1 byte slip_index
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
         let mut res: Vec<u8> = vec![];
-        res.extend(&self.get_publickey());
-        res.extend(&self.get_uuid());
-        res.extend(&self.get_amount().to_be_bytes());
-        res.extend(&self.get_slip_index().to_be_bytes());
+        res.extend(&self.public_key);
+        res.extend(&self.uuid);
+        res.extend(&self.amount.to_be_bytes());
+        res.extend(&self.slip_index.to_be_bytes());
 
         res[0..74].try_into().unwrap()
     }
 
-    //
-    // Getters and Setters
-    //
-    pub fn get_publickey(&self) -> SaitoPublicKey {
-        self.publickey
-    }
-
-    pub fn get_amount(&self) -> u64 {
-        self.amount
-    }
-
-    pub fn get_uuid(&self) -> SaitoHash {
-        self.uuid
-    }
-
-    pub fn get_slip_index(&self) -> u8 {
-        self.slip_index
-    }
-
-    pub fn get_slip_type(&self) -> SlipType {
-        self.slip_type
-    }
-
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
-        if self.get_amount() > 0 {
+        if self.amount > 0 {
             if utxoset.contains_key(&self.utxoset_key) {
                 utxoset.insert(self.utxoset_key, spendable);
             } else {
@@ -129,29 +106,9 @@ impl Slip {
         }
     }
 
-    pub fn set_publickey(&mut self, publickey: SaitoPublicKey) {
-        self.publickey = publickey;
-    }
-
-    pub fn set_amount(&mut self, amount: u64) {
-        self.amount = amount;
-    }
-
-    pub fn set_uuid(&mut self, uuid: SaitoHash) {
-        self.uuid = uuid;
-    }
-
-    pub fn set_slip_index(&mut self, slip_index: u8) {
-        self.slip_index = slip_index;
-    }
-
-    pub fn set_slip_type(&mut self, slip_type: SlipType) {
-        self.slip_type = slip_type;
-    }
-
     pub fn serialize_for_net(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.publickey);
+        vbytes.extend(&self.public_key);
         vbytes.extend(&self.uuid);
         vbytes.extend(&self.amount.to_be_bytes());
         vbytes.extend(&self.slip_index.to_be_bytes());
@@ -161,7 +118,7 @@ impl Slip {
 
     pub fn serialize_input_for_signature(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.publickey);
+        vbytes.extend(&self.public_key);
         vbytes.extend(&self.uuid);
         vbytes.extend(&self.amount.to_be_bytes());
         vbytes.extend(&(self.slip_index.to_be_bytes()));
@@ -171,7 +128,7 @@ impl Slip {
 
     pub fn serialize_output_for_signature(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.publickey);
+        vbytes.extend(&self.public_key);
         vbytes.extend(&[0; 32]);
         vbytes.extend(&self.amount.to_be_bytes());
         vbytes.extend(&(self.slip_index.to_be_bytes()));
@@ -180,7 +137,7 @@ impl Slip {
     }
 
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
-        if self.get_amount() > 0 {
+        if self.amount > 0 {
             match utxoset.get(&self.utxoset_key) {
                 Some(value) => {
                     if *value == true {
@@ -199,9 +156,9 @@ impl Slip {
                     error!(
                         "value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
                         hex::encode(self.utxoset_key),
-                        self.get_slip_type(),
-                        self.get_slip_index(),
-                        self.get_amount()
+                        self.slip_type,
+                        self.slip_index,
+                        self.amount
                     );
                     false
                 }
@@ -227,26 +184,26 @@ mod tests {
     #[test]
     fn slip_new_test() {
         let mut slip = Slip::new();
-        assert_eq!(slip.get_publickey(), [0; 33]);
-        assert_eq!(slip.get_uuid(), [0; 32]);
-        assert_eq!(slip.get_amount(), 0);
-        assert_eq!(slip.get_slip_type(), SlipType::Normal);
-        assert_eq!(slip.get_slip_index(), 0);
+        assert_eq!(slip.public_key, [0; 33]);
+        assert_eq!(slip.uuid, [0; 32]);
+        assert_eq!(slip.amount, 0);
+        assert_eq!(slip.slip_type, SlipType::Normal);
+        assert_eq!(slip.slip_index, 0);
 
-        slip.set_publickey([1; 33]);
-        assert_eq!(slip.get_publickey(), [1; 33]);
+        slip.public_key = [1; 33];
+        assert_eq!(slip.public_key, [1; 33]);
 
-        slip.set_amount(100);
-        assert_eq!(slip.get_amount(), 100);
+        slip.amount = 100;
+        assert_eq!(slip.amount, 100);
 
-        slip.set_uuid([30; 32]);
-        assert_eq!(slip.get_uuid(), [30; 32]);
+        slip.uuid = [30; 32];
+        assert_eq!(slip.uuid, [30; 32]);
 
-        slip.set_slip_index(1);
-        assert_eq!(slip.get_slip_index(), 1);
+        slip.slip_index = 1;
+        assert_eq!(slip.slip_index, 1);
 
-        slip.set_slip_type(SlipType::MinerInput);
-        assert_eq!(slip.get_slip_type(), SlipType::MinerInput);
+        slip.slip_type = SlipType::MinerInput;
+        assert_eq!(slip.slip_type, SlipType::MinerInput);
     }
 
     #[test]
@@ -280,13 +237,13 @@ mod tests {
         trace!("acquired the blockchain write lock");
 
         let mut slip = Slip::new();
-        slip.set_amount(100_000);
-        slip.set_uuid([1; 32]);
+        slip.amount = 100_000;
+        slip.uuid = [1; 32];
         {
             trace!("waiting for the wallet write lock");
             let wallet = wallet_lock.read().await;
             trace!("acquired the wallet write lock");
-            slip.set_publickey(wallet.get_publickey());
+            slip.public_key = wallet.get_publickey();
         }
         slip.generate_utxoset_key();
 

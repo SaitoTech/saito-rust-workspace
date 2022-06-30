@@ -51,7 +51,7 @@ impl Peer {
             block_fetch_url = configs.get_block_fetch_url();
         }
         let challenge = HandshakeChallenge {
-            public_key: wallet.publickey,
+            public_key: wallet.public_key,
             challenge: generate_random_bytes(32).try_into().unwrap(),
             block_fetch_url,
         };
@@ -87,7 +87,7 @@ impl Peer {
         self.block_fetch_url = challenge.block_fetch_url;
         let wallet = wallet.read().await;
         let response = HandshakeResponse {
-            public_key: wallet.publickey,
+            public_key: wallet.public_key,
             signature: sign(&challenge.challenge.to_vec(), wallet.privatekey),
             challenge: generate_random_bytes(32).try_into().unwrap(),
             block_fetch_url,

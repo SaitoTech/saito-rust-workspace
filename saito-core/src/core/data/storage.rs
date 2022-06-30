@@ -224,7 +224,7 @@ mod test {
         let mut total_issuance = 0;
 
         for i in 0..slips.len() {
-            total_issuance += slips[i].get_amount();
+            total_issuance += slips[i].amount;
         }
 
         assert_eq!(total_issuance, MAX_TOKEN_SUPPLY);
