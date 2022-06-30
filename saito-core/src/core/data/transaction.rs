@@ -19,10 +19,13 @@ pub const TRANSACTION_SIZE: usize = 89;
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone, FromPrimitive)]
 pub enum TransactionType {
     Normal,
+    /// Paying for the network
     Fee,
     GoldenTicket,
     ATR,
+    /// VIP transactions won't pay an ATR fee. (Issued to early investors)
     Vip,
+    /// Issues funds for an address at the start of the network
     Issuance,
     SPV,
 }
@@ -41,20 +44,20 @@ pub struct Transaction {
     signature: SaitoSignature,
     path: Vec<Hop>,
 
-    // hash used for merkle_root (does not include signature) and slip uuid
+    /// hash used for merkle_root (does not include signature) and slip uuid
     hash_for_signature: Option<SaitoHash>,
 
-    // total nolan in input slips
+    /// total nolan in input slips
     total_in: u64,
-    // total nolan in output slips
+    /// total nolan in output slips
     total_out: u64,
-    // total fees
+    /// total fees
     pub total_fees: u64,
-    // total work to creator
+    /// total work to creator
     pub total_work: u64,
-    // cumulative fees for this tx-in-block
+    /// cumulative fees for this tx-in-block
     pub cumulative_fees: u64,
-    // cumulative work for this tx-in-block
+    /// cumulative work for this tx-in-block
     pub cumulative_work: u64,
 }
 
@@ -89,25 +92,58 @@ impl Transaction {
         self.path.push(hop);
     }
 
-    //
-    // add input slip
-    //
+    /// add input slip
+    ///
+    /// # Arguments
+    ///
+    /// * `input_slip`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     pub fn add_input(&mut self, input_slip: Slip) {
         self.inputs.push(input_slip);
     }
 
-    //
-    // add output slip
-    //
+    /// add output slip
+    ///
+    /// # Arguments
+    ///
+    /// * `output_slip`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     pub fn add_output(&mut self, output_slip: Slip) {
         self.outputs.push(output_slip);
     }
 
-    //
-    // this function exists largely for testing. It attempts to attach the requested fee
-    // to the transaction if possible. If not possible it reverts back to a transaction
-    // with 1 zero-fee input and 1 zero-fee output.
-    //
+    /// this function exists largely for testing. It attempts to attach the requested fee
+    /// to the transaction if possible. If not possible it reverts back to a transaction
+    /// with 1 zero-fee input and 1 zero-fee output.
+    ///
+    /// # Arguments
+    ///
+    /// * `wallet_lock`:
+    /// * `to_publickey`:
+    /// * `with_payment`:
+    /// * `with_fee`:
+    ///
+    /// returns: Transaction
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     pub async fn create(
         wallet_lock: Arc<RwLock<Wallet>>,
         to_publickey: SaitoPublicKey,
@@ -223,6 +259,20 @@ impl Transaction {
         }
     }
 
+    ///
+    ///
+    /// # Arguments
+    ///
+    /// * `to_publickey`:
+    /// * `with_amount`:
+    ///
+    /// returns: Transaction
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     pub fn create_vip_transaction(to_publickey: SaitoPublicKey, with_amount: u64) -> Transaction {
         debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::new();
@@ -235,9 +285,22 @@ impl Transaction {
         transaction
     }
 
-    //
-    // create rebroadcast transaction
-    //
+    /// create rebroadcast transaction
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction_to_rebroadcast`:
+    /// * `output_slip_to_rebroadcast`:
+    /// * `with_fee`:
+    /// * `with_staking_subsidy`:
+    ///
+    /// returns: Transaction
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
         output_slip_to_rebroadcast: &Slip,
