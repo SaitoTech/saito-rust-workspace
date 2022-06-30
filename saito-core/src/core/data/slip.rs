@@ -61,14 +61,14 @@ impl Slip {
     }
 
     pub fn deserialize_from_net(bytes: Vec<u8>) -> Slip {
-        let publickey: SaitoPublicKey = bytes[..33].try_into().unwrap();
+        let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let uuid: SaitoHash = bytes[33..65].try_into().unwrap();
         let amount: u64 = u64::from_be_bytes(bytes[65..73].try_into().unwrap());
         let slip_index: u8 = bytes[73];
         let slip_type: SlipType = FromPrimitive::from_u8(bytes[SLIP_SIZE - 1]).unwrap();
         let mut slip = Slip::new();
 
-        slip.public_key = publickey;
+        slip.public_key = public_key;
         slip.uuid = uuid;
         slip.amount = amount;
         slip.slip_index = slip_index;
@@ -82,7 +82,7 @@ impl Slip {
         self.is_utxoset_key_set = true;
     }
 
-    // 33 bytes publickey
+    // 33 bytes public_key
     // 32 bytes uuid
     // 8 bytes amount
     // 1 byte slip_index
@@ -243,7 +243,7 @@ mod tests {
             trace!("waiting for the wallet write lock");
             let wallet = wallet_lock.read().await;
             trace!("acquired the wallet write lock");
-            slip.public_key = wallet.get_publickey();
+            slip.public_key = wallet.public_key;
         }
         slip.generate_utxoset_key();
 

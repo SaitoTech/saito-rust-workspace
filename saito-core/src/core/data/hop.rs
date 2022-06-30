@@ -33,7 +33,7 @@ impl Hop {
 
     pub async fn generate(
         wallet_lock: Arc<RwLock<Wallet>>,
-        to_publickey: SaitoPublicKey,
+        to_public_key: SaitoPublicKey,
         tx: &Transaction,
     ) -> Hop {
         trace!("waiting for the wallet read lock");
@@ -42,16 +42,16 @@ impl Hop {
         let mut hop = Hop::new();
 
         //
-        // msg-to-sign is hash of transaction signature + next_peer.publickey
+        // msg-to-sign is hash of transaction signature + next_peer.public_key
         //
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(tx.get_signature());
-        vbytes.extend(&to_publickey);
+        vbytes.extend(&to_public_key);
         let hash_to_sign = hash(&vbytes);
 
-        hop.set_from(wallet.get_publickey());
-        hop.set_to(to_publickey);
-        hop.set_sig(sign(&hash_to_sign, wallet.get_privatekey()));
+        hop.set_from(wallet.public_key);
+        hop.set_to(to_public_key);
+        hop.set_sig(sign(&hash_to_sign, wallet.private_key));
 
         hop
     }
@@ -120,29 +120,29 @@ mod tests {
     #[tokio::test]
     async fn generate_test() {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
-        let sender_publickey: SaitoPublicKey;
+        let sender_public_key: SaitoPublicKey;
 
         {
             let w = wallet.read().await;
-            sender_publickey = w.get_publickey();
+            sender_public_key = w.public_key;
         }
 
         let tx = Transaction::new();
-        let (receiver_publickey, _receiver_privatekey) = generate_keys();
+        let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let hop = Hop::generate(wallet, receiver_publickey, &tx).await;
+        let hop = Hop::generate(wallet, receiver_public_key, &tx).await;
 
-        assert_eq!(hop.from, sender_publickey);
-        assert_eq!(hop.to, receiver_publickey);
+        assert_eq!(hop.from, sender_public_key);
+        assert_eq!(hop.to, receiver_public_key);
     }
 
     #[tokio::test]
     async fn serialize_and_deserialize_test() {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         let tx = Transaction::new();
-        let (receiver_publickey, _receiver_privatekey) = generate_keys();
+        let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let hop = Hop::generate(wallet, receiver_publickey, &tx).await;
+        let hop = Hop::generate(wallet, receiver_public_key, &tx).await;
 
         let hop2 = Hop::deserialize_from_net(hop.serialize_for_net());
 

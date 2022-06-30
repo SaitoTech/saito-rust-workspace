@@ -260,22 +260,22 @@ mod tests {
         for i in 0..5 {
             let mut transaction = Transaction::new();
             transaction.set_timestamp(i);
-            transaction.sign(wallet.get_privatekey());
+            transaction.sign(wallet.private_key);
             transactions.push(transaction);
         }
 
         let tree1 = MerkleTree::generate(&transactions).unwrap();
 
         transactions[0].set_timestamp(10);
-        transactions[0].sign(wallet.get_privatekey());
+        transactions[0].sign(wallet.private_key);
         let tree2 = MerkleTree::generate(&transactions).unwrap();
 
         transactions[4].set_timestamp(11);
-        transactions[4].sign(wallet.get_privatekey());
+        transactions[4].sign(wallet.private_key);
         let tree3 = MerkleTree::generate(&transactions).unwrap();
 
         transactions[2].set_timestamp(12);
-        transactions[2].sign(wallet.get_privatekey());
+        transactions[2].sign(wallet.private_key);
         let tree4 = MerkleTree::generate(&transactions).unwrap();
         let tree5 = MerkleTree::generate(&transactions).unwrap();
 
@@ -301,7 +301,7 @@ mod tests {
         for i in 0..5 {
             let mut transaction = Transaction::new();
             transaction.set_timestamp(i);
-            transaction.sign(wallet.get_privatekey());
+            transaction.sign(wallet.private_key);
             transactions.push(transaction);
         }
 

@@ -88,7 +88,7 @@ impl Peer {
         let wallet = wallet.read().await;
         let response = HandshakeResponse {
             public_key: wallet.public_key,
-            signature: sign(&challenge.challenge.to_vec(), wallet.privatekey),
+            signature: sign(&challenge.challenge.to_vec(), wallet.private_key),
             challenge: generate_random_bytes(32).try_into().unwrap(),
             block_fetch_url,
         };
@@ -136,7 +136,7 @@ impl Peer {
         self.handshake_done = true;
         let wallet = wallet.read().await;
         let response = HandshakeCompletion {
-            signature: sign(&response.challenge, wallet.privatekey),
+            signature: sign(&response.challenge, wallet.private_key),
         };
         io_handler
             .send_message(
@@ -193,7 +193,6 @@ impl Peer {
 
 #[cfg(test)]
 mod tests {
-
     use crate::core::data::peer::Peer;
 
     #[test]

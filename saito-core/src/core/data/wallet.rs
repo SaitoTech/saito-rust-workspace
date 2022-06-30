@@ -17,7 +17,7 @@ pub const WALLET_SIZE: usize = 65;
 /// longest-chain.
 ///
 /// Please note that the wallet in this Saito Rust client is intended primarily
-/// to hold the public/privatekey and that slip-spending and tracking code is
+/// to hold the public/private_key and that slip-spending and tracking code is
 /// not coded in a way intended to be robust against chain-reorganizations but
 /// rather for testing of basic functions like transaction creation. Slips that
 /// are spent on one fork are not recaptured on chains, for instance, and once
@@ -40,7 +40,7 @@ pub struct WalletSlip {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
-    pub privatekey: SaitoPrivateKey,
+    pub private_key: SaitoPrivateKey,
     slips: Vec<WalletSlip>,
     pub filename: String,
     pub filepass: String,
@@ -48,10 +48,10 @@ pub struct Wallet {
 
 impl Wallet {
     pub fn new() -> Wallet {
-        let (publickey, privatekey) = generate_keys();
+        let (public_key, private_key) = generate_keys();
         Wallet {
-            public_key: publickey,
-            privatekey,
+            public_key,
+            private_key,
             slips: vec![],
             filename: "default".to_string(),
             filepass: "password".to_string(),
@@ -63,7 +63,7 @@ impl Wallet {
         filename.push_str(&self.filename);
 
         if storage.file_exists(&filename).await {
-            let password = self.get_password();
+            let password = self.filepass.clone();
             let encoded = storage.read(&filename).await.unwrap();
             let decrypted_encoded = decrypt_with_password(encoded, &password);
             self.deserialize_from_disk(&decrypted_encoded);
@@ -82,7 +82,7 @@ impl Wallet {
         storage: &mut Storage,
     ) {
         self.filename = wallet_path.to_string();
-        self.set_password(password.unwrap().to_string());
+        self.filepass = password.unwrap().to_string();
         self.load(storage).await;
     }
 
@@ -90,28 +90,28 @@ impl Wallet {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
 
-        let password = self.get_password();
+        let password = self.filepass.clone();
         let byte_array: Vec<u8> = self.serialize_for_disk();
         let encrypted_wallet = encrypt_with_password((&byte_array[..]).to_vec(), &password);
 
         storage.write(encrypted_wallet, &filename).await;
     }
 
-    /// [privatekey - 32 bytes]
-    /// [publickey - 33 bytes]
+    /// [private_key - 32 bytes]
+    /// [public_key - 33 bytes]
     pub fn serialize_for_disk(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
 
-        vbytes.extend(&self.privatekey);
+        vbytes.extend(&self.private_key);
         vbytes.extend(&self.public_key);
 
         vbytes
     }
 
-    /// [privatekey - 32 bytes
-    /// [publickey - 33 bytes]
+    /// [private_key - 32 bytes
+    /// [public_key - 33 bytes]
     pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
-        self.privatekey = bytes[0..32].try_into().unwrap();
+        self.private_key = bytes[0..32].try_into().unwrap();
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
@@ -119,12 +119,12 @@ impl Wallet {
         if lc {
             for tx in block.get_transactions() {
                 for input in tx.get_inputs() {
-                    if input.amount > 0 && input.public_key == self.get_publickey() {
+                    if input.amount > 0 && input.public_key == self.public_key {
                         self.delete_slip(input);
                     }
                 }
                 for output in tx.get_outputs() {
-                    if output.amount > 0 && output.public_key == self.get_publickey() {
+                    if output.amount > 0 && output.public_key == self.public_key {
                         self.add_slip(block, tx, output, true);
                     }
                 }
@@ -132,12 +132,12 @@ impl Wallet {
         } else {
             for tx in block.get_transactions() {
                 for input in tx.get_inputs() {
-                    if input.amount > 0 && input.public_key == self.get_publickey() {
+                    if input.amount > 0 && input.public_key == self.public_key {
                         self.add_slip(block, tx, input, true);
                     }
                 }
                 for output in tx.get_outputs() {
-                    if output.amount > 0 && output.public_key == self.get_publickey() {
+                    if output.amount > 0 && output.public_key == self.public_key {
                         self.delete_slip(output);
                     }
                 }
@@ -179,26 +179,6 @@ impl Wallet {
             .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
-    pub fn get_privatekey(&self) -> SaitoPrivateKey {
-        self.privatekey
-    }
-
-    pub fn get_publickey(&self) -> SaitoPublicKey {
-        self.public_key
-    }
-
-    pub fn set_password(&mut self, filepass: String) {
-        self.filepass = filepass;
-    }
-
-    pub fn get_filename(&mut self) -> String {
-        self.filename.clone()
-    }
-
-    pub fn get_password(&mut self) -> String {
-        self.filepass.clone()
-    }
-
     pub fn get_available_balance(&self) -> u64 {
         let mut available_balance: u64 = 0;
         for slip in &self.slips {
@@ -217,7 +197,7 @@ impl Wallet {
         let mut outputs: Vec<Slip> = vec![];
         let mut nolan_in: u64 = 0;
         let mut nolan_out: u64 = 0;
-        let my_publickey = self.get_publickey();
+        let my_public_key = self.public_key;
 
         //
         // grab inputs
@@ -228,7 +208,7 @@ impl Wallet {
                     nolan_in += slip.amount;
 
                     let mut input = Slip::new();
-                    input.public_key = my_publickey;
+                    input.public_key = my_public_key;
                     input.amount = slip.amount;
                     input.uuid = slip.uuid;
                     input.slip_index = slip.slip_index;
@@ -250,7 +230,7 @@ impl Wallet {
         // add change address
         //
         let mut output = Slip::new();
-        output.public_key = my_publickey;
+        output.public_key = my_public_key;
         output.amount = nolan_out;
         outputs.push(output);
 
@@ -259,14 +239,14 @@ impl Wallet {
         //
         if inputs.is_empty() {
             let mut input = Slip::new();
-            input.public_key = my_publickey;
+            input.public_key = my_public_key;
             input.amount = 0;
             input.uuid = [0; 32];
             inputs.push(input);
         }
         if outputs.is_empty() {
             let mut output = Slip::new();
-            output.public_key = my_publickey;
+            output.public_key = my_public_key;
             output.amount = 0;
             output.uuid = [0; 32];
             outputs.push(output);
@@ -276,7 +256,7 @@ impl Wallet {
     }
 
     pub fn sign(&self, message_bytes: &[u8]) -> SaitoSignature {
-        sign(message_bytes, self.privatekey)
+        sign(message_bytes, self.private_key)
     }
 
     pub async fn create_transaction_with_default_fees(&self) -> Transaction {
@@ -294,12 +274,12 @@ impl Wallet {
         transaction.set_message(golden_ticket.serialize_for_net());
 
         let mut input1 = Slip::new();
-        input1.public_key = self.get_publickey();
+        input1.public_key = self.public_key;
         input1.amount = 0;
         input1.uuid = [0; 32];
 
         let mut output1 = Slip::new();
-        output1.public_key = self.get_publickey();
+        output1.public_key = self.public_key;
         output1.amount = 0;
         output1.uuid = [0; 32];
 
@@ -309,7 +289,7 @@ impl Wallet {
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.set_hash_for_signature(hash_for_signature);
 
-        transaction.sign(self.get_privatekey());
+        transaction.sign(self.private_key);
 
         transaction
     }
@@ -344,8 +324,8 @@ mod tests {
     #[test]
     fn wallet_new_test() {
         let wallet = Wallet::new();
-        assert_ne!(wallet.get_publickey(), [0; 33]);
-        assert_ne!(wallet.get_privatekey(), [0; 32]);
+        assert_ne!(wallet.public_key, [0; 33]);
+        assert_ne!(wallet.private_key, [0; 32]);
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
     }
 
@@ -366,8 +346,8 @@ mod tests {
         let mut t = TestManager::new();
 
         let mut wallet = Wallet::new();
-        let publickey1 = wallet.get_publickey().clone();
-        let privatekey1 = wallet.get_privatekey().clone();
+        let public_key1 = wallet.public_key.clone();
+        let private_key1 = wallet.private_key.clone();
 
         let mut storage = Storage {
             io_interface: Box::new(TestIOHandler::new()),
@@ -376,12 +356,12 @@ mod tests {
 
         wallet = Wallet::new();
 
-        assert_ne!(wallet.get_publickey(), publickey1);
-        assert_ne!(wallet.get_privatekey(), privatekey1);
+        assert_ne!(wallet.public_key, public_key1);
+        assert_ne!(wallet.private_key, private_key1);
 
         wallet.load(&mut storage).await;
 
-        assert_eq!(wallet.get_publickey(), publickey1);
-        assert_eq!(wallet.get_privatekey(), privatekey1);
+        assert_eq!(wallet.public_key, public_key1);
+        assert_eq!(wallet.private_key, private_key1);
     }
 }

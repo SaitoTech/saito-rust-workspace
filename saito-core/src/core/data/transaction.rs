@@ -86,9 +86,9 @@ impl Transaction {
     pub async fn add_hop(
         &mut self,
         wallet_lock: Arc<RwLock<Wallet>>,
-        to_publickey: SaitoPublicKey,
+        to_public_key: SaitoPublicKey,
     ) {
-        let hop = Hop::generate(wallet_lock.clone(), to_publickey, self).await;
+        let hop = Hop::generate(wallet_lock.clone(), to_public_key, self).await;
         self.path.push(hop);
     }
 
@@ -146,7 +146,7 @@ impl Transaction {
     /// ```
     pub async fn create(
         wallet_lock: Arc<RwLock<Wallet>>,
-        to_publickey: SaitoPublicKey,
+        to_public_key: SaitoPublicKey,
         with_payment: u64,
         with_fee: u64,
     ) -> Transaction {
@@ -158,7 +158,7 @@ impl Transaction {
         trace!("waiting for the wallet write lock");
         let mut wallet = wallet_lock.write().await;
         trace!("acquired the wallet write lock");
-        let wallet_publickey = wallet.get_publickey();
+        let wallet_public_key = wallet.public_key;
 
         let available_balance = wallet.get_available_balance();
         let total_requested = with_payment + with_fee;
@@ -186,7 +186,7 @@ impl Transaction {
 
             // add the payment
             let mut output = Slip::new();
-            output.public_key = to_publickey;
+            output.public_key = to_public_key;
             output.amount = with_payment;
             transaction.add_output(output);
 
@@ -209,7 +209,7 @@ impl Transaction {
 
                 // add the payment
                 let mut output = Slip::new();
-                output.public_key = to_publickey;
+                output.public_key = to_public_key;
                 output.amount = with_payment;
                 transaction.add_output(output);
 
@@ -242,13 +242,13 @@ impl Transaction {
             let mut transaction = Transaction::new();
 
             let mut input1 = Slip::new();
-            input1.public_key = to_publickey;
+            input1.public_key = to_public_key;
             input1.amount = 0;
             let random_uuid = hash(&generate_random_bytes(32));
             input1.uuid = random_uuid;
 
             let mut output1 = Slip::new();
-            output1.public_key = wallet_publickey;
+            output1.public_key = wallet_public_key;
             output1.amount = 0;
             output1.uuid = [0; 32];
 
@@ -273,12 +273,13 @@ impl Transaction {
     /// ```
     ///
     /// ```
-    pub fn create_vip_transaction(to_publickey: SaitoPublicKey, with_amount: u64) -> Transaction {
+
+    pub fn create_vip_transaction(to_public_key: SaitoPublicKey, with_amount: u64) -> Transaction {
         debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::new();
         transaction.set_transaction_type(TransactionType::Vip);
         let mut output = Slip::new();
-        output.public_key = to_publickey;
+        output.public_key = to_public_key;
         output.amount = with_amount;
         output.slip_type = SlipType::VipOutput;
         transaction.add_output(output);
@@ -443,16 +444,16 @@ impl Transaction {
     //
     // generates all non-cumulative
     //
-    pub fn generate(&mut self, publickey: SaitoPublicKey) -> bool {
+    pub fn generate(&mut self, public_key: SaitoPublicKey) -> bool {
         //
         // nolan_in, nolan_out, total fees
         //
         self.generate_total_fees();
 
         //
-        // routing work for asserted publickey
+        // routing work for asserted public_key
         //
-        self.generate_total_work(publickey);
+        self.generate_total_work(public_key);
 
         //
         // ensure hash exists for signing
@@ -530,7 +531,7 @@ impl Transaction {
     //
     // calculate cumulative routing work in block
     //
-    pub fn generate_total_work(&mut self, publickey: SaitoPublicKey) {
+    pub fn generate_total_work(&mut self, public_key: SaitoPublicKey) {
         //
         // if there is no routing path, then the transaction contains
         // no usable work for producing a block, and any payout associated
@@ -546,13 +547,13 @@ impl Transaction {
         // something is wrong if we are not the last routing node
         //
         let last_hop = &self.path[self.path.len() - 1];
-        if last_hop.get_to() != publickey {
+        if last_hop.get_to() != public_key {
             self.total_work = 0;
             return;
         }
 
         let total_fees = self.get_total_fees();
-        let mut routing_work_available_to_publickey = total_fees;
+        let mut routing_work_available_to_public_key = total_fees;
 
         //
         // first hop gets ALL the routing work, so we start
@@ -565,11 +566,11 @@ impl Transaction {
             }
 
             // otherwise halve the work
-            let half_of_routing_work: u64 = routing_work_available_to_publickey / 2;
-            routing_work_available_to_publickey -= half_of_routing_work;
+            let half_of_routing_work: u64 = routing_work_available_to_public_key / 2;
+            routing_work_available_to_public_key -= half_of_routing_work;
         }
 
-        self.total_work = routing_work_available_to_publickey;
+        self.total_work = routing_work_available_to_public_key;
     }
 
     //
@@ -811,7 +812,7 @@ impl Transaction {
         self.hash_for_signature = Some(hash);
     }
 
-    pub fn sign(&mut self, privatekey: SaitoPrivateKey) {
+    pub fn sign(&mut self, private_key: SaitoPrivateKey) {
         //
         // we set slip ordinals when signing
         //
@@ -821,7 +822,7 @@ impl Transaction {
 
         let hash_for_signature = hash(&self.serialize_for_signature());
         self.set_hash_for_signature(hash_for_signature);
-        self.set_signature(sign(&hash_for_signature, privatekey));
+        self.set_signature(sign(&hash_for_signature, private_key));
     }
 
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
@@ -843,7 +844,7 @@ impl Transaction {
         //
         // User-Sent Transactions
         //
-        // most transactions are identifiable by the publickey that
+        // most transactions are identifiable by the public_key that
         // has signed their input transaction, but some transactions
         // do not have senders as they are auto-generated as part of
         // the block itself.
@@ -870,8 +871,8 @@ impl Transaction {
             //
             if let Some(hash_for_signature) = self.get_hash_for_signature() {
                 let sig: SaitoSignature = self.get_signature();
-                let publickey: SaitoPublicKey = self.get_inputs()[0].public_key;
-                if !verify(&hash_for_signature, sig, publickey) {
+                let public_key: SaitoPublicKey = self.get_inputs()[0].public_key;
+                if !verify(&hash_for_signature, sig, public_key) {
                     error!("message verifies not");
                     return false;
                 }
@@ -951,7 +952,7 @@ impl Transaction {
         //
         if transaction_type == TransactionType::Vip {
             // we should validate that VIP transactions are signed by the
-            // publickey associated with the Saito project.
+            // public_key associated with the Saito project.
         }
 
         //
@@ -1048,7 +1049,7 @@ mod tests {
         let wallet = Wallet::new();
 
         tx.set_outputs(vec![Slip::new()]);
-        tx.sign(wallet.get_privatekey());
+        tx.sign(wallet.private_key);
 
         assert_eq!(tx.get_outputs()[0].slip_index, 0);
         assert_ne!(tx.get_signature(), [0; 64]);

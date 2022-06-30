@@ -174,7 +174,7 @@ pub fn get_latest_block_hash() -> Result<JsValue, JsValue> {
 
 #[wasm_bindgen]
 pub fn get_public_key() -> Result<JsValue, JsValue> {
-    Ok(JsValue::from("publickey"))
+    Ok(JsValue::from("public_key"))
 }
 
 #[wasm_bindgen]

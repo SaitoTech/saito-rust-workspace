@@ -281,12 +281,12 @@ impl Block {
             hex::encode(previous_block_hash)
         );
 
-        let publickey;
+        let public_key;
         {
             trace!("waiting for the wallet read lock");
             let wallet = wallet_lock.read().await;
             trace!("acquired the wallet read lock");
-            publickey = wallet.get_publickey();
+            public_key = wallet.public_key;
         }
         let mut previous_block_id = 0;
         let mut previous_block_burnfee = 0;
@@ -319,7 +319,7 @@ impl Block {
         block.set_timestamp(current_timestamp);
         block.set_difficulty(previous_block_difficulty);
 
-        block.set_creator(publickey);
+        block.set_creator(public_key);
 
         //
         // in-memory swap copying txs in block from mempool
@@ -367,7 +367,7 @@ impl Block {
         // than iterating through the entire transaction set here.
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
             .par_iter_mut()
-            .all(|tx| tx.generate(publickey));
+            .all(|tx| tx.generate(public_key));
         if rlen > 0 {
             block.transactions.append(&mut cv.rebroadcasts);
         }
@@ -390,7 +390,7 @@ impl Block {
                 trace!("waiting for the wallet read lock");
                 let wallet = wallet_lock.read().await;
                 trace!("acquired the wallet read lock");
-                fee_tx.sign(wallet.get_privatekey());
+                fee_tx.sign(wallet.private_key);
             }
             //
             // and we add it to the block
@@ -462,7 +462,7 @@ impl Block {
             trace!("waiting for the wallet read lock");
             let wallet = wallet_lock.read().await;
             trace!("acquired the wallet read lock");
-            block.sign(wallet.get_privatekey());
+            block.sign(wallet.private_key);
         }
 
         //
@@ -677,10 +677,10 @@ impl Block {
 
         //
         // if we are generating the metadata for a block, we use the
-        // publickey of the block creator when we calculate the fees
+        // public_key of the block creator when we calculate the fees
         // and the routing work.
         //
-        let creator_publickey = self.get_creator();
+        let creator_public_key = self.get_creator();
 
         // ensure hashes correct
         self.generate_pre_hash();
@@ -689,7 +689,7 @@ impl Block {
         let _transactions_pre_calculated = &self
             .transactions
             .par_iter_mut()
-            .all(|tx| tx.generate(creator_publickey));
+            .all(|tx| tx.generate(creator_public_key));
 
         // trace!(" ... block.prevalid - pst hash:  {:?}", create_timestamp());
 
@@ -989,8 +989,8 @@ impl Block {
                 self.transactions[gt_index].get_message().to_vec(),
             );
             // generate input hash for router
-            let mut next_random_number = hash(&golden_ticket.get_random().to_vec());
-            let _miner_publickey = golden_ticket.get_publickey();
+            let mut next_random_number = hash(&golden_ticket.random.to_vec());
+            let _miner_public_key = golden_ticket.public_key;
 
             //
             // miner payout is fees from previous block, no staking treasury
@@ -1012,11 +1012,11 @@ impl Block {
                 //
                 // calculate miner and router payments
                 //
-                let router_publickey = previous_block.find_winning_router(next_random_number);
+                let router_public_key = previous_block.find_winning_router(next_random_number);
 
                 let mut payout = BlockPayout::new();
-                payout.miner = golden_ticket.get_publickey();
-                payout.router = router_publickey;
+                payout.miner = golden_ticket.public_key;
+                payout.router = router_public_key;
                 payout.miner_payout = miner_payment;
                 payout.router_payout = router_payment;
                 cv.block_payout.push(payout);
@@ -1418,11 +1418,11 @@ impl Block {
     // we may want to separate the signing of the block from the setting of the necessary hash
     // we do this together out of convenience only
     //
-    pub fn sign(&mut self, privatekey: SaitoPrivateKey) {
+    pub fn sign(&mut self, private_key: SaitoPrivateKey) {
         //
         // we set final data
         //
-        self.set_signature(sign(&self.get_pre_hash(), privatekey));
+        self.set_signature(sign(&self.get_pre_hash(), private_key));
     }
 
     // serialize the pre_hash and the signature_for_source into a
@@ -1749,8 +1749,8 @@ impl Block {
                 //
                 let gt = GoldenTicket::create(
                     previous_block.get_hash(),
-                    golden_ticket.get_random(),
-                    golden_ticket.get_publickey(),
+                    golden_ticket.random,
+                    golden_ticket.public_key,
                 );
                 if !gt.validate(previous_block.get_difficulty()) {
                     error!(
@@ -2090,12 +2090,12 @@ mod tests {
     fn block_sign_and_verify_test() {
         let wallet = Wallet::new();
         let mut block = Block::new();
-        block.creator = wallet.get_publickey();
+        block.creator = wallet.public_key;
         block.generate();
-        block.sign(wallet.get_privatekey());
+        block.sign(wallet.private_key);
         block.generate_hash();
 
-        assert_eq!(block.creator, wallet.get_publickey());
+        assert_eq!(block.creator, wallet.public_key);
         assert_eq!(
             verify(
                 &block.get_pre_hash(),
@@ -2117,7 +2117,7 @@ mod tests {
             .into_iter()
             .map(|_| {
                 let mut transaction = Transaction::new();
-                transaction.sign(wallet.get_privatekey());
+                transaction.sign(wallet.private_key);
                 transaction
             })
             .collect();
@@ -2139,7 +2139,7 @@ mod tests {
         let mut transactions = join_all((0..5).into_iter().map(|_| async {
             let mut transaction = Transaction::new();
             let wallet = wallet_lock.read().await;
-            transaction.sign(wallet.get_privatekey());
+            transaction.sign(wallet.private_key);
             transaction
         }))
         .await

@@ -192,7 +192,7 @@ impl Storage {
     //     }
     //
     //     let mut slip = Slip::new();
-    //     slip.set_publickey(add);
+    //     slip.set_public_key(add);
     //     slip.set_amount(amt);
     //     if typ.eq("VipOutput") {
     //         slip.set_slip_type(SlipType::VipOutput);

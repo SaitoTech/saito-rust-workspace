@@ -72,16 +72,16 @@ impl ConsensusEventProcessor {
 
         let txs_to_generate = 10;
         let bytes_per_tx = 1024;
-        let publickey;
-        let privatekey;
+        let public_key;
+        let private_key;
         let latest_block_id;
 
         {
             trace!("waiting for the wallet read lock");
             let wallet = wallet_lock_clone.read().await;
             trace!("acquired the wallet read lock");
-            publickey = wallet.get_publickey();
-            privatekey = wallet.get_privatekey();
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
         }
 
         trace!("waiting for the mempool write lock");
@@ -96,8 +96,8 @@ impl ConsensusEventProcessor {
         {
             if latest_block_id == 0 {
                 let mut vip_transaction =
-                    Transaction::create_vip_transaction(publickey, 50_000_000);
-                vip_transaction.sign(privatekey);
+                    Transaction::create_vip_transaction(public_key, 50_000_000);
+                vip_transaction.sign(private_key);
 
                 mempool.add_transaction(vip_transaction).await;
             }
@@ -105,21 +105,21 @@ impl ConsensusEventProcessor {
 
         for _i in 0..txs_to_generate {
             let mut transaction =
-                Transaction::create(wallet_lock_clone.clone(), publickey, 5000, 5000).await;
+                Transaction::create(wallet_lock_clone.clone(), public_key, 5000, 5000).await;
             transaction.set_message(
                 (0..bytes_per_tx)
                     .into_iter()
                     .map(|_| rand::random::<u8>())
                     .collect(),
             );
-            transaction.generate(publickey);
-            transaction.sign(privatekey);
+            transaction.generate(public_key);
+            transaction.sign(private_key);
 
             transaction
-                .add_hop(wallet_lock_clone.clone(), publickey)
+                .add_hop(wallet_lock_clone.clone(), public_key)
                 .await;
             transaction
-                .add_hop(wallet_lock_clone.clone(), publickey)
+                .add_hop(wallet_lock_clone.clone(), public_key)
                 .await;
             {
                 mempool
@@ -225,7 +225,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
                     "received new golden ticket : {:?}",
-                    hex::encode(golden_ticket.get_target())
+                    hex::encode(golden_ticket.target)
                 );
                 trace!("waiting for the mempool write lock");
                 let mut mempool = self.mempool.write().await;

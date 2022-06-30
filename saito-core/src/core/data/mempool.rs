@@ -35,8 +35,8 @@ pub struct Mempool {
     // vector so we just copy it over
     routing_work_in_mempool: u64,
     wallet_lock: Arc<RwLock<Wallet>>,
-    mempool_publickey: SaitoPublicKey,
-    mempool_privatekey: SaitoPrivateKey,
+    mempool_public_key: SaitoPublicKey,
+    mempool_private_key: SaitoPrivateKey,
 }
 
 impl Mempool {
@@ -47,8 +47,8 @@ impl Mempool {
             transactions: vec![],
             routing_work_in_mempool: 0,
             wallet_lock,
-            mempool_publickey: [0; 33],
-            mempool_privatekey: [0; 32],
+            mempool_public_key: [0; 33],
+            mempool_private_key: [0; 32],
         }
     }
 
@@ -117,21 +117,21 @@ impl Mempool {
 
         //
         // this assigns the amount of routing work that this transaction
-        // contains to us, which is why we need to provide our publickey
+        // contains to us, which is why we need to provide our public_key
         // so that we can calculate routing work.
         //
-        let publickey;
+        let public_key;
         {
             trace!("waiting for the wallet read lock");
             let wallet = self.wallet_lock.read().await;
             trace!("acquired the wallet read lock");
-            publickey = wallet.get_publickey();
+            public_key = wallet.public_key;
         }
 
         //
         // generates hashes, total fees, routing work for me, etc.
         //
-        transaction.generate(publickey);
+        transaction.generate(public_key);
 
         if self
             .transactions
@@ -249,12 +249,12 @@ impl Mempool {
         work_needed
     }
 
-    pub fn set_mempool_publickey(&mut self, publickey: SaitoPublicKey) {
-        self.mempool_publickey = publickey;
+    pub fn set_mempool_public_key(&mut self, public_key: SaitoPublicKey) {
+        self.mempool_public_key = public_key;
     }
 
-    pub fn set_mempool_privatekey(&mut self, privatekey: SaitoPrivateKey) {
-        self.mempool_privatekey = privatekey;
+    pub fn set_mempool_private_key(&mut self, private_key: SaitoPrivateKey) {
+        self.mempool_private_key = private_key;
     }
 
     pub fn transaction_exists(&self, tx_hash: Option<SaitoHash>) -> bool {
@@ -268,9 +268,10 @@ impl Mempool {
 mod tests {
     use std::sync::Arc;
 
+    use tokio::sync::RwLock;
+
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::burnfee::HEARTBEAT;
-    use tokio::sync::RwLock;
 
     use super::*;
 
@@ -296,8 +297,8 @@ mod tests {
         let mempool_lock: Arc<RwLock<Mempool>>;
         let wallet_lock: Arc<RwLock<Wallet>>;
         let blockchain_lock: Arc<RwLock<Blockchain>>;
-        let publickey: SaitoPublicKey;
-        let privatekey: SaitoPrivateKey;
+        let public_key: SaitoPublicKey;
+        let private_key: SaitoPrivateKey;
 
         {
             let mut t = TestManager::new();
@@ -311,8 +312,8 @@ mod tests {
 
         {
             let mut wallet = wallet_lock.write().await;
-            publickey = wallet.get_publickey();
-            privatekey = wallet.get_privatekey();
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
         }
 
         let ts = create_timestamp();
@@ -334,11 +335,11 @@ mod tests {
                 // _i prevents sig from being identical during test
                 // and thus from being auto-rejected from mempool
                 tx.set_timestamp(ts + 120000 + _i);
-                tx.generate(publickey);
-                tx.sign(privatekey);
+                tx.generate(public_key);
+                tx.sign(private_key);
             }
 
-            tx.add_hop(wallet_lock.clone(), publickey).await;
+            tx.add_hop(wallet_lock.clone(), public_key).await;
 
             mempool.add_transaction(tx).await;
         }
