@@ -117,7 +117,7 @@ impl Wallet {
 
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
         if lc {
-            for tx in block.get_transactions() {
+            for tx in block.transactions.iter() {
                 for input in tx.inputs.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         self.delete_slip(input);
@@ -130,7 +130,7 @@ impl Wallet {
                 }
             }
         } else {
-            for tx in block.get_transactions() {
+            for tx in block.transactions.iter() {
                 for input in tx.inputs.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         self.add_slip(block, tx, input, true);
@@ -149,7 +149,7 @@ impl Wallet {
     // removes all slips in block when pruned / deleted
     //
     pub fn delete_block(&mut self, block: &Block) {
-        for tx in block.get_transactions() {
+        for tx in block.transactions.iter() {
             for input in tx.inputs.iter() {
                 self.delete_slip(input);
             }
@@ -168,8 +168,8 @@ impl Wallet {
         wallet_slip.utxokey = slip.get_utxoset_key();
         wallet_slip.amount = slip.amount;
         wallet_slip.slip_index = slip.slip_index;
-        wallet_slip.block_id = block.get_id();
-        wallet_slip.block_hash = block.get_hash();
+        wallet_slip.block_id = block.id;
+        wallet_slip.block_hash = block.hash;
         wallet_slip.lc = lc;
         self.slips.push(wallet_slip);
     }

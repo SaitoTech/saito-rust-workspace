@@ -86,14 +86,14 @@ mod tests {
         let mut ringitem = RingItem::new();
         let mut block = Block::new();
         block.generate_hash();
-        let block_id = block.get_id();
-        let block_hash = block.get_hash();
+        let block_id = block.id;
+        let block_hash = block.hash;
 
         assert_eq!(ringitem.contains_block_hash(block_hash), false);
         assert_eq!(ringitem.block_hashes.len() as u64, 0);
         assert_eq!(ringitem.block_ids.len() as u64, 0);
 
-        ringitem.add_block(block.get_id(), block.get_hash());
+        ringitem.add_block(block.id, block.hash);
 
         assert_eq!(ringitem.contains_block_hash(block_hash), true);
         assert_eq!(ringitem.block_hashes.len() as u64, 1);

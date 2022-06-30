@@ -148,8 +148,8 @@ pub mod test {
                     if i != 1 && previous_block_hash != [0; 32] {
                         assert_eq!(previous_block.is_none(), false);
                         assert_eq!(
-                            block.unwrap().get_previous_block_hash(),
-                            previous_block.unwrap().get_hash()
+                            block.unwrap().previous_block_hash,
+                            previous_block.unwrap().hash
                         );
                     }
                 }
@@ -176,12 +176,8 @@ pub mod test {
                     .get_longest_chain_block_hash_by_block_id(i as u64);
                 info!("WINDING ID HASH - {} {:?}", i, block_hash);
                 let block = blockchain.get_block(&block_hash).await.unwrap();
-                for j in 0..block.get_transactions().len() {
-                    block.get_transactions()[j].on_chain_reorganization(
-                        &mut utxoset,
-                        true,
-                        i as u64,
-                    );
+                for j in 0..block.transactions.len() {
+                    block.transactions[j].on_chain_reorganization(&mut utxoset, true, i as u64);
                 }
             }
 
@@ -291,9 +287,9 @@ pub mod test {
                 block_contains_fee_tx = 0;
 
                 previous_block_treasury = current_block_treasury;
-                current_block_treasury = block.get_treasury();
+                current_block_treasury = block.treasury;
 
-                for t in 0..block.get_transactions().len() {
+                for t in 0..block.transactions.len() {
                     //
                     // we ignore the inputs in staking / fee transactions as they have
                     // been pulled from the staking treasury and are already technically
@@ -301,15 +297,15 @@ pub mod test {
                     // we only care about the difference in token supply represented by
                     // the difference in the staking_treasury.
                     //
-                    if block.get_transactions()[t].transaction_type == TransactionType::Fee {
+                    if block.transactions[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = 1;
                         block_fee_tx_idx = t as usize;
                     } else {
-                        for z in 0..block.get_transactions()[t].inputs.len() {
-                            block_inputs += block.get_transactions()[t].inputs[z].amount;
+                        for z in 0..block.transactions[t].inputs.len() {
+                            block_inputs += block.transactions[t].inputs[z].amount;
                         }
-                        for z in 0..block.get_transactions()[t].outputs.len() {
-                            block_outputs += block.get_transactions()[t].outputs[z].amount;
+                        for z in 0..block.transactions[t].outputs.len() {
+                            block_outputs += block.transactions[t].outputs[z].amount;
                         }
                     }
 
@@ -317,8 +313,7 @@ pub mod test {
                     // block one sets circulation
                     //
                     if i == 1 {
-                        token_supply =
-                            block_outputs + block.get_treasury() + block.get_staking_treasury();
+                        token_supply = block_outputs + block.treasury + block.staking_treasury;
                         current_supply = token_supply;
                     } else {
                         //
@@ -343,7 +338,7 @@ pub mod test {
                             // calculate total amount paid
                             //
                             let mut total_fees_paid: u64 = 0;
-                            let fee_transaction = &block.get_transactions()[block_fee_tx_idx];
+                            let fee_transaction = &block.transactions[block_fee_tx_idx];
                             for output in fee_transaction.outputs.iter() {
                                 total_fees_paid += output.amount;
                             }
@@ -370,8 +365,8 @@ pub mod test {
                         //
                         let total_in_circulation = current_supply
                             + unpaid_but_uncollected
-                            + block.get_treasury()
-                            + block.get_staking_treasury();
+                            + block.treasury
+                            + block.staking_treasury;
 
                         //
                         // we check that overall token supply has not changed
@@ -419,7 +414,7 @@ pub mod test {
                 let golden_ticket: GoldenTicket = Self::create_golden_ticket(
                     self.wallet_lock.clone(),
                     parent_hash,
-                    block.get_difficulty(),
+                    block.difficulty,
                 )
                 .await;
                 let mut gttx: Transaction;
@@ -520,7 +515,7 @@ pub mod test {
             //
             // we have added VIP, so need to regenerate the merkle-root
             //
-            block.set_merkle_root(block.generate_merkle_root());
+            block.merkle_root = block.generate_merkle_root();
             block.generate();
             block.sign(private_key);
 

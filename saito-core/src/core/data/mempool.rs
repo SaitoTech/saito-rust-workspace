@@ -53,12 +53,12 @@ impl Mempool {
     }
 
     pub fn add_block(&mut self, block: Block) {
-        debug!("mempool add block : {:?}", hex::encode(block.get_hash()));
-        let hash_to_insert = block.get_hash();
+        debug!("mempool add block : {:?}", hex::encode(block.hash));
+        let hash_to_insert = block.hash;
         if self
             .blocks_queue
             .iter()
-            .any(|block| block.get_hash() == hash_to_insert)
+            .any(|block| block.hash == hash_to_insert)
         {
             // do nothing
         } else {
@@ -189,11 +189,11 @@ impl Mempool {
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
-            println!("last ts: {}", previous_block.get_timestamp());
+            println!("last ts: {}", previous_block.timestamp);
             println!("this ts: {}", current_timestamp);
             println!("work available: {}", work_available);
             println!("work needed {}", work_needed);
-            let time_elapsed = current_timestamp - previous_block.get_timestamp();
+            let time_elapsed = current_timestamp - previous_block.timestamp;
             debug!(
                 "can_bundle_block. work available: {:?} -- work needed: {:?} -- time elapsed: {:?} ",
                 work_available,
@@ -237,8 +237,8 @@ impl Mempool {
     // Return work needed in Nolan
     //
     pub fn get_routing_work_needed(&self, previous_block: &Block, current_timestamp: u64) -> u64 {
-        let previous_block_timestamp = previous_block.get_timestamp();
-        let previous_block_burnfee = previous_block.get_burnfee();
+        let previous_block_timestamp = previous_block.timestamp;
+        let previous_block_burnfee = previous_block.burnfee;
 
         let work_needed: u64 = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
             previous_block_burnfee,

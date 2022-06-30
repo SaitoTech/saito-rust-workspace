@@ -161,18 +161,18 @@ pub enum BlockType {
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Block {
     /// Consensus Level Variables
-    id: u64,
-    timestamp: u64,
-    previous_block_hash: [u8; 32],
+    pub id: u64,
+    pub(crate) timestamp: u64,
+    pub(crate) previous_block_hash: [u8; 32],
     #[serde_as(as = "[_; 33]")]
     creator: [u8; 33],
-    merkle_root: [u8; 32],
+    pub(crate) merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
     signature: [u8; 64],
-    treasury: u64,
-    burnfee: u64,
-    difficulty: u64,
-    staking_treasury: u64,
+    pub(crate) treasury: u64,
+    pub(crate) burnfee: u64,
+    pub(crate) difficulty: u64,
+    pub(crate) staking_treasury: u64,
     avg_income: u64,
     avg_variance: u64,
     avg_atr_income: u64,
@@ -182,13 +182,13 @@ pub struct Block {
     /// Self-Calculated / Validated
     pre_hash: SaitoHash,
     /// Self-Calculated / Validated
-    hash: SaitoHash,
+    pub hash: SaitoHash,
     /// total fees paid into block
     total_fees: u64,
     /// total routing work in block, given creator
     total_work: u64,
     /// Is Block on longest chain
-    in_longest_chain: bool,
+    pub(crate) in_longest_chain: bool,
     // has golden ticket
     pub has_golden_ticket: bool,
     // has issuance transaction
@@ -208,7 +208,7 @@ pub struct Block {
     // all ATR txs hashed together
     rebroadcast_hash: [u8; 32],
     // the state of the block w/ pruning etc
-    block_type: BlockType,
+    pub(crate) block_type: BlockType,
     // vector of staker slips spent this block - used to prevent withdrawals and payouts same block
     #[serde(skip)]
     pub slips_spent_this_block: AHashMap<SaitoUTXOSetKey, u64>,
@@ -296,12 +296,12 @@ impl Block {
         let mut previous_block_staking_treasury = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
-            previous_block_id = previous_block.get_id();
-            previous_block_burnfee = previous_block.get_burnfee();
-            previous_block_timestamp = previous_block.get_timestamp();
-            previous_block_difficulty = previous_block.get_difficulty();
-            previous_block_treasury = previous_block.get_treasury();
-            previous_block_staking_treasury = previous_block.get_staking_treasury();
+            previous_block_id = previous_block.id;
+            previous_block_burnfee = previous_block.burnfee;
+            previous_block_timestamp = previous_block.timestamp;
+            previous_block_difficulty = previous_block.difficulty;
+            previous_block_treasury = previous_block.treasury;
+            previous_block_staking_treasury = previous_block.staking_treasury;
         }
 
         let mut block = Block::new();
@@ -313,13 +313,13 @@ impl Block {
                 previous_block_timestamp,
             );
 
-        block.set_id(previous_block_id + 1);
-        block.set_previous_block_hash(previous_block_hash);
-        block.set_burnfee(current_burnfee);
-        block.set_timestamp(current_timestamp);
-        block.set_difficulty(previous_block_difficulty);
+        block.id = previous_block_id + 1;
+        block.previous_block_hash = previous_block_hash;
+        block.burnfee = current_burnfee;
+        block.timestamp = current_timestamp;
+        block.difficulty = previous_block_difficulty;
 
-        block.set_creator(public_key);
+        block.creator = public_key;
 
         //
         // in-memory swap copying txs in block from mempool
@@ -421,13 +421,13 @@ impl Block {
         //
         // set difficulty
         //
-        block.set_difficulty(cv.expected_difficulty);
+        block.difficulty = cv.expected_difficulty;
 
         //
         // set treasury
         //
         if cv.nolan_falling_off_chain != 0 {
-            block.set_treasury(previous_block_treasury + cv.nolan_falling_off_chain);
+            block.treasury = previous_block_treasury + cv.nolan_falling_off_chain;
         }
 
         //
@@ -449,14 +449,14 @@ impl Block {
             //     "adjusted staking treasury written into block {}",
             //     adjusted_staking_treasury
             // );
-            block.set_staking_treasury(adjusted_staking_treasury);
+            block.staking_treasury = adjusted_staking_treasury;
         }
 
         //
         // generate merkle root
         //
         let block_merkle_root = block.generate_merkle_root();
-        block.set_merkle_root(block_merkle_root);
+        block.merkle_root = block_merkle_root;
 
         {
             trace!("waiting for the wallet read lock");
@@ -553,23 +553,23 @@ impl Block {
         }
 
         let mut block = Block::new();
-        block.set_id(id);
-        block.set_timestamp(timestamp);
-        block.set_previous_block_hash(previous_block_hash);
-        block.set_creator(creator);
-        block.set_merkle_root(merkle_root);
-        block.set_signature(signature);
-        block.set_treasury(treasury);
-        block.set_burnfee(burnfee);
-        block.set_difficulty(difficulty);
-        block.set_staking_treasury(staking_treasury);
-        block.set_avg_income(avg_income);
-        block.set_avg_variance(avg_variance);
-        block.set_avg_atr_income(avg_atr_income);
-        block.set_avg_atr_variance(avg_atr_variance);
-        block.set_transactions(&mut transactions);
+        block.id = id;
+        block.timestamp = timestamp;
+        block.previous_block_hash = previous_block_hash;
+        block.creator = creator;
+        block.merkle_root = merkle_root;
+        block.signature = signature;
+        block.treasury = treasury;
+        block.burnfee = burnfee;
+        block.difficulty = difficulty;
+        block.staking_treasury = staking_treasury;
+        block.avg_income = avg_income;
+        block.avg_variance = avg_variance;
+        block.avg_atr_income = avg_atr_income;
+        block.avg_atr_variance = avg_atr_variance;
+        block.transactions = transactions.to_vec();
         if transactions_len == 0 {
-            block.set_block_type(BlockType::Header);
+            block.block_type = BlockType::Header;
         }
 
         block
@@ -578,7 +578,7 @@ impl Block {
     // downgrade block
     //
     pub async fn downgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
-        info!("BLOCK_ID {:?}", self.get_id());
+        info!("BLOCK_ID {:?}", self.id);
 
         if self.block_type == block_type {
             return true;
@@ -590,7 +590,7 @@ impl Block {
         //
         if block_type == BlockType::Pruned {
             self.transactions = vec![];
-            self.set_block_type(BlockType::Pruned);
+            self.block_type = BlockType::Pruned;
             return true;
         }
 
@@ -611,7 +611,7 @@ impl Block {
         // fee calculation should be the same used in block when
         // generating the fee transaction.
         //
-        let y = self.get_total_fees();
+        let y = self.total_fees;
 
         //
         // if there are no fees, payout to burn address
@@ -680,7 +680,7 @@ impl Block {
         // public_key of the block creator when we calculate the fees
         // and the routing work.
         //
-        let creator_public_key = self.get_creator();
+        let creator_public_key = self.creator;
 
         // ensure hashes correct
         self.generate_pre_hash();
@@ -776,18 +776,18 @@ impl Block {
                 _ => {}
             };
         }
-        self.set_has_fee_transaction(has_fee_transaction);
-        self.set_has_golden_ticket(has_golden_ticket);
-        self.set_has_issuance_transaction(has_issuance_transaction);
-        self.set_fee_transaction_index(fee_transaction_index);
-        self.set_golden_ticket_index(golden_ticket_index);
-        self.set_issuance_transaction_index(issuance_transaction_index);
+        self.has_fee_transaction = has_fee_transaction;
+        self.has_golden_ticket = has_golden_ticket;
+        self.has_issuance_transaction = has_issuance_transaction;
+        self.fee_transaction_index = fee_transaction_index;
+        self.golden_ticket_index = golden_ticket_index;
+        self.issuance_transaction_index = issuance_transaction_index;
 
         //
         // update block with total fees
         //
-        self.set_total_fees(cumulative_fees);
-        self.set_total_work(cumulative_work);
+        self.total_fees = cumulative_fees;
+        self.total_work = cumulative_work;
 
         // trace!(
         //     " ... block.pre_validation_done:  {:?}",
@@ -800,7 +800,7 @@ impl Block {
 
     pub fn generate_hash(&mut self) -> SaitoHash {
         let hash_for_hash = hash(&self.serialize_for_hash());
-        self.set_hash(hash_for_hash);
+        self.hash = hash_for_hash;
         hash_for_hash
     }
 
@@ -849,10 +849,10 @@ impl Block {
         //
         // calculate automatic transaction rebroadcasts / ATR / atr
         //
-        if self.get_id() > GENESIS_PERIOD {
+        if self.id > GENESIS_PERIOD {
             let pruned_block_hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(self.get_id() - 2);
+                .get_longest_chain_block_hash_by_block_id(self.id - 2);
 
             //
             // generate metadata should have prepared us with a pre-prune block
@@ -922,20 +922,20 @@ impl Block {
         //
         // burn fee, difficulty and avg_income figures
         //
-        if let Some(previous_block) = blockchain.blocks.get(&self.get_previous_block_hash()) {
-            cv.avg_income = previous_block.get_avg_income();
-            cv.avg_variance = previous_block.get_avg_variance();
-            cv.avg_atr_income = previous_block.get_avg_atr_income();
-            cv.avg_atr_variance = previous_block.get_avg_atr_variance();
+        if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+            cv.avg_income = previous_block.avg_income;
+            cv.avg_variance = previous_block.avg_variance;
+            cv.avg_atr_income = previous_block.avg_atr_income;
+            cv.avg_atr_variance = previous_block.avg_atr_variance;
 
-            if previous_block.get_avg_income() > cv.total_fees {
-                let adjustment = (previous_block.get_avg_income() - cv.total_fees) / GENESIS_PERIOD;
+            if previous_block.avg_income > cv.total_fees {
+                let adjustment = (previous_block.avg_income - cv.total_fees) / GENESIS_PERIOD;
                 if adjustment > 0 {
                     cv.avg_income -= adjustment;
                 }
             }
-            if previous_block.get_avg_income() < cv.total_fees {
-                let adjustment = (cv.total_fees - previous_block.get_avg_income()) / GENESIS_PERIOD;
+            if previous_block.avg_income < cv.total_fees {
+                let adjustment = (cv.total_fees - previous_block.avg_income) / GENESIS_PERIOD;
                 if adjustment > 0 {
                     cv.avg_income += adjustment;
                 }
@@ -944,27 +944,27 @@ impl Block {
             //
             // average atr income and variance adjusts slowly.
             //
-            if previous_block.get_avg_atr_income() > cv.total_rebroadcast_nolan {
-                let adjustment = (previous_block.get_avg_atr_income() - cv.total_rebroadcast_nolan)
-                    / GENESIS_PERIOD;
+            if previous_block.avg_atr_income > cv.total_rebroadcast_nolan {
+                let adjustment =
+                    (previous_block.avg_atr_income - cv.total_rebroadcast_nolan) / GENESIS_PERIOD;
                 if adjustment > 0 {
                     cv.avg_atr_income -= adjustment;
                 }
             }
-            if previous_block.get_avg_atr_income() < cv.total_rebroadcast_nolan {
-                let adjustment = (cv.total_rebroadcast_nolan - previous_block.get_avg_atr_income())
-                    / GENESIS_PERIOD;
+            if previous_block.avg_atr_income < cv.total_rebroadcast_nolan {
+                let adjustment =
+                    (cv.total_rebroadcast_nolan - previous_block.avg_atr_income) / GENESIS_PERIOD;
                 if adjustment > 0 {
                     cv.avg_atr_income += adjustment;
                 }
             }
 
-            let difficulty = previous_block.get_difficulty();
-            if !previous_block.get_has_golden_ticket() && cv.gt_num == 0 {
+            let difficulty = previous_block.difficulty;
+            if !previous_block.has_golden_ticket && cv.gt_num == 0 {
                 if difficulty > 0 {
-                    cv.expected_difficulty = previous_block.get_difficulty() - 1;
+                    cv.expected_difficulty = previous_block.difficulty - 1;
                 }
-            } else if previous_block.get_has_golden_ticket() && cv.gt_num > 0 {
+            } else if previous_block.has_golden_ticket && cv.gt_num > 0 {
                 cv.expected_difficulty = difficulty + 1;
             } else {
                 cv.expected_difficulty = difficulty;
@@ -975,10 +975,10 @@ impl Block {
             // rules will cause the block to fail unless it is the first block. average
             // income is set to whatever the block avg_income is set to.
             //
-            cv.avg_income = self.get_avg_income();
-            cv.avg_variance = self.get_avg_variance();
-            cv.avg_atr_income = self.get_avg_atr_income();
-            cv.avg_atr_variance = self.get_avg_atr_variance();
+            cv.avg_income = self.avg_income;
+            cv.avg_variance = self.avg_variance;
+            cv.avg_atr_income = self.avg_atr_income;
+            cv.avg_atr_variance = self.avg_atr_variance;
         }
 
         //
@@ -994,15 +994,15 @@ impl Block {
             //
             // miner payout is fees from previous block, no staking treasury
             //
-            if let Some(previous_block) = blockchain.blocks.get(&self.get_previous_block_hash()) {
+            if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
                 //
                 // limit previous block payout to avg income
                 //
-                let mut previous_block_payout = previous_block.get_total_fees();
-                if previous_block_payout > (previous_block.get_avg_income() as f64 * 1.25) as u64
+                let mut previous_block_payout = previous_block.total_fees;
+                if previous_block_payout > (previous_block.avg_income as f64 * 1.25) as u64
                     && previous_block_payout > 50
                 {
-                    previous_block_payout = (previous_block.get_avg_income() as f64 * 1.24) as u64;
+                    previous_block_payout = (previous_block.avg_income as f64 * 1.24) as u64;
                 }
 
                 let miner_payment = previous_block_payout / 2;
@@ -1032,11 +1032,11 @@ impl Block {
                 let mut cont = 1;
                 let mut loop_index = 0;
                 let mut did_the_block_before_our_staking_block_have_a_golden_ticket =
-                    previous_block.get_has_golden_ticket();
+                    previous_block.has_golden_ticket;
                 //
                 // staking block hash is 3 back, pre
                 //
-                let mut staking_block_hash = previous_block.get_previous_block_hash();
+                let mut staking_block_hash = previous_block.previous_block_hash;
 
                 while cont == 1 {
                     loop_index += 1;
@@ -1050,13 +1050,13 @@ impl Block {
                         cont = 0;
                     } else {
                         if let Some(staking_block) = blockchain.blocks.get(&staking_block_hash) {
-                            staking_block_hash = staking_block.get_previous_block_hash();
+                            staking_block_hash = staking_block.previous_block_hash;
                             if !did_the_block_before_our_staking_block_have_a_golden_ticket {
                                 //
                                 // update with this block info in case of next loop
                                 //
                                 did_the_block_before_our_staking_block_have_a_golden_ticket =
-                                    staking_block.get_has_golden_ticket();
+                                    staking_block.has_golden_ticket;
 
                                 //
                                 // calculate staker and router payments
@@ -1067,14 +1067,13 @@ impl Block {
                                 // be withheld for the staker treasury, which is what previous_staker_
                                 // payment is measuring.
                                 //
-                                let mut previous_staking_block_payout =
-                                    staking_block.get_total_fees();
+                                let mut previous_staking_block_payout = staking_block.total_fees;
                                 if previous_staking_block_payout
-                                    > (staking_block.get_avg_income() as f64 * 1.25) as u64
+                                    > (staking_block.avg_income as f64 * 1.25) as u64
                                     && previous_staking_block_payout > 50
                                 {
                                     previous_staking_block_payout =
-                                        (staking_block.get_avg_income() as f64 * 1.24) as u64;
+                                        (staking_block.avg_income as f64 * 1.24) as u64;
                                 }
 
                                 let sp = previous_staking_block_payout / 2;
@@ -1140,11 +1139,11 @@ impl Block {
         //
         if cv.gt_num == 0 {
             for i in 1..=MAX_STAKER_RECURSION {
-                if i >= self.get_id() {
+                if i >= self.id {
                     break;
                 }
 
-                let bid = self.get_id() - i;
+                let bid = self.id - i;
                 let previous_block_hash = blockchain
                     .blockring
                     .get_longest_chain_block_hash_by_block_id(bid);
@@ -1154,7 +1153,7 @@ impl Block {
                 if previous_block_hash != [0; 32] {
                     let previous_block = blockchain.get_block(&previous_block_hash).await.unwrap();
 
-                    if previous_block.get_has_golden_ticket() {
+                    if previous_block.has_golden_ticket {
                         break;
                     } else {
                         //
@@ -1163,7 +1162,7 @@ impl Block {
                         // RECURSION is 3, at 3 we are the fourth block back.
                         //
                         if i == MAX_STAKER_RECURSION {
-                            cv.nolan_falling_off_chain = previous_block.get_total_fees();
+                            cv.nolan_falling_off_chain = previous_block.total_fees;
                         }
                     }
                 }
@@ -1174,243 +1173,14 @@ impl Block {
     }
     pub fn generate_pre_hash(&mut self) {
         let hash_for_signature = hash(&self.serialize_for_signature());
-        self.set_pre_hash(hash_for_signature);
-    }
-
-    pub fn get_avg_income(&self) -> u64 {
-        self.avg_income
-    }
-
-    pub fn get_avg_atr_income(&self) -> u64 {
-        self.avg_atr_income
-    }
-
-    pub fn get_avg_variance(&self) -> u64 {
-        self.avg_variance
-    }
-
-    pub fn get_avg_atr_variance(&self) -> u64 {
-        self.avg_atr_variance
-    }
-
-    pub fn get_transactions(&self) -> &Vec<Transaction> {
-        &self.transactions
-    }
-
-    pub fn get_hash(&self) -> SaitoHash {
-        self.hash
-    }
-
-    pub fn get_id(&self) -> u64 {
-        self.id
-    }
-
-    pub fn get_timestamp(&self) -> u64 {
-        self.timestamp
-    }
-
-    pub fn get_previous_block_hash(&self) -> SaitoHash {
-        self.previous_block_hash
-    }
-
-    pub fn get_creator(&self) -> SaitoPublicKey {
-        self.creator
-    }
-
-    pub fn get_merkle_root(&self) -> SaitoHash {
-        self.merkle_root
-    }
-
-    pub fn get_signature(&self) -> SaitoSignature {
-        self.signature
-    }
-
-    pub fn get_treasury(&self) -> u64 {
-        self.treasury
-    }
-
-    pub fn get_staking_treasury(&self) -> u64 {
-        self.staking_treasury
-    }
-
-    pub fn get_burnfee(&self) -> u64 {
-        self.burnfee
-    }
-
-    pub fn get_block_type(&self) -> BlockType {
-        self.block_type
-    }
-
-    pub fn get_difficulty(&self) -> u64 {
-        self.difficulty
-    }
-
-    pub fn get_has_golden_ticket(&self) -> bool {
-        self.has_golden_ticket
-    }
-
-    pub fn get_has_issuance_transaction(&self) -> bool {
-        self.has_issuance_transaction
-    }
-
-    pub fn get_has_fee_transaction(&self) -> bool {
-        self.has_fee_transaction
-    }
-
-    pub fn get_golden_ticket_index(&self) -> u64 {
-        self.golden_ticket_index
-    }
-
-    pub fn get_issuance_transaction_index(&self) -> u64 {
-        self.issuance_transaction_index
-    }
-
-    pub fn get_fee_transaction_index(&self) -> u64 {
-        self.fee_transaction_index
-    }
-
-    pub fn get_pre_hash(&self) -> SaitoHash {
-        self.pre_hash
-    }
-
-    pub fn get_total_fees(&self) -> u64 {
-        self.total_fees
-    }
-
-    pub fn get_total_work(&self) -> u64 {
-        self.total_work
-    }
-
-    pub fn get_source_connection_id(&self) -> Option<SaitoPublicKey> {
-        self.source_connection_id
-    }
-
-    pub fn is_in_longest_chain(&self) -> bool {
-        self.in_longest_chain
+        self.pre_hash = hash_for_signature;
     }
 
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
         for tx in &self.transactions {
-            tx.on_chain_reorganization(utxoset, longest_chain, self.get_id());
+            tx.on_chain_reorganization(utxoset, longest_chain, self.id);
         }
         true
-    }
-
-    pub fn set_avg_income(&mut self, x: u64) {
-        self.avg_income = x;
-    }
-
-    pub fn set_avg_atr_income(&mut self, x: u64) {
-        self.avg_atr_income = x;
-    }
-
-    pub fn set_avg_variance(&mut self, x: u64) {
-        self.avg_variance = x;
-    }
-
-    pub fn set_avg_atr_variance(&mut self, x: u64) {
-        self.avg_atr_variance = x;
-    }
-
-    pub fn set_total_work(&mut self, x: u64) {
-        self.total_work = x;
-    }
-
-    pub fn set_has_issuance_transaction(&mut self, hit: bool) {
-        self.has_issuance_transaction = hit;
-    }
-
-    pub fn set_has_golden_ticket(&mut self, hgt: bool) {
-        self.has_golden_ticket = hgt;
-    }
-
-    pub fn set_has_fee_transaction(&mut self, hft: bool) {
-        self.has_fee_transaction = hft;
-    }
-
-    pub fn set_issuance_transaction_index(&mut self, index: u64) {
-        self.issuance_transaction_index = index;
-    }
-
-    pub fn set_golden_ticket_index(&mut self, index: u64) {
-        self.golden_ticket_index = index;
-    }
-
-    pub fn set_fee_transaction_index(&mut self, index: u64) {
-        self.fee_transaction_index = index;
-    }
-
-    pub fn set_total_fees(&mut self, total_fees: u64) {
-        self.total_fees = total_fees;
-    }
-
-    // TODO refactor: All of these setters which are setting something which is included
-    // in the pre_hash or hash are dangerous. The purpose of the set/get paradigm is for
-    // a class/unit to be able to enforce an API which guarantees it's consistency to
-    // those using it. To be correct, each of these setters should call generate_hashes()
-    // after it sets the state. However, this would be ridiculous because everytime we
-    // construct a new Block, we call all these one after the other. A comprimise might
-    // be to remove them and at least just set the private fields directly, or make the
-    // setters private, but this misses the point. We want to encapsulate any state
-    // changes into a single black-box so that state is easier to reason about.
-    pub fn set_transactions(&mut self, transactions: &mut Vec<Transaction>) {
-        self.transactions = transactions.to_vec();
-    }
-
-    pub fn set_block_type(&mut self, block_type: BlockType) {
-        self.block_type = block_type;
-    }
-
-    pub fn set_id(&mut self, id: u64) {
-        self.id = id;
-    }
-
-    pub fn set_in_longest_chain(&mut self, lc: bool) {
-        self.in_longest_chain = lc;
-    }
-
-    pub fn set_timestamp(&mut self, timestamp: u64) {
-        self.timestamp = timestamp;
-    }
-
-    pub fn set_previous_block_hash(&mut self, previous_block_hash: SaitoHash) {
-        self.previous_block_hash = previous_block_hash;
-    }
-
-    pub fn set_creator(&mut self, creator: SaitoPublicKey) {
-        self.creator = creator;
-    }
-
-    pub fn set_merkle_root(&mut self, merkle_root: SaitoHash) {
-        self.merkle_root = merkle_root;
-    }
-
-    pub fn set_signature(&mut self, signature: SaitoSignature) {
-        self.signature = signature;
-    }
-
-    pub fn set_staking_treasury(&mut self, staking_treasury: u64) {
-        self.staking_treasury = staking_treasury;
-    }
-
-    pub fn set_treasury(&mut self, treasury: u64) {
-        self.treasury = treasury;
-    }
-
-    pub fn set_burnfee(&mut self, burnfee: u64) {
-        self.burnfee = burnfee;
-    }
-
-    pub fn set_difficulty(&mut self, difficulty: u64) {
-        self.difficulty = difficulty;
-    }
-
-    pub fn set_pre_hash(&mut self, pre_hash: SaitoHash) {
-        self.pre_hash = pre_hash;
-    }
-
-    pub fn set_hash(&mut self, hash: SaitoHash) {
-        self.hash = hash;
     }
 
     //
@@ -1421,16 +1191,16 @@ impl Block {
         //
         // we set final data
         //
-        self.set_signature(sign(&self.get_pre_hash(), private_key));
+        self.signature = sign(&self.pre_hash, private_key);
     }
 
     // serialize the pre_hash and the signature_for_source into a
     // bytes array that can be hashed and then have the hash set.
     pub fn serialize_for_hash(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.get_pre_hash());
-        vbytes.extend(&self.get_signature());
-        vbytes.extend(&self.get_previous_block_hash());
+        vbytes.extend(&self.pre_hash);
+        vbytes.extend(&self.signature);
+        vbytes.extend(&self.previous_block_hash);
         vbytes
     }
 
@@ -1561,9 +1331,9 @@ impl Block {
                 .await
                 .unwrap();
             let hash_for_signature = hash(&new_block.serialize_for_signature());
-            new_block.set_pre_hash(hash_for_signature);
+            new_block.pre_hash = hash_for_signature;
             let hash_for_hash = hash(&new_block.serialize_for_hash());
-            new_block.set_hash(hash_for_hash);
+            new_block.hash = hash_for_hash;
 
             //
             // in-memory swap copying txs in block from mempool
@@ -1573,7 +1343,7 @@ impl Block {
             // transactions need hashes
             //
             self.generate();
-            self.set_block_type(BlockType::Full);
+            self.block_type = BlockType::Full;
 
             return true;
         }
@@ -1600,11 +1370,7 @@ impl Block {
         //
         // verify signed by creator
         //
-        if !verify(
-            &self.get_pre_hash(),
-            self.get_signature(),
-            self.get_creator(),
-        ) {
+        if !verify(&self.pre_hash, self.signature, self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
@@ -1627,7 +1393,7 @@ impl Block {
         //
         // only block #1 can have an issuance transaction
         //
-        if cv.it_num > 0 && self.get_id() > 1 {
+        if cv.it_num > 0 && self.id > 1 {
             error!("ERROR: blockchain contains issuance after block 1 in chain",);
             return false;
         }
@@ -1642,15 +1408,15 @@ impl Block {
         // if no previous block exists, we are valid only in a limited number of
         // circumstances, such as this being the first block we are adding to our chain.
         //
-        if let Some(previous_block) = blockchain.blocks.get(&self.get_previous_block_hash()) {
+        if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
             //
             // validate treasury
             //
-            if self.get_treasury() != previous_block.get_treasury() + cv.nolan_falling_off_chain {
+            if self.treasury != previous_block.treasury + cv.nolan_falling_off_chain {
                 error!(
                     "ERROR: treasury does not validate: {} expected versus {} found",
-                    (previous_block.get_treasury() + cv.nolan_falling_off_chain),
-                    self.get_treasury(),
+                    (previous_block.treasury + cv.nolan_falling_off_chain),
+                    self.treasury,
                     // tracing_tracker.time_since_last();
                 );
                 return false;
@@ -1659,7 +1425,7 @@ impl Block {
             //
             // validate staking treasury
             //
-            let mut adjusted_staking_treasury = previous_block.get_staking_treasury();
+            let mut adjusted_staking_treasury = previous_block.staking_treasury;
             if cv.staking_treasury < 0 {
                 let x = cv.staking_treasury * -1;
                 if adjusted_staking_treasury > x as u64 {
@@ -1672,11 +1438,10 @@ impl Block {
                 adjusted_staking_treasury += x;
             }
 
-            if self.get_staking_treasury() != adjusted_staking_treasury {
+            if self.staking_treasury != adjusted_staking_treasury {
                 error!(
                     "ERROR: staking treasury does not validate: {} expected versus {} found",
-                    adjusted_staking_treasury,
-                    self.get_staking_treasury(),
+                    adjusted_staking_treasury, self.staking_treasury,
                 );
                 //     "ERROR: staking treasury does not validate: {} expected versus {} found",
                 //     adjusted_staking_treasury,
@@ -1689,11 +1454,11 @@ impl Block {
             //
             let new_burnfee: u64 =
                 BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-                    previous_block.get_burnfee(),
-                    self.get_timestamp(),
-                    previous_block.get_timestamp(),
+                    previous_block.burnfee,
+                    self.timestamp,
+                    previous_block.timestamp,
                 );
-            if new_burnfee != self.get_burnfee() {
+            if new_burnfee != self.burnfee {
                 error!(
                     "ERROR: burn fee does not validate, expected: {}",
                     new_burnfee
@@ -1711,9 +1476,9 @@ impl Block {
             //
             let amount_of_routing_work_needed: u64 =
                 BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
-                    previous_block.get_burnfee(),
-                    self.get_timestamp(),
-                    previous_block.get_timestamp(),
+                    previous_block.burnfee,
+                    self.timestamp,
+                    previous_block.timestamp,
                 );
             if self.total_work < amount_of_routing_work_needed {
                 error!("Error 510293: block lacking adequate routing work from creator");
@@ -1738,7 +1503,7 @@ impl Block {
             //
             if let Some(gt_index) = cv.gt_index {
                 let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
-                    self.get_transactions()[gt_index].message.to_vec(),
+                    self.transactions[gt_index].message.to_vec(),
                 );
                 //
                 // we already have a golden ticket, but create a new one pulling the
@@ -1747,11 +1512,11 @@ impl Block {
                 // internally consistent in the blockchain of the sender.
                 //
                 let gt = GoldenTicket::create(
-                    previous_block.get_hash(),
+                    previous_block.hash,
                     golden_ticket.random,
                     golden_ticket.public_key,
                 );
-                if !gt.validate(previous_block.get_difficulty()) {
+                if !gt.validate(previous_block.difficulty) {
                     error!(
                         "ERROR: Golden Ticket solution does not validate against previous block hash and difficulty"
                     );
@@ -1792,9 +1557,7 @@ impl Block {
         //
         // validate merkle root
         //
-        if self.get_merkle_root() == [0; 32]
-            && self.get_merkle_root() != self.generate_merkle_root()
-        {
+        if self.merkle_root == [0; 32] && self.merkle_root != self.generate_merkle_root() {
             error!("merkle root is unset or is invalid false 1");
             return false;
         }
@@ -1823,14 +1586,14 @@ impl Block {
             // block-specific data in the same way that all of the transactions in
             // the block have been. we must do this prior to comparing them.
             //
-            fee_transaction.generate(self.get_creator());
+            fee_transaction.generate(self.creator);
 
             let hash1 = hash(&fee_transaction.serialize_for_signature());
             let hash2 = hash(&self.transactions[ft_index].serialize_for_signature());
             if hash1 != hash2 {
                 error!(
                     "ERROR 627428: block {} fee transaction doesn't match cv fee transaction",
-                    self.get_id()
+                    self.id
                 );
                 info!("fee transaction = {:?}", fee_transaction);
                 info!("tx : {:?}", self.transactions[ft_index]);
@@ -1851,11 +1614,10 @@ impl Block {
         // certain amount of golden ticket solutions over-time, so the
         // distinction is in practice less clean.
         //
-        if cv.expected_difficulty != self.get_difficulty() {
+        if cv.expected_difficulty != self.difficulty {
             error!(
                 "difficulty is false {} vs {}",
-                cv.expected_difficulty,
-                self.get_difficulty()
+                cv.expected_difficulty, self.difficulty
             );
             return false;
         }
@@ -1956,10 +1718,10 @@ mod tests {
         // block hashes should have updated
         assert_ne!(block.pre_hash, [0; 32]);
         assert_ne!(block.hash, [0; 32]);
-        assert_ne!(block.get_pre_hash(), [0; 32]);
-        assert_ne!(block.get_hash(), [0; 32]);
-        assert_eq!(block.get_pre_hash(), block.pre_hash);
-        assert_eq!(block.get_hash(), block.hash);
+        assert_ne!(block.pre_hash, [0; 32]);
+        assert_ne!(block.hash, [0; 32]);
+        assert_eq!(block.pre_hash, block.pre_hash);
+        assert_eq!(block.hash, block.hash);
     }
 
     #[test]
@@ -2037,16 +1799,16 @@ mod tests {
         let timestamp = 0;
 
         let mut block = Block::new();
-        block.set_id(1);
-        block.set_timestamp(timestamp);
-        block.set_previous_block_hash([1; 32]);
-        block.set_creator([2; 33]);
-        block.set_merkle_root([3; 32]);
-        block.set_signature([4; 64]);
-        block.set_treasury(1);
-        block.set_burnfee(2);
-        block.set_difficulty(3);
-        block.set_transactions(&mut vec![mock_tx, mock_tx2]);
+        block.id = 1;
+        block.timestamp = timestamp;
+        block.previous_block_hash = [1; 32];
+        block.creator = [2; 33];
+        block.merkle_root = [3; 32];
+        block.signature = [4; 64];
+        block.treasury = 1;
+        block.burnfee = 2;
+        block.difficulty = 3;
+        block.transactions = vec![mock_tx, mock_tx2];
 
         let serialized_block = block.serialize_for_net(BlockType::Full);
         let deserialized_block = Block::deserialize_from_net(&serialized_block);
@@ -2059,30 +1821,30 @@ mod tests {
             deserialized_block.serialize_for_net(BlockType::Full)
         );
 
-        assert_eq!(deserialized_block.get_id(), 1);
-        assert_eq!(deserialized_block.get_timestamp(), timestamp);
-        assert_eq!(deserialized_block.get_previous_block_hash(), [1; 32]);
-        assert_eq!(deserialized_block.get_creator(), [2; 33]);
-        assert_eq!(deserialized_block.get_merkle_root(), [3; 32]);
-        assert_eq!(deserialized_block.get_signature(), [4; 64]);
-        assert_eq!(deserialized_block.get_treasury(), 1);
-        assert_eq!(deserialized_block.get_burnfee(), 2);
-        assert_eq!(deserialized_block.get_difficulty(), 3);
+        assert_eq!(deserialized_block.id, 1);
+        assert_eq!(deserialized_block.timestamp, timestamp);
+        assert_eq!(deserialized_block.previous_block_hash, [1; 32]);
+        assert_eq!(deserialized_block.creator, [2; 33]);
+        assert_eq!(deserialized_block.merkle_root, [3; 32]);
+        assert_eq!(deserialized_block.signature, [4; 64]);
+        assert_eq!(deserialized_block.treasury, 1);
+        assert_eq!(deserialized_block.burnfee, 2);
+        assert_eq!(deserialized_block.difficulty, 3);
 
         assert_eq!(
             deserialized_block_header.serialize_for_net(BlockType::Full),
             deserialized_block.serialize_for_net(BlockType::Header)
         );
 
-        assert_eq!(deserialized_block_header.get_id(), 1);
-        assert_eq!(deserialized_block_header.get_timestamp(), timestamp);
-        assert_eq!(deserialized_block_header.get_previous_block_hash(), [1; 32]);
-        assert_eq!(deserialized_block_header.get_creator(), [2; 33]);
-        assert_eq!(deserialized_block_header.get_merkle_root(), [3; 32]);
-        assert_eq!(deserialized_block_header.get_signature(), [4; 64]);
-        assert_eq!(deserialized_block_header.get_treasury(), 1);
-        assert_eq!(deserialized_block_header.get_burnfee(), 2);
-        assert_eq!(deserialized_block_header.get_difficulty(), 3);
+        assert_eq!(deserialized_block_header.id, 1);
+        assert_eq!(deserialized_block_header.timestamp, timestamp);
+        assert_eq!(deserialized_block_header.previous_block_hash, [1; 32]);
+        assert_eq!(deserialized_block_header.creator, [2; 33]);
+        assert_eq!(deserialized_block_header.merkle_root, [3; 32]);
+        assert_eq!(deserialized_block_header.signature, [4; 64]);
+        assert_eq!(deserialized_block_header.treasury, 1);
+        assert_eq!(deserialized_block_header.burnfee, 2);
+        assert_eq!(deserialized_block_header.difficulty, 3);
     }
 
     #[test]
@@ -2096,15 +1858,11 @@ mod tests {
 
         assert_eq!(block.creator, wallet.public_key);
         assert_eq!(
-            verify(
-                &block.get_pre_hash(),
-                block.get_signature(),
-                block.get_creator(),
-            ),
+            verify(&block.pre_hash, block.signature, block.creator,),
             true
         );
-        assert_ne!(block.get_hash(), [0; 32]);
-        assert_ne!(block.get_signature(), [0; 64]);
+        assert_ne!(block.hash, [0; 32]);
+        assert_ne!(block.signature, [0; 64]);
     }
 
     #[test]
@@ -2112,7 +1870,7 @@ mod tests {
         let mut block = Block::new();
         let wallet = Wallet::new();
 
-        let mut transactions = (0..5)
+        let mut transactions: Vec<Transaction> = (0..5)
             .into_iter()
             .map(|_| {
                 let mut transaction = Transaction::new();
@@ -2121,11 +1879,11 @@ mod tests {
             })
             .collect();
 
-        block.set_transactions(&mut transactions);
-        block.set_merkle_root(block.generate_merkle_root());
+        block.transactions = transactions;
+        block.merkle_root = block.generate_merkle_root();
 
-        assert!(block.get_merkle_root().len() == 32);
-        assert_ne!(block.get_merkle_root(), [0; 32]);
+        assert_eq!(block.merkle_root.len(), 32);
+        assert_ne!(block.merkle_root, [0; 32]);
     }
 
     #[tokio::test]
@@ -2151,7 +1909,7 @@ mod tests {
         t.storage.write_block_to_disk(&mut block).await;
 
         assert_eq!(block.transactions.len(), 5);
-        assert_eq!(block.get_block_type(), BlockType::Full);
+        assert_eq!(block.block_type, BlockType::Full);
 
         let serialized_full_block = block.serialize_for_net(BlockType::Full);
         block
@@ -2159,14 +1917,14 @@ mod tests {
             .await;
 
         assert_eq!(block.transactions.len(), 0);
-        assert_eq!(block.get_block_type(), BlockType::Pruned);
+        assert_eq!(block.block_type, BlockType::Pruned);
 
         block
             .update_block_to_block_type(BlockType::Full, &mut t.storage)
             .await;
 
         assert_eq!(block.transactions.len(), 5);
-        assert_eq!(block.get_block_type(), BlockType::Full);
+        assert_eq!(block.block_type, BlockType::Full);
         assert_eq!(
             serialized_full_block,
             block.serialize_for_net(BlockType::Full)

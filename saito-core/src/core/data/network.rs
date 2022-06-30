@@ -37,7 +37,7 @@ impl Network {
         }
     }
     pub async fn propagate_block(&self, block: &Block) {
-        debug!("propagating block : {:?}", hex::encode(block.get_hash()));
+        debug!("propagating block : {:?}", hex::encode(&block.hash));
 
         let mut excluded_peers = vec![];
         // finding block sender to avoid resending the block to that node
@@ -52,11 +52,8 @@ impl Network {
                 excluded_peers.push(*peer.unwrap());
             }
         }
-        debug!(
-            "sending block : {:?} to peers",
-            hex::encode(block.get_hash())
-        );
-        let message = Message::BlockHeaderHash(block.get_hash());
+        debug!("sending block : {:?} to peers", hex::encode(&block.hash));
+        let message = Message::BlockHeaderHash(block.hash);
         self.io_interface
             .send_message_to_all(message.serialize(), excluded_peers)
             .await

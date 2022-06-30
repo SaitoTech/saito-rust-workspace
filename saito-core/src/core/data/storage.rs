@@ -57,8 +57,8 @@ impl Storage {
     }
 
     pub fn generate_block_filename(&self, block: &Block) -> String {
-        let timestamp = block.get_timestamp();
-        let block_hash = block.get_hash();
+        let timestamp = block.timestamp;
+        let block_hash = block.hash;
         self.io_interface.get_block_dir().to_string()
             + timestamp.to_string().as_str()
             + "-"
@@ -239,7 +239,7 @@ mod test {
         let current_timestamp = create_timestamp();
 
         let mut block = Block::new();
-        block.set_timestamp(current_timestamp);
+        block.timestamp = current_timestamp;
 
         let filename = t.storage.write_block_to_disk(&mut block).await;
         log::trace!("block written to file : {}", filename);
@@ -247,9 +247,6 @@ mod test {
         let mut actual_retrieved_block = retrieved_block.unwrap();
         actual_retrieved_block.generate();
 
-        assert_eq!(
-            block.get_timestamp(),
-            actual_retrieved_block.get_timestamp()
-        );
+        assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
     }
 }

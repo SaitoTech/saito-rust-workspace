@@ -195,9 +195,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             while let Some(block) = mempool.blocks_queue.pop_front() {
                 trace!(
                     "deleting transactions from block : {:?}",
-                    hex::encode(block.get_hash())
+                    hex::encode(block.hash)
                 );
-                mempool.delete_transactions(&block.get_transactions());
+                mempool.delete_transactions(&block.transactions);
                 blockchain
                     .add_block(
                         block,
