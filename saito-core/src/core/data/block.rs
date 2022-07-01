@@ -1870,7 +1870,7 @@ mod tests {
         let mut block = Block::new();
         let wallet = Wallet::new();
 
-        let mut transactions: Vec<Transaction> = (0..5)
+        let transactions: Vec<Transaction> = (0..5)
             .into_iter()
             .map(|_| {
                 let mut transaction = Transaction::new();
@@ -1891,9 +1891,9 @@ mod tests {
     // downgrade and upgrade a block with transactions
     async fn block_downgrade_upgrade_test() {
         let mut t = TestManager::new();
-        let mut wallet_lock = t.wallet_lock.clone();
+        let wallet_lock = t.wallet_lock.clone();
         let mut block = Block::new();
-        let mut transactions = join_all((0..5).into_iter().map(|_| async {
+        let transactions = join_all((0..5).into_iter().map(|_| async {
             let mut transaction = Transaction::new();
             let wallet = wallet_lock.read().await;
             transaction.sign(wallet.private_key);

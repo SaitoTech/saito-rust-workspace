@@ -1,4 +1,4 @@
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
 use crate::core::data::transaction::Transaction;
 use rayon::prelude::*;
@@ -239,13 +239,10 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::defs::SaitoHash;
-    use crate::core::data::crypto::hash;
-    use crate::core::data::merkle::{MerkleTree, MerkleTreeNode, TraverseMode};
+
+    use crate::core::data::merkle::{MerkleTree, TraverseMode};
     use crate::core::data::transaction::Transaction;
     use crate::core::data::wallet::Wallet;
-    use log::{debug, trace};
-    use std::collections::LinkedList;
 
     #[test]
     fn merkle_tree_generation_test() {

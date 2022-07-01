@@ -1359,10 +1359,10 @@ mod tests {
     //
     async fn add_five_good_blocks() {
         let mut t = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -1521,10 +1521,10 @@ mod tests {
     //
     async fn insufficient_golden_tickets_test() {
         let mut t = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -1759,10 +1759,10 @@ mod tests {
     //
     async fn seven_blocks_with_sufficient_golden_tickets_test() {
         let mut t = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -1997,10 +1997,10 @@ mod tests {
     //
     async fn basic_longest_chain_reorg_test() {
         let mut t = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -2056,7 +2056,7 @@ mod tests {
             .await;
         block3.generate(); // generate hashes
         let block3_hash = block3.hash;
-        let block3_id = block3.id;
+        let _block3_id = block3.id;
         t.add_block(block3).await;
 
         //
@@ -2074,7 +2074,7 @@ mod tests {
             .await;
         block4.generate(); // generate hashes
         let block4_hash = block4.hash;
-        let block4_id = block4.id;
+        let _block4_id = block4.id;
         t.add_block(block4).await;
 
         //
@@ -2116,7 +2116,7 @@ mod tests {
             .await;
         block3_2.generate(); // generate hashes
         let block3_2_hash = block3_2.hash;
-        let block3_2_id = block3_2.id;
+        let _block3_2_id = block3_2.id;
         t.add_block(block3_2).await;
 
         {
@@ -2140,7 +2140,7 @@ mod tests {
             .await;
         block4_2.generate(); // generate hashes
         let block4_2_hash = block4_2.hash;
-        let block4_2_id = block4_2.id;
+        let _block4_2_id = block4_2.id;
         t.add_block(block4_2).await;
 
         {
@@ -2164,7 +2164,7 @@ mod tests {
             .await;
         block5_2.generate(); // generate hashes
         let block5_2_hash = block5_2.hash;
-        let block5_2_id = block5_2.id;
+        let _block5_2_id = block5_2.id;
         t.add_block(block5_2).await;
 
         {
@@ -2208,11 +2208,11 @@ mod tests {
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
         let mut t = TestManager::new();
-        let mut t2 = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let _t2 = TestManager::new();
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -2242,8 +2242,8 @@ mod tests {
             .await;
         block2.generate(); // generate hashes
 
-        let block2_hash = block2.hash;
-        let block2_id = block2.id;
+        let _block2_hash = block2.hash;
+        let _block2_id = block2.id;
 
         t.add_block(block2).await;
 

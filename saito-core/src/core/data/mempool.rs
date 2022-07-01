@@ -311,16 +311,16 @@ mod tests {
         }
 
         {
-            let mut wallet = wallet_lock.write().await;
+            let wallet = wallet_lock.write().await;
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
         let ts = create_timestamp();
-        let next_block_timestamp = ts + (HEARTBEAT * 2);
+        let _next_block_timestamp = ts + (HEARTBEAT * 2);
 
         let mut mempool = mempool_lock.write().await;
-        let txs = Vec::<Transaction>::new();
+        let _txs = Vec::<Transaction>::new();
 
         assert_eq!(mempool.get_routing_work_available(), 0);
 

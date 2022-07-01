@@ -1,6 +1,6 @@
 #[cfg(test)]
 pub mod test {
-    use std::{thread::sleep, time::Duration};
+
     //
     // TestManager provides a set of functions to simplify the testing of dynamic
     // interactions, such as chain-reorganizations and/or other tests that require
@@ -29,16 +29,16 @@ pub mod test {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
-    use log::{debug, info, trace};
+    use log::{info, trace};
     use rayon::prelude::*;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
     use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet};
     use crate::common::test_io_handler::test::TestIOHandler;
-    use crate::core::data::block::{Block, BlockType};
+    use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
-    use crate::core::data::burnfee::HEARTBEAT;
+
     use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
@@ -505,7 +505,7 @@ pub mod test {
             //
             // generate UTXO-carrying VIP transactions
             //
-            for i in 0..vip_transactions {
+            for _i in 0..vip_transactions {
                 let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
                 tx.generate(public_key);
                 tx.sign(private_key);

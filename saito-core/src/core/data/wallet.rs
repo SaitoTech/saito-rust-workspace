@@ -343,7 +343,7 @@ mod tests {
     async fn save_and_restore_wallet_test() {
         info!("current dir = {:?}", std::env::current_dir().unwrap());
 
-        let mut t = TestManager::new();
+        let _t = TestManager::new();
 
         let mut wallet = Wallet::new();
         let public_key1 = wallet.public_key.clone();
