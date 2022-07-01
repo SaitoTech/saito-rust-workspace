@@ -64,7 +64,7 @@ impl MerkleTree {
         for index in 0..transactions.len() {
             leaves.push_back(Box::new(MerkleTreeNode::new(
                 NodeType::Transaction { index },
-                transactions[index].get_hash_for_signature(),
+                transactions[index].hash_for_signature,
                 1 as usize,
             )));
         }
@@ -306,8 +306,7 @@ mod tests {
         let tree = MerkleTree::generate(&transactions).unwrap();
         let cloned_tree = tree.create_clone();
         let mut pruned_tree = tree.create_clone();
-        pruned_tree
-            .prune(|index| target_hash != transactions[index].get_hash_for_signature().unwrap());
+        pruned_tree.prune(|index| target_hash != transactions[index].hash_for_signature.unwrap());
 
         assert_eq!(tree.get_root_hash(), cloned_tree.get_root_hash());
         assert_eq!(cloned_tree.get_root_hash(), pruned_tree.get_root_hash());
