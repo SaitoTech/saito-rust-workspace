@@ -10,55 +10,43 @@ use crate::core::data::crypto::hash;
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GoldenTicket {
-    target: SaitoHash,
-    random: SaitoHash,
+    pub target: SaitoHash,
+    pub(crate) random: SaitoHash,
     #[serde_as(as = "[_; 33]")]
-    publickey: SaitoPublicKey,
+    pub(crate) public_key: SaitoPublicKey,
 }
 
 impl GoldenTicket {
     #[allow(clippy::new_without_default)]
 
-    pub fn new(target: SaitoHash, random: SaitoHash, publickey: SaitoPublicKey) -> Self {
+    pub fn new(target: SaitoHash, random: SaitoHash, public_key: SaitoPublicKey) -> Self {
         return Self {
             target,
             random,
-            publickey,
+            public_key,
         };
     }
 
     pub fn create(
         previous_block_hash: SaitoHash,
         random_bytes: SaitoHash,
-        publickey: SaitoPublicKey,
+        public_key: SaitoPublicKey,
     ) -> GoldenTicket {
-        GoldenTicket::new(previous_block_hash, random_bytes, publickey)
+        GoldenTicket::new(previous_block_hash, random_bytes, public_key)
     }
 
     pub fn deserialize_from_net(bytes: Vec<u8>) -> GoldenTicket {
         let target: SaitoHash = bytes[0..32].try_into().unwrap();
         let random: SaitoHash = bytes[32..64].try_into().unwrap();
-        let publickey: SaitoPublicKey = bytes[64..97].try_into().unwrap();
-        GoldenTicket::new(target, random, publickey)
-    }
-
-    pub fn get_target(&self) -> SaitoHash {
-        self.target
-    }
-
-    pub fn get_random(&self) -> SaitoHash {
-        self.random
-    }
-
-    pub fn get_publickey(&self) -> SaitoPublicKey {
-        self.publickey
+        let public_key: SaitoPublicKey = bytes[64..97].try_into().unwrap();
+        GoldenTicket::new(target, random, public_key)
     }
 
     pub fn serialize_for_net(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&self.target);
         vbytes.extend(&self.random);
-        vbytes.extend(&self.publickey);
+        vbytes.extend(&self.public_key);
         vbytes
     }
 
@@ -124,9 +112,9 @@ mod tests {
 
         let random = hash(&generate_random_bytes(32));
         let target = hash(&random.to_vec());
-        let publickey = wallet.get_publickey();
+        let public_key = wallet.public_key;
 
-        let gt = GoldenTicket::create(target, random, publickey);
+        let gt = GoldenTicket::create(target, random, public_key);
 
         assert_eq!(gt.validate(0), true);
         assert_eq!(gt.validate(256), false);

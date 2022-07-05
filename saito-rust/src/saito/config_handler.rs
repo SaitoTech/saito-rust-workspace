@@ -29,6 +29,7 @@ impl ConfigHandler {
     }
 }
 
+#[cfg(test)]
 mod test {
     use crate::ConfigHandler;
     use std::io::ErrorKind;

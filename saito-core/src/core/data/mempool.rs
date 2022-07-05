@@ -35,8 +35,8 @@ pub struct Mempool {
     // vector so we just copy it over
     routing_work_in_mempool: u64,
     wallet_lock: Arc<RwLock<Wallet>>,
-    mempool_publickey: SaitoPublicKey,
-    mempool_privatekey: SaitoPrivateKey,
+    mempool_public_key: SaitoPublicKey,
+    mempool_private_key: SaitoPrivateKey,
 }
 
 impl Mempool {
@@ -47,18 +47,18 @@ impl Mempool {
             transactions: vec![],
             routing_work_in_mempool: 0,
             wallet_lock,
-            mempool_publickey: [0; 33],
-            mempool_privatekey: [0; 32],
+            mempool_public_key: [0; 33],
+            mempool_private_key: [0; 32],
         }
     }
 
     pub fn add_block(&mut self, block: Block) {
-        debug!("mempool add block : {:?}", hex::encode(block.get_hash()));
-        let hash_to_insert = block.get_hash();
+        debug!("mempool add block : {:?}", hex::encode(block.hash));
+        let hash_to_insert = block.hash;
         if self
             .blocks_queue
             .iter()
-            .any(|block| block.get_hash() == hash_to_insert)
+            .any(|block| block.hash == hash_to_insert)
         {
             // do nothing
         } else {
@@ -93,7 +93,7 @@ impl Mempool {
     ) {
         trace!(
             "add transaction if validates : {:?}",
-            hex::encode(transaction.get_hash_for_signature().unwrap())
+            hex::encode(transaction.hash_for_signature.unwrap())
         );
         //
         // validate
@@ -103,44 +103,44 @@ impl Mempool {
         } else {
             debug!(
                 "transaction not valid : {:?}",
-                transaction.get_hash_for_signature().unwrap()
+                transaction.hash_for_signature.unwrap()
             );
         }
     }
     pub async fn add_transaction(&mut self, mut transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
-            hex::encode(transaction.get_hash_for_signature().unwrap()),
-            transaction.get_transaction_type()
+            hex::encode(transaction.hash_for_signature.unwrap()),
+            transaction.transaction_type
         );
-        let tx_sig_to_insert = transaction.get_signature();
+        let tx_sig_to_insert = transaction.signature;
 
         //
         // this assigns the amount of routing work that this transaction
-        // contains to us, which is why we need to provide our publickey
+        // contains to us, which is why we need to provide our public_key
         // so that we can calculate routing work.
         //
-        let publickey;
+        let public_key;
         {
             trace!("waiting for the wallet read lock");
             let wallet = self.wallet_lock.read().await;
             trace!("acquired the wallet read lock");
-            publickey = wallet.get_publickey();
+            public_key = wallet.public_key;
         }
 
         //
         // generates hashes, total fees, routing work for me, etc.
         //
-        transaction.generate(publickey);
+        transaction.generate(public_key);
 
         if self
             .transactions
             .iter()
-            .any(|transaction| transaction.get_signature() == tx_sig_to_insert)
+            .any(|transaction| transaction.signature == tx_sig_to_insert)
         {
         } else {
-            println!("Here we are with sig 2: {}", transaction.get_total_work());
-            self.routing_work_in_mempool += transaction.get_total_work();
+            println!("Here we are with sig 2: {}", transaction.total_work);
+            self.routing_work_in_mempool += transaction.total_work;
             println!("Here we are with sig 3: {}", self.routing_work_in_mempool);
             self.transactions.push(transaction);
         }
@@ -189,11 +189,11 @@ impl Mempool {
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
-            println!("last ts: {}", previous_block.get_timestamp());
+            println!("last ts: {}", previous_block.timestamp);
             println!("this ts: {}", current_timestamp);
             println!("work available: {}", work_available);
             println!("work needed {}", work_needed);
-            let time_elapsed = current_timestamp - previous_block.get_timestamp();
+            let time_elapsed = current_timestamp - previous_block.timestamp;
             debug!(
                 "can_bundle_block. work available: {:?} -- work needed: {:?} -- time elapsed: {:?} ",
                 work_available,
@@ -209,17 +209,17 @@ impl Mempool {
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         let mut tx_hashmap = HashMap::new();
         for transaction in transactions {
-            let hash = transaction.get_hash_for_signature();
+            let hash = transaction.hash_for_signature;
             tx_hashmap.entry(hash).or_insert(true);
         }
 
         self.routing_work_in_mempool = 0;
 
         self.transactions
-            .retain(|x| tx_hashmap.contains_key(&x.get_hash_for_signature()) != true);
+            .retain(|x| tx_hashmap.contains_key(&x.hash_for_signature) != true);
 
         for transaction in &self.transactions {
-            self.routing_work_in_mempool += transaction.get_total_work();
+            self.routing_work_in_mempool += transaction.total_work;
         }
     }
 
@@ -237,8 +237,8 @@ impl Mempool {
     // Return work needed in Nolan
     //
     pub fn get_routing_work_needed(&self, previous_block: &Block, current_timestamp: u64) -> u64 {
-        let previous_block_timestamp = previous_block.get_timestamp();
-        let previous_block_burnfee = previous_block.get_burnfee();
+        let previous_block_timestamp = previous_block.timestamp;
+        let previous_block_burnfee = previous_block.burnfee;
 
         let work_needed: u64 = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
             previous_block_burnfee,
@@ -249,18 +249,18 @@ impl Mempool {
         work_needed
     }
 
-    pub fn set_mempool_publickey(&mut self, publickey: SaitoPublicKey) {
-        self.mempool_publickey = publickey;
+    pub fn set_mempool_public_key(&mut self, public_key: SaitoPublicKey) {
+        self.mempool_public_key = public_key;
     }
 
-    pub fn set_mempool_privatekey(&mut self, privatekey: SaitoPrivateKey) {
-        self.mempool_privatekey = privatekey;
+    pub fn set_mempool_private_key(&mut self, private_key: SaitoPrivateKey) {
+        self.mempool_private_key = private_key;
     }
 
     pub fn transaction_exists(&self, tx_hash: Option<SaitoHash>) -> bool {
         self.transactions
             .iter()
-            .any(|transaction| transaction.get_hash_for_signature() == tx_hash)
+            .any(|transaction| transaction.hash_for_signature == tx_hash)
     }
 }
 
@@ -268,9 +268,10 @@ impl Mempool {
 mod tests {
     use std::sync::Arc;
 
+    use tokio::sync::RwLock;
+
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::burnfee::HEARTBEAT;
-    use tokio::sync::RwLock;
 
     use super::*;
 
@@ -296,8 +297,8 @@ mod tests {
         let mempool_lock: Arc<RwLock<Mempool>>;
         let wallet_lock: Arc<RwLock<Wallet>>;
         let blockchain_lock: Arc<RwLock<Blockchain>>;
-        let publickey: SaitoPublicKey;
-        let privatekey: SaitoPrivateKey;
+        let public_key: SaitoPublicKey;
+        let private_key: SaitoPrivateKey;
 
         {
             let mut t = TestManager::new();
@@ -310,16 +311,16 @@ mod tests {
         }
 
         {
-            let mut wallet = wallet_lock.write().await;
-            publickey = wallet.get_publickey();
-            privatekey = wallet.get_privatekey();
+            let wallet = wallet_lock.write().await;
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
         }
 
         let ts = create_timestamp();
-        let next_block_timestamp = ts + (HEARTBEAT * 2);
+        let _next_block_timestamp = ts + (HEARTBEAT * 2);
 
         let mut mempool = mempool_lock.write().await;
-        let txs = Vec::<Transaction>::new();
+        let _txs = Vec::<Transaction>::new();
 
         assert_eq!(mempool.get_routing_work_available(), 0);
 
@@ -333,12 +334,12 @@ mod tests {
                 tx.outputs = outputs;
                 // _i prevents sig from being identical during test
                 // and thus from being auto-rejected from mempool
-                tx.set_timestamp(ts + 120000 + _i);
-                tx.generate(publickey);
-                tx.sign(privatekey);
+                tx.timestamp = ts + 120000 + _i;
+                tx.generate(public_key);
+                tx.sign(private_key);
             }
 
-            tx.add_hop(wallet_lock.clone(), publickey).await;
+            tx.add_hop(wallet_lock.clone(), public_key).await;
 
             mempool.add_transaction(tx).await;
         }

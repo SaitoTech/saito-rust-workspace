@@ -90,15 +90,15 @@ impl Blockchain {
         block.generate_pre_hash();
         block.generate_hash();
 
-        info!("add_block {:?}", &hex::encode(&block.get_hash()));
+        info!("add_block {:?}", &hex::encode(&block.hash));
 
         //
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
         // blockchain and our various indices.
         //
-        let block_hash = block.get_hash();
-        let block_id = block.get_id();
+        let block_hash = block.hash;
+        let block_id = block.id;
         let previous_block_hash = self.blockring.get_latest_block_hash();
 
         //
@@ -107,7 +107,7 @@ impl Blockchain {
         if self.blocks.contains_key(&block_hash) {
             error!(
                 "ERROR: block exists in blockchain {:?}",
-                &hex::encode(&block.get_hash())
+                &hex::encode(&block.hash)
             );
             return;
         }
@@ -133,26 +133,22 @@ impl Blockchain {
             let earliest_block = self.get_mut_block(&earliest_block_hash).await;
 
             // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
-            if block.get_timestamp() > earliest_block.get_timestamp() {
-                if self
-                    .get_block(&block.get_previous_block_hash())
-                    .await
-                    .is_none()
-                {
-                    if block.get_id() > earliest_block_id {
+            if block.timestamp > earliest_block.timestamp {
+                if self.get_block(&block.previous_block_hash).await.is_none() {
+                    if block.id > earliest_block_id {
                         if block.source_connection_id.is_some() {
-                            let block_hash = block.get_previous_block_hash();
+                            let block_hash = block.previous_block_hash;
 
                             let result = network
                                 .fetch_missing_block(
                                     block_hash,
-                                    block.get_source_connection_id().as_ref().unwrap(),
+                                    block.source_connection_id.as_ref().unwrap(),
                                 )
                                 .await;
                             if result.is_err() {
                                 warn!(
                                     "couldn't fetch block : {:?}",
-                                    hex::encode(block.get_previous_block_hash())
+                                    hex::encode(block.previous_block_hash)
                                 );
                                 todo!()
                             }
@@ -212,7 +208,7 @@ impl Blockchain {
         } else {
             error!(
                 "BLOCK IS ALREADY IN THE BLOCKCHAIN, WHY ARE WE ADDING IT????? {:?}",
-                block.get_hash()
+                block.hash
             );
             return;
         }
@@ -228,12 +224,7 @@ impl Blockchain {
 
         while !shared_ancestor_found {
             if self.blocks.contains_key(&new_chain_hash) {
-                if self
-                    .blocks
-                    .get(&new_chain_hash)
-                    .unwrap()
-                    .is_in_longest_chain()
-                {
+                if self.blocks.get(&new_chain_hash).unwrap().in_longest_chain {
                     shared_ancestor_found = true;
                     break;
                 } else {
@@ -246,7 +237,7 @@ impl Blockchain {
                     .blocks
                     .get(&new_chain_hash)
                     .unwrap()
-                    .get_previous_block_hash();
+                    .previous_block_hash;
             } else {
                 break;
             }
@@ -266,7 +257,7 @@ impl Blockchain {
                         .blocks
                         .get(&old_chain_hash)
                         .unwrap()
-                        .get_previous_block_hash();
+                        .previous_block_hash;
                     if old_chain_hash == [0; 32] {
                         break;
                     }
@@ -334,10 +325,7 @@ impl Blockchain {
                 // this trick. we did this check before validating.
                 //
                 {
-                    self.blocks
-                        .get_mut(&block_hash)
-                        .unwrap()
-                        .set_in_longest_chain(true);
+                    self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
                 }
 
                 // TODO : send with the right channel
@@ -345,7 +333,7 @@ impl Blockchain {
                 //     .send(GlobalEvent::BlockchainAddBlockSuccess { hash: block_hash })
                 //     .expect("error: BlockchainAddBlockSuccess message failed to send");
 
-                let difficulty = self.blocks.get(&block_hash).unwrap().get_difficulty();
+                let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
                 sender_to_miner
                     .send(MiningEvent::LongestChainBlockAdded {
@@ -404,7 +392,7 @@ impl Blockchain {
         //
         {
             let block = self.get_mut_block(&block_hash).await;
-            if block.get_block_type() != BlockType::Header {
+            if block.block_type != BlockType::Header {
                 storage.write_block_to_disk(block).await;
             }
             network.propagate_block(block).await;
@@ -709,8 +697,7 @@ impl Blockchain {
             return false;
         }
 
-        if self.blockring.get_latest_block_id() >= self.blocks.get(&new_chain[0]).unwrap().get_id()
-        {
+        if self.blockring.get_latest_block_id() >= self.blocks.get(&new_chain[0]).unwrap().id {
             return false;
         }
 
@@ -718,11 +705,11 @@ impl Blockchain {
         let mut new_bf: u64 = 0;
 
         for hash in old_chain.iter() {
-            old_bf += self.blocks.get(hash).unwrap().get_burnfee();
+            old_bf += self.blocks.get(hash).unwrap().burnfee;
         }
         for hash in new_chain.iter() {
             if let Some(x) = self.blocks.get(hash) {
-                new_bf += x.get_burnfee();
+                new_bf += x.burnfee;
             } else {
                 return false;
             }
@@ -770,7 +757,7 @@ impl Blockchain {
 
             if let Some(block) = self.get_block_sync(&latest_block_hash) {
                 if i == 0 {
-                    if block.get_id() < MIN_GOLDEN_TICKETS_DENOMINATOR {
+                    if block.id < MIN_GOLDEN_TICKETS_DENOMINATOR {
                         break;
                     }
                 }
@@ -779,10 +766,10 @@ impl Blockchain {
                 // so it is possible we undercount the latest block. this
                 // is dealt with by manually checking for the existence of
                 // a golden ticket if we only have 1 golden ticket below.
-                if block.get_has_golden_ticket() {
+                if block.has_golden_ticket {
                     golden_tickets_found += 1;
                 }
-                latest_block_hash = block.get_previous_block_hash();
+                latest_block_hash = block.previous_block_hash;
             } else {
                 break;
             }
@@ -793,8 +780,8 @@ impl Blockchain {
         {
             let mut return_value = false;
             if let Some(block) = self.get_block_sync(&new_chain[0]) {
-                for transaction in block.get_transactions() {
-                    if transaction.get_transaction_type() == TransactionType::GoldenTicket {
+                for transaction in block.transactions.iter() {
+                    if transaction.transaction_type == TransactionType::GoldenTicket {
                         return_value = true;
                         break;
                     }
@@ -873,7 +860,7 @@ impl Blockchain {
             let mut block = self.get_mut_block(&new_chain[current_wind_index]).await;
             block.generate();
 
-            let latest_block_id = block.get_id();
+            let latest_block_id = block.id;
 
             //
             // ensure previous blocks that may be needed to calculate the staking
@@ -920,7 +907,7 @@ impl Blockchain {
 
             // blockring update
             self.blockring
-                .on_chain_reorganization(block.get_id(), block.get_hash(), true);
+                .on_chain_reorganization(block.id, block.hash, true);
 
             //
             // TODO - wallet update should be optional, as core routing nodes
@@ -939,7 +926,7 @@ impl Blockchain {
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
 
-            let block_id = block.get_id();
+            let block_id = block.id;
             self.on_chain_reorganization(block_id, true, storage).await;
 
             //
@@ -1066,7 +1053,7 @@ impl Blockchain {
 
         // blockring update
         self.blockring
-            .on_chain_reorganization(block.get_id(), block.get_hash(), false);
+            .on_chain_reorganization(block.id, block.hash, false);
 
         // wallet update
         {
@@ -1372,10 +1359,10 @@ mod tests {
     //
     async fn add_five_good_blocks() {
         let mut t = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -1385,9 +1372,9 @@ mod tests {
         {
             let blockchain = t.blockchain_lock.write().await;
             block1 = blockchain.get_latest_block().unwrap();
-            block1_id = block1.get_id();
-            block1_hash = block1.get_hash();
-            ts = block1.get_timestamp();
+            block1_id = block1.id;
+            block1_hash = block1.hash;
+            ts = block1.timestamp;
 
             assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
             assert_eq!(blockchain.get_latest_block_id(), block1_id);
@@ -1409,8 +1396,8 @@ mod tests {
             .await;
         block2.generate(); // generate hashes
 
-        let block2_hash = block2.get_hash();
-        let block2_id = block2.get_id();
+        let block2_hash = block2.hash;
+        let block2_id = block2.id;
 
         t.add_block(block2).await;
 
@@ -1438,8 +1425,8 @@ mod tests {
             .await;
         block3.generate(); // generate hashes
 
-        let block3_hash = block3.get_hash();
-        let block3_id = block3.get_id();
+        let block3_hash = block3.hash;
+        let block3_id = block3.id;
 
         t.add_block(block3).await;
 
@@ -1469,8 +1456,8 @@ mod tests {
             .await;
         block4.generate(); // generate hashes
 
-        let block4_hash = block4.get_hash();
-        let block4_id = block4.get_id();
+        let block4_hash = block4.hash;
+        let block4_id = block4.id;
 
         t.add_block(block4).await;
 
@@ -1502,8 +1489,8 @@ mod tests {
             .await;
         block5.generate(); // generate hashes
 
-        let block5_hash = block5.get_hash();
-        let block5_id = block5.get_id();
+        let block5_hash = block5.hash;
+        let block5_id = block5.id;
 
         t.add_block(block5).await;
 
@@ -1534,10 +1521,10 @@ mod tests {
     //
     async fn insufficient_golden_tickets_test() {
         let mut t = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -1547,9 +1534,9 @@ mod tests {
         {
             let blockchain = t.blockchain_lock.write().await;
             block1 = blockchain.get_latest_block().unwrap();
-            block1_id = block1.get_id();
-            block1_hash = block1.get_hash();
-            ts = block1.get_timestamp();
+            block1_id = block1.id;
+            block1_hash = block1.hash;
+            ts = block1.timestamp;
 
             assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
             assert_eq!(blockchain.get_latest_block_id(), block1_id);
@@ -1571,8 +1558,8 @@ mod tests {
             .await;
         block2.generate(); // generate hashes
 
-        let block2_hash = block2.get_hash();
-        let block2_id = block2.get_id();
+        let block2_hash = block2.hash;
+        let block2_id = block2.id;
 
         t.add_block(block2).await;
 
@@ -1600,8 +1587,8 @@ mod tests {
             .await;
         block3.generate(); // generate hashes
 
-        let block3_hash = block3.get_hash();
-        let block3_id = block3.get_id();
+        let block3_hash = block3.hash;
+        let block3_id = block3.id;
 
         t.add_block(block3).await;
 
@@ -1631,8 +1618,8 @@ mod tests {
             .await;
         block4.generate(); // generate hashes
 
-        let block4_hash = block4.get_hash();
-        let block4_id = block4.get_id();
+        let block4_hash = block4.hash;
+        let block4_id = block4.id;
 
         t.add_block(block4).await;
 
@@ -1664,8 +1651,8 @@ mod tests {
             .await;
         block5.generate(); // generate hashes
 
-        let block5_hash = block5.get_hash();
-        let block5_id = block5.get_id();
+        let block5_hash = block5.hash;
+        let block5_id = block5.id;
 
         t.add_block(block5).await;
 
@@ -1699,8 +1686,8 @@ mod tests {
             .await;
         block6.generate(); // generate hashes
 
-        let block6_hash = block6.get_hash();
-        let block6_id = block6.get_id();
+        let block6_hash = block6.hash;
+        let block6_id = block6.id;
 
         t.add_block(block6).await;
 
@@ -1736,8 +1723,8 @@ mod tests {
             .await;
         block7.generate(); // generate hashes
 
-        let block7_hash = block7.get_hash();
-        let block7_id = block7.get_id();
+        let block7_hash = block7.hash;
+        let block7_id = block7.id;
 
         t.add_block(block7).await;
 
@@ -1772,10 +1759,10 @@ mod tests {
     //
     async fn seven_blocks_with_sufficient_golden_tickets_test() {
         let mut t = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -1785,9 +1772,9 @@ mod tests {
         {
             let blockchain = t.blockchain_lock.write().await;
             block1 = blockchain.get_latest_block().unwrap();
-            block1_hash = block1.get_hash();
-            block1_id = block1.get_id();
-            ts = block1.get_timestamp();
+            block1_hash = block1.hash;
+            block1_id = block1.id;
+            ts = block1.timestamp;
 
             assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
             assert_eq!(blockchain.get_latest_block_id(), block1_id);
@@ -1809,8 +1796,8 @@ mod tests {
             .await;
         block2.generate(); // generate hashes
 
-        let block2_hash = block2.get_hash();
-        let block2_id = block2.get_id();
+        let block2_hash = block2.hash;
+        let block2_id = block2.id;
 
         t.add_block(block2).await;
 
@@ -1838,8 +1825,8 @@ mod tests {
             .await;
         block3.generate(); // generate hashes
 
-        let block3_hash = block3.get_hash();
-        let block3_id = block3.get_id();
+        let block3_hash = block3.hash;
+        let block3_id = block3.id;
 
         t.add_block(block3).await;
 
@@ -1869,8 +1856,8 @@ mod tests {
             .await;
         block4.generate(); // generate hashes
 
-        let block4_hash = block4.get_hash();
-        let block4_id = block4.get_id();
+        let block4_hash = block4.hash;
+        let block4_id = block4.id;
 
         t.add_block(block4).await;
 
@@ -1902,8 +1889,8 @@ mod tests {
             .await;
         block5.generate(); // generate hashes
 
-        let block5_hash = block5.get_hash();
-        let block5_id = block5.get_id();
+        let block5_hash = block5.hash;
+        let block5_id = block5.id;
 
         t.add_block(block5).await;
 
@@ -1937,8 +1924,8 @@ mod tests {
             .await;
         block6.generate(); // generate hashes
 
-        let block6_hash = block6.get_hash();
-        let block6_id = block6.get_id();
+        let block6_hash = block6.hash;
+        let block6_id = block6.id;
 
         t.add_block(block6).await;
 
@@ -1974,8 +1961,8 @@ mod tests {
             .await;
         block7.generate(); // generate hashes
 
-        let block7_hash = block7.get_hash();
-        let block7_id = block7.get_id();
+        let block7_hash = block7.hash;
+        let block7_id = block7.id;
 
         t.add_block(block7).await;
 
@@ -2010,10 +1997,10 @@ mod tests {
     //
     async fn basic_longest_chain_reorg_test() {
         let mut t = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -2023,9 +2010,9 @@ mod tests {
         {
             let blockchain = t.blockchain_lock.write().await;
             block1 = blockchain.get_latest_block().unwrap();
-            block1_hash = block1.get_hash();
-            block1_id = block1.get_id();
-            ts = block1.get_timestamp();
+            block1_hash = block1.hash;
+            block1_id = block1.id;
+            ts = block1.timestamp;
         }
 
         //
@@ -2043,8 +2030,8 @@ mod tests {
             .await;
         block2.generate(); // generate hashes
 
-        let block2_hash = block2.get_hash();
-        let block2_id = block2.get_id();
+        let block2_hash = block2.hash;
+        let block2_id = block2.id;
 
         t.add_block(block2).await;
 
@@ -2068,8 +2055,8 @@ mod tests {
             )
             .await;
         block3.generate(); // generate hashes
-        let block3_hash = block3.get_hash();
-        let block3_id = block3.get_id();
+        let block3_hash = block3.hash;
+        let _block3_id = block3.id;
         t.add_block(block3).await;
 
         //
@@ -2086,8 +2073,8 @@ mod tests {
             )
             .await;
         block4.generate(); // generate hashes
-        let block4_hash = block4.get_hash();
-        let block4_id = block4.get_id();
+        let block4_hash = block4.hash;
+        let _block4_id = block4.id;
         t.add_block(block4).await;
 
         //
@@ -2104,8 +2091,8 @@ mod tests {
             )
             .await;
         block5.generate(); // generate hashes
-        let block5_hash = block5.get_hash();
-        let block5_id = block5.get_id();
+        let block5_hash = block5.hash;
+        let block5_id = block5.id;
         t.add_block(block5).await;
 
         {
@@ -2128,8 +2115,8 @@ mod tests {
             )
             .await;
         block3_2.generate(); // generate hashes
-        let block3_2_hash = block3_2.get_hash();
-        let block3_2_id = block3_2.get_id();
+        let block3_2_hash = block3_2.hash;
+        let _block3_2_id = block3_2.id;
         t.add_block(block3_2).await;
 
         {
@@ -2152,8 +2139,8 @@ mod tests {
             )
             .await;
         block4_2.generate(); // generate hashes
-        let block4_2_hash = block4_2.get_hash();
-        let block4_2_id = block4_2.get_id();
+        let block4_2_hash = block4_2.hash;
+        let _block4_2_id = block4_2.id;
         t.add_block(block4_2).await;
 
         {
@@ -2176,8 +2163,8 @@ mod tests {
             )
             .await;
         block5_2.generate(); // generate hashes
-        let block5_2_hash = block5_2.get_hash();
-        let block5_2_id = block5_2.get_id();
+        let block5_2_hash = block5_2.hash;
+        let _block5_2_id = block5_2.id;
         t.add_block(block5_2).await;
 
         {
@@ -2200,8 +2187,8 @@ mod tests {
             )
             .await;
         block6_2.generate(); // generate hashes
-        let block6_2_hash = block6_2.get_hash();
-        let block6_2_id = block6_2.get_id();
+        let block6_2_hash = block6_2.hash;
+        let block6_2_id = block6_2.id;
         t.add_block(block6_2).await;
 
         {
@@ -2221,11 +2208,11 @@ mod tests {
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
         let mut t = TestManager::new();
-        let mut t2 = TestManager::new();
-        let mut block1;
-        let mut block1_id;
-        let mut block1_hash;
-        let mut ts;
+        let _t2 = TestManager::new();
+        let block1;
+        let block1_id;
+        let block1_hash;
+        let ts;
 
         //
         // block 1
@@ -2235,9 +2222,9 @@ mod tests {
         {
             let blockchain = t.blockchain_lock.write().await;
             block1 = blockchain.get_latest_block().unwrap();
-            block1_id = block1.get_id();
-            block1_hash = block1.get_hash();
-            ts = block1.get_timestamp();
+            block1_id = block1.id;
+            block1_hash = block1.hash;
+            ts = block1.timestamp;
         }
 
         //
@@ -2255,8 +2242,8 @@ mod tests {
             .await;
         block2.generate(); // generate hashes
 
-        let block2_hash = block2.get_hash();
-        let block2_id = block2.get_id();
+        let _block2_hash = block2.hash;
+        let _block2_id = block2.id;
 
         t.add_block(block2).await;
 
@@ -2284,11 +2271,11 @@ mod tests {
                         (block1_chain2, block1_chain1),
                         (block2_chain2, block2_chain1),
                     ] {
-                        assert_eq!(block_new.get_hash(), block_old.get_hash());
+                        assert_eq!(block_new.hash, block_old.hash);
                         assert_eq!(block_new.has_golden_ticket, block_old.has_golden_ticket);
                         assert_eq!(
-                            block_new.get_previous_block_hash(),
-                            block_old.get_previous_block_hash()
+                            block_new.previous_block_hash,
+                            block_old.previous_block_hash
                         );
                         assert_eq!(block_new.get_block_type(), block_old.get_block_type());
                         assert_eq!(block_new.get_signature(), block_old.get_signature());

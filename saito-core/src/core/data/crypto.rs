@@ -55,7 +55,7 @@ pub fn generate_keys() -> (SaitoPublicKey, SaitoPrivateKey) {
 }
 
 /// Create and return a keypair with  the given hex u8 array as the private key
-pub fn generate_keypair_from_privatekey(slice: &[u8]) -> (SaitoPublicKey, SaitoPrivateKey) {
+pub fn generate_keypair_from_private_key(slice: &[u8]) -> (SaitoPublicKey, SaitoPrivateKey) {
     let secret_key = SecretKey::from_slice(slice).unwrap();
     let public_key = PublicKey::from_secret_key(&SECP256K1, &secret_key);
     let mut secret_bytes = [0u8; 32];
@@ -65,8 +65,8 @@ pub fn generate_keypair_from_privatekey(slice: &[u8]) -> (SaitoPublicKey, SaitoP
     (public_key.serialize(), secret_bytes)
 }
 
-pub fn sign_blob(vbytes: &mut Vec<u8>, privatekey: SaitoPrivateKey) -> &mut Vec<u8> {
-    let sig = sign(&hash(vbytes.as_ref()), privatekey);
+pub fn sign_blob(vbytes: &mut Vec<u8>, private_key: SaitoPrivateKey) -> &mut Vec<u8> {
+    let sig = sign(&hash(vbytes.as_ref()), private_key);
     vbytes.extend(&sig);
     vbytes
 }
@@ -92,16 +92,16 @@ pub fn hash(data: &Vec<u8>) -> SaitoHash {
     hasher.finalize().into()
 }
 
-pub fn sign(message_bytes: &[u8], privatekey: SaitoPrivateKey) -> SaitoSignature {
+pub fn sign(message_bytes: &[u8], private_key: SaitoPrivateKey) -> SaitoSignature {
     let msg = Message::from_slice(message_bytes).unwrap();
-    let secret = SecretKey::from_slice(&privatekey).unwrap();
+    let secret = SecretKey::from_slice(&private_key).unwrap();
     let sig = SECP256K1.sign(&msg, &secret);
     sig.serialize_compact()
 }
 
-pub fn verify(msg: &[u8], sig: SaitoSignature, publickey: SaitoPublicKey) -> bool {
+pub fn verify(msg: &[u8], sig: SaitoSignature, public_key: SaitoPublicKey) -> bool {
     let m = Message::from_slice(msg);
-    let p = PublicKey::from_slice(&publickey);
+    let p = PublicKey::from_slice(&public_key);
     let s = Signature::from_compact(&sig);
     if m.is_err() || p.is_err() || s.is_err() {
         false
@@ -113,12 +113,12 @@ pub fn verify(msg: &[u8], sig: SaitoSignature, publickey: SaitoPublicKey) -> boo
 }
 
 #[cfg(test)]
-
 mod tests {
+    use std::str;
+
+    use hex::FromHex;
 
     use super::*;
-    use hex::FromHex;
-    use std::str;
 
     #[test]
     //
@@ -133,11 +133,11 @@ mod tests {
     }
 
     #[test]
-    fn keypair_restoration_from_privatekey_test() {
-        let (publickey, privatekey) = generate_keys();
-        let (publickey2, privatekey2) = generate_keypair_from_privatekey(&privatekey);
-        assert_eq!(publickey, publickey2);
-        assert_eq!(privatekey, privatekey2);
+    fn keypair_restoration_from_private_key_test() {
+        let (public_key, private_key) = generate_keys();
+        let (public_key2, private_key2) = generate_keypair_from_private_key(&private_key);
+        assert_eq!(public_key, public_key2);
+        assert_eq!(private_key, private_key2);
     }
 
     #[test]
@@ -146,12 +146,12 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
         .unwrap();
-        let privatekey: SaitoPrivateKey = <[u8; 32]>::from_hex(
+        let private_key: SaitoPrivateKey = <[u8; 32]>::from_hex(
             "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
         )
         .unwrap();
 
-        let result = sign(&msg, privatekey);
+        let result = sign(&msg, private_key);
         assert_eq!(result.len(), 64);
         assert_eq!(
             result,
@@ -171,12 +171,12 @@ mod tests {
         )
         .unwrap();
 
-        let (publickey, privatekey) = generate_keys();
-        let (publickey2, privatekey2) = generate_keys();
+        let (public_key, private_key) = generate_keys();
+        let (public_key2, private_key2) = generate_keys();
 
-        assert_eq!(verify(&msg, sign(&msg, privatekey), publickey), true);
-        assert_eq!(verify(&msg, sign(&msg, privatekey2), publickey2), true);
-        assert_eq!(verify(&msg, sign(&msg, privatekey), publickey2), false);
-        assert_eq!(verify(&msg, sign(&msg, privatekey2), publickey), false);
+        assert_eq!(verify(&msg, sign(&msg, private_key), public_key), true);
+        assert_eq!(verify(&msg, sign(&msg, private_key2), public_key2), true);
+        assert_eq!(verify(&msg, sign(&msg, private_key), public_key2), false);
+        assert_eq!(verify(&msg, sign(&msg, private_key2), public_key), false);
     }
 }

@@ -1,6 +1,6 @@
 #[cfg(test)]
 pub mod test {
-    use std::{thread::sleep, time::Duration};
+
     //
     // TestManager provides a set of functions to simplify the testing of dynamic
     // interactions, such as chain-reorganizations and/or other tests that require
@@ -29,16 +29,16 @@ pub mod test {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
-    use log::{debug, info, trace};
+    use log::{info, trace};
     use rayon::prelude::*;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
     use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet};
     use crate::common::test_io_handler::test::TestIOHandler;
-    use crate::core::data::block::{Block, BlockType};
+    use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
-    use crate::core::data::burnfee::HEARTBEAT;
+
     use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
@@ -148,8 +148,8 @@ pub mod test {
                     if i != 1 && previous_block_hash != [0; 32] {
                         assert_eq!(previous_block.is_none(), false);
                         assert_eq!(
-                            block.unwrap().get_previous_block_hash(),
-                            previous_block.unwrap().get_hash()
+                            block.unwrap().previous_block_hash,
+                            previous_block.unwrap().hash
                         );
                     }
                 }
@@ -176,12 +176,8 @@ pub mod test {
                     .get_longest_chain_block_hash_by_block_id(i as u64);
                 info!("WINDING ID HASH - {} {:?}", i, block_hash);
                 let block = blockchain.get_block(&block_hash).await.unwrap();
-                for j in 0..block.get_transactions().len() {
-                    block.get_transactions()[j].on_chain_reorganization(
-                        &mut utxoset,
-                        true,
-                        i as u64,
-                    );
+                for j in 0..block.transactions.len() {
+                    block.transactions[j].on_chain_reorganization(&mut utxoset, true, i as u64);
                 }
             }
 
@@ -291,9 +287,9 @@ pub mod test {
                 block_contains_fee_tx = 0;
 
                 previous_block_treasury = current_block_treasury;
-                current_block_treasury = block.get_treasury();
+                current_block_treasury = block.treasury;
 
-                for t in 0..block.get_transactions().len() {
+                for t in 0..block.transactions.len() {
                     //
                     // we ignore the inputs in staking / fee transactions as they have
                     // been pulled from the staking treasury and are already technically
@@ -301,15 +297,15 @@ pub mod test {
                     // we only care about the difference in token supply represented by
                     // the difference in the staking_treasury.
                     //
-                    if block.get_transactions()[t].get_transaction_type() == TransactionType::Fee {
+                    if block.transactions[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = 1;
                         block_fee_tx_idx = t as usize;
                     } else {
-                        for z in 0..block.get_transactions()[t].inputs.len() {
-                            block_inputs += block.get_transactions()[t].inputs[z].get_amount();
+                        for z in 0..block.transactions[t].inputs.len() {
+                            block_inputs += block.transactions[t].inputs[z].amount;
                         }
-                        for z in 0..block.get_transactions()[t].outputs.len() {
-                            block_outputs += block.get_transactions()[t].outputs[z].get_amount();
+                        for z in 0..block.transactions[t].outputs.len() {
+                            block_outputs += block.transactions[t].outputs[z].amount;
                         }
                     }
 
@@ -317,8 +313,7 @@ pub mod test {
                     // block one sets circulation
                     //
                     if i == 1 {
-                        token_supply =
-                            block_outputs + block.get_treasury() + block.get_staking_treasury();
+                        token_supply = block_outputs + block.treasury + block.staking_treasury;
                         current_supply = token_supply;
                     } else {
                         //
@@ -343,9 +338,9 @@ pub mod test {
                             // calculate total amount paid
                             //
                             let mut total_fees_paid: u64 = 0;
-                            let fee_transaction = &block.get_transactions()[block_fee_tx_idx];
-                            for output in fee_transaction.get_outputs() {
-                                total_fees_paid += output.get_amount();
+                            let fee_transaction = &block.transactions[block_fee_tx_idx];
+                            for output in fee_transaction.outputs.iter() {
+                                total_fees_paid += output.amount;
                             }
 
                             current_supply -= block_inputs;
@@ -370,8 +365,8 @@ pub mod test {
                         //
                         let total_in_circulation = current_supply
                             + unpaid_but_uncollected
-                            + block.get_treasury()
-                            + block.get_staking_treasury();
+                            + block.treasury
+                            + block.staking_treasury;
 
                         //
                         // we check that overall token supply has not changed
@@ -395,21 +390,21 @@ pub mod test {
             include_valid_golden_ticket: bool,
         ) -> Block {
             let mut transactions: Vec<Transaction> = vec![];
-            let privatekey: SaitoPrivateKey;
-            let publickey: SaitoPublicKey;
+            let private_key: SaitoPrivateKey;
+            let public_key: SaitoPublicKey;
 
             {
                 let wallet = self.wallet_lock.read().await;
-                publickey = wallet.get_publickey();
-                privatekey = wallet.get_privatekey();
+                public_key = wallet.public_key;
+                private_key = wallet.private_key;
             }
 
             for _i in 0..txs_number {
                 let mut transaction =
-                    Transaction::create(self.wallet_lock.clone(), publickey, txs_amount, txs_fee)
+                    Transaction::create(self.wallet_lock.clone(), public_key, txs_amount, txs_fee)
                         .await;
-                transaction.sign(privatekey);
-                transaction.generate(publickey);
+                transaction.sign(private_key);
+                transaction.generate(public_key);
                 transactions.push(transaction);
             }
 
@@ -419,7 +414,7 @@ pub mod test {
                 let golden_ticket: GoldenTicket = Self::create_golden_ticket(
                     self.wallet_lock.clone(),
                     parent_hash,
-                    block.get_difficulty(),
+                    block.difficulty,
                 )
                 .await;
                 let mut gttx: Transaction;
@@ -427,7 +422,7 @@ pub mod test {
                     let mut wallet = self.wallet_lock.write().await;
                     gttx = wallet.create_golden_ticket_transaction(golden_ticket).await;
                 }
-                gttx.generate(publickey);
+                gttx.generate(public_key);
                 transactions.push(gttx);
             }
 
@@ -443,7 +438,7 @@ pub mod test {
             )
             .await;
             block.generate();
-            block.sign(privatekey);
+            block.sign(private_key);
 
             block
         }
@@ -458,7 +453,7 @@ pub mod test {
                 trace!("waiting for the wallet read lock");
                 let wallet = wallet.read().await;
                 trace!("acquired the wallet read lock");
-                public_key = wallet.get_publickey();
+                public_key = wallet.public_key;
             }
             let mut random_bytes = hash(&generate_random_bytes(32));
 
@@ -494,12 +489,12 @@ pub mod test {
             //
             // create initial transactions
             //
-            let privatekey: SaitoPrivateKey;
-            let publickey: SaitoPublicKey;
+            let private_key: SaitoPrivateKey;
+            let public_key: SaitoPublicKey;
             {
                 let wallet = self.wallet_lock.read().await;
-                publickey = wallet.get_publickey();
-                privatekey = wallet.get_privatekey();
+                public_key = wallet.public_key;
+                private_key = wallet.private_key;
             }
 
             //
@@ -510,19 +505,19 @@ pub mod test {
             //
             // generate UTXO-carrying VIP transactions
             //
-            for i in 0..vip_transactions {
-                let mut tx = Transaction::create_vip_transaction(publickey, vip_amount);
-                tx.generate(publickey);
-                tx.sign(privatekey);
+            for _i in 0..vip_transactions {
+                let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
+                tx.generate(public_key);
+                tx.sign(private_key);
                 block.add_transaction(tx);
             }
 
             //
             // we have added VIP, so need to regenerate the merkle-root
             //
-            block.set_merkle_root(block.generate_merkle_root());
+            block.merkle_root = block.generate_merkle_root();
             block.generate();
-            block.sign(privatekey);
+            block.sign(private_key);
 
             //
             // and add first block to blockchain
@@ -580,15 +575,15 @@ pub mod test {
                     )
                     .await;
 
-                let privatekey: SaitoPrivateKey;
-                let publickey: SaitoPublicKey;
+                let private_key: SaitoPrivateKey;
+                let public_key: SaitoPublicKey;
 
                 {
                     let wallet = self.wallet_lock.read().await;
-                    publickey = wallet.get_publickey();
-                    privatekey = wallet.get_privatekey();
+                    public_key = wallet.get_public_key();
+                    private_key = wallet.get_private_key();
                 }
-                block.sign(privatekey);
+                block.sign(private_key);
             block.generate();
 
                 self.latest_block_hash = block.get_hash();
@@ -833,14 +828,14 @@ pub mod test {
                 tokio::spawn(async move {
                     let txs_to_generate = 10;
                     let bytes_per_tx = 1024;
-                    let publickey;
-                    let privatekey;
+                    let public_key;
+                    let private_key;
                     let latest_block_id;
 
                     {
                         let wallet = wallet_lock_clone.read().await;
-                        publickey = wallet.get_publickey();
-                        privatekey = wallet.get_privatekey();
+                        public_key = wallet.get_public_key();
+                        private_key = wallet.get_private_key();
                     }
 
                     {
@@ -852,12 +847,12 @@ pub mod test {
                         if latest_block_id == 0 {
                             let mut vip_transaction = Transaction::generate_vip_transaction(
                                 wallet_lock_clone.clone(),
-                                publickey,
+                                public_key,
                                 100_000_000,
                                 10,
                             )
                             .await;
-                            vip_transaction.sign(privatekey);
+                            vip_transaction.sign(private_key);
                             let mut mempool = mempool_lock_clone.write().await;
                             mempool.add_transaction(vip_transaction).await;
                         }
@@ -867,7 +862,7 @@ pub mod test {
                         for _i in 0..txs_to_generate {
                             let mut transaction = Transaction::generate_transaction(
                                 wallet_lock_clone.clone(),
-                                publickey,
+                                public_key,
                                 5000,
                                 5000,
                             )
@@ -878,15 +873,15 @@ pub mod test {
                                     .map(|_| rand::random::<u8>())
                                     .collect(),
                             );
-                            transaction.sign(privatekey);
+                            transaction.sign(private_key);
                             // before validation!
-                            transaction.generate_metadata(publickey);
+                            transaction.generate_metadata(public_key);
 
                             transaction
-                                .add_hop_to_path(wallet_lock_clone.clone(), publickey)
+                                .add_hop_to_path(wallet_lock_clone.clone(), public_key)
                                 .await;
                             transaction
-                                .add_hop_to_path(wallet_lock_clone.clone(), publickey)
+                                .add_hop_to_path(wallet_lock_clone.clone(), public_key)
                                 .await;
                             {
                                 let mut mempool = mempool_lock_clone.write().await;

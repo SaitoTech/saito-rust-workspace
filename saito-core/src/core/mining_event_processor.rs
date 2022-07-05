@@ -39,23 +39,23 @@ impl MiningEventProcessor {
     async fn mine(&self) {
         debug!("mining for golden ticket");
 
-        let publickey: SaitoPublicKey;
+        let public_key: SaitoPublicKey;
 
         {
             trace!("waiting for the wallet read lock");
             let wallet = self.wallet.read().await;
             trace!("acquired the wallet read lock");
-            publickey = wallet.get_publickey();
+            public_key = wallet.public_key;
         }
 
         let random_bytes = hash(&generate_random_bytes(32));
         // The new way of validation will be wasting a GT instance if the validation fails
         // old way used a static method instead
-        let gt = GoldenTicket::create(self.target, random_bytes, publickey);
+        let gt = GoldenTicket::create(self.target, random_bytes, public_key);
         if gt.validate(self.difficulty) {
             debug!(
                 "golden ticket found. sending to mempool : {:?}",
-                hex::encode(gt.get_target())
+                hex::encode(gt.target)
             );
             self.sender_to_mempool
                 .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })

@@ -1,4 +1,4 @@
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
 use crate::core::data::transaction::Transaction;
 use rayon::prelude::*;
@@ -49,10 +49,6 @@ impl MerkleTree {
         return self.root.hash.unwrap();
     }
 
-    pub fn get_root(&self) -> &Box<MerkleTreeNode> {
-        return &self.root;
-    }
-
     pub fn generate(transactions: &Vec<Transaction>) -> Option<Box<MerkleTree>> {
         if transactions.is_empty() {
             return None;
@@ -68,7 +64,7 @@ impl MerkleTree {
         for index in 0..transactions.len() {
             leaves.push_back(Box::new(MerkleTreeNode::new(
                 NodeType::Transaction { index },
-                transactions[index].get_hash_for_signature(),
+                transactions[index].hash_for_signature,
                 1 as usize,
             )));
         }
@@ -243,13 +239,10 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::defs::SaitoHash;
-    use crate::core::data::crypto::hash;
-    use crate::core::data::merkle::{MerkleTree, MerkleTreeNode, TraverseMode};
+
+    use crate::core::data::merkle::{MerkleTree, TraverseMode};
     use crate::core::data::transaction::Transaction;
     use crate::core::data::wallet::Wallet;
-    use log::{debug, trace};
-    use std::collections::LinkedList;
 
     #[test]
     fn merkle_tree_generation_test() {
@@ -259,23 +252,23 @@ mod tests {
 
         for i in 0..5 {
             let mut transaction = Transaction::new();
-            transaction.set_timestamp(i);
-            transaction.sign(wallet.get_privatekey());
+            transaction.timestamp = i;
+            transaction.sign(wallet.private_key);
             transactions.push(transaction);
         }
 
         let tree1 = MerkleTree::generate(&transactions).unwrap();
 
-        transactions[0].set_timestamp(10);
-        transactions[0].sign(wallet.get_privatekey());
+        transactions[0].timestamp = 10;
+        transactions[0].sign(wallet.private_key);
         let tree2 = MerkleTree::generate(&transactions).unwrap();
 
-        transactions[4].set_timestamp(11);
-        transactions[4].sign(wallet.get_privatekey());
+        transactions[4].timestamp = 11;
+        transactions[4].sign(wallet.private_key);
         let tree3 = MerkleTree::generate(&transactions).unwrap();
 
-        transactions[2].set_timestamp(12);
-        transactions[2].sign(wallet.get_privatekey());
+        transactions[2].timestamp = 12;
+        transactions[2].sign(wallet.private_key);
         let tree4 = MerkleTree::generate(&transactions).unwrap();
         let tree5 = MerkleTree::generate(&transactions).unwrap();
 
@@ -300,18 +293,17 @@ mod tests {
 
         for i in 0..5 {
             let mut transaction = Transaction::new();
-            transaction.set_timestamp(i);
-            transaction.sign(wallet.get_privatekey());
+            transaction.timestamp = i;
+            transaction.sign(wallet.private_key);
             transactions.push(transaction);
         }
 
-        let target_hash = transactions[0].get_hash_for_signature().unwrap();
+        let target_hash = transactions[0].hash_for_signature.unwrap();
 
         let tree = MerkleTree::generate(&transactions).unwrap();
         let cloned_tree = tree.create_clone();
         let mut pruned_tree = tree.create_clone();
-        pruned_tree
-            .prune(|index| target_hash != transactions[index].get_hash_for_signature().unwrap());
+        pruned_tree.prune(|index| target_hash != transactions[index].hash_for_signature.unwrap());
 
         assert_eq!(tree.get_root_hash(), cloned_tree.get_root_hash());
         assert_eq!(cloned_tree.get_root_hash(), pruned_tree.get_root_hash());

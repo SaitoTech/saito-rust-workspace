@@ -38,8 +38,8 @@ impl BlockRing {
     }
 
     pub fn add_block(&mut self, block: &Block) {
-        let insert_pos = block.get_id() % RING_BUFFER_LENGTH;
-        self.ring[(insert_pos as usize)].add_block(block.get_id(), block.get_hash());
+        let insert_pos = block.id % RING_BUFFER_LENGTH;
+        self.ring[(insert_pos as usize)].add_block(block.id, block.hash);
     }
 
     pub fn contains_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
@@ -176,7 +176,6 @@ impl BlockRing {
 
 #[cfg(test)]
 mod tests {
-
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::GENESIS_PERIOD;
     use crate::core::data::blockring::BlockRing;
@@ -194,10 +193,10 @@ mod tests {
     fn blockring_add_block_test() {
         let mut blockring = BlockRing::new();
         let mut block = Block::new();
-        block.set_id(1);
+        block.id = 1;
         block.generate_hash();
-        let block_hash = block.get_hash();
-        let block_id = block.get_id();
+        let block_hash = block.hash;
+        let block_id = block.id;
 
         // everything is empty to start
         assert_eq!(blockring.is_empty(), true);
@@ -208,12 +207,12 @@ mod tests {
             [0; 32]
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            blockring.contains_block_hash_at_block_id(block.id, block.hash),
             false
         );
 
         blockring.add_block(&block);
-        blockring.on_chain_reorganization(block.get_id(), block.get_hash(), true);
+        blockring.on_chain_reorganization(block.id, block.hash, true);
 
         assert_eq!(blockring.is_empty(), false);
         assert_eq!(blockring.get_latest_block_hash(), block_hash);
@@ -223,7 +222,7 @@ mod tests {
             block_hash
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            blockring.contains_block_hash_at_block_id(block.id, block.hash),
             true
         );
     }
@@ -233,8 +232,8 @@ mod tests {
         let mut blockring = BlockRing::new();
         let mut block = Block::new();
         block.generate_hash();
-        let block_hash = block.get_hash();
-        let block_id = block.get_id();
+        let block_hash = block.hash;
+        let block_id = block.id;
 
         // everything is empty to start
         assert_eq!(blockring.is_empty(), true);
@@ -245,12 +244,12 @@ mod tests {
             [0; 32]
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            blockring.contains_block_hash_at_block_id(block.id, block.hash),
             false
         );
 
         blockring.add_block(&block);
-        blockring.on_chain_reorganization(block.get_id(), block.get_hash(), true);
+        blockring.on_chain_reorganization(block.id, block.hash, true);
 
         assert_eq!(blockring.is_empty(), false);
         assert_eq!(blockring.get_latest_block_hash(), block_hash);
@@ -260,16 +259,17 @@ mod tests {
             block_hash
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            blockring.contains_block_hash_at_block_id(block.id, block.hash),
             true
         );
 
-        blockring.delete_block(block.get_id(), block.get_hash());
+        blockring.delete_block(block.id, block.hash);
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(block.get_id(), block.get_hash()),
+            blockring.contains_block_hash_at_block_id(block.id, block.hash),
             false
         );
     }
+
     #[tokio::test]
     #[serial_test::serial]
     //
@@ -282,11 +282,11 @@ mod tests {
         let mut block4 = Block::new();
         let mut block5 = Block::new();
 
-        block1.set_id(1);
-        block2.set_id(2);
-        block3.set_id(3);
-        block4.set_id(4);
-        block5.set_id(5);
+        block1.id = 1;
+        block2.id = 2;
+        block3.id = 3;
+        block4.id = 4;
+        block5.id = 5;
 
         block1.generate();
         block2.generate();
@@ -304,55 +304,55 @@ mod tests {
 
         // do we contain these block hashes?
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(1, block1.get_hash()),
+            blockring.contains_block_hash_at_block_id(1, block1.hash),
             true
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(2, block2.get_hash()),
+            blockring.contains_block_hash_at_block_id(2, block2.hash),
             true
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(3, block3.get_hash()),
+            blockring.contains_block_hash_at_block_id(3, block3.hash),
             true
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(4, block4.get_hash()),
+            blockring.contains_block_hash_at_block_id(4, block4.hash),
             true
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(5, block5.get_hash()),
+            blockring.contains_block_hash_at_block_id(5, block5.hash),
             true
         );
         assert_eq!(
-            blockring.contains_block_hash_at_block_id(2, block4.get_hash()),
+            blockring.contains_block_hash_at_block_id(2, block4.hash),
             false
         );
 
         // reorganize longest chain
-        blockring.on_chain_reorganization(1, block1.get_hash(), true);
+        blockring.on_chain_reorganization(1, block1.hash, true);
         assert_eq!(blockring.get_latest_block_id(), 1);
-        blockring.on_chain_reorganization(2, block2.get_hash(), true);
+        blockring.on_chain_reorganization(2, block2.hash, true);
         assert_eq!(blockring.get_latest_block_id(), 2);
-        blockring.on_chain_reorganization(3, block3.get_hash(), true);
+        blockring.on_chain_reorganization(3, block3.hash, true);
         assert_eq!(blockring.get_latest_block_id(), 3);
-        blockring.on_chain_reorganization(4, block4.get_hash(), true);
+        blockring.on_chain_reorganization(4, block4.hash, true);
         assert_eq!(blockring.get_latest_block_id(), 4);
-        blockring.on_chain_reorganization(5, block5.get_hash(), true);
+        blockring.on_chain_reorganization(5, block5.hash, true);
         assert_eq!(blockring.get_latest_block_id(), 5);
-        blockring.on_chain_reorganization(5, block5.get_hash(), false);
+        blockring.on_chain_reorganization(5, block5.hash, false);
         assert_eq!(blockring.get_latest_block_id(), 4);
-        blockring.on_chain_reorganization(4, block4.get_hash(), false);
+        blockring.on_chain_reorganization(4, block4.hash, false);
         assert_eq!(blockring.get_latest_block_id(), 3);
-        blockring.on_chain_reorganization(3, block3.get_hash(), false);
+        blockring.on_chain_reorganization(3, block3.hash, false);
         assert_eq!(blockring.get_latest_block_id(), 2);
 
         // reorg in the wrong block_id location, should not change
-        blockring.on_chain_reorganization(532, block5.get_hash(), false);
+        blockring.on_chain_reorganization(532, block5.hash, false);
         assert_eq!(blockring.get_latest_block_id(), 2);
 
         // double reorg in correct and should be fine still
-        blockring.on_chain_reorganization(2, block2.get_hash(), true);
-        blockring.on_chain_reorganization(2, block2.get_hash(), true);
+        blockring.on_chain_reorganization(2, block2.hash, true);
+        blockring.on_chain_reorganization(2, block2.hash, true);
         assert_eq!(blockring.get_latest_block_id(), 2);
     }
 }
