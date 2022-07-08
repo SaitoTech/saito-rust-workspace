@@ -108,20 +108,8 @@ impl RoutingEventProcessor {
             Message::Transaction(_) => {
                 debug!("received transaction");
             }
-            Message::BlockchainRequest(request) => {
-                self.network
-                    .process_incoming_blockchain_request(
-                        request,
-                        peer_index,
-                        self.blockchain.clone(),
-                    )
-                    .await;
-            }
-            Message::BlockHeaderHash(hash) => {
-                self.network
-                    .process_incoming_block_hash(hash, peer_index, self.blockchain.clone())
-                    .await;
-            }
+            Message::BlockchainRequest(request) => {}
+            Message::BlockHeaderHash(hash) => {}
         }
         debug!("incoming message processed");
     }

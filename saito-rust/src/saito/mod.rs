@@ -1,9 +1,11 @@
 pub mod config_handler;
+mod consensus_handler;
 mod io_context;
 pub mod io_event;
 mod io_future;
+mod mining_handler;
 pub mod network_connection;
-pub mod network_controller;
+pub mod network_handler;
 pub mod rust_io_handler;
 mod rust_task_runner;
 pub mod time_keeper;

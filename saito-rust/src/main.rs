@@ -26,7 +26,7 @@ use saito_core::core::routing_event_processor::{
 
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::io_event::IoEvent;
-use crate::saito::network_controller::run_network_controller;
+use crate::saito::network_handler::run_network_controller;
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::time_keeper::TimeKeeper;
 
@@ -129,6 +129,7 @@ async fn run_consensus_event_processor(
     sender_to_routing: &Sender<RoutingEvent>,
     sender_to_miner: Sender<MiningEvent>,
     sender_to_network_controller: Sender<IoEvent>,
+    event_sender_to_loop: Sender<IoEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
     let mut create_test_tx = false;
@@ -149,6 +150,9 @@ async fn run_consensus_event_processor(
                 CONSENSUS_EVENT_PROCESSOR_ID,
             )),
             peers.clone(),
+            context.blockchain.clone(),
+            context.wallet.clone(),
+            context.configuration.clone(),
         ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
@@ -179,6 +183,7 @@ async fn run_routing_event_processor(
     sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MiningEvent>,
+    event_sender_to_loop: Sender<IoEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingEventProcessor {
         blockchain: context.blockchain.clone(),
@@ -194,6 +199,9 @@ async fn run_routing_event_processor(
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
             peers.clone(),
+            context.blockchain.clone(),
+            context.wallet.clone(),
+            context.configuration.clone(),
         ),
     };
     {
@@ -355,6 +363,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &sender_to_mempool,
         receiver_for_routing,
         &sender_to_miner,
+        event_sender_to_loop.clone(),
     )
     .await;
 
@@ -365,6 +374,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &sender_to_routing,
         sender_to_miner,
         sender_to_network_controller.clone(),
+        event_sender_to_loop.clone(),
     )
     .await;
 
@@ -386,8 +396,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let network_handle = tokio::spawn(run_network_controller(
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
+        sender_to_network_controller.clone(),
         configs.clone(),
         context.blockchain.clone(),
+        context.wallet.clone(),
+        peers.clone(),
     ));
 
     let _result = tokio::join!(

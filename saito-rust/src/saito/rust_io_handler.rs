@@ -44,8 +44,11 @@ pub struct RustIOHandler {
 }
 
 impl RustIOHandler {
-    pub fn new(sender: Sender<IoEvent>, handler_id: u8) -> RustIOHandler {
-        RustIOHandler { sender, handler_id }
+    pub fn new(sender_to_network: Sender<IoEvent>, handler_id: u8) -> RustIOHandler {
+        RustIOHandler {
+            sender: sender_to_network,
+            handler_id,
+        }
     }
 
     // TODO : delete this if not required

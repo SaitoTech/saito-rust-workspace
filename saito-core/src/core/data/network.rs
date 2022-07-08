@@ -15,7 +15,7 @@ use crate::core::data::msg::handshake::{
     HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
 };
 use crate::core::data::msg::message::Message;
-use crate::core::data::peer::Peer;
+use crate::core::data::peer::{Peer, PeerConnection};
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
@@ -24,18 +24,28 @@ pub struct Network {
     // TODO : manage peers from network
     peers: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
+    blockchain: Arc<RwLock<Blockchain>>,
+    wallet: Arc<RwLock<Wallet>>,
+    configs: Arc<RwLock<Configuration>>,
 }
 
 impl Network {
     pub fn new(
         io_handler: Box<dyn InterfaceIO + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
+        blockchain: Arc<RwLock<Blockchain>>,
+        wallet: Arc<RwLock<Wallet>>,
+        configs: Arc<RwLock<Configuration>>,
     ) -> Network {
         Network {
             peers,
             io_interface: io_handler,
+            blockchain,
+            wallet,
+            configs,
         }
     }
+
     pub async fn propagate_block(&self, block: &Block) {
         debug!("propagating block : {:?}", hex::encode(&block.hash));
 
@@ -88,6 +98,116 @@ impl Network {
             .fetch_block_from_peer(block_hash, peer_index, url)
             .await
     }
+
+    pub async fn handle_new_peer(
+        &mut self,
+        peer_data: Option<data::configuration::PeerConfig>,
+        peer_index: u64,
+        connection: &mut impl PeerConnection,
+    ) {
+        // TODO : if an incoming peer is same as static peer, handle the scenario
+        debug!("handing new peer : {:?}", peer_index);
+        trace!("waiting for the peers write lock");
+
+        let block_fetch_url;
+        {
+            block_fetch_url = self.configs.read().await.get_block_fetch_url();
+        }
+
+        let mut peer = Peer::new(
+            self.blockchain.clone(),
+            self.wallet.clone(),
+            block_fetch_url,
+            peer_index,
+        );
+
+        peer.static_peer_config = peer_data;
+
+        if peer.static_peer_config.is_none() {
+            // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
+            peer.initiate_handshake(connection).await.unwrap();
+        }
+
+        {
+            let mut peers = self.peers.write().await;
+            trace!("acquired the peers write lock");
+            peers.index_to_peers.insert(peer_index, peer);
+            info!("new peer added : {:?}", peer_index);
+        }
+    }
+
+    pub async fn handle_handshake_challenge(
+        &self,
+        peer_index: u64,
+        challenge: HandshakeChallenge,
+        connection: &mut impl PeerConnection,
+    ) {
+        let mut peers = self.peers.write().await;
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_none() {
+            todo!()
+        }
+        let peer = peer.unwrap();
+        peer.handle_handshake_challenge(challenge, connection)
+            .await
+            .unwrap();
+    }
+
+    pub async fn handle_handshake_response(
+        &self,
+        peer_index: u64,
+        response: HandshakeResponse,
+        connection: &mut impl PeerConnection,
+    ) {
+        debug!("received handshake response");
+        let mut peers = self.peers.write().await;
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_none() {
+            todo!()
+        }
+
+        let peer = peer.unwrap();
+        peer.handle_handshake_response(response, connection)
+            .await
+            .unwrap();
+
+        if peer.handshake_done {
+            debug!(
+                "peer : {:?} handshake successful for peer : {:?}",
+                peer.peer_index,
+                hex::encode(peer.peer_public_key)
+            );
+            // start block syncing here
+            self.request_blockchain_from_peer(peer_index, connection)
+                .await;
+        }
+    }
+
+    pub async fn handle_handshake_completion(
+        &self,
+        peer_index: u64,
+        response: HandshakeCompletion,
+        connection: &mut impl PeerConnection,
+    ) {
+        debug!("received handshake completion");
+        let mut peers = self.peers.write().await;
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_none() {
+            todo!()
+        }
+        let peer = peer.unwrap();
+        let result = peer.handle_handshake_completion(response).await;
+        if peer.handshake_done {
+            debug!(
+                "peer : {:?} handshake successful for peer : {:?}",
+                peer.peer_index,
+                hex::encode(peer.peer_public_key)
+            );
+            // start block syncing here
+            peer.request_blockchain(connection).await;
+        }
+    }
+
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
         let peers = self.peers.read().await;
@@ -119,119 +239,18 @@ impl Network {
             todo!("Handle the unknown peer disconnect");
         }
     }
-    // pub async fn handle_new_peer(
-    //     &mut self,
-    //     peer_data: Option<data::configuration::PeerConfig>,
-    //     peer_index: u64,
-    //     wallet: Arc<RwLock<Wallet>>,
-    //     configs: Arc<RwLock<Configuration>>,
-    // ) {
-    //     // TODO : if an incoming peer is same as static peer, handle the scenario
-    //     debug!("handing new peer : {:?}", peer_index);
-    //     trace!("waiting for the peers write lock");
-    //     let mut peers = self.peers.write().await;
-    //     trace!("acquired the peers write lock");
-    //     let mut peer = Peer::new(peer_index);
-    //     peer.static_peer_config = peer_data;
-    //
-    //     if peer.static_peer_config.is_none() {
-    //         // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-    //         peer.initiate_handshake(&self.io_interface, wallet.clone(), configs.clone())
-    //             .await
-    //             .unwrap();
-    //     }
-    //
-    //     peers.index_to_peers.insert(peer_index, peer);
-    //     info!("new peer added : {:?}", peer_index);
-    // }
-    // pub async fn handle_handshake_challenge(
-    //     &self,
-    //     peer_index: u64,
-    //     challenge: HandshakeChallenge,
-    //     wallet: Arc<RwLock<Wallet>>,
-    //     configs: Arc<RwLock<Configuration>>,
-    // ) {
-    //     let mut peers = self.peers.write().await;
-    //     let peer = peers.index_to_peers.get_mut(&peer_index);
-    //     if peer.is_none() {
-    //         todo!()
-    //     }
-    //     let peer = peer.unwrap();
-    //     peer.handle_handshake_challenge(
-    //         challenge,
-    //         &self.io_interface,
-    //         wallet.clone(),
-    //         configs.clone(),
-    //     )
-    //     .await
-    //     .unwrap();
-    // }
-    // pub async fn handle_handshake_response(
-    //     &self,
-    //     peer_index: u64,
-    //     response: HandshakeResponse,
-    //     wallet: Arc<RwLock<Wallet>>,
-    //     blockchain: Arc<RwLock<Blockchain>>,
-    // ) {
-    //     debug!("received handshake response");
-    //     let mut peers = self.peers.write().await;
-    //     let peer = peers.index_to_peers.get_mut(&peer_index);
-    //     if peer.is_none() {
-    //         todo!()
-    //     }
-    //     let peer = peer.unwrap();
-    //     peer.handle_handshake_response(response, &self.io_interface, wallet.clone())
-    //         .await
-    //         .unwrap();
-    //     if peer.handshake_done {
-    //         debug!(
-    //             "peer : {:?} handshake successful for peer : {:?}",
-    //             peer.peer_index,
-    //             hex::encode(peer.peer_public_key)
-    //         );
-    //         // start block syncing here
-    //         self.request_blockchain_from_peer(peer_index, blockchain.clone())
-    //             .await;
-    //     }
-    // }
-    // pub async fn handle_handshake_completion(
-    //     &self,
-    //     peer_index: u64,
-    //     response: HandshakeCompletion,
-    //     blockchain: Arc<RwLock<Blockchain>>,
-    // ) {
-    //     debug!("received handshake completion");
-    //     let mut peers = self.peers.write().await;
-    //     let peer = peers.index_to_peers.get_mut(&peer_index);
-    //     if peer.is_none() {
-    //         todo!()
-    //     }
-    //     let peer = peer.unwrap();
-    //     let result = peer
-    //         .handle_handshake_completion(response, &self.io_interface)
-    //         .await;
-    //     if peer.handshake_done {
-    //         debug!(
-    //             "peer : {:?} handshake successful for peer : {:?}",
-    //             peer.peer_index,
-    //             hex::encode(peer.peer_public_key)
-    //         );
-    //         // start block syncing here
-    //         self.request_blockchain_from_peer(peer_index, blockchain.clone())
-    //             .await;
-    //     }
-    // }
+
     async fn request_blockchain_from_peer(
         &self,
         peer_index: u64,
-        blockchain: Arc<RwLock<Blockchain>>,
+        connection: &mut impl PeerConnection,
     ) {
         debug!("requesting blockchain from peer : {:?}", peer_index);
 
         // TODO : should this be moved inside peer ?
         let request;
         {
-            let blockchain = blockchain.read().await;
+            let blockchain = self.blockchain.read().await;
             request = BlockchainRequest {
                 latest_block_id: blockchain.get_latest_block_id(),
                 latest_block_hash: blockchain.get_latest_block_hash(),
@@ -240,16 +259,14 @@ impl Network {
         }
 
         let buffer = Message::BlockchainRequest(request).serialize();
-        self.io_interface
-            .send_message(peer_index, buffer)
-            .await
-            .unwrap();
+        connection.send_message(buffer).await.unwrap();
     }
+
     pub async fn process_incoming_blockchain_request(
         &self,
         request: BlockchainRequest,
         peer_index: u64,
-        blockchain: Arc<RwLock<Blockchain>>,
+        connection: &mut impl PeerConnection,
     ) {
         debug!(
             "processing incoming blockchain request : {:?}-{:?}-{:?} from peer : {:?}",
@@ -260,7 +277,7 @@ impl Network {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        let blockchain = blockchain.read().await;
+        let blockchain = self.blockchain.read().await;
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
@@ -276,22 +293,14 @@ impl Network {
             }
             let buffer = Message::BlockHeaderHash(block_hash).serialize();
 
-            self.io_interface
-                .send_message(peer_index, buffer)
-                .await
-                .unwrap();
+            connection.send_message(buffer).await.unwrap();
         }
     }
 
-    pub async fn process_incoming_block_hash(
-        &self,
-        block_hash: SaitoHash,
-        peer_index: u64,
-        blockchain: Arc<RwLock<Blockchain>>,
-    ) {
+    pub async fn process_incoming_block_hash(&self, block_hash: SaitoHash, peer_index: u64) {
         let block_exists;
         {
-            let blockchain = blockchain.read().await;
+            let blockchain = self.blockchain.read().await;
             block_exists = blockchain.is_block_indexed(block_hash);
         }
         let url;
@@ -310,6 +319,7 @@ impl Network {
                 .unwrap();
         }
     }
+
     pub async fn connect_to_static_peers(&mut self, configs: Arc<RwLock<Configuration>>) {
         debug!("connect to peers from config",);
         trace!("waiting for the configs read lock");
