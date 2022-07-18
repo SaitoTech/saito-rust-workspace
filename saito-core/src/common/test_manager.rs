@@ -29,7 +29,7 @@ pub mod test {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
-    use log::{info, trace};
+    use log::{debug, info, trace};
     use rayon::prelude::*;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
@@ -74,7 +74,7 @@ pub mod test {
             let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
-            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
+            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
 
             Self {
                 wallet_lock: wallet_lock,
@@ -112,6 +112,7 @@ pub mod test {
         // add block to blockchain
         //
         pub async fn add_block(&mut self, block: Block) {
+            debug!("adding block to test manager blockchain");
             let mut blockchain = self.blockchain_lock.write().await;
             blockchain
                 .add_block(
@@ -121,6 +122,7 @@ pub mod test {
                     self.sender_to_miner.clone(),
                 )
                 .await;
+            debug!("block added to test manager blockchain");
         }
 
         //

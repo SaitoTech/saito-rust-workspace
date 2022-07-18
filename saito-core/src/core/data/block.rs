@@ -805,8 +805,8 @@ impl Block {
     }
 
     pub fn generate_merkle_root(&self) -> SaitoHash {
-        println!("generating the merkle root 1");
-        println!(
+        debug!("generating the merkle root 1");
+        debug!(
             "generating the merkle root len: {}",
             self.transactions.len()
         );

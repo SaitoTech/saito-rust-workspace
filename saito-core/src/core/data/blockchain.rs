@@ -670,8 +670,7 @@ impl Blockchain {
     }
 
     pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> &mut Block {
-        let block = self.blocks.get_mut(block_hash).unwrap();
-        block
+        self.blocks.get_mut(block_hash).unwrap()
     }
 
     pub fn is_block_indexed(&self, block_hash: SaitoHash) -> bool {
@@ -1280,6 +1279,7 @@ impl Blockchain {
 
 #[cfg(test)]
 mod tests {
+    use log::info;
     use std::sync::Arc;
 
     use crate::common::defs::SaitoHash;
@@ -2197,10 +2197,6 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_hash(), block6_2_hash);
             assert_eq!(blockchain.get_latest_block_id(), block6_2_id);
             assert_eq!(blockchain.get_latest_block_id(), 6);
-
-            let fork_id = blockchain.generate_fork_id(6);
-            let expected: SaitoHash = [0; 32];
-            assert_eq!(fork_id, expected);
         }
 
         t.check_blockchain().await;
@@ -2290,5 +2286,54 @@ mod tests {
 
         // TODO - fix above test
         assert_eq!(1, 1);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn fork_id_test() {
+        // pretty_env_logger::init();
+
+        let mut t = TestManager::new();
+        let mut block1;
+        let mut block1_id;
+        let mut block1_hash;
+        let mut ts;
+
+        t.initialize(100, 1_000_000_000).await;
+
+        for _i in (0..21).step_by(1) {
+            {
+                let blockchain = t.blockchain_lock.write().await;
+                block1 = blockchain.get_latest_block().unwrap();
+                block1_hash = block1.hash;
+                block1_id = block1.id;
+                ts = block1.timestamp;
+            }
+
+            let mut block = t
+                .create_block(
+                    block1_hash, // hash of parent block
+                    ts + 120000, // timestamp
+                    0,           // num transactions
+                    0,           // amount
+                    0,           // fee
+                    true,        // mine golden ticket
+                )
+                .await;
+            block.generate(); // generate hashes
+
+            let block_hash = block.hash;
+            let block_id = block.id;
+
+            t.add_block(block).await;
+
+            let result = t.receiver_in_miner.try_recv();
+        }
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+            let fork_id = blockchain.generate_fork_id(20);
+            assert_ne!(fork_id, [0; 32]);
+        }
     }
 }
