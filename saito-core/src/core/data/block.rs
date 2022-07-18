@@ -168,7 +168,7 @@ pub struct Block {
     creator: [u8; 33],
     pub(crate) merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
-    signature: [u8; 64],
+    pub signature: [u8; 64],
     pub(crate) treasury: u64,
     pub(crate) burnfee: u64,
     pub(crate) difficulty: u64,

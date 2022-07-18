@@ -2210,15 +2210,13 @@ mod tests {
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
         let mut t = TestManager::new();
-        let _t2 = TestManager::new();
+        let mut t2 = TestManager::new();
         let block1;
         let block1_id;
         let block1_hash;
         let ts;
 
-        //
         // block 1
-        //
         t.initialize(100, 1_000_000_000).await;
 
         {
@@ -2229,9 +2227,7 @@ mod tests {
             ts = block1.timestamp;
         }
 
-        //
         // block 2
-        //
         let mut block2 = t
             .create_block(
                 block1_hash, // hash of parent block
@@ -2244,49 +2240,40 @@ mod tests {
             .await;
         block2.generate(); // generate hashes
 
-        let _block2_hash = block2.hash;
-        let _block2_id = block2.id;
+        let block2_hash = block2.hash;
+        let block2_id = block2.id;
 
         t.add_block(block2).await;
 
-        /*******
-                test_manager2
-                    .storage
-                    .load_blocks_from_disk(
-                        blockchain_lock2.clone(),
-                        &mut test_manager2.network,
-                        test_manager2.sender_to_miner.clone(),
-                    )
-                    .await;
+        t2.storage
+            .load_blocks_from_disk(
+                t2.blockchain_lock.clone(),
+                &mut t2.network,
+                t2.sender_to_miner.clone(),
+            )
+            .await;
 
-                {
-                    let blockchain1 = blockchain_lock1.read().await;
-                    let blockchain2 = blockchain_lock2.read().await;
+        {
+            let blockchain1 = t.blockchain_lock.read().await;
+            let blockchain2 = t2.blockchain_lock.read().await;
 
-                    let block1_chain1 = blockchain1.get_block(&block1_hash).await.unwrap();
-                    let block1_chain2 = blockchain2.get_block(&block1_hash).await.unwrap();
+            let block1_chain1 = blockchain1.get_block(&block1_hash).await.unwrap();
+            let block1_chain2 = blockchain2.get_block(&block1_hash).await.unwrap();
 
-                    let block2_chain1 = blockchain1.get_block(&block2_hash).await.unwrap();
-                    let block2_chain2 = blockchain2.get_block(&block2_hash).await.unwrap();
+            let block2_chain1 = blockchain1.get_block(&block2_hash).await.unwrap();
+            let block2_chain2 = blockchain2.get_block(&block2_hash).await.unwrap();
 
-                    for (block_new, block_old) in &[
-                        (block1_chain2, block1_chain1),
-                        (block2_chain2, block2_chain1),
-                    ] {
-                        assert_eq!(block_new.hash, block_old.hash);
-                        assert_eq!(block_new.has_golden_ticket, block_old.has_golden_ticket);
-                        assert_eq!(
-                            block_new.previous_block_hash,
-                            block_old.previous_block_hash
-                        );
-                        assert_eq!(block_new.get_block_type(), block_old.get_block_type());
-                        assert_eq!(block_new.get_signature(), block_old.get_signature());
-                    }
-                }
-        *************/
-
-        // TODO - fix above test
-        assert_eq!(1, 1);
+            for (block_new, block_old) in [
+                (block1_chain2, block1_chain1),
+                (block2_chain2, block2_chain1),
+            ] {
+                assert_eq!(block_new.hash, block_old.hash);
+                assert_eq!(block_new.has_golden_ticket, block_old.has_golden_ticket);
+                assert_eq!(block_new.previous_block_hash, block_old.previous_block_hash);
+                assert_eq!(block_new.block_type, block_old.block_type);
+                assert_eq!(block_new.signature, block_old.signature);
+            }
+        }
     }
 
     #[tokio::test]
