@@ -469,16 +469,26 @@ pub mod test {
             GoldenTicket::new(block_hash, random_bytes, public_key)
         }
 
+        pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: u64) {
+            let timestamp = create_timestamp();
+            self.initialize_with_timestamp(vip_transactions, vip_amount, timestamp)
+                .await;
+        }
+
         //
         // initialize chain
         //
         // creates and adds the first block to the blockchain, with however many VIP
         // transactions are necessary
-        pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: u64) {
+        pub async fn initialize_with_timestamp(
+            &mut self,
+            vip_transactions: u64,
+            vip_amount: u64,
+            timestamp: u64,
+        ) {
             //
             // initialize timestamp
             //
-            let timestamp = create_timestamp();
 
             //
             // reset data dirs

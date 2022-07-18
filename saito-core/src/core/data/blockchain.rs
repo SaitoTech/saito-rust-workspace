@@ -666,6 +666,7 @@ impl Blockchain {
     }
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
+
         self.blocks.get(block_hash)
     }
 
@@ -2299,9 +2300,10 @@ mod tests {
         let mut block1_hash;
         let mut ts;
 
-        t.initialize(100, 1_000_000_000).await;
+        t.initialize_with_timestamp(100, 1_000_000_000, 10_000_000)
+            .await;
 
-        for _i in (0..21).step_by(1) {
+        for _i in (0..20).step_by(1) {
             {
                 let blockchain = t.blockchain_lock.write().await;
                 block1 = blockchain.get_latest_block().unwrap();
@@ -2332,8 +2334,14 @@ mod tests {
 
         {
             let blockchain = t.blockchain_lock.write().await;
+
+            let fork_id = blockchain.generate_fork_id(15);
+            assert_ne!(fork_id, [0; 32]);
+            assert_eq!(fork_id[2..], [0; 30]);
+
             let fork_id = blockchain.generate_fork_id(20);
             assert_ne!(fork_id, [0; 32]);
+            assert_eq!(fork_id[4..], [0; 28]);
         }
     }
 }
