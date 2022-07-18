@@ -1282,10 +1282,11 @@ impl Blockchain {
 mod tests {
     use std::sync::Arc;
 
-    use crate::common::test_manager::test;
-    use crate::common::test_manager::test::TestManager;
+    use crate::common::defs::SaitoHash;
     use tokio::sync::RwLock;
 
+    use crate::common::test_manager::test;
+    use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
 
@@ -2196,6 +2197,10 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_hash(), block6_2_hash);
             assert_eq!(blockchain.get_latest_block_id(), block6_2_id);
             assert_eq!(blockchain.get_latest_block_id(), 6);
+
+            let fork_id = blockchain.generate_fork_id(6);
+            let expected: SaitoHash = [0; 32];
+            assert_eq!(fork_id, expected);
         }
 
         t.check_blockchain().await;
