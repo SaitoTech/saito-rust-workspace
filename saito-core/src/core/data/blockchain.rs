@@ -883,7 +883,6 @@ impl Blockchain {
             }
         }
 
-        debug!("here");
         let block = self.blocks.get(&new_chain[current_wind_index]).unwrap();
         // trace!(" ... before block.validate:      {:?}", create_timestamp());
         let does_block_validate = block.validate(&self, &self.utxoset).await;
