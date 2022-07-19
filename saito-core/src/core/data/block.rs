@@ -462,6 +462,8 @@ impl Block {
             trace!("waiting for the wallet read lock");
             let wallet = wallet_lock.read().await;
             trace!("acquired the wallet read lock");
+
+            block.generate_pre_hash();
             block.sign(wallet.private_key);
         }
 
