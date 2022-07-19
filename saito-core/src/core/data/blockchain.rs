@@ -1279,10 +1279,10 @@ impl Blockchain {
 
 #[cfg(test)]
 mod tests {
-    use log::info;
+    
     use std::sync::Arc;
 
-    use crate::common::defs::SaitoHash;
+    
     use tokio::sync::RwLock;
 
     use crate::common::test_manager::test;
@@ -2240,7 +2240,7 @@ mod tests {
         block2.generate(); // generate hashes
 
         let block2_hash = block2.hash;
-        let block2_id = block2.id;
+        let _block2_id = block2.id;
 
         t.add_block(block2).await;
 
@@ -2310,12 +2310,12 @@ mod tests {
                 .await;
             block.generate(); // generate hashes
 
-            let block_hash = block.hash;
-            let block_id = block.id;
+            let _block_hash = block.hash;
+            let _block_id = block.id;
 
             t.add_block(block).await;
 
-            let result = t.receiver_in_miner.try_recv();
+            let _result = t.receiver_in_miner.try_recv();
         }
 
         {
