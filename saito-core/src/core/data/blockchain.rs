@@ -1279,10 +1279,9 @@ impl Blockchain {
 
 #[cfg(test)]
 mod tests {
-    
+
     use std::sync::Arc;
 
-    
     use tokio::sync::RwLock;
 
     use crate::common::test_manager::test;
