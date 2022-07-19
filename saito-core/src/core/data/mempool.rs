@@ -139,9 +139,9 @@ impl Mempool {
             .any(|transaction| transaction.signature == tx_sig_to_insert)
         {
         } else {
-            println!("Here we are with sig 2: {}", transaction.total_work);
+            trace!("Here we are with sig 2: {}", transaction.total_work);
             self.routing_work_in_mempool += transaction.total_work;
-            println!("Here we are with sig 3: {}", self.routing_work_in_mempool);
+            trace!("Here we are with sig 3: {}", self.routing_work_in_mempool);
             self.transactions.push(transaction);
         }
     }

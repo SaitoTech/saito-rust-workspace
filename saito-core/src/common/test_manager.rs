@@ -29,7 +29,7 @@ pub mod test {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
-    use log::{info, trace};
+    use log::{debug, info, trace};
     use rayon::prelude::*;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
@@ -74,7 +74,7 @@ pub mod test {
             let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
-            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
+            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
 
             Self {
                 wallet_lock: wallet_lock,
@@ -112,6 +112,7 @@ pub mod test {
         // add block to blockchain
         //
         pub async fn add_block(&mut self, block: Block) {
+            debug!("adding block to test manager blockchain");
             let mut blockchain = self.blockchain_lock.write().await;
             blockchain
                 .add_block(
@@ -121,6 +122,7 @@ pub mod test {
                     self.sender_to_miner.clone(),
                 )
                 .await;
+            debug!("block added to test manager blockchain");
         }
 
         //
@@ -467,16 +469,26 @@ pub mod test {
             GoldenTicket::new(block_hash, random_bytes, public_key)
         }
 
+        pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: u64) {
+            let timestamp = create_timestamp();
+            self.initialize_with_timestamp(vip_transactions, vip_amount, timestamp)
+                .await;
+        }
+
         //
         // initialize chain
         //
         // creates and adds the first block to the blockchain, with however many VIP
         // transactions are necessary
-        pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: u64) {
+        pub async fn initialize_with_timestamp(
+            &mut self,
+            vip_transactions: u64,
+            vip_amount: u64,
+            timestamp: u64,
+        ) {
             //
             // initialize timestamp
             //
-            let timestamp = create_timestamp();
 
             //
             // reset data dirs
