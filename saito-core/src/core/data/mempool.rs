@@ -139,9 +139,7 @@ impl Mempool {
             .any(|transaction| transaction.signature == tx_sig_to_insert)
         {
         } else {
-            trace!("Here we are with sig 2: {}", transaction.total_work);
             self.routing_work_in_mempool += transaction.total_work;
-            trace!("Here we are with sig 3: {}", self.routing_work_in_mempool);
             self.transactions.push(transaction);
         }
     }
@@ -189,10 +187,10 @@ impl Mempool {
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
-            println!("last ts: {}", previous_block.timestamp);
-            println!("this ts: {}", current_timestamp);
-            println!("work available: {}", work_available);
-            println!("work needed {}", work_needed);
+            debug!(
+                "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}",
+                previous_block.timestamp, current_timestamp, work_available, work_needed
+            );
             let time_elapsed = current_timestamp - previous_block.timestamp;
             debug!(
                 "can_bundle_block. work available: {:?} -- work needed: {:?} -- time elapsed: {:?} ",
