@@ -1,16 +1,17 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::saito::consensus_handler::ConsensusEvent;
 use log::{debug, trace};
 use saito_core::common::defs::{SaitoHash, SaitoPublicKey};
 use saito_core::common::keep_time::KeepTime;
-use saito_core::core::consensus_event_processor::ConsensusEvent;
 use saito_core::core::data::crypto::{generate_random_bytes, hash};
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_event_processor::MiningEvent;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
 use tokio::time::interval;
 
 #[derive(Debug)]
@@ -18,21 +19,24 @@ use tokio::time::interval;
 //     LongestChainBlockAdded { hash: SaitoHash, difficulty: u64 },
 // }
 pub struct MiningHandler {
-    wallet: Arc<RwLock<Wallet>>,
-    sender_to_consensus_handler: Sender<ConsensusEvent>,
+    pub wallet: Arc<RwLock<Wallet>>,
+    pub sender_to_consensus_handler: Sender<ConsensusEvent>,
 }
 
 impl MiningHandler {
-    async fn run(mut handler: MiningHandler, mut event_receiver: Receiver<MiningEvent>) {
+    pub async fn run(
+        mut handler: MiningHandler,
+        mut event_receiver: Receiver<MiningEvent>,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             loop {
                 let result = event_receiver.recv().await;
                 if result.is_some() {
                     let event = result.unwrap();
-                    handler.process_event(event).await
+                    handler.process_event(event).await;
                 }
             }
-        });
+        })
     }
 
     async fn process_event(&mut self, event: MiningEvent) {

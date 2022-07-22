@@ -7,32 +7,16 @@ pub enum NetworkEvent {
         peer_index: u64,
         buffer: Vec<u8>,
     },
-    OutgoingNetworkMessageForAll {
-        buffer: Vec<u8>,
-        exceptions: Vec<u64>,
-    },
-    IncomingNetworkMessage {
-        peer_index: u64,
-        buffer: Vec<u8>,
-    },
-    ConnectToPeer {
-        peer_details: data::configuration::PeerConfig,
-    },
-    PeerConnectionResult {
-        peer_details: Option<data::configuration::PeerConfig>,
-        result: Result<u64, std::io::Error>,
-    },
-    PeerDisconnected {
-        peer_index: u64,
-    },
     BlockFetchRequest {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
+        request_id: u64,
     },
     BlockFetched {
         block_hash: SaitoHash,
         peer_index: u64,
         buffer: Vec<u8>,
+        request_id: u64,
     },
 }

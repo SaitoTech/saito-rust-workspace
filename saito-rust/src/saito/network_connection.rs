@@ -23,7 +23,6 @@ use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
-use saito_core::core::data::peer::{Peer, PeerConnection};
 use saito_core::core::data::peer_collection::PeerCollection;
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
@@ -36,6 +35,7 @@ use crate::saito::network_handler::{PeerReceiver, PeerSender};
 use async_trait::async_trait;
 use saito_core::core::data::msg::message::Message;
 use saito_core::core::data::network::Network;
+use saito_core::core::data::peer::PeerConnection;
 
 pub struct NetworkConnection {
     sender: PeerSender,

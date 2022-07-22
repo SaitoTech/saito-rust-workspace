@@ -115,10 +115,10 @@ impl RoutingEventProcessor {
     }
 
     async fn connect_to_static_peers(&mut self) {
-        debug!("connect to peers from config",);
-        self.network
-            .connect_to_static_peers(self.configs.clone())
-            .await;
+        // debug!("connect to peers from config",);
+        // self.network
+        //     .connect_to_static_peers(self.configs.clone())
+        //     .await;
     }
     async fn handle_new_peer(
         &mut self,
@@ -138,7 +138,7 @@ impl RoutingEventProcessor {
 
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
-        self.network.handle_peer_disconnect(peer_index).await;
+        //self.network.handle_peer_disconnect(peer_index).await;
     }
 }
 
@@ -154,33 +154,33 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                 // TODO : remove this case if not being used
                 unreachable!()
             }
-            NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                debug!("incoming message received from peer : {:?}", peer_index);
-                let message = Message::deserialize(buffer);
-                if message.is_err() {
-                    todo!()
-                }
-                self.process_incoming_message(peer_index, message.unwrap())
-                    .await;
-            }
-            NetworkEvent::PeerConnectionResult {
-                peer_details,
-                result,
-            } => {
-                if result.is_ok() {
-                    self.handle_new_peer(peer_details, result.unwrap()).await;
-                }
-            }
-            NetworkEvent::PeerDisconnected { peer_index } => {
-                self.handle_peer_disconnect(peer_index).await;
-            }
-
-            NetworkEvent::OutgoingNetworkMessageForAll { .. } => {
-                unreachable!()
-            }
-            NetworkEvent::ConnectToPeer { .. } => {
-                unreachable!()
-            }
+            // NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
+            //     debug!("incoming message received from peer : {:?}", peer_index);
+            //     let message = Message::deserialize(buffer);
+            //     if message.is_err() {
+            //         todo!()
+            //     }
+            //     self.process_incoming_message(peer_index, message.unwrap())
+            //         .await;
+            // }
+            // NetworkEvent::PeerConnectionResult {
+            //     peer_details,
+            //     result,
+            // } => {
+            //     if result.is_ok() {
+            //         self.handle_new_peer(peer_details, result.unwrap()).await;
+            //     }
+            // }
+            // NetworkEvent::PeerDisconnected { peer_index } => {
+            //     self.handle_peer_disconnect(peer_index).await;
+            // }
+            //
+            // NetworkEvent::OutgoingNetworkMessageForAll { .. } => {
+            //     unreachable!()
+            // }
+            // NetworkEvent::ConnectToPeer { .. } => {
+            //     unreachable!()
+            // }
             NetworkEvent::BlockFetchRequest { .. } => {
                 unreachable!()
             }
@@ -188,6 +188,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                 block_hash,
                 peer_index,
                 buffer,
+                request_id,
             } => {
                 debug!("block received : {:?}", hex::encode(block_hash));
                 self.sender_to_mempool

@@ -80,13 +80,17 @@ pub fn new() -> SaitoWasm {
     let wallet = Arc::new(RwLock::new(Wallet::new()));
     let configuration = Arc::new(RwLock::new(Configuration::new()));
 
-    let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
         blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
         mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet: wallet.clone(),
         configuration: configuration.clone(),
     };
+    let peers = Arc::new(RwLock::new(PeerCollection::new(
+        configuration.clone(),
+        context.blockchain.clone(),
+        wallet.clone(),
+    )));
 
     let (sender_to_mempool, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
@@ -104,8 +108,6 @@ pub fn new() -> SaitoWasm {
                 Box::new(WasmIoHandler {}),
                 peers.clone(),
                 context.blockchain.clone(),
-                context.wallet.clone(),
-                context.configuration.clone(),
             ),
         },
         routing_event_processor: ConsensusEventProcessor {
@@ -123,8 +125,6 @@ pub fn new() -> SaitoWasm {
                 Box::new(WasmIoHandler {}),
                 peers.clone(),
                 context.blockchain.clone(),
-                context.wallet.clone(),
-                context.configuration.clone(),
             ),
             storage: Storage::new(Box::new(WasmIoHandler {})),
         },

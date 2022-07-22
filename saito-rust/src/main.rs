@@ -26,7 +26,6 @@ use saito_core::core::routing_event_processor::{
 
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::io_event::IoEvent;
-use crate::saito::network_handler::run_network_controller;
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::time_keeper::TimeKeeper;
 
@@ -151,8 +150,6 @@ async fn run_consensus_event_processor(
             )),
             peers.clone(),
             context.blockchain.clone(),
-            context.wallet.clone(),
-            context.configuration.clone(),
         ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
@@ -200,8 +197,6 @@ async fn run_routing_event_processor(
             )),
             peers.clone(),
             context.blockchain.clone(),
-            context.wallet.clone(),
-            context.configuration.clone(),
         ),
     };
     {
@@ -307,27 +302,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Running saito");
 
-    // pretty_env_logger::init();
-    // let mut builder = pretty_env_logger::formatted_builder();
-    // builder
-    //     .format(|buf, record| {
-    //         let mut style = buf.style();
-    //
-    //         // TODO : set colored output
-    //         style.set_bold(true);
-    //         writeln!(
-    //             buf,
-    //             "{:6} {:2?} - {:45}- {:?}",
-    //             style.value(record.level()),
-    //             // record.level(),
-    //             std::thread::current().id(),
-    //             record.module_path().unwrap_or_default(),
-    //             record.args(),
-    //         )
-    //     })
-    //     .parse_filters(&env::var("RUST_LOG").unwrap_or_default())
-    //     .init();
-
     // install global subscriber configured based on RUST_LOG envvar.
     tracing_subscriber::fmt::init();
 
@@ -345,7 +319,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("running saito controllers");
 
     let context = Context::new(configs.clone());
-    let peers = Arc::new(RwLock::new(PeerCollection::new()));
+    let peers = Arc::new(RwLock::new(PeerCollection::new(
+        configs.clone(),
+        context.blockchain.clone(),
+        context.wallet.clone(),
+    )));
 
     let (sender_to_mempool, receiver_for_mempool) =
         tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
@@ -393,22 +371,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         network_event_sender_to_miner,
     );
 
-    let network_handle = tokio::spawn(run_network_controller(
-        receiver_in_network_controller,
-        event_sender_to_loop.clone(),
-        sender_to_network_controller.clone(),
-        configs.clone(),
-        context.blockchain.clone(),
-        context.wallet.clone(),
-        peers.clone(),
-    ));
+    // let network_handle = tokio::spawn(run_network_controller(
+    //     receiver_in_network_controller,
+    //     event_sender_to_loop.clone(),
+    //     configs.clone(),
+    //     context.blockchain.clone(),
+    //     context.wallet.clone(),
+    //     peers.clone(),
+    // ));
 
     let _result = tokio::join!(
         routing_handle,
         blockchain_handle,
         miner_handle,
         loop_handle,
-        network_handle
+        //network_handle
     );
     Ok(())
 }

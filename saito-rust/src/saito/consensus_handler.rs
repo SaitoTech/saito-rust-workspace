@@ -7,11 +7,11 @@ use saito_core::core::data::network::Network;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_event_processor::MiningEvent;
-use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
 use tokio::time::interval;
 
 #[derive(Debug)]
@@ -32,11 +32,11 @@ pub struct ConsensusHandler {
 }
 
 impl ConsensusHandler {
-    async fn run(
+    pub async fn run(
         mut handler: ConsensusHandler,
         mut event_sender: Sender<ConsensusEvent>,
         mut event_receiver: Receiver<ConsensusEvent>,
-    ) {
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             handler.load_blocks_from_disk().await;
 
@@ -48,7 +48,7 @@ impl ConsensusHandler {
             .await;
 
             ConsensusHandler::run_event_loop(handler, event_receiver).await;
-        });
+        })
     }
 
     async fn load_blocks_from_disk(&mut self) {
@@ -111,64 +111,76 @@ impl ConsensusHandler {
     async fn process_event(&mut self, event: ConsensusEvent) {
         match event {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
-                debug!(
-                    "received new golden ticket : {:?}",
-                    hex::encode(golden_ticket.target)
-                );
-
-                let mut mempool = self.mempool.write().await;
-                mempool.add_golden_ticket(golden_ticket).await;
+                self.on_new_golden_ticket(golden_ticket).await;
             }
 
             ConsensusEvent::BlockFetched {
                 peer_index: _,
                 buffer,
             } => {
-                let mut blockchain = self.blockchain.write().await;
-                let block = Block::deserialize_from_net(&buffer);
-                blockchain
-                    .add_block(
-                        block,
-                        &mut self.network,
-                        &mut self.storage,
-                        self.sender_to_miner.clone(),
-                    )
-                    .await;
+                self.on_block_fetch(&buffer).await;
             }
 
             ConsensusEvent::CanBundleBlock { .. } => {
-                let timestamp = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64;
-
-                let mut mempool = self.mempool.write().await;
-                let mut blockchain = self.blockchain.write().await;
-
-                let result = mempool.bundle_block(&mut blockchain, timestamp).await;
-
-                mempool.add_block(result);
-                debug!("adding blocks to blockchain");
-
-                while let Some(block) = mempool.blocks_queue.pop_front() {
-                    trace!(
-                        "deleting transactions from block : {:?}",
-                        hex::encode(block.hash)
-                    );
-
-                    mempool.delete_transactions(&block.transactions);
-                    blockchain
-                        .add_block(
-                            block,
-                            &mut self.network,
-                            &mut self.storage,
-                            self.sender_to_miner.clone(),
-                        )
-                        .await;
-                }
-
-                debug!("blocks added to blockchain");
+                self.on_bundle_block().await;
             }
         }
+    }
+
+    async fn on_bundle_block(&mut self) {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let mut mempool = self.mempool.write().await;
+        let mut blockchain = self.blockchain.write().await;
+
+        let result = mempool.bundle_block(&mut blockchain, timestamp).await;
+
+        mempool.add_block(result);
+        debug!("adding blocks to blockchain");
+
+        while let Some(block) = mempool.blocks_queue.pop_front() {
+            trace!(
+                "deleting transactions from block : {:?}",
+                hex::encode(block.hash)
+            );
+
+            mempool.delete_transactions(&block.transactions);
+            blockchain
+                .add_block(
+                    block,
+                    &mut self.network,
+                    &mut self.storage,
+                    self.sender_to_miner.clone(),
+                )
+                .await;
+        }
+
+        debug!("blocks added to blockchain");
+    }
+
+    async fn on_block_fetch(&mut self, buffer: &Vec<u8>) {
+        let mut blockchain = self.blockchain.write().await;
+        let block = Block::deserialize_from_net(&buffer);
+        blockchain
+            .add_block(
+                block,
+                &mut self.network,
+                &mut self.storage,
+                self.sender_to_miner.clone(),
+            )
+            .await;
+    }
+
+    async fn on_new_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
+        debug!(
+            "received new golden ticket : {:?}",
+            hex::encode(golden_ticket.target)
+        );
+
+        let mut mempool = self.mempool.write().await;
+        mempool.add_golden_ticket(golden_ticket).await;
     }
 }

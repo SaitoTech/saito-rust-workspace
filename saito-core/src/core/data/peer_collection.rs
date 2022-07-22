@@ -1,23 +1,65 @@
+use crate::common::command::NetworkEvent;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::common::defs::SaitoPublicKey;
+use crate::core::data::blockchain::Blockchain;
+use crate::core::data::configuration::{Configuration, PeerConfig};
 use crate::core::data::peer::Peer;
+use crate::core::data::wallet::Wallet;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PeerCollection {
-    pub index_to_peers: HashMap<u64, Peer>,
+    next_peer_index: Mutex<u64>,
+    pub index_to_peers: HashMap<u64, Arc<RwLock<Peer>>>,
     pub address_to_peers: HashMap<SaitoPublicKey, u64>,
+    configs: Arc<RwLock<Configuration>>,
+    blockchain: Arc<RwLock<Blockchain>>,
+    wallet: Arc<RwLock<Wallet>>,
 }
 
 impl PeerCollection {
-    pub fn new() -> PeerCollection {
+    pub fn new(
+        configs: Arc<RwLock<Configuration>>,
+        blockchain: Arc<RwLock<Blockchain>>,
+        wallet: Arc<RwLock<Wallet>>,
+    ) -> PeerCollection {
         PeerCollection {
+            next_peer_index: Mutex::new(0 as u64),
             index_to_peers: Default::default(),
             address_to_peers: Default::default(),
+            configs,
+            blockchain,
+            wallet,
         }
     }
 
-    pub fn find_peer_by_address(&self, address: &SaitoPublicKey) -> Option<&Peer> {
+    pub async fn add(
+        &mut self,
+        event_sender: Sender<NetworkEvent>,
+        config: Option<PeerConfig>,
+    ) -> Arc<RwLock<Peer>> {
+        let index;
+        {
+            index = *self.next_peer_index.lock().await + 1;
+        }
+
+        let peer = Arc::new(RwLock::new(Peer::new(
+            self.blockchain.clone(),
+            self.wallet.clone(),
+            self.configs.read().await.get_block_fetch_url(),
+            index,
+            config,
+            event_sender,
+        )));
+
+        self.index_to_peers.insert(index, peer.clone());
+        return peer;
+    }
+
+    pub fn find_peer_by_address(&self, address: &SaitoPublicKey) -> Option<&Arc<RwLock<Peer>>> {
         let result = self.address_to_peers.get(address);
         if result.is_none() {
             return None;
@@ -26,7 +68,7 @@ impl PeerCollection {
         return self.find_peer_by_index(*result.unwrap());
     }
 
-    pub fn find_peer_by_index(&self, peer_index: u64) -> Option<&Peer> {
+    pub fn find_peer_by_index(&self, peer_index: u64) -> Option<&Arc<RwLock<Peer>>> {
         return self.index_to_peers.get(&peer_index);
     }
 }
