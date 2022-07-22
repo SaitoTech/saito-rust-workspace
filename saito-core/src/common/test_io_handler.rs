@@ -6,7 +6,7 @@ pub mod test {
 
     use crate::common::defs::SaitoHash;
     use async_trait::async_trait;
-    use log::{debug, info};
+    use log::{debug, error, info, warn};
     use tokio::fs::File;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -83,8 +83,13 @@ pub mod test {
         }
 
         async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-            let result = File::open(key).await;
+            let result = File::open(key.clone()).await;
             if result.is_err() {
+                error!(
+                    "error : path {:?} \r\n : {:?}",
+                    key.to_string(),
+                    result.err().unwrap()
+                );
                 todo!()
             }
             let mut file = result.unwrap();

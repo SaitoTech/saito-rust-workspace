@@ -14,7 +14,7 @@ use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
 
-pub const TRANSACTION_SIZE: usize = 89;
+pub const TRANSACTION_SIZE: usize = 93;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone, FromPrimitive)]
 pub enum TransactionType {
@@ -40,6 +40,7 @@ pub struct Transaction {
     // #[serde(with = "serde_bytes")] TODO : check this for performance
     pub(crate) message: Vec<u8>,
     pub(crate) transaction_type: TransactionType,
+    pub(crate) replaces_txs: u32,
     #[serde_as(as = "[_; 64]")]
     pub(crate) signature: SaitoSignature,
     path: Vec<Hop>,
@@ -71,6 +72,7 @@ impl Transaction {
             // TODO : reset to vec![] after WASM implementation done
             message: vec![123, 125], // to match with JS {}
             transaction_type: TransactionType::Normal,
+            replaces_txs: 0,
             signature: [0; 64],
             hash_for_signature: None,
             path: vec![],
@@ -384,7 +386,8 @@ impl Transaction {
         let path_len: usize = u32::from_be_bytes(bytes[12..16].try_into().unwrap()) as usize;
         let signature: SaitoSignature = bytes[16..80].try_into().unwrap();
         let timestamp: u64 = u64::from_be_bytes(bytes[80..88].try_into().unwrap());
-        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[88]).unwrap();
+        let replaces_txs = u32::from_be_bytes(bytes[88..92].try_into().unwrap());
+        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[92]).unwrap();
         let start_of_inputs = TRANSACTION_SIZE;
         let start_of_outputs = start_of_inputs + inputs_len as usize * SLIP_SIZE;
         let start_of_message = start_of_outputs + outputs_len as usize * SLIP_SIZE;
@@ -419,6 +422,7 @@ impl Transaction {
         transaction.inputs = inputs;
         transaction.outputs = outputs;
         transaction.message = message;
+        transaction.replaces_txs = replaces_txs;
         transaction.transaction_type = transaction_type;
         transaction.signature = signature;
         transaction.path = path;
@@ -698,6 +702,7 @@ impl Transaction {
         vbytes.extend(&(path_len as u32).to_be_bytes());
         vbytes.extend(&self.signature);
         vbytes.extend(&self.timestamp.to_be_bytes());
+        vbytes.extend(&self.replaces_txs.to_be_bytes());
         vbytes.extend(&(self.transaction_type as u8).to_be_bytes());
         for input in &self.inputs {
             vbytes.extend(&input.serialize_for_net());
@@ -1126,5 +1131,15 @@ mod tests {
 
         let deserialized_tx = Transaction::deserialize_from_net(serialized_tx);
         assert_eq!(mock_tx, deserialized_tx);
+    }
+
+    #[test]
+    fn deserialize_test_against_slr() {
+        let buffer = hex::decode("000000010000000100000014000000005d32a088a3171ea59a8c813959688b4e86935b60699f03202402e1a815c2655558411b77a728c2b8e3ea71ef04a25ea3bb083b101281f5ab36fcd16d4c471cd60000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0003cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b0000000000000159000065794a305a584e30496a6f696447567a64434a39").unwrap();
+
+        let tx = Transaction::deserialize_from_net(buffer);
+
+        assert_eq!(tx.timestamp, 1637034582666);
+        assert_eq!(tx.transaction_type, TransactionType::ATR);
     }
 }

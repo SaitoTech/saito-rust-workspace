@@ -213,6 +213,7 @@ mod test {
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::MAX_TOKEN_SUPPLY;
+    use log::info;
 
     #[ignore]
     #[tokio::test]
@@ -248,5 +249,26 @@ mod test {
         actual_retrieved_block.generate();
 
         assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
+    }
+    // TODO : delete this test
+    #[ignore]
+    #[tokio::test]
+    async fn block_load_test_slr() {
+        pretty_env_logger::init();
+
+        let t = TestManager::new();
+
+        info!(
+            "current dir = {:?}",
+            std::env::current_dir().unwrap().to_str().unwrap()
+        );
+        let filename =std::env::current_dir().unwrap().to_str().unwrap().to_string()+
+            "/data/blocks/1658377242777-ef4593a4ee39a25d04940be0835d2ab81c8e13745745b580debb9ab90c6d1ce7.sai";
+        let retrieved_block = t.storage.load_block_from_disk(filename).await;
+        let mut block = retrieved_block.unwrap();
+        block.generate();
+
+        assert_ne!(block.timestamp, 0);
+        // assert_eq!(retrieved_block.timestamp, 1637034582666);
     }
 }
