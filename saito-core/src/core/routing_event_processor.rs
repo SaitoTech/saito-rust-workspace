@@ -184,6 +184,9 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
             NetworkEvent::BlockFetchRequest { .. } => {
                 unreachable!()
             }
+            NetworkEvent::PeerDisconnected { peer_index } => {
+                unreachable!()
+            }
             NetworkEvent::BlockFetched {
                 block_hash,
                 peer_index,

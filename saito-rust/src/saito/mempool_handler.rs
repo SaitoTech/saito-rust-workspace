@@ -1,4 +1,4 @@
-use log::{debug, trace};
+use log::{debug, info, trace};
 use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::golden_ticket::GoldenTicket;
@@ -17,37 +17,36 @@ use tokio::time::interval;
 #[derive(Debug)]
 pub enum ConsensusEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
-    BlockFetched { peer_index: u64, buffer: Vec<u8> },
     CanBundleBlock { timestamp: u64 },
 }
 
 /// Manages blockchain and the mempool
-pub struct ConsensusHandler {
+pub struct MempoolHandler {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub sender_to_miner: Sender<MiningEvent>,
+    pub event_sender: Sender<ConsensusEvent>,
+    pub event_receiver: Receiver<ConsensusEvent>,
     pub network: Network,
     pub storage: Storage,
 }
 
-impl ConsensusHandler {
-    pub async fn run(
-        mut handler: ConsensusHandler,
-        mut event_sender: Sender<ConsensusEvent>,
-        mut event_receiver: Receiver<ConsensusEvent>,
-    ) -> JoinHandle<()> {
+impl MempoolHandler {
+    pub async fn run(mut handler: MempoolHandler) -> JoinHandle<()> {
         tokio::spawn(async move {
             handler.load_blocks_from_disk().await;
 
-            ConsensusHandler::run_block_producer(
+            MempoolHandler::run_block_producer(
                 handler.mempool.clone(),
                 handler.blockchain.clone(),
-                event_sender,
+                handler.event_sender.clone(),
             )
             .await;
 
-            ConsensusHandler::run_event_loop(handler, event_receiver).await;
+            info!("Mempool Handler is Running");
+
+            handler.run_event_loop();
         })
     }
 
@@ -59,6 +58,22 @@ impl ConsensusHandler {
                 self.sender_to_miner.clone(),
             )
             .await;
+    }
+
+    async fn run_event_loop(&mut self) {
+        loop {
+            if let Some(event) = self.event_receiver.recv().await {
+                match event {
+                    ConsensusEvent::NewGoldenTicket { golden_ticket } => {
+                        self.on_new_golden_ticket(golden_ticket).await;
+                    }
+
+                    ConsensusEvent::CanBundleBlock { .. } => {
+                        self.on_bundle_block().await;
+                    }
+                }
+            }
+        }
     }
 
     async fn run_block_producer(
@@ -95,37 +110,7 @@ impl ConsensusHandler {
         });
     }
 
-    async fn run_event_loop(
-        mut handler: ConsensusHandler,
-        mut event_receiver: Receiver<ConsensusEvent>,
-    ) {
-        loop {
-            let result = event_receiver.recv().await;
-            if result.is_some() {
-                let event = result.unwrap();
-                handler.process_event(event).await
-            }
-        }
-    }
-
-    async fn process_event(&mut self, event: ConsensusEvent) {
-        match event {
-            ConsensusEvent::NewGoldenTicket { golden_ticket } => {
-                self.on_new_golden_ticket(golden_ticket).await;
-            }
-
-            ConsensusEvent::BlockFetched {
-                peer_index: _,
-                buffer,
-            } => {
-                self.on_block_fetch(&buffer).await;
-            }
-
-            ConsensusEvent::CanBundleBlock { .. } => {
-                self.on_bundle_block().await;
-            }
-        }
-    }
+    async fn process_event(&mut self, event: ConsensusEvent) {}
 
     async fn on_bundle_block(&mut self) {
         let timestamp = SystemTime::now()
@@ -159,19 +144,6 @@ impl ConsensusHandler {
         }
 
         debug!("blocks added to blockchain");
-    }
-
-    async fn on_block_fetch(&mut self, buffer: &Vec<u8>) {
-        let mut blockchain = self.blockchain.write().await;
-        let block = Block::deserialize_from_net(&buffer);
-        blockchain
-            .add_block(
-                block,
-                &mut self.network,
-                &mut self.storage,
-                self.sender_to_miner.clone(),
-            )
-            .await;
     }
 
     async fn on_new_golden_ticket(&mut self, golden_ticket: GoldenTicket) {

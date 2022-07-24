@@ -79,18 +79,20 @@ lazy_static! {
 pub fn new() -> SaitoWasm {
     let wallet = Arc::new(RwLock::new(Wallet::new()));
     let configuration = Arc::new(RwLock::new(Configuration::new()));
+    let blockchain = Arc::new(RwLock::new(Blockchain::new(wallet.clone())));
+    let peers = Arc::new(RwLock::new(PeerCollection::new(
+        configuration.clone(),
+        blockchain.clone(),
+        wallet.clone(),
+    )));
 
     let context = Context {
-        blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
+        blockchain,
         mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet: wallet.clone(),
         configuration: configuration.clone(),
+        peers,
     };
-    let peers = Arc::new(RwLock::new(PeerCollection::new(
-        configuration.clone(),
-        context.blockchain.clone(),
-        wallet.clone(),
-    )));
 
     let (sender_to_mempool, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
@@ -104,11 +106,7 @@ pub fn new() -> SaitoWasm {
             configs: context.configuration.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
-            network: Network::new(
-                Box::new(WasmIoHandler {}),
-                peers.clone(),
-                context.blockchain.clone(),
-            ),
+            network: Network::new(Box::new(WasmIoHandler {}), context.peers.clone()),
         },
         routing_event_processor: ConsensusEventProcessor {
             mempool: context.mempool.clone(),
@@ -121,11 +119,7 @@ pub fn new() -> SaitoWasm {
             tx_producing_timer: 0,
             create_test_tx: false,
             time_keeper: Box::new(WasmTimeKeeper {}),
-            network: Network::new(
-                Box::new(WasmIoHandler {}),
-                peers.clone(),
-                context.blockchain.clone(),
-            ),
+            network: Network::new(Box::new(WasmIoHandler {}), context.peers.clone()),
             storage: Storage::new(Box::new(WasmIoHandler {})),
         },
         mining_event_processor: MiningEventProcessor {

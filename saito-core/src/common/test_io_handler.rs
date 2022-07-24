@@ -11,6 +11,7 @@ pub mod test {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use crate::common::interface_io::InterfaceIO;
+    use crate::core::data::block::Block;
 
     use crate::core::data::configuration::PeerConfig;
 
@@ -25,38 +26,7 @@ pub mod test {
 
     #[async_trait]
     impl InterfaceIO for TestIOHandler {
-        async fn send_message(&self, _peer_index: u64, _buffer: Vec<u8>) -> Result<(), Error> {
-            // TODO : implement a way to check sent messages
-
-            Ok(())
-        }
-
-        async fn send_message_to_all(
-            &self,
-            _buffer: Vec<u8>,
-            _peer_exceptions: Vec<u64>,
-        ) -> Result<(), Error> {
-            debug!("send message to all");
-
-            Ok(())
-        }
-
-        async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
-            debug!("connecting to peer : {:?}", peer.host);
-
-            Ok(())
-        }
-
-        async fn disconnect_from_peer(&mut self, _peer_index: u64) -> Result<(), Error> {
-            todo!()
-        }
-
-        async fn fetch_block_from_peer(
-            &self,
-            _block_hash: SaitoHash,
-            _peer_index: u64,
-            _url: String,
-        ) -> Result<(), Error> {
+        async fn fetch_block_by_url(&self, url: String) -> Result<Block, Error> {
             todo!()
         }
 
@@ -142,7 +112,7 @@ pub mod test {
         }
 
         fn get_block_dir(&self) -> String {
-            "./data/blocks/".to_string()
+            "./test_data/blocks/".to_string()
         }
     }
 }

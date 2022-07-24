@@ -1,81 +1,99 @@
-use crate::saito::consensus_handler::{ConsensusEvent, ConsensusHandler};
+use crate::saito::config_handler::ConfigHandler;
+use crate::saito::mempool_handler::{ConsensusEvent, MempoolHandler};
 use crate::saito::mining_handler::MiningHandler;
-use crate::saito::network_handler::NetworkHandler;
-use crate::{ConfigHandler, IoEvent, RustIOHandler};
+use crate::saito::rust_io_handler::RustIOHandler;
+use crate::saito::web_socket_clients::WebSocketClients;
+use crate::saito::web_socket_server::WebSocketServer;
 use log::info;
+use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::mining_event_processor::MiningEvent;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 
 pub struct SaitoNodeApp {}
 
 impl SaitoNodeApp {
-    pub async fn run() {
+    fn configure(configs: Arc<RwLock<Configuration>>) {}
+
+    pub async fn run(config_file_pathname: String) {
+        let timestamp_at_start = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
         tracing_subscriber::fmt::init();
 
+        info!(
+            "Starting Saito Node, Current Directory : {:?}",
+            std::env::current_dir().unwrap()
+        );
+
         let configs = Arc::new(RwLock::new(
-            ConfigHandler::load_configs("configs/saito.config.json".to_string())
-                .expect("loading configs failed"),
+            ConfigHandler::load_configs(config_file_pathname).expect("loading configs failed"),
         ));
 
-        let (sender_to_mining_handler, receiver_in_mining_handler) =
-            tokio::sync::mpsc::channel::<MiningEvent>(1000);
+        let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel::<MiningEvent>(1000);
 
-        let (sender_to_consensus_handler, receiver_consensus_handler) =
+        let (sender_to_mempool, receiver_in_mempool) =
             tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
 
-        let (sender_to_network_handler, receiver_in_network_handler) =
-            tokio::sync::mpsc::channel::<IoEvent>(1000);
-
-        info!("running saito controllers");
+        info!("Starting Saito handlers");
 
         let context = Context::new(configs.clone());
-        let peers = Arc::new(RwLock::new(PeerCollection::new(
-            configs.clone(),
-            context.blockchain.clone(),
-            context.wallet.clone(),
-        )));
 
-        let consensus_handler = ConsensusHandler {
+        let mempool_handler = MempoolHandler {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
-            sender_to_miner: sender_to_mining_handler.clone(),
-            network: Network::new(
-                Box::new(RustIOHandler::new(sender_to_network_handler.clone(), 1)),
-                peers.clone(),
-                context.blockchain.clone(),
-            ),
-            storage: Storage::new(Box::new(RustIOHandler::new(
-                sender_to_network_handler.clone(),
-                1,
-            ))),
+            sender_to_miner: sender_to_miner.clone(),
+            event_sender: sender_to_mempool.clone(),
+            event_receiver: receiver_in_mempool,
+            network: Network::new(Box::new(RustIOHandler::new()), context.peers.clone()),
+            storage: Storage::new(Box::new(RustIOHandler::new())),
         };
 
         let mining_handler = MiningHandler {
             wallet: context.wallet.clone(),
-            sender_to_consensus_handler: sender_to_consensus_handler.clone(),
+            event_receiver: receiver_in_miner,
+            sender_to_mempool: sender_to_mempool.clone(),
         };
 
-        ConsensusHandler::run(
-            consensus_handler,
-            sender_to_consensus_handler.clone(),
-            receiver_consensus_handler,
-        );
-
-        MiningHandler::run(mining_handler, receiver_in_mining_handler);
-
-        NetworkHandler::run(
-            receiver_in_network_handler,
-            sender_to_consensus_handler.clone(),
-            context.configuration.clone(),
+        let ws_clients = WebSocketClients::new(
+            configs.clone(),
+            context.peers.clone(),
             context.blockchain.clone(),
-            context.wallet.clone(),
-            peers.clone(),
+            sender_to_miner.clone(),
         );
+
+        let ws_server = WebSocketServer::new(
+            configs.clone(),
+            context.peers.clone(),
+            context.blockchain.clone(),
+            sender_to_miner.clone(),
+        );
+
+        let mempool_handle = MempoolHandler::run(mempool_handler).await;
+        let miner_handle = MiningHandler::run(mining_handler).await;
+        ws_clients.connect().await;
+        let web_server_handle = ws_server.run().await;
+
+        let timestamp_now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let elapsed_time = (timestamp_now as f64 - timestamp_at_start as f64) / 1000.0 as f64;
+
+        info!(
+            "Saito Node has Started, Elapsed Time {:?} seconds",
+            elapsed_time
+        );
+
+        let result = tokio::join!(mempool_handle, miner_handle, web_server_handle);
     }
 }

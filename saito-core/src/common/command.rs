@@ -19,4 +19,7 @@ pub enum NetworkEvent {
         buffer: Vec<u8>,
         request_id: u64,
     },
+    PeerDisconnected {
+        peer_index: u64,
+    },
 }

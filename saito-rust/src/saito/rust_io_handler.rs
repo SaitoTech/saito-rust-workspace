@@ -1,11 +1,11 @@
 use std::fs;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, warn};
+use log::{debug, error, warn};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
@@ -13,12 +13,11 @@ use tokio::sync::mpsc::Sender;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;
 use saito_core::common::interface_io::InterfaceIO;
+use saito_core::core::data::block::Block;
 
 use saito_core::core::data::configuration::PeerConfig;
 
 use crate::saito::io_context::IoContext;
-
-use crate::IoEvent;
 
 lazy_static! {
     pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
@@ -26,9 +25,9 @@ lazy_static! {
 }
 pub fn configure_storage() -> String {
     if cfg!(test) {
-        String::from("./data/test/blocks/")
+        String::from("./test_data/test/blocks/")
     } else {
-        String::from("./data/blocks/")
+        String::from("./test_data/blocks/")
     }
 }
 
@@ -38,17 +37,11 @@ pub enum FutureState {
 }
 
 #[derive(Clone, Debug)]
-pub struct RustIOHandler {
-    sender: Sender<IoEvent>,
-    handler_id: u8,
-}
+pub struct RustIOHandler {}
 
 impl RustIOHandler {
-    pub fn new(sender_to_network: Sender<IoEvent>, handler_id: u8) -> RustIOHandler {
-        RustIOHandler {
-            sender: sender_to_network,
-            handler_id,
-        }
+    pub fn new() -> RustIOHandler {
+        RustIOHandler {}
     }
 
     // TODO : delete this if not required
@@ -76,67 +69,35 @@ impl RustIOHandler {
 
 #[async_trait]
 impl InterfaceIO for RustIOHandler {
-    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
-        // TODO : refactor to combine event and the future
-        let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessage { peer_index, buffer });
+    async fn fetch_block_by_url(&self, url: String) -> Result<Block, Error> {
+        debug!("fetching block : {:?}", url);
 
-        self.sender.send(event).await.unwrap();
+        let result = reqwest::get(url.clone()).await;
+        if result.is_err() {
+            error!(
+                "fetching failed : {:?}, {:?}",
+                url,
+                result.err().unwrap().to_string()
+            );
+            return Err(Error::from(ErrorKind::ConnectionRefused));
+        }
+        let response = result.unwrap();
+        let result = response.bytes().await;
+        if result.is_err() {
+            error!(
+                "binary conversion failed : {:?}, {:?}",
+                url,
+                result.err().unwrap().to_string()
+            );
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
 
-        Ok(())
-    }
+        let result = result.unwrap();
+        let buffer = result.to_vec();
+        let block = Block::deserialize_from_net(&buffer);
+        debug!("block buffer received");
 
-    async fn send_message_to_all(
-        &self,
-        buffer: Vec<u8>,
-        peer_exceptions: Vec<u64>,
-    ) -> Result<(), Error> {
-        debug!("send message to all");
-
-        // let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessageForAll {
-        //     buffer,
-        //     exceptions: peer_exceptions,
-        // });
-        //
-        // self.sender.send(event).await.unwrap();
-
-        Ok(())
-    }
-
-    async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
-        debug!("connecting to peer : {:?}", peer.host);
-        // let event = IoEvent::new(NetworkEvent::ConnectToPeer {
-        //     peer_details: peer.clone(),
-        // });
-        //
-        // self.sender.send(event).await.unwrap();
-
-        Ok(())
-    }
-
-    async fn disconnect_from_peer(&mut self, _peer_index: u64) -> Result<(), Error> {
-        todo!()
-    }
-
-    async fn fetch_block_from_peer(
-        &self,
-        block_hash: SaitoHash,
-        peer_index: u64,
-        url: String,
-    ) -> Result<(), Error> {
-        debug!("fetching block from peer : {:?}", url);
-        let event = IoEvent::new(NetworkEvent::BlockFetchRequest {
-            block_hash,
-            peer_index,
-            url: url.clone(),
-            request_id: 0,
-        });
-
-        self.sender
-            .send(event)
-            .await
-            .expect("failed sending to io controller");
-
-        Ok(())
+        Ok(block)
     }
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
@@ -230,14 +191,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_write_value() {
-        let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let mut io_handler = RustIOHandler::new(sender, 0);
+        let mut io_handler = RustIOHandler::new();
 
         let result = io_handler
-            .write_value("./data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())
+            .write_value("./test_data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())
             .await;
         assert!(result.is_ok(), "{:?}", result.err().unwrap().to_string());
-        let result = io_handler.read_value("./data/test/KEY".to_string()).await;
+        let result = io_handler
+            .read_value("./test_data/test/KEY".to_string())
+            .await;
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result, [1, 2, 3, 4]);
@@ -245,9 +207,8 @@ mod tests {
 
     #[tokio::test]
     async fn file_exists_success() {
-        let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let io_handler = RustIOHandler::new(sender, 0);
-        let path = String::from("src/test/data/config_handler_tests.json");
+        let mut io_handler = RustIOHandler::new();
+        let path = String::from("src/test/test_data/config_handler_tests.json");
 
         let result = io_handler.is_existing_file(path).await;
         assert!(result);
@@ -255,8 +216,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_exists_fail() {
-        let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let io_handler = RustIOHandler::new(sender, 0);
+        let mut io_handler = RustIOHandler::new();
         let path = String::from("badfilename.json");
 
         let result = io_handler.is_existing_file(path).await;

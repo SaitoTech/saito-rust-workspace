@@ -38,6 +38,7 @@ pub mod test {
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
+    use crate::core::data::configuration::Configuration;
 
     use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
@@ -70,9 +71,14 @@ pub mod test {
 
     impl TestManager {
         pub fn new() -> Self {
-            let peers = Arc::new(RwLock::new(PeerCollection::new()));
+            let configs = Arc::new(RwLock::new(Configuration::new()));
             let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
+            let peers = Arc::new(RwLock::new(PeerCollection::new(
+                configs,
+                blockchain_lock.clone(),
+                wallet_lock.clone(),
+            )));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
 
@@ -491,12 +497,14 @@ pub mod test {
             //
 
             //
-            // reset data dirs
+            // reset test_data dirs
             //
-            tokio::fs::remove_dir_all("data/blocks").await;
-            tokio::fs::create_dir_all("data/blocks").await.unwrap();
-            tokio::fs::remove_dir_all("data/wallets").await;
-            tokio::fs::create_dir_all("data/wallets").await.unwrap();
+            tokio::fs::remove_dir_all("test_data/blocks").await;
+            tokio::fs::create_dir_all("test_data/blocks").await.unwrap();
+            tokio::fs::remove_dir_all("test_data/wallets").await;
+            tokio::fs::create_dir_all("test_data/wallets")
+                .await
+                .unwrap();
 
             //
             // create initial transactions

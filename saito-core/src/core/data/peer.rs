@@ -89,7 +89,7 @@ impl Peer {
         self.peer_block_fetch_url.to_string() + hex::encode(block_hash).as_str()
     }
 
-    pub async fn process_incoming_message(&mut self, message: Message) -> Result<Vec<u8>, Error> {
+    pub async fn process_incoming_message(&mut self, message: Message) -> Result<(), Error> {
         debug!(
             "processing incoming message type : {:?} from peer : {:?}",
             message.get_type_value(),
@@ -123,7 +123,7 @@ impl Peer {
         };
     }
 
-    pub async fn initiate_handshake(&mut self) -> Result<Vec<u8>, Error> {
+    pub async fn initiate_handshake(&mut self) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.peer_index);
         let wallet = self.wallet.read().await;
         let block_fetch_url = self.local_block_fetch_url.clone();
@@ -136,13 +136,14 @@ impl Peer {
         self.challenge_for_peer = Some(challenge.challenge);
         let message = Message::HandshakeChallenge(challenge);
         debug!("handshake challenge sent for peer: {:?}", self.peer_index);
-        Ok(message.serialize())
+        self.send_buffer(message.serialize());
+        Ok(())
     }
 
     async fn handle_handshake_challenge(
         &mut self,
         challenge: HandshakeChallenge,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<(), Error> {
         debug!(
             "handling handshake challenge : {:?} with address : {:?}",
             self.peer_index,
@@ -162,13 +163,14 @@ impl Peer {
 
         self.challenge_for_peer = Some(response.challenge);
         debug!("handshake response sent for peer: {:?}", self.peer_index);
-        Ok(Message::HandshakeResponse(response).serialize())
+        self.send_buffer(Message::HandshakeResponse(response).serialize());
+        Ok(())
     }
 
     async fn handle_handshake_response(
         &mut self,
         response: HandshakeResponse,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<(), Error> {
         debug!(
             "handling handshake response :{:?} with address : {:?}",
             self.peer_index,
@@ -201,13 +203,14 @@ impl Peer {
         };
 
         debug!("handshake completion sent for peer: {:?}", self.peer_index);
-        Ok(Message::HandshakeCompletion(response).serialize())
+        self.send_buffer(Message::HandshakeCompletion(response).serialize());
+        Ok(())
     }
 
     async fn handle_handshake_completion(
         &mut self,
         response: HandshakeCompletion,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<(), Error> {
         debug!("handling handshake completion : {:?}", self.peer_index);
         if self.challenge_for_peer.is_none() {
             warn!(
@@ -228,7 +231,7 @@ impl Peer {
         return self.request_blockchain().await;
     }
 
-    async fn request_blockchain(&self) -> Result<Vec<u8>, Error> {
+    async fn request_blockchain(&self) -> Result<(), Error> {
         debug!("requesting blockchain from peer : {:?}", self.peer_index);
 
         let request;
@@ -241,13 +244,14 @@ impl Peer {
             };
         }
 
-        Ok(Message::BlockchainRequest(request).serialize())
+        self.send_buffer(Message::BlockchainRequest(request).serialize());
+        Ok(())
     }
 
     async fn process_incoming_blockchain_request(
         &self,
         request: BlockchainRequest,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Result<(), Error> {
         debug!(
             "processing incoming blockchain request : {:?}-{:?}-{:?} from peer : {:?}",
             request.latest_block_id,
@@ -262,7 +266,6 @@ impl Peer {
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
         debug!("last shared ancestor = {:?}", last_shared_ancestor);
-        let mut buffer: Vec<u8> = Default::default();
 
         for i in last_shared_ancestor..(blockchain.blockring.get_latest_block_id() + 1) {
             let block_hash = blockchain
@@ -273,13 +276,13 @@ impl Peer {
                 continue;
             }
 
-            buffer.append(&mut Message::BlockHeaderHash(block_hash).serialize());
+            self.send_buffer(Message::BlockHeaderHash(block_hash).serialize());
         }
 
-        Ok(buffer)
+        Ok(())
     }
 
-    async fn process_incoming_block_hash(&self, block_hash: SaitoHash) -> Result<Vec<u8>, Error> {
+    async fn process_incoming_block_hash(&self, block_hash: SaitoHash) -> Result<(), Error> {
         let block_exists;
         {
             let blockchain = self.blockchain.read().await;
@@ -291,8 +294,7 @@ impl Peer {
             self.fetch_missing_block(url, block_hash, 0);
         }
 
-        let buffer: Vec<u8> = Default::default();
-        Ok(buffer)
+        Ok(())
     }
 
     pub async fn fetch_missing_block(&self, url: String, block_hash: SaitoHash, request_id: u64) {
@@ -304,6 +306,13 @@ impl Peer {
         });
     }
 
+    pub fn reset(&mut self) {
+        self.peer_public_key = [0; 33];
+        self.peer_block_fetch_url = "".to_string();
+        self.challenge_for_peer = None;
+        self.handshake_done = false;
+    }
+
     pub async fn send_buffer(&self, buffer: Vec<u8>) {
         self.send_event(NetworkEvent::OutgoingNetworkMessage {
             buffer,
@@ -312,7 +321,7 @@ impl Peer {
         .await;
     }
 
-    async fn send_event(&self, event: NetworkEvent) {
+    pub async fn send_event(&self, event: NetworkEvent) {
         self.event_sender.send(event).await;
     }
 }

@@ -10,7 +10,7 @@ pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
 //
 // TODO -- shift to a RingBuffer ? or Slice-VecDeque so that we can have
 // contiguous entries for rapid lookups, inserts and updates? we want to
-// have fast access to elements in random positions in the data structure
+// have fast access to elements in random positions in the test_data structure
 //
 #[derive(Debug)]
 pub struct BlockRing {

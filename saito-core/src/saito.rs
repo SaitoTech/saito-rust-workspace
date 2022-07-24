@@ -6,9 +6,9 @@
 //
 // use crate::common::handle_io::HandleIo;
 // use crate::common::run_task::RunTask;
-// use crate::core::data::blockchain::Blockchain;
-// use crate::core::data::context::Context;
-// use crate::core::data::mempool::Mempool;
+// use crate::core::test_data::blockchain::Blockchain;
+// use crate::core::test_data::context::Context;
+// use crate::core::test_data::mempool::Mempool;
 //
 // pub struct Saito<T: HandleIo, S: RunTask> {
 //     pub io_handler: T,

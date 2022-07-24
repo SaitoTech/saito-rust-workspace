@@ -1,3 +1,4 @@
+use crate::core::data::block::Block;
 use std::io::Error;
 
 use async_trait::async_trait;
@@ -8,45 +9,6 @@ use crate::core::data;
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
 #[async_trait]
 pub trait InterfaceIO {
-    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error>;
-
-    /// Sends the given message buffer to all the peers except the ones specified
-    ///
-    /// # Arguments
-    ///
-    /// * `message_name`:
-    /// * `buffer`:
-    /// * `peer_exceptions`: Peer indices for which this message should not be sent
-    ///
-    /// returns: Result<(), Error>
-    ///
-    /// # Examples
-    ///
-    /// ```
-    ///
-    /// ```
-    async fn send_message_to_all(
-        &self,
-        buffer: Vec<u8>,
-        excluded_peers: Vec<u64>,
-    ) -> Result<(), Error>;
-    /// Connects to the peer with given configuration
-    ///
-    /// # Arguments
-    ///
-    /// * `peer`:
-    ///
-    /// returns: Result<(), Error>
-    ///
-    /// # Examples
-    ///
-    /// ```
-    ///
-    /// ```
-    async fn connect_to_peer(&mut self, peer: data::configuration::PeerConfig)
-        -> Result<(), Error>;
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error>;
-
     /// Fetches a block with given hash from a specific peer
     ///
     /// # Arguments
@@ -62,12 +24,7 @@ pub trait InterfaceIO {
     /// ```
     ///
     /// ```
-    async fn fetch_block_from_peer(
-        &self,
-        block_hash: SaitoHash,
-        peer_index: u64,
-        url: String,
-    ) -> Result<(), Error>;
+    async fn fetch_block_by_url(&self, url: String) -> Result<Block, Error>;
 
     /// Writes a value to a persistent storage with the given key
     ///

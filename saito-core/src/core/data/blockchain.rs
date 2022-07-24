@@ -145,12 +145,23 @@ impl Blockchain {
                                     block.source_connection_id.as_ref().unwrap(),
                                 )
                                 .await;
-                            if result.is_err() {
-                                warn!(
-                                    "couldn't fetch block : {:?}",
-                                    hex::encode(block.previous_block_hash)
-                                );
-                                todo!()
+
+                            match result {
+                                Ok(block) => {
+                                    self.add_block(
+                                        block,
+                                        network,
+                                        storage,
+                                        sender_to_miner.clone(),
+                                    );
+                                }
+                                Err(error) => {
+                                    warn!(
+                                        "couldn't fetch block : {:?}, {:?}",
+                                        hex::encode(block.previous_block_hash),
+                                        error
+                                    );
+                                }
                             }
                         }
                     }
@@ -424,7 +435,7 @@ impl Blockchain {
         // trace!(" ... block save done:            {:?}", create_timestamp());
 
         //
-        // update_genesis_period and prune old data - MOVED to on_chain_reorganization()
+        // update_genesis_period and prune old test_data - MOVED to on_chain_reorganization()
         //
         // self.update_genesis_period().await;
 
@@ -846,13 +857,13 @@ impl Blockchain {
         }
 
         //
-        // winding the chain requires us to have certain data associated
+        // winding the chain requires us to have certain test_data associated
         // with the block and the transactions, particularly the tx hashes
         // that we need to generate the slip UUIDs and create the tx sigs.
         //
         // we fetch the block mutably first in order to update these vars.
         // we cannot just send the block mutably into our regular validate()
-        // function because of limitatins imposed by Rust on mutable data
+        // function because of limitatins imposed by Rust on mutable test_data
         // structures. So validation is "read-only" and our "write" actions
         // happen first.
         //
@@ -865,7 +876,7 @@ impl Blockchain {
             //
             // ensure previous blocks that may be needed to calculate the staking
             // tables or the nolan that are potentially falling off the chain have
-            // full access to their transaction data.
+            // full access to their transaction test_data.
             //
             for i in 1..MAX_STAKER_RECURSION {
                 if i >= latest_block_id {
@@ -1123,7 +1134,7 @@ impl Blockchain {
 
         if longest_chain {
             //
-            // update genesis period, purge old data
+            // update genesis period, purge old test_data
             //
             self.update_genesis_period(storage).await;
 
@@ -1143,7 +1154,7 @@ impl Blockchain {
         // from our previous genesis_id. If there is no connection between it
         // and us, then we cannot delete anything as otherwise the provision of
         // the block may be an attack on us intended to force us to discard
-        // actually useful data.
+        // actually useful test_data.
         //
         // so we check that our block is the head of the longest-chain and only
         // update the genesis period when that is the case.
@@ -1173,7 +1184,7 @@ impl Blockchain {
     //
     pub async fn delete_blocks(&mut self, delete_block_id: u64, storage: &Storage) {
         trace!(
-            "removing data including from disk at id {}",
+            "removing test_data including from disk at id {}",
             delete_block_id
         );
 
@@ -1219,7 +1230,7 @@ impl Blockchain {
                 wallet.delete_block(pblock);
             }
             //
-            // removes utxoset data
+            // removes utxoset test_data
             //
             pblock.delete(&mut self.utxoset).await;
 
