@@ -12,37 +12,25 @@ use crate::core::data::mempool::Mempool;
 use crate::core::data::peer::Peer;
 use crate::core::data::wallet::Wallet;
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct PeerCollection {
     next_peer_index: Mutex<u64>,
     pub index_to_peers: HashMap<u64, Arc<RwLock<Peer>>>,
     pub address_to_peers: HashMap<SaitoPublicKey, u64>,
-    configs: Arc<RwLock<Configuration>>,
-    blockchain: Arc<RwLock<Blockchain>>,
-    mempool: Arc<RwLock<Mempool>>,
-    wallet: Arc<RwLock<Wallet>>,
 }
 
 impl PeerCollection {
-    pub fn new(
-        configs: Arc<RwLock<Configuration>>,
-        blockchain: Arc<RwLock<Blockchain>>,
-        mempool: Arc<RwLock<Mempool>>,
-        wallet: Arc<RwLock<Wallet>>,
-    ) -> PeerCollection {
+    pub fn new() -> PeerCollection {
         PeerCollection {
             next_peer_index: Mutex::new(0 as u64),
             index_to_peers: Default::default(),
             address_to_peers: Default::default(),
-            configs,
-            blockchain,
-            mempool,
-            wallet,
         }
     }
 
     pub async fn add(
         &mut self,
+        context: &Context,
         event_sender: Sender<NetworkEvent>,
         config: Option<PeerConfig>,
     ) -> Arc<RwLock<Peer>> {
@@ -51,15 +39,7 @@ impl PeerCollection {
             index = *self.next_peer_index.lock().await + 1;
         }
 
-        let peer = Arc::new(RwLock::new(Peer::new(
-            self.blockchain.clone(),
-            self.mempool.clone(),
-            self.wallet.clone(),
-            self.configs.read().await.get_block_fetch_url(),
-            index,
-            config,
-            event_sender,
-        )));
+        let peer = Arc::new(RwLock::new(Peer::new(context, index, config, event_sender)));
 
         self.index_to_peers.insert(index, peer.clone());
         return peer;

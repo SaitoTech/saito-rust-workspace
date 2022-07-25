@@ -10,6 +10,7 @@ use crate::common::interface_io::InterfaceIO;
 use crate::core::data;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
+use crate::core::data::context::Context;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
 use crate::core::data::mempool::Mempool;
 use crate::core::data::msg::block_request::BlockchainRequest;
@@ -28,36 +29,27 @@ pub trait PeerConnection {
     fn get_peer_index(&self) -> u64;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Peer {
-    blockchain: Arc<RwLock<Blockchain>>,
-    mempool: Arc<RwLock<Mempool>>,
-    wallet: Arc<RwLock<Wallet>>,
-    local_block_fetch_url: String,
+    context: Context,
     pub peer_index: u64,
     pub peer_public_key: SaitoPublicKey,
-    pub peer_block_fetch_url: String,
-    pub static_peer_config: Option<data::configuration::PeerConfig>,
-    pub challenge_for_peer: Option<SaitoHash>,
+    peer_block_fetch_url: String,
+    static_peer_config: Option<data::configuration::PeerConfig>,
+    challenge_for_peer: Option<SaitoHash>,
     pub handshake_done: bool,
     event_sender: Sender<NetworkEvent>,
 }
 
 impl Peer {
     pub fn new(
-        blockchain: Arc<RwLock<Blockchain>>,
-        mempool: Arc<RwLock<Mempool>>,
-        wallet: Arc<RwLock<Wallet>>,
-        local_block_fetch_url: String,
+        context: &Context,
         peer_index: u64,
         config: Option<PeerConfig>,
         event_sender: Sender<NetworkEvent>,
     ) -> Peer {
         Peer {
-            blockchain,
-            mempool,
-            wallet,
-            local_block_fetch_url,
+            context: context.clone(),
             peer_index,
             peer_public_key: [0; 33],
             peer_block_fetch_url: "".to_string(),
@@ -143,11 +135,20 @@ impl Peer {
 
     pub async fn initiate_handshake(&mut self) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.peer_index);
-        let wallet = self.wallet.read().await;
-        let block_fetch_url = self.local_block_fetch_url.clone();
+        let block_fetch_url;
+        let public_key;
+        {
+            block_fetch_url = self
+                .context
+                .configuration
+                .read()
+                .await
+                .get_block_fetch_url();
+            public_key = self.context.wallet.read().await.public_key;
+        }
 
         let challenge = HandshakeChallenge {
-            public_key: wallet.public_key,
+            public_key,
             challenge: generate_random_bytes(32).try_into().unwrap(),
             block_fetch_url,
         };
@@ -168,13 +169,27 @@ impl Peer {
             hex::encode(challenge.public_key)
         );
 
-        let block_fetch_url = self.local_block_fetch_url.clone();
+        let block_fetch_url;
+        let public_key;
+        let private_key;
+        {
+            block_fetch_url = self
+                .context
+                .configuration
+                .read()
+                .await
+                .get_block_fetch_url();
+            let wallet = self.context.wallet.read().await;
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
+        }
+
         self.peer_public_key = challenge.public_key;
         self.peer_block_fetch_url = challenge.block_fetch_url;
-        let wallet = self.wallet.read().await;
+
         let response = HandshakeResponse {
-            public_key: wallet.public_key,
-            signature: sign(&challenge.challenge.to_vec(), wallet.private_key),
+            public_key,
+            signature: sign(&challenge.challenge.to_vec(), private_key),
             challenge: generate_random_bytes(32).try_into().unwrap(),
             block_fetch_url,
         };
@@ -216,9 +231,12 @@ impl Peer {
         self.peer_public_key = response.public_key;
         self.peer_block_fetch_url = response.block_fetch_url;
         self.handshake_done = true;
-        let wallet = self.wallet.read().await;
+        let private_key;
+        {
+            private_key = self.context.wallet.read().await.private_key;
+        }
         let response = HandshakeCompletion {
-            signature: sign(&response.challenge, wallet.private_key),
+            signature: sign(&response.challenge, private_key),
         };
 
         debug!("handshake completion sent for peer: {:?}", self.peer_index);
@@ -257,7 +275,7 @@ impl Peer {
 
         let request;
         {
-            let blockchain = self.blockchain.read().await;
+            let blockchain = self.context.blockchain.read().await;
             request = BlockchainRequest {
                 latest_block_id: blockchain.get_latest_block_id(),
                 latest_block_hash: blockchain.get_latest_block_hash(),
@@ -283,7 +301,7 @@ impl Peer {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        let blockchain = self.blockchain.read().await;
+        let blockchain = self.context.blockchain.read().await;
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
@@ -308,7 +326,7 @@ impl Peer {
     async fn process_incoming_block_hash(&self, block_hash: SaitoHash) -> Result<(), Error> {
         let block_exists;
         {
-            let blockchain = self.blockchain.read().await;
+            let blockchain = self.context.blockchain.read().await;
             block_exists = blockchain.is_block_indexed(block_hash);
         }
 
@@ -331,7 +349,7 @@ impl Peer {
         mut transaction: Transaction,
     ) -> Result<(), Error> {
         transaction.generate_hash_for_signature();
-        let mut mempool = self.mempool.write().await;
+        let mut mempool = self.context.mempool.write().await;
         mempool.add_transaction(transaction).await;
         Ok(())
     }

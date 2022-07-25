@@ -6,13 +6,11 @@ use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::peer::Peer;
 use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::mining_event_processor::MiningEvent;
 use std::sync::Arc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use warp::http::StatusCode;
@@ -23,54 +21,51 @@ type ServerSideSender = SplitSink<WebSocket, warp::ws::Message>;
 type ServerSideReceiver = SplitStream<WebSocket>;
 
 pub struct WebSocketServer {
-    configs: Arc<RwLock<Configuration>>,
+    context: Context,
     peers: Arc<RwLock<PeerCollection>>,
-    blockchain: Arc<RwLock<Blockchain>>,
     task_runner: Arc<BlockFetchingTaskRunner>,
 }
 
 impl WebSocketServer {
     pub fn new(
-        context: &Context,
+        context: Context,
         peers: Arc<RwLock<PeerCollection>>,
-        sender_to_miner: Sender<MiningEvent>,
+        task_runner: Arc<BlockFetchingTaskRunner>,
     ) -> Self {
         WebSocketServer {
-            configs: context.configuration.clone(),
-            peers: peers.clone(),
-            blockchain: context.blockchain.clone(),
-            task_runner: Arc::new(BlockFetchingTaskRunner {
-                peers: peers.clone(),
-                blockchain: context.blockchain.clone(),
-                sender_to_miner,
-            }),
+            context,
+            peers,
+            task_runner,
         }
     }
 
     pub async fn run(&self) -> JoinHandle<()> {
+        let context = self.context.clone();
         let peers = self.peers.clone();
-        let blockchain = self.blockchain.clone();
         let task_runner = self.task_runner.clone();
-        let port;
-        {
-            let configs = self.configs.read().await;
-            port = configs.server.port;
-        }
 
         tokio::spawn(async move {
-            Self::run_ws_server(peers, blockchain, port, task_runner).await;
+            Self::run_ws_server(context, peers, task_runner).await;
         })
     }
 
     async fn run_ws_server(
+        context: Context,
         peers: Arc<RwLock<PeerCollection>>,
-        blockchain: Arc<RwLock<Blockchain>>,
-        port: u16,
         task_runner: Arc<BlockFetchingTaskRunner>,
     ) {
+        let port;
+        {
+            let configs = context.configuration.read().await;
+            port = configs.server.port;
+        }
+
         info!("Starting Web Socket Server on {:?}", port);
+
         let peers = peers.clone();
         let task_runner = task_runner.clone();
+        let context = context.clone();
+        let blockchain = context.blockchain.clone();
 
         let ws_route = warp::path("wsopen")
             .and(warp::ws())
@@ -78,12 +73,14 @@ impl WebSocketServer {
                 debug!("incoming connection received");
                 let peers = peers.clone();
                 let task_runner = task_runner.clone();
+                let context = context.clone();
 
                 ws.on_upgrade(move |socket| async move {
                     debug!("socket connection established");
 
                     let peers = peers.clone();
                     let task_runner = task_runner.clone();
+                    let context = context.clone();
 
                     let (sender, receiver) = socket.split();
                     let (event_sender, event_receiver) =
@@ -91,7 +88,7 @@ impl WebSocketServer {
 
                     let new_peer;
                     {
-                        new_peer = peers.write().await.add(event_sender, None).await;
+                        new_peer = peers.write().await.add(&context, event_sender, None).await;
                     }
 
                     Self::process_network_events(event_receiver, sender, task_runner).await;

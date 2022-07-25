@@ -1,3 +1,4 @@
+use crate::saito::block_fetching_task::BlockFetchingTaskRunner;
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::mempool_handler::{MempoolEvent, MempoolHandler};
 use crate::saito::mining_handler::MiningHandler;
@@ -40,12 +41,7 @@ impl SaitoNodeApp {
 
         let context = Context::new(configuration.clone());
 
-        let peers = Arc::new(RwLock::new(PeerCollection::new(
-            configuration.clone(),
-            context.blockchain.clone(),
-            context.mempool.clone(),
-            context.wallet.clone(),
-        )));
+        let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
         let mempool_handler = MempoolHandler::new(
             &context,
@@ -54,14 +50,21 @@ impl SaitoNodeApp {
             sender_to_mempool.clone(),
             receiver_in_mempool,
         );
+
+        let task_runner = Arc::new(BlockFetchingTaskRunner {
+            peers: peers.clone(),
+            blockchain: context.blockchain.clone(),
+            sender_to_miner: sender_to_miner.clone(),
+        });
+
         let mining_handler =
             MiningHandler::new(&context, receiver_in_miner, sender_to_mempool.clone());
-        let ws_clients = WebSocketClients::new(&context, peers.clone(), sender_to_miner.clone());
-        let ws_server = WebSocketServer::new(&context, peers.clone(), sender_to_miner.clone());
+        let ws_clients = WebSocketClients::new(context.clone(), peers.clone(), task_runner.clone());
+        let ws_server = WebSocketServer::new(context.clone(), peers.clone(), task_runner.clone());
 
         let mempool_handle = MempoolHandler::run(mempool_handler).await;
         let miner_handle = MiningHandler::run(mining_handler).await;
-        ws_clients.connect().await;
+        let connection_handles = ws_clients.connect().await;
         let web_server_handle = ws_server.run().await;
 
         let timestamp_now = SystemTime::now()
@@ -75,6 +78,10 @@ impl SaitoNodeApp {
             "Saito Node has Started, Elapsed Time {:?} seconds",
             elapsed_time
         );
+
+        for handle in connection_handles {
+            let _result = tokio::join!(handle);
+        }
 
         let _result = tokio::join!(mempool_handle, miner_handle, web_server_handle);
     }
