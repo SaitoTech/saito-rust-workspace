@@ -42,7 +42,8 @@ impl SpamGenerator {
                 let transactions = generator.generate_tx(count, bytes_per_tx).await;
 
                 for transaction in transactions {
-                    let buffer = transaction.serialize_for_net();
+                    let message = Message::Transaction(transaction);
+                    let buffer = message.serialize();
                     let peer_exceptions = Default::default();
                     let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessageForAll {
                         buffer,
@@ -62,7 +63,7 @@ impl SpamGenerator {
 
         let public_key;
         let private_key;
-        let latest_block_id;
+        //let latest_block_id;
         {
             trace!("waiting for the wallet read lock");
             let wallet = self.wallet.read().await;
@@ -76,19 +77,21 @@ impl SpamGenerator {
             let blockchain = self.blockchain.read().await;
             trace!("acquired the blockchain read lock");
 
-            latest_block_id = blockchain.get_latest_block_id();
-
-            if latest_block_id == 0 {
-                let mut vip_transaction =
-                    Transaction::create_vip_transaction(public_key, 50_000_000);
-                vip_transaction.sign(private_key);
-                transactions.push(vip_transaction);
+            if blockchain.blockring.is_empty() {
+                return transactions;
             }
+
+            // if latest_block_id == 0 {
+            //     let mut vip_transaction =
+            //         Transaction::create_vip_transaction(public_key, 50_000_000);
+            //     vip_transaction.sign(private_key);
+            //     transactions.push(vip_transaction);
+            // }
         }
 
         for _i in 0..count {
             let mut transaction =
-                Transaction::create(self.wallet.clone(), public_key, 5000, 5000).await;
+                Transaction::create(self.wallet.clone(), public_key, 100, 100).await;
             transaction.message = (0..bytes_per_tx)
                 .into_iter()
                 .map(|_| rand::random::<u8>())

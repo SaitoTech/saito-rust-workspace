@@ -48,7 +48,22 @@ pub struct Wallet {
 
 impl Wallet {
     pub fn new() -> Wallet {
-        let (public_key, private_key) = generate_keys();
+        //let (public_key, private_key) = generate_keys();
+
+        let public_key: SaitoPublicKey =
+            hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let private_key: SaitoPrivateKey =
+            hex::decode("ddb4ba7e5d70c2234f035853902c6bc805cae9163085f2eac5e585e2d6113ccd")
+                .unwrap()
+                .try_into()
+                .unwrap();
+
+        println!("Public Key : {:?}", hex::encode(public_key));
+        println!("Private Key : {:?}", hex::encode(private_key));
+
         Wallet {
             public_key,
             private_key,

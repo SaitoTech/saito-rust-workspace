@@ -117,6 +117,7 @@ impl NetworkConnections {
                         )
                         .await
                     );
+                    interval.reset();
                 } else {
                     warn!(
                         "failed connecting to peer : {:?}, error : {:?}, reconnecting ...",
@@ -136,7 +137,9 @@ impl NetworkConnections {
         mut receiver: SocketReceiver,
         sender: SocketSender,
     ) -> JoinHandle<()> {
-        senders.lock().await.insert(peer_index, sender);
+        {
+            senders.lock().await.insert(peer_index, sender);
+        }
 
         sender_to_core
             .send(IoEvent {
@@ -297,16 +300,16 @@ pub async fn run_network_controller(
                 match interface_event {
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
                         trace!("waiting for the io_controller write lock");
-                        let mut instance = network_connections.write().await;
+                        let mut instance = network_connections.read().await;
                         trace!("acquired the io controller write lock");
-                        instance.send_to_all(buffer, exceptions);
+                        instance.send_to_all(buffer, exceptions).await;
                     }
                     NetworkEvent::OutgoingNetworkMessage {
                         peer_index: index,
                         buffer,
                     } => {
                         trace!("waiting for the io_controller write lock");
-                        let mut instance = network_connections.write().await;
+                        let mut instance = network_connections.read().await;
                         trace!("acquired the io controller write lock");
                         instance.send(index, buffer).await;
                     }

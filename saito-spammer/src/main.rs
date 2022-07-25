@@ -371,14 +371,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let generator = SpamGenerator::new(context.wallet.clone(), context.blockchain.clone());
 
-    let generator_handle = SpamGenerator::run(
-        generator,
-        1000,
-        10,
-        100,
-        sender_to_network_controller.clone(),
-    )
-    .await;
+    let generator_handle =
+        SpamGenerator::run(generator, 100, 1, 100, sender_to_network_controller.clone()).await;
 
     let _result = tokio::join!(
         routing_handle,
@@ -386,7 +380,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         miner_handle,
         loop_handle,
         network_handle,
-        generator_handle,
+        //generator_handle,
     );
     Ok(())
 }
