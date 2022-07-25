@@ -1,11 +1,11 @@
+use crate::saito::rust_io_handler::RustIOHandler;
 use log::{debug, info, trace};
-use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
+use saito_core::core::data::context::Context;
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::storage::Storage;
-use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_event_processor::MiningEvent;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -15,24 +15,40 @@ use tokio::task::JoinHandle;
 use tokio::time::interval;
 
 #[derive(Debug)]
-pub enum ConsensusEvent {
+pub enum MempoolEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
     CanBundleBlock { timestamp: u64 },
 }
 
 /// Manages blockchain and the mempool
 pub struct MempoolHandler {
-    pub mempool: Arc<RwLock<Mempool>>,
-    pub blockchain: Arc<RwLock<Blockchain>>,
-    pub wallet: Arc<RwLock<Wallet>>,
-    pub sender_to_miner: Sender<MiningEvent>,
-    pub event_sender: Sender<ConsensusEvent>,
-    pub event_receiver: Receiver<ConsensusEvent>,
-    pub network: Network,
-    pub storage: Storage,
+    mempool: Arc<RwLock<Mempool>>,
+    blockchain: Arc<RwLock<Blockchain>>,
+    sender_to_miner: Sender<MiningEvent>,
+    event_sender: Sender<MempoolEvent>,
+    event_receiver: Receiver<MempoolEvent>,
+    network: Network,
+    storage: Storage,
 }
 
 impl MempoolHandler {
+    pub fn new(
+        context: &Context,
+        sender_to_miner: Sender<MiningEvent>,
+        event_sender: Sender<MempoolEvent>,
+        event_receiver: Receiver<MempoolEvent>,
+    ) -> Self {
+        MempoolHandler {
+            mempool: context.mempool.clone(),
+            blockchain: context.blockchain.clone(),
+            sender_to_miner,
+            event_sender,
+            event_receiver,
+            network: Network::new(Box::new(RustIOHandler::new()), context.peers.clone()),
+            storage: Storage::new(Box::new(RustIOHandler::new())),
+        }
+    }
+
     pub async fn run(mut handler: MempoolHandler) -> JoinHandle<()> {
         tokio::spawn(async move {
             handler.load_blocks_from_disk().await;
@@ -46,7 +62,7 @@ impl MempoolHandler {
 
             info!("Mempool Handler is Running");
 
-            handler.run_event_loop();
+            handler.run_event_loop().await;
         })
     }
 
@@ -64,11 +80,11 @@ impl MempoolHandler {
         loop {
             if let Some(event) = self.event_receiver.recv().await {
                 match event {
-                    ConsensusEvent::NewGoldenTicket { golden_ticket } => {
+                    MempoolEvent::NewGoldenTicket { golden_ticket } => {
                         self.on_new_golden_ticket(golden_ticket).await;
                     }
 
-                    ConsensusEvent::CanBundleBlock { .. } => {
+                    MempoolEvent::CanBundleBlock { .. } => {
                         self.on_bundle_block().await;
                     }
                 }
@@ -79,7 +95,7 @@ impl MempoolHandler {
     async fn run_block_producer(
         mempool: Arc<RwLock<Mempool>>,
         blockchain: Arc<RwLock<Blockchain>>,
-        mut event_sender: Sender<ConsensusEvent>,
+        event_sender: Sender<MempoolEvent>,
     ) {
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_millis(1000));
@@ -102,15 +118,13 @@ impl MempoolHandler {
 
                 if can_bundle {
                     event_sender
-                        .send(ConsensusEvent::CanBundleBlock { timestamp })
+                        .send(MempoolEvent::CanBundleBlock { timestamp })
                         .await
                         .expect("sending to mempool failed");
                 }
             }
         });
     }
-
-    async fn process_event(&mut self, event: ConsensusEvent) {}
 
     async fn on_bundle_block(&mut self) {
         let timestamp = SystemTime::now()

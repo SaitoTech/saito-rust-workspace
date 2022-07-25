@@ -1,5 +1,4 @@
-use crate::saito::block_fetching_task::{BlockFetchingTask, BlockFetchingTaskRunner};
-use crate::saito::mempool_handler::ConsensusEvent;
+use crate::saito::block_fetching_task::BlockFetchingTaskRunner;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, trace};
@@ -8,23 +7,20 @@ use saito_core::common::defs::SaitoHash;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
-use saito_core::core::data::msg::message::Message;
+use saito_core::core::data::context::Context;
 use saito_core::core::data::peer::Peer;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::mining_event_processor::MiningEvent;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing_subscriber::fmt::writer::EitherWriter::B;
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
-use warp::{Error, Filter};
+use warp::Filter;
 
 type ServerSideSender = SplitSink<WebSocket, warp::ws::Message>;
 type ServerSideReceiver = SplitStream<WebSocket>;
-type ServerSideSenderMap = HashMap<u64, Arc<Mutex<ServerSideSender>>>;
 
 pub struct WebSocketServer {
     configs: Arc<RwLock<Configuration>>,
@@ -34,19 +30,14 @@ pub struct WebSocketServer {
 }
 
 impl WebSocketServer {
-    pub fn new(
-        configs: Arc<RwLock<Configuration>>,
-        peers: Arc<RwLock<PeerCollection>>,
-        blockchain: Arc<RwLock<Blockchain>>,
-        sender_to_miner: Sender<MiningEvent>,
-    ) -> Self {
+    pub fn new(context: &Context, sender_to_miner: Sender<MiningEvent>) -> Self {
         WebSocketServer {
-            configs,
-            peers: peers.clone(),
-            blockchain: blockchain.clone(),
+            configs: context.configuration.clone(),
+            peers: context.peers.clone(),
+            blockchain: context.blockchain.clone(),
             task_runner: Arc::new(BlockFetchingTaskRunner {
-                peers,
-                blockchain,
+                peers: context.peers.clone(),
+                blockchain: context.blockchain.clone(),
                 sender_to_miner,
             }),
         }
@@ -99,8 +90,8 @@ impl WebSocketServer {
                         new_peer = peers.write().await.add(event_sender, None).await;
                     }
 
-                    Self::process_network_events(event_receiver, sender, task_runner);
-                    Self::receive_incoming_messages(new_peer, receiver);
+                    Self::process_network_events(event_receiver, sender, task_runner).await;
+                    Self::receive_incoming_messages(new_peer, receiver).await;
                 })
             });
         let http_route = warp::path!("block" / String)
@@ -153,7 +144,8 @@ impl WebSocketServer {
 
                 if let Err(error) = peer.initiate_handshake().await {
                     error!("Initializing handshake failed, {:?}", error);
-                    peer.send_event(NetworkEvent::PeerDisconnected { peer_index });
+                    peer.send_event(NetworkEvent::PeerDisconnected { peer_index })
+                        .await;
                     return;
                 }
             }
@@ -163,26 +155,17 @@ impl WebSocketServer {
                     match input {
                         Ok(web_socket_message) => {
                             if web_socket_message.is_binary() {
-                                match Message::deserialize(web_socket_message.into_bytes()) {
-                                    Ok(message) => {
-                                        if let Err(error) = peer
-                                            .write()
-                                            .await
-                                            .process_incoming_message(message)
-                                            .await
-                                        {
-                                            error!("Handling input from peer failed, {:?}", error);
-                                            break;
-                                        }
-                                    }
-                                    Err(error) => {
-                                        error!(
-                                            "Deserializing incoming message failed, reason {:?}",
-                                            error
-                                        );
-                                        break;
-                                    }
+                                if peer
+                                    .write()
+                                    .await
+                                    .process_incoming_data(web_socket_message.into_bytes())
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
                                 }
+                            } else {
+                                error!("Input is not binary {:?}", peer_index);
                             }
                         }
                         Err(error) => {
@@ -192,7 +175,8 @@ impl WebSocketServer {
                             );
                             peer.read()
                                 .await
-                                .send_event(NetworkEvent::PeerDisconnected { peer_index });
+                                .send_event(NetworkEvent::PeerDisconnected { peer_index })
+                                .await;
                             break;
                         }
                     }
@@ -210,7 +194,10 @@ impl WebSocketServer {
             loop {
                 if let Some(event) = event_receiver.recv().await {
                     match event {
-                        NetworkEvent::OutgoingNetworkMessage { peer_index, buffer } => {
+                        NetworkEvent::OutgoingNetworkMessage {
+                            peer_index: _,
+                            buffer,
+                        } => {
                             sender
                                 .send(warp::ws::Message::binary(buffer))
                                 .await
@@ -218,17 +205,17 @@ impl WebSocketServer {
                             sender.flush().await.unwrap();
                         }
                         NetworkEvent::BlockFetchRequest {
-                            block_hash,
-                            peer_index,
+                            block_hash: _,
+                            peer_index: _,
                             url,
-                            request_id,
+                            request_id: _,
                         } => {
                             task_runner.run_task(url).await;
                         }
                         NetworkEvent::BlockFetched { .. } => {
                             unreachable!()
                         }
-                        NetworkEvent::PeerDisconnected { peer_index } => {
+                        NetworkEvent::PeerDisconnected { peer_index: _ } => {
                             break;
                         }
                     }

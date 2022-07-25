@@ -1,14 +1,9 @@
 use crate::saito::rust_io_handler::RustIOHandler;
-use log::debug;
-use saito_core::common::defs::SaitoHash;
-use saito_core::common::interface_io::InterfaceIO;
-use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::mining_event_processor::MiningEvent;
-use std::io::Error;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -74,7 +69,7 @@ impl BlockFetchingTask {
                     self.sender_to_miner.clone(),
                 );
             }
-            Err(error) => {
+            Err(_error) => {
                 todo!("handle block fetch error")
             }
         }

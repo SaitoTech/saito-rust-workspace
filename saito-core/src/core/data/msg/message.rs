@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};
@@ -42,7 +42,7 @@ impl Message {
         let message_type = buffer[0];
         let buffer = buffer[1..].to_vec();
 
-        info!("buffer size = {:?}", buffer.len());
+        debug!("deserialize message : buffer size = {:?}", buffer.len());
 
         // TODO : remove hardcoded values into an enum
         match message_type {

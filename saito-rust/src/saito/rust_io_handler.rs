@@ -3,21 +3,14 @@ use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::sync::Mutex;
 
+use crate::saito::io_context::IoContext;
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::{debug, error, warn};
-use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::mpsc::Sender;
-
-use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::SaitoHash;
 use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::block::Block;
-
-use saito_core::core::data::configuration::PeerConfig;
-
-use crate::saito::io_context::IoContext;
+use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 lazy_static! {
     pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());

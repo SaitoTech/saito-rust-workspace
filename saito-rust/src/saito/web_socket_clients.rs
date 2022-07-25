@@ -1,28 +1,24 @@
 use crate::saito::block_fetching_task::BlockFetchingTaskRunner;
-use crate::saito::mempool_handler::ConsensusEvent;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, warn};
 use saito_core::common::command::NetworkEvent;
-use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
-use saito_core::core::data::msg::message::Message;
+use saito_core::core::data::context::Context;
 use saito_core::core::data::peer::Peer;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::mining_event_processor::MiningEvent;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio::time::interval;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
-type SocketSenderMap = HashMap<u64, SocketSender>;
 
 pub struct WebSocketClients {
     configs: Arc<RwLock<Configuration>>,
@@ -31,18 +27,13 @@ pub struct WebSocketClients {
 }
 
 impl WebSocketClients {
-    pub fn new(
-        configs: Arc<RwLock<Configuration>>,
-        peers: Arc<RwLock<PeerCollection>>,
-        blockchain: Arc<RwLock<Blockchain>>,
-        sender_to_miner: Sender<MiningEvent>,
-    ) -> Self {
+    pub fn new(context: &Context, sender_to_miner: Sender<MiningEvent>) -> Self {
         WebSocketClients {
-            configs,
-            peers: peers.clone(),
+            configs: context.configuration.clone(),
+            peers: context.peers.clone(),
             task_runner: Arc::new(BlockFetchingTaskRunner {
-                peers,
-                blockchain,
+                peers: context.peers.clone(),
+                blockchain: context.blockchain.clone(),
                 sender_to_miner,
             }),
         }
@@ -92,7 +83,8 @@ impl WebSocketClients {
                     let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) =
                         socket.split();
 
-                    Self::receive_incoming_messages(peer.clone(), socket_receiver).await;
+                    Self::receive_incoming_messages(peer_index, peer.clone(), socket_receiver)
+                        .await;
                     Self::process_network_events(peer, event_receiver, socket_sender, task_runner)
                         .await;
 
@@ -109,6 +101,7 @@ impl WebSocketClients {
     }
 
     async fn receive_incoming_messages(
+        peer_index: u64,
         peer: Arc<RwLock<Peer>>,
         mut socket_receiver: SocketReceiver,
     ) -> JoinHandle<()> {
@@ -119,33 +112,18 @@ impl WebSocketClients {
                     match input {
                         Ok(tungstenite_message) => {
                             if let tungstenite::Message::Binary(buffer) = tungstenite_message {
-                                match Message::deserialize(buffer) {
-                                    Ok(message) => {
-                                        if let Err(error) = peer
-                                            .write()
-                                            .await
-                                            .process_incoming_message(message)
-                                            .await
-                                        {
-                                            error!("Handling input from peer failed, {:?}", error);
-                                            break;
-                                        }
-                                    }
-                                    Err(error) => {
-                                        error!(
-                                            "Deserializing incoming message failed, reason {:?}",
-                                            error
-                                        );
-                                        break;
-                                    }
+                                if peer
+                                    .write()
+                                    .await
+                                    .process_incoming_data(buffer)
+                                    .await
+                                    .is_err()
+                                {
+                                    break;
                                 }
                             }
                         }
                         Err(error) => {
-                            let peer_index;
-                            {
-                                peer_index = peer.read().await.peer_index;
-                            }
                             error!(
                                 "failed receiving message from server, {:?} : {:?}",
                                 peer_index, error
@@ -172,7 +150,10 @@ impl WebSocketClients {
             loop {
                 if let Some(event) = event_receiver.recv().await {
                     match event {
-                        NetworkEvent::OutgoingNetworkMessage { peer_index, buffer } => {
+                        NetworkEvent::OutgoingNetworkMessage {
+                            peer_index: _,
+                            buffer,
+                        } => {
                             socket_sender
                                 .send(tungstenite::Message::Binary(buffer))
                                 .await
@@ -181,10 +162,10 @@ impl WebSocketClients {
                             socket_sender.flush().await.unwrap();
                         }
                         NetworkEvent::BlockFetchRequest {
-                            block_hash,
-                            peer_index,
+                            block_hash: _,
+                            peer_index: _,
                             url,
-                            request_id,
+                            request_id: _,
                         } => {
                             task_runner.run_task(url).await;
                         }
@@ -192,7 +173,7 @@ impl WebSocketClients {
                             unreachable!()
                         }
                         NetworkEvent::PeerDisconnected { .. } => {
-                            Self::connect_to_peer(peer, event_receiver, task_runner);
+                            //Self::connect_to_peer(peer, event_receiver, task_runner).await;
                             break;
                         }
                     }
