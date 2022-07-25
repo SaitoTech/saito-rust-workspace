@@ -254,7 +254,7 @@ mod test {
         assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
     }
     // TODO : delete this test
-    // #[ignore]
+    #[ignore]
     #[tokio::test]
     async fn block_load_test_slr() {
         pretty_env_logger::init();
@@ -266,7 +266,7 @@ mod test {
             std::env::current_dir().unwrap().to_str().unwrap()
         );
         let filename =std::env::current_dir().unwrap().to_str().unwrap().to_string()+
-            "/data/blocks/1658721610288-ee3d5a38ea7f2dce29c2332cb8bec457a23ae4e328725f55e3a07600bc041894.sai";
+            "/data/blocks/1658721386981-acf9e86643504772c8901bc7ed9cb99709f0d5efcdfc3a3aba8888133db5b8a8.sai";
         let retrieved_block = t.storage.load_block_from_disk(filename).await;
         let mut block = retrieved_block.unwrap();
         block.generate();
