@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet};
-use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify};
+use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify, verify_hash};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
@@ -732,6 +732,7 @@ impl Transaction {
         for output in &self.outputs {
             vbytes.extend(&output.serialize_output_for_signature());
         }
+        vbytes.extend(&(self.replaces_txs as u32).to_be_bytes());
         vbytes.extend(&(self.transaction_type as u32).to_be_bytes());
         vbytes.extend(&self.message);
 
@@ -798,7 +799,7 @@ impl Transaction {
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
                 let public_key: SaitoPublicKey = self.inputs[0].public_key;
-                if !verify(hash_for_signature, sig, public_key) {
+                if !verify(self.serialize_for_signature().as_slice(), sig, public_key) {
                     error!("message verifies not");
                     return false;
                 }
@@ -1135,11 +1136,28 @@ mod tests {
 
     #[test]
     fn deserialize_test_against_slr() {
-        let buffer = hex::decode("000000010000000100000014000000005d32a088a3171ea59a8c813959688b4e86935b60699f03202402e1a815c2655558411b77a728c2b8e3ea71ef04a25ea3bb083b101281f5ab36fcd16d4c471cd60000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0003cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b0000000000000159000065794a305a584e30496a6f696447567a64434a39").unwrap();
+        let tx_buffer_txt = "00000001000000010000000300000000dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec0000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b00000000000001590000616263";
+        let buffer = hex::decode(tx_buffer_txt).unwrap();
 
-        let tx = Transaction::deserialize_from_net(buffer);
+        let mut tx = Transaction::deserialize_from_net(buffer);
 
         assert_eq!(tx.timestamp, 1637034582666);
         assert_eq!(tx.transaction_type, TransactionType::ATR);
+
+        assert_eq!(hex::encode(tx.signature), "dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec");
+        let public_key: SaitoPublicKey = tx.inputs[0].public_key;
+        assert_eq!(
+            hex::encode(public_key),
+            "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
+        );
+        tx.generate(public_key);
+        let sig: SaitoSignature = tx.signature;
+
+        assert_eq!(hex::decode("0000017d26dd628a03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce76100000000000000000000000000000000000000000000000000000000000000000000000000000015900000000000100000003616263").unwrap()
+                   ,tx.serialize_for_signature());
+        let result = verify(tx.serialize_for_signature().as_slice(), sig, public_key);
+        assert!(result);
+        let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), sig, public_key);
+        assert!(result);
     }
 }

@@ -4,7 +4,7 @@ pub mod test {
     use std::io::Error;
     use std::path::Path;
 
-    use crate::common::defs::SaitoHash;
+    use crate::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
     use async_trait::async_trait;
     use log::{debug, error, info, warn};
     use tokio::fs::File;
@@ -110,7 +110,12 @@ pub mod test {
             let mut paths: Vec<_> = result
                 .unwrap()
                 .map(|r| r.unwrap())
-                .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
+                .filter(|r| {
+                    r.file_name()
+                        .into_string()
+                        .unwrap()
+                        .contains(BLOCK_FILE_EXTENSION)
+                })
                 .collect();
             paths.sort_by(|a, b| {
                 let a_metadata = fs::metadata(a.path()).unwrap();

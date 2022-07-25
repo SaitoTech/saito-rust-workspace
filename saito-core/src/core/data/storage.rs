@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::common::defs::BLOCK_FILE_EXTENSION;
 use log::{debug, error, trace};
 use tokio::sync::RwLock;
 
@@ -63,7 +64,7 @@ impl Storage {
             + timestamp.to_string().as_str()
             + "-"
             + hex::encode(block_hash).as_str()
-            + ".block"
+            + BLOCK_FILE_EXTENSION
     }
     pub async fn write_block_to_disk(&mut self, block: &Block) -> String {
         let buffer = block.serialize_for_net(BlockType::Full);
@@ -108,6 +109,7 @@ impl Storage {
             let buffer = result.unwrap();
             let mut block = Block::deserialize_from_net(&buffer);
             block.generate();
+            debug!("adding block from file : {:?}", file_name);
             blockchain
                 .add_block(block, network, self, sender_to_miner.clone())
                 .await;
@@ -213,6 +215,7 @@ mod test {
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::MAX_TOKEN_SUPPLY;
+    use crate::core::data::crypto::{hash, verify};
     use log::info;
 
     #[ignore]
@@ -251,7 +254,7 @@ mod test {
         assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
     }
     // TODO : delete this test
-    #[ignore]
+    // #[ignore]
     #[tokio::test]
     async fn block_load_test_slr() {
         pretty_env_logger::init();
@@ -263,12 +266,27 @@ mod test {
             std::env::current_dir().unwrap().to_str().unwrap()
         );
         let filename =std::env::current_dir().unwrap().to_str().unwrap().to_string()+
-            "/data/blocks/1658377242777-ef4593a4ee39a25d04940be0835d2ab81c8e13745745b580debb9ab90c6d1ce7.sai";
+            "/data/blocks/1658721610288-ee3d5a38ea7f2dce29c2332cb8bec457a23ae4e328725f55e3a07600bc041894.sai";
         let retrieved_block = t.storage.load_block_from_disk(filename).await;
         let mut block = retrieved_block.unwrap();
         block.generate();
 
         assert_ne!(block.timestamp, 0);
+
+        let hex = hash(&block.pre_hash.to_vec());
+        info!(
+            "prehash = {:?}, hex = {:?}, signature : {:?}, creator = {:?}",
+            hex::encode(block.pre_hash),
+            hex::encode(hex),
+            hex::encode(block.signature),
+            hex::encode(block.creator)
+        );
+        let result = verify(
+            &block.serialize_for_signature(),
+            block.signature,
+            block.creator,
+        );
+        assert!(result);
         // assert_eq!(retrieved_block.timestamp, 1637034582666);
     }
 }

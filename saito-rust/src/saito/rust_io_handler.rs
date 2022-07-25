@@ -11,7 +11,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::SaitoHash;
+use saito_core::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::InterfaceIO;
 
 use saito_core::core::data::configuration::PeerConfig;
@@ -185,7 +185,12 @@ impl InterfaceIO for RustIOHandler {
         let mut paths: Vec<_> = result
             .unwrap()
             .map(|r| r.unwrap())
-            .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
+            .filter(|r| {
+                r.file_name()
+                    .into_string()
+                    .unwrap()
+                    .contains(BLOCK_FILE_EXTENSION)
+            })
             .collect();
         paths.sort_by(|a, b| {
             let a_metadata = fs::metadata(a.path()).unwrap();

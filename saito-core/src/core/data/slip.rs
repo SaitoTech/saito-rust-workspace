@@ -113,6 +113,7 @@ impl Slip {
         vbytes.extend(&self.amount.to_be_bytes());
         vbytes.extend(&self.slip_index.to_be_bytes());
         vbytes.extend(&(self.slip_type as u8).to_be_bytes());
+        assert_eq!(vbytes.len(), SLIP_SIZE);
         vbytes
     }
 
@@ -122,7 +123,7 @@ impl Slip {
         vbytes.extend(&self.uuid);
         vbytes.extend(&self.amount.to_be_bytes());
         vbytes.extend(&(self.slip_index.to_be_bytes()));
-        vbytes.extend(&(self.slip_type as u32).to_be_bytes());
+        vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
 
@@ -132,7 +133,7 @@ impl Slip {
         vbytes.extend(&[0; 32]);
         vbytes.extend(&self.amount.to_be_bytes());
         vbytes.extend(&(self.slip_index.to_be_bytes()));
-        vbytes.extend(&(self.slip_type as u32).to_be_bytes());
+        vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
 

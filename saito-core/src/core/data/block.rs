@@ -89,7 +89,7 @@ impl ConsensusValues {
             gt_num: 0,
             gt_index: None,
             total_fees: 0,
-            expected_difficulty: 0,
+            expected_difficulty: 1,
             rebroadcasts: vec![],
             total_rebroadcast_slips: 0,
             total_rebroadcast_nolan: 0,
@@ -165,7 +165,7 @@ pub struct Block {
     pub(crate) timestamp: u64,
     pub(crate) previous_block_hash: [u8; 32],
     #[serde_as(as = "[_; 33]")]
-    creator: [u8; 33],
+    pub(crate) creator: [u8; 33],
     pub(crate) merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
     pub signature: [u8; 64],
@@ -180,7 +180,7 @@ pub struct Block {
     /// Transactions
     pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
-    pre_hash: SaitoHash,
+    pub(crate) pre_hash: SaitoHash,
     /// Self-Calculated / Validated
     pub hash: SaitoHash,
     /// total fees paid into block
@@ -1369,10 +1369,12 @@ impl Block {
         //     // tracing_tracker.time_since_last();
         // );
 
-        //
         // verify signed by creator
-        //
-        if !verify(&self.pre_hash, self.signature, self.creator) {
+        if !verify(
+            &self.serialize_for_signature(),
+            self.signature,
+            self.creator,
+        ) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
@@ -1655,7 +1657,7 @@ impl Block {
             let transactions_valid2 = self.transactions[i].validate(utxoset);
             if !transactions_valid2 {
                 info!("Type: {:?}", self.transactions[i].transaction_type);
-                info!("Data {:?}", self.transactions[i]);
+                // info!("Data {:?}", self.transactions[i]);
             }
         }
         //true
