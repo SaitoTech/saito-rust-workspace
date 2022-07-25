@@ -65,7 +65,8 @@ impl Message {
                 todo!()
             }
             6 => {
-                todo!()
+                let tx = Transaction::deserialize_from_net(buffer);
+                return Ok(Message::Transaction(tx));
             }
             7 => {
                 let result = BlockchainRequest::deserialize(&buffer)?;

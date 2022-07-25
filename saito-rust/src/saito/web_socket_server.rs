@@ -30,13 +30,17 @@ pub struct WebSocketServer {
 }
 
 impl WebSocketServer {
-    pub fn new(context: &Context, sender_to_miner: Sender<MiningEvent>) -> Self {
+    pub fn new(
+        context: &Context,
+        peers: Arc<RwLock<PeerCollection>>,
+        sender_to_miner: Sender<MiningEvent>,
+    ) -> Self {
         WebSocketServer {
             configs: context.configuration.clone(),
-            peers: context.peers.clone(),
+            peers: peers.clone(),
             blockchain: context.blockchain.clone(),
             task_runner: Arc::new(BlockFetchingTaskRunner {
-                peers: context.peers.clone(),
+                peers: peers.clone(),
                 blockchain: context.blockchain.clone(),
                 sender_to_miner,
             }),

@@ -22,6 +22,7 @@ pub struct MiningHandler {
     wallet: Arc<RwLock<Wallet>>,
     event_receiver: Receiver<MiningEvent>,
     sender_to_mempool: Sender<MempoolEvent>,
+    last_thread: Option<JoinHandle<()>>,
 }
 
 impl MiningHandler {
@@ -34,6 +35,7 @@ impl MiningHandler {
             wallet: context.wallet.clone(),
             event_receiver,
             sender_to_mempool,
+            last_thread: None,
         }
     }
 
@@ -50,14 +52,23 @@ impl MiningHandler {
                 debug!("event received : {:?}", event);
                 match event {
                     MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
-                        self.on_longest_chain_block_added(hash, difficulty).await;
+                        if self.last_thread.is_some() {
+                            self.last_thread.as_ref().unwrap().abort();
+                        }
+
+                        self.last_thread =
+                            Some(self.on_longest_chain_block_added(hash, difficulty).await);
                     }
                 }
             }
         }
     }
 
-    async fn on_longest_chain_block_added(&mut self, hash: SaitoHash, difficulty: u64) {
+    async fn on_longest_chain_block_added(
+        &mut self,
+        hash: SaitoHash,
+        difficulty: u64,
+    ) -> JoinHandle<()> {
         let wallet = self.wallet.clone();
         let sender = self.sender_to_mempool.clone();
 
@@ -76,7 +87,7 @@ impl MiningHandler {
                     break;
                 }
             }
-        });
+        })
     }
 
     async fn find_solution(
@@ -84,7 +95,7 @@ impl MiningHandler {
         difficulty: u64,
         wallet: &Arc<RwLock<Wallet>>,
     ) -> Option<GoldenTicket> {
-        debug!("mining for golden ticket");
+        trace!("mining for golden ticket");
 
         let publickey: SaitoPublicKey;
         {

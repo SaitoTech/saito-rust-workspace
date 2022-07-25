@@ -5,6 +5,7 @@ use saito_core::core::data::context::Context;
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
+use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::mining_event_processor::MiningEvent;
 use std::sync::Arc;
@@ -34,6 +35,7 @@ pub struct MempoolHandler {
 impl MempoolHandler {
     pub fn new(
         context: &Context,
+        peers: Arc<RwLock<PeerCollection>>,
         sender_to_miner: Sender<MiningEvent>,
         event_sender: Sender<MempoolEvent>,
         event_receiver: Receiver<MempoolEvent>,
@@ -44,7 +46,7 @@ impl MempoolHandler {
             sender_to_miner,
             event_sender,
             event_receiver,
-            network: Network::new(Box::new(RustIOHandler::new()), context.peers.clone()),
+            network: Network::new(Box::new(RustIOHandler::new()), peers),
             storage: Storage::new(Box::new(RustIOHandler::new())),
         }
     }

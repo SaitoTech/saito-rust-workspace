@@ -11,11 +11,13 @@ use crate::core::data;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
+use crate::core::data::mempool::Mempool;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::handshake::{
     HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
 };
 use crate::core::data::msg::message::Message;
+use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
@@ -29,6 +31,7 @@ pub trait PeerConnection {
 #[derive(Debug, Clone)]
 pub struct Peer {
     blockchain: Arc<RwLock<Blockchain>>,
+    mempool: Arc<RwLock<Mempool>>,
     wallet: Arc<RwLock<Wallet>>,
     local_block_fetch_url: String,
     pub peer_index: u64,
@@ -43,6 +46,7 @@ pub struct Peer {
 impl Peer {
     pub fn new(
         blockchain: Arc<RwLock<Blockchain>>,
+        mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
         local_block_fetch_url: String,
         peer_index: u64,
@@ -51,6 +55,7 @@ impl Peer {
     ) -> Peer {
         Peer {
             blockchain,
+            mempool,
             wallet,
             local_block_fetch_url,
             peer_index,
@@ -129,7 +134,10 @@ impl Peer {
             }
             Message::ApplicationMessage(_) => Err(Error::from(ErrorKind::InvalidData)),
             Message::Block(_) => Err(Error::from(ErrorKind::InvalidData)),
-            Message::Transaction(_) => Err(Error::from(ErrorKind::InvalidData)),
+            Message::Transaction(mut transaction) => {
+                debug!("received transaction");
+                self.handle_incoming_transaction(transaction).await
+            }
         };
     }
 
@@ -315,6 +323,16 @@ impl Peer {
             .await;
         }
 
+        Ok(())
+    }
+
+    async fn handle_incoming_transaction(
+        &mut self,
+        mut transaction: Transaction,
+    ) -> Result<(), Error> {
+        transaction.generate_hash_for_signature();
+        let mut mempool = self.mempool.write().await;
+        mempool.add_transaction(transaction).await;
         Ok(())
     }
 

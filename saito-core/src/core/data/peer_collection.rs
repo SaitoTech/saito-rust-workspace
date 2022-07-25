@@ -7,6 +7,8 @@ use tokio::sync::{Mutex, RwLock};
 use crate::common::defs::SaitoPublicKey;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
+use crate::core::data::context::Context;
+use crate::core::data::mempool::Mempool;
 use crate::core::data::peer::Peer;
 use crate::core::data::wallet::Wallet;
 
@@ -17,6 +19,7 @@ pub struct PeerCollection {
     pub address_to_peers: HashMap<SaitoPublicKey, u64>,
     configs: Arc<RwLock<Configuration>>,
     blockchain: Arc<RwLock<Blockchain>>,
+    mempool: Arc<RwLock<Mempool>>,
     wallet: Arc<RwLock<Wallet>>,
 }
 
@@ -24,6 +27,7 @@ impl PeerCollection {
     pub fn new(
         configs: Arc<RwLock<Configuration>>,
         blockchain: Arc<RwLock<Blockchain>>,
+        mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
     ) -> PeerCollection {
         PeerCollection {
@@ -32,6 +36,7 @@ impl PeerCollection {
             address_to_peers: Default::default(),
             configs,
             blockchain,
+            mempool,
             wallet,
         }
     }
@@ -48,6 +53,7 @@ impl PeerCollection {
 
         let peer = Arc::new(RwLock::new(Peer::new(
             self.blockchain.clone(),
+            self.mempool.clone(),
             self.wallet.clone(),
             self.configs.read().await.get_block_fetch_url(),
             index,

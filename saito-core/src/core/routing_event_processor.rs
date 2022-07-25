@@ -105,8 +105,13 @@ impl RoutingEventProcessor {
             Message::Block(_) => {
                 debug!("received block");
             }
-            Message::Transaction(_) => {
+            Message::Transaction(transaction) => {
                 debug!("received transaction");
+
+                self.sender_to_mempool
+                    .send(ConsensusEvent::NewTransaction { transaction })
+                    .await
+                    .unwrap();
             }
             Message::BlockchainRequest(request) => {}
             Message::BlockHeaderHash(hash) => {}

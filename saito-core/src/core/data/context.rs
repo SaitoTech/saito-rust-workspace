@@ -16,25 +16,19 @@ pub struct Context {
     pub mempool: Arc<RwLock<Mempool>>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub configuration: Arc<RwLock<Configuration>>,
-    pub peers: Arc<RwLock<PeerCollection>>,
 }
 
 impl Context {
     pub fn new(configuration: Arc<RwLock<Configuration>>) -> Context {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         let blockchain = Arc::new(RwLock::new(Blockchain::new(wallet.clone())));
-        let peers = Arc::new(RwLock::new(PeerCollection::new(
-            configuration.clone(),
-            blockchain.clone(),
-            wallet.clone(),
-        )));
+        let mempool = Arc::new(RwLock::new(Mempool::new(wallet.clone())));
 
         Context {
             blockchain,
-            mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
-            wallet: wallet.clone(),
+            mempool,
+            wallet,
             configuration,
-            peers,
         }
     }
     pub async fn init(&self, _task_runner: &dyn RunTask) -> Result<(), Error> {
