@@ -666,7 +666,6 @@ impl Blockchain {
     }
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
-
         self.blocks.get(block_hash)
     }
 

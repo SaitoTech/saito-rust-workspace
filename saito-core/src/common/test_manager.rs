@@ -167,11 +167,7 @@ pub mod test {
             let mut utxoset: UtxoSet = AHashMap::new();
             let latest_block_id = blockchain.get_latest_block_id();
 
-            info!("----");
-            info!("----");
             info!("---- check utxoset ");
-            info!("----");
-            info!("----");
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring

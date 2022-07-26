@@ -1200,9 +1200,9 @@ impl Block {
     // bytes array that can be hashed and then have the hash set.
     pub fn serialize_for_hash(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.pre_hash);
-        vbytes.extend(&self.signature);
+        // vbytes.extend(&self.signature);
         vbytes.extend(&self.previous_block_hash);
+        vbytes.extend(&self.pre_hash);
         vbytes
     }
 

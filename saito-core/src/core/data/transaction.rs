@@ -18,16 +18,17 @@ pub const TRANSACTION_SIZE: usize = 93;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone, FromPrimitive)]
 pub enum TransactionType {
-    Normal,
+    Normal = 0,
     /// Paying for the network
-    Fee,
-    GoldenTicket,
-    ATR,
+    Fee = 1,
+    GoldenTicket = 2,
+    ATR = 3,
     /// VIP transactions won't pay an ATR fee. (Issued to early investors)
-    Vip,
+    Vip = 4,
+    SPV = 5,
     /// Issues funds for an address at the start of the network
-    Issuance,
-    SPV,
+    Issuance = 6,
+    Other = 7,
 }
 
 #[serde_with::serde_as]
@@ -799,8 +800,13 @@ impl Transaction {
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
                 let public_key: SaitoPublicKey = self.inputs[0].public_key;
-                if !verify(self.serialize_for_signature().as_slice(), sig, public_key) {
-                    error!("message verifies not");
+                if !verify_hash(hash_for_signature, sig, public_key) {
+                    error!(
+                        "tx verification failed : hash = {:?}, sig = {:?}, pub_key = {:?}",
+                        hex::encode(hash_for_signature),
+                        hex::encode(sig),
+                        hex::encode(public_key)
+                    );
                     return false;
                 }
             } else {
@@ -842,7 +848,7 @@ impl Transaction {
             {
                 warn!("{} in and {} out", self.total_in, self.total_out);
                 for z in self.outputs.iter() {
-                    info!("{:?} --- ", z.amount);
+                    // info!("{:?} --- ", z.amount);
                 }
                 error!("ERROR 672941: transaction spends more than it has available");
                 return false;

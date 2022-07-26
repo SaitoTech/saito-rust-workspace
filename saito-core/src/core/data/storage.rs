@@ -96,7 +96,8 @@ impl Storage {
             error!("{:?}", file_names.err().unwrap());
             return;
         }
-        let file_names = file_names.unwrap();
+        let mut file_names = file_names.unwrap();
+        file_names.sort();
         debug!("block file names : {:?}", file_names);
         for file_name in file_names {
             let result = self
@@ -212,6 +213,7 @@ impl Storage {
 
 #[cfg(test)]
 mod test {
+    use crate::common::defs::SaitoHash;
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::MAX_TOKEN_SUPPLY;
@@ -266,11 +268,28 @@ mod test {
             std::env::current_dir().unwrap().to_str().unwrap()
         );
         let filename =std::env::current_dir().unwrap().to_str().unwrap().to_string()+
-            "/data/blocks/1658721386981-acf9e86643504772c8901bc7ed9cb99709f0d5efcdfc3a3aba8888133db5b8a8.sai";
+            "/data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai";
         let retrieved_block = t.storage.load_block_from_disk(filename).await;
         let mut block = retrieved_block.unwrap();
         block.generate();
 
+        info!(
+            "prehash = {:?},  prev : {:?}",
+            hex::encode(block.pre_hash),
+            hex::encode(block.previous_block_hash),
+        );
+        // assert_eq!(
+        //     "11bc1529b4bcdbfbdbd6582b9033e4156681e5b8777fcc5bcc0d69eb7238d133",
+        //     hex::encode(block.pre_hash)
+        // );
+        // assert_eq!(
+        //     "bcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        //     hex::encode(block.previous_block_hash)
+        // );
+        assert_eq!(
+            hex::encode(block.hash),
+            "f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda"
+        );
         assert_ne!(block.timestamp, 0);
 
         let hex = hash(&block.pre_hash.to_vec());
@@ -281,12 +300,44 @@ mod test {
             hex::encode(block.signature),
             hex::encode(block.creator)
         );
+        // assert_eq!("000000000000000a0000017d26dd628abcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bdcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bccccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000000000000000000000000000000002faf08000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        //     hex::encode(block.serialize_for_signature()));
         let result = verify(
             &block.serialize_for_signature(),
             block.signature,
             block.creator,
         );
         assert!(result);
+
+        let filename = t.storage.generate_block_filename(&block);
+        assert_eq!(
+            filename,
+            "./data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai"
+        );
         // assert_eq!(retrieved_block.timestamp, 1637034582666);
+    }
+
+    #[test]
+    fn hashing_test() {
+        pretty_env_logger::init();
+        let h1: SaitoHash =
+            hex::decode("fa761296cdca6b5c0e587e8bdc75f86223072780533a8edeb90fa51aea597128")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let h2: SaitoHash =
+            hex::decode("8f1717d0f4a244f805436633897d48952c30cb35b3941e5d36cb371c68289d25")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let mut h3: Vec<u8> = vec![];
+        h3.extend(&h1);
+        h3.extend(&h2);
+
+        let hash = hash(&h3);
+        assert_eq!(
+            hex::encode(hash),
+            "de0cdde5db8fd4489f2038aca5224c18983f6676aebcb2561f5089e12ea2eedf"
+        );
     }
 }
