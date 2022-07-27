@@ -1,5 +1,4 @@
 use crate::common::defs::SaitoHash;
-use crate::core::data;
 
 #[derive(Debug)]
 pub enum NetworkEvent {

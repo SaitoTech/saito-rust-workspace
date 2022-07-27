@@ -1,4 +1,5 @@
 use crate::saito::rust_io_handler::RustIOHandler;
+use log::warn;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
@@ -70,7 +71,7 @@ impl BlockFetchingTask {
                 );
             }
             Err(_error) => {
-                todo!("handle block fetch error")
+                warn!("failed to fetch block from {:?}", self.url);
             }
         }
     }

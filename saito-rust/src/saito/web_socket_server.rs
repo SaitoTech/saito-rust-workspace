@@ -1,7 +1,7 @@
 use crate::saito::block_fetching_task::BlockFetchingTaskRunner;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;
 use saito_core::core::data::block::BlockType;
@@ -153,20 +153,22 @@ impl WebSocketServer {
 
             loop {
                 if let Some(input) = receiver.next().await {
+                    let mut peer = peer.write().await;
                     match input {
                         Ok(web_socket_message) => {
                             if web_socket_message.is_binary() {
                                 if peer
-                                    .write()
-                                    .await
                                     .process_incoming_data(web_socket_message.into_bytes())
                                     .await
                                     .is_err()
                                 {
+                                    peer.reset();
                                     break;
                                 }
                             } else {
                                 error!("Input is not binary {:?}", peer_index);
+                                peer.reset();
+                                break;
                             }
                         }
                         Err(error) => {
@@ -174,10 +176,9 @@ impl WebSocketServer {
                                 "failed receiving message from client, {:?} : {:?}",
                                 peer_index, error
                             );
-                            peer.read()
-                                .await
-                                .send_event(NetworkEvent::PeerDisconnected { peer_index })
+                            peer.send_event(NetworkEvent::PeerDisconnected { peer_index })
                                 .await;
+                            peer.reset();
                             break;
                         }
                     }
@@ -199,11 +200,25 @@ impl WebSocketServer {
                             peer_index: _,
                             buffer,
                         } => {
-                            sender
-                                .send(warp::ws::Message::binary(buffer))
-                                .await
-                                .unwrap();
-                            sender.flush().await.unwrap();
+                            let result = sender.send(warp::ws::Message::binary(buffer)).await;
+
+                            if result.is_err() {
+                                warn!(
+                                    "Sending to websocket client failed {:?}",
+                                    result.err().unwrap()
+                                );
+                                break;
+                            }
+
+                            let result2 = sender.flush().await;
+
+                            if result2.is_err() {
+                                warn!(
+                                    "Flushing websocket client failed {:?}",
+                                    result2.err().unwrap()
+                                );
+                                break;
+                            }
                         }
                         NetworkEvent::BlockFetchRequest {
                             block_hash: _,

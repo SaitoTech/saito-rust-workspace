@@ -1,24 +1,15 @@
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{debug, info, trace};
+use log::{debug, trace};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::interface_io::InterfaceIO;
-use crate::core::data;
 use crate::core::data::block::Block;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::msg::block_request::BlockchainRequest;
-use crate::core::data::msg::handshake::{
-    HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
-};
 use crate::core::data::msg::message::Message;
-use crate::core::data::peer::{Peer, PeerConnection};
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::transaction::Transaction;
-use crate::core::data::wallet::Wallet;
 
 pub struct Network {
     io_interface: Box<dyn InterfaceIO + Send + Sync>,
@@ -54,7 +45,7 @@ impl Network {
                 }
             }
 
-            peer.send_buffer(buffer.clone());
+            peer.send_buffer(buffer.clone()).await;
         }
     }
 

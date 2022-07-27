@@ -157,19 +157,25 @@ impl WebSocketClients {
                         NetworkEvent::OutgoingNetworkMessage { peer_index, buffer } => {
                             let senders = &mut senders.lock().await;
                             if let Some(socket_sender) = senders.get_mut(&peer_index) {
-                                let mut message_sent = false;
-
-                                if socket_sender
+                                let result1 = socket_sender
                                     .send(tungstenite::Message::Binary(buffer))
-                                    .await
-                                    .is_ok()
-                                {
-                                    if socket_sender.flush().await.is_ok() {
-                                        message_sent = true;
-                                    }
-                                }
+                                    .await;
 
-                                if !message_sent {
+                                if result1.is_ok() {
+                                    let result2 = socket_sender.flush().await;
+
+                                    if result2.is_err() {
+                                        error!(
+                                            "Flushing server side websocket client failed {:?}",
+                                            result1.err().unwrap()
+                                        );
+                                        senders.remove(&peer_index);
+                                    }
+                                } else {
+                                    error!(
+                                        "Sending to server side websocket client failed {:?}",
+                                        result1.err().unwrap()
+                                    );
                                     senders.remove(&peer_index);
                                 }
                             }

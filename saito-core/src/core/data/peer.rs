@@ -1,25 +1,19 @@
 use std::io::{Error, ErrorKind};
-use std::sync::Arc;
 
-use log::{debug, error, warn};
-use tokio::sync::RwLock;
+use log::{debug, error, info, warn};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
-use crate::common::interface_io::InterfaceIO;
 use crate::core::data;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::configuration::{Configuration, PeerConfig};
+use crate::core::data::configuration::PeerConfig;
 use crate::core::data::context::Context;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
-use crate::core::data::mempool::Mempool;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::handshake::{
     HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
 };
 use crate::core::data::msg::message::Message;
 use crate::core::data::transaction::Transaction;
-use crate::core::data::wallet::Wallet;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 
@@ -126,7 +120,7 @@ impl Peer {
             }
             Message::ApplicationMessage(_) => Err(Error::from(ErrorKind::InvalidData)),
             Message::Block(_) => Err(Error::from(ErrorKind::InvalidData)),
-            Message::Transaction(mut transaction) => {
+            Message::Transaction(transaction) => {
                 debug!("received transaction");
                 self.handle_incoming_transaction(transaction).await
             }
@@ -239,7 +233,11 @@ impl Peer {
             signature: sign(&response.challenge, private_key),
         };
 
-        debug!("handshake completion sent for peer: {:?}", self.peer_index);
+        info!(
+            "handshake completion sent for peer: {:?}, {:?}",
+            self.peer_index,
+            hex::encode(self.peer_public_key)
+        );
         self.send_buffer(Message::HandshakeCompletion(response).serialize())
             .await;
 
@@ -265,6 +263,12 @@ impl Peer {
             warn!("handshake failed. signature is not valid");
             todo!()
         }
+        info!(
+            "handshake completion received by peer: {:?}, {:?}",
+            self.peer_index,
+            hex::encode(self.peer_public_key)
+        );
+
         self.challenge_for_peer = None;
         self.handshake_done = true;
         return self.request_blockchain().await;

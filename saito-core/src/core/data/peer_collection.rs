@@ -5,12 +5,9 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::{Mutex, RwLock};
 
 use crate::common::defs::SaitoPublicKey;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::configuration::{Configuration, PeerConfig};
+use crate::core::data::configuration::PeerConfig;
 use crate::core::data::context::Context;
-use crate::core::data::mempool::Mempool;
 use crate::core::data::peer::Peer;
-use crate::core::data::wallet::Wallet;
 
 //#[derive(Debug)]
 pub struct PeerCollection {

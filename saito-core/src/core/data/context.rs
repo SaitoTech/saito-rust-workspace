@@ -7,7 +7,6 @@ use crate::common::run_task::RunTask;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::mempool::Mempool;
-use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::wallet::Wallet;
 
 #[derive(Clone)]
