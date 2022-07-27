@@ -1,7 +1,7 @@
 //
 // our target blocktime
 //
-pub const HEARTBEAT: u64 = 10_000;
+pub const HEARTBEAT: u64 = 5_000;
 
 //
 // Burn Fee
@@ -88,9 +88,10 @@ impl BurnFee {
 
         let burn_fee_previous_block_as_float: f64 = burn_fee_previous_block as f64 / 100_000_000.0;
 
-        let res1: f64 = burn_fee_previous_block_as_float
-            * (HEARTBEAT as f64 / timestamp_difference as f64).sqrt();
-        let new_burnfee: u64 = (res1 * 100_000_000.0).round() as u64;
+        let res0 = HEARTBEAT as f64 / timestamp_difference as f64;
+        let res1 = res0.sqrt();
+        let res2: f64 = burn_fee_previous_block_as_float * res1;
+        let new_burnfee: u64 = (res2 * 100_000_000.0).round() as u64;
 
         new_burnfee
     }
@@ -137,5 +138,18 @@ mod tests {
             new_start_burnfee,
             (100_000_000.0 * (10 as f64).sqrt()).round() as u64
         );
+    }
+    #[test]
+    fn burnfee_slr_match() {
+        let burn_fee_previous_block: u64 = 50000000;
+        let current_block_timestamp: u64 = 1658821423410;
+        let previous_block_timestamp: u64 = 1658821412997;
+
+        let burnfee = BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
+            burn_fee_previous_block,
+            current_block_timestamp,
+            previous_block_timestamp,
+        );
+        assert_eq!(burnfee, 34647115);
     }
 }
