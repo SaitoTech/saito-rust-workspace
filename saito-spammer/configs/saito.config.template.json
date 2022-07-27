@@ -16,5 +16,10 @@
       "protocol": "http",
       "synctype": "full"
     }
-  ]
+  ],
+  "spammer": {
+    "timer_in_milli": 100,
+    "burst_count": 1,
+    "bytes_per_tx": 1000
+  }
 }

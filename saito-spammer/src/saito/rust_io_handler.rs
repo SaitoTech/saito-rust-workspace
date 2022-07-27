@@ -1,11 +1,10 @@
 use std::fs;
 use std::io::Error;
 use std::path::Path;
-use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, warn};
+use log::debug;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
@@ -16,12 +15,9 @@ use saito_core::common::interface_io::InterfaceIO;
 
 use saito_core::core::data::configuration::PeerConfig;
 
-use crate::saito::io_context::IoContext;
-
 use crate::IoEvent;
 
 lazy_static! {
-    pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
     pub static ref BLOCKS_DIR_PATH: String = configure_storage();
 }
 pub fn configure_storage() -> String {
@@ -30,11 +26,6 @@ pub fn configure_storage() -> String {
     } else {
         String::from("./data/blocks/")
     }
-}
-
-pub enum FutureState {
-    DataSent(Vec<u8>),
-    PeerConnectionResult(Result<u64, Error>),
 }
 
 #[derive(Clone, Debug)]
@@ -46,28 +37,6 @@ pub struct RustIOHandler {
 impl RustIOHandler {
     pub fn new(sender: Sender<IoEvent>, handler_id: u8) -> RustIOHandler {
         RustIOHandler { sender, handler_id }
-    }
-
-    // TODO : delete this if not required
-    pub fn set_event_response(event_id: u64, response: FutureState) {
-        // debug!("setting event response for : {:?}", event_id,);
-        if event_id == 0 {
-            return;
-        }
-        let waker;
-        {
-            let mut context = SHARED_CONTEXT.lock().unwrap();
-            context.future_states.insert(event_id, response);
-            waker = context.future_wakers.remove(&event_id);
-        }
-        if waker.is_some() {
-            // debug!("waking future on event: {:?}", event_id,);
-            let waker = waker.unwrap();
-            waker.wake();
-            // debug!("waker invoked on event: {:?}", event_id);
-        } else {
-            warn!("waker not found for event: {:?}", event_id);
-        }
     }
 }
 
