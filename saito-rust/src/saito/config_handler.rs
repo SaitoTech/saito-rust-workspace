@@ -10,11 +10,7 @@ pub struct ConfigHandler {}
 
 impl ConfigHandler {
     pub fn load_configs(config_file_path: String) -> Result<Configuration, Error> {
-        debug!(
-            "loading configurations from path : {:?} current_dir = {:?}",
-            config_file_path,
-            std::env::current_dir()
-        );
+        debug!("loading configurations from path : {:?}", config_file_path);
         // TODO : add prompt with user friendly format
         let configs = Figment::new()
             .merge(Json::file(config_file_path))
@@ -31,12 +27,12 @@ impl ConfigHandler {
 
 #[cfg(test)]
 mod test {
-    use crate::ConfigHandler;
+    use crate::saito::config_handler::ConfigHandler;
     use std::io::ErrorKind;
 
     #[test]
     fn load_config_from_existing_file() {
-        let path = String::from("saito-rust/src/test/data/config_handler_tests.json");
+        let path = String::from("saito-rust/src/test/test_data/config_handler_tests.json");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_ok());
         let configs = result.unwrap();
@@ -50,7 +46,8 @@ mod test {
 
     #[test]
     fn load_config_from_bad_file_format() {
-        let path = String::from("saito-rust/src/test/data/config_handler_tests_bad_format.xml");
+        let path =
+            String::from("saito-rust/src/test/test_data/config_handler_tests_bad_format.xml");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_err());
         assert_eq!(result.err().unwrap().kind(), ErrorKind::InvalidInput);

@@ -141,12 +141,12 @@ impl BlockPayout {
 ///
 /// BlockType is a human-readable indicator of the state of the block
 /// with particular attention to its state of pruning and the amount of
-/// data that is available. It is used by some functions to fetch blocks
-/// that require certain types of data, such as the full set of transactions
+/// test_data that is available. It is used by some functions to fetch blocks
+/// that require certain types of test_data, such as the full set of transactions
 /// or the UTXOSet
 ///
 /// Hash - a ghost block sent to lite-clients primarily for SPV mode
-/// Header - the header of the block without transaction data
+/// Header - the header of the block without transaction test_data
 /// Full - the full block including transactions and signatures
 ///
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone)]
@@ -662,9 +662,9 @@ impl Block {
     }
 
     //
-    // generate ancillary data
+    // generate ancillary test_data
     //
-    // this function generates all of the ancillary data needed to process or
+    // this function generates all of the ancillary test_data needed to process or
     // validate blocks. this includes the various hashes and other dynamic
     // values that are not provided on the creation of the block object itself
     // but must be calculated from information such as the set of transactions
@@ -1099,7 +1099,7 @@ impl Block {
             }
 
             //
-            // now create fee transaction using the block payout data
+            // now create fee transaction using the block payout test_data
             //
             let mut slip_index = 0;
             let mut transaction = Transaction::new();
@@ -1191,7 +1191,7 @@ impl Block {
     //
     pub fn sign(&mut self, private_key: SaitoPrivateKey) {
         //
-        // we set final data
+        // we set final test_data
         //
         self.signature = sign(&self.pre_hash, private_key);
     }
@@ -1248,7 +1248,7 @@ impl Block {
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
 
-        // block headers do not get tx data
+        // block headers do not get tx test_data
         if block_type == BlockType::Header {
             vbytes.extend(&(0 as u32).to_be_bytes());
         } else {
@@ -1272,7 +1272,7 @@ impl Block {
 
         let mut serialized_txs = vec![];
 
-        // block headers do not get tx data
+        // block headers do not get tx test_data
         if block_type != BlockType::Header {
             self.transactions.iter().for_each(|transaction| {
                 serialized_txs.extend(transaction.serialize_for_net());
@@ -1305,7 +1305,7 @@ impl Block {
 
     //
     // if the block is not at the proper type, try to upgrade it to have the
-    // data that is necessary for blocks of that type if possible. if this is
+    // test_data that is necessary for blocks of that type if possible. if this is
     // not possible, return false. if it is possible, return true once upgraded.
     //
     pub async fn upgrade_block_to_block_type(
@@ -1380,12 +1380,12 @@ impl Block {
         //
         // Consensus Values
         //
-        // consensus data refers to the info in the proposed block that depends
+        // consensus test_data refers to the info in the proposed block that depends
         // on its relationship to other blocks in the chain -- things like the burn
         // fee, the ATR transactions, the golden ticket solution and more.
         //
         // the first step in validating our block is asking our software to calculate
-        // what it thinks this data should be. this same function should have been
+        // what it thinks this test_data should be. this same function should have been
         // used by the block creator to create this block, so consensus rules allow us
         // to validate it by checking the variables we can see in our block with what
         // they should be given this function.
@@ -1535,7 +1535,7 @@ impl Block {
         //
         // Automatic Transaction Rebroadcasts are removed programmatically from
         // an earlier block in the blockchain and rebroadcast into the latest
-        // block, with a fee being deducted to keep the data on-chain. In order
+        // block, with a fee being deducted to keep the test_data on-chain. In order
         // to validate ATR we need to make sure we have the correct number of
         // transactions (and ONLY those transactions!) included in our block.
         //
@@ -1564,7 +1564,7 @@ impl Block {
             return false;
         }
 
-        // trace!(" ... block.validate: (cv-data)   {:?}", create_timestamp());
+        // trace!(" ... block.validate: (cv-test_data)   {:?}", create_timestamp());
 
         //
         // validate fee transactions
@@ -1585,7 +1585,7 @@ impl Block {
 
             //
             // the fee transaction we receive from the CV needs to be updated with
-            // block-specific data in the same way that all of the transactions in
+            // block-specific test_data in the same way that all of the transactions in
             // the block have been. we must do this prior to comparing them.
             //
             fee_transaction.generate(self.creator);

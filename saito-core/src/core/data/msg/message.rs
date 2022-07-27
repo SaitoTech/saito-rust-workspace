@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{info, warn};
+use log::{debug, warn};
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};
@@ -42,7 +42,7 @@ impl Message {
         let message_type = buffer[0];
         let buffer = buffer[1..].to_vec();
 
-        info!("buffer size = {:?}", buffer.len());
+        debug!("deserialize message : buffer size = {:?}", buffer.len());
 
         // TODO : remove hardcoded values into an enum
         match message_type {
@@ -65,7 +65,8 @@ impl Message {
                 todo!()
             }
             6 => {
-                todo!()
+                let tx = Transaction::deserialize_from_net(buffer);
+                return Ok(Message::Transaction(tx));
             }
             7 => {
                 let result = BlockchainRequest::deserialize(&buffer)?;

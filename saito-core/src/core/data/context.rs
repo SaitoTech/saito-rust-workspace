@@ -18,16 +18,16 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(configs: Arc<RwLock<Configuration>>) -> Context {
+    pub fn new(configuration: Arc<RwLock<Configuration>>) -> Context {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let blockchain = Arc::new(RwLock::new(Blockchain::new(wallet.clone())));
+        let mempool = Arc::new(RwLock::new(Mempool::new(wallet.clone())));
+
         Context {
-            blockchain: Arc::new(RwLock::new(Blockchain::new(
-                wallet.clone(),
-                // global_sender.clone(),
-            ))),
-            mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
-            wallet: wallet.clone(),
-            configuration: configs,
+            blockchain,
+            mempool,
+            wallet,
+            configuration,
         }
     }
     pub async fn init(&self, _task_runner: &dyn RunTask) -> Result<(), Error> {

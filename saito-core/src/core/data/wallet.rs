@@ -59,7 +59,7 @@ impl Wallet {
     }
 
     pub async fn load(&mut self, storage: &mut Storage) {
-        let mut filename = String::from("data/wallets/");
+        let mut filename = String::from("test_data/wallets/");
         filename.push_str(&self.filename);
 
         if storage.file_exists(&filename).await {
@@ -87,7 +87,7 @@ impl Wallet {
     }
 
     pub async fn save(&mut self, storage: &mut Storage) {
-        let mut filename = String::from("data/wallets/");
+        let mut filename = String::from("test_data/wallets/");
         filename.push_str(&self.filename);
 
         let password = self.filepass.clone();

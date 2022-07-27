@@ -8,6 +8,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
+use crate::common::defs::SaitoPublicKey;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::Block;
@@ -26,6 +27,7 @@ use crate::core::routing_event_processor::RoutingEvent;
 pub enum ConsensusEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
     BlockFetched { peer_index: u64, buffer: Vec<u8> },
+    NewTransaction { transaction: Transaction },
 }
 
 /// Manages blockchain and the mempool
@@ -244,6 +246,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                         self.sender_to_miner.clone(),
                     )
                     .await;
+            }
+            ConsensusEvent::NewTransaction { mut transaction } => {
+                transaction.generate_hash_for_signature();
+                trace!("waiting for the mempool write lock");
+                let mut mempool = self.mempool.write().await;
+                trace!(
+                    "acquired the mempool write lock, adding new transaction : {:?}",
+                    hex::encode(transaction.hash_for_signature.unwrap())
+                );
+                mempool.add_transaction(transaction).await;
             }
         }
         None

@@ -14,17 +14,17 @@ pub struct Storage {
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
 
-pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
-pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
-pub const DEFAULT_FILE_PATH: &'static str = "./data/issuance/default";
+pub const ISSUANCE_FILE_PATH: &'static str = "./test_data/issuance/issuance";
+pub const EARLYBIRDS_FILE_PATH: &'static str = "./test_data/issuance/earlybirds";
+pub const DEFAULT_FILE_PATH: &'static str = "./test_data/issuance/default";
 
 pub struct StorageConfigurer {}
 
 pub fn configure_storage() -> String {
     if cfg!(test) {
-        String::from("./data/test/blocks/")
+        String::from("./test_data/test/blocks/")
     } else {
-        String::from("./data/blocks/")
+        String::from("./test_data/blocks/")
     }
 }
 
@@ -262,8 +262,8 @@ mod test {
             "current dir = {:?}",
             std::env::current_dir().unwrap().to_str().unwrap()
         );
-        let filename =std::env::current_dir().unwrap().to_str().unwrap().to_string()+
-            "/data/blocks/1658377242777-ef4593a4ee39a25d04940be0835d2ab81c8e13745745b580debb9ab90c6d1ce7.sai";
+        let filename = std::env::current_dir().unwrap().to_str().unwrap().to_string() +
+            "/test_data/blocks/1658377242777-ef4593a4ee39a25d04940be0835d2ab81c8e13745745b580debb9ab90c6d1ce7.sai";
         let retrieved_block = t.storage.load_block_from_disk(filename).await;
         let mut block = retrieved_block.unwrap();
         block.generate();
