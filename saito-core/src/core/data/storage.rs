@@ -259,7 +259,7 @@ mod test {
     #[ignore]
     #[tokio::test]
     async fn block_load_test_slr() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
 
         let t = TestManager::new();
 
@@ -319,7 +319,7 @@ mod test {
 
     #[test]
     fn hashing_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         let h1: SaitoHash =
             hex::decode("fa761296cdca6b5c0e587e8bdc75f86223072780533a8edeb90fa51aea597128")
                 .unwrap()

@@ -13,7 +13,7 @@ use crate::common::defs::{
 };
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
 use crate::core::data::burnfee::BurnFee;
-use crate::core::data::crypto::{hash, sign, verify};
+use crate::core::data::crypto::{hash, sign, verify, verify_hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
 use crate::core::data::merkle::MerkleTree;
@@ -1193,7 +1193,7 @@ impl Block {
         //
         // we set final data
         //
-        self.signature = sign(&self.pre_hash, private_key);
+        self.signature = sign(&self.serialize_for_signature(), private_key);
     }
 
     // serialize the pre_hash and the signature_for_source into a
@@ -1370,11 +1370,10 @@ impl Block {
         // );
 
         // verify signed by creator
-        if !verify(
-            &self.serialize_for_signature(),
-            self.signature,
-            self.creator,
-        ) {
+        info!("prehash2 = {:?}", hex::encode(self.pre_hash));
+        info!("signature2 = {:?}", hex::encode(self.signature));
+        info!("creator2 = {:?}", hex::encode(self.creator));
+        if !verify_hash(&self.pre_hash, self.signature, self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
@@ -1464,8 +1463,8 @@ impl Block {
                 );
             if new_burnfee != self.burnfee {
                 error!(
-                    "ERROR: burn fee does not validate, expected: {}",
-                    new_burnfee
+                    "ERROR: burn fee does not validate,current = {}, expected: {}",
+                    self.burnfee, new_burnfee
                 );
                 return false;
             }
@@ -1676,7 +1675,7 @@ mod tests {
 
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::crypto::verify;
+    use crate::core::data::crypto::{verify, verify_hash};
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -1771,10 +1770,10 @@ mod tests {
         assert_eq!(
             block.signature,
             [
-                79, 111, 17, 122, 189, 142, 78, 252, 111, 231, 122, 86, 129, 151, 99, 71, 245, 34,
-                33, 254, 104, 138, 238, 136, 230, 45, 113, 171, 146, 105, 138, 64, 43, 25, 204,
-                186, 169, 208, 222, 5, 89, 64, 83, 32, 102, 18, 114, 20, 171, 0, 97, 232, 158, 108,
-                185, 37, 225, 233, 33, 97, 222, 132, 218, 120
+                181, 196, 195, 189, 82, 225, 56, 124, 169, 36, 245, 199, 95, 50, 182, 135, 95, 153,
+                228, 2, 162, 21, 248, 254, 42, 1, 106, 1, 25, 208, 145, 191, 21, 187, 69, 52, 225,
+                214, 86, 94, 116, 168, 14, 58, 70, 186, 16, 164, 215, 211, 153, 107, 226, 236, 231,
+                190, 0, 62, 12, 122, 68, 24, 2, 109
             ]
         )
     }
@@ -1862,7 +1861,7 @@ mod tests {
 
         assert_eq!(block.creator, wallet.public_key);
         assert_eq!(
-            verify(&block.pre_hash, block.signature, block.creator,),
+            verify_hash(&block.pre_hash, block.signature, block.creator,),
             true
         );
         assert_ne!(block.hash, [0; 32]);
