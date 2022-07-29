@@ -130,27 +130,30 @@ impl Blockchain {
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(earliest_block_id);
             trace!("earliest_block_hash {:?}", earliest_block_hash);
-            let earliest_block = self.get_mut_block(&earliest_block_hash).await;
 
-            // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
-            if block.timestamp > earliest_block.timestamp {
-                if self.get_block(&block.previous_block_hash).await.is_none() {
-                    if block.id > earliest_block_id {
-                        if block.source_connection_id.is_some() {
-                            let block_hash = block.previous_block_hash;
+            if earliest_block_hash != [0u8; 32] {
+                let earliest_block = self.get_mut_block(&earliest_block_hash).await;
 
-                            let result = network
-                                .fetch_missing_block(
-                                    block_hash,
-                                    block.source_connection_id.as_ref().unwrap(),
-                                )
-                                .await;
-                            if result.is_err() {
-                                warn!(
-                                    "couldn't fetch block : {:?}",
-                                    hex::encode(block.previous_block_hash)
-                                );
-                                todo!()
+                // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
+                if block.timestamp > earliest_block.timestamp {
+                    if self.get_block(&block.previous_block_hash).await.is_none() {
+                        if block.id > earliest_block_id {
+                            if block.source_connection_id.is_some() {
+                                let block_hash = block.previous_block_hash;
+
+                                let result = network
+                                    .fetch_missing_block(
+                                        block_hash,
+                                        block.source_connection_id.as_ref().unwrap(),
+                                    )
+                                    .await;
+                                if result.is_err() {
+                                    warn!(
+                                        "couldn't fetch block : {:?}",
+                                        hex::encode(block.previous_block_hash)
+                                    );
+                                    todo!()
+                                }
                             }
                         }
                     }

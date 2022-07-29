@@ -1515,6 +1515,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "saito-spammer"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "async-trait",
+ "ctor",
+ "figment",
+ "futures",
+ "hex",
+ "lazy_static",
+ "log",
+ "pretty_env_logger",
+ "rand 0.8.5",
+ "rayon",
+ "reqwest",
+ "saito-core",
+ "serial_test",
+ "tokio",
+ "tokio-tungstenite 0.17.1",
+ "tracing",
+ "tracing-subscriber",
+ "tungstenite 0.17.2",
+ "warp",
+]
+
+[[package]]
 name = "saito-wasm"
 version = "0.1.0"
 dependencies = [

@@ -24,9 +24,17 @@ pub struct Server {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct Spammer {
+    pub timer_in_milli: u64,
+    pub burst_count: u32,
+    pub bytes_per_tx: u32,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct Configuration {
     pub server: Server,
     pub peers: Vec<PeerConfig>,
+    pub spammer: Spammer,
 }
 
 impl Configuration {
@@ -43,6 +51,11 @@ impl Configuration {
                 },
             },
             peers: vec![],
+            spammer: Spammer {
+                timer_in_milli: 0,
+                burst_count: 0,
+                bytes_per_tx: 0,
+            },
         }
     }
     pub fn get_block_fetch_url(&self) -> String {

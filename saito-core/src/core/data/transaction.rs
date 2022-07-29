@@ -38,7 +38,7 @@ pub struct Transaction {
     pub inputs: Vec<Slip>,
     pub outputs: Vec<Slip>,
     // #[serde(with = "serde_bytes")] TODO : check this for performance
-    pub(crate) message: Vec<u8>,
+    pub message: Vec<u8>,
     pub(crate) transaction_type: TransactionType,
     pub(crate) replaces_txs: u32,
     #[serde_as(as = "[_; 64]")]

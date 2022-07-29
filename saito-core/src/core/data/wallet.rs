@@ -49,6 +49,7 @@ pub struct Wallet {
 impl Wallet {
     pub fn new() -> Wallet {
         let (public_key, private_key) = generate_keys();
+
         Wallet {
             public_key,
             private_key,

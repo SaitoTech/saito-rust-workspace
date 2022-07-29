@@ -8,6 +8,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
+use crate::common::defs::SaitoPublicKey;
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::Block;
@@ -26,6 +27,7 @@ use crate::core::routing_event_processor::RoutingEvent;
 pub enum ConsensusEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
     BlockFetched { peer_index: u64, buffer: Vec<u8> },
+    NewTransaction { transaction: Transaction },
 }
 
 /// Manages blockchain and the mempool
@@ -93,10 +95,22 @@ impl ConsensusEventProcessor {
 
         latest_block_id = blockchain.get_latest_block_id();
 
+        let spammer_public_key: SaitoPublicKey =
+            hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
+                .unwrap()
+                .try_into()
+                .unwrap();
+
         {
             if latest_block_id == 0 {
                 let mut vip_transaction =
                     Transaction::create_vip_transaction(public_key, 50_000_000);
+                vip_transaction.sign(private_key);
+
+                mempool.add_transaction(vip_transaction).await;
+
+                let mut vip_transaction =
+                    Transaction::create_vip_transaction(spammer_public_key, 50_000_000);
                 vip_transaction.sign(private_key);
 
                 mempool.add_transaction(vip_transaction).await;
@@ -244,6 +258,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                         self.sender_to_miner.clone(),
                     )
                     .await;
+            }
+            ConsensusEvent::NewTransaction { mut transaction } => {
+                transaction.generate_hash_for_signature();
+                trace!("waiting for the mempool write lock");
+                let mut mempool = self.mempool.write().await;
+                trace!(
+                    "acquired the mempool write lock, adding new transaction : {:?}",
+                    hex::encode(transaction.hash_for_signature.unwrap())
+                );
+                mempool.add_transaction(transaction).await;
             }
         }
         None
