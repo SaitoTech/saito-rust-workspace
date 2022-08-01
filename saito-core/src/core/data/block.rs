@@ -1,8 +1,8 @@
 use std::convert::TryInto;
+use std::ops::Rem;
 use std::{mem, sync::Arc};
 
 use ahash::AHashMap;
-use bigint::uint::U256;
 use log::{debug, error, info, trace};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -608,7 +608,7 @@ impl Block {
         //
         // find winning nolan
         //
-        let x = U256::from_big_endian(&random_number);
+        let x = primitive_types::U256::from_big_endian(&random_number);
         //
         // fee calculation should be the same used in block when
         // generating the fee transaction.
@@ -623,8 +623,8 @@ impl Block {
             return winner_pubkey;
         }
 
-        let z = U256::from_big_endian(&y.to_be_bytes());
-        let (zy, _bolres) = x.overflowing_rem(z);
+        let z = primitive_types::U256::from_big_endian(&y.to_be_bytes());
+        let zy = x.rem(z);
         let winning_nolan = zy.low_u64();
         // we may need function-timelock object if we need to recreate
         // an ATR transaction to pick the winning routing node.
@@ -962,7 +962,7 @@ impl Block {
             }
 
             let difficulty = previous_block.difficulty;
-            if !previous_block.has_golden_ticket && cv.gt_num == 0 {
+            if previous_block.has_golden_ticket && cv.gt_num == 0 {
                 if difficulty > 0 {
                     cv.expected_difficulty = previous_block.difficulty - 1;
                 }
@@ -1370,9 +1370,6 @@ impl Block {
         // );
 
         // verify signed by creator
-        info!("prehash2 = {:?}", hex::encode(self.pre_hash));
-        info!("signature2 = {:?}", hex::encode(self.signature));
-        info!("creator2 = {:?}", hex::encode(self.creator));
         if !verify_hash(&self.pre_hash, self.signature, self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
@@ -1521,7 +1518,15 @@ impl Block {
                 );
                 if !gt.validate(previous_block.difficulty) {
                     error!(
-                        "ERROR: Golden Ticket solution does not validate against previous block hash and difficulty"
+                        "ERROR: Golden Ticket solution does not validate against previous block hash : {:?}, difficulty : {:?}, random : {:?}, key : {:?}", 
+                        hex::encode(previous_block.hash),
+                        previous_block.difficulty,
+                        hex::encode(gt.random),
+                        hex::encode(gt.public_key)
+                    );
+                    error!(
+                        "solution : {:?}",
+                        hex::encode(hash(&gt.serialize_for_net()))
                     );
                     return false;
                 }

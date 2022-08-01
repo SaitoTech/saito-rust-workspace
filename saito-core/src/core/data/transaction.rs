@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use bigint::U256;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use primitive_types::U256;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -638,7 +638,7 @@ impl Transaction {
         //
         let x = U256::from_big_endian(&random_hash);
         let z = U256::from_big_endian(&aggregate_routing_work.to_be_bytes());
-        let (zy, _bolres) = x.overflowing_rem(z);
+        let zy = x.div_mod(z).1;
         let winning_routing_work_in_nolan = zy.low_u64();
 
         for i in 0..work_by_hop.len() {
@@ -933,7 +933,7 @@ impl Transaction {
             vbytes.extend(&self.path[i].to);
 
             // check sig is valid
-            if !verify(&hash(&vbytes), self.path[i].sig, self.path[i].from) {
+            if !verify(&vbytes, self.path[i].sig, self.path[i].from) {
                 return false;
             }
 

@@ -93,7 +93,11 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
         debug!("event received : {:?}", event);
         match event {
             MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
-                trace!("Setting miner hash and difficulty");
+                debug!(
+                    "Setting miner hash : {:?} and difficulty : {:?}",
+                    hex::encode(hash),
+                    difficulty
+                );
                 self.difficulty = difficulty;
                 self.target = hash;
                 self.new_miner_event_received = true;
