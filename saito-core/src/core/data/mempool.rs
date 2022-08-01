@@ -7,6 +7,7 @@ use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
+use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
@@ -66,7 +67,10 @@ impl Mempool {
         }
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
-        debug!("adding golden ticket");
+        debug!(
+            "adding golden ticket : {:?}",
+            hash(&golden_ticket.serialize_for_net())
+        );
         let transaction;
         {
             trace!("waiting for the wallet write lock");

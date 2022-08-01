@@ -54,8 +54,9 @@ impl MiningEventProcessor {
         let gt = GoldenTicket::create(self.target, random_bytes, public_key);
         if gt.validate(self.difficulty) {
             debug!(
-                "golden ticket found. sending to mempool : {:?}",
-                hex::encode(gt.target)
+                "golden ticket found. sending to mempool. previous block : {:?} solution : {:?}",
+                hex::encode(gt.target),
+                hex::encode(hash(&gt.serialize_for_net()))
             );
             self.sender_to_mempool
                 .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
