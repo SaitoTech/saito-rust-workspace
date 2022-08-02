@@ -1524,9 +1524,13 @@ impl Block {
                         hex::encode(gt.random),
                         hex::encode(gt.public_key)
                     );
+                    let solution = hash(&gt.serialize_for_net());
+                    let solution_num = primitive_types::U256::from_big_endian(&solution);
+
                     error!(
-                        "solution : {:?}",
-                        hex::encode(hash(&gt.serialize_for_net()))
+                        "solution : {:?} leading zeros : {:?}",
+                        hex::encode(solution),
+                        solution_num.leading_zeros()
                     );
                     return false;
                 }
