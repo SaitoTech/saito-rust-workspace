@@ -116,9 +116,9 @@ impl ConsensusEventProcessor {
             transaction
                 .add_hop(wallet_lock_clone.clone(), public_key)
                 .await;
-            transaction
-                .add_hop(wallet_lock_clone.clone(), public_key)
-                .await;
+            // transaction
+            //     .add_hop(wallet_lock_clone.clone(), public_key)
+            //     .await;
             {
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)

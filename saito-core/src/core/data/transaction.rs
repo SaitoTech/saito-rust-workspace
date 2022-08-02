@@ -933,7 +933,7 @@ impl Transaction {
             vbytes.extend(&self.path[i].to);
 
             // check sig is valid
-            if !verify(&vbytes, self.path[i].sig, self.path[i].from) {
+            if !verify(&hash(&vbytes), self.path[i].sig, self.path[i].from) {
                 return false;
             }
 

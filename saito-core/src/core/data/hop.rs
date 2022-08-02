@@ -80,7 +80,7 @@ impl Hop {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::data::crypto::generate_keys;
+    use crate::core::data::crypto::{generate_keys, verify};
     use crate::core::data::hop::Hop;
 
     use super::*;
@@ -115,15 +115,26 @@ mod tests {
     #[tokio::test]
     async fn serialize_and_deserialize_test() {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
-        let tx = Transaction::new();
+        let mut tx = Transaction::new();
+        {
+            let w = wallet.read().await;
+            tx.sign(w.private_key);
+        }
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let hop = Hop::generate(wallet, receiver_public_key, &tx).await;
+        let hop = Hop::generate(wallet.clone(), receiver_public_key, &tx).await;
 
         let hop2 = Hop::deserialize_from_net(hop.serialize_for_net());
 
         assert_eq!(hop.from, hop2.from);
         assert_eq!(hop.to, hop2.to);
         assert_eq!(hop.sig, hop2.sig);
+
+        let mut buffer = vec![];
+        buffer.extend(tx.signature.to_vec());
+        buffer.extend(hop.to.to_vec());
+        let hash = hash(&buffer);
+        let result = verify(&hash, hop.sig, hop.from);
+        assert!(result);
     }
 }
