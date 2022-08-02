@@ -39,7 +39,7 @@ pub mod test {
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
 
-    use crate::core::data::crypto::{generate_random_bytes, hash};
+    use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify_hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
@@ -167,11 +167,7 @@ pub mod test {
             let mut utxoset: UtxoSet = AHashMap::new();
             let latest_block_id = blockchain.get_latest_block_id();
 
-            info!("----");
-            info!("----");
             info!("---- check utxoset ");
-            info!("----");
-            info!("----");
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
@@ -524,16 +520,14 @@ pub mod test {
                 block.add_transaction(tx);
             }
 
-            //
             // we have added VIP, so need to regenerate the merkle-root
-            //
             block.merkle_root = block.generate_merkle_root();
             block.generate();
             block.sign(private_key);
 
-            //
+            assert!(verify_hash(&block.pre_hash, block.signature, block.creator));
+
             // and add first block to blockchain
-            //
             self.add_block(block).await;
         }
 

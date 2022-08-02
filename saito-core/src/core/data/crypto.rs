@@ -93,14 +93,20 @@ pub fn hash(data: &Vec<u8>) -> SaitoHash {
 }
 
 pub fn sign(message_bytes: &[u8], private_key: SaitoPrivateKey) -> SaitoSignature {
-    let msg = Message::from_slice(message_bytes).unwrap();
+    let hash = hash(&message_bytes.to_vec());
+    let msg = Message::from_slice(&hash).unwrap();
     let secret = SecretKey::from_slice(&private_key).unwrap();
     let sig = SECP256K1.sign(&msg, &secret);
     sig.serialize_compact()
 }
 
 pub fn verify(msg: &[u8], sig: SaitoSignature, public_key: SaitoPublicKey) -> bool {
-    let m = Message::from_slice(msg);
+    let hash = hash(&msg.to_vec());
+    verify_hash(&hash, sig, public_key)
+}
+
+pub fn verify_hash(hash: &SaitoHash, sig: SaitoSignature, public_key: SaitoPublicKey) -> bool {
+    let m = Message::from_slice(hash);
     let p = PublicKey::from_slice(&public_key);
     let s = Signature::from_compact(&sig);
     if m.is_err() || p.is_err() || s.is_err() {
@@ -143,25 +149,32 @@ mod tests {
     #[test]
     fn sign_message_test() {
         let msg = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
-        let private_key: SaitoPrivateKey = <[u8; 32]>::from_hex(
-            "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
+            "5a16ffa08e5fc440772ee962c1d730041f12c7008a6e5c704d13dfd3d1906e0d",
         )
         .unwrap();
 
-        let result = sign(&msg, private_key);
-        assert_eq!(result.len(), 64);
+        let hex = hash(&msg.to_vec());
+
+        let hex_str = hex::encode(hex);
         assert_eq!(
-            result,
-            [
-                202, 118, 37, 146, 48, 117, 177, 10, 18, 74, 214, 201, 245, 79, 145, 68, 124, 181,
-                129, 43, 91, 128, 75, 189, 34, 121, 244, 108, 214, 106, 46, 155, 54, 226, 157, 1,
-                230, 58, 151, 82, 11, 177, 41, 250, 204, 74, 32, 21, 109, 128, 177, 114, 15, 171,
-                9, 150, 237, 116, 236, 2, 146, 210, 39, 69
-            ]
+            hex_str,
+            "f8b1f22222bdbd2e0bce06707a51f5fffa0753b11483c330e3bfddaf5bacabd6"
         );
+
+        let private_key: SaitoPrivateKey = <[u8; 32]>::from_hex(
+            "4a16ffa08e5fc440772ee962c1d730041f12c7008a6e5c704d13dfd3d1905e0d",
+        )
+        .unwrap();
+
+        let (public, _) = generate_keypair_from_private_key(&private_key);
+
+        let signature = sign(&msg, private_key);
+        assert_eq!(signature.len(), 64);
+        let hex_str = hex::encode(signature);
+        assert_eq!(hex_str, "11c0e19856726c42c8ac3ec8e469057f5f8a882f7206377525db00899835b03f6ec3010d19534a5703dd9b1004b4f0e31d19582cdd5aec794541d0d0f339db7c");
+
+        let result = verify(&msg, signature, public);
+        assert!(result);
     }
 
     #[test]

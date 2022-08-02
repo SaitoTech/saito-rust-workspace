@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use bigint::U256;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use primitive_types::U256;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet};
-use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify};
+use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify, verify_hash};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
@@ -18,16 +18,17 @@ pub const TRANSACTION_SIZE: usize = 93;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone, FromPrimitive)]
 pub enum TransactionType {
-    Normal,
+    Normal = 0,
     /// Paying for the network
-    Fee,
-    GoldenTicket,
-    ATR,
+    Fee = 1,
+    GoldenTicket = 2,
+    ATR = 3,
     /// VIP transactions won't pay an ATR fee. (Issued to early investors)
-    Vip,
+    Vip = 4,
+    SPV = 5,
     /// Issues funds for an address at the start of the network
-    Issuance,
-    SPV,
+    Issuance = 6,
+    Other = 7,
 }
 
 #[serde_with::serde_as]
@@ -637,7 +638,7 @@ impl Transaction {
         //
         let x = U256::from_big_endian(&random_hash);
         let z = U256::from_big_endian(&aggregate_routing_work.to_be_bytes());
-        let (zy, _bolres) = x.overflowing_rem(z);
+        let zy = x.div_mod(z).1;
         let winning_routing_work_in_nolan = zy.low_u64();
 
         for i in 0..work_by_hop.len() {
@@ -732,6 +733,7 @@ impl Transaction {
         for output in &self.outputs {
             vbytes.extend(&output.serialize_output_for_signature());
         }
+        vbytes.extend(&(self.replaces_txs as u32).to_be_bytes());
         vbytes.extend(&(self.transaction_type as u32).to_be_bytes());
         vbytes.extend(&self.message);
 
@@ -748,7 +750,7 @@ impl Transaction {
 
         let hash_for_signature = hash(&self.serialize_for_signature());
         self.hash_for_signature = Some(hash_for_signature);
-        self.signature = sign(&hash_for_signature, private_key);
+        self.signature = sign(&self.serialize_for_signature(), private_key);
     }
 
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
@@ -798,8 +800,13 @@ impl Transaction {
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
                 let public_key: SaitoPublicKey = self.inputs[0].public_key;
-                if !verify(hash_for_signature, sig, public_key) {
-                    error!("message verifies not");
+                if !verify_hash(hash_for_signature, sig, public_key) {
+                    error!(
+                        "tx verification failed : hash = {:?}, sig = {:?}, pub_key = {:?}",
+                        hex::encode(hash_for_signature),
+                        hex::encode(sig),
+                        hex::encode(public_key)
+                    );
                     return false;
                 }
             } else {
@@ -841,7 +848,7 @@ impl Transaction {
             {
                 warn!("{} in and {} out", self.total_in, self.total_out);
                 for z in self.outputs.iter() {
-                    info!("{:?} --- ", z.amount);
+                    // info!("{:?} --- ", z.amount);
                 }
                 error!("ERROR 672941: transaction spends more than it has available");
                 return false;
@@ -983,7 +990,7 @@ mod tests {
         let tx = Transaction::new();
         assert_eq!(
             tx.serialize_for_signature(),
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 125]
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123, 125]
         );
     }
 
@@ -1032,12 +1039,12 @@ mod tests {
                 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192,
                 176, 22, 31, 205, 139, 204, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35,
                 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192, 176,
-                22, 31, 205, 139, 0, 0, 0, 0, 0, 0, 0, 123, 10, 0, 0, 0, 1, 220, 246, 204, 235,
-                116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237,
-                191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 1, 89, 23, 0, 0, 0, 0, 0, 0, 0, 3, 123, 34, 116, 101, 115, 116, 34, 58, 34,
-                116, 101, 115, 116, 34, 125,
+                22, 31, 205, 139, 0, 0, 0, 0, 0, 0, 0, 123, 10, 1, 220, 246, 204, 235, 116, 113,
+                127, 152, 195, 247, 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204,
+                251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                89, 23, 0, 0, 0, 0, 0, 0, 0, 0, 3, 123, 34, 116, 101, 115, 116, 34, 58, 34, 116,
+                101, 115, 116, 34, 125,
             ]
         );
     }
@@ -1091,10 +1098,10 @@ mod tests {
         assert_eq!(
             tx.signature,
             [
-                209, 217, 122, 116, 63, 234, 152, 214, 162, 107, 132, 66, 7, 179, 237, 146, 138,
-                159, 205, 119, 94, 123, 207, 207, 130, 106, 48, 31, 101, 4, 62, 68, 122, 235, 103,
-                24, 158, 82, 178, 251, 91, 248, 236, 61, 188, 28, 219, 9, 15, 63, 5, 200, 4, 78,
-                193, 14, 84, 50, 203, 70, 102, 19, 205, 21
+                65, 65, 246, 190, 219, 59, 250, 1, 149, 70, 15, 80, 198, 147, 215, 93, 104, 16,
+                164, 178, 248, 157, 169, 150, 153, 139, 177, 235, 67, 243, 230, 162, 54, 175, 133,
+                119, 102, 55, 130, 226, 200, 244, 102, 202, 45, 200, 100, 73, 51, 172, 41, 238, 84,
+                212, 59, 118, 237, 248, 196, 212, 108, 54, 9, 29
             ]
         );
     }
@@ -1135,11 +1142,28 @@ mod tests {
 
     #[test]
     fn deserialize_test_against_slr() {
-        let buffer = hex::decode("000000010000000100000014000000005d32a088a3171ea59a8c813959688b4e86935b60699f03202402e1a815c2655558411b77a728c2b8e3ea71ef04a25ea3bb083b101281f5ab36fcd16d4c471cd60000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0003cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b0000000000000159000065794a305a584e30496a6f696447567a64434a39").unwrap();
+        let tx_buffer_txt = "00000001000000010000000300000000dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec0000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b00000000000001590000616263";
+        let buffer = hex::decode(tx_buffer_txt).unwrap();
 
-        let tx = Transaction::deserialize_from_net(buffer);
+        let mut tx = Transaction::deserialize_from_net(buffer);
 
         assert_eq!(tx.timestamp, 1637034582666);
         assert_eq!(tx.transaction_type, TransactionType::ATR);
+
+        assert_eq!(hex::encode(tx.signature), "dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec");
+        let public_key: SaitoPublicKey = tx.inputs[0].public_key;
+        assert_eq!(
+            hex::encode(public_key),
+            "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
+        );
+        tx.generate(public_key);
+        let sig: SaitoSignature = tx.signature;
+
+        assert_eq!(hex::decode("0000017d26dd628a03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce76100000000000000000000000000000000000000000000000000000000000000000000000000000015900000000000100000003616263").unwrap()
+                   ,tx.serialize_for_signature());
+        let result = verify(tx.serialize_for_signature().as_slice(), sig, public_key);
+        assert!(result);
+        let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), sig, public_key);
+        assert!(result);
     }
 }

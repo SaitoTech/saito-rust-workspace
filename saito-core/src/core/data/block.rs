@@ -1,8 +1,8 @@
 use std::convert::TryInto;
+use std::ops::Rem;
 use std::{mem, sync::Arc};
 
 use ahash::AHashMap;
-use bigint::uint::U256;
 use log::{debug, error, info, trace};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use crate::common::defs::{
 };
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
 use crate::core::data::burnfee::BurnFee;
-use crate::core::data::crypto::{hash, sign, verify};
+use crate::core::data::crypto::{hash, sign, verify, verify_hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
 use crate::core::data::merkle::MerkleTree;
@@ -89,7 +89,7 @@ impl ConsensusValues {
             gt_num: 0,
             gt_index: None,
             total_fees: 0,
-            expected_difficulty: 0,
+            expected_difficulty: 1,
             rebroadcasts: vec![],
             total_rebroadcast_slips: 0,
             total_rebroadcast_nolan: 0,
@@ -165,7 +165,7 @@ pub struct Block {
     pub(crate) timestamp: u64,
     pub(crate) previous_block_hash: [u8; 32],
     #[serde_as(as = "[_; 33]")]
-    creator: [u8; 33],
+    pub(crate) creator: [u8; 33],
     pub(crate) merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
     pub signature: [u8; 64],
@@ -180,7 +180,7 @@ pub struct Block {
     /// Transactions
     pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
-    pre_hash: SaitoHash,
+    pub(crate) pre_hash: SaitoHash,
     /// Self-Calculated / Validated
     pub hash: SaitoHash,
     /// total fees paid into block
@@ -608,7 +608,7 @@ impl Block {
         //
         // find winning nolan
         //
-        let x = U256::from_big_endian(&random_number);
+        let x = primitive_types::U256::from_big_endian(&random_number);
         //
         // fee calculation should be the same used in block when
         // generating the fee transaction.
@@ -623,8 +623,8 @@ impl Block {
             return winner_pubkey;
         }
 
-        let z = U256::from_big_endian(&y.to_be_bytes());
-        let (zy, _bolres) = x.overflowing_rem(z);
+        let z = primitive_types::U256::from_big_endian(&y.to_be_bytes());
+        let zy = x.rem(z);
         let winning_nolan = zy.low_u64();
         // we may need function-timelock object if we need to recreate
         // an ATR transaction to pick the winning routing node.
@@ -962,7 +962,7 @@ impl Block {
             }
 
             let difficulty = previous_block.difficulty;
-            if !previous_block.has_golden_ticket && cv.gt_num == 0 {
+            if previous_block.has_golden_ticket && cv.gt_num == 0 {
                 if difficulty > 0 {
                     cv.expected_difficulty = previous_block.difficulty - 1;
                 }
@@ -1193,16 +1193,16 @@ impl Block {
         //
         // we set final data
         //
-        self.signature = sign(&self.pre_hash, private_key);
+        self.signature = sign(&self.serialize_for_signature(), private_key);
     }
 
     // serialize the pre_hash and the signature_for_source into a
     // bytes array that can be hashed and then have the hash set.
     pub fn serialize_for_hash(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.pre_hash);
-        vbytes.extend(&self.signature);
+        // vbytes.extend(&self.signature);
         vbytes.extend(&self.previous_block_hash);
+        vbytes.extend(&self.pre_hash);
         vbytes
     }
 
@@ -1369,10 +1369,8 @@ impl Block {
         //     // tracing_tracker.time_since_last();
         // );
 
-        //
         // verify signed by creator
-        //
-        if !verify(&self.pre_hash, self.signature, self.creator) {
+        if !verify_hash(&self.pre_hash, self.signature, self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
@@ -1462,8 +1460,8 @@ impl Block {
                 );
             if new_burnfee != self.burnfee {
                 error!(
-                    "ERROR: burn fee does not validate, expected: {}",
-                    new_burnfee
+                    "ERROR: burn fee does not validate,current = {}, expected: {}",
+                    self.burnfee, new_burnfee
                 );
                 return false;
             }
@@ -1520,7 +1518,19 @@ impl Block {
                 );
                 if !gt.validate(previous_block.difficulty) {
                     error!(
-                        "ERROR: Golden Ticket solution does not validate against previous block hash and difficulty"
+                        "ERROR: Golden Ticket solution does not validate against previous block hash : {:?}, difficulty : {:?}, random : {:?}, key : {:?}", 
+                        hex::encode(previous_block.hash),
+                        previous_block.difficulty,
+                        hex::encode(gt.random),
+                        hex::encode(gt.public_key)
+                    );
+                    let solution = hash(&gt.serialize_for_net());
+                    let solution_num = primitive_types::U256::from_big_endian(&solution);
+
+                    error!(
+                        "solution : {:?} leading zeros : {:?}",
+                        hex::encode(solution),
+                        solution_num.leading_zeros()
                     );
                     return false;
                 }
@@ -1655,7 +1665,7 @@ impl Block {
             let transactions_valid2 = self.transactions[i].validate(utxoset);
             if !transactions_valid2 {
                 info!("Type: {:?}", self.transactions[i].transaction_type);
-                info!("Data {:?}", self.transactions[i]);
+                // info!("Data {:?}", self.transactions[i]);
             }
         }
         //true
@@ -1674,7 +1684,7 @@ mod tests {
 
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::crypto::verify;
+    use crate::core::data::crypto::{verify, verify_hash};
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -1769,10 +1779,10 @@ mod tests {
         assert_eq!(
             block.signature,
             [
-                79, 111, 17, 122, 189, 142, 78, 252, 111, 231, 122, 86, 129, 151, 99, 71, 245, 34,
-                33, 254, 104, 138, 238, 136, 230, 45, 113, 171, 146, 105, 138, 64, 43, 25, 204,
-                186, 169, 208, 222, 5, 89, 64, 83, 32, 102, 18, 114, 20, 171, 0, 97, 232, 158, 108,
-                185, 37, 225, 233, 33, 97, 222, 132, 218, 120
+                181, 196, 195, 189, 82, 225, 56, 124, 169, 36, 245, 199, 95, 50, 182, 135, 95, 153,
+                228, 2, 162, 21, 248, 254, 42, 1, 106, 1, 25, 208, 145, 191, 21, 187, 69, 52, 225,
+                214, 86, 94, 116, 168, 14, 58, 70, 186, 16, 164, 215, 211, 153, 107, 226, 236, 231,
+                190, 0, 62, 12, 122, 68, 24, 2, 109
             ]
         )
     }
@@ -1860,7 +1870,7 @@ mod tests {
 
         assert_eq!(block.creator, wallet.public_key);
         assert_eq!(
-            verify(&block.pre_hash, block.signature, block.creator,),
+            verify_hash(&block.pre_hash, block.signature, block.creator,),
             true
         );
         assert_ne!(block.hash, [0; 32]);

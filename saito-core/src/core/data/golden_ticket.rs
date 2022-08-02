@@ -1,7 +1,9 @@
 use std::convert::TryInto;
+use std::ops::{Shl, Shr};
 
-use bigint::uint::U256;
-use log::trace;
+use log::{debug, trace};
+
+use secp256k1::bitcoin_hashes::hex::ToHex;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
@@ -36,6 +38,7 @@ impl GoldenTicket {
     }
 
     pub fn deserialize_from_net(bytes: Vec<u8>) -> GoldenTicket {
+        assert_eq!(bytes.len(), 97);
         let target: SaitoHash = bytes[0..32].try_into().unwrap();
         let random: SaitoHash = bytes[32..64].try_into().unwrap();
         let public_key: SaitoPublicKey = bytes[64..97].try_into().unwrap();
@@ -56,11 +59,11 @@ impl GoldenTicket {
     }
 
     pub fn validate_hashing_difficulty(solution_hash: &SaitoHash, difficulty: u64) -> bool {
-        let solution = U256::from_big_endian(solution_hash);
+        let solution = primitive_types::U256::from_big_endian(solution_hash);
 
         if solution.leading_zeros() >= difficulty as u32 {
-            trace!(
-                "GT : difficulty : {:?} solution : {:?} ",
+            debug!(
+                "GT : difficulty : {:?} solution : {:?}",
                 difficulty,
                 hex::encode(solution_hash)
             );
@@ -119,4 +122,44 @@ mod tests {
         assert_eq!(gt.validate(0), true);
         assert_eq!(gt.validate(256), false);
     }
+    #[test]
+    fn gt_against_slr() {
+        let buffer = hex::decode("844702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235e03bf1a4714cfc7ae33d3f6e860c23191ddea07bcb1bfa6c85bc124151ad8d4ce03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610").unwrap();
+        assert_eq!(buffer.len(), 97);
+
+        let result = GoldenTicket::deserialize_from_net(buffer);
+        assert_eq!(
+            hex::encode(result.target),
+            "844702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235e"
+        );
+        assert_eq!(
+            hex::encode(result.random),
+            "03bf1a4714cfc7ae33d3f6e860c23191ddea07bcb1bfa6c85bc124151ad8d4ce"
+        );
+        assert_eq!(
+            hex::encode(result.public_key),
+            "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
+        );
+
+        assert!(result.validate(0));
+    }
+
+    // #[test]
+    // fn gen_target_hash() {
+    //     // let hash = GoldenTicket::generate_target_hash(0);
+    //     // assert_eq!(
+    //     //     hex::encode(hash),
+    //     //     "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    //     // );
+    //     let hash = GoldenTicket::generate_target_hash(1);
+    //     assert_eq!(
+    //         hex::encode(hash),
+    //         "efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    //     );
+    //     let hash = GoldenTicket::generate_target_hash(16);
+    //     assert_eq!(
+    //         hex::encode(hash),
+    //         "0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    //     );
+    // }
 }
