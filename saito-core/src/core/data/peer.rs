@@ -53,6 +53,7 @@ impl Peer {
         let challenge = HandshakeChallenge {
             public_key: wallet.public_key,
             challenge: generate_random_bytes(32).try_into().unwrap(),
+            is_lite: 0,
             block_fetch_url,
         };
         self.challenge_for_peer = Some(challenge.challenge);
@@ -90,6 +91,7 @@ impl Peer {
             public_key: wallet.public_key,
             signature: sign(&challenge.challenge.to_vec(), wallet.private_key),
             challenge: generate_random_bytes(32).try_into().unwrap(),
+            is_lite: 0,
             block_fetch_url,
         };
 
