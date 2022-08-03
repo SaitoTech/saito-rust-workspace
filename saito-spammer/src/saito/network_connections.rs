@@ -291,6 +291,7 @@ impl NetworkConnections {
                     .process_incoming_block_hash(header_hash, peer_index, blockchain)
                     .await;
             }
+            _ => {}
         }
     }
 

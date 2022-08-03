@@ -146,7 +146,7 @@ mod tests {
             block_fetch_url: "http://url/test".to_string(),
         };
         let buffer = challenge.serialize();
-        assert_eq!(buffer.len(), 80);
+        assert_eq!(buffer.len(), 92);
         let challenge2 = HandshakeChallenge::deserialize(&buffer).expect("deserialization failed");
         assert_eq!(challenge.challenge, challenge2.challenge);
         assert_eq!(challenge.public_key, challenge2.public_key);
@@ -164,7 +164,7 @@ mod tests {
             block_fetch_url: "http://url/test2".to_string(),
         };
         let buffer = response.serialize();
-        assert_eq!(buffer.len(), 145);
+        assert_eq!(buffer.len(), 157);
         let response2 = HandshakeResponse::deserialize(&buffer).expect("deserialization failed");
         assert_eq!(response.challenge, response2.challenge);
         assert_eq!(response.public_key, response2.public_key);
