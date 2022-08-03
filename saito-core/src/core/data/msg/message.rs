@@ -21,12 +21,17 @@ pub enum Message {
     Transaction(Transaction),
     BlockchainRequest(BlockchainRequest),
     BlockHeaderHash(SaitoHash),
+    Ping(),
 }
 
 impl Message {
     pub fn serialize(&self) -> Vec<u8> {
         let message_type: u8 = self.get_type_value();
-        let internal_buffer = match self {
+        let request_id: u32 = 0;
+        let mut buffer: Vec<u8> = vec![];
+        buffer.extend(&message_type.to_be_bytes());
+        buffer.extend(&request_id.to_be_bytes());
+        buffer.append(&mut match self {
             Message::HandshakeChallenge(data) => data.serialize(),
             Message::HandshakeResponse(data) => data.serialize(),
             Message::HandshakeCompletion(data) => data.serialize(),
@@ -35,12 +40,17 @@ impl Message {
             Message::Transaction(data) => data.serialize_for_net(),
             Message::BlockchainRequest(data) => data.serialize(),
             Message::BlockHeaderHash(data) => data.to_vec(),
-        };
-        [vec![message_type], internal_buffer].concat()
+            Message::Ping() => {
+                vec![]
+            }
+        });
+
+        return buffer;
     }
     pub fn deserialize(buffer: Vec<u8>) -> Result<Message, Error> {
-        let message_type = buffer[0];
-        let buffer = buffer[1..].to_vec();
+        let message_type: u8 = u8::from_be_bytes(buffer[0..1].try_into().unwrap());
+        let request_id: u32 = u32::from_be_bytes(buffer[1..5].try_into().unwrap());
+        let buffer = buffer[5..].to_vec();
 
         info!("buffer size = {:?}", buffer.len());
 
@@ -59,10 +69,11 @@ impl Message {
                 return Ok(Message::HandshakeCompletion(result));
             }
             4 => {
-                todo!()
+                return Ok(Message::ApplicationMessage(buffer));
             }
             5 => {
-                todo!()
+                let block = Block::deserialize_from_net(&buffer);
+                return Ok(Message::Block(block));
             }
             6 => {
                 let tx = Transaction::deserialize_from_net(buffer);
@@ -76,6 +87,9 @@ impl Message {
                 assert_eq!(buffer.len(), 32);
                 let result = buffer[0..32].to_vec().try_into().unwrap();
                 return Ok(Message::BlockHeaderHash(result));
+            }
+            9 => {
+                return Ok(Message::Ping());
             }
             _ => {
                 warn!("message type : {:?} not valid", message_type);
@@ -93,6 +107,7 @@ impl Message {
             Message::Transaction(_) => 6,
             Message::BlockchainRequest(_) => 7,
             Message::BlockHeaderHash(_) => 8,
+            Message::Ping() => 9,
         }
     }
 }

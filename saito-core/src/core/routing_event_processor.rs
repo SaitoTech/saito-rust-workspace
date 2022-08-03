@@ -120,6 +120,7 @@ impl RoutingEventProcessor {
             Message::BlockHeaderHash(hash) => {
                 self.process_incoming_block_hash(hash, peer_index).await;
             }
+            Message::Ping() => {}
         }
         debug!("incoming message processed");
     }
@@ -215,8 +216,10 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                 debug!("incoming message received from peer : {:?}", peer_index);
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
-                    todo!()
+                    //todo!()
+                    return None;
                 }
+
                 self.process_incoming_message(peer_index, message.unwrap())
                     .await;
             }

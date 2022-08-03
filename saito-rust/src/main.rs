@@ -86,8 +86,8 @@ where
                 tokio::task::yield_now().await;
                 // std::thread::yield_now();
             } else {
-                tokio::task::yield_now().await;
-                // std::thread::sleep(Duration::new(0, 1000_000));
+                //tokio::task::yield_now().await;
+                std::thread::sleep(Duration::new(0, 1000_000));
             }
         }
     })
