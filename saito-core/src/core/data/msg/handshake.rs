@@ -41,21 +41,14 @@ impl Serialize<Self> for HandshakeChallenge {
         return buffer;
     }
     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
-        if buffer.len() <= 77 {
+        if buffer.len() < 77 {
             warn!(
                 "Deserializing Handshake Challenge, buffer size is :{:?}",
                 buffer.len()
             );
             return Err(Error::from(ErrorKind::InvalidData));
         }
-        let result = String::from_utf8(buffer[77..].to_vec());
-        if result.is_err() {
-            warn!(
-                "failed decoding block fetch url. {:?}",
-                result.err().unwrap()
-            );
-            return Err(Error::from(ErrorKind::InvalidData));
-        }
+
         let mut challenge = HandshakeChallenge {
             public_key: [0; 33],
             challenge: [0; 32],
@@ -65,7 +58,20 @@ impl Serialize<Self> for HandshakeChallenge {
         challenge.public_key = buffer[0..33].to_vec().try_into().unwrap();
         challenge.challenge = buffer[33..65].to_vec().try_into().unwrap();
         challenge.is_lite = u64::from_be_bytes(buffer[65..73].try_into().unwrap());
-        challenge.block_fetch_url = result.unwrap();
+        let url_length = u32::from_be_bytes(buffer[73..77].try_into().unwrap());
+        if url_length > 0 {
+            let result = String::from_utf8(buffer[77..77 as usize + url_length as usize].to_vec());
+            if result.is_err() {
+                warn!(
+                    "failed decoding block fetch url. {:?}",
+                    result.err().unwrap()
+                );
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
+
+            challenge.block_fetch_url = result.unwrap();
+        }
+
         return Ok(challenge);
     }
 }
@@ -83,28 +89,39 @@ impl Serialize<Self> for HandshakeResponse {
         .concat()
     }
     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
-        if buffer.len() <= 141 {
+        if buffer.len() < 141 {
             warn!(
                 "Deserializing Handshake Response, buffer size is :{:?}",
                 buffer.len()
             );
             return Err(Error::from(ErrorKind::InvalidData));
         }
-        let result = String::from_utf8(buffer[141..].to_vec());
-        if result.is_err() {
-            warn!(
-                "failed decoding block fetch url. {:?}",
-                result.err().unwrap()
-            );
-            return Err(Error::from(ErrorKind::InvalidData));
-        }
-        Ok(HandshakeResponse {
+
+        let mut response = HandshakeResponse {
             public_key: buffer[0..33].to_vec().try_into().unwrap(),
             signature: buffer[33..97].to_vec().try_into().unwrap(),
             challenge: buffer[97..129].to_vec().try_into().unwrap(),
             is_lite: u64::from_be_bytes(buffer[129..137].try_into().unwrap()),
-            block_fetch_url: result.unwrap(),
-        })
+            block_fetch_url: "".to_string(),
+        };
+
+        let url_length = u32::from_be_bytes(buffer[137..141].try_into().unwrap());
+
+        if url_length > 0 {
+            let result =
+                String::from_utf8(buffer[141..141 as usize + url_length as usize].to_vec());
+            if result.is_err() {
+                warn!(
+                    "failed decoding block fetch url. {:?}",
+                    result.err().unwrap()
+                );
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
+
+            response.block_fetch_url = result.unwrap();
+        }
+
+        Ok(response)
     }
 }
 
