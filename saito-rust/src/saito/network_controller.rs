@@ -146,7 +146,7 @@ impl NetworkController {
     ) {
         debug!("fetching block : {:?}", url);
 
-        let result = reqwest::get(url).await;
+        let result = reqwest::get(url.clone()).await;
         if result.is_err() {
             todo!()
         }
@@ -157,7 +157,16 @@ impl NetworkController {
         }
         let result = result.unwrap();
         let buffer = result.to_vec();
-        debug!("block buffer received");
+        let result = base64::decode(buffer);
+        if result.is_err() {
+            todo!()
+        }
+        let buffer = result.unwrap();
+        debug!(
+            "block buffer received with size : {:?} for url : {:?}",
+            buffer.len(),
+            url
+        );
         // RustIOHandler::set_event_response(event_id, FutureState::BlockFetched(block));
         sender_to_core
             .send(IoEvent {

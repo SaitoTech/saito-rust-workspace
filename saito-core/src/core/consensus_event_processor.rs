@@ -146,7 +146,7 @@ impl ConsensusEventProcessor {
 #[async_trait]
 impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
-        debug!("processing new interface event");
+        trace!("processing new interface event");
 
         None
     }
