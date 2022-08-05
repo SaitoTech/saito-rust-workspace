@@ -69,7 +69,7 @@ impl MiningEventProcessor {
 #[async_trait]
 impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
-        debug!("processing new interface event");
+        trace!("processing new interface event");
 
         None
     }

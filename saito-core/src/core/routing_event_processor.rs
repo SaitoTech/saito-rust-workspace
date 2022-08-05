@@ -121,6 +121,12 @@ impl RoutingEventProcessor {
                 self.process_incoming_block_hash(hash, peer_index).await;
             }
             Message::Ping() => {}
+            Message::SPVChain() => {}
+            Message::Services() => {}
+            Message::GhostChain() => {}
+            Message::GhostChainRequest() => {}
+            Message::Result() => {}
+            Message::Error() => {}
         }
         debug!("incoming message processed");
     }
@@ -203,7 +209,7 @@ impl RoutingEventProcessor {
 #[async_trait]
 impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
-        debug!("processing new interface event");
+        trace!("processing new interface event");
         match event {
             NetworkEvent::OutgoingNetworkMessage {
                 peer_index: _,

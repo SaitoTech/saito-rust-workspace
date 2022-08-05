@@ -86,7 +86,7 @@ where
                 tokio::task::yield_now().await;
                 // std::thread::yield_now();
             } else {
-                //tokio::task::yield_now().await;
+                tokio::task::yield_now().await;
                 std::thread::sleep(Duration::new(0, 1000_000));
             }
         }
@@ -268,7 +268,8 @@ fn run_loop_thread(
             }
 
             if !work_done {
-                std::thread::sleep(Duration::new(1, 0));
+                tokio::task::yield_now().await;
+                std::thread::sleep(Duration::new(0, 1_000_000));
             } else {
                 tokio::task::yield_now().await;
             }
@@ -278,7 +279,7 @@ fn run_loop_thread(
     loop_handle
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let orig_hook = panic::take_hook();
     panic::set_hook(Box::new(move |panic_info| {

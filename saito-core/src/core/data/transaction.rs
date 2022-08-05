@@ -934,12 +934,18 @@ impl Transaction {
 
             // check sig is valid
             if !verify(&hash(&vbytes), self.path[i].sig, self.path[i].from) {
+                warn!("signature is not valid");
                 return false;
             }
 
             // check path is continuous
             if i > 0 {
                 if self.path[i].from != self.path[i - 1].to {
+                    warn!(
+                        "from : {:?} not matching with previous to : {:?}",
+                        hex::encode(self.path[i].from),
+                        hex::encode(self.path[i - 1].to)
+                    );
                     return false;
                 }
             }

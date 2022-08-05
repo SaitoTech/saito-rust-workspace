@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{info, warn};
+use log::{info, trace, warn};
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};
@@ -22,6 +22,12 @@ pub enum Message {
     BlockchainRequest(BlockchainRequest),
     BlockHeaderHash(SaitoHash),
     Ping(),
+    SPVChain(),
+    Services(),
+    GhostChain(),
+    GhostChainRequest(),
+    Result(),
+    Error(),
 }
 
 impl Message {
@@ -43,6 +49,9 @@ impl Message {
             Message::Ping() => {
                 vec![]
             }
+            _ => {
+                todo!()
+            }
         });
 
         return buffer;
@@ -52,7 +61,7 @@ impl Message {
         let request_id: u32 = u32::from_be_bytes(buffer[1..5].try_into().unwrap());
         let buffer = buffer[5..].to_vec();
 
-        info!("buffer size = {:?}", buffer.len());
+        trace!("buffer size = {:?}", buffer.len());
 
         // TODO : remove hardcoded values into an enum
         match message_type {
@@ -91,6 +100,12 @@ impl Message {
             9 => {
                 return Ok(Message::Ping());
             }
+            10 => return Ok(Message::SPVChain()),
+            11 => return Ok(Message::Services()),
+            12 => return Ok(Message::GhostChain()),
+            13 => return Ok(Message::GhostChainRequest()),
+            14 => return Ok(Message::Result()),
+            15 => return Ok(Message::Error()),
             _ => {
                 warn!("message type : {:?} not valid", message_type);
                 return Err(Error::from(ErrorKind::InvalidData));
@@ -108,6 +123,12 @@ impl Message {
             Message::BlockchainRequest(_) => 7,
             Message::BlockHeaderHash(_) => 8,
             Message::Ping() => 9,
+            Message::SPVChain() => 10,
+            Message::Services() => 11,
+            Message::GhostChain() => 12,
+            Message::GhostChainRequest() => 13,
+            Message::Result() => 14,
+            Message::Error() => 15,
         }
     }
 }
