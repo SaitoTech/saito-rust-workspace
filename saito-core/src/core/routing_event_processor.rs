@@ -172,7 +172,9 @@ impl RoutingEventProcessor {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
+        trace!("waiting for the blockchain read lock");
         let blockchain = self.blockchain.read().await;
+        trace!("acquired the blockchain read lock");
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);

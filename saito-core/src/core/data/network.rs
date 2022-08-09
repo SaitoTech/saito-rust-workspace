@@ -231,7 +231,9 @@ impl Network {
         // TODO : should this be moved inside peer ?
         let request;
         {
+            trace!("waiting for the blockchain read lock");
             let blockchain = blockchain.read().await;
+            trace!("acquired the blockchain read lock");
             request = BlockchainRequest {
                 latest_block_id: blockchain.get_latest_block_id(),
                 latest_block_hash: blockchain.get_latest_block_hash(),
@@ -253,7 +255,9 @@ impl Network {
     ) {
         let block_exists;
         {
+            trace!("waiting for the blockchain read lock");
             let blockchain = blockchain.read().await;
+            trace!("acquired the blockchain read lock");
             block_exists = blockchain.is_block_indexed(block_hash);
         }
         let url;

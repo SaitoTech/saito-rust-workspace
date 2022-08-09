@@ -248,7 +248,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 peer_index: _,
                 buffer,
             } => {
+                trace!("waiting for the blockchain write lock");
                 let mut blockchain = self.blockchain.write().await;
+                trace!("acquired the blockchain write lock");
                 let block = Block::deserialize_from_net(&buffer);
                 blockchain
                     .add_block(

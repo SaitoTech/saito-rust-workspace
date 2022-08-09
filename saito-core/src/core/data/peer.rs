@@ -1,7 +1,7 @@
 use std::io::Error;
 use std::sync::Arc;
 
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
@@ -44,6 +44,7 @@ impl Peer {
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.peer_index);
+        trace!("waiting for the wallet read lock");
         let wallet = wallet.read().await;
         let block_fetch_url;
         {
@@ -86,6 +87,7 @@ impl Peer {
 
         self.peer_public_key = challenge.public_key;
         self.block_fetch_url = challenge.block_fetch_url;
+        trace!("waiting for the wallet read lock");
         let wallet = wallet.read().await;
         let response = HandshakeResponse {
             public_key: wallet.public_key,
@@ -141,6 +143,7 @@ impl Peer {
         self.peer_public_key = response.public_key;
         self.block_fetch_url = response.block_fetch_url;
         self.handshake_done = true;
+        trace!("waiting for the wallet read lock");
         let wallet = wallet.read().await;
         let response = HandshakeCompletion {
             signature: sign(&response.challenge, wallet.private_key),
