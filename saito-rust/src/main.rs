@@ -323,7 +323,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     .init();
 
     // install global subscriber configured based on RUST_LOG envvar.
-    tracing_subscriber::fmt::init();
+
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
+
+    tracing_subscriber::fmt::fmt()
+        .with_env_filter(filter)
+        .pretty()
+        .init();
 
     let configs = Arc::new(RwLock::new(
         ConfigHandler::load_configs("configs/saito.config.json".to_string())

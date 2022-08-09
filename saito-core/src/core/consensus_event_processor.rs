@@ -261,6 +261,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             }
             ConsensusEvent::NewTransaction { mut transaction } => {
                 transaction.generate_hash_for_signature();
+                debug!("tx received with sig: {:?}", transaction.signature);
                 trace!("waiting for the mempool write lock");
                 let mut mempool = self.mempool.write().await;
                 trace!(

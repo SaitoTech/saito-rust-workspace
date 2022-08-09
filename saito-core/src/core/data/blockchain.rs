@@ -896,8 +896,6 @@ impl Blockchain {
         //     does_block_validate
         // );
 
-        debug!("before does block validate!");
-
         if does_block_validate {
             // trace!(" ... before block ocr            {:?}", create_timestamp());
 
@@ -905,7 +903,6 @@ impl Blockchain {
             block.on_chain_reorganization(&mut self.utxoset, true);
 
             // trace!(" ... before blockring ocr:       {:?}", create_timestamp());
-            debug!("before does block validate 2!");
 
             // blockring update
             self.blockring

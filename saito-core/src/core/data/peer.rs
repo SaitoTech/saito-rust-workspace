@@ -129,7 +129,12 @@ impl Peer {
         let sent_challenge = self.challenge_for_peer.unwrap();
         let result = verify(&sent_challenge, response.signature, response.public_key);
         if !result {
-            warn!("handshake failed. signature is not valid");
+            warn!(
+                "handshake failed. signature is not valid. sig : {:?} challenge : {:?} key : {:?}",
+                hex::encode(sent_challenge),
+                hex::encode(response.signature),
+                hex::encode(response.public_key)
+            );
             todo!()
         }
         self.challenge_for_peer = None;
