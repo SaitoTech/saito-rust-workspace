@@ -1,5 +1,6 @@
 use std::panic;
 use std::process;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use std::time::{Duration, Instant};
@@ -10,6 +11,7 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::info;
 use tracing_subscriber;
+use tracing_subscriber::filter::Directive;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
@@ -325,7 +327,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // install global subscriber configured based on RUST_LOG envvar.
 
     let filter = tracing_subscriber::EnvFilter::from_default_env();
-
+    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
     tracing_subscriber::fmt::fmt()
         .with_env_filter(filter)
         .pretty()
