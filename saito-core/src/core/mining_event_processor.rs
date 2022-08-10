@@ -42,9 +42,9 @@ impl MiningEventProcessor {
         let public_key: SaitoPublicKey;
 
         {
-            trace!("waiting for the wallet read lock");
+            trace!("waiting for the wallet lock for reading");
             let wallet = self.wallet.read().await;
-            trace!("acquired the wallet read lock");
+            trace!("acquired the wallet lock for reading");
             public_key = wallet.public_key;
         }
 

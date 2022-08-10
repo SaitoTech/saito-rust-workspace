@@ -267,6 +267,8 @@ impl Blockchain {
                     if new_chain_hash == old_chain_hash {
                         break;
                     }
+                } else {
+                    break;
                 }
             }
         } else {
@@ -669,7 +671,6 @@ impl Blockchain {
     }
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
-
         self.blocks.get(block_hash)
     }
 
@@ -896,8 +897,6 @@ impl Blockchain {
         //     does_block_validate
         // );
 
-        debug!("before does block validate!");
-
         if does_block_validate {
             // trace!(" ... before block ocr            {:?}", create_timestamp());
 
@@ -905,7 +904,6 @@ impl Blockchain {
             block.on_chain_reorganization(&mut self.utxoset, true);
 
             // trace!(" ... before blockring ocr:       {:?}", create_timestamp());
-            debug!("before does block validate 2!");
 
             // blockring update
             self.blockring
@@ -920,9 +918,9 @@ impl Blockchain {
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
 
-                trace!("waiting for the wallet write lock");
+                trace!("waiting for the wallet lock for writing");
                 let mut wallet = self.wallet_lock.write().await;
-                trace!("acquired the wallet write lock");
+                trace!("acquired the wallet lock for writing");
                 wallet.on_chain_reorganization(&block, true);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
@@ -1059,9 +1057,9 @@ impl Blockchain {
 
         // wallet update
         {
-            trace!("waiting for the wallet write lock");
+            trace!("waiting for the wallet lock for writing");
             let mut wallet = self.wallet_lock.write().await;
-            trace!("acquired the wallet write lock");
+            trace!("acquired the wallet lock for writing");
             wallet.on_chain_reorganization(&block, false);
         }
 
@@ -1216,9 +1214,9 @@ impl Blockchain {
             // remove slips from wallet
             //
             {
-                trace!("waiting for the wallet write lock");
+                trace!("waiting for the wallet lock for writing");
                 let mut wallet = self.wallet_lock.write().await;
-                trace!("acquired the wallet write lock");
+                trace!("acquired the wallet lock for writing");
                 wallet.delete_block(pblock);
             }
             //

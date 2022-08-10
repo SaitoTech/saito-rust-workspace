@@ -42,9 +42,9 @@ impl Network {
         let mut excluded_peers = vec![];
         // finding block sender to avoid resending the block to that node
         if block.source_connection_id.is_some() {
-            trace!("waiting for the peers read lock");
+            trace!("waiting for the peers lock for reading");
             let peers = self.peers.read().await;
-            trace!("acquired the peers read lock");
+            trace!("acquired the peers lock for reading");
             let peer = peers
                 .address_to_peers
                 .get(&block.source_connection_id.unwrap());
@@ -77,7 +77,9 @@ impl Network {
         let peer_index;
         let url;
         {
+            trace!("waiting for the peers lock for reading");
             let peers = self.peers.read().await;
+            trace!("acquired the peers lock for reading");
             let peer = peers.find_peer_by_address(public_key);
             let peer = peer.unwrap();
             url = peer.get_block_fetch_url(block_hash);
@@ -90,7 +92,9 @@ impl Network {
     }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
+        trace!("waiting for the peers lock for reading");
         let peers = self.peers.read().await;
+        trace!("acquired the peers lock for reading");
         let result = peers.find_peer_by_index(peer_index);
 
         if result.is_some() {
@@ -128,9 +132,9 @@ impl Network {
     ) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
-        trace!("waiting for the peers write lock");
+        trace!("waiting for the peers lock for writing");
         let mut peers = self.peers.write().await;
-        trace!("acquired the peers write lock");
+        trace!("acquired the peers lock for writing");
         let mut peer = Peer::new(peer_index);
         peer.static_peer_config = peer_data;
 
@@ -151,7 +155,9 @@ impl Network {
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<Configuration>>,
     ) {
+        trace!("waiting for the peers lock for writing");
         let mut peers = self.peers.write().await;
+        trace!("acquired the peers lock for writing");
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             todo!()
@@ -174,7 +180,9 @@ impl Network {
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         debug!("received handshake response");
+        trace!("waiting for the peers lock for writing");
         let mut peers = self.peers.write().await;
+        trace!("acquired the peers lock for writing");
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             todo!()
@@ -201,7 +209,9 @@ impl Network {
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         debug!("received handshake completion");
+        trace!("waiting for the peers lock for writing");
         let mut peers = self.peers.write().await;
+        trace!("acquired the peers lock for writing");
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             todo!()
@@ -231,7 +241,9 @@ impl Network {
         // TODO : should this be moved inside peer ?
         let request;
         {
+            trace!("waiting for the blockchain lock for reading");
             let blockchain = blockchain.read().await;
+            trace!("acquired the blockchain lock for reading");
             request = BlockchainRequest {
                 latest_block_id: blockchain.get_latest_block_id(),
                 latest_block_hash: blockchain.get_latest_block_hash(),
@@ -253,12 +265,16 @@ impl Network {
     ) {
         let block_exists;
         {
+            trace!("waiting for the blockchain lock for reading");
             let blockchain = blockchain.read().await;
+            trace!("acquired the blockchain lock for reading");
             block_exists = blockchain.is_block_indexed(block_hash);
         }
         let url;
         {
+            trace!("waiting for the peers lock for reading");
             let peers = self.peers.read().await;
+            trace!("acquired the peers lock for reading");
             let peer = peers
                 .index_to_peers
                 .get(&peer_index)
@@ -274,9 +290,9 @@ impl Network {
     }
     pub async fn connect_to_static_peers(&mut self, configs: Arc<RwLock<Configuration>>) {
         debug!("connect to peers from config",);
-        trace!("waiting for the configs read lock");
+        trace!("waiting for the configs lock for reading");
         let configs = configs.read().await;
-        trace!("acquired the configs read lock");
+        trace!("acquired the configs lock for reading");
 
         for peer in &configs.peers {
             self.io_interface

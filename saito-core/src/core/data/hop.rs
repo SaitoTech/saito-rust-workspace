@@ -36,9 +36,9 @@ impl Hop {
         to_public_key: SaitoPublicKey,
         tx: &Transaction,
     ) -> Hop {
-        trace!("waiting for the wallet read lock");
+        trace!("waiting for the wallet lock for reading");
         let wallet = wallet_lock.read().await;
-        trace!("acquired the wallet read lock");
+        trace!("acquired the wallet lock for reading");
         let mut hop = Hop::new();
 
         //

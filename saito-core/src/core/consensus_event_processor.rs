@@ -79,19 +79,19 @@ impl ConsensusEventProcessor {
         let latest_block_id;
 
         {
-            trace!("waiting for the wallet read lock");
+            trace!("waiting for the wallet lock for reading");
             let wallet = wallet_lock_clone.read().await;
-            trace!("acquired the wallet read lock");
+            trace!("acquired the wallet lock for reading");
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
-        trace!("waiting for the mempool write lock");
+        trace!("waiting for the mempool lock for writing");
         let mut mempool = mempool_lock_clone.write().await;
-        trace!("acquired the mempool write lock");
-        trace!("waiting for the blockchain read lock");
+        trace!("acquired the mempool lock for writing");
+        trace!("waiting for the blockchain lock for reading");
         let blockchain = blockchain_lock_clone.read().await;
-        trace!("acquired the blockchain read lock");
+        trace!("acquired the blockchain lock for reading");
 
         latest_block_id = blockchain.get_latest_block_id();
 
@@ -181,9 +181,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         self.block_producing_timer = self.block_producing_timer + duration_value;
         // TODO : make timers configurable
         if self.block_producing_timer >= 1_000_000 {
-            trace!("waiting for the mempool read lock");
+            trace!("waiting for the mempool lock for reading");
             let mempool = self.mempool.read().await;
-            trace!("acquired the mempool read lock");
+            trace!("acquired the mempool lock for reading");
             can_bundle = mempool
                 .can_bundle_block(self.blockchain.clone(), timestamp)
                 .await;
@@ -193,12 +193,12 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 
         if can_bundle {
             let mempool = self.mempool.clone();
-            trace!("waiting for the mempool write lock");
+            trace!("waiting for the mempool lock for writing");
             let mut mempool = mempool.write().await;
-            trace!("acquired the mempool write lock");
-            trace!("waiting for the blockchain write lock");
+            trace!("acquired the mempool lock for writing");
+            trace!("waiting for the blockchain lock for writing");
             let mut blockchain = self.blockchain.write().await;
-            trace!("acquired the blockchain write lock");
+            trace!("acquired the blockchain lock for writing");
             let result = mempool
                 .bundle_block(blockchain.deref_mut(), timestamp)
                 .await;
@@ -239,16 +239,18 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     "received new golden ticket : {:?}",
                     hex::encode(golden_ticket.target)
                 );
-                trace!("waiting for the mempool write lock");
+                trace!("waiting for the mempool lock for writing");
                 let mut mempool = self.mempool.write().await;
-                trace!("acquired the mempool write lock");
+                trace!("acquired the mempool lock for writing");
                 mempool.add_golden_ticket(golden_ticket).await;
             }
             ConsensusEvent::BlockFetched {
                 peer_index: _,
                 buffer,
             } => {
+                trace!("waiting for the blockchain lock for writing");
                 let mut blockchain = self.blockchain.write().await;
+                trace!("acquired the blockchain lock for writing");
                 let block = Block::deserialize_from_net(&buffer);
                 blockchain
                     .add_block(
@@ -261,10 +263,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             }
             ConsensusEvent::NewTransaction { mut transaction } => {
                 transaction.generate_hash_for_signature();
-                trace!("waiting for the mempool write lock");
+                debug!("tx received with sig: {:?}", transaction.signature);
+                trace!("waiting for the mempool lock for writing");
                 let mut mempool = self.mempool.write().await;
                 trace!(
-                    "acquired the mempool write lock, adding new transaction : {:?}",
+                    "acquired the mempool lock for writing, adding new transaction : {:?}",
                     hex::encode(transaction.hash_for_signature.unwrap())
                 );
                 mempool.add_transaction(transaction).await;

@@ -129,7 +129,9 @@ pub mod test {
         // check that the blockchain connects properly
         //
         pub async fn check_blockchain(&self) {
+            trace!("waiting for the blockchain lock for reading");
             let blockchain = self.blockchain_lock.read().await;
+            trace!("acquired the blockchain lock for reading");
 
             for i in 1..blockchain.blocks.len() {
                 let block_hash = blockchain
@@ -448,9 +450,9 @@ pub mod test {
         ) -> GoldenTicket {
             let public_key;
             {
-                trace!("waiting for the wallet read lock");
+                trace!("waiting for the wallet lock for reading");
                 let wallet = wallet.read().await;
-                trace!("acquired the wallet read lock");
+                trace!("acquired the wallet lock for reading");
                 public_key = wallet.public_key;
             }
             let mut random_bytes = hash(&generate_random_bytes(32));

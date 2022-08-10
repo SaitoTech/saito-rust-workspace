@@ -1,7 +1,7 @@
 use std::io::Error;
 use std::sync::Arc;
 
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
@@ -44,7 +44,9 @@ impl Peer {
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.peer_index);
+        trace!("waiting for the wallet lock for reading");
         let wallet = wallet.read().await;
+        trace!("acquired the wallet lock for reading");
         let block_fetch_url;
         {
             let configs = configs.read().await;
@@ -86,7 +88,9 @@ impl Peer {
 
         self.peer_public_key = challenge.public_key;
         self.block_fetch_url = challenge.block_fetch_url;
+        trace!("waiting for the wallet lock for reading");
         let wallet = wallet.read().await;
+        trace!("acquired the wallet lock for reading");
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(&challenge.challenge.to_vec(), wallet.private_key),
@@ -129,14 +133,21 @@ impl Peer {
         let sent_challenge = self.challenge_for_peer.unwrap();
         let result = verify(&sent_challenge, response.signature, response.public_key);
         if !result {
-            warn!("handshake failed. signature is not valid");
+            warn!(
+                "handshake failed. signature is not valid. sig : {:?} challenge : {:?} key : {:?}",
+                hex::encode(sent_challenge),
+                hex::encode(response.signature),
+                hex::encode(response.public_key)
+            );
             todo!()
         }
         self.challenge_for_peer = None;
         self.peer_public_key = response.public_key;
         self.block_fetch_url = response.block_fetch_url;
         self.handshake_done = true;
+        trace!("waiting for the wallet lock for reading");
         let wallet = wallet.read().await;
+        trace!("acquired the wallet lock for reading");
         let response = HandshakeCompletion {
             signature: sign(&response.challenge, wallet.private_key),
         };

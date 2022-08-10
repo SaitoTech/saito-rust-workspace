@@ -373,15 +373,23 @@ impl NetworkConnections {
         let has_generator;
         let public_key;
         {
+            trace!("waiting for the blockchain lock for writing");
             let mut blockchain = self.blockchain.write().await;
+            trace!("acquired the blockchain lock for writing");
+
             let network = self.network.lock().await;
             let mut storage = self.storage.lock().await;
             blockchain
                 .add_block(block, &network, &mut storage, self.sender_to_miner.clone())
                 .await;
-            balance = self.wallet.read().await.get_available_balance();
+            {
+                trace!("waiting for the wallet lock for reading");
+                let wallet = self.wallet.read().await;
+                trace!("acquired the wallet lock for reading");
+                balance = wallet.get_available_balance();
+                public_key = wallet.public_key;
+            }
             has_generator = self.spam_generators.lock().await.get(&peer_index).is_some();
-            public_key = self.wallet.read().await.public_key;
 
             info!(
                 "New Block Added, Wallet Balance for {:?} is {:?}",
@@ -449,13 +457,17 @@ impl NetworkConnections {
         let private_key;
         //let latest_block_id;
         {
+            trace!("waiting for the wallet lock for reading");
             let wallet = wallet.read().await;
+            trace!("acquired the wallet lock for reading");
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
         {
+            trace!("waiting for the blockchain lock for reading");
             let blockchain = blockchain.read().await;
+            trace!("acquired the blockchain lock for reading");
 
             if blockchain.blockring.is_empty() {
                 unreachable!()
