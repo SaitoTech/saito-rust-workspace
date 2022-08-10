@@ -44,8 +44,9 @@ impl Peer {
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.peer_index);
-        trace!("waiting for the wallet read lock");
+        trace!("waiting for the wallet lock for reading");
         let wallet = wallet.read().await;
+        trace!("acquired the wallet lock for reading");
         let block_fetch_url;
         {
             let configs = configs.read().await;
@@ -87,8 +88,9 @@ impl Peer {
 
         self.peer_public_key = challenge.public_key;
         self.block_fetch_url = challenge.block_fetch_url;
-        trace!("waiting for the wallet read lock");
+        trace!("waiting for the wallet lock for reading");
         let wallet = wallet.read().await;
+        trace!("acquired the wallet lock for reading");
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(&challenge.challenge.to_vec(), wallet.private_key),
@@ -143,8 +145,9 @@ impl Peer {
         self.peer_public_key = response.public_key;
         self.block_fetch_url = response.block_fetch_url;
         self.handshake_done = true;
-        trace!("waiting for the wallet read lock");
+        trace!("waiting for the wallet lock for reading");
         let wallet = wallet.read().await;
+        trace!("acquired the wallet lock for reading");
         let response = HandshakeCompletion {
             signature: sign(&response.challenge, wallet.private_key),
         };

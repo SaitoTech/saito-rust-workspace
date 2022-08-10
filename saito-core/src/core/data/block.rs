@@ -283,9 +283,9 @@ impl Block {
 
         let public_key;
         {
-            trace!("waiting for the wallet read lock");
+            trace!("waiting for the wallet lock for reading");
             let wallet = wallet_lock.read().await;
-            trace!("acquired the wallet read lock");
+            trace!("acquired the wallet lock for reading");
             public_key = wallet.public_key;
         }
         let mut previous_block_id = 0;
@@ -387,9 +387,9 @@ impl Block {
             let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
             fee_tx.hash_for_signature = Some(hash_for_signature);
             {
-                trace!("waiting for the wallet read lock");
+                trace!("waiting for the wallet lock for reading");
                 let wallet = wallet_lock.read().await;
-                trace!("acquired the wallet read lock");
+                trace!("acquired the wallet lock for reading");
                 fee_tx.sign(wallet.private_key);
             }
             //
@@ -459,9 +459,9 @@ impl Block {
         block.merkle_root = block_merkle_root;
 
         {
-            trace!("waiting for the wallet read lock");
+            trace!("waiting for the wallet lock for reading");
             let wallet = wallet_lock.read().await;
-            trace!("acquired the wallet read lock");
+            trace!("acquired the wallet lock for reading");
 
             block.generate_pre_hash();
             block.sign(wallet.private_key);

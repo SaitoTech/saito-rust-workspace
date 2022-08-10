@@ -373,9 +373,9 @@ impl NetworkConnections {
         let has_generator;
         let public_key;
         {
-            trace!("waiting for the blockchain write lock");
+            trace!("waiting for the blockchain lock for writing");
             let mut blockchain = self.blockchain.write().await;
-            trace!("acquired the blockchain write lock");
+            trace!("acquired the blockchain lock for writing");
 
             let network = self.network.lock().await;
             let mut storage = self.storage.lock().await;
@@ -383,9 +383,9 @@ impl NetworkConnections {
                 .add_block(block, &network, &mut storage, self.sender_to_miner.clone())
                 .await;
             {
-                trace!("waiting for the wallet read lock");
+                trace!("waiting for the wallet lock for reading");
                 let wallet = self.wallet.read().await;
-                trace!("acquired the wallet read lock");
+                trace!("acquired the wallet lock for reading");
                 balance = wallet.get_available_balance();
                 public_key = wallet.public_key;
             }
@@ -457,17 +457,17 @@ impl NetworkConnections {
         let private_key;
         //let latest_block_id;
         {
-            trace!("waiting for the wallet read lock");
+            trace!("waiting for the wallet lock for reading");
             let wallet = wallet.read().await;
-            trace!("acquired the wallet read lock");
+            trace!("acquired the wallet lock for reading");
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
         {
-            trace!("waiting for the blockchain read lock");
+            trace!("waiting for the blockchain lock for reading");
             let blockchain = blockchain.read().await;
-            trace!("acquired the blockchain read lock");
+            trace!("acquired the blockchain lock for reading");
 
             if blockchain.blockring.is_empty() {
                 unreachable!()

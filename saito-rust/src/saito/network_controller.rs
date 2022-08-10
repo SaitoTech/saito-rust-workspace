@@ -95,9 +95,9 @@ impl NetworkController {
         let result = result.unwrap();
         let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-        trace!("waiting for the io controller write lock");
+        trace!("waiting for the io controller lock for writing");
         let mut io_controller = io_controller.write().await;
-        trace!("acquired the io controller write lock");
+        trace!("acquired the io controller lock for writing");
         let sender_to_controller = io_controller.sender_to_saito_controller.clone();
         let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
         NetworkController::send_new_peer(
@@ -317,9 +317,9 @@ pub async fn run_network_controller(
     let url;
     let port;
     {
-        trace!("waiting for the configs write lock");
+        trace!("waiting for the configs lock for reading");
         let configs = configs.read().await;
-        trace!("acquired the configs write lock");
+        trace!("acquired the configs lock for reading");
         url = "localhost:".to_string() + configs.server.port.to_string().as_str();
         port = configs.server.port;
     }
@@ -360,18 +360,18 @@ pub async fn run_network_controller(
                 work_done = true;
                 match interface_event {
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
-                        trace!("waiting for the io controller write lock");
+                        trace!("waiting for the io controller lock for writing");
                         let mut io_controller = network_controller.write().await;
-                        trace!("acquired the io controller write lock");
+                        trace!("acquired the io controller lock for writing");
                         io_controller.send_to_all(buffer, exceptions).await;
                     }
                     NetworkEvent::OutgoingNetworkMessage {
                         peer_index: index,
                         buffer,
                     } => {
-                        trace!("waiting for the io_controller write lock");
+                        trace!("waiting for the io_controller lock for writing");
                         let mut io_controller = network_controller.write().await;
-                        trace!("acquired the io controller write lock");
+                        trace!("acquired the io controller lock for writing");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
                     NetworkEvent::ConnectToPeer { peer_details } => {
@@ -398,7 +398,9 @@ pub async fn run_network_controller(
                     } => {
                         let sender;
                         {
+                            trace!("waiting for the io controller lock for reading");
                             let io_controller = network_controller.read().await;
+                            trace!("acquired the io controller lock for reading");
                             sender = io_controller.sender_to_saito_controller.clone();
                         }
                         // starting new thread to stop io controller from getting blocked
@@ -457,9 +459,9 @@ fn run_websocket_server(
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
 
-                    trace!("waiting for the io controller write lock");
+                    trace!("waiting for the io controller lock for writing");
                     let mut controller = clone.write().await;
-                    trace!("acquired the io controller write lock");
+                    trace!("acquired the io controller lock for writing");
 
                     NetworkController::send_new_peer(
                         0,
@@ -489,10 +491,10 @@ fn run_websocket_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
-                        trace!("waiting for the blockchain read lock");
+                        trace!("waiting for the blockchain lock for reading");
                         // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
-                        trace!("acquired the blockchain read lock");
+                        trace!("acquired the blockchain lock for reading");
                         let block = blockchain.get_block(&block_hash).await;
                         if block.is_none() {
                             debug!("block not found : {:?}", block_hash);

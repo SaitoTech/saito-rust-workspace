@@ -200,9 +200,9 @@ async fn run_routing_event_processor(
         ),
     };
     {
-        trace!("waiting for the configs write lock");
+        trace!("waiting for the configs lock for reading");
         let configs = configs.read().await;
-        trace!("acquired the configs write lock");
+        trace!("acquired the configs lock for reading");
         let peers = &configs.peers;
         for peer in peers {
             routing_event_processor.static_peers.push(StaticPeer {

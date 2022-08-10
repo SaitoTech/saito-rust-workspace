@@ -267,6 +267,8 @@ impl Blockchain {
                     if new_chain_hash == old_chain_hash {
                         break;
                     }
+                } else {
+                    break;
                 }
             }
         } else {
@@ -916,9 +918,9 @@ impl Blockchain {
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
 
-                trace!("waiting for the wallet write lock");
+                trace!("waiting for the wallet lock for writing");
                 let mut wallet = self.wallet_lock.write().await;
-                trace!("acquired the wallet write lock");
+                trace!("acquired the wallet lock for writing");
                 wallet.on_chain_reorganization(&block, true);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
@@ -1055,9 +1057,9 @@ impl Blockchain {
 
         // wallet update
         {
-            trace!("waiting for the wallet write lock");
+            trace!("waiting for the wallet lock for writing");
             let mut wallet = self.wallet_lock.write().await;
-            trace!("acquired the wallet write lock");
+            trace!("acquired the wallet lock for writing");
             wallet.on_chain_reorganization(&block, false);
         }
 
@@ -1212,9 +1214,9 @@ impl Blockchain {
             // remove slips from wallet
             //
             {
-                trace!("waiting for the wallet write lock");
+                trace!("waiting for the wallet lock for writing");
                 let mut wallet = self.wallet_lock.write().await;
-                trace!("acquired the wallet write lock");
+                trace!("acquired the wallet lock for writing");
                 wallet.delete_block(pblock);
             }
             //

@@ -158,9 +158,9 @@ impl Transaction {
             with_payment,
             with_fee
         );
-        trace!("waiting for the wallet write lock");
+        trace!("waiting for the wallet lock for writing");
         let mut wallet = wallet_lock.write().await;
-        trace!("acquired the wallet write lock");
+        trace!("acquired the wallet lock for writing");
         let wallet_public_key = wallet.public_key;
 
         let available_balance = wallet.get_available_balance();

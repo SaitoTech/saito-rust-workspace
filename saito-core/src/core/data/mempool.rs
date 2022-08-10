@@ -73,9 +73,9 @@ impl Mempool {
         );
         let transaction;
         {
-            trace!("waiting for the wallet write lock");
+            trace!("waiting for the wallet lock for writing");
             let mut wallet = self.wallet_lock.write().await;
-            trace!("acquired the wallet write lock");
+            trace!("acquired the wallet lock for writing");
             transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
         }
         if self
@@ -126,9 +126,9 @@ impl Mempool {
         //
         let public_key;
         {
-            trace!("waiting for the wallet read lock");
+            trace!("waiting for the wallet lock for reading");
             let wallet = self.wallet_lock.read().await;
-            trace!("acquired the wallet read lock");
+            trace!("acquired the wallet lock for reading");
             public_key = wallet.public_key;
         }
 
@@ -184,9 +184,9 @@ impl Mempool {
         }
         trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
-        trace!("waiting for the blockchain read lock");
+        trace!("waiting for the blockchain lock for reading");
         let blockchain = blockchain_lock.read().await;
-        trace!("acquired the blockchain read lock");
+        trace!("acquired the blockchain lock for reading");
 
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();

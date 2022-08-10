@@ -88,9 +88,9 @@ impl Storage {
     ) {
         debug!("loading blocks from disk");
         let file_names = self.io_interface.load_block_file_list().await;
-        trace!("waiting for the blockchain write lock");
+        trace!("waiting for the blockchain lock for writing");
         let mut blockchain = blockchain_lock.write().await;
-        trace!("acquired the blockchain write lock");
+        trace!("acquired the blockchain lock for writing");
 
         if file_names.is_err() {
             error!("{:?}", file_names.err().unwrap());
@@ -114,7 +114,9 @@ impl Storage {
             blockchain
                 .add_block(block, network, self, sender_to_miner.clone())
                 .await;
+            debug!("block added from file : {:?}", file_name);
         }
+        debug!("loading blocks completed");
     }
 
     pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
