@@ -69,7 +69,7 @@ impl Network {
         &self,
         block_hash: SaitoHash,
         public_key: &SaitoPublicKey,
-    ) -> Result<(), Error> {
+    ) -> Result<Block, Error> {
         debug!(
             "fetch missing block : block : {:?} from : {:?}",
             block_hash, public_key
