@@ -157,11 +157,11 @@ impl NetworkController {
         }
         let result = result.unwrap();
         let buffer = result.to_vec();
-        let result = base64::decode(buffer);
-        if result.is_err() {
-            todo!()
-        }
-        let buffer = result.unwrap();
+        // let result = base64::decode(buffer);
+        // if result.is_err() {
+        //     todo!()
+        // }
+        // let buffer = result.unwrap();
         debug!(
             "block buffer received with size : {:?} for url : {:?}",
             buffer.len(),
