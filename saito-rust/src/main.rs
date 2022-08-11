@@ -333,7 +333,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
     tracing_subscriber::fmt::fmt()
         .with_env_filter(filter)
-        // .pretty()
+        .pretty()
         .init();
 
     let configs = Arc::new(RwLock::new(

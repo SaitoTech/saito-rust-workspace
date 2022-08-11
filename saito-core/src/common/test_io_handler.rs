@@ -11,7 +11,6 @@ pub mod test {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use crate::common::interface_io::InterfaceIO;
-    use crate::core::data::block::Block;
 
     use crate::core::data::configuration::PeerConfig;
 
@@ -57,7 +56,7 @@ pub mod test {
             _block_hash: SaitoHash,
             _peer_index: u64,
             _url: String,
-        ) -> Result<Block, Error> {
+        ) -> Result<(), Error> {
             todo!()
         }
 

@@ -13,7 +13,6 @@ use tokio::sync::mpsc::Sender;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::InterfaceIO;
-use saito_core::core::data::block::Block;
 
 use saito_core::core::data::configuration::PeerConfig;
 
@@ -120,34 +119,20 @@ impl InterfaceIO for RustIOHandler {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
-    ) -> Result<Block, Error> {
+    ) -> Result<(), Error> {
         debug!("fetching block from peer : {:?}", url);
+        let event = IoEvent::new(NetworkEvent::BlockFetchRequest {
+            block_hash,
+            peer_index,
+            url: url.clone(),
+        });
 
-        let result = reqwest::get(url.clone()).await;
-        if result.is_err() {
-            todo!()
-        }
-        let response = result.unwrap();
-        let result = response.bytes().await;
-        if result.is_err() {
-            todo!()
-        }
-        let result = result.unwrap();
-        let buffer = result.to_vec();
-        let result = base64::decode(buffer);
-        if result.is_err() {
-            todo!()
-        }
-        let buffer = result.unwrap();
-        debug!(
-            "block buffer received with size : {:?} for url : {:?}",
-            buffer.len(),
-            url
-        );
+        self.sender
+            .send(event)
+            .await
+            .expect("failed sending to io controller");
 
-        let block = Block::deserialize_from_net(&buffer);
-
-        Ok(block)
+        Ok(())
     }
 
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
