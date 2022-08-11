@@ -339,6 +339,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
     tracing_subscriber::fmt::fmt()
         .with_env_filter(filter)
         // .pretty()

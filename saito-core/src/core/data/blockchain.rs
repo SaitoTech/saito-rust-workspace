@@ -10,6 +10,7 @@ use tokio::sync::RwLock;
 use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
+use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
@@ -81,6 +82,7 @@ impl Blockchain {
         network: &Network,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
+        mempool: Arc<RwLock<Mempool>>,
     ) {
         debug!("adding block to blockchain");
 
@@ -154,6 +156,14 @@ impl Blockchain {
                                     );
                                     todo!()
                                 }
+                                trace!("waiting for the mempool lock for writing");
+                                let mut mempool = mempool.write().await;
+                                trace!("acquired the mempool lock for writing");
+                                debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
+                                    hex::encode(block.hash),
+                                    hex::encode(block.previous_block_hash));
+                                mempool.add_block(block);
+                                return;
                             }
                         }
                     }
@@ -320,7 +330,8 @@ impl Blockchain {
             let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
 
             if does_new_chain_validate {
-                self.add_block_success(block_hash, network, storage).await;
+                self.add_block_success(block_hash, network, storage, mempool)
+                    .await;
 
                 //
                 // TODO
@@ -356,7 +367,7 @@ impl Blockchain {
                 //     })
                 //     .expect("error: BlockchainNewLongestChainBlock message failed to send");
             } else {
-                self.add_block_failure().await;
+                self.add_block_failure(mempool).await;
 
                 // TODO : send with related channel
                 // global_sender
@@ -364,7 +375,7 @@ impl Blockchain {
                 //     .expect("error: BlockchainAddBlockFailure message failed to send");
             }
         } else {
-            self.add_block_failure().await;
+            self.add_block_failure(mempool).await;
 
             // TODO : send with related channel
             // global_sender
@@ -383,6 +394,7 @@ impl Blockchain {
         block_hash: SaitoHash,
         network: &crate::core::data::network::Network,
         storage: &mut Storage,
+        mempool: Arc<RwLock<Mempool>>,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -411,7 +423,13 @@ impl Blockchain {
         //  is blockchain calling mempool.on_chain_reorganization?
         //
         //
-        // mempool.delete_transactions(&block.get_transactions());
+        {
+            let block = self.get_mut_block(&block_hash).await.unwrap();
+            trace!("waiting for the mempool lock for writing");
+            let mut mempool = mempool.write().await;
+            trace!("acquired the mempool lock for writing");
+            mempool.delete_transactions(&block.transactions);
+        }
 
         //
         // propagate block to network
@@ -464,7 +482,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn add_block_failure(&mut self) {
+    pub async fn add_block_failure(&mut self, mempool: Arc<RwLock<Mempool>>) {
         // todo!()
     }
 

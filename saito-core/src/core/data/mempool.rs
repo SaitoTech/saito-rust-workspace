@@ -56,15 +56,14 @@ impl Mempool {
     pub fn add_block(&mut self, block: Block) {
         debug!("mempool add block : {:?}", hex::encode(block.hash));
         let hash_to_insert = block.hash;
-        if self
+        if !self
             .blocks_queue
             .iter()
             .any(|block| block.hash == hash_to_insert)
         {
-            // do nothing
-        } else {
             self.blocks_queue.push_back(block);
         }
+   
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
         debug!(
@@ -228,6 +227,7 @@ impl Mempool {
         self.transactions
             .retain(|x| tx_hashmap.contains_key(&x.hash_for_signature) != true);
 
+        // add routing work from remaining tx
         for transaction in &self.transactions {
             self.routing_work_in_mempool += transaction.total_work;
         }
