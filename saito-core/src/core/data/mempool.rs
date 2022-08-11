@@ -63,7 +63,6 @@ impl Mempool {
         {
             self.blocks_queue.push_back(block);
         }
-   
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
         debug!(
