@@ -87,7 +87,11 @@ pub fn new() -> SaitoWasm {
         wallet: wallet.clone(),
         configuration: configuration.clone(),
     };
-
+    // let generate_genesis_block:bool;
+    // {
+    //     let configs = context.configuration.read().await;
+    //     generate_genesis_block = configs.peers.is_empty();
+    // }
     let (sender_to_mempool, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
@@ -106,6 +110,7 @@ pub fn new() -> SaitoWasm {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
+            generate_genesis_block: false,
             sender_to_router: sender_to_blockchain.clone(),
             sender_to_miner: sender_to_miner.clone(),
             // sender_global: (),

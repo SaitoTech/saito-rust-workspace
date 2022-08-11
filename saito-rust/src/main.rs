@@ -138,10 +138,18 @@ async fn run_consensus_event_processor(
     if result.is_ok() {
         create_test_tx = result.unwrap().eq("1");
     }
+    let generate_genesis_block: bool;
+    {
+        let configs = context.configuration.read().await;
+
+        // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
+        generate_genesis_block = configs.peers.is_empty();
+    }
     let consensus_event_processor = ConsensusEventProcessor {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
         wallet: context.wallet.clone(),
+        generate_genesis_block,
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),

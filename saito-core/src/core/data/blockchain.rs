@@ -132,7 +132,7 @@ impl Blockchain {
             trace!("earliest_block_hash {:?}", earliest_block_hash);
 
             if earliest_block_hash != [0u8; 32] {
-                let earliest_block = self.get_mut_block(&earliest_block_hash).await;
+                let earliest_block = self.get_mut_block(&earliest_block_hash).await.unwrap();
 
                 // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
                 if block.timestamp > earliest_block.timestamp {
@@ -396,7 +396,7 @@ impl Blockchain {
         // save to disk
         //
         {
-            let block = self.get_mut_block(&block_hash).await;
+            let block = self.get_mut_block(&block_hash).await.unwrap();
             if block.block_type != BlockType::Header {
                 storage.write_block_to_disk(block).await;
             }
@@ -456,7 +456,7 @@ impl Blockchain {
             // to use to check the utxoset.
             //
             {
-                let pblock = self.get_mut_block(&pruned_block_hash).await;
+                let pblock = self.get_mut_block(&pruned_block_hash).await.unwrap();
                 pblock
                     .upgrade_block_to_block_type(BlockType::Full, storage)
                     .await;
@@ -640,6 +640,7 @@ impl Blockchain {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
+        info!("------------------------------------------------------");
         while current_id > 0 {
             info!(
                 "{} - {:?}",
@@ -651,6 +652,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
+        info!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
@@ -674,8 +676,8 @@ impl Blockchain {
         self.blocks.get(block_hash)
     }
 
-    pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> &mut Block {
-        self.blocks.get_mut(block_hash).unwrap()
+    pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {
+        self.blocks.get_mut(block_hash)
     }
 
     pub fn is_block_indexed(&self, block_hash: SaitoHash) -> bool {
@@ -861,7 +863,10 @@ impl Blockchain {
         // happen first.
         //
         {
-            let mut block = self.get_mut_block(&new_chain[current_wind_index]).await;
+            let mut block = self
+                .get_mut_block(&new_chain[current_wind_index])
+                .await
+                .unwrap();
             block.generate();
 
             let latest_block_id = block.id;
@@ -879,7 +884,7 @@ impl Blockchain {
                 let previous_block_hash =
                     self.blockring.get_longest_chain_block_hash_by_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
-                    block = self.get_mut_block(&previous_block_hash).await;
+                    block = self.get_mut_block(&previous_block_hash).await.unwrap();
                     block
                         .upgrade_block_to_block_type(BlockType::Full, storage)
                         .await;
@@ -1269,7 +1274,7 @@ impl Blockchain {
             // ask the block to remove its transactions
             //
             {
-                let pblock = self.get_mut_block(&hash).await;
+                let pblock = self.get_mut_block(&hash).await.unwrap();
                 pblock
                     .downgrade_block_to_block_type(BlockType::Pruned)
                     .await;

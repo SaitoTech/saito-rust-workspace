@@ -35,6 +35,7 @@ pub struct ConsensusEventProcessor {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub wallet: Arc<RwLock<Wallet>>,
+    pub generate_genesis_block: bool,
     pub sender_to_router: Sender<RoutingEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
     pub block_producing_timer: u128,
@@ -184,8 +185,14 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             trace!("waiting for the mempool lock for reading");
             let mempool = self.mempool.read().await;
             trace!("acquired the mempool lock for reading");
+            let mut generate_genesis_block: bool = false;
+            {}
             can_bundle = mempool
-                .can_bundle_block(self.blockchain.clone(), timestamp)
+                .can_bundle_block(
+                    self.blockchain.clone(),
+                    timestamp,
+                    self.generate_genesis_block,
+                )
                 .await;
             self.block_producing_timer = 0;
             work_done = true;

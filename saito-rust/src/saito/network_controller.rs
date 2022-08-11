@@ -503,7 +503,10 @@ fn run_websocket_server(
                         // TODO : check if the full block is in memory or need to load from disk
                         buffer = block.unwrap().serialize_for_net(BlockType::Full);
                     }
-                    Ok(warp::reply::with_status(buffer, StatusCode::OK))
+                    let buffer_len = buffer.len();
+                    let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
+                    debug!("served block with : {:?} length", buffer_len);
+                    return result;
                 },
             );
         let routes = http_route.or(ws_route);

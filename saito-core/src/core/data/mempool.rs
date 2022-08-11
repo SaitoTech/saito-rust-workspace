@@ -1,6 +1,6 @@
 use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
@@ -178,15 +178,23 @@ impl Mempool {
         &self,
         blockchain_lock: Arc<RwLock<Blockchain>>,
         current_timestamp: u64,
+        generate_genesis_block: bool,
     ) -> bool {
         if self.transactions.is_empty() {
             return false;
         }
         trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
+        // TODO : add checks [downloading_active,etc...] from SLR code here
+
         trace!("waiting for the blockchain lock for reading");
         let blockchain = blockchain_lock.read().await;
         trace!("acquired the blockchain lock for reading");
+
+        if !generate_genesis_block && blockchain.blocks.is_empty() {
+            warn!("Not generating #1 block. Waiting for blocks from peers");
+            return false;
+        }
 
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
@@ -356,7 +364,7 @@ mod tests {
         // );
         assert_eq!(
             mempool
-                .can_bundle_block(blockchain_lock.clone(), ts + 120000)
+                .can_bundle_block(blockchain_lock.clone(), ts + 120000, true)
                 .await,
             true
         );
