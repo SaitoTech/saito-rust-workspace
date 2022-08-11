@@ -4,6 +4,7 @@ use async_trait::async_trait;
 
 use crate::common::defs::SaitoHash;
 use crate::core::data;
+use crate::core::data::block::Block;
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
 #[async_trait]
@@ -67,7 +68,7 @@ pub trait InterfaceIO {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
-    ) -> Result<(), Error>;
+    ) -> Result<Block, Error>;
 
     /// Writes a value to a persistent storage with the given key
     ///

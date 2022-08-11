@@ -153,6 +153,13 @@ impl Blockchain {
                                         hex::encode(block.previous_block_hash)
                                     );
                                     todo!()
+                                } else {
+                                    self.add_block(
+                                        result.unwrap(),
+                                        network,
+                                        storage,
+                                        sender_to_miner.clone(),
+                                    );
                                 }
                             }
                         }

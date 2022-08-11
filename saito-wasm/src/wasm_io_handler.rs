@@ -73,7 +73,7 @@ impl InterfaceIO for WasmIoHandler {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
-    ) -> Result<(), Error> {
+    ) -> Result<Block, Error> {
         todo!()
     }
 }
