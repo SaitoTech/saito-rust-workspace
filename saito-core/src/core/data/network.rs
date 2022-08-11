@@ -69,7 +69,7 @@ impl Network {
         &self,
         block_hash: SaitoHash,
         public_key: &SaitoPublicKey,
-    ) -> Result<Block, Error> {
+    ) -> Result<(), Error> {
         debug!(
             "fetch missing block : block : {:?} from : {:?}",
             block_hash, public_key
@@ -180,40 +180,23 @@ impl Network {
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         debug!("received handshake response");
-        let handshake_successful;
-        let public_key;
-        {
-            trace!("waiting for the peers lock for writing");
-            let mut peers = self.peers.write().await;
-            trace!("acquired the peers lock for writing");
-            let peer = peers.index_to_peers.get_mut(&peer_index);
-            if peer.is_none() {
-                todo!()
-            }
-            let peer = peer.unwrap();
-            peer.handle_handshake_response(response, &self.io_interface, wallet.clone())
-                .await
-                .unwrap();
-
-            handshake_successful = peer.handshake_done;
-            public_key = peer.peer_public_key;
+        trace!("waiting for the peers lock for writing");
+        let mut peers = self.peers.write().await;
+        trace!("acquired the peers lock for writing");
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_none() {
+            todo!()
         }
-
-        if handshake_successful {
+        let peer = peer.unwrap();
+        peer.handle_handshake_response(response, &self.io_interface, wallet.clone())
+            .await
+            .unwrap();
+        if peer.handshake_done {
             debug!(
                 "peer : {:?} handshake successful for peer : {:?}",
-                peer_index,
-                hex::encode(public_key)
+                peer.peer_index,
+                hex::encode(peer.peer_public_key)
             );
-
-            {
-                trace!("waiting for the peers lock for writing");
-                let mut peers = self.peers.write().await;
-                trace!("acquired the peers lock for writing");
-
-                // TODO : Use old index returned here for peer cleanup
-                peers.address_to_peers.insert(public_key, peer_index);
-            }
             // start block syncing here
             self.request_blockchain_from_peer(peer_index, blockchain.clone())
                 .await;
@@ -226,39 +209,23 @@ impl Network {
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         debug!("received handshake completion");
-        let handshake_successful;
-        let public_key;
-        {
-            trace!("waiting for the peers lock for writing");
-            let mut peers = self.peers.write().await;
-            trace!("acquired the peers lock for writing");
-            let peer = peers.index_to_peers.get_mut(&peer_index);
-            if peer.is_none() {
-                todo!()
-            }
-            let peer = peer.unwrap();
-            let _result = peer
-                .handle_handshake_completion(response, &self.io_interface)
-                .await;
-
-            handshake_successful = peer.handshake_done;
-            public_key = peer.peer_public_key;
+        trace!("waiting for the peers lock for writing");
+        let mut peers = self.peers.write().await;
+        trace!("acquired the peers lock for writing");
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_none() {
+            todo!()
         }
-
-        if handshake_successful {
+        let peer = peer.unwrap();
+        let _result = peer
+            .handle_handshake_completion(response, &self.io_interface)
+            .await;
+        if peer.handshake_done {
             debug!(
                 "peer : {:?} handshake successful for peer : {:?}",
-                peer_index,
-                hex::encode(public_key)
+                peer.peer_index,
+                hex::encode(peer.peer_public_key)
             );
-            {
-                trace!("waiting for the peers lock for writing");
-                let mut peers = self.peers.write().await;
-                trace!("acquired the peers lock for writing");
-
-                // TODO : Use old index returned here for peer cleanup
-                peers.address_to_peers.insert(public_key, peer_index);
-            }
             // start block syncing here
             self.request_blockchain_from_peer(peer_index, blockchain.clone())
                 .await;
