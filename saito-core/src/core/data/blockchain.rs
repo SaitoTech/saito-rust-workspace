@@ -2269,11 +2269,7 @@ mod tests {
         t.add_block(block2).await;
 
         t2.storage
-            .load_blocks_from_disk(
-                t2.blockchain_lock.clone(),
-                &mut t2.network,
-                t2.sender_to_miner.clone(),
-            )
+            .load_blocks_from_disk(t2.mempool_lock.clone())
             .await;
 
         {
