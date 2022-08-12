@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
@@ -754,10 +754,10 @@ impl Transaction {
     }
 
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
-        trace!(
-            "validating transaction : {:?}",
-            hex::encode(self.hash_for_signature.unwrap())
-        );
+        // trace!(
+        //     "validating transaction : {:?}",
+        //     hex::encode(self.hash_for_signature.unwrap())
+        // );
         //
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash

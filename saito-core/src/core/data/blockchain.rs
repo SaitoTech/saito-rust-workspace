@@ -118,7 +118,7 @@ impl Blockchain {
         // TODO -- david review -- should be no need for recursive fetch
         // as each block will fetch the parent on arrival and processing
         // and we may want to tag and use the degree of distance to impose
-        // penalities on routing peers.
+        // penalties on routing peers.
         //
         // get missing block
         //
@@ -131,14 +131,23 @@ impl Blockchain {
             let earliest_block_hash = self
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(earliest_block_id);
-            trace!("earliest_block_hash {:?}", earliest_block_hash);
+            trace!("earliest_block_hash {:?}", hex::encode(earliest_block_hash));
 
-            if earliest_block_hash != [0u8; 32] {
+            if earliest_block_hash != [0; 32] {
                 let earliest_block = self.get_mut_block(&earliest_block_hash).await.unwrap();
 
+                trace!(
+                    "block.timestamp - earliest_block.timestamp = {:?}",
+                    block.timestamp - earliest_block.timestamp
+                );
                 // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
                 if block.timestamp > earliest_block.timestamp {
                     if self.get_block(&block.previous_block_hash).await.is_none() {
+                        trace!(
+                            "block id : {:?} earliest block id : {:?}",
+                            block.id,
+                            earliest_block_id
+                        );
                         if block.id > earliest_block_id {
                             if block.source_connection_id.is_some() {
                                 let block_hash = block.previous_block_hash;
@@ -165,8 +174,18 @@ impl Blockchain {
                                 // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix
                                 mempool.add_block(block);
                                 return;
+                            } else {
+                                trace!(
+                                    "block : {:?} source connection id not set",
+                                    hex::encode(block.hash)
+                                );
                             }
                         }
+                    } else {
+                        trace!(
+                            "previous block : {:?} exists in blockchain",
+                            hex::encode(block.previous_block_hash)
+                        );
                     }
                 }
             }
@@ -211,6 +230,11 @@ impl Blockchain {
             .contains_block_hash_at_block_id(block_id, block_hash)
         {
             self.blockring.add_block(&block);
+        } else {
+            debug!(
+                "block : {:?} is already in blockring. therefore not adding",
+                hex::encode(block.hash)
+            );
         }
         //
         // blocks are stored in a hashmap indexed by the block_hash. we expect all
@@ -692,6 +716,7 @@ impl Blockchain {
     }
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
+
         self.blocks.get(block_hash)
     }
 

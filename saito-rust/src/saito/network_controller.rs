@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use std::io::{Error, ErrorKind, Write};
+use std::io::{Error, ErrorKind};
 
 use std::sync::Arc;
 

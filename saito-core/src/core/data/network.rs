@@ -83,7 +83,8 @@ impl Network {
     ) -> Result<(), Error> {
         debug!(
             "fetch missing block : block : {:?} from : {:?}",
-            block_hash, public_key
+            hex::encode(block_hash),
+            hex::encode(public_key)
         );
         let peer_index;
         let url;
@@ -92,6 +93,10 @@ impl Network {
             let peers = self.peers.read().await;
             trace!("acquired the peers lock for reading");
             let peer = peers.find_peer_by_address(public_key);
+            if peer.is_none() {
+                debug!("a = {:?}", peers.address_to_peers.len());
+                todo!()
+            }
             let peer = peer.unwrap();
             url = peer.get_block_fetch_url(block_hash);
             peer_index = peer.peer_index;
@@ -208,6 +213,8 @@ impl Network {
                 peer.peer_index,
                 hex::encode(peer.peer_public_key)
             );
+            let public_key = peer.peer_public_key;
+            peers.address_to_peers.insert(public_key, peer_index);
             // start block syncing here
             self.request_blockchain_from_peer(peer_index, blockchain.clone())
                 .await;
@@ -237,6 +244,7 @@ impl Network {
                 return;
             }
             public_key = peer.peer_public_key;
+            peers.address_to_peers.insert(public_key, peer_index);
         }
 
         debug!(

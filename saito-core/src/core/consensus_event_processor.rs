@@ -208,11 +208,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 let mut blockchain = self.blockchain.write().await;
                 trace!("acquired the blockchain lock for writing");
 
-                let result = mempool
+                let mut block = mempool
                     .bundle_block(blockchain.deref_mut(), timestamp)
                     .await;
                 debug!("adding bundled block to mempool");
-                mempool.add_block(result);
+                mempool.add_block(block);
             }
 
             add_to_blockchain_from_mempool(
@@ -263,14 +263,23 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 trace!("acquired the mempool lock for writing");
                 mempool.add_golden_ticket(golden_ticket).await;
             }
-            ConsensusEvent::BlockFetched {
-                peer_index: _,
-                buffer,
-            } => {
+            ConsensusEvent::BlockFetched { peer_index, buffer } => {
                 // trace!("waiting for the blockchain lock for writing");
                 // let mut blockchain = self.blockchain.write().await;
                 // trace!("acquired the blockchain lock for writing");
-                let block = Block::deserialize_from_net(&buffer);
+                let mut block = Block::deserialize_from_net(&buffer);
+                {
+                    trace!("waiting for the peers lock for reading");
+                    let peers = self.network.peers.read().await;
+                    trace!("acquired the peers lock for reading");
+                    let peer = peers.index_to_peers.get(&peer_index);
+                    if peer.is_some() {
+                        let peer = peer.unwrap();
+                        block.source_connection_id = Some(peer.peer_public_key);
+                    }
+                }
+
+                block.generate();
                 {
                     trace!("waiting for the mempool lock for writing");
                     let mut mempool = self.mempool.write().await;
@@ -351,10 +360,10 @@ async fn add_to_blockchain_from_mempool(
 
     debug!("blocks to add : {:?}", blocks.len());
     while let Some(block) = blocks.pop_front() {
-        trace!(
-            "deleting transactions from block : {:?}",
-            hex::encode(block.hash)
-        );
+        // trace!(
+        //     "deleting transactions from block : {:?}",
+        //     hex::encode(block.hash)
+        // );
         // mempool.delete_transactions(&block.transactions);
         blockchain
             .add_block(
