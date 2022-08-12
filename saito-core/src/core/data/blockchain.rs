@@ -151,29 +151,41 @@ impl Blockchain {
                         if block.id > earliest_block_id {
                             if block.source_connection_id.is_some() {
                                 let block_hash = block.previous_block_hash;
-
-                                let result = network
-                                    .fetch_missing_block(
-                                        block_hash,
-                                        block.source_connection_id.as_ref().unwrap(),
-                                    )
-                                    .await;
-                                if result.is_err() {
-                                    warn!(
-                                        "couldn't fetch block : {:?}",
-                                        hex::encode(block.previous_block_hash)
-                                    );
-                                    todo!()
+                                let block_in_mempool_queue;
+                                {
+                                    let mempool = mempool.read().await;
+                                    block_in_mempool_queue =
+                                        mempool.blocks_queue.iter().any(|b| block_hash == b.hash);
                                 }
-                                trace!("waiting for the mempool lock for writing");
-                                let mut mempool = mempool.write().await;
-                                trace!("acquired the mempool lock for writing");
-                                debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
+                                if !block_in_mempool_queue {
+                                    let result = network
+                                        .fetch_missing_block(
+                                            block_hash,
+                                            block.source_connection_id.as_ref().unwrap(),
+                                        )
+                                        .await;
+                                    if result.is_err() {
+                                        warn!(
+                                            "couldn't fetch block : {:?}",
+                                            hex::encode(block.previous_block_hash)
+                                        );
+                                        todo!()
+                                    }
+                                    trace!("waiting for the mempool lock for writing");
+                                    let mut mempool = mempool.write().await;
+                                    trace!("acquired the mempool lock for writing");
+                                    debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
                                     hex::encode(block.hash),
                                     hex::encode(block.previous_block_hash));
-                                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix
-                                mempool.add_block(block);
-                                return;
+                                    // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix
+                                    mempool.add_block(block);
+                                    return;
+                                } else {
+                                    debug!(
+                                        "previous block : {:?} is in the mempool. not fetching",
+                                        hex::encode(block_hash)
+                                    );
+                                }
                             } else {
                                 trace!(
                                     "block : {:?} source connection id not set",
