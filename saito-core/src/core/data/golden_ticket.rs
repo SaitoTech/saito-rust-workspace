@@ -163,7 +163,7 @@ mod tests {
         info!("sss = {:?}", sol);
         assert_eq!(
             primitive_types::U256::from_big_endian(sol.as_ref()).leading_zeros(),
-            2
+            1
         );
 
         let gt = GoldenTicket {
@@ -186,7 +186,7 @@ mod tests {
             .unwrap(),
         };
 
-        let result = gt.validate(2);
+        let result = gt.validate(1);
 
         assert!(result);
     }
