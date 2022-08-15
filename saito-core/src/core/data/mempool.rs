@@ -1,6 +1,6 @@
 use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
@@ -56,14 +56,14 @@ impl Mempool {
     pub fn add_block(&mut self, block: Block) {
         debug!("mempool add block : {:?}", hex::encode(block.hash));
         let hash_to_insert = block.hash;
-        if self
+        if !self
             .blocks_queue
             .iter()
             .any(|block| block.hash == hash_to_insert)
         {
-            // do nothing
-        } else {
             self.blocks_queue.push_back(block);
+        } else {
+            debug!("block not added to mempool as it was already there");
         }
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
@@ -178,15 +178,23 @@ impl Mempool {
         &self,
         blockchain_lock: Arc<RwLock<Blockchain>>,
         current_timestamp: u64,
+        generate_genesis_block: bool,
     ) -> bool {
         if self.transactions.is_empty() {
             return false;
         }
         trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
+        // TODO : add checks [downloading_active,etc...] from SLR code here
+
         trace!("waiting for the blockchain lock for reading");
         let blockchain = blockchain_lock.read().await;
         trace!("acquired the blockchain lock for reading");
+
+        if !generate_genesis_block && blockchain.blocks.is_empty() {
+            warn!("Not generating #1 block. Waiting for blocks from peers");
+            return false;
+        }
 
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
@@ -220,6 +228,7 @@ impl Mempool {
         self.transactions
             .retain(|x| tx_hashmap.contains_key(&x.hash_for_signature) != true);
 
+        // add routing work from remaining tx
         for transaction in &self.transactions {
             self.routing_work_in_mempool += transaction.total_work;
         }
@@ -356,7 +365,7 @@ mod tests {
         // );
         assert_eq!(
             mempool
-                .can_bundle_block(blockchain_lock.clone(), ts + 120000)
+                .can_bundle_block(blockchain_lock.clone(), ts + 120000, true)
                 .await,
             true
         );

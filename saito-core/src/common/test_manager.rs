@@ -120,6 +120,7 @@ pub mod test {
                     &mut self.network,
                     &mut self.storage,
                     self.sender_to_miner.clone(),
+                    self.mempool_lock.clone(),
                 )
                 .await;
             debug!("block added to test manager blockchain");

@@ -10,6 +10,7 @@ use tokio::sync::RwLock;
 use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
+use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
@@ -81,9 +82,8 @@ impl Blockchain {
         network: &Network,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
+        mempool: Arc<RwLock<Mempool>>,
     ) {
-        debug!("adding block to blockchain");
-
         //
         // confirm hash first
         //
@@ -116,7 +116,7 @@ impl Blockchain {
         // TODO -- david review -- should be no need for recursive fetch
         // as each block will fetch the parent on arrival and processing
         // and we may want to tag and use the degree of distance to impose
-        // penalities on routing peers.
+        // penalties on routing peers.
         //
         // get missing block
         //
@@ -129,33 +129,73 @@ impl Blockchain {
             let earliest_block_hash = self
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(earliest_block_id);
-            trace!("earliest_block_hash {:?}", earliest_block_hash);
+            trace!("earliest_block_hash {:?}", hex::encode(earliest_block_hash));
 
-            if earliest_block_hash != [0u8; 32] {
-                let earliest_block = self.get_mut_block(&earliest_block_hash).await;
+            if earliest_block_hash != [0; 32] {
+                let earliest_block = self.get_mut_block(&earliest_block_hash).await.unwrap();
 
+                trace!(
+                    "block.timestamp - earliest_block.timestamp = {:?}",
+                    block.timestamp - earliest_block.timestamp
+                );
                 // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
                 if block.timestamp > earliest_block.timestamp {
                     if self.get_block(&block.previous_block_hash).await.is_none() {
+                        trace!(
+                            "block id : {:?} earliest block id : {:?}",
+                            block.id,
+                            earliest_block_id
+                        );
                         if block.id > earliest_block_id {
                             if block.source_connection_id.is_some() {
                                 let block_hash = block.previous_block_hash;
-
-                                let result = network
-                                    .fetch_missing_block(
-                                        block_hash,
-                                        block.source_connection_id.as_ref().unwrap(),
-                                    )
-                                    .await;
-                                if result.is_err() {
-                                    warn!(
-                                        "couldn't fetch block : {:?}",
-                                        hex::encode(block.previous_block_hash)
-                                    );
-                                    todo!()
+                                let block_in_mempool_queue;
+                                {
+                                    let mempool = mempool.read().await;
+                                    block_in_mempool_queue =
+                                        mempool.blocks_queue.iter().any(|b| block_hash == b.hash);
                                 }
+                                if !block_in_mempool_queue {
+                                    let result = network
+                                        .fetch_missing_block(
+                                            block_hash,
+                                            block.source_connection_id.as_ref().unwrap(),
+                                        )
+                                        .await;
+                                    if result.is_err() {
+                                        warn!(
+                                            "couldn't fetch block : {:?}",
+                                            hex::encode(block.previous_block_hash)
+                                        );
+                                        todo!()
+                                    }
+                                } else {
+                                    debug!(
+                                        "previous block : {:?} is in the mempool. not fetching",
+                                        hex::encode(block_hash)
+                                    );
+                                }
+                                trace!("waiting for the mempool lock for writing");
+                                let mut mempool = mempool.write().await;
+                                trace!("acquired the mempool lock for writing");
+                                debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
+                                    hex::encode(block.hash),
+                                    hex::encode(block.previous_block_hash));
+                                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix
+                                mempool.add_block(block);
+                                return;
+                            } else {
+                                trace!(
+                                    "block : {:?} source connection id not set",
+                                    hex::encode(block.hash)
+                                );
                             }
                         }
+                    } else {
+                        trace!(
+                            "previous block : {:?} exists in blockchain",
+                            hex::encode(block.previous_block_hash)
+                        );
                     }
                 }
             }
@@ -200,6 +240,11 @@ impl Blockchain {
             .contains_block_hash_at_block_id(block_id, block_hash)
         {
             self.blockring.add_block(&block);
+        } else {
+            error!(
+                "block : {:?} is already in blockring. therefore not adding",
+                hex::encode(block.hash)
+            );
         }
         //
         // blocks are stored in a hashmap indexed by the block_hash. we expect all
@@ -272,7 +317,11 @@ impl Blockchain {
                 }
             }
         } else {
-            debug!("block without parent");
+            debug!(
+                "block : {:?} without parent: {:?}",
+                hex::encode(block_hash),
+                hex::encode(previous_block_hash)
+            );
 
             //
             // we have a block without a parent.
@@ -320,7 +369,8 @@ impl Blockchain {
             let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
 
             if does_new_chain_validate {
-                self.add_block_success(block_hash, network, storage).await;
+                self.add_block_success(block_hash, network, storage, mempool)
+                    .await;
 
                 //
                 // TODO
@@ -356,7 +406,7 @@ impl Blockchain {
                 //     })
                 //     .expect("error: BlockchainNewLongestChainBlock message failed to send");
             } else {
-                self.add_block_failure().await;
+                self.add_block_failure(mempool).await;
 
                 // TODO : send with related channel
                 // global_sender
@@ -364,7 +414,7 @@ impl Blockchain {
                 //     .expect("error: BlockchainAddBlockFailure message failed to send");
             }
         } else {
-            self.add_block_failure().await;
+            self.add_block_failure(mempool).await;
 
             // TODO : send with related channel
             // global_sender
@@ -383,6 +433,7 @@ impl Blockchain {
         block_hash: SaitoHash,
         network: &crate::core::data::network::Network,
         storage: &mut Storage,
+        mempool: Arc<RwLock<Mempool>>,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -396,7 +447,7 @@ impl Blockchain {
         // save to disk
         //
         {
-            let block = self.get_mut_block(&block_hash).await;
+            let block = self.get_mut_block(&block_hash).await.unwrap();
             if block.block_type != BlockType::Header {
                 storage.write_block_to_disk(block).await;
             }
@@ -411,7 +462,13 @@ impl Blockchain {
         //  is blockchain calling mempool.on_chain_reorganization?
         //
         //
-        // mempool.delete_transactions(&block.get_transactions());
+        {
+            let block = self.get_mut_block(&block_hash).await.unwrap();
+            trace!("waiting for the mempool lock for writing");
+            let mut mempool = mempool.write().await;
+            trace!("acquired the mempool lock for writing");
+            mempool.delete_transactions(&block.transactions);
+        }
 
         //
         // propagate block to network
@@ -456,7 +513,7 @@ impl Blockchain {
             // to use to check the utxoset.
             //
             {
-                let pblock = self.get_mut_block(&pruned_block_hash).await;
+                let pblock = self.get_mut_block(&pruned_block_hash).await.unwrap();
                 pblock
                     .upgrade_block_to_block_type(BlockType::Full, storage)
                     .await;
@@ -464,7 +521,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn add_block_failure(&mut self) {
+    pub async fn add_block_failure(&mut self, mempool: Arc<RwLock<Mempool>>) {
         // todo!()
     }
 
@@ -640,6 +697,7 @@ impl Blockchain {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
+        info!("------------------------------------------------------");
         while current_id > 0 {
             info!(
                 "{} - {:?}",
@@ -651,6 +709,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
+        info!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
@@ -669,13 +728,14 @@ impl Blockchain {
     pub fn get_block_sync(&self, block_hash: &SaitoHash) -> Option<&Block> {
         self.blocks.get(block_hash)
     }
+
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
         self.blocks.get(block_hash)
     }
 
-    pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> &mut Block {
-        self.blocks.get_mut(block_hash).unwrap()
+    pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {
+        self.blocks.get_mut(block_hash)
     }
 
     pub fn is_block_indexed(&self, block_hash: SaitoHash) -> bool {
@@ -861,7 +921,10 @@ impl Blockchain {
         // happen first.
         //
         {
-            let mut block = self.get_mut_block(&new_chain[current_wind_index]).await;
+            let mut block = self
+                .get_mut_block(&new_chain[current_wind_index])
+                .await
+                .unwrap();
             block.generate();
 
             let latest_block_id = block.id;
@@ -879,7 +942,7 @@ impl Blockchain {
                 let previous_block_hash =
                     self.blockring.get_longest_chain_block_hash_by_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
-                    block = self.get_mut_block(&previous_block_hash).await;
+                    block = self.get_mut_block(&previous_block_hash).await.unwrap();
                     block
                         .upgrade_block_to_block_type(BlockType::Full, storage)
                         .await;
@@ -961,7 +1024,10 @@ impl Blockchain {
             // will know it has rewound the old chain successfully instead of
             // successfully added the new chain.
             //
-            error!("ERROR: this block does not validate!");
+            error!(
+                "ERROR: this block : {:?} does not validate!",
+                hex::encode(block.hash)
+            );
             if current_wind_index == new_chain.len() - 1 {
                 //
                 // this is the first block we have tried to add
@@ -1269,7 +1335,7 @@ impl Blockchain {
             // ask the block to remove its transactions
             //
             {
-                let pblock = self.get_mut_block(&hash).await;
+                let pblock = self.get_mut_block(&hash).await.unwrap();
                 pblock
                     .downgrade_block_to_block_type(BlockType::Pruned)
                     .await;
@@ -1287,6 +1353,7 @@ mod tests {
 
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
+    use crate::core::consensus_event_processor::add_to_blockchain_from_mempool;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
 
@@ -2245,12 +2312,17 @@ mod tests {
         t.add_block(block2).await;
 
         t2.storage
-            .load_blocks_from_disk(
-                t2.blockchain_lock.clone(),
-                &mut t2.network,
-                t2.sender_to_miner.clone(),
-            )
+            .load_blocks_from_disk(t2.mempool_lock.clone())
             .await;
+
+        add_to_blockchain_from_mempool(
+            t2.mempool_lock.clone(),
+            t2.blockchain_lock.clone(),
+            &t2.network,
+            &mut t2.storage,
+            t2.sender_to_miner.clone(),
+        )
+        .await;
 
         {
             let blockchain1 = t.blockchain_lock.read().await;

@@ -379,9 +379,10 @@ impl NetworkConnections {
 
             let network = self.network.lock().await;
             let mut storage = self.storage.lock().await;
-            blockchain
-                .add_block(block, &network, &mut storage, self.sender_to_miner.clone())
-                .await;
+            // TODO  : uncomment
+            // blockchain
+            //     .add_block(block, &network, &mut storage, self.sender_to_miner.clone(),)
+            //     .await;
             {
                 trace!("waiting for the wallet lock for reading");
                 let wallet = self.wallet.read().await;

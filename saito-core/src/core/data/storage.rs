@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
 use crate::core::data::slip::Slip;
 use crate::core::mining_event_processor::MiningEvent;
@@ -80,18 +81,16 @@ impl Storage {
         filename
     }
 
-    pub async fn load_blocks_from_disk(
-        &mut self,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
-        network: &Network,
-        sender_to_miner: tokio::sync::mpsc::Sender<MiningEvent>,
-    ) {
+    pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
         debug!("loading blocks from disk");
         let file_names = self.io_interface.load_block_file_list().await;
-        trace!("waiting for the blockchain lock for writing");
-        let mut blockchain = blockchain_lock.write().await;
-        trace!("acquired the blockchain lock for writing");
+        // trace!("waiting for the blockchain lock for writing");
+        // let mut blockchain = blockchain_lock.write().await;
+        // trace!("acquired the blockchain lock for writing");
 
+        trace!("waiting for the mempool lock for writing");
+        let mut mempool = mempool.write().await;
+        trace!("acquired the mempool lock for writing");
         if file_names.is_err() {
             error!("{:?}", file_names.err().unwrap());
             return;
@@ -111,12 +110,10 @@ impl Storage {
             let mut block = Block::deserialize_from_net(&buffer);
             block.generate();
             debug!("adding block from file : {:?}", file_name);
-            blockchain
-                .add_block(block, network, self, sender_to_miner.clone())
-                .await;
+            mempool.add_block(block);
             debug!("block added from file : {:?}", file_name);
         }
-        debug!("loading blocks completed");
+        debug!("loading blocks to mempool completed");
     }
 
     pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {

@@ -1,4 +1,4 @@
-use log::trace;
+use log::{debug, trace};
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::Block;
@@ -39,6 +39,11 @@ impl BlockRing {
 
     pub fn add_block(&mut self, block: &Block) {
         let insert_pos = block.id % RING_BUFFER_LENGTH;
+        trace!(
+            "blockring.add_block : {:?} at pos = {:?}",
+            hex::encode(block.hash),
+            insert_pos
+        );
         self.ring[(insert_pos as usize)].add_block(block.id, block.hash);
     }
 
@@ -75,7 +80,14 @@ impl BlockRing {
         let insert_pos = (id % RING_BUFFER_LENGTH) as usize;
         match self.ring[insert_pos].lc_pos {
             Some(lc_pos) => self.ring[insert_pos].block_hashes[lc_pos],
-            None => [0; 32],
+            None => {
+                trace!(
+                    "get_longest_chain_block_hash_by_block_id : {:?} insert_pos = {:?} is not set",
+                    id,
+                    insert_pos
+                );
+                return [0; 32];
+            }
         }
     }
 
@@ -110,6 +122,11 @@ impl BlockRing {
     }
 
     pub fn on_chain_reorganization(&mut self, block_id: u64, hash: SaitoHash, lc: bool) -> bool {
+        trace!(
+            "blockring.on_chain_reorg : block_id = {:?}, hash = {:?}",
+            block_id,
+            hex::encode(hash)
+        );
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         if !self.ring[(insert_pos as usize)].on_chain_reorganization(hash, lc) {
             return false;

@@ -138,10 +138,18 @@ async fn run_consensus_event_processor(
     if result.is_ok() {
         create_test_tx = result.unwrap().eq("1");
     }
+    let generate_genesis_block: bool;
+    {
+        let configs = context.configuration.read().await;
+
+        // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
+        generate_genesis_block = configs.peers.is_empty();
+    }
     let consensus_event_processor = ConsensusEventProcessor {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
         wallet: context.wallet.clone(),
+        generate_genesis_block,
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
@@ -230,9 +238,9 @@ async fn run_routing_event_processor(
 // TODO : to be moved to routing event processor
 fn run_loop_thread(
     mut receiver: Receiver<IoEvent>,
-    network_event_sender_to_routing: Sender<NetworkEvent>,
-    network_event_sender_to_blockchain: Sender<NetworkEvent>,
-    network_event_sender_to_miner: Sender<NetworkEvent>,
+    network_event_sender_to_routing_ep: Sender<NetworkEvent>,
+    network_event_sender_to_consensus_ep: Sender<NetworkEvent>,
+    network_event_sender_to_mining_ep: Sender<NetworkEvent>,
 ) -> JoinHandle<()> {
     let loop_handle = tokio::spawn(async move {
         let mut work_done: bool;
@@ -245,22 +253,28 @@ fn run_loop_thread(
                 // TODO : remove hard coded values
                 match command.event_processor_id {
                     ROUTING_EVENT_PROCESSOR_ID => {
-                        debug!("routing event to blockchain controller  ",);
-                        network_event_sender_to_routing
+                        debug!("routing event to routing event processor  ",);
+                        network_event_sender_to_routing_ep
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     CONSENSUS_EVENT_PROCESSOR_ID => {
-                        debug!("routing event to mempool controller : {:?}", command.event);
-                        network_event_sender_to_blockchain
+                        debug!(
+                            "routing event to consensus event processor : {:?}",
+                            command.event
+                        );
+                        network_event_sender_to_consensus_ep
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     MINING_EVENT_PROCESSOR_ID => {
-                        debug!("routing event to miner controller : {:?}", command.event);
-                        network_event_sender_to_miner
+                        debug!(
+                            "routing event to mining event processor : {:?}",
+                            command.event
+                        );
+                        network_event_sender_to_mining_ep
                             .send(command.event)
                             .await
                             .unwrap();
@@ -331,6 +345,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
     tracing_subscriber::fmt::fmt()
         .with_env_filter(filter)
         // .pretty()
@@ -352,7 +370,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let context = Context::new(configs.clone());
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
-    let (sender_to_mempool, receiver_for_mempool) =
+    let (sender_to_consensus, receiver_for_consensus) =
         tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
 
     let (sender_to_routing, receiver_for_routing) =
@@ -365,25 +383,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         configs.clone(),
         &context,
         peers.clone(),
-        &sender_to_mempool,
+        &sender_to_consensus,
         receiver_for_routing,
         &sender_to_miner,
     )
     .await;
 
-    let (network_event_sender_to_blockchain, blockchain_handle) = run_consensus_event_processor(
+    let (network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
         &context,
         peers.clone(),
-        receiver_for_mempool,
+        receiver_for_consensus,
         &sender_to_routing,
         sender_to_miner,
         sender_to_network_controller.clone(),
     )
     .await;
 
-    let (network_event_sender_to_miner, miner_handle) = run_mining_event_processor(
+    let (network_event_sender_to_mining, miner_handle) = run_mining_event_processor(
         &context,
-        &sender_to_mempool,
+        &sender_to_consensus,
         &sender_to_routing,
         receiver_for_miner,
     )
@@ -392,8 +410,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let loop_handle = run_loop_thread(
         event_receiver_in_loop,
         network_event_sender_to_routing,
-        network_event_sender_to_blockchain,
-        network_event_sender_to_miner,
+        network_event_sender_to_consensus,
+        network_event_sender_to_mining,
     );
 
     let network_handle = tokio::spawn(run_network_controller(

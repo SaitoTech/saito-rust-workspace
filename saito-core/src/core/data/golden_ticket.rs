@@ -55,6 +55,9 @@ impl GoldenTicket {
 
     pub fn validate(&self, difficulty: u64) -> bool {
         let solution_hash = hash(&self.serialize_for_net());
+
+        trace!("gt sol hash = {:?}", hex::encode(solution_hash));
+
         return GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty);
     }
 
@@ -70,7 +73,11 @@ impl GoldenTicket {
 
             return true;
         }
-
+        trace!(
+            "difficulty = {:?} leading zeros = {:?}",
+            difficulty,
+            solution.leading_zeros()
+        );
         return false;
     }
 }
@@ -81,6 +88,7 @@ mod tests {
     use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
+    use log::{debug, info};
 
     #[test]
     fn golden_ticket_validate_hashing_difficulty() {
@@ -144,22 +152,42 @@ mod tests {
         assert!(result.validate(0));
     }
 
-    // #[test]
-    // fn gen_target_hash() {
-    //     // let hash = GoldenTicket::generate_target_hash(0);
-    //     // assert_eq!(
-    //     //     hex::encode(hash),
-    //     //     "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-    //     // );
-    //     let hash = GoldenTicket::generate_target_hash(1);
-    //     assert_eq!(
-    //         hex::encode(hash),
-    //         "efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-    //     );
-    //     let hash = GoldenTicket::generate_target_hash(16);
-    //     assert_eq!(
-    //         hex::encode(hash),
-    //         "0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-    //     );
-    // }
+    #[test]
+    fn gt_against_slr_2() {
+        pretty_env_logger::init();
+
+        assert_eq!(primitive_types::U256::one().leading_zeros(), 255);
+        assert_eq!(primitive_types::U256::zero().leading_zeros(), 256);
+        let sol = hex::decode("4523d0eb05233434b42de74a99049decb6c4347da2e7cde9fb49330e905da1e2")
+            .unwrap();
+        info!("sss = {:?}", sol);
+        assert_eq!(
+            primitive_types::U256::from_big_endian(sol.as_ref()).leading_zeros(),
+            1
+        );
+
+        let gt = GoldenTicket {
+            target: hex::decode("6bc717fdd325b39383923e21c00aedf04efbc2d8ae6ba092e86b984ba45daf5f")
+                .unwrap()
+                .to_vec()
+                .try_into()
+                .unwrap(),
+            random: hex::decode("e41eed52c0d1b261654bd7bc7c15996276714e79bf837e129b022f9c04a97e49")
+                .unwrap()
+                .to_vec()
+                .try_into()
+                .unwrap(),
+            public_key: hex::decode(
+                "02262b7491f6599ed3f4f60315d9345e9ef02767973663b9764b52842306da461c",
+            )
+            .unwrap()
+            .to_vec()
+            .try_into()
+            .unwrap(),
+        };
+
+        let result = gt.validate(1);
+
+        assert!(result);
+    }
 }

@@ -22,7 +22,7 @@ use crate::core::data::wallet::Wallet;
 
 pub struct Network {
     // TODO : manage peers from network
-    peers: Arc<RwLock<PeerCollection>>,
+    pub peers: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
 
@@ -41,17 +41,28 @@ impl Network {
 
         let mut excluded_peers = vec![];
         // finding block sender to avoid resending the block to that node
-        if block.source_connection_id.is_some() {
+
+        {
             trace!("waiting for the peers lock for reading");
             let peers = self.peers.read().await;
             trace!("acquired the peers lock for reading");
-            let peer = peers
-                .address_to_peers
-                .get(&block.source_connection_id.unwrap());
-            if peer.is_some() {
-                excluded_peers.push(*peer.unwrap());
+            for (index, peer) in peers.index_to_peers.iter() {
+                if !peer.handshake_done {
+                    excluded_peers.push(*index);
+                    continue;
+                }
+                if block.source_connection_id.is_some() {
+                    let peer = peers
+                        .address_to_peers
+                        .get(&block.source_connection_id.unwrap());
+                    if peer.is_some() {
+                        excluded_peers.push(*peer.unwrap());
+                        continue;
+                    }
+                }
             }
         }
+
         debug!("sending block : {:?} to peers", hex::encode(&block.hash));
         let message = Message::BlockHeaderHash(block.hash);
         self.io_interface
@@ -72,7 +83,8 @@ impl Network {
     ) -> Result<(), Error> {
         debug!(
             "fetch missing block : block : {:?} from : {:?}",
-            block_hash, public_key
+            hex::encode(block_hash),
+            hex::encode(public_key)
         );
         let peer_index;
         let url;
@@ -81,6 +93,10 @@ impl Network {
             let peers = self.peers.read().await;
             trace!("acquired the peers lock for reading");
             let peer = peers.find_peer_by_address(public_key);
+            if peer.is_none() {
+                debug!("a = {:?}", peers.address_to_peers.len());
+                todo!()
+            }
             let peer = peer.unwrap();
             url = peer.get_block_fetch_url(block_hash);
             peer_index = peer.peer_index;
@@ -197,6 +213,8 @@ impl Network {
                 peer.peer_index,
                 hex::encode(peer.peer_public_key)
             );
+            let public_key = peer.peer_public_key;
+            peers.address_to_peers.insert(public_key, peer_index);
             // start block syncing here
             self.request_blockchain_from_peer(peer_index, blockchain.clone())
                 .await;
@@ -209,27 +227,34 @@ impl Network {
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         debug!("received handshake completion");
-        trace!("waiting for the peers lock for writing");
-        let mut peers = self.peers.write().await;
-        trace!("acquired the peers lock for writing");
-        let peer = peers.index_to_peers.get_mut(&peer_index);
-        if peer.is_none() {
-            todo!()
-        }
-        let peer = peer.unwrap();
-        let _result = peer
-            .handle_handshake_completion(response, &self.io_interface)
-            .await;
-        if peer.handshake_done {
-            debug!(
-                "peer : {:?} handshake successful for peer : {:?}",
-                peer.peer_index,
-                hex::encode(peer.peer_public_key)
-            );
-            // start block syncing here
-            self.request_blockchain_from_peer(peer_index, blockchain.clone())
+        let public_key;
+        {
+            trace!("waiting for the peers lock for writing");
+            let mut peers = self.peers.write().await;
+            trace!("acquired the peers lock for writing");
+            let peer = peers.index_to_peers.get_mut(&peer_index);
+            if peer.is_none() {
+                todo!()
+            }
+            let peer = peer.unwrap();
+            let _result = peer
+                .handle_handshake_completion(response, &self.io_interface)
                 .await;
+            if !peer.handshake_done {
+                return;
+            }
+            public_key = peer.peer_public_key;
+            peers.address_to_peers.insert(public_key, peer_index);
         }
+
+        debug!(
+            "peer : {:?} handshake successful for peer : {:?}",
+            peer_index,
+            hex::encode(public_key)
+        );
+        // start block syncing here
+        self.request_blockchain_from_peer(peer_index, blockchain.clone())
+            .await;
     }
     async fn request_blockchain_from_peer(
         &self,
