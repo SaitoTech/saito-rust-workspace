@@ -169,22 +169,21 @@ impl Blockchain {
                                         );
                                         todo!()
                                     }
-                                    trace!("waiting for the mempool lock for writing");
-                                    let mut mempool = mempool.write().await;
-                                    trace!("acquired the mempool lock for writing");
-                                    debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
-                                    hex::encode(block.hash),
-                                    hex::encode(block.previous_block_hash));
-                                    // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix
-                                    mempool.add_block(block);
-                                    return;
                                 } else {
                                     debug!(
                                         "previous block : {:?} is in the mempool. not fetching",
                                         hex::encode(block_hash)
                                     );
-                                    return;
                                 }
+                                trace!("waiting for the mempool lock for writing");
+                                let mut mempool = mempool.write().await;
+                                trace!("acquired the mempool lock for writing");
+                                debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
+                                    hex::encode(block.hash),
+                                    hex::encode(block.previous_block_hash));
+                                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix
+                                mempool.add_block(block);
+                                return;
                             } else {
                                 trace!(
                                     "block : {:?} source connection id not set",
@@ -732,7 +731,6 @@ impl Blockchain {
 
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
-
         self.blocks.get(block_hash)
     }
 
