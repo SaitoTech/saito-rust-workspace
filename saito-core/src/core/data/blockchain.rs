@@ -84,8 +84,6 @@ impl Blockchain {
         sender_to_miner: Sender<MiningEvent>,
         mempool: Arc<RwLock<Mempool>>,
     ) {
-        debug!("adding block to blockchain");
-
         //
         // confirm hash first
         //
@@ -1022,7 +1020,10 @@ impl Blockchain {
             // will know it has rewound the old chain successfully instead of
             // successfully added the new chain.
             //
-            error!("ERROR: this block does not validate!");
+            error!(
+                "ERROR: this block : {:?} does not validate!",
+                hex::encode(block.hash)
+            );
             if current_wind_index == new_chain.len() - 1 {
                 //
                 // this is the first block we have tried to add

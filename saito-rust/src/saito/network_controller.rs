@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use std::io::{Error, ErrorKind};
 
@@ -32,6 +32,7 @@ type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 pub struct NetworkController {
     sockets: HashMap<u64, PeerSender>,
     peer_counter: Arc<Mutex<PeerCounter>>,
+    currently_queried_urls: Arc<Mutex<HashSet<String>>>,
     pub sender_to_saito_controller: Sender<IoEvent>,
 }
 
@@ -143,9 +144,19 @@ impl NetworkController {
         url: String,
         event_id: u64,
         sender_to_core: Sender<IoEvent>,
+        current_queries: Arc<Mutex<HashSet<String>>>,
     ) {
         debug!("fetching block : {:?}", url);
 
+        {
+            // since the block sizes can be large, we need to make sure same block is not fetched multiple times before first fetch finishes.
+            let mut queries = current_queries.lock().await;
+            if queries.contains(&url) {
+                debug!("url : {:?} is already being fetched", url);
+                return;
+            }
+            queries.insert(url.clone());
+        }
         let result = reqwest::get(url.clone()).await;
         if result.is_err() {
             todo!()
@@ -180,6 +191,11 @@ impl NetworkController {
             })
             .await
             .unwrap();
+        {
+            // since we have already fetched the block, we will remove it from the set.
+            let mut queries = current_queries.lock().await;
+            queries.remove(&url);
+        }
         debug!("block buffer sent to blockchain controller");
     }
     pub async fn send_new_peer(
@@ -332,6 +348,7 @@ pub async fn run_network_controller(
         sockets: Default::default(),
         sender_to_saito_controller: sender,
         peer_counter: peer_index_counter.clone(),
+        currently_queried_urls: Arc::new(Default::default()),
     }));
 
     let network_controller_clone = network_controller.clone();
@@ -397,16 +414,23 @@ pub async fn run_network_controller(
                         url,
                     } => {
                         let sender;
+                        let current_queries;
                         {
                             trace!("waiting for the io controller lock for reading");
                             let io_controller = network_controller.read().await;
                             trace!("acquired the io controller lock for reading");
                             sender = io_controller.sender_to_saito_controller.clone();
+                            current_queries = io_controller.currently_queried_urls.clone();
                         }
                         // starting new thread to stop io controller from getting blocked
                         tokio::spawn(async move {
                             NetworkController::fetch_block(
-                                block_hash, peer_index, url, event_id, sender,
+                                block_hash,
+                                peer_index,
+                                url,
+                                event_id,
+                                sender,
+                                current_queries,
                             )
                             .await
                         });
