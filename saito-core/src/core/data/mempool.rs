@@ -62,6 +62,8 @@ impl Mempool {
             .any(|block| block.hash == hash_to_insert)
         {
             self.blocks_queue.push_back(block);
+        } else {
+            debug!("block not added to mempool as it was already there");
         }
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {

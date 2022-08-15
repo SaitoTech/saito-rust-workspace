@@ -252,7 +252,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
     }
 
     async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
-        match event {
+        return match event {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
                     "received new golden ticket : {:?}",
@@ -262,28 +262,38 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 let mut mempool = self.mempool.write().await;
                 trace!("acquired the mempool lock for writing");
                 mempool.add_golden_ticket(golden_ticket).await;
+                Some(())
             }
             ConsensusEvent::BlockFetched { peer_index, buffer } => {
-                // trace!("waiting for the blockchain lock for writing");
-                // let mut blockchain = self.blockchain.write().await;
-                // trace!("acquired the blockchain lock for writing");
                 let mut block = Block::deserialize_from_net(&buffer);
                 {
                     trace!("waiting for the peers lock for reading");
                     let peers = self.network.peers.read().await;
                     trace!("acquired the peers lock for reading");
+                    trace!("waiting for the blockchain lock for writing");
+                    let blockchain = self.blockchain.read().await;
+                    trace!("acquired the blockchain lock for writing");
+                    trace!("waiting for the mempool lock for writing");
+                    let mut mempool = self.mempool.write().await;
+                    trace!("acquired the mempool lock for writing");
+
                     let peer = peers.index_to_peers.get(&peer_index);
                     if peer.is_some() {
                         let peer = peer.unwrap();
                         block.source_connection_id = Some(peer.peer_public_key);
                     }
-                }
 
-                block.generate();
-                {
-                    trace!("waiting for the mempool lock for writing");
-                    let mut mempool = self.mempool.write().await;
-                    trace!("acquired the mempool lock for writing");
+                    block.generate();
+
+                    debug!("block : {:?} fetched from peer", hex::encode(block.hash));
+
+                    if blockchain.blocks.contains_key(&block.hash) {
+                        debug!(
+                            "fetched block : {:?} already in blockchain",
+                            hex::encode(block.hash)
+                        );
+                        return Some(());
+                    }
                     debug!("adding fetched block to mempool");
                     mempool.add_block(block);
                 }
@@ -295,15 +305,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     self.sender_to_miner.clone(),
                 )
                 .await;
-                // blockchain
-                //     .add_block(
-                //         block,
-                //         &mut self.network,
-                //         &mut self.storage,
-                //         self.sender_to_miner.clone(),
-                //         self.mempool.clone(),
-                //     )
-                //     .await;
+                Some(())
             }
             ConsensusEvent::NewTransaction { mut transaction } => {
                 transaction.generate_hash_for_signature();
@@ -315,9 +317,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     hex::encode(transaction.hash_for_signature.unwrap())
                 );
                 mempool.add_transaction(transaction).await;
+                Some(())
             }
-        }
-        None
+        };
     }
 
     async fn on_init(&mut self) {
@@ -337,7 +339,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
     }
 }
 
-async fn add_to_blockchain_from_mempool(
+pub async fn add_to_blockchain_from_mempool(
     mempool: Arc<RwLock<Mempool>>,
     blockchain: Arc<RwLock<Blockchain>>,
     network: &Network,

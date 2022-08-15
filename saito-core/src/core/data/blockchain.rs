@@ -183,6 +183,7 @@ impl Blockchain {
                                         "previous block : {:?} is in the mempool. not fetching",
                                         hex::encode(block_hash)
                                     );
+                                    return;
                                 }
                             } else {
                                 trace!(
@@ -241,7 +242,7 @@ impl Blockchain {
         {
             self.blockring.add_block(&block);
         } else {
-            debug!(
+            error!(
                 "block : {:?} is already in blockring. therefore not adding",
                 hex::encode(block.hash)
             );
@@ -317,7 +318,11 @@ impl Blockchain {
                 }
             }
         } else {
-            debug!("block without parent");
+            debug!(
+                "block : {:?} without parent: {:?}",
+                hex::encode(block_hash),
+                hex::encode(previous_block_hash)
+            );
 
             //
             // we have a block without a parent.
@@ -724,6 +729,7 @@ impl Blockchain {
     pub fn get_block_sync(&self, block_hash: &SaitoHash) -> Option<&Block> {
         self.blocks.get(block_hash)
     }
+
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
 
@@ -1349,6 +1355,7 @@ mod tests {
 
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
+    use crate::core::consensus_event_processor::add_to_blockchain_from_mempool;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
 
@@ -2309,6 +2316,15 @@ mod tests {
         t2.storage
             .load_blocks_from_disk(t2.mempool_lock.clone())
             .await;
+
+        add_to_blockchain_from_mempool(
+            t2.mempool_lock.clone(),
+            t2.blockchain_lock.clone(),
+            &t2.network,
+            &mut t2.storage,
+            t2.sender_to_miner.clone(),
+        )
+        .await;
 
         {
             let blockchain1 = t.blockchain_lock.read().await;
