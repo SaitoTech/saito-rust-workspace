@@ -223,23 +223,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 self.sender_to_miner.clone(),
             )
             .await;
-            //
-            // while let Some(block) = mempool.blocks_queue.pop_front() {
-            //     trace!(
-            //         "deleting transactions from block : {:?}",
-            //         hex::encode(block.hash)
-            //     );
-            //     mempool.delete_transactions(&block.transactions);
-            //     blockchain
-            //         .add_block(
-            //             block,
-            //             &mut self.network,
-            //             &mut self.storage,
-            //             self.sender_to_miner.clone(),
-            //             ,
-            //         )
-            //         .await;
-            // }
+
             debug!("blocks added to blockchain");
 
             work_done = true;
@@ -362,11 +346,6 @@ pub async fn add_to_blockchain_from_mempool(
 
     debug!("blocks to add : {:?}", blocks.len());
     while let Some(block) = blocks.pop_front() {
-        // trace!(
-        //     "deleting transactions from block : {:?}",
-        //     hex::encode(block.hash)
-        // );
-        // mempool.delete_transactions(&block.transactions);
         blockchain
             .add_block(
                 block,
