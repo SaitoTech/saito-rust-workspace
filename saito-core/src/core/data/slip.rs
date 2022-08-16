@@ -179,6 +179,7 @@ mod tests {
 
     use crate::core::data::blockchain::Blockchain;
     use crate::core::data::wallet::Wallet;
+    use crate::{log_read_lock_receive, log_read_lock_request};
 
     use super::*;
 
@@ -233,17 +234,13 @@ mod tests {
     async fn slip_addition_and_removal_from_utxoset() {
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        trace!("waiting for the blockchain lock for writing");
         let mut blockchain = blockchain_lock.write().await;
-        trace!("acquired the blockchain lock for writing");
 
         let mut slip = Slip::new();
         slip.amount = 100_000;
         slip.uuid = [1; 32];
         {
-            trace!("waiting for the wallet lock for reading");
             let wallet = wallet_lock.read().await;
-            trace!("acquired the wallet lock for reading");
             slip.public_key = wallet.public_key;
         }
         slip.generate_utxoset_key();

@@ -1,4 +1,4 @@
-use log::{debug, trace};
+use log::trace;
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::Block;

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, trace};
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -15,8 +15,9 @@ use crate::core::data::crypto::{generate_random_bytes, hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::wallet::Wallet;
 use crate::core::routing_event_processor::RoutingEvent;
+use crate::{log_read_lock_receive, log_read_lock_request};
 
-const MINER_INTERVAL: u128 = 100_000;
+const MINER_INTERVAL: u128 = 10_000;
 
 #[derive(Debug)]
 pub enum MiningEvent {
@@ -42,9 +43,9 @@ impl MiningEventProcessor {
         let public_key: SaitoPublicKey;
 
         {
-            trace!("waiting for the wallet lock for reading");
+            log_read_lock_request!("wallet");
             let wallet = self.wallet.read().await;
-            trace!("acquired the wallet lock for reading");
+            log_read_lock_receive!("wallet");
             public_key = wallet.public_key;
         }
 
@@ -53,10 +54,13 @@ impl MiningEventProcessor {
         // old way used a static method instead
         let gt = GoldenTicket::create(self.target, random_bytes, public_key);
         if gt.validate(self.difficulty) {
-            debug!(
-                "golden ticket found. sending to mempool. previous block : {:?} solution : {:?}",
+            info!(
+                "golden ticket found. sending to mempool. previous block : {:?} random : {:?} key : {:?} solution : {:?} for difficulty : {:?}",
                 hex::encode(gt.target),
-                hex::encode(hash(&gt.serialize_for_net()))
+                hex::encode(gt.random),
+                hex::encode(gt.public_key),
+                hex::encode(hash(&gt.serialize_for_net())),
+                self.difficulty
             );
             self.sender_to_mempool
                 .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
@@ -79,7 +83,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
 
         if self.new_miner_event_received {
             self.miner_timer += duration.as_micros();
-            if self.miner_timer > MINER_INTERVAL {
+            if self.miner_timer >= MINER_INTERVAL {
                 self.miner_timer = 0;
                 self.new_miner_event_received = false;
 
@@ -91,7 +95,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     }
 
     async fn process_event(&mut self, event: MiningEvent) -> Option<()> {
-        debug!("event received : {:?}", event);
+        // debug!("event received : {:?}", event);
         match event {
             MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
                 debug!(

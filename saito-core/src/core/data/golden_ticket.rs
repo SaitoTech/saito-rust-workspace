@@ -3,7 +3,6 @@ use std::ops::{Shl, Shr};
 
 use log::{debug, trace};
 
-use secp256k1::bitcoin_hashes::hex::ToHex;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};

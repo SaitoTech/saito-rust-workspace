@@ -11,6 +11,7 @@ use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
 use crate::core::data::slip::Slip;
 use crate::core::mining_event_processor::MiningEvent;
+use crate::{log_write_lock_receive, log_write_lock_request};
 
 pub struct Storage {
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
@@ -84,13 +85,13 @@ impl Storage {
     pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
         debug!("loading blocks from disk");
         let file_names = self.io_interface.load_block_file_list().await;
-        // trace!("waiting for the blockchain lock for writing");
+        // trace!("waiting for the log_write_lock_request!("blockchain");");
         // let mut blockchain = blockchain_lock.write().await;
-        // trace!("acquired the blockchain lock for writing");
+        // trace!("acquired the log_write_lock_request!("blockchain");");
 
-        trace!("waiting for the mempool lock for writing");
+        log_write_lock_request!("mempool");
         let mut mempool = mempool.write().await;
-        trace!("acquired the mempool lock for writing");
+        log_write_lock_receive!("mempool");
         if file_names.is_err() {
             error!("{:?}", file_names.err().unwrap());
             return;

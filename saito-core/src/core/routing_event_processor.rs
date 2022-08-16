@@ -19,6 +19,7 @@ use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
+use crate::{log_read_lock_receive, log_read_lock_request};
 
 #[derive(Debug)]
 pub enum RoutingEvent {}
@@ -172,9 +173,9 @@ impl RoutingEventProcessor {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        trace!("waiting for the blockchain lock for reading");
+        log_read_lock_request!("blockchain");
         let blockchain = self.blockchain.read().await;
-        trace!("acquired the blockchain lock for reading");
+        log_read_lock_receive!("blockchain");
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);

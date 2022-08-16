@@ -16,6 +16,9 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
+use crate::{
+    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
+};
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 10;
@@ -151,7 +154,9 @@ impl Blockchain {
                                 let block_hash = block.previous_block_hash;
                                 let block_in_mempool_queue;
                                 {
+                                    log_read_lock_request!("mempool");
                                     let mempool = mempool.read().await;
+                                    log_read_lock_receive!("mempool");
                                     block_in_mempool_queue =
                                         mempool.blocks_queue.iter().any(|b| block_hash == b.hash);
                                 }
@@ -175,9 +180,9 @@ impl Blockchain {
                                         hex::encode(block_hash)
                                     );
                                 }
-                                trace!("waiting for the mempool lock for writing");
+                                log_write_lock_request!("mempool");
                                 let mut mempool = mempool.write().await;
-                                trace!("acquired the mempool lock for writing");
+                                log_write_lock_receive!("mempool");
                                 debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
                                     hex::encode(block.hash),
                                     hex::encode(block.previous_block_hash));
@@ -464,9 +469,9 @@ impl Blockchain {
         //
         {
             let block = self.get_mut_block(&block_hash).await.unwrap();
-            trace!("waiting for the mempool lock for writing");
+            log_write_lock_request!("mempool");
             let mut mempool = mempool.write().await;
-            trace!("acquired the mempool lock for writing");
+            log_write_lock_receive!("mempool");
             mempool.delete_transactions(&block.transactions);
         }
 
@@ -981,9 +986,9 @@ impl Blockchain {
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
 
-                trace!("waiting for the wallet lock for writing");
+                log_write_lock_request!("wallet");
                 let mut wallet = self.wallet_lock.write().await;
-                trace!("acquired the wallet lock for writing");
+                log_write_lock_receive!("wallet");
                 wallet.on_chain_reorganization(&block, true);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
@@ -1123,9 +1128,9 @@ impl Blockchain {
 
         // wallet update
         {
-            trace!("waiting for the wallet lock for writing");
+            log_write_lock_request!("wallet");
             let mut wallet = self.wallet_lock.write().await;
-            trace!("acquired the wallet lock for writing");
+            log_write_lock_receive!("wallet");
             wallet.on_chain_reorganization(&block, false);
         }
 
@@ -1280,9 +1285,9 @@ impl Blockchain {
             // remove slips from wallet
             //
             {
-                trace!("waiting for the wallet lock for writing");
+                log_write_lock_request!("wallet");
                 let mut wallet = self.wallet_lock.write().await;
-                trace!("acquired the wallet lock for writing");
+                log_write_lock_receive!("wallet");
                 wallet.delete_block(pblock);
             }
             //
