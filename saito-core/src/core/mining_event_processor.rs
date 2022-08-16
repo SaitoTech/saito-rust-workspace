@@ -17,7 +17,7 @@ use crate::core::data::wallet::Wallet;
 use crate::core::routing_event_processor::RoutingEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
 
-const MINER_INTERVAL: u128 = 100_000;
+const MINER_INTERVAL: u128 = 10_000;
 
 #[derive(Debug)]
 pub enum MiningEvent {
