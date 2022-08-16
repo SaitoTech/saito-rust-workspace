@@ -139,21 +139,22 @@ impl MerkleTree {
 
         match &node.node_type {
             NodeType::Node { left, right } => {
-                let mut vbytes: Vec<u8> = vec![];
-
-                if left.is_some() {
-                    vbytes.extend(left.as_ref().unwrap().hash.unwrap());
+                if let Some(leftNode) = left {
+                    if let Some(rightNode) = right {
+                        let mut vbytes: Vec<u8> = vec![];
+                        vbytes.extend(leftNode.hash.unwrap());
+                        vbytes.extend(rightNode.hash.unwrap());
+                        node.hash = Some(hash(&vbytes));
+                    } else {
+                        node.hash = leftNode.hash;
+                    }
                 } else {
-                    vbytes.extend(&[0u8; 32]);
+                    if let Some(rightNode) = right {
+                        node.hash = rightNode.hash;
+                    } else {
+                        unreachable!("Both leaves of a merkle tree node are null")
+                    }
                 }
-
-                if right.is_some() {
-                    vbytes.extend(right.as_ref().unwrap().hash.unwrap());
-                } else {
-                    vbytes.extend(&[0u8; 32]);
-                }
-
-                node.hash = Some(hash(&vbytes));
             }
             NodeType::Transaction { .. } => {}
         }
