@@ -12,6 +12,7 @@ use tokio::task::JoinHandle;
 use tracing::info;
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
+use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
@@ -25,6 +26,7 @@ use saito_core::core::mining_event_processor::{MiningEvent, MiningEventProcessor
 use saito_core::core::routing_event_processor::{
     PeerState, RoutingEvent, RoutingEventProcessor, StaticPeer,
 };
+use saito_core::{log_read_lock_receive, log_read_lock_request};
 
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::io_event::IoEvent;
@@ -208,9 +210,9 @@ async fn run_routing_event_processor(
         ),
     };
     {
-        trace!("waiting for the configs lock for reading");
+        log_read_lock_request!("configs");
         let configs = configs.read().await;
-        trace!("acquired the configs lock for reading");
+        log_read_lock_receive!("configs");
         let peers = &configs.peers;
         for peer in peers {
             routing_event_processor.static_peers.push(StaticPeer {
@@ -349,6 +351,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+
     tracing_subscriber::fmt::fmt()
         .with_env_filter(filter)
         // .pretty()

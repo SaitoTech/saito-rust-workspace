@@ -14,6 +14,7 @@ use crate::core::data::msg::handshake::{
 };
 use crate::core::data::msg::message::Message;
 use crate::core::data::wallet::Wallet;
+use crate::{log_read_lock_receive, log_read_lock_request};
 
 #[derive(Debug, Clone)]
 pub struct Peer {
@@ -44,12 +45,14 @@ impl Peer {
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.peer_index);
-        trace!("waiting for the wallet lock for reading");
+        log_read_lock_request!("wallet");
         let wallet = wallet.read().await;
-        trace!("acquired the wallet lock for reading");
+        log_read_lock_receive!("wallet");
         let block_fetch_url;
         {
+            log_read_lock_request!("configs");
             let configs = configs.read().await;
+            log_read_lock_receive!("configs");
             block_fetch_url = configs.get_block_fetch_url();
         }
         let challenge = HandshakeChallenge {
@@ -82,15 +85,17 @@ impl Peer {
         );
         let block_fetch_url;
         {
+            log_read_lock_request!("configs");
             let configs = configs.read().await;
+            log_read_lock_receive!("configs");
             block_fetch_url = configs.get_block_fetch_url();
         }
 
         self.peer_public_key = challenge.public_key;
         self.block_fetch_url = challenge.block_fetch_url;
-        trace!("waiting for the wallet lock for reading");
+        log_read_lock_request!("wallet");
         let wallet = wallet.read().await;
-        trace!("acquired the wallet lock for reading");
+        log_read_lock_receive!("wallet");
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(&challenge.challenge.to_vec(), wallet.private_key),
@@ -145,9 +150,9 @@ impl Peer {
         self.peer_public_key = response.public_key;
         self.block_fetch_url = response.block_fetch_url;
         self.handshake_done = true;
-        trace!("waiting for the wallet lock for reading");
+        log_read_lock_request!("wallet");
         let wallet = wallet.read().await;
-        trace!("acquired the wallet lock for reading");
+        log_read_lock_receive!("wallet");
         let response = HandshakeCompletion {
             signature: sign(&response.challenge, wallet.private_key),
         };

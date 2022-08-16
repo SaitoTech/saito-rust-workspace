@@ -8,6 +8,7 @@ use crate::common::defs::{SaitoPublicKey, SaitoSignature};
 use crate::core::data::crypto::{hash, sign};
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
+use crate::{log_read_lock_receive, log_read_lock_request};
 
 pub const HOP_SIZE: usize = 130;
 
@@ -36,9 +37,9 @@ impl Hop {
         to_public_key: SaitoPublicKey,
         tx: &Transaction,
     ) -> Hop {
-        trace!("waiting for the wallet lock for reading");
+        log_read_lock_request!("wallet");
         let wallet = wallet_lock.read().await;
-        trace!("acquired the wallet lock for reading");
+        log_read_lock_receive!("wallet");
         let mut hop = Hop::new();
 
         //

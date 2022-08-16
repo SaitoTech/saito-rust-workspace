@@ -28,6 +28,9 @@ use saito_core::core::data::storage::Storage;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_event_processor::MiningEvent;
+use saito_core::{
+    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
+};
 
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::{IoEvent, NetworkEvent};
@@ -373,9 +376,9 @@ impl NetworkConnections {
         let has_generator;
         let public_key;
         {
-            trace!("waiting for the blockchain lock for writing");
+            log_write_lock_request!("blockchain");
             let mut blockchain = self.blockchain.write().await;
-            trace!("acquired the blockchain lock for writing");
+            log_write_lock_receive!("blockchain");
 
             let network = self.network.lock().await;
             let mut storage = self.storage.lock().await;
@@ -384,9 +387,9 @@ impl NetworkConnections {
             //     .add_block(block, &network, &mut storage, self.sender_to_miner.clone(),)
             //     .await;
             {
-                trace!("waiting for the wallet lock for reading");
+                log_read_lock_request!("wallet");
                 let wallet = self.wallet.read().await;
-                trace!("acquired the wallet lock for reading");
+                log_read_lock_receive!("wallet");
                 balance = wallet.get_available_balance();
                 public_key = wallet.public_key;
             }
@@ -458,17 +461,17 @@ impl NetworkConnections {
         let private_key;
         //let latest_block_id;
         {
-            trace!("waiting for the wallet lock for reading");
+            log_read_lock_request!("wallet");
             let wallet = wallet.read().await;
-            trace!("acquired the wallet lock for reading");
+            log_read_lock_receive!("wallet");
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
         {
-            trace!("waiting for the blockchain lock for reading");
+            log_read_lock_request!("blockchain");
             let blockchain = blockchain.read().await;
-            trace!("acquired the blockchain lock for reading");
+            log_read_lock_receive!("blockchain");
 
             if blockchain.blockring.is_empty() {
                 unreachable!()

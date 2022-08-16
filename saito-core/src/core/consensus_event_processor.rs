@@ -23,6 +23,9 @@ use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
 use crate::core::routing_event_processor::RoutingEvent;
+use crate::{
+    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
+};
 
 #[derive(Debug)]
 pub enum ConsensusEvent {
@@ -81,19 +84,19 @@ impl ConsensusEventProcessor {
         let latest_block_id;
 
         {
-            trace!("waiting for the wallet lock for reading");
+            log_read_lock_request!("wallet");
             let wallet = wallet_lock_clone.read().await;
-            trace!("acquired the wallet lock for reading");
+            log_read_lock_receive!("wallet");
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
-        trace!("waiting for the mempool lock for writing");
+        log_write_lock_request!("mempool");
         let mut mempool = mempool_lock_clone.write().await;
-        trace!("acquired the mempool lock for writing");
-        trace!("waiting for the blockchain lock for reading");
+        log_write_lock_receive!("mempool");
+        log_read_lock_request!("blockchain");
         let blockchain = blockchain_lock_clone.read().await;
-        trace!("acquired the blockchain lock for reading");
+        log_read_lock_receive!("blockchain");
 
         latest_block_id = blockchain.get_latest_block_id();
 
@@ -183,9 +186,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         self.block_producing_timer = self.block_producing_timer + duration_value;
         // TODO : make timers configurable
         if self.block_producing_timer >= 1_000_000 {
-            trace!("waiting for the mempool lock for reading");
+            log_read_lock_request!("mempool");
             let mempool = self.mempool.read().await;
-            trace!("acquired the mempool lock for reading");
+            log_read_lock_receive!("mempool");
             let mut generate_genesis_block: bool = false;
             {}
             can_bundle = mempool
@@ -201,12 +204,12 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 
         if can_bundle {
             {
-                trace!("waiting for the mempool lock for writing");
+                log_write_lock_request!("mempool");
                 let mut mempool = self.mempool.write().await;
-                trace!("acquired the mempool lock for writing");
-                trace!("waiting for the blockchain lock for writing");
+                log_write_lock_receive!("mempool");
+                log_write_lock_request!("blockchain");
                 let mut blockchain = self.blockchain.write().await;
-                trace!("acquired the blockchain lock for writing");
+                log_write_lock_receive!("blockchain");
 
                 let mut block = mempool
                     .bundle_block(blockchain.deref_mut(), timestamp)
@@ -242,24 +245,24 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     "received new golden ticket : {:?}",
                     hex::encode(golden_ticket.target)
                 );
-                trace!("waiting for the mempool lock for writing");
+                log_write_lock_request!("mempool");
                 let mut mempool = self.mempool.write().await;
-                trace!("acquired the mempool lock for writing");
+                log_write_lock_receive!("mempool");
                 mempool.add_golden_ticket(golden_ticket).await;
                 Some(())
             }
             ConsensusEvent::BlockFetched { peer_index, buffer } => {
                 let mut block = Block::deserialize_from_net(&buffer);
                 {
-                    trace!("waiting for the peers lock for reading");
+                    log_read_lock_request!("peers");
                     let peers = self.network.peers.read().await;
-                    trace!("acquired the peers lock for reading");
-                    trace!("waiting for the blockchain lock for writing");
+                    log_read_lock_receive!("peers");
+                    log_read_lock_request!("blockchain");
                     let blockchain = self.blockchain.read().await;
-                    trace!("acquired the blockchain lock for writing");
-                    trace!("waiting for the mempool lock for writing");
+                    log_read_lock_receive!("blockchain");
+                    log_write_lock_request!("mempool");
                     let mut mempool = self.mempool.write().await;
-                    trace!("acquired the mempool lock for writing");
+                    log_write_lock_receive!("mempool");
 
                     let peer = peers.index_to_peers.get(&peer_index);
                     if peer.is_some() {
@@ -293,8 +296,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             }
             ConsensusEvent::NewTransaction { mut transaction } => {
                 transaction.generate_hash_for_signature();
-                debug!("tx received with sig: {:?}", transaction.signature);
-                trace!("waiting for the mempool lock for writing");
+                debug!(
+                    "tx received with sig: {:?}",
+                    hex::encode(transaction.signature)
+                );
+                log_write_lock_request!("mempool");
                 let mut mempool = self.mempool.write().await;
                 trace!(
                     "acquired the mempool lock for writing, adding new transaction : {:?}",
@@ -333,16 +339,18 @@ pub async fn add_to_blockchain_from_mempool(
     debug!("adding blocks from mempool to blockchain");
     let mut blocks: VecDeque<Block>;
     {
-        trace!("waiting for the mempool lock for writing");
+        log_write_lock_request!("mempool");
         let mut mempool = mempool.write().await;
-        trace!("acquired the mempool lock for writing");
+        log_write_lock_receive!("mempool");
         blocks = mempool.blocks_queue.drain(..).collect();
     }
     blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
 
-    trace!("waiting for the blockchain lock for writing");
+    // trace!("waiting for the log_write_lock_request!("blockchain");");
+    log_write_lock_request!("blockchain");
     let mut blockchain = blockchain.write().await;
-    trace!("acquired the blockchain lock for writing");
+    log_write_lock_receive!("blockchain");
+    // trace!("acquired the log_write_lock_request!("blockchain");");
 
     debug!("blocks to add : {:?}", blocks.len());
     while let Some(block) = blocks.pop_front() {

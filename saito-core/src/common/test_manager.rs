@@ -48,6 +48,7 @@ pub mod test {
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_event_processor::MiningEvent;
+    use crate::{log_read_lock_receive, log_read_lock_request};
 
     pub fn create_timestamp() -> u64 {
         SystemTime::now()
@@ -130,9 +131,9 @@ pub mod test {
         // check that the blockchain connects properly
         //
         pub async fn check_blockchain(&self) {
-            trace!("waiting for the blockchain lock for reading");
+            log_read_lock_request!("blockchain");
             let blockchain = self.blockchain_lock.read().await;
-            trace!("acquired the blockchain lock for reading");
+            log_read_lock_receive!("blockchain");
 
             for i in 1..blockchain.blocks.len() {
                 let block_hash = blockchain
@@ -451,9 +452,9 @@ pub mod test {
         ) -> GoldenTicket {
             let public_key;
             {
-                trace!("waiting for the wallet lock for reading");
+                log_read_lock_request!("wallet");
                 let wallet = wallet.read().await;
-                trace!("acquired the wallet lock for reading");
+                log_read_lock_receive!("wallet");
                 public_key = wallet.public_key;
             }
             let mut random_bytes = hash(&generate_random_bytes(32));

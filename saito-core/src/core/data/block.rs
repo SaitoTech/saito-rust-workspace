@@ -21,6 +21,7 @@ use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::core::data::wallet::Wallet;
+use crate::{log_read_lock_receive, log_read_lock_request};
 
 pub const BLOCK_HEADER_SIZE: usize = 245;
 
@@ -283,9 +284,9 @@ impl Block {
 
         let public_key;
         {
-            trace!("waiting for the wallet lock for reading");
+            log_read_lock_request!("wallet");
             let wallet = wallet_lock.read().await;
-            trace!("acquired the wallet lock for reading");
+            log_read_lock_receive!("wallet");
             public_key = wallet.public_key;
         }
         let mut previous_block_id = 0;
@@ -387,9 +388,9 @@ impl Block {
             let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
             fee_tx.hash_for_signature = Some(hash_for_signature);
             {
-                trace!("waiting for the wallet lock for reading");
+                log_read_lock_request!("wallet");
                 let wallet = wallet_lock.read().await;
-                trace!("acquired the wallet lock for reading");
+                log_read_lock_receive!("wallet");
                 fee_tx.sign(wallet.private_key);
             }
             //
@@ -459,9 +460,9 @@ impl Block {
         block.merkle_root = block_merkle_root;
 
         {
-            trace!("waiting for the wallet lock for reading");
+            log_read_lock_request!("wallet");
             let wallet = wallet_lock.read().await;
-            trace!("acquired the wallet lock for reading");
+            log_read_lock_receive!("wallet");
 
             block.generate_pre_hash();
             block.sign(wallet.private_key);
@@ -1522,7 +1523,7 @@ impl Block {
                         hex::encode(previous_block.hash),
                         previous_block.difficulty,
                         hex::encode(gt.random),
-                        hex::encode(gt.public_key)
+                        hex::encode(gt.public_key),
                     );
                     let solution = hash(&gt.serialize_for_net());
                     let solution_num = primitive_types::U256::from_big_endian(&solution);

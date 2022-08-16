@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
@@ -22,6 +23,9 @@ use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
+use saito_core::{
+    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
+};
 
 use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
 use crate::{IoEvent, NetworkEvent};
@@ -96,9 +100,9 @@ impl NetworkController {
         let result = result.unwrap();
         let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-        trace!("waiting for the io controller lock for writing");
+        log_write_lock_request!("network controller");
         let mut io_controller = io_controller.write().await;
-        trace!("acquired the io controller lock for writing");
+        log_write_lock_receive!("network controller");
         let sender_to_controller = io_controller.sender_to_saito_controller.clone();
         let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
         NetworkController::send_new_peer(
@@ -333,9 +337,9 @@ pub async fn run_network_controller(
     let url;
     let port;
     {
-        trace!("waiting for the configs lock for reading");
+        log_read_lock_request!("configs");
         let configs = configs.read().await;
-        trace!("acquired the configs lock for reading");
+        log_read_lock_receive!("configs");
         url = "localhost:".to_string() + configs.server.port.to_string().as_str();
         port = configs.server.port;
     }
@@ -377,18 +381,18 @@ pub async fn run_network_controller(
                 work_done = true;
                 match interface_event {
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
-                        trace!("waiting for the io controller lock for writing");
+                        log_write_lock_request!("network controller");
                         let mut io_controller = network_controller.write().await;
-                        trace!("acquired the io controller lock for writing");
+                        log_write_lock_receive!("network controller");
                         io_controller.send_to_all(buffer, exceptions).await;
                     }
                     NetworkEvent::OutgoingNetworkMessage {
                         peer_index: index,
                         buffer,
                     } => {
-                        trace!("waiting for the io_controller lock for writing");
+                        log_write_lock_request!("network controller");
                         let mut io_controller = network_controller.write().await;
-                        trace!("acquired the io controller lock for writing");
+                        log_write_lock_receive!("network controller");
                         io_controller.send_outgoing_message(index, buffer).await;
                     }
                     NetworkEvent::ConnectToPeer { peer_details } => {
@@ -416,9 +420,9 @@ pub async fn run_network_controller(
                         let sender;
                         let current_queries;
                         {
-                            trace!("waiting for the io controller lock for reading");
+                            log_read_lock_request!("network controller");
                             let io_controller = network_controller.read().await;
-                            trace!("acquired the io controller lock for reading");
+                            log_read_lock_receive!("network controller");
                             sender = io_controller.sender_to_saito_controller.clone();
                             current_queries = io_controller.currently_queried_urls.clone();
                         }
@@ -441,9 +445,9 @@ pub async fn run_network_controller(
                 }
             }
 
-            // if !work_done {
-            //     std::thread::sleep(Duration::new(1, 0));
-            // }
+            if !work_done {
+                std::thread::sleep(Duration::new(0, 1_000_000));
+            }
         }
     });
     let _result = tokio::join!(server_handle, controller_handle);
@@ -515,10 +519,10 @@ fn run_websocket_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
-                        trace!("waiting for the blockchain lock for reading");
+                        log_read_lock_request!("blockchain");
                         // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
-                        trace!("acquired the blockchain lock for reading");
+                        log_read_lock_receive!("blockchain");
                         let block = blockchain.get_block(&block_hash).await;
                         if block.is_none() {
                             debug!("block not found : {:?}", block_hash);

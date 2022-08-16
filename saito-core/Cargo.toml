@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.17.0", features = ["sync", "tokio-macros", "test-util", "macros", "tracing"] }
-secp256k1 = { version = "0.20.3", features = ["rand", "bitcoin_hashes", "global-context", "serde"] }
+secp256k1 = { version = "0.24.0", features = ["rand", "bitcoin_hashes", "global-context", "serde"] }
 getrandom = { version = "0.2.4", features = ["js"] }
 rand = { version = "0.8.4", features = ["getrandom"] }
 pretty_env_logger = "0.4"
@@ -21,7 +21,7 @@ merkle = "1.11.0"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_with = "1.12.0"
 hex = "0.4.3"
-ahash = "0.7.6"
+ahash = "0.8.0"
 num-derive = "0.3.3"
 num-traits = "0.2.14"
 async-recursion = "1.0.0"
@@ -30,6 +30,9 @@ async-trait = "0.1.52"
 primitive-types = "0.11.1"
 
 [dev-dependencies]
-serial_test = "0.6.0"
+serial_test = "0.9.0"
 tokio = { version = "1.17.0", features = ["full"] }
 futures = { version = "0.3.21" }
+
+[features]
+locking-logs = []

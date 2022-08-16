@@ -13,6 +13,7 @@ use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify, verif
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
+use crate::{log_write_lock_receive, log_write_lock_request};
 
 pub const TRANSACTION_SIZE: usize = 93;
 
@@ -158,9 +159,9 @@ impl Transaction {
             with_payment,
             with_fee
         );
-        trace!("waiting for the wallet lock for writing");
+        log_write_lock_request!("wallet");
         let mut wallet = wallet_lock.write().await;
-        trace!("acquired the wallet lock for writing");
+        log_write_lock_receive!("wallet");
         let wallet_public_key = wallet.public_key;
 
         let available_balance = wallet.get_available_balance();

@@ -11,6 +11,9 @@ use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
+use crate::{
+    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
+};
 
 //
 // In addition to responding to global broadcast messages, the
@@ -69,21 +72,20 @@ impl Mempool {
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
         debug!(
             "adding golden ticket : {:?}",
-            hash(&golden_ticket.serialize_for_net())
+            hex::encode(hash(&golden_ticket.serialize_for_net()))
         );
         let transaction;
         {
-            trace!("waiting for the wallet lock for writing");
+            log_write_lock_request!("wallet");
             let mut wallet = self.wallet_lock.write().await;
-            trace!("acquired the wallet lock for writing");
+            log_write_lock_receive!("wallet");
             transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
         }
-        if self
+        if !self
             .transactions
             .iter()
             .any(|transaction| transaction.is_golden_ticket())
         {
-        } else {
             info!("adding golden ticket to mempool...");
             self.transactions.push(transaction);
         }
@@ -126,9 +128,9 @@ impl Mempool {
         //
         let public_key;
         {
-            trace!("waiting for the wallet lock for reading");
+            log_read_lock_request!("wallet");
             let wallet = self.wallet_lock.read().await;
-            trace!("acquired the wallet lock for reading");
+            log_read_lock_receive!("wallet");
             public_key = wallet.public_key;
         }
 
@@ -187,9 +189,9 @@ impl Mempool {
 
         // TODO : add checks [downloading_active,etc...] from SLR code here
 
-        trace!("waiting for the blockchain lock for reading");
+        log_read_lock_request!("blockchain");
         let blockchain = blockchain_lock.read().await;
-        trace!("acquired the blockchain lock for reading");
+        log_read_lock_receive!("blockchain");
 
         if !generate_genesis_block && blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
