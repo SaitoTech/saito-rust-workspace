@@ -21,7 +21,7 @@ use crate::{
 };
 
 // length of 1 genesis period
-pub const GENESIS_PERIOD: u64 = 10;
+pub const GENESIS_PERIOD: u64 = 100000;
 // prune blocks from index after N blocks
 pub const PRUNE_AFTER_BLOCKS: u64 = 20;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
@@ -102,7 +102,8 @@ impl Blockchain {
         //
         let block_hash = block.hash;
         let block_id = block.id;
-        let previous_block_hash = self.blockring.get_latest_block_hash();
+        let latest_block_hash = self.blockring.get_latest_block_hash();
+        let previous_block_hash = block.previous_block_hash;
 
         //
         // sanity checks
@@ -273,12 +274,18 @@ impl Blockchain {
         let mut old_chain: Vec<[u8; 32]> = Vec::new();
         let mut shared_ancestor_found = false;
         let mut new_chain_hash = block_hash;
-        let mut old_chain_hash = previous_block_hash;
+        let mut old_chain_hash = latest_block_hash;
 
         while !shared_ancestor_found {
+            trace!(
+                "checking new chain hash : {:?}",
+                hex::encode(new_chain_hash)
+            );
+            // TODO : following 2 lines can be optimized for a single search
             if self.blocks.contains_key(&new_chain_hash) {
                 if self.blocks.get(&new_chain_hash).unwrap().in_longest_chain {
                     shared_ancestor_found = true;
+                    trace!("shared ancestor found : {:?}", hex::encode(new_chain_hash));
                     break;
                 } else {
                     if new_chain_hash == [0; 32] {
@@ -323,9 +330,9 @@ impl Blockchain {
             }
         } else {
             debug!(
-                "block : {:?} without parent: {:?}",
+                "block without parent. block : {:?}, latest : {:?}",
                 hex::encode(block_hash),
-                hex::encode(previous_block_hash)
+                hex::encode(latest_block_hash)
             );
 
             //
@@ -351,8 +358,13 @@ impl Blockchain {
                 // block 503 before block 453 when block 453 is our expected proper
                 // next block and we are getting blocks out-of-order because of
                 // connection or network issues.
-                //
-                error!("blocks received out-of-order issue...");
+
+                info!("blocks received out-of-order issue. handling edge case...");
+                if previous_block_hash == self.get_latest_block_hash()
+                    && previous_block_hash != [0; 32]
+                {
+                    todo!("copy implementation from SLR. needed for lite client implementation")
+                }
             }
         }
 
@@ -371,30 +383,18 @@ impl Blockchain {
         // viable.
         //
         if am_i_the_longest_chain {
+            debug!("this is the longest chain");
             let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
 
             if does_new_chain_validate {
                 self.add_block_success(block_hash, network, storage, mempool)
                     .await;
 
-                //
-                // TODO
-                //
-                // mutable update is hell -- we can do this but have to have
-                // manually checked that the entry exists in order to pull
-                // this trick. we did this check before validating.
-                //
-                {
-                    self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
-                }
-
-                // TODO : send with the right channel
-                // global_sender
-                //     .send(GlobalEvent::BlockchainAddBlockSuccess { hash: block_hash })
-                //     .expect("error: BlockchainAddBlockSuccess message failed to send");
+                self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
+                debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}",hex::encode(block_hash),difficulty);
                 sender_to_miner
                     .send(MiningEvent::LongestChainBlockAdded {
                         hash: block_hash,
@@ -402,41 +402,20 @@ impl Blockchain {
                     })
                     .await
                     .unwrap();
-
-                debug!("event sent to miner");
-                // global_sender
-                //     .send(GlobalEvent::BlockchainNewLongestChainBlock {
-                //         hash: block_hash,
-                //         difficulty,
-                //     })
-                //     .expect("error: BlockchainNewLongestChainBlock message failed to send");
             } else {
+                debug!("new chain doesn't validate");
                 self.add_block_failure(mempool).await;
-
-                // TODO : send with related channel
-                // global_sender
-                //     .send(GlobalEvent::BlockchainAddBlockFailure { hash: block_hash })
-                //     .expect("error: BlockchainAddBlockFailure message failed to send");
             }
         } else {
+            debug!("this is not the longest chain");
             self.add_block_failure(mempool).await;
-
-            // TODO : send with related channel
-            // global_sender
-            //     .send(GlobalEvent::BlockchainAddBlockFailure { hash: block_hash })
-            //     .expect("error: BlockchainAddBlockFailure message failed to send");
         }
     }
-    // pub async fn add_block_to_blockchain(blockchain_lock: Arc<RwLock<Blockchain>>, block: Block) {
-    //     let mut blockchain = blockchain_lock.write().await;
-    //     let res = blockchain.add_block(block).await;
-    //     res
-    // }
 
     pub async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
-        network: &crate::core::data::network::Network,
+        network: &Network,
         storage: &mut Storage,
         mempool: Arc<RwLock<Mempool>>,
     ) {
@@ -527,6 +506,7 @@ impl Blockchain {
     }
 
     pub async fn add_block_failure(&mut self, mempool: Arc<RwLock<Mempool>>) {
+        debug!("add block failed");
         // todo!()
     }
 
@@ -736,6 +716,7 @@ impl Blockchain {
 
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
+
         self.blocks.get(block_hash)
     }
 
