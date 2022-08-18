@@ -512,7 +512,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn add_block_failure(&mut self, mempool: Arc<RwLock<Mempool>>) {
+    pub async fn add_block_failure(&mut self, _mempool: Arc<RwLock<Mempool>>) {
         debug!("add block failed");
         // todo!()
     }
@@ -723,6 +723,7 @@ impl Blockchain {
 
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
+
         self.blocks.get(block_hash)
     }
 

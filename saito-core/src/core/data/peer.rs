@@ -1,7 +1,7 @@
 use std::io::Error;
 use std::sync::Arc;
 
-use log::{debug, trace, warn};
+use log::{debug, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};

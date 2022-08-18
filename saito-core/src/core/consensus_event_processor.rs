@@ -210,7 +210,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 let mut blockchain = self.blockchain.write().await;
                 log_write_lock_receive!("blockchain");
 
-                let mut block = mempool
+                let block = mempool
                     .bundle_block(blockchain.deref_mut(), timestamp)
                     .await;
                 debug!("adding bundled block to mempool");

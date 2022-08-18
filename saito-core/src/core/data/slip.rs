@@ -174,12 +174,10 @@ impl Slip {
 mod tests {
     use std::sync::Arc;
 
-    use log::trace;
     use tokio::sync::RwLock;
 
     use crate::core::data::blockchain::Blockchain;
     use crate::core::data::wallet::Wallet;
-    use crate::{log_read_lock_receive, log_read_lock_request};
 
     use super::*;
 

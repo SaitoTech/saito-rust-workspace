@@ -39,7 +39,7 @@ pub mod test {
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
 
-    use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify_hash};
+    use crate::core::data::crypto::{generate_random_bytes, hash, verify_hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;

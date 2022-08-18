@@ -1,5 +1,4 @@
 use std::convert::TryInto;
-use std::ops::{Shl, Shr};
 
 use log::{debug, trace};
 
@@ -87,7 +86,7 @@ mod tests {
     use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
-    use log::{debug, info};
+    use log::info;
 
     #[test]
     fn golden_ticket_validate_hashing_difficulty() {

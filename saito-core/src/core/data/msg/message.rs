@@ -58,7 +58,7 @@ impl Message {
     }
     pub fn deserialize(buffer: Vec<u8>) -> Result<Message, Error> {
         let message_type: u8 = u8::from_be_bytes(buffer[0..1].try_into().unwrap());
-        let request_id: u32 = u32::from_be_bytes(buffer[1..5].try_into().unwrap());
+        let _request_id: u32 = u32::from_be_bytes(buffer[1..5].try_into().unwrap());
         let buffer = buffer[5..].to_vec();
 
         trace!("buffer size = {:?}", buffer.len());

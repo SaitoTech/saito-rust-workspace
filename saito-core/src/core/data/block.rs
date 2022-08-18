@@ -1691,7 +1691,7 @@ mod tests {
 
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::crypto::{verify, verify_hash};
+    use crate::core::data::crypto::verify_hash;
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;

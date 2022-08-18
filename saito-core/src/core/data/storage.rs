@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::common::defs::BLOCK_FILE_EXTENSION;
-use log::{debug, error, trace};
+use log::{debug, error};
 use tokio::sync::RwLock;
 
 use crate::common::interface_io::InterfaceIO;
