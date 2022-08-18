@@ -105,6 +105,7 @@ pub fn new() -> SaitoWasm {
             time_keeper: Box::new(WasmTimeKeeper {}),
             wallet,
             network: Network::new(Box::new(WasmIoHandler {}), peers.clone()),
+            reconnection_timer: 0,
         },
         routing_event_processor: ConsensusEventProcessor {
             mempool: context.mempool.clone(),
