@@ -60,7 +60,7 @@ impl Slip {
         true
     }
 
-    pub fn deserialize_from_net(bytes: Vec<u8>) -> Slip {
+    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let uuid: SaitoHash = bytes[33..65].try_into().unwrap();
         let amount: u64 = u64::from_be_bytes(bytes[65..73].try_into().unwrap());
@@ -225,7 +225,7 @@ mod tests {
         let slip = Slip::new();
         let serialized_slip = slip.serialize_for_net();
         assert_eq!(serialized_slip.len(), 75);
-        let deserilialized_slip = Slip::deserialize_from_net(serialized_slip);
+        let deserilialized_slip = Slip::deserialize_from_net(&serialized_slip);
         assert_eq!(slip, deserilialized_slip);
     }
 

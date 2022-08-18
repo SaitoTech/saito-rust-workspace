@@ -128,7 +128,7 @@ pub fn new() -> SaitoWasm {
             sender_to_mempool: sender_to_mempool.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
             miner_timer: 0,
-            new_miner_event_received: false,
+            miner_active: false,
             target: [0; 32],
             difficulty: 0,
         },

@@ -23,7 +23,7 @@ use crate::{
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 100000;
 // prune blocks from index after N blocks
-pub const PRUNE_AFTER_BLOCKS: u64 = 20;
+pub const PRUNE_AFTER_BLOCKS: u64 = 100;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
 pub const MAX_STAKER_RECURSION: u64 = 3;
 // max token supply - used in validating block #1
@@ -275,6 +275,7 @@ impl Blockchain {
         let mut shared_ancestor_found = false;
         let mut new_chain_hash = block_hash;
         let mut old_chain_hash = latest_block_hash;
+        let mut am_i_the_longest_chain = false;
 
         while !shared_ancestor_found {
             trace!(
@@ -370,7 +371,11 @@ impl Blockchain {
 
         // at this point we should have a shared ancestor or not
         // find out whether this new block is claiming to require chain-validation
-        let am_i_the_longest_chain = self.is_new_chain_the_longest_chain(&new_chain, &old_chain);
+        if !am_i_the_longest_chain {
+            if self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
+                am_i_the_longest_chain = true
+            }
+        }
 
         //
         // validate
@@ -405,10 +410,12 @@ impl Blockchain {
             } else {
                 debug!("new chain doesn't validate");
                 self.add_block_failure(mempool).await;
+                self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = false;
             }
         } else {
             debug!("this is not the longest chain");
-            self.add_block_failure(mempool).await;
+            self.add_block_success(block_hash, network, storage, mempool)
+                .await;
         }
     }
 
@@ -716,7 +723,6 @@ impl Blockchain {
 
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
-
         self.blocks.get(block_hash)
     }
 
@@ -742,6 +748,9 @@ impl Blockchain {
         old_chain: &Vec<[u8; 32]>,
     ) -> bool {
         debug!("checking for longest chain");
+        if self.blockring.is_empty() {
+            return true;
+        }
         if old_chain.len() > new_chain.len() {
             warn!("WARN: old chain length is greater than new chain length");
             return false;

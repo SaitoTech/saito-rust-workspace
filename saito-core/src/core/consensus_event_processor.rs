@@ -151,7 +151,7 @@ impl ConsensusEventProcessor {
 #[async_trait]
 impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
-        trace!("processing new interface event");
+        // trace!("processing new interface event");
 
         None
     }
@@ -189,8 +189,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             log_read_lock_request!("mempool");
             let mempool = self.mempool.read().await;
             log_read_lock_receive!("mempool");
-            let mut generate_genesis_block: bool = false;
-            {}
+
             can_bundle = mempool
                 .can_bundle_block(
                     self.blockchain.clone(),
@@ -302,10 +301,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 );
                 log_write_lock_request!("mempool");
                 let mut mempool = self.mempool.write().await;
-                trace!(
-                    "acquired the mempool lock for writing, adding new transaction : {:?}",
-                    hex::encode(transaction.hash_for_signature.unwrap())
-                );
+                log_write_lock_receive!("mempool");
                 mempool.add_transaction(transaction).await;
                 Some(())
             }

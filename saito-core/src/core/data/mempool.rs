@@ -9,7 +9,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::transaction::Transaction;
+use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
@@ -75,21 +75,30 @@ impl Mempool {
             hex::encode(hash(&golden_ticket.serialize_for_net()))
         );
         let transaction;
+        let target = golden_ticket.target;
         {
             log_write_lock_request!("wallet");
             let mut wallet = self.wallet_lock.write().await;
             log_write_lock_receive!("wallet");
             transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
         }
-        if !self
-            .transactions
-            .iter()
-            .any(|transaction| transaction.is_golden_ticket())
-        {
-            info!("adding golden ticket to mempool...");
-            self.transactions.push(transaction);
+        for tx in self.transactions.iter() {
+            if let TransactionType::GoldenTicket = tx.transaction_type {
+                let gt = GoldenTicket::deserialize_from_net(&tx.message);
+                if gt.target == target {
+                    debug!("similar golden ticket already exists : {:?}", target);
+                    return;
+                }
+            }
         }
-        trace!("golden ticket added to mempool");
+        // if !self
+        //     .transactions
+        //     .iter()
+        //     .any(|transaction| transaction.is_golden_ticket())
+        // {
+        self.transactions.push(transaction);
+        info!("golden ticket added to mempool");
+        // }
     }
 
     pub async fn add_transaction_if_validates(

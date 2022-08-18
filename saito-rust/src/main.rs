@@ -110,7 +110,7 @@ async fn run_mining_event_processor(
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         miner_timer: 0,
-        new_miner_event_received: false,
+        miner_active: false,
         target: [0; 32],
         difficulty: 0,
     };
@@ -256,14 +256,14 @@ fn run_loop_thread(
                 // TODO : remove hard coded values
                 match command.event_processor_id {
                     ROUTING_EVENT_PROCESSOR_ID => {
-                        debug!("routing event to routing event processor  ",);
+                        trace!("routing event to routing event processor  ",);
                         network_event_sender_to_routing_ep
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     CONSENSUS_EVENT_PROCESSOR_ID => {
-                        debug!(
+                        trace!(
                             "routing event to consensus event processor : {:?}",
                             command.event
                         );
@@ -273,7 +273,7 @@ fn run_loop_thread(
                             .unwrap();
                     }
                     MINING_EVENT_PROCESSOR_ID => {
-                        debug!(
+                        trace!(
                             "routing event to mining event processor : {:?}",
                             command.event
                         );

@@ -57,7 +57,7 @@ impl Hop {
         hop
     }
 
-    pub fn deserialize_from_net(bytes: Vec<u8>) -> Hop {
+    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Hop {
         let from: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let to: SaitoPublicKey = bytes[33..66].try_into().unwrap();
         let sig: SaitoSignature = bytes[66..130].try_into().unwrap();
@@ -125,7 +125,7 @@ mod tests {
 
         let hop = Hop::generate(wallet.clone(), receiver_public_key, &tx).await;
 
-        let hop2 = Hop::deserialize_from_net(hop.serialize_for_net());
+        let hop2 = Hop::deserialize_from_net(&hop.serialize_for_net());
 
         assert_eq!(hop.from, hop2.from);
         assert_eq!(hop.to, hop2.to);
