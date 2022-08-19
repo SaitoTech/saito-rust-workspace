@@ -78,11 +78,15 @@ pub mod test {
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
 
             Self {
-                wallet_lock: wallet_lock,
+                wallet_lock: wallet_lock.clone(),
                 blockchain_lock: blockchain_lock,
                 mempool_lock: mempool_lock,
                 latest_block_hash: [0; 32],
-                network: Network::new(Box::new(TestIOHandler::new()), peers.clone()),
+                network: Network::new(
+                    Box::new(TestIOHandler::new()),
+                    peers.clone(),
+                    wallet_lock.clone(),
+                ),
                 peers: peers.clone(),
                 storage: Storage::new(Box::new(TestIOHandler::new())),
                 sender_to_miner: sender_to_miner.clone(),

@@ -62,11 +62,12 @@ impl NetworkConnections {
     ) -> Self {
         NetworkConnections {
             blockchain,
-            wallet,
+            wallet: wallet.clone(),
             configuration,
             network: Arc::new(Mutex::new(Network::new(
                 Box::new(RustIOHandler::new(sender_to_self.clone(), 0)),
                 peers.clone(),
+                wallet.clone(),
             ))),
             storage: Arc::new(Mutex::new(Storage::new(Box::new(RustIOHandler::new(
                 sender_to_self,
