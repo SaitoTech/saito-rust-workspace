@@ -354,7 +354,7 @@ impl Network {
     }
 
     pub async fn connect_to_static_peers(&mut self) {
-        debug!("connect to static peers",);
+        trace!("connect to static peers",);
 
         for peer in &self.static_peer_configs {
             self.io_interface
@@ -362,6 +362,6 @@ impl Network {
                 .await
                 .unwrap();
         }
-        debug!("connected to peers");
+        trace!("connected to peers");
     }
 }
