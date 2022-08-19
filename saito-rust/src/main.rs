@@ -162,6 +162,7 @@ async fn run_consensus_event_processor(
                 CONSENSUS_EVENT_PROCESSOR_ID,
             )),
             peers.clone(),
+            context.wallet.clone(),
         ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
@@ -207,6 +208,7 @@ async fn run_routing_event_processor(
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
             peers.clone(),
+            context.wallet.clone(),
         ),
         reconnection_timer: 0,
     };

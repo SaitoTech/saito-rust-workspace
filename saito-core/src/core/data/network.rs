@@ -28,17 +28,20 @@ pub struct Network {
     pub peers: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
     static_peer_configs: Vec<PeerConfig>,
+    pub wallet: Arc<RwLock<Wallet>>,
 }
 
 impl Network {
     pub fn new(
         io_handler: Box<dyn InterfaceIO + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
+        wallet: Arc<RwLock<Wallet>>,
     ) -> Network {
         Network {
             peers,
             io_interface: io_handler,
             static_peer_configs: Default::default(),
+            wallet,
         }
     }
     pub async fn propagate_block(&self, block: &Block) {
@@ -76,9 +79,30 @@ impl Network {
             .unwrap();
     }
 
-    pub async fn propagate_transaction(&self, _transaction: &Transaction) {
-        debug!("propagating transaction");
-        todo!()
+    pub async fn propagate_transaction(&self, transaction: &Transaction) {
+        debug!(
+            "propagating transaction : {:?}",
+            hex::encode(transaction.signature)
+        );
+
+        // TODO : return if tx is not valid
+
+        log_read_lock_request!("peers");
+        let peers = self.peers.read().await;
+        log_read_lock_receive!("peers");
+
+        for (index, peer) in peers.index_to_peers.iter() {
+            if transaction.is_in_path(&peer.peer_public_key) {
+                continue;
+            }
+            let mut transaction = transaction.clone();
+            transaction.add_hop(self.wallet.clone(), peer.peer_public_key);
+            let message = Message::Transaction(transaction);
+            self.io_interface
+                .send_message(*index, message.serialize())
+                .await
+                .unwrap();
+        }
     }
 
     pub async fn fetch_missing_block(

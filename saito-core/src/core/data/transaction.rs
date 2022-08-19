@@ -953,6 +953,27 @@ impl Transaction {
 
         true
     }
+    pub fn is_in_path(&self, public_key: &SaitoPublicKey) -> bool {
+        if self.is_from(public_key) {
+            return true;
+        }
+        for hop in &self.path {
+            if hop.from.eq(public_key) {
+                return true;
+            }
+        }
+        false
+    }
+    pub fn is_from(&self, public_key: &SaitoPublicKey) -> bool {
+        self.inputs
+            .iter()
+            .any(|input| input.public_key.eq(public_key))
+    }
+    pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
+        self.outputs
+            .iter()
+            .any(|slip| slip.public_key.eq(public_key))
+    }
 }
 
 #[cfg(test)]

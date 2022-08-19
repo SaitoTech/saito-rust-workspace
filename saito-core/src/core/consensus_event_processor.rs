@@ -302,7 +302,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 log_write_lock_request!("mempool");
                 let mut mempool = self.mempool.write().await;
                 log_write_lock_receive!("mempool");
-                mempool.add_transaction(transaction).await;
+                mempool.add_transaction(transaction.clone()).await;
+                self.network.propagate_transaction(&transaction).await;
+
                 Some(())
             }
         };
