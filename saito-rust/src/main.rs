@@ -208,6 +208,7 @@ async fn run_routing_event_processor(
             )),
             peers.clone(),
         ),
+        reconnection_timer: 0,
     };
     {
         log_read_lock_request!("configs");

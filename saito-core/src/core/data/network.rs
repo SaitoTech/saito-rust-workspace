@@ -9,7 +9,7 @@ use crate::common::interface_io::InterfaceIO;
 use crate::core::data;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
-use crate::core::data::configuration::Configuration;
+use crate::core::data::configuration::{Configuration, PeerConfig};
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::handshake::{
     HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
@@ -27,6 +27,7 @@ pub struct Network {
     // TODO : manage peers from network
     pub peers: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
+    static_peer_configs: Vec<PeerConfig>,
 }
 
 impl Network {
@@ -37,6 +38,7 @@ impl Network {
         Network {
             peers,
             io_interface: io_handler,
+            static_peer_configs: Default::default(),
         }
     }
     pub async fn propagate_block(&self, block: &Block) {
@@ -134,6 +136,9 @@ impl Network {
                     .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
                     .await
                     .unwrap();
+
+                self.static_peer_configs
+                    .push(peer.static_peer_config.as_ref().unwrap().clone());
             } else {
                 info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
                     peer.peer_index, hex::encode(peer.peer_public_key));
@@ -162,6 +167,9 @@ impl Network {
             peer.initiate_handshake(&self.io_interface, wallet.clone(), configs.clone())
                 .await
                 .unwrap();
+        } else {
+            self.static_peer_configs
+                .retain(|config| config != peer.static_peer_config.as_ref().unwrap());
         }
 
         peers.index_to_peers.insert(peer_index, peer);
@@ -316,13 +324,15 @@ impl Network {
                 .unwrap();
         }
     }
-    pub async fn connect_to_static_peers(&mut self, configs: Arc<RwLock<Configuration>>) {
-        debug!("connect to peers from config",);
-        log_read_lock_request!("configs");
-        let configs = configs.read().await;
-        log_read_lock_receive!("configs");
 
-        for peer in &configs.peers {
+    pub async fn initialize_static_peers(&mut self, configs: Arc<RwLock<Configuration>>) {
+        self.static_peer_configs = configs.read().await.peers.clone();
+    }
+
+    pub async fn connect_to_static_peers(&mut self) {
+        debug!("connect to static peers",);
+
+        for peer in &self.static_peer_configs {
             self.io_interface
                 .connect_to_peer(peer.clone())
                 .await

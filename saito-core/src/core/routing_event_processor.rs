@@ -48,6 +48,7 @@ pub struct RoutingEventProcessor {
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub network: Network,
+    pub reconnection_timer: u128,
 }
 
 impl RoutingEventProcessor {
@@ -132,12 +133,6 @@ impl RoutingEventProcessor {
         debug!("incoming message processed");
     }
 
-    async fn connect_to_static_peers(&mut self) {
-        debug!("connect to peers from config",);
-        self.network
-            .connect_to_static_peers(self.configs.clone())
-            .await;
-    }
     async fn handle_new_peer(
         &mut self,
         peer_data: Option<data::configuration::PeerConfig>,
@@ -267,8 +262,17 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
         }
         None
     }
-    async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
+    async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
+
+        let timestamp = self.time_keeper.get_timestamp();
+        let duration_value = duration.as_micros();
+
+        self.reconnection_timer = self.reconnection_timer + duration_value;
+        if self.reconnection_timer >= 5_000_000 {
+            self.network.connect_to_static_peers().await;
+            self.reconnection_timer = 0;
+        }
 
         None
     }
@@ -284,6 +288,8 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
 
     async fn on_init(&mut self) {
         // connect to peers
-        self.connect_to_static_peers().await;
+        self.network
+            .initialize_static_peers(self.configs.clone())
+            .await;
     }
 }
