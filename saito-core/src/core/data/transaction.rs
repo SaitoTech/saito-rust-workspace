@@ -70,10 +70,9 @@ impl Transaction {
             timestamp: 0,
             inputs: vec![],
             outputs: vec![],
-            // TODO : reset to vec![] after WASM implementation done
-            message: vec![123, 125], // to match with JS {}
+            message: vec![],
             transaction_type: TransactionType::Normal,
-            replaces_txs: 0,
+            replaces_txs: 1,
             signature: [0; 64],
             hash_for_signature: None,
             path: vec![],

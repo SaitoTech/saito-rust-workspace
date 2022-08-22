@@ -1,6 +1,7 @@
 use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
 use crate::core::data::transaction::Transaction;
+use log::{debug, trace};
 use rayon::prelude::*;
 use std::collections::LinkedList;
 
@@ -34,6 +35,10 @@ impl MerkleTreeNode {
             count,
         }
     }
+
+    pub fn get_hash(&self) -> Option<SaitoHash> {
+        return self.hash;
+    }
 }
 
 pub struct MerkleTree {
@@ -62,12 +67,20 @@ impl MerkleTree {
         let mut leaves: LinkedList<Box<MerkleTreeNode>> = Default::default();
 
         for index in 0..transactions.len() {
+            trace!(
+                "Tx[{:?}] = {:?}, hash = {:?}",
+                index,
+                hex::encode(transactions[index].serialize_for_signature()),
+                hex::encode(transactions[index].hash_for_signature.unwrap())
+            );
             leaves.push_back(Box::new(MerkleTreeNode::new(
                 NodeType::Transaction { index },
                 transactions[index].hash_for_signature,
                 1 as usize,
             )));
         }
+
+        trace!("---------------------");
 
         while leaves.len() > 1 {
             let mut nodes: LinkedList<MerkleTreeNode> = Default::default();
@@ -77,11 +90,21 @@ impl MerkleTree {
                 let left = leaves.pop_front();
                 let right = leaves.pop_front(); //Can be None, this is expected
                 let count = MerkleTree::calculate_child_count(&left, &right);
-                nodes.push_back(MerkleTreeNode::new(
-                    NodeType::Node { left, right },
-                    None,
-                    count,
-                ));
+
+                if right.is_some() {
+                    nodes.push_back(MerkleTreeNode::new(
+                        NodeType::Node { left, right },
+                        None,
+                        count,
+                    ));
+                } else {
+                    let hash = left.as_ref().unwrap().get_hash();
+                    nodes.push_back(MerkleTreeNode::new(
+                        NodeType::Node { left, right },
+                        hash,
+                        count,
+                    ));
+                }
             }
 
             // Compute the node hashes in parallel
@@ -92,8 +115,11 @@ impl MerkleTree {
             leaves.clear();
 
             while !nodes.is_empty() {
-                leaves.push_back(Box::new(nodes.pop_front().unwrap()));
+                let node = nodes.pop_front().unwrap();
+                leaves.push_back(Box::new(node));
             }
+
+            trace!("---------------------");
         }
 
         return Some(Box::new(MerkleTree {
@@ -139,22 +165,15 @@ impl MerkleTree {
 
         match &node.node_type {
             NodeType::Node { left, right } => {
-                if let Some(leftNode) = left {
-                    if let Some(rightNode) = right {
-                        let mut vbytes: Vec<u8> = vec![];
-                        vbytes.extend(leftNode.hash.unwrap());
-                        vbytes.extend(rightNode.hash.unwrap());
-                        node.hash = Some(hash(&vbytes));
-                    } else {
-                        node.hash = leftNode.hash;
-                    }
-                } else {
-                    if let Some(rightNode) = right {
-                        node.hash = rightNode.hash;
-                    } else {
-                        unreachable!("Both leaves of a merkle tree node are null")
-                    }
-                }
+                let mut vbytes: Vec<u8> = vec![];
+                vbytes.extend(left.as_ref().unwrap().hash.unwrap());
+                vbytes.extend(right.as_ref().unwrap().hash.unwrap());
+                node.hash = Some(hash(&vbytes));
+                trace!(
+                    "Node : buffer = {:?}, hash = {:?}",
+                    hex::encode(vbytes),
+                    hex::encode(node.hash.unwrap())
+                );
             }
             NodeType::Transaction { .. } => {}
         }
@@ -288,6 +307,7 @@ mod tests {
 
     #[test]
     fn merkle_tree_pruning_test() {
+        pretty_env_logger::init();
         let wallet = Wallet::new();
 
         let mut transactions = vec![];
@@ -312,19 +332,19 @@ mod tests {
         assert_eq!(cloned_tree.len(), tree.len());
         assert_eq!(pruned_tree.len(), 7);
 
-        println!("\ntree");
-        tree.traverse(TraverseMode::BreadthFirst, |node| {
-            print!("{}, ", hex::encode(node.hash.unwrap()))
-        });
-
-        println!("\ncloned_tree");
-        cloned_tree.traverse(TraverseMode::BreadthFirst, |node| {
-            print!("{}, ", hex::encode(node.hash.unwrap()))
-        });
-
-        println!("\npruned_tree");
-        pruned_tree.traverse(TraverseMode::BreadthFirst, |node| {
-            print!("{}, ", hex::encode(node.hash.unwrap()))
-        });
+        // println!("\ntree");
+        // tree.traverse(TraverseMode::BreadthFirst, |node| {
+        //     print!("{}, ", hex::encode(node.hash.unwrap()))
+        // });
+        //
+        // println!("\ncloned_tree");
+        // cloned_tree.traverse(TraverseMode::BreadthFirst, |node| {
+        //     print!("{}, ", hex::encode(node.hash.unwrap()))
+        // });
+        //
+        // println!("\npruned_tree");
+        // pruned_tree.traverse(TraverseMode::BreadthFirst, |node| {
+        //     print!("{}, ", hex::encode(node.hash.unwrap()))
+        // });
     }
 }

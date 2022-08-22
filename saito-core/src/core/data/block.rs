@@ -16,7 +16,7 @@ use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::{hash, sign, verify, verify_hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
-use crate::core::data::merkle::MerkleTree;
+use crate::core::data::merkle::{MerkleTree, TraverseMode};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
@@ -808,15 +808,21 @@ impl Block {
 
     pub fn generate_merkle_root(&self) -> SaitoHash {
         debug!("generating the merkle root 1");
+
+        let merkle_root_hash;
+        if let Some(tree) = MerkleTree::generate(&self.transactions) {
+            merkle_root_hash = tree.get_root_hash();
+        } else {
+            merkle_root_hash = [0u8; 32];
+        }
+
         debug!(
-            "generating the merkle root len: {}",
-            self.transactions.len()
+            "generated the merkle root, Tx Count: {:?}, root = {:?}",
+            self.transactions.len(),
+            hex::encode(merkle_root_hash)
         );
 
-        match MerkleTree::generate(&self.transactions) {
-            None => [0u8; 32],
-            Some(tree) => tree.get_root_hash(),
-        }
+        return merkle_root_hash;
     }
 
     //
