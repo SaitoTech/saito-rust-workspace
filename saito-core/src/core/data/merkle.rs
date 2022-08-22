@@ -59,6 +59,8 @@ impl MerkleTree {
             return None;
         }
 
+        debug!("Generating merkle tree");
+
         // Logic: a single node will be created per two leaves, each node will generate
         // a hash by combining the hashes of the two leaves, in the next loop
         // those node hashes will used as the leaves for the next set of nodes,
@@ -307,7 +309,6 @@ mod tests {
 
     #[test]
     fn merkle_tree_pruning_test() {
-        pretty_env_logger::init();
         let wallet = Wallet::new();
 
         let mut transactions = vec![];
