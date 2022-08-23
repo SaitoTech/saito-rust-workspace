@@ -858,10 +858,10 @@ impl Block {
         //
         // calculate automatic transaction rebroadcasts / ATR / atr
         //
-        if self.id > GENESIS_PERIOD {
+        if self.id > GENESIS_PERIOD + 1 {
             let pruned_block_hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(self.id - 2);
+                .get_longest_chain_block_hash_by_block_id(self.id - GENESIS_PERIOD);
 
             //
             // generate metadata should have prepared us with a pre-prune block
