@@ -50,7 +50,7 @@ pub struct Blockchain {
     pub blockring: BlockRing,
     pub blocks: AHashMap<SaitoHash, Block>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
-    genesis_block_id: u64,
+    pub genesis_block_id: u64,
     fork_id: SaitoHash,
 }
 
