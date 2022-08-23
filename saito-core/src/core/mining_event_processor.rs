@@ -17,7 +17,7 @@ use crate::core::data::wallet::Wallet;
 use crate::core::routing_event_processor::RoutingEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
 
-const MINER_INTERVAL: u128 = 10_000;
+const MINER_INTERVAL: u128 = 1_000;
 
 #[derive(Debug)]
 pub enum MiningEvent {
@@ -31,14 +31,16 @@ pub struct MiningEventProcessor {
     pub sender_to_mempool: Sender<ConsensusEvent>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub miner_timer: u128,
-    pub new_miner_event_received: bool,
+    pub miner_active: bool,
     pub target: SaitoHash,
     pub difficulty: u64,
 }
 
 impl MiningEventProcessor {
-    async fn mine(&self) {
-        debug!("mining for golden ticket");
+    async fn mine(&mut self) {
+        trace!("mining for golden ticket");
+
+        assert!(self.miner_active);
 
         let public_key: SaitoPublicKey;
 
@@ -62,6 +64,7 @@ impl MiningEventProcessor {
                 hex::encode(hash(&gt.serialize_for_net())),
                 self.difficulty
             );
+            self.miner_active = false;
             self.sender_to_mempool
                 .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
                 .await
@@ -73,7 +76,7 @@ impl MiningEventProcessor {
 #[async_trait]
 impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
-        trace!("processing new interface event");
+        // trace!("processing new interface event");
 
         None
     }
@@ -81,12 +84,10 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
-        if self.new_miner_event_received {
-            self.miner_timer += duration.as_micros();
+        self.miner_timer += duration.as_micros();
+        if self.miner_active {
             if self.miner_timer >= MINER_INTERVAL {
                 self.miner_timer = 0;
-                self.new_miner_event_received = false;
-
                 self.mine().await;
             }
         }
@@ -105,7 +106,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
                 );
                 self.difficulty = difficulty;
                 self.target = hash;
-                self.new_miner_event_received = true;
+                self.miner_active = true;
             }
         }
         None

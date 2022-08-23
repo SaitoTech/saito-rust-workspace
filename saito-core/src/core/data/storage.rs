@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
 use crate::common::defs::BLOCK_FILE_EXTENSION;
-use log::{debug, error, trace};
+use log::{debug, error};
 use tokio::sync::RwLock;
 
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
-use crate::core::data::blockchain::Blockchain;
+
 use crate::core::data::mempool::Mempool;
-use crate::core::data::network::Network;
+
 use crate::core::data::slip::Slip;
-use crate::core::mining_event_processor::MiningEvent;
+
 use crate::{log_write_lock_receive, log_write_lock_request};
 
 pub struct Storage {

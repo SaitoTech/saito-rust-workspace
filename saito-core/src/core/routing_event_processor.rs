@@ -67,7 +67,7 @@ impl RoutingEventProcessor {
     ///
     /// ```
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
-        debug!(
+        trace!(
             "processing incoming message type : {:?} from peer : {:?}",
             message.get_type_value(),
             peer_index
@@ -130,7 +130,7 @@ impl RoutingEventProcessor {
             Message::Result() => {}
             Message::Error() => {}
         }
-        debug!("incoming message processed");
+        trace!("incoming message processed");
     }
 
     async fn handle_new_peer(
@@ -207,7 +207,7 @@ impl RoutingEventProcessor {
 #[async_trait]
 impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
-        trace!("processing new interface event");
+        // trace!("processing new interface event");
         match event {
             NetworkEvent::OutgoingNetworkMessage {
                 peer_index: _,
@@ -217,7 +217,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                 unreachable!()
             }
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                debug!("incoming message received from peer : {:?}", peer_index);
+                trace!("incoming message received from peer : {:?}", peer_index);
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
                     //todo!()
@@ -269,7 +269,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
         let duration_value = duration.as_micros();
 
         self.reconnection_timer = self.reconnection_timer + duration_value;
-        if self.reconnection_timer >= 5_000_000 {
+        if self.reconnection_timer >= 10_000_000 {
             self.network.connect_to_static_peers().await;
             self.reconnection_timer = 0;
         }

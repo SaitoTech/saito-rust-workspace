@@ -13,7 +13,7 @@ use crate::common::defs::{
 };
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
 use crate::core::data::burnfee::BurnFee;
-use crate::core::data::crypto::{hash, sign, verify, verify_hash};
+use crate::core::data::crypto::{hash, sign, verify_hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
 use crate::core::data::merkle::{MerkleTree, TraverseMode};
@@ -549,7 +549,7 @@ impl Block {
                 + message_len
                 + path_len as usize * HOP_SIZE;
             let transaction = Transaction::deserialize_from_net(
-                bytes[start_of_transaction_data..end_of_transaction_data].to_vec(),
+                &bytes[start_of_transaction_data..end_of_transaction_data].to_vec(),
             );
             transactions.push(transaction);
             start_of_transaction_data = end_of_transaction_data;
@@ -650,7 +650,7 @@ impl Block {
         //
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.message.to_vec();
-            winning_tx_placeholder = Transaction::deserialize_from_net(tmptx);
+            winning_tx_placeholder = Transaction::deserialize_from_net(&tmptx);
             winning_tx = &winning_tx_placeholder;
         }
 
@@ -858,10 +858,10 @@ impl Block {
         //
         // calculate automatic transaction rebroadcasts / ATR / atr
         //
-        if self.id > GENESIS_PERIOD {
+        if self.id > GENESIS_PERIOD + 1 {
             let pruned_block_hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(self.id - 2);
+                .get_longest_chain_block_hash_by_block_id(self.id - GENESIS_PERIOD);
 
             //
             // generate metadata should have prepared us with a pre-prune block
@@ -995,7 +995,7 @@ impl Block {
         //
         if let Some(gt_index) = cv.gt_index {
             let golden_ticket: GoldenTicket =
-                GoldenTicket::deserialize_from_net(self.transactions[gt_index].message.to_vec());
+                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message.to_vec());
             // generate input hash for router
             let mut next_random_number = hash(&golden_ticket.random.to_vec());
             let _miner_public_key = golden_ticket.public_key;
@@ -1510,7 +1510,7 @@ impl Block {
             //
             if let Some(gt_index) = cv.gt_index {
                 let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
-                    self.transactions[gt_index].message.to_vec(),
+                    &self.transactions[gt_index].message.to_vec(),
                 );
                 //
                 // we already have a golden ticket, but create a new one pulling the
@@ -1691,7 +1691,7 @@ mod tests {
 
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::crypto::{verify, verify_hash};
+    use crate::core::data::crypto::verify_hash;
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;

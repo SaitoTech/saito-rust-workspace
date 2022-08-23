@@ -39,7 +39,7 @@ pub mod test {
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
 
-    use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify_hash};
+    use crate::core::data::crypto::{generate_random_bytes, hash, verify_hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
@@ -78,11 +78,15 @@ pub mod test {
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
 
             Self {
-                wallet_lock: wallet_lock,
+                wallet_lock: wallet_lock.clone(),
                 blockchain_lock: blockchain_lock,
                 mempool_lock: mempool_lock,
                 latest_block_hash: [0; 32],
-                network: Network::new(Box::new(TestIOHandler::new()), peers.clone()),
+                network: Network::new(
+                    Box::new(TestIOHandler::new()),
+                    peers.clone(),
+                    wallet_lock.clone(),
+                ),
                 peers: peers.clone(),
                 storage: Storage::new(Box::new(TestIOHandler::new())),
                 sender_to_miner: sender_to_miner.clone(),

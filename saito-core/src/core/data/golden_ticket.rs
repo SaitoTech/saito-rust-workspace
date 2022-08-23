@@ -1,5 +1,4 @@
 use std::convert::TryInto;
-use std::ops::{Shl, Shr};
 
 use log::{debug, trace};
 
@@ -36,7 +35,7 @@ impl GoldenTicket {
         GoldenTicket::new(previous_block_hash, random_bytes, public_key)
     }
 
-    pub fn deserialize_from_net(bytes: Vec<u8>) -> GoldenTicket {
+    pub fn deserialize_from_net(bytes: &Vec<u8>) -> GoldenTicket {
         assert_eq!(bytes.len(), 97);
         let target: SaitoHash = bytes[0..32].try_into().unwrap();
         let random: SaitoHash = bytes[32..64].try_into().unwrap();
@@ -87,7 +86,7 @@ mod tests {
     use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
-    use log::{debug, info};
+    use log::info;
 
     #[test]
     fn golden_ticket_validate_hashing_difficulty() {
@@ -134,7 +133,7 @@ mod tests {
         let buffer = hex::decode("844702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235e03bf1a4714cfc7ae33d3f6e860c23191ddea07bcb1bfa6c85bc124151ad8d4ce03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610").unwrap();
         assert_eq!(buffer.len(), 97);
 
-        let result = GoldenTicket::deserialize_from_net(buffer);
+        let result = GoldenTicket::deserialize_from_net(&buffer);
         assert_eq!(
             hex::encode(result.target),
             "844702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235e"
