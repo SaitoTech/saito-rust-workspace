@@ -789,11 +789,18 @@ impl Transaction {
         //
         let transaction_type = self.transaction_type;
 
-        if transaction_type != TransactionType::Fee
-            && transaction_type != TransactionType::ATR
+        if transaction_type != TransactionType::ATR
             && transaction_type != TransactionType::Vip
             && transaction_type != TransactionType::Issuance
         {
+            //
+            // validate sender exists
+            //
+            if self.inputs.is_empty() {
+                error!("ERROR 582039: less than 1 input in transaction");
+                return false;
+            }
+
             //
             // validate signature
             //
@@ -821,14 +828,6 @@ impl Transaction {
             }
 
             //
-            // validate sender exists
-            //
-            if self.inputs.is_empty() {
-                error!("ERROR 582039: less than 1 input in transaction");
-                return false;
-            }
-
-            //
             // validate routing path sigs
             //
             // a transaction without routing paths is valid, and pays off the
@@ -850,7 +849,7 @@ impl Transaction {
                 for _z in self.outputs.iter() {
                     // info!("{:?} --- ", z.amount);
                 }
-                error!("ERROR 672941: transaction spends more than it has available");
+                error!("ERROR 802394: transaction spends more than it has available");
                 return false;
             }
         }
@@ -908,17 +907,6 @@ impl Transaction {
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
         //
-        //for i in 0..self.inputs.len() {
-        //    let is_valid = self.inputs[i].validate(utxoset);
-        //    if is_valid != true {
-        //        //info!("tx: {:?}", self);
-        //        info!(
-        //            "this input is invalid: {:?}",
-        //            self.inputs[i].get_slip_type()
-        //        );
-        //        return false;
-        //    }
-        //}
         let inputs_validate = self.inputs.par_iter().all(|input| input.validate(utxoset));
         inputs_validate
     }
