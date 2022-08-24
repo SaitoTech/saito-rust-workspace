@@ -1632,8 +1632,8 @@ impl Block {
                     "ERROR 627428: block {} fee transaction doesn't match cv fee transaction",
                     self.id
                 );
-                info!("fee transaction = {:?}", fee_transaction);
-                info!("tx : {:?}", self.transactions[ft_index]);
+                info!("expected = {:?}", fee_transaction);
+                info!("actual   = {:?}", self.transactions[ft_index]);
                 return false;
             }
         }
