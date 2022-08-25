@@ -1420,7 +1420,7 @@ impl Block {
         }
 
         if cv.avg_atr_variance != self.avg_atr_variance {
-            console.error("ERROR 712923: block is mis-reporting its average atr variance");
+            error!("ERROR 712923: block is mis-reporting its average atr variance");
             return false;
         }
 
