@@ -571,6 +571,8 @@ impl Block {
         block.avg_atr_income = avg_atr_income;
         block.avg_atr_variance = avg_atr_variance;
         block.transactions = transactions.to_vec();
+
+        debug!("block.deserialize tx length = {:?}", transactions_len);
         if transactions_len == 0 {
             block.block_type = BlockType::Header;
         }
