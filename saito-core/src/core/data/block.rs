@@ -1456,7 +1456,7 @@ impl Block {
             let mut adjusted_staking_treasury = previous_block.staking_treasury;
             if cv.staking_treasury < 0 {
                 let x = cv.staking_treasury * -1;
-                if adjusted_staking_treasury < x as u64 {
+                if adjusted_staking_treasury > x as u64 {
                     adjusted_staking_treasury -= x as u64;
                 } else {
                     adjusted_staking_treasury = 0;
