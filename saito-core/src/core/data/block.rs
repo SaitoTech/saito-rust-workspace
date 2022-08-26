@@ -571,6 +571,8 @@ impl Block {
         block.avg_atr_income = avg_atr_income;
         block.avg_atr_variance = avg_atr_variance;
         block.transactions = transactions.to_vec();
+
+        debug!("block.deserialize tx length = {:?}", transactions_len);
         if transactions_len == 0 {
             block.block_type = BlockType::Header;
         }
@@ -1397,6 +1399,22 @@ impl Block {
         //
         let cv = self.generate_consensus_values(&blockchain).await;
 
+        if cv.avg_income != self.avg_income {
+            error!("block is misreporting its average income");
+            return false;
+        }
+        if cv.avg_variance != self.avg_variance {
+            error!("block is misreporting its average variance");
+            return false;
+        }
+        if cv.avg_atr_income != self.avg_atr_income {
+            error!("block is mis-reporting its average atr income");
+            return false;
+        }
+        if cv.avg_atr_variance != self.avg_atr_variance {
+            error!("block is mis-reporting its average atr variance");
+            return false;
+        }
         //
         // only block #1 can have an issuance transaction
         //
@@ -1416,6 +1434,9 @@ impl Block {
         // circumstances, such as this being the first block we are adding to our chain.
         //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+            if let BlockType::Ghost = previous_block.block_type {
+                return true;
+            }
             //
             // validate treasury
             //
@@ -1441,8 +1462,7 @@ impl Block {
                     adjusted_staking_treasury = 0;
                 }
             } else {
-                let x: u64 = cv.staking_treasury as u64;
-                adjusted_staking_treasury += x;
+                adjusted_staking_treasury += cv.staking_treasury as u64;
             }
 
             if self.staking_treasury != adjusted_staking_treasury {
@@ -1614,8 +1634,8 @@ impl Block {
                     "ERROR 627428: block {} fee transaction doesn't match cv fee transaction",
                     self.id
                 );
-                info!("fee transaction = {:?}", fee_transaction);
-                info!("tx : {:?}", self.transactions[ft_index]);
+                info!("expected = {:?}", fee_transaction);
+                info!("actual   = {:?}", self.transactions[ft_index]);
                 return false;
             }
         }
@@ -1663,19 +1683,6 @@ impl Block {
         // class. Note that we are passing in a read-only copy of our UTXOSet so
         // as to determine spendability.
         //
-        // TODO - remove when convenient. when transactions fail to validate using
-        // parallel processing can make it difficult to find out exactly what the
-        // problem is. ergo this code that tries to do them on the main thread so
-        // debugging output works.
-        //
-        for i in 0..self.transactions.len() {
-            let transactions_valid2 = self.transactions[i].validate(utxoset);
-            if !transactions_valid2 {
-                info!("Type: {:?}", self.transactions[i].transaction_type);
-                // info!("Data {:?}", self.transactions[i]);
-            }
-        }
-        //true
 
         let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
 
