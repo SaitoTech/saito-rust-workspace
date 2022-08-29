@@ -1363,6 +1363,7 @@ impl Block {
     }
 
     pub async fn validate(&self, blockchain: &Blockchain, utxoset: &UtxoSet) -> bool {
+        // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
         //
         // no transactions? no thank you
         //
@@ -1416,6 +1417,32 @@ impl Block {
             return false;
         }
         //
+        // average income and average income variance
+        //
+        if cv.avg_income != self.avg_income {
+            error!("ERROR 712923: block is mis-reporting its average income");
+            return false;
+        }
+
+        if cv.avg_variance != self.avg_variance {
+            error!("ERROR 712923: block is mis-reporting its average variance");
+            return false;
+        }
+
+        //
+        // average atr income and average atr income variance
+        //
+        if cv.avg_atr_income != self.avg_atr_income {
+            error!("ERROR 712923: block is mis-reporting its average atr income");
+            return false;
+        }
+
+        if cv.avg_atr_variance != self.avg_atr_variance {
+            error!("ERROR 712923: block is mis-reporting its average atr variance");
+            return false;
+        }
+
+        //
         // only block #1 can have an issuance transaction
         //
         if cv.it_num > 0 && self.id > 1 {
@@ -1442,7 +1469,7 @@ impl Block {
             //
             if self.treasury != previous_block.treasury + cv.nolan_falling_off_chain {
                 error!(
-                    "ERROR: treasury does not validate: {} expected versus {} found",
+                    "ERROR 123243: treasury does not validate: {} expected versus {} found",
                     (previous_block.treasury + cv.nolan_falling_off_chain),
                     self.treasury,
                     // tracing_tracker.time_since_last();
@@ -1456,6 +1483,7 @@ impl Block {
             let mut adjusted_staking_treasury = previous_block.staking_treasury;
             if cv.staking_treasury < 0 {
                 let x = cv.staking_treasury * -1;
+                // TODO SYNC : SLR checks the opposite for this validation, i.e adjusted_staking_treasury < x
                 if adjusted_staking_treasury > x as u64 {
                     adjusted_staking_treasury -= x as u64;
                 } else {
@@ -1467,7 +1495,7 @@ impl Block {
 
             if self.staking_treasury != adjusted_staking_treasury {
                 error!(
-                    "ERROR: staking treasury does not validate: {} expected versus {} found",
+                    "ERROR 820391: staking treasury does not validate: {} expected versus {} found",
                     adjusted_staking_treasury, self.staking_treasury,
                 );
                 //     "ERROR: staking treasury does not validate: {} expected versus {} found",
@@ -1487,7 +1515,7 @@ impl Block {
                 );
             if new_burnfee != self.burnfee {
                 error!(
-                    "ERROR: burn fee does not validate,current = {}, expected: {}",
+                    "ERROR 182085: burn fee does not validate,current = {}, expected: {}",
                     self.burnfee, new_burnfee
                 );
                 return false;
@@ -1545,7 +1573,7 @@ impl Block {
                 );
                 if !gt.validate(previous_block.difficulty) {
                     error!(
-                        "ERROR: Golden Ticket solution does not validate against previous block hash : {:?}, difficulty : {:?}, random : {:?}, key : {:?}", 
+                        "ERROR 801923: Golden Ticket solution does not validate against previous block hash : {:?}, difficulty : {:?}, random : {:?}, key : {:?}", 
                         hex::encode(previous_block.hash),
                         previous_block.difficulty,
                         hex::encode(gt.random),
@@ -1631,7 +1659,7 @@ impl Block {
             let hash2 = hash(&self.transactions[ft_index].serialize_for_signature());
             if hash1 != hash2 {
                 error!(
-                    "ERROR 627428: block {} fee transaction doesn't match cv fee transaction",
+                    "ERROR 892032: block {} fee transaction doesn't match cv fee transaction",
                     self.id
                 );
                 info!("expected = {:?}", fee_transaction);
@@ -1655,7 +1683,7 @@ impl Block {
         //
         if cv.expected_difficulty != self.difficulty {
             error!(
-                "difficulty is false {} vs {}",
+                "ERROR 202392: difficulty is invalid {} vs {}",
                 cv.expected_difficulty, self.difficulty
             );
             return false;
@@ -1685,6 +1713,10 @@ impl Block {
         //
 
         let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
+
+        if !transactions_valid {
+            error!("ERROR 579128: Invalid transactions found, block validation failed");
+        }
 
         transactions_valid
     }
