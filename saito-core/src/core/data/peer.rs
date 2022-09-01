@@ -106,10 +106,7 @@ impl Peer {
 
         self.challenge_for_peer = Some(response.challenge);
         io_handler
-            .send_message(
-                self.index,
-                Message::HandshakeResponse(response).serialize(),
-            )
+            .send_message(self.index, Message::HandshakeResponse(response).serialize())
             .await
             .unwrap();
         debug!("handshake response sent for peer: {:?}", self.index);
