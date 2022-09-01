@@ -409,7 +409,7 @@ impl Blockchain {
                     .unwrap();
             } else {
                 debug!("new chain doesn't validate");
-                self.add_block_failure(mempool).await;
+                self.add_block_failure(&block_hash, mempool).await;
                 self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = false;
             }
         } else {
@@ -512,9 +512,14 @@ impl Blockchain {
         }
     }
 
-    pub async fn add_block_failure(&mut self, _mempool: Arc<RwLock<Mempool>>) {
+    pub async fn add_block_failure(
+        &mut self,
+        block_hash: &SaitoHash,
+        mempool: Arc<RwLock<Mempool>>,
+    ) {
         debug!("add block failed");
-        // todo!()
+        let mut mempool = mempool.write().await;
+        mempool.delete_block(block_hash);
     }
 
     pub fn generate_fork_id(&self, block_id: u64) -> SaitoHash {
@@ -848,6 +853,7 @@ impl Blockchain {
                 }
             }
             if !return_value {
+                debug!("not enough golden tickets");
                 return false;
             }
         }
@@ -1342,7 +1348,6 @@ impl Blockchain {
 
 #[cfg(test)]
 mod tests {
-
     use std::sync::Arc;
 
     use tokio::sync::RwLock;
