@@ -36,7 +36,7 @@ impl RingItem {
     pub fn delete_block(&mut self, block_id: u64, hash: SaitoHash) {
         let mut new_block_hashes: Vec<SaitoHash> = vec![];
         let mut new_block_ids: Vec<u64> = vec![];
-        let mut idx_loop = 0;
+        let mut index_loop = 0;
         let mut new_lc_pos = Some(0);
 
         for i in 0..self.block_ids.len() {
@@ -45,9 +45,9 @@ impl RingItem {
                 new_block_hashes.push(self.block_hashes[i]);
                 new_block_ids.push(self.block_ids[i]);
                 if self.lc_pos == Some(i) {
-                    new_lc_pos = Some(idx_loop);
+                    new_lc_pos = Some(index_loop);
                 }
-                idx_loop += 1;
+                index_loop += 1;
             }
         }
 

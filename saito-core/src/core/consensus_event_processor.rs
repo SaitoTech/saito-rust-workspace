@@ -266,7 +266,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     let peer = peers.index_to_peers.get(&peer_index);
                     if peer.is_some() {
                         let peer = peer.unwrap();
-                        block.source_connection_id = Some(peer.peer_public_key);
+                        block.source_connection_id = Some(peer.public_key);
                     }
 
                     block.generate();

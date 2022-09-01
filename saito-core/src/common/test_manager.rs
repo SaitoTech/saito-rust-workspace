@@ -277,7 +277,7 @@ pub mod test {
             let mut current_block_treasury: u64 = 0;
             let mut unpaid_but_uncollected: u64 = 0;
             let mut block_contains_fee_tx: u64;
-            let mut block_fee_tx_idx: usize = 0;
+            let mut block_fee_tx_index: usize = 0;
 
             let blockchain = self.blockchain_lock.read().await;
             let latest_block_id = blockchain.get_latest_block_id();
@@ -305,7 +305,7 @@ pub mod test {
                     //
                     if block.transactions[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = 1;
-                        block_fee_tx_idx = t as usize;
+                        block_fee_tx_index = t as usize;
                     } else {
                         for z in 0..block.transactions[t].inputs.len() {
                             block_inputs += block.transactions[t].inputs[z].amount;
@@ -344,7 +344,7 @@ pub mod test {
                             // calculate total amount paid
                             //
                             let mut total_fees_paid: u64 = 0;
-                            let fee_transaction = &block.transactions[block_fee_tx_idx];
+                            let fee_transaction = &block.transactions[block_fee_tx_index];
                             for output in fee_transaction.outputs.iter() {
                                 total_fees_paid += output.amount;
                             }
