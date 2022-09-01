@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use std::io::{Error, ErrorKind};
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -27,7 +25,6 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-use crate::saito::rust_io_handler::{FutureState, RustIOHandler};
 use crate::{IoEvent, NetworkEvent};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
@@ -139,7 +136,7 @@ impl NetworkController {
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
             log_write_lock_request!("network controller");
-            let mut io_controller = io_controller.write().await;
+            let io_controller = io_controller.write().await;
             log_write_lock_receive!("network controller");
             let sender_to_controller = io_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
@@ -550,14 +547,14 @@ fn run_websocket_server(
             .map(move |ws: warp::ws::Ws| {
                 debug!("incoming connection received");
                 let clone = io_controller.clone();
-                let peer_counter = peer_counter.clone();
+                let _peer_counter = peer_counter.clone();
                 let sender_to_io = sender_to_io.clone();
                 ws.on_upgrade(move |socket| async move {
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
 
                     trace!("waiting for the io controller lock for writing");
-                    let mut controller = clone.write().await;
+                    let controller = clone.write().await;
                     trace!("acquired the io controller lock for writing");
 
                     let peer_index;

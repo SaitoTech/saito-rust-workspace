@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         wallet.private_key = private_key;
         wallet.public_key = public_key;
 
-        let (sender, mut receiver) = tokio::sync::mpsc::channel::<IoEvent>(1000);
+        let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(1000);
         let mut storage = Storage::new(Box::new(RustIOHandler::new(sender, 1)));
         wallet.load(&mut storage).await;
     }

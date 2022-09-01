@@ -92,11 +92,11 @@ impl Network {
         log_read_lock_receive!("peers");
 
         for (index, peer) in peers.index_to_peers.iter() {
-            if transaction.is_in_path(&peer.peer_public_key) {
+            if transaction.is_in_path(&peer.public_key) {
                 continue;
             }
             let mut transaction = transaction.clone();
-            transaction.add_hop(self.wallet.clone(), peer.peer_public_key);
+            transaction.add_hop(self.wallet.clone(), peer.public_key);
             let message = Message::Transaction(transaction);
             self.io_interface
                 .send_message(*index, message.serialize())
@@ -128,7 +128,7 @@ impl Network {
             }
             let peer = peer.unwrap();
             url = peer.get_block_fetch_url(block_hash);
-            peer_index = peer.peer_index;
+            peer_index = peer.index;
         }
 
         self.io_interface
@@ -152,8 +152,8 @@ impl Network {
                 // disconnects, check the best place to add (here or network_controller)
                 info!(
                     "Static peer disconnected, reconnecting .., Peer ID = {}, Public Key = {:?}",
-                    peer.peer_index,
-                    hex::encode(peer.peer_public_key)
+                    peer.index,
+                    hex::encode(peer.public_key)
                 );
 
                 self.io_interface
@@ -165,7 +165,7 @@ impl Network {
                     .push(peer.static_peer_config.as_ref().unwrap().clone());
             } else {
                 info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
-                    peer.peer_index, hex::encode(peer.peer_public_key));
+                    peer.index, hex::encode(peer.public_key));
             }
         } else {
             todo!("Handle the unknown peer disconnect");
@@ -245,10 +245,10 @@ impl Network {
         if peer.handshake_done {
             debug!(
                 "peer : {:?} handshake successful for peer : {:?}",
-                peer.peer_index,
-                hex::encode(peer.peer_public_key)
+                peer.index,
+                hex::encode(peer.public_key)
             );
-            let public_key = peer.peer_public_key;
+            let public_key = peer.public_key;
             peers.address_to_peers.insert(public_key, peer_index);
             // start block syncing here
             self.request_blockchain_from_peer(peer_index, blockchain.clone())
@@ -278,7 +278,7 @@ impl Network {
             if !peer.handshake_done {
                 return;
             }
-            public_key = peer.peer_public_key;
+            public_key = peer.public_key;
             peers.address_to_peers.insert(public_key, peer_index);
         }
 

@@ -17,7 +17,6 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
-
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
@@ -125,6 +124,7 @@ impl ConsensusEventProcessor {
         for _i in 0..txs_to_generate {
             let mut transaction =
                 Transaction::create(wallet_lock_clone.clone(), public_key, 5000, 5000).await;
+            // TODO : generate a message buffer which can be converted back into JSON
             transaction.message = (0..bytes_per_tx)
                 .into_iter()
                 .map(|_| rand::random::<u8>())
@@ -266,7 +266,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     let peer = peers.index_to_peers.get(&peer_index);
                     if peer.is_some() {
                         let peer = peer.unwrap();
-                        block.source_connection_id = Some(peer.peer_public_key);
+                        block.source_connection_id = Some(peer.public_key);
                     }
 
                     block.generate();

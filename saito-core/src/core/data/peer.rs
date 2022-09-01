@@ -18,8 +18,8 @@ use crate::{log_read_lock_receive, log_read_lock_request};
 
 #[derive(Debug, Clone)]
 pub struct Peer {
-    pub peer_index: u64,
-    pub peer_public_key: SaitoPublicKey,
+    pub index: u64,
+    pub public_key: SaitoPublicKey,
     pub block_fetch_url: String,
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
     pub static_peer_config: Option<data::configuration::PeerConfig>,
@@ -30,8 +30,8 @@ pub struct Peer {
 impl Peer {
     pub fn new(peer_index: u64) -> Peer {
         Peer {
-            peer_index,
-            peer_public_key: [0; 33],
+            index: peer_index,
+            public_key: [0; 33],
             block_fetch_url: "".to_string(),
             static_peer_config: None,
             challenge_for_peer: None,
@@ -44,7 +44,7 @@ impl Peer {
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<Configuration>>,
     ) -> Result<(), Error> {
-        debug!("initiating handshake : {:?}", self.peer_index);
+        debug!("initiating handshake : {:?}", self.index);
         log_read_lock_request!("wallet");
         let wallet = wallet.read().await;
         log_read_lock_receive!("wallet");
@@ -64,10 +64,10 @@ impl Peer {
         self.challenge_for_peer = Some(challenge.challenge);
         let message = Message::HandshakeChallenge(challenge);
         io_handler
-            .send_message(self.peer_index, message.serialize())
+            .send_message(self.index, message.serialize())
             .await
             .unwrap();
-        debug!("handshake challenge sent for peer: {:?}", self.peer_index);
+        debug!("handshake challenge sent for peer: {:?}", self.index);
 
         Ok(())
     }
@@ -80,7 +80,7 @@ impl Peer {
     ) -> Result<(), Error> {
         debug!(
             "handling handshake challenge : {:?} with address : {:?}",
-            self.peer_index,
+            self.index,
             hex::encode(challenge.public_key)
         );
         let block_fetch_url;
@@ -91,7 +91,7 @@ impl Peer {
             block_fetch_url = configs.get_block_fetch_url();
         }
 
-        self.peer_public_key = challenge.public_key;
+        self.public_key = challenge.public_key;
         self.block_fetch_url = challenge.block_fetch_url;
         log_read_lock_request!("wallet");
         let wallet = wallet.read().await;
@@ -106,13 +106,10 @@ impl Peer {
 
         self.challenge_for_peer = Some(response.challenge);
         io_handler
-            .send_message(
-                self.peer_index,
-                Message::HandshakeResponse(response).serialize(),
-            )
+            .send_message(self.index, Message::HandshakeResponse(response).serialize())
             .await
             .unwrap();
-        debug!("handshake response sent for peer: {:?}", self.peer_index);
+        debug!("handshake response sent for peer: {:?}", self.index);
 
         Ok(())
     }
@@ -124,13 +121,13 @@ impl Peer {
     ) -> Result<(), Error> {
         debug!(
             "handling handshake response :{:?} with address : {:?}",
-            self.peer_index,
+            self.index,
             hex::encode(response.public_key)
         );
         if self.challenge_for_peer.is_none() {
             warn!(
                 "we don't have a challenge to verify for peer : {:?}",
-                self.peer_index
+                self.index
             );
             // TODO : handle the scenario.
             todo!()
@@ -147,7 +144,7 @@ impl Peer {
             todo!()
         }
         self.challenge_for_peer = None;
-        self.peer_public_key = response.public_key;
+        self.public_key = response.public_key;
         self.block_fetch_url = response.block_fetch_url;
         self.handshake_done = true;
         log_read_lock_request!("wallet");
@@ -158,12 +155,12 @@ impl Peer {
         };
         io_handler
             .send_message(
-                self.peer_index,
+                self.index,
                 Message::HandshakeCompletion(response).serialize(),
             )
             .await
             .unwrap();
-        debug!("handshake completion sent for peer: {:?}", self.peer_index);
+        debug!("handshake completion sent for peer: {:?}", self.index);
         Ok(())
     }
     pub async fn handle_handshake_completion(
@@ -171,17 +168,17 @@ impl Peer {
         response: HandshakeCompletion,
         _io_handler: &Box<dyn InterfaceIO + Send + Sync>,
     ) -> Result<(), Error> {
-        debug!("handling handshake completion : {:?}", self.peer_index);
+        debug!("handling handshake completion : {:?}", self.index);
         if self.challenge_for_peer.is_none() {
             warn!(
                 "we don't have a challenge to verify for peer : {:?}",
-                self.peer_index
+                self.index
             );
             // TODO : handle the scenario.
             todo!()
         }
         let sent_challenge = self.challenge_for_peer.unwrap();
-        let result = verify(&sent_challenge, response.signature, self.peer_public_key);
+        let result = verify(&sent_challenge, response.signature, self.public_key);
         if !result {
             warn!("handshake failed. signature is not valid");
             todo!()
@@ -217,8 +214,8 @@ mod tests {
     fn peer_new_test() {
         let peer = Peer::new(1);
 
-        assert_eq!(peer.peer_index, 1);
-        assert_eq!(peer.peer_public_key, [0; 33]);
+        assert_eq!(peer.index, 1);
+        assert_eq!(peer.public_key, [0; 33]);
         assert_eq!(peer.block_fetch_url, "".to_string());
         assert_eq!(peer.static_peer_config, None);
         assert_eq!(peer.challenge_for_peer, None);

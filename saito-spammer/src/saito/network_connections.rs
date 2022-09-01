@@ -372,17 +372,17 @@ impl NetworkConnections {
         Ok(block)
     }
 
-    async fn on_block(&mut self, peer_index: u64, block: Block) {
+    async fn on_block(&mut self, peer_index: u64, _block: Block) {
         let balance;
         let has_generator;
         let public_key;
         {
             log_write_lock_request!("blockchain");
-            let mut blockchain = self.blockchain.write().await;
+            let _blockchain = self.blockchain.write().await;
             log_write_lock_receive!("blockchain");
 
-            let network = self.network.lock().await;
-            let mut storage = self.storage.lock().await;
+            let _network = self.network.lock().await;
+            let _storage = self.storage.lock().await;
             // TODO  : uncomment
             // blockchain
             //     .add_block(block, &network, &mut storage, self.sender_to_miner.clone(),)
@@ -494,7 +494,7 @@ impl NetworkConnections {
     pub async fn run(context: Context, peers: Arc<RwLock<PeerCollection>>) -> JoinHandle<()> {
         tokio::spawn(async move {
             info!("running network handler");
-            let (sender_to_miner, receiver_for_miner) =
+            let (sender_to_miner, _receiver_for_miner) =
                 tokio::sync::mpsc::channel::<MiningEvent>(1000);
             let (sender_to_self, mut receiver) = tokio::sync::mpsc::channel::<IoEvent>(1000);
 

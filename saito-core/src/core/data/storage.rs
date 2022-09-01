@@ -240,7 +240,7 @@ mod test {
     #[serial_test::serial]
     async fn write_read_block_to_file_test() {
         let mut t = TestManager::new();
-        t.initialize(100, 100_000_000);
+        t.initialize(100, 100_000_000).await;
 
         let current_timestamp = create_timestamp();
 

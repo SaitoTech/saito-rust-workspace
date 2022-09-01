@@ -227,6 +227,15 @@ impl Mempool {
         }
     }
 
+    pub fn delete_block(&mut self, block_hash: &SaitoHash) {
+        debug!(
+            "deleting block from mempool : {:?}",
+            hex::encode(block_hash)
+        );
+
+        self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
+    }
+
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         let mut tx_hashmap = HashMap::new();
         for transaction in transactions {
