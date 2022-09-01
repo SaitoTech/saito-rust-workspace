@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -26,7 +24,6 @@ use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
-
 
 use crate::{IoEvent, NetworkEvent};
 
