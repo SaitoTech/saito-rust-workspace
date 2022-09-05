@@ -27,6 +27,13 @@ pub fn serialize_tx(c: &mut Criterion) {
         });
     });
 
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 0 slips and empty buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
+        });
+    });
+
     let tx = generate_tx(0, 0, 1_000);
 
     c.bench_function("serializing tx with 0 slips and 1KB buffer", |b| {
@@ -34,7 +41,12 @@ pub fn serialize_tx(c: &mut Criterion) {
             black_box(tx.serialize_for_net());
         });
     });
-
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 0 slips and 1KB buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
+        });
+    });
     let tx = generate_tx(0, 0, 10_000);
 
     c.bench_function("serializing tx with 0 slips and 10KB buffer", |b| {
@@ -42,7 +54,12 @@ pub fn serialize_tx(c: &mut Criterion) {
             black_box(tx.serialize_for_net());
         });
     });
-
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 0 slips and 10KB buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
+        });
+    });
     let tx = generate_tx(0, 0, 100_000);
 
     c.bench_function("serializing tx with 0 slips and 100KB buffer", |b| {
@@ -50,25 +67,46 @@ pub fn serialize_tx(c: &mut Criterion) {
             black_box(tx.serialize_for_net());
         });
     });
-
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 0 slips and 100KB buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
+        });
+    });
     let tx = generate_tx(0, 0, 1_000_000);
     c.bench_function("serializing tx with 0 slips and 1MB buffer", |b| {
         b.iter(|| {
             black_box(tx.serialize_for_net());
         });
     });
-
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 0 slips and 1MB buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
+        });
+    });
     let tx = generate_tx(0, 0, 10_000_000);
     c.bench_function("serializing tx with 0 slips and 10MB buffer", |b| {
         b.iter(|| {
             black_box(tx.serialize_for_net());
         });
     });
-
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 0 slips and 10MB buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
+        });
+    });
     let tx = generate_tx(0, 0, 100_000_000);
     c.bench_function("serializing tx with 0 slips and 100MB buffer", |b| {
         b.iter(|| {
             black_box(tx.serialize_for_net());
+        });
+    });
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 0 slips and 100MB buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
         });
     });
     let tx = generate_tx(1, 1, 0);
@@ -77,17 +115,34 @@ pub fn serialize_tx(c: &mut Criterion) {
             black_box(tx.serialize_for_net());
         });
     });
-
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 1 slips and empty buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
+        });
+    });
     let tx = generate_tx(10, 10, 0);
     c.bench_function("serializing tx with 10 slips each and empty buffer", |b| {
         b.iter(|| {
             black_box(tx.serialize_for_net());
         });
     });
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 10 slips and empty buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
+        });
+    });
     let tx = generate_tx(100, 100, 0);
     c.bench_function("serializing tx with 100 slips each and empty buffer", |b| {
         b.iter(|| {
             black_box(tx.serialize_for_net());
+        });
+    });
+    let buffer = tx.serialize_for_net();
+    c.bench_function("deserializing tx with 100 slips and empty buffer", |b| {
+        b.iter(|| {
+            black_box(Transaction::deserialize_from_net(&buffer));
         });
     });
 }
