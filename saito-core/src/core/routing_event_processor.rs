@@ -265,7 +265,6 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
-        let timestamp = self.time_keeper.get_timestamp();
         let duration_value = duration.as_micros();
 
         self.reconnection_timer = self.reconnection_timer + duration_value;
