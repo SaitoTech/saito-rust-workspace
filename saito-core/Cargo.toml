@@ -39,5 +39,5 @@ criterion = "0.3.6"
 locking-logs = []
 
 [[bench]]
-name = "hashing_benchmark"
+name = "benches"
 harness = false
