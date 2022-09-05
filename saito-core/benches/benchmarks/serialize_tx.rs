@@ -71,9 +71,21 @@ pub fn serialize_tx(c: &mut Criterion) {
             black_box(tx.serialize_for_net());
         });
     });
+    let tx = generate_tx(1, 1, 0);
+    c.bench_function("serializing tx with 1 slip each and empty buffer", |b| {
+        b.iter(|| {
+            black_box(tx.serialize_for_net());
+        });
+    });
 
     let tx = generate_tx(10, 10, 0);
-    c.bench_function("serializing tx with 10 slips and empty buffer", |b| {
+    c.bench_function("serializing tx with 10 slips each and empty buffer", |b| {
+        b.iter(|| {
+            black_box(tx.serialize_for_net());
+        });
+    });
+    let tx = generate_tx(100, 100, 0);
+    c.bench_function("serializing tx with 100 slips each and empty buffer", |b| {
         b.iter(|| {
             black_box(tx.serialize_for_net());
         });

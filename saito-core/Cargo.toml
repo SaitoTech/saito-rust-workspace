@@ -33,7 +33,7 @@ primitive-types = "0.11.1"
 serial_test = "0.9.0"
 tokio = { version = "1.17.0", features = ["full"] }
 futures = { version = "0.3.21" }
-criterion = "0.3.6"
+criterion = { version = "0.3.6", features = ["default", "html_reports"] }
 
 [features]
 locking-logs = []
