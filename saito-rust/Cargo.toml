@@ -37,3 +37,5 @@ panic = "unwind"
 [features]
 locking-logs = ["saito-core/locking-logs"]
 
+[profile.release]
+debug = true
