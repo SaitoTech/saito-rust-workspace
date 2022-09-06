@@ -16,7 +16,7 @@ use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::{hash, sign, verify_hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
-use crate::core::data::merkle::{MerkleTree, TraverseMode};
+use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
@@ -880,18 +880,18 @@ impl Block {
                         // these need to be calculated dynamically based on the
                         // value of the UTXO and the byte-size of the transaction
                         //
-                        let REBROADCAST_FEE = 200_000_000;
-                        let STAKING_SUBSIDY = 100_000_000;
-                        let UTXO_ADJUSTMENT = REBROADCAST_FEE - STAKING_SUBSIDY;
+                        let rebroadcast_fee = 200_000_000;
+                        let staking_subsidy = 100_000_000;
+                        let utxo_adjustment = rebroadcast_fee - staking_subsidy;
 
                         //
                         // valid means spendable and non-zero
                         //HACK
                         if output.validate(&blockchain.utxoset) {
-                            if output.amount > UTXO_ADJUSTMENT {
+                            if output.amount > utxo_adjustment {
                                 cv.total_rebroadcast_nolan += output.amount;
-                                cv.total_rebroadcast_fees_nolan += REBROADCAST_FEE;
-                                cv.total_rebroadcast_staking_payouts_nolan += STAKING_SUBSIDY;
+                                cv.total_rebroadcast_fees_nolan += rebroadcast_fee;
+                                cv.total_rebroadcast_staking_payouts_nolan += staking_subsidy;
                                 cv.total_rebroadcast_slips += 1;
 
                                 //
@@ -901,8 +901,8 @@ impl Block {
                                     Transaction::create_rebroadcast_transaction(
                                         &transaction,
                                         output,
-                                        REBROADCAST_FEE,
-                                        STAKING_SUBSIDY,
+                                        rebroadcast_fee,
+                                        staking_subsidy,
                                     );
 
                                 //

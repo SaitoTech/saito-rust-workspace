@@ -1,9 +1,11 @@
+use std::collections::LinkedList;
+
+use log::{debug, trace};
+use rayon::prelude::*;
+
 use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
 use crate::core::data::transaction::Transaction;
-use log::{debug, trace};
-use rayon::prelude::*;
-use std::collections::LinkedList;
 
 #[derive(PartialEq)]
 pub enum TraverseMode {
@@ -261,8 +263,7 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::core::data::merkle::{MerkleTree, TraverseMode};
+    use crate::core::data::merkle::MerkleTree;
     use crate::core::data::transaction::Transaction;
     use crate::core::data::wallet::Wallet;
 
