@@ -1,3 +1,4 @@
 /target
 data/.gitignore
 ./*flamegraph*
+./perf.data*
