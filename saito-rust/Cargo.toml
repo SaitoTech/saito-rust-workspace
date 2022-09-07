@@ -25,6 +25,7 @@ hex = "0.4.3"
 warp = "0.3.2"
 reqwest = "0.11.10"
 base64 = "0.13.0"
+ctrlc = { version = "3.2.3", features = ["termination"] }
 
 [dev-dependencies]
 serial_test = "0.9.0"
