@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::io::Error;
 
 use async_trait::async_trait;
@@ -75,5 +76,12 @@ impl InterfaceIO for WasmIoHandler {
         url: String,
     ) -> Result<(), Error> {
         todo!()
+    }
+}
+impl Debug for WasmIoHandler {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RustIoHandler")
+            // .field("handler_id", &self.handler_id)
+            .finish()
     }
 }
