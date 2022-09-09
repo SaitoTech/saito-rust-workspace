@@ -1,7 +1,7 @@
 use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 
-use log::{debug, info, trace, warn};
 use tokio::sync::RwLock;
+use tracing::{debug, info, trace, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
 use crate::core::data::block::Block;
@@ -56,6 +56,7 @@ impl Mempool {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn add_block(&mut self, block: Block) {
         debug!("mempool add block : {:?}", hex::encode(block.hash));
         let hash_to_insert = block.hash;
@@ -69,6 +70,7 @@ impl Mempool {
             debug!("block not added to mempool as it was already there");
         }
     }
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
         debug!(
             "adding golden ticket : {:?}",
@@ -101,6 +103,7 @@ impl Mempool {
         // }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_transaction_if_validates(
         &mut self,
         transaction: Transaction,
@@ -122,6 +125,7 @@ impl Mempool {
             );
         }
     }
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_transaction(&mut self, mut transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
@@ -159,6 +163,7 @@ impl Mempool {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn bundle_block(
         &mut self,
         blockchain: &mut Blockchain,
@@ -185,6 +190,7 @@ impl Mempool {
         block
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn can_bundle_block(
         &self,
         blockchain_lock: Arc<RwLock<Blockchain>>,
@@ -227,6 +233,7 @@ impl Mempool {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_block(&mut self, block_hash: &SaitoHash) {
         debug!(
             "deleting block from mempool : {:?}",
@@ -236,6 +243,7 @@ impl Mempool {
         self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         let mut tx_hashmap = HashMap::new();
         for transaction in transactions {
@@ -267,6 +275,7 @@ impl Mempool {
     //
     // Return work needed in Nolan
     //
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn get_routing_work_needed(&self, previous_block: &Block, current_timestamp: u64) -> u64 {
         let previous_block_timestamp = previous_block.timestamp;
         let previous_block_burnfee = previous_block.burnfee;
@@ -288,6 +297,7 @@ impl Mempool {
         self.mempool_private_key = private_key;
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn transaction_exists(&self, tx_hash: Option<SaitoHash>) -> bool {
         self.transactions
             .iter()

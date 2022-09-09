@@ -14,7 +14,7 @@ pub const BLOCK_FILE_EXTENSION: &str = ".sai";
 macro_rules! log_write_lock_request {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        log::trace!("waiting for {:?} lock for writing", $resource);
+        tracing::trace!("waiting for {:?} lock for writing", $resource);
     };
 }
 
@@ -22,7 +22,7 @@ macro_rules! log_write_lock_request {
 macro_rules! log_write_lock_receive {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        log::trace!("acquired {:?} lock for writing", $resource);
+        tracing::trace!("acquired {:?} lock for writing", $resource);
     };
 }
 
@@ -30,7 +30,7 @@ macro_rules! log_write_lock_receive {
 macro_rules! log_read_lock_request {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        log::trace!("waiting for {:?} lock for reading", $resource);
+        tracing::trace!("waiting for {:?} lock for reading", $resource);
     };
 }
 
@@ -38,6 +38,6 @@ macro_rules! log_read_lock_request {
 macro_rules! log_read_lock_receive {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        log::trace!("acquired {:?} lock for reading", $resource);
+        tracing::trace!("acquired {:?} lock for reading", $resource);
     };
 }

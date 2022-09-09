@@ -1,8 +1,9 @@
+use std::fmt::Debug;
 use std::io::Error;
 use std::sync::Arc;
 
-use log::{debug, info, trace};
 use tokio::sync::RwLock;
+use tracing::{debug, info, trace};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::interface_io::InterfaceIO;
@@ -23,6 +24,7 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
+#[derive(Debug)]
 pub struct Network {
     // TODO : manage peers from network
     pub peers: Arc<RwLock<PeerCollection>>,
@@ -309,7 +311,7 @@ impl Network {
             request = BlockchainRequest {
                 latest_block_id: blockchain.get_latest_block_id(),
                 latest_block_hash: blockchain.get_latest_block_hash(),
-                fork_id: blockchain.get_fork_id(),
+                fork_id: blockchain.get_fork_id().clone(),
             };
         }
 

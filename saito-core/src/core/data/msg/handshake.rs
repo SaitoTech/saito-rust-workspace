@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::warn;
+use tracing::warn;
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
 use crate::core::data::serialize::Serialize;

@@ -2,7 +2,7 @@
 // use std::sync::{Arc, RwLock};
 // use std::time::Duration;
 //
-// use log::debug;
+// use tracing::debug;
 //
 // use crate::common::handle_io::HandleIo;
 // use crate::common::run_task::RunTask;

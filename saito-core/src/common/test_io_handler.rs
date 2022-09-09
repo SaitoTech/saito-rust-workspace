@@ -6,9 +6,9 @@ pub mod test {
 
     use crate::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
     use async_trait::async_trait;
-    use log::{debug, error, info};
     use tokio::fs::File;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tracing::{debug, error, info};
 
     use crate::common::interface_io::InterfaceIO;
 

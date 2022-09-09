@@ -2,9 +2,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
+use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
@@ -37,9 +37,8 @@ pub struct MiningEventProcessor {
 }
 
 impl MiningEventProcessor {
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn mine(&mut self) {
-        trace!("mining for golden ticket");
-
         assert!(self.miner_active);
 
         let public_key: SaitoPublicKey;

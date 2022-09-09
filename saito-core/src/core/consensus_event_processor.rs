@@ -4,9 +4,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
+use tracing::{debug, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::SaitoPublicKey;

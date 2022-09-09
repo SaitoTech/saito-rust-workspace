@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{trace, warn};
+use tracing::{trace, warn};
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};

@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
-use log::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, instrument, span, trace, warn, Level};
 
 use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
@@ -74,10 +74,11 @@ impl Blockchain {
         self.fork_id = fork_id;
     }
 
-    pub fn get_fork_id(&self) -> SaitoHash {
-        self.fork_id
+    pub fn get_fork_id(&self) -> &SaitoHash {
+        &self.fork_id
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     #[async_recursion]
     pub async fn add_block(
         &mut self,
@@ -87,27 +88,21 @@ impl Blockchain {
         sender_to_miner: Sender<MiningEvent>,
         mempool: Arc<RwLock<Mempool>>,
     ) {
-        //
         // confirm hash first
-        //
         block.generate_pre_hash();
         block.generate_hash();
 
         info!("add_block {:?}", &hex::encode(&block.hash));
 
-        //
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
         // blockchain and our various indices.
-        //
         let block_hash = block.hash;
         let block_id = block.id;
         let latest_block_hash = self.blockring.get_latest_block_hash();
         let previous_block_hash = block.previous_block_hash;
 
-        //
         // sanity checks
-        //
         if self.blocks.contains_key(&block_hash) {
             error!(
                 "ERROR: block exists in blockchain {:?}",
@@ -129,7 +124,7 @@ impl Blockchain {
             if self.get_latest_block_id() > GENESIS_PERIOD {
                 earliest_block_id = self.get_latest_block_id() - GENESIS_PERIOD;
             }
-            trace!("earliest_block_id {}", earliest_block_id);
+            trace!("earliest_block_id {:?}", earliest_block_id);
             let earliest_block_hash = self
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(earliest_block_id);
@@ -419,6 +414,7 @@ impl Blockchain {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
@@ -512,6 +508,7 @@ impl Blockchain {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_block_failure(
         &mut self,
         block_hash: &SaitoHash,
@@ -522,6 +519,7 @@ impl Blockchain {
         mempool.delete_block(block_hash);
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_fork_id(&self, block_id: u64) -> SaitoHash {
         let mut fork_id = [0; 32];
         let mut current_block_id = block_id;
@@ -614,6 +612,7 @@ impl Blockchain {
         fork_id
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_last_shared_ancestor(
         &self,
         peer_latest_block_id: u64,
@@ -726,6 +725,7 @@ impl Blockchain {
         self.blocks.get(block_hash)
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
 
@@ -748,6 +748,7 @@ impl Blockchain {
             .contains_block_hash_at_block_id(block_id, block_hash)
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn is_new_chain_the_longest_chain(
         &self,
         new_chain: &Vec<[u8; 32]>,
@@ -801,6 +802,7 @@ impl Blockchain {
     // winding requires starting from th END of the vector. the loops move
     // in opposite directions.
     //
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn validate(
         &mut self,
         new_chain: Vec<[u8; 32]>,
@@ -892,6 +894,7 @@ impl Blockchain {
     // being processed. we start winding with current_wind_index 4 not 0.
     //
     #[async_recursion]
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn wind_chain(
         &mut self,
         new_chain: &Vec<[u8; 32]>,
@@ -1106,6 +1109,7 @@ impl Blockchain {
     // walking up the vector from there until we reach the end.
     //
     #[async_recursion]
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn unwind_chain(
         &mut self,
         new_chain: &Vec<[u8; 32]>,
@@ -1177,6 +1181,7 @@ impl Blockchain {
     /// keeps any blockchain variables like fork_id or genesis_period
     /// tracking variables updated as the chain gets new blocks. also
     /// pre-loads any blocks needed to improve performance.
+    #[tracing::instrument(level = "info", skip_all)]
     async fn on_chain_reorganization(
         &mut self,
         block_id: u64,
@@ -1206,6 +1211,7 @@ impl Blockchain {
         self.downgrade_blockchain_data().await;
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn update_genesis_period(&mut self, storage: &Storage) {
         //
         // we need to make sure this is not a random block that is disconnected
@@ -1240,6 +1246,7 @@ impl Blockchain {
     //
     // deletes all blocks at a single block_id
     //
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn delete_blocks(&mut self, delete_block_id: u64, storage: &Storage) {
         trace!(
             "removing data including from disk at id {}",
@@ -1265,6 +1272,7 @@ impl Blockchain {
     //
     // deletes a single block
     //
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn delete_block(
         &mut self,
         delete_block_id: u64,
@@ -1312,6 +1320,7 @@ impl Blockchain {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn downgrade_blockchain_data(&mut self) {
         //
         // downgrade blocks still on the chain

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::common::defs::BLOCK_FILE_EXTENSION;
-use log::{debug, error};
 use tokio::sync::RwLock;
+use tracing::{debug, error};
 
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
@@ -13,6 +13,7 @@ use crate::core::data::slip::Slip;
 
 use crate::{log_write_lock_receive, log_write_lock_request};
 
+#[derive(Debug)]
 pub struct Storage {
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
@@ -36,6 +37,7 @@ impl Storage {
         Storage { io_interface }
     }
     /// read from a path to a Vec<u8>
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
         let buffer = self.io_interface.read_value(path.to_string()).await;
         if buffer.is_err() {
@@ -45,6 +47,7 @@ impl Storage {
         Ok(buffer)
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn write(&mut self, data: Vec<u8>, filename: &str) {
         self.io_interface
             .write_value(filename.to_string(), data)
@@ -52,6 +55,7 @@ impl Storage {
             .expect("writing to storage failed");
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn file_exists(&self, filename: &str) -> bool {
         return self
             .io_interface
@@ -59,6 +63,7 @@ impl Storage {
             .await;
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_block_filename(&self, block: &Block) -> String {
         let timestamp = block.timestamp;
         let block_hash = block.hash;
@@ -68,6 +73,7 @@ impl Storage {
             + hex::encode(block_hash).as_str()
             + BLOCK_FILE_EXTENSION
     }
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn write_block_to_disk(&mut self, block: &Block) -> String {
         let buffer = block.serialize_for_net(BlockType::Full);
         let filename = self.generate_block_filename(block);
@@ -82,6 +88,7 @@ impl Storage {
         filename
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
         debug!("loading blocks from disk");
         let file_names = self.io_interface.load_block_file_list().await;
@@ -117,6 +124,7 @@ impl Storage {
         debug!("loading blocks to mempool completed");
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
         debug!("loading block {:?} from disk", file_name);
         let result = self.io_interface.read_value(file_name).await;
@@ -127,6 +135,7 @@ impl Storage {
         Ok(Block::deserialize_from_net(&buffer))
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn delete_block_from_disk(&self, filename: String) -> bool {
         self.io_interface.remove_value(filename).await.is_ok()
     }
@@ -218,7 +227,7 @@ mod test {
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::MAX_TOKEN_SUPPLY;
     use crate::core::data::crypto::{hash, verify};
-    use log::info;
+    use tracing::info;
 
     #[ignore]
     #[tokio::test]
@@ -248,7 +257,7 @@ mod test {
         block.timestamp = current_timestamp;
 
         let filename = t.storage.write_block_to_disk(&mut block).await;
-        log::trace!("block written to file : {}", filename);
+        tracing::trace!("block written to file : {}", filename);
         let retrieved_block = t.storage.load_block_from_disk(filename).await;
         let mut actual_retrieved_block = retrieved_block.unwrap();
         actual_retrieved_block.generate();

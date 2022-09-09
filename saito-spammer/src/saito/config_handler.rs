@@ -2,7 +2,7 @@ use std::io::{Error, ErrorKind};
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use log::{debug, error};
+use tracing::{debug, error};
 
 use saito_core::core::data::configuration::Configuration;
 

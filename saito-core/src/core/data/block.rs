@@ -3,10 +3,10 @@ use std::ops::Rem;
 use std::{mem, sync::Arc};
 
 use ahash::AHashMap;
-use log::{debug, error, info, trace};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, span, trace, Level};
 
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
@@ -803,12 +803,14 @@ impl Block {
         true
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
     pub fn generate_hash(&mut self) -> SaitoHash {
         let hash_for_hash = hash(&self.serialize_for_hash());
         self.hash = hash_for_hash;
         hash_for_hash
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
     pub fn generate_merkle_root(&self) -> SaitoHash {
         debug!("generating the merkle root 1");
 
@@ -828,9 +830,8 @@ impl Block {
         return merkle_root_hash;
     }
 
-    //
     // generate dynamic consensus values
-    //
+    #[tracing::instrument(level = "trace", skip_all)]
     pub async fn generate_consensus_values(&self, blockchain: &Blockchain) -> ConsensusValues {
         debug!("generate consensus values");
         let mut cv = ConsensusValues::new();
@@ -1182,11 +1183,13 @@ impl Block {
 
         cv
     }
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn generate_pre_hash(&mut self) {
         let hash_for_signature = hash(&self.serialize_for_signature());
         self.pre_hash = hash_for_signature;
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
         for tx in &self.transactions {
             tx.on_chain_reorganization(utxoset, longest_chain, self.id);
@@ -1194,19 +1197,18 @@ impl Block {
         true
     }
 
-    //
     // we may want to separate the signing of the block from the setting of the necessary hash
     // we do this together out of convenience only
-    //
+
+    #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
     pub fn sign(&mut self, private_key: SaitoPrivateKey) {
-        //
         // we set final data
-        //
         self.signature = sign(&self.serialize_for_signature(), private_key);
     }
 
     // serialize the pre_hash and the signature_for_source into a
     // bytes array that can be hashed and then have the hash set.
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_hash(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
         // vbytes.extend(&self.signature);
@@ -1219,6 +1221,7 @@ impl Block {
     // this will manually calculate the merkle_root if necessary
     // but it is advised that the merkle_root be already calculated
     // to avoid speed issues.
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&self.id.to_be_bytes());
@@ -1254,6 +1257,7 @@ impl Block {
     /// [avg_atr_income - 8 bytes - u64]
     /// [avg_atr_variance - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
 
@@ -1292,6 +1296,7 @@ impl Block {
         vbytes
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
     pub async fn update_block_to_block_type(
         &mut self,
         block_type: BlockType,
@@ -1317,6 +1322,7 @@ impl Block {
     // data that is necessary for blocks of that type if possible. if this is
     // not possible, return false. if it is possible, return true once upgraded.
     //
+    #[tracing::instrument(level = "trace", skip_all)]
     pub async fn upgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,

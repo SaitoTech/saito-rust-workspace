@@ -1,4 +1,4 @@
-use log::debug;
+use tracing::debug;
 
 use saito_core::common::run_task::{RunTask, RunnableTask};
 

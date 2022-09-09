@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, trace, warn};
 use tokio::net::TcpStream;
+use tracing::{debug, error, info, trace, warn};
 
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{Mutex, RwLock};

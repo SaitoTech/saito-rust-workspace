@@ -4,11 +4,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use log::{debug, error, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::info;
+use tracing::{debug, error, trace};
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
 use tracing_subscriber::Layer;

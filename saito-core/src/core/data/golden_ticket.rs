@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use log::{debug, trace};
+use tracing::{debug, trace};
 
 use serde::{Deserialize, Serialize};
 
@@ -51,31 +51,33 @@ impl GoldenTicket {
         vbytes
     }
 
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn validate(&self, difficulty: u64) -> bool {
         let solution_hash = hash(&self.serialize_for_net());
 
-        trace!("gt sol hash = {:?}", hex::encode(solution_hash));
+        // trace!("gt sol hash = {:?}", hex::encode(solution_hash));
 
         return GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty);
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn validate_hashing_difficulty(solution_hash: &SaitoHash, difficulty: u64) -> bool {
         let solution = primitive_types::U256::from_big_endian(solution_hash);
 
         if solution.leading_zeros() >= difficulty as u32 {
-            debug!(
-                "GT : difficulty : {:?} solution : {:?}",
-                difficulty,
-                hex::encode(solution_hash)
-            );
+            // debug!(
+            //     "GT : difficulty : {:?} solution : {:?}",
+            //     difficulty,
+            //     hex::encode(solution_hash)
+            // );
 
             return true;
         }
-        trace!(
-            "difficulty = {:?} leading zeros = {:?}",
-            difficulty,
-            solution.leading_zeros()
-        );
+        // trace!(
+        //     "difficulty = {:?} leading zeros = {:?}",
+        //     difficulty,
+        //     solution.leading_zeros()
+        // );
         return false;
     }
 }
@@ -86,7 +88,7 @@ mod tests {
     use crate::core::data::crypto::{generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
-    use log::info;
+    use tracing::info;
 
     #[test]
     fn golden_ticket_validate_hashing_difficulty() {
