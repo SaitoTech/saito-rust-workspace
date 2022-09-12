@@ -402,7 +402,7 @@ impl PeerCounter {
 pub async fn run_network_controller(
     mut receiver: Receiver<IoEvent>,
     sender: Sender<IoEvent>,
-    configs: Arc<RwLock<Configuration>>,
+    configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     blockchain: Arc<RwLock<Blockchain>>,
 ) {
     info!("running network handler");
@@ -414,8 +414,8 @@ pub async fn run_network_controller(
         log_read_lock_request!("configs");
         let configs = configs.read().await;
         log_read_lock_receive!("configs");
-        url = "localhost:".to_string() + configs.server.port.to_string().as_str();
-        port = configs.server.port;
+        url = "localhost:".to_string() + configs.get_server_configs().port.to_string().as_str();
+        port = configs.get_server_configs().port;
     }
 
     info!("starting server on : {:?}", url);
