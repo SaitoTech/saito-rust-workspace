@@ -11,6 +11,8 @@ use tracing::info;
 use tracing::{debug, error, trace};
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
@@ -361,8 +363,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
 
-    tracing_subscriber::fmt::fmt()
-        .with_env_filter(filter)
+    use tracing_flame::FlameLayer;
+
+    // let (flame_layer, _guard) = FlameLayer::with_file("./tracing.folded").unwrap();
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+
+    // filter.with_filter(flame_layer);
+    // tracing_subscriber::fmt::fmt()
+    tracing_subscriber::registry()
+        .with(fmt_layer)
+        // .with_env_filter(filter)
+        // .with(flame_layer)
         // .pretty()
         .init();
 
