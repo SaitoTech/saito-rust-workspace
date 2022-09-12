@@ -4,10 +4,10 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::debug;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
+use tracing::debug;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::SaitoHash;

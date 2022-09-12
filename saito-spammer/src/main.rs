@@ -2,8 +2,8 @@ use std::panic;
 use std::process;
 use std::sync::Arc;
 
-use log::error;
 use tokio::sync::RwLock;
+use tracing::error;
 use tracing_subscriber;
 
 use saito_core::common::command::NetworkEvent;

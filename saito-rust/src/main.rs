@@ -2,14 +2,13 @@ use std::panic;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
-
 use std::time::{Duration, Instant};
 
-use log::{debug, error, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::info;
+use tracing::{debug, error, trace};
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
 use tracing_subscriber::Layer;
@@ -303,6 +302,12 @@ fn run_loop_thread(
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ctrlc::set_handler(move || {
+        info!("shutting down the node");
+        process::exit(0);
+    })
+    .expect("Error setting Ctrl-C handler");
+
     let orig_hook = panic::take_hook();
     panic::set_hook(Box::new(move |panic_info| {
         if let Some(location) = panic_info.location() {

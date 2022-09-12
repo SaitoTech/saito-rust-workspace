@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::io::Error;
 
 use async_trait::async_trait;
@@ -7,7 +8,7 @@ use crate::core::data;
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
 #[async_trait]
-pub trait InterfaceIO {
+pub trait InterfaceIO: Debug {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error>;
 
     /// Sends the given message buffer to all the peers except the ones specified
@@ -107,3 +108,9 @@ pub trait InterfaceIO {
     /// Retrieve the prefix for all the keys for blocks
     fn get_block_dir(&self) -> String;
 }
+
+// impl Debug for dyn InterfaceIO {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("IoInterface").finish()
+//     }
+// }

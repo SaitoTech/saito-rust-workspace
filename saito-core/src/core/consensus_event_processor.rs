@@ -4,9 +4,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
+use tracing::{debug, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::SaitoPublicKey;
@@ -76,7 +76,7 @@ impl ConsensusEventProcessor {
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let txs_to_generate = 10;
+        let txs_to_generate = 1000;
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;

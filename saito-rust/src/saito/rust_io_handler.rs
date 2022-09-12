@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::fs;
 use std::io::Error;
 use std::path::Path;
@@ -5,10 +6,10 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, warn};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
+use tracing::{debug, warn};
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
@@ -67,6 +68,14 @@ impl RustIOHandler {
         } else {
             warn!("waker not found for event: {:?}", event_id);
         }
+    }
+}
+
+impl Debug for RustIOHandler {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RustIoHandler")
+            .field("handler_id", &self.handler_id)
+            .finish()
     }
 }
 
@@ -134,6 +143,7 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
         let filename = key.as_str();
@@ -156,6 +166,7 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         let result = File::open(key).await;
         if result.is_err() {
@@ -171,6 +182,7 @@ impl InterfaceIO for RustIOHandler {
         Ok(encoded)
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
         debug!(
             "loading blocks from dir : {:?}",

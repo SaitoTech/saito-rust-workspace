@@ -1,7 +1,7 @@
 use std::collections::LinkedList;
 
-use log::{debug, trace};
 use rayon::prelude::*;
+use tracing::{debug, trace};
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
@@ -71,12 +71,12 @@ impl MerkleTree {
         let mut leaves: LinkedList<Box<MerkleTreeNode>> = Default::default();
 
         for index in 0..transactions.len() {
-            trace!(
-                "Tx[{:?}] = {:?}, hash = {:?}",
-                index,
-                hex::encode(transactions[index].serialize_for_signature()),
-                hex::encode(transactions[index].hash_for_signature.unwrap())
-            );
+            // trace!(
+            //     "Tx[{:?}] = {:?}, hash = {:?}",
+            //     index,
+            //     hex::encode(transactions[index].serialize_for_signature()),
+            //     hex::encode(transactions[index].hash_for_signature.unwrap())
+            // );
             leaves.push_back(Box::new(MerkleTreeNode::new(
                 NodeType::Transaction { index },
                 transactions[index].hash_for_signature,
@@ -84,7 +84,7 @@ impl MerkleTree {
             )));
         }
 
-        trace!("---------------------");
+        // trace!("---------------------");
 
         while leaves.len() > 1 {
             let mut nodes: LinkedList<MerkleTreeNode> = Default::default();
@@ -123,7 +123,7 @@ impl MerkleTree {
                 leaves.push_back(Box::new(node));
             }
 
-            trace!("---------------------");
+            // trace!("---------------------");
         }
 
         return Some(Box::new(MerkleTree {
@@ -173,11 +173,11 @@ impl MerkleTree {
                 vbytes.extend(left.as_ref().unwrap().hash.unwrap());
                 vbytes.extend(right.as_ref().unwrap().hash.unwrap());
                 node.hash = Some(hash(&vbytes));
-                trace!(
-                    "Node : buffer = {:?}, hash = {:?}",
-                    hex::encode(vbytes),
-                    hex::encode(node.hash.unwrap())
-                );
+                // trace!(
+                //     "Node : buffer = {:?}, hash = {:?}",
+                //     hex::encode(vbytes),
+                //     hex::encode(node.hash.unwrap())
+                // );
             }
             NodeType::Transaction { .. } => {}
         }

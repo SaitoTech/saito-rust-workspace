@@ -1,4 +1,4 @@
-use log::trace;
+use tracing::trace;
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::Block;
@@ -37,6 +37,7 @@ impl BlockRing {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn add_block(&mut self, block: &Block) {
         let insert_pos = block.id % RING_BUFFER_LENGTH;
         trace!(
@@ -47,11 +48,13 @@ impl BlockRing {
         self.ring[(insert_pos as usize)].add_block(block.id, block.hash);
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn contains_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         self.ring[(insert_pos as usize)].contains_block_hash(block_hash)
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn get_latest_block_hash(&self) -> SaitoHash {
         match self.lc_pos {
             Some(lc_pos_block_ring) => match self.ring[lc_pos_block_ring].lc_pos {
@@ -64,6 +67,7 @@ impl BlockRing {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn get_latest_block_id(&self) -> u64 {
         match self.lc_pos {
             Some(lc_pos_block_ring) => match self.ring[lc_pos_block_ring].lc_pos {
@@ -76,6 +80,7 @@ impl BlockRing {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn get_longest_chain_block_hash_by_block_id(&self, id: u64) -> SaitoHash {
         let insert_pos = (id % RING_BUFFER_LENGTH) as usize;
         match self.ring[insert_pos].lc_pos {
@@ -91,6 +96,7 @@ impl BlockRing {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn is_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         for i in 0..self.ring[(insert_pos as usize)].block_hashes.len() {
@@ -105,11 +111,13 @@ impl BlockRing {
         return self.lc_pos.is_none();
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_block(&mut self, block_id: u64, block_hash: SaitoHash) {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         self.ring[(insert_pos as usize)].delete_block(block_id, block_hash);
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn get_block_hashes_at_block_id(&mut self, block_id: u64) -> Vec<SaitoHash> {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         let mut v: Vec<SaitoHash> = vec![];
@@ -121,6 +129,7 @@ impl BlockRing {
         v
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(&mut self, block_id: u64, hash: SaitoHash, lc: bool) -> bool {
         trace!(
             "blockring.on_chain_reorg : block_id = {:?}, hash = {:?}",

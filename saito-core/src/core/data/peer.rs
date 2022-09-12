@@ -1,8 +1,8 @@
 use std::io::Error;
 use std::sync::Arc;
 
-use log::{debug, warn};
 use tokio::sync::RwLock;
+use tracing::{debug, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::interface_io::InterfaceIO;
