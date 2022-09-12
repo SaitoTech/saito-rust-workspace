@@ -144,7 +144,7 @@ async fn run_consensus_event_processor(
         let configs = context.configuration.read().await;
 
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
-        generate_genesis_block = configs.peers.is_empty();
+        generate_genesis_block = configs.get_peer_configs().is_empty();
     }
     let consensus_event_processor = ConsensusEventProcessor {
         mempool: context.mempool.clone(),
@@ -186,7 +186,7 @@ async fn run_consensus_event_processor(
 
 async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
-    configs: Arc<RwLock<Configuration>>,
+    configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     context: &Context,
     peers: Arc<RwLock<PeerCollection>>,
     sender_to_mempool: &Sender<ConsensusEvent>,
@@ -215,7 +215,7 @@ async fn run_routing_event_processor(
         log_read_lock_request!("configs");
         let configs = configs.read().await;
         log_read_lock_receive!("configs");
-        let peers = &configs.peers;
+        let peers = configs.get_peer_configs();
         for peer in peers {
             routing_event_processor.static_peers.push(StaticPeer {
                 peer_details: (*peer).clone(),
@@ -366,10 +366,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // .pretty()
         .init();
 
-    let configs = Arc::new(RwLock::new(
-        ConfigHandler::load_configs("configs/saito.config.json".to_string())
-            .expect("loading configs failed"),
-    ));
+    let configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
+        Arc::new(RwLock::new(Box::new(
+            ConfigHandler::load_configs("configs/saito.config.json".to_string())
+                .expect("loading configs failed"),
+        )));
 
     let (event_sender_to_loop, event_receiver_in_loop) =
         tokio::sync::mpsc::channel::<IoEvent>(1000);

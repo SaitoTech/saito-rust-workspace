@@ -21,6 +21,7 @@ use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::core::data::context::Context;
 use saito_core::core::data::crypto::generate_random_bytes;
+use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
@@ -33,7 +34,7 @@ use saito_core::{
 };
 
 use crate::saito::rust_io_handler::RustIOHandler;
-use crate::{IoEvent, NetworkEvent};
+use crate::{IoEvent, NetworkEvent, SpammerConfiguration};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
@@ -41,7 +42,9 @@ type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 pub struct NetworkConnections {
     blockchain: Arc<RwLock<Blockchain>>,
     wallet: Arc<RwLock<Wallet>>,
-    configuration: Arc<RwLock<Configuration>>,
+    configuration: Arc<RwLock<Box<SpammerConfiguration>>>,
+    core_configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+    mempool: Arc<RwLock<Mempool>>,
     network: Arc<Mutex<Network>>,
     storage: Arc<Mutex<Storage>>,
     peers: Arc<RwLock<PeerCollection>>,
@@ -55,7 +58,9 @@ impl NetworkConnections {
     pub fn new(
         blockchain: Arc<RwLock<Blockchain>>,
         wallet: Arc<RwLock<Wallet>>,
-        configuration: Arc<RwLock<Configuration>>,
+        configuration: Arc<RwLock<Box<SpammerConfiguration>>>,
+        core_configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+        mempool: Arc<RwLock<Mempool>>,
         peers: Arc<RwLock<PeerCollection>>,
         sender_to_self: Sender<IoEvent>,
         sender_to_miner: Sender<MiningEvent>,
@@ -64,6 +69,8 @@ impl NetworkConnections {
             blockchain,
             wallet: wallet.clone(),
             configuration,
+            core_configuration,
+            mempool,
             network: Arc::new(Mutex::new(Network::new(
                 Box::new(RustIOHandler::new(sender_to_self.clone(), 0)),
                 peers.clone(),
@@ -82,7 +89,7 @@ impl NetworkConnections {
     }
 
     pub async fn connect(&mut self) {
-        let peer_configs = self.configuration.read().await.peers.clone();
+        let peer_configs = self.configuration.read().await.get_peer_configs().clone();
 
         for peer_config in peer_configs {
             self.connect_to_static_peer(peer_config).await;
@@ -96,7 +103,7 @@ impl NetworkConnections {
         Self::connect_to_peer(
             self.blockchain.clone(),
             self.wallet.clone(),
-            self.configuration.clone(),
+            self.core_configuration.clone(),
             self.network.clone(),
             config,
             next_index,
@@ -125,7 +132,7 @@ impl NetworkConnections {
     pub async fn connect_to_peer(
         blockchain: Arc<RwLock<Blockchain>>,
         wallet: Arc<RwLock<Wallet>>,
-        configuration: Arc<RwLock<Configuration>>,
+        configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
         network: Arc<Mutex<Network>>,
         peer_config: PeerConfig,
         peer_index: u64,
@@ -175,7 +182,7 @@ impl NetworkConnections {
     pub async fn on_new_connection(
         blockchain: Arc<RwLock<Blockchain>>,
         wallet: Arc<RwLock<Wallet>>,
-        configuration: Arc<RwLock<Configuration>>,
+        configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
         network: Arc<Mutex<Network>>,
         config: PeerConfig,
         peer_index: u64,
@@ -224,7 +231,8 @@ impl NetworkConnections {
                         Self::handle_input_message(
                             blockchain.clone(),
                             wallet.clone(),
-                            configuration.clone(),
+                            configuration.clone()
+                                as Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
                             network.clone(),
                             peer_index,
                             message,
@@ -252,7 +260,7 @@ impl NetworkConnections {
     async fn handle_input_message(
         blockchain: Arc<RwLock<Blockchain>>,
         wallet: Arc<RwLock<Wallet>>,
-        configuration: Arc<RwLock<Configuration>>,
+        configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
         network: Arc<Mutex<Network>>,
         peer_index: u64,
         message: Message,
@@ -372,21 +380,28 @@ impl NetworkConnections {
         Ok(block)
     }
 
-    async fn on_block(&mut self, peer_index: u64, _block: Block) {
+    async fn on_block(&mut self, peer_index: u64, block: Block) {
         let balance;
         let has_generator;
         let public_key;
         {
             log_write_lock_request!("blockchain");
-            let _blockchain = self.blockchain.write().await;
+            let mut blockchain = self.blockchain.write().await;
             log_write_lock_receive!("blockchain");
 
-            let _network = self.network.lock().await;
-            let _storage = self.storage.lock().await;
-            // TODO  : uncomment
-            // blockchain
-            //     .add_block(block, &network, &mut storage, self.sender_to_miner.clone(),)
-            //     .await;
+            let network = self.network.lock().await;
+            let mut storage = self.storage.lock().await;
+
+            blockchain
+                .add_block(
+                    block,
+                    &network,
+                    &mut storage,
+                    self.sender_to_miner.clone(),
+                    self.mempool.clone(),
+                )
+                .await;
+
             {
                 log_read_lock_request!("wallet");
                 let wallet = self.wallet.read().await;
@@ -427,9 +442,9 @@ impl NetworkConnections {
         let bytes_per_tx;
         {
             let config = self.configuration.read().await;
-            timer_in_milli = config.spammer.timer_in_milli;
-            burst_count = config.spammer.burst_count;
-            bytes_per_tx = config.spammer.bytes_per_tx;
+            timer_in_milli = config.get_spammer_configs().timer_in_milli;
+            burst_count = config.get_spammer_configs().burst_count;
+            bytes_per_tx = config.get_spammer_configs().bytes_per_tx;
         }
 
         let blockchain = self.blockchain.clone();
@@ -491,7 +506,11 @@ impl NetworkConnections {
         return transaction;
     }
 
-    pub async fn run(context: Context, peers: Arc<RwLock<PeerCollection>>) -> JoinHandle<()> {
+    pub async fn run(
+        context: Context,
+        peers: Arc<RwLock<PeerCollection>>,
+        configs: Arc<RwLock<Box<SpammerConfiguration>>>,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             info!("running network handler");
             let (sender_to_miner, _receiver_for_miner) =
@@ -501,7 +520,9 @@ impl NetworkConnections {
             let network_connections = Arc::new(Mutex::new(NetworkConnections::new(
                 context.blockchain.clone(),
                 context.wallet.clone(),
+                configs,
                 context.configuration.clone(),
+                context.mempool.clone(),
                 peers.clone(),
                 sender_to_self,
                 sender_to_miner,

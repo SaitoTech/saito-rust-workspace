@@ -42,7 +42,7 @@ impl Peer {
         &mut self,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Configuration>>,
+        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.index);
         log_read_lock_request!("wallet");
@@ -76,7 +76,7 @@ impl Peer {
         challenge: HandshakeChallenge,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Configuration>>,
+        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) -> Result<(), Error> {
         debug!(
             "handling handshake challenge : {:?} with address : {:?}",

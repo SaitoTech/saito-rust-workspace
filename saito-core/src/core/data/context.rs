@@ -14,11 +14,11 @@ pub struct Context {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub mempool: Arc<RwLock<Mempool>>,
     pub wallet: Arc<RwLock<Wallet>>,
-    pub configuration: Arc<RwLock<Configuration>>,
+    pub configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
 }
 
 impl Context {
-    pub fn new(configs: Arc<RwLock<Configuration>>) -> Context {
+    pub fn new(configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>) -> Context {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         Context {
             blockchain: Arc::new(RwLock::new(Blockchain::new(

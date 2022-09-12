@@ -1,4 +1,5 @@
 pub mod saitowasm;
+mod wasm_configuration;
 mod wasm_io_handler;
 mod wasm_slip;
 mod wasm_task_runner;
