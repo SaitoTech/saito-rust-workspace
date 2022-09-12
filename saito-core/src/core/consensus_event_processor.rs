@@ -76,7 +76,7 @@ impl ConsensusEventProcessor {
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let txs_to_generate = 10;
+        let txs_to_generate = 1000;
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;
