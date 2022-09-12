@@ -197,9 +197,9 @@ impl Mempool {
         current_timestamp: u64,
         generate_genesis_block: bool,
     ) -> bool {
-        if self.transactions.is_empty() {
-            return false;
-        }
+        // if self.transactions.is_empty() {
+        //     return false;
+        // }
         trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
         // TODO : add checks [downloading_active,etc...] from SLR code here

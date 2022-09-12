@@ -1373,7 +1373,8 @@ impl Block {
         //
         // no transactions? no thank you
         //
-        if self.transactions.is_empty() {
+        if self.transactions.is_empty() && self.id != 1 && !blockchain.blocks.is_empty() {
+            // we check blockchain blocks to make sure #1 block can be created without transactions
             error!("ERROR 424342: block does not validate as it has no transactions",);
             return false;
         }
