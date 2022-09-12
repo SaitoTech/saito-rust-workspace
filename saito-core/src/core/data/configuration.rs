@@ -23,48 +23,8 @@ pub struct Server {
     pub endpoint: Endpoint,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct Spammer {
-    pub timer_in_milli: u64,
-    pub burst_count: u32,
-    pub bytes_per_tx: u32,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Configuration {
-    pub server: Server,
-    pub peers: Vec<PeerConfig>,
-    pub spammer: Spammer,
-}
-
-impl Configuration {
-    pub fn new() -> Configuration {
-        Configuration {
-            server: Server {
-                host: "127.0.0.1".to_string(),
-                port: 12100,
-                protocol: "http".to_string(),
-                endpoint: Endpoint {
-                    host: "127.0.0.1".to_string(),
-                    port: 12101,
-                    protocol: "http".to_string(),
-                },
-            },
-            peers: vec![],
-            spammer: Spammer {
-                timer_in_milli: 0,
-                burst_count: 0,
-                bytes_per_tx: 0,
-            },
-        }
-    }
-    pub fn get_block_fetch_url(&self) -> String {
-        let endpoint = &self.server.endpoint;
-        endpoint.protocol.to_string()
-            + "://"
-            + endpoint.host.as_str()
-            + ":"
-            + endpoint.port.to_string().as_str()
-            + "/block/"
-    }
+pub trait Configuration {
+    fn get_server_configs(&self) -> &Server;
+    fn get_peer_configs(&self) -> &Vec<PeerConfig>;
+    fn get_block_fetch_url(&self) -> String;
 }

@@ -180,7 +180,7 @@ impl Network {
         peer_data: Option<data::configuration::PeerConfig>,
         peer_index: u64,
         wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Configuration>>,
+        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
@@ -208,7 +208,7 @@ impl Network {
         peer_index: u64,
         challenge: HandshakeChallenge,
         wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Configuration>>,
+        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) {
         log_write_lock_request!("peers");
         let mut peers = self.peers.write().await;
@@ -218,14 +218,9 @@ impl Network {
             todo!()
         }
         let peer = peer.unwrap();
-        peer.handle_handshake_challenge(
-            challenge,
-            &self.io_interface,
-            wallet.clone(),
-            configs.clone(),
-        )
-        .await
-        .unwrap();
+        peer.handle_handshake_challenge(challenge, &self.io_interface, wallet.clone(), configs)
+            .await
+            .unwrap();
     }
     pub async fn handle_handshake_response(
         &self,
@@ -353,8 +348,11 @@ impl Network {
         }
     }
 
-    pub async fn initialize_static_peers(&mut self, configs: Arc<RwLock<Configuration>>) {
-        self.static_peer_configs = configs.read().await.peers.clone();
+    pub async fn initialize_static_peers(
+        &mut self,
+        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+    ) {
+        self.static_peer_configs = configs.read().await.get_peer_configs().clone();
     }
 
     pub async fn connect_to_static_peers(&mut self) {

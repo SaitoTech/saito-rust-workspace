@@ -8,14 +8,16 @@ use tracing_subscriber;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
+use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
 
-use crate::saito::config_handler::ConfigHandler;
 use crate::saito::io_event::IoEvent;
 use crate::saito::network_connections::NetworkConnections;
 use crate::saito::rust_io_handler::RustIOHandler;
+use crate::saito::spammer_configuration;
+use crate::saito::spammer_configuration::SpammerConfiguration;
 
 mod saito;
 mod test;
@@ -43,12 +45,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::fmt::init();
 
-    let configs = Arc::new(RwLock::new(
-        ConfigHandler::load_configs("configs/saito.config.json".to_string())
-            .expect("loading configs failed"),
-    ));
+    let context_configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
+        Arc::new(RwLock::new(Box::new(
+            SpammerConfiguration::load_configs("configs/spammer.config.json".to_string())
+                .expect("loading configs failed"),
+        )));
+    let context = Context::new(context_configs);
 
-    let context = Context::new(configs.clone());
+    let spammer_configs = Arc::new(RwLock::new(Box::new(
+        SpammerConfiguration::load_configs("configs/spammer.config.json".to_string())
+            .expect("loading configs failed"),
+    )));
 
     let public_key: SaitoPublicKey =
         hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
@@ -74,7 +81,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
-    let network_handle = NetworkConnections::run(context.clone(), peers.clone()).await;
+    let network_handle =
+        NetworkConnections::run(context.clone(), peers.clone(), spammer_configs).await;
 
     let _result = tokio::join!(network_handle);
     Ok(())

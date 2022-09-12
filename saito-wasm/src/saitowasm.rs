@@ -13,6 +13,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
+use crate::wasm_configuration::WasmConfiguration;
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
@@ -78,7 +79,8 @@ lazy_static! {
 
 pub fn new() -> SaitoWasm {
     let wallet = Arc::new(RwLock::new(Wallet::new()));
-    let configuration = Arc::new(RwLock::new(Configuration::new()));
+    let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
+        Arc::new(RwLock::new(Box::new(WasmConfiguration::new())));
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {

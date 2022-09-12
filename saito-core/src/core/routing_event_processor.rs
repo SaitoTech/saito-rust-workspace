@@ -44,7 +44,7 @@ pub struct RoutingEventProcessor {
     pub sender_to_miner: Sender<MiningEvent>,
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
-    pub configs: Arc<RwLock<Configuration>>,
+    pub configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub network: Network,
