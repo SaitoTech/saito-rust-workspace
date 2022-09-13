@@ -573,7 +573,7 @@ impl Block {
         block.transactions = transactions.to_vec();
 
         debug!("block.deserialize tx length = {:?}", transactions_len);
-        if transactions_len == 0 {
+        if transactions_len == 0 && !(block.id == 1 && previous_block_hash == [0; 32]) {
             block.block_type = BlockType::Header;
         }
 

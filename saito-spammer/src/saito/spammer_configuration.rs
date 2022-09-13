@@ -1,9 +1,9 @@
 use figment::providers::{Format, Json};
 use figment::Figment;
-use log::{debug, error};
 use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 use serde::Deserialize;
 use std::io::{Error, ErrorKind};
+use tracing::{debug, error};
 
 #[derive(Deserialize, Debug)]
 pub struct Spammer {

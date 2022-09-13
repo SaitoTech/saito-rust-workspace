@@ -10,7 +10,6 @@ saito-core = { path = "../saito-core" }
 tokio = { version = "1.17.0", features = ["full", "tracing"] }
 tungstenite = { version = "0.17.2" }
 tokio-tungstenite = "0.17.1"
-#log = "0.4.14"
 tracing = "0.1.36"
 pretty_env_logger = "0.4.0"
 async-trait = "0.1.52"
@@ -20,7 +19,7 @@ futures = { version = "0.3.21", default-features = false }
 rand = "0.8.5"
 rayon = "1.5.2"
 ahash = "0.8.0"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.15", features = ["env-filter"] }
 hex = "0.4.3"
 warp = "0.3.2"
 reqwest = "0.11.10"
