@@ -21,9 +21,9 @@ use crate::{
 };
 
 // length of 1 genesis period
-pub const GENESIS_PERIOD: u64 = 100000;
+pub const GENESIS_PERIOD: u64 = 50;
 // prune blocks from index after N blocks
-pub const PRUNE_AFTER_BLOCKS: u64 = 100;
+pub const PRUNE_AFTER_BLOCKS: u64 = 10;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
 pub const MAX_STAKER_RECURSION: u64 = 3;
 // max token supply - used in validating block #1
@@ -734,8 +734,14 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
-
-        self.blocks.get(block_hash)
+        let block = self.blocks.get(block_hash);
+        if block.is_none() {
+            return None;
+        }
+        if let BlockType::Full = block.as_ref().unwrap().block_type {
+            return block;
+        }
+        None
     }
 
     pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {

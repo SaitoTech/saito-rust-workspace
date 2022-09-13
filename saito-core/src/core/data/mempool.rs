@@ -191,11 +191,36 @@ impl Mempool {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
+    pub async fn bundle_genesis_block(
+        &mut self,
+        blockchain: &mut Blockchain,
+        current_timestamp: u64,
+    ) -> Block {
+        debug!("bundling genesis block...");
+        if !blockchain.blocks.is_empty() || blockchain.genesis_block_id != 0 {
+            unreachable!("there should not be any blocks");
+        }
+
+        let mut block = Block::create(
+            &mut self.transactions,
+            [0; 32],
+            self.wallet_lock.clone(),
+            blockchain,
+            current_timestamp,
+        )
+        .await;
+        block.generate();
+
+        self.routing_work_in_mempool = 0;
+
+        block
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn can_bundle_block(
         &self,
         blockchain_lock: Arc<RwLock<Blockchain>>,
         current_timestamp: u64,
-        generate_genesis_block: bool,
     ) -> bool {
         // if self.transactions.is_empty() {
         //     return false;
@@ -208,8 +233,11 @@ impl Mempool {
         let blockchain = blockchain_lock.read().await;
         log_read_lock_receive!("blockchain");
 
-        if !generate_genesis_block && blockchain.blocks.is_empty() {
+        if blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
+            return false;
+        }
+        if self.transactions.is_empty() {
             return false;
         }
 

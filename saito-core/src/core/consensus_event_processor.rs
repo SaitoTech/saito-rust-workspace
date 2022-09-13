@@ -76,7 +76,7 @@ impl ConsensusEventProcessor {
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let txs_to_generate = 10;
+        let txs_to_generate = 1000;
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;
@@ -164,6 +164,35 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 
         let duration_value = duration.as_micros();
 
+        if self.generate_genesis_block {
+            let block;
+            {
+                log_read_lock_request!("mempool");
+                let mut mempool = self.mempool.write().await;
+                log_read_lock_receive!("mempool");
+                log_write_lock_request!("blockchain");
+                let mut blockchain = self.blockchain.write().await;
+                log_write_lock_receive!("blockchain");
+                block = mempool
+                    .bundle_genesis_block(&mut blockchain, timestamp)
+                    .await;
+            }
+            log_write_lock_request!("blockchain");
+            let mut blockchain = self.blockchain.write().await;
+            log_write_lock_receive!("blockchain");
+            blockchain
+                .add_block(
+                    block,
+                    &self.network,
+                    &mut self.storage,
+                    self.sender_to_miner.clone(),
+                    self.mempool.clone(),
+                )
+                .await;
+            self.generate_genesis_block = false;
+            return Some(());
+        }
+
         // generate test transactions
         if self.create_test_tx {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
@@ -191,11 +220,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             log_read_lock_receive!("mempool");
 
             can_bundle = mempool
-                .can_bundle_block(
-                    self.blockchain.clone(),
-                    timestamp,
-                    self.generate_genesis_block,
-                )
+                .can_bundle_block(self.blockchain.clone(), timestamp)
                 .await;
             self.block_producing_timer = 0;
             work_done = true;
