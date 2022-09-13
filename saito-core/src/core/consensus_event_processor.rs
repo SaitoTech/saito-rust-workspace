@@ -76,7 +76,7 @@ impl ConsensusEventProcessor {
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let txs_to_generate = 1000;
+        let txs_to_generate = 10;
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;
@@ -165,32 +165,33 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         let duration_value = duration.as_micros();
 
         if self.generate_genesis_block {
-            let block;
-            {
-                log_read_lock_request!("mempool");
-                let mut mempool = self.mempool.write().await;
-                log_read_lock_receive!("mempool");
-                log_write_lock_request!("blockchain");
-                let mut blockchain = self.blockchain.write().await;
-                log_write_lock_receive!("blockchain");
-                block = mempool
-                    .bundle_genesis_block(&mut blockchain, timestamp)
-                    .await;
-            }
             log_write_lock_request!("blockchain");
             let mut blockchain = self.blockchain.write().await;
             log_write_lock_receive!("blockchain");
-            blockchain
-                .add_block(
-                    block,
-                    &self.network,
-                    &mut self.storage,
-                    self.sender_to_miner.clone(),
-                    self.mempool.clone(),
-                )
-                .await;
-            self.generate_genesis_block = false;
-            return Some(());
+            if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
+                let block;
+                {
+                    log_read_lock_request!("mempool");
+                    let mut mempool = self.mempool.write().await;
+                    log_read_lock_receive!("mempool");
+
+                    block = mempool
+                        .bundle_genesis_block(&mut blockchain, timestamp)
+                        .await;
+                }
+
+                blockchain
+                    .add_block(
+                        block,
+                        &self.network,
+                        &mut self.storage,
+                        self.sender_to_miner.clone(),
+                        self.mempool.clone(),
+                    )
+                    .await;
+                self.generate_genesis_block = false;
+                return Some(());
+            }
         }
 
         // generate test transactions

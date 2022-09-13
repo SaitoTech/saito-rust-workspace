@@ -197,9 +197,6 @@ impl Mempool {
         current_timestamp: u64,
     ) -> Block {
         debug!("bundling genesis block...");
-        if !blockchain.blocks.is_empty() || blockchain.genesis_block_id != 0 {
-            unreachable!("there should not be any blocks");
-        }
 
         let mut block = Block::create(
             &mut self.transactions,
@@ -237,7 +234,12 @@ impl Mempool {
             warn!("Not generating #1 block. Waiting for blocks from peers");
             return false;
         }
+        if !self.blocks_queue.is_empty() {
+            trace!("waiting till blocks in the queue are processed");
+            return false;
+        }
         if self.transactions.is_empty() {
+            trace!("waiting till transactions come in");
             return false;
         }
 
