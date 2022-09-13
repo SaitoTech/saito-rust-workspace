@@ -423,7 +423,7 @@ mod tests {
         // );
         assert_eq!(
             mempool
-                .can_bundle_block(blockchain_lock.clone(), ts + 120000, true)
+                .can_bundle_block(blockchain_lock.clone(), ts + 120000)
                 .await,
             true
         );
