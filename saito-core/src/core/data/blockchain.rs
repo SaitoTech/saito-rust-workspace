@@ -437,6 +437,12 @@ impl Blockchain {
             let block = self.get_mut_block(&block_hash).await.unwrap();
             if block.block_type != BlockType::Header {
                 storage.write_block_to_disk(block).await;
+            } else {
+                debug!(
+                    "block : {:?} not written to disk as type : {:?}",
+                    hex::encode(block.hash),
+                    block.block_type
+                );
             }
             network.propagate_block(block).await;
         }

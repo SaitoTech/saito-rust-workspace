@@ -1,10 +1,15 @@
 use std::panic;
 use std::process;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
 use tracing::error;
 use tracing_subscriber;
+use tracing_subscriber::filter::Directive;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
@@ -22,7 +27,7 @@ use crate::saito::spammer_configuration::SpammerConfiguration;
 mod saito;
 mod test;
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let orig_hook = panic::take_hook();
     panic::set_hook(Box::new(move |panic_info| {
@@ -43,7 +48,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Running saito");
 
-    tracing_subscriber::fmt::init();
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+
+    tracing_subscriber::registry().with(fmt_layer).init();
 
     let context_configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
         Arc::new(RwLock::new(Box::new(
