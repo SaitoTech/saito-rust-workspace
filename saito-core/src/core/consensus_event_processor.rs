@@ -6,7 +6,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::SaitoPublicKey;
@@ -50,6 +50,58 @@ pub struct ConsensusEventProcessor {
 }
 
 impl ConsensusEventProcessor {
+    async fn generate_spammer_init_tx(
+        mempool: Arc<RwLock<Mempool>>,
+        wallet: Arc<RwLock<Wallet>>,
+        blockchain: Arc<RwLock<Blockchain>>,
+    ) {
+        trace!("generating spammer init transaction");
+
+        let mempool_lock_clone = mempool.clone();
+        let wallet_lock_clone = wallet.clone();
+        let blockchain_lock_clone = blockchain.clone();
+
+        let public_key;
+        let private_key;
+
+        {
+            log_read_lock_request!("wallet");
+            let wallet = wallet_lock_clone.read().await;
+            log_read_lock_receive!("wallet");
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
+        }
+
+        log_write_lock_request!("mempool");
+        let mut mempool = mempool_lock_clone.write().await;
+        log_write_lock_receive!("mempool");
+        log_read_lock_request!("blockchain");
+        let blockchain = blockchain_lock_clone.read().await;
+        log_read_lock_receive!("blockchain");
+
+        let spammer_public_key: SaitoPublicKey =
+            hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
+                .unwrap()
+                .try_into()
+                .unwrap();
+
+        {
+            let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
+            vip_transaction.sign(private_key);
+
+            mempool.add_transaction(vip_transaction).await;
+
+            let mut vip_transaction =
+                Transaction::create_vip_transaction(spammer_public_key, 50_000_000);
+            vip_transaction.sign(private_key);
+
+            mempool.add_transaction(vip_transaction).await;
+            info!(
+                "added spammer init tx for : {:?}",
+                hex::encode(spammer_public_key)
+            );
+        }
+    }
     /// Test method to generate test transactions
     ///
     /// # Arguments
@@ -165,33 +217,41 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         let duration_value = duration.as_micros();
 
         if self.generate_genesis_block {
-            log_write_lock_request!("blockchain");
-            let mut blockchain = self.blockchain.write().await;
-            log_write_lock_receive!("blockchain");
-            if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                let block;
-                {
-                    log_read_lock_request!("mempool");
-                    let mut mempool = self.mempool.write().await;
-                    log_read_lock_receive!("mempool");
+            {
+                log_write_lock_request!("blockchain");
+                let mut blockchain = self.blockchain.write().await;
+                log_write_lock_receive!("blockchain");
+                if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
+                    let block;
+                    {
+                        log_read_lock_request!("mempool");
+                        let mut mempool = self.mempool.write().await;
+                        log_read_lock_receive!("mempool");
 
-                    block = mempool
-                        .bundle_genesis_block(&mut blockchain, timestamp)
+                        block = mempool
+                            .bundle_genesis_block(&mut blockchain, timestamp)
+                            .await;
+                    }
+
+                    blockchain
+                        .add_block(
+                            block,
+                            &self.network,
+                            &mut self.storage,
+                            self.sender_to_miner.clone(),
+                            self.mempool.clone(),
+                        )
                         .await;
                 }
-
-                blockchain
-                    .add_block(
-                        block,
-                        &self.network,
-                        &mut self.storage,
-                        self.sender_to_miner.clone(),
-                        self.mempool.clone(),
-                    )
-                    .await;
-                self.generate_genesis_block = false;
-                return Some(());
             }
+            Self::generate_spammer_init_tx(
+                self.mempool.clone(),
+                self.wallet.clone(),
+                self.blockchain.clone(),
+            )
+            .await;
+            self.generate_genesis_block = false;
+            return Some(());
         }
 
         // generate test transactions
