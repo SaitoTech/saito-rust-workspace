@@ -4,7 +4,7 @@ use std::time::Duration;
 use tracing::info;
 
 pub type Currency = u128;
-pub type Timestamp = u128;
+pub type Timestamp = u64;
 pub type SaitoSignature = [u8; 64];
 pub type SaitoPublicKey = [u8; 33];
 pub type SaitoPrivateKey = [u8; 32];
@@ -13,8 +13,8 @@ pub type SaitoUTXOSetKey = [u8; 74];
 pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 
 pub const BLOCK_FILE_EXTENSION: &str = ".sai";
-pub const STAT_INTERVAL: Timestamp = Duration::from_secs(5).as_millis();
-pub const STAT_BIN_SIZE: u64 = 10;
+pub const STAT_INTERVAL: Timestamp = Duration::from_secs(5).as_micros() as Timestamp;
+pub const STAT_BIN_COUNT: usize = 10;
 
 #[macro_export]
 macro_rules! log_write_lock_request {
@@ -120,7 +120,8 @@ impl StatVariable {
     pub fn print(&self) {
         #[cfg(feature = "with-stats")]
         {
-            info!(
+            println!(
+                // target : "saito_stats",
                 "--- {:?} - total : {:?} current_rate : {:?} max_rate : {:?} min_rate : {:?}",
                 self.name.as_str(),
                 self.total,

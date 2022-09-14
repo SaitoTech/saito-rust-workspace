@@ -112,6 +112,7 @@ pub fn new() -> SaitoWasm {
                 context.wallet.clone(),
             ),
             reconnection_timer: 0,
+            stats: Default::default(),
         },
         routing_event_processor: ConsensusEventProcessor {
             mempool: context.mempool.clone(),
