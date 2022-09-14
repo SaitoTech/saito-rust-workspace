@@ -1,3 +1,5 @@
+use ahash::HashMap;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -7,7 +9,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::SaitoHash;
+use crate::common::defs::{SaitoHash, StatVariable, Timestamp};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_event_processor::ConsensusEvent;
@@ -37,6 +39,13 @@ pub struct StaticPeer {
     pub peer_index: u64,
 }
 
+pub struct RoutingStats {
+    pub received_transactions: StatVariable,
+    pub received_blocks: StatVariable,
+    pub total_incoming_messages: StatVariable,
+    pub last_stat_taken_on: Timestamp,
+}
+
 /// Manages peers and routes messages to correct controller
 pub struct RoutingEventProcessor {
     pub blockchain: Arc<RwLock<Blockchain>>,
@@ -49,6 +58,7 @@ pub struct RoutingEventProcessor {
     pub wallet: Arc<RwLock<Wallet>>,
     pub network: Network,
     pub reconnection_timer: u128,
+    pub stats: RoutingStats,
 }
 
 impl RoutingEventProcessor {
@@ -73,6 +83,7 @@ impl RoutingEventProcessor {
             message.get_type_value(),
             peer_index
         );
+
         match message {
             Message::HandshakeChallenge(challenge) => {
                 debug!("received handshake challenge");
