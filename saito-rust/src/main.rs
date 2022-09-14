@@ -212,6 +212,7 @@ async fn run_routing_event_processor(
             context.wallet.clone(),
         ),
         reconnection_timer: 0,
+        stats: Default::default(),
     };
     {
         log_read_lock_request!("configs");
@@ -362,8 +363,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
 
-    use tracing_flame::FlameLayer;
+    // #[cfg(feature = "with-stats")]
+    // {
+    //     let current_env = std::env::var("RUST_LOG").unwrap();
+    //     let new_env = current_env + ",saito_stat=info";
+    //     std::env::set_var("RUST_LOG", new_env);
+    // }
+    // use tracing_flame::FlameLayer;
 
     // let (flame_layer, _guard) = FlameLayer::with_file("./tracing.folded").unwrap();
 

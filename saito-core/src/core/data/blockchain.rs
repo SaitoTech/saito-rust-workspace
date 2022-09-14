@@ -734,6 +734,7 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         // TODO : load from disk if not found
+
         let block = self.blocks.get(block_hash);
         if block.is_none() {
             return None;

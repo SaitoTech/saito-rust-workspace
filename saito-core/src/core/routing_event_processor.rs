@@ -1,3 +1,5 @@
+use ahash::HashMap;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -7,7 +9,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::SaitoHash;
+use crate::common::defs::{SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT, STAT_INTERVAL};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_event_processor::ConsensusEvent;
@@ -37,6 +39,33 @@ pub struct StaticPeer {
     pub peer_index: u64,
 }
 
+pub struct RoutingStats {
+    pub received_transactions: StatVariable,
+    pub received_blocks: StatVariable,
+    pub total_incoming_messages: StatVariable,
+    pub stat_timer: Timestamp,
+}
+
+impl Default for RoutingStats {
+    fn default() -> Self {
+        RoutingStats {
+            received_transactions: StatVariable::new(
+                "routing::received_txs".to_string(),
+                STAT_BIN_COUNT,
+            ),
+            received_blocks: StatVariable::new(
+                "routing::received_blocks".to_string(),
+                STAT_BIN_COUNT,
+            ),
+            total_incoming_messages: StatVariable::new(
+                "routing::incoming_msgs".to_string(),
+                STAT_BIN_COUNT,
+            ),
+            stat_timer: 0,
+        }
+    }
+}
+
 /// Manages peers and routes messages to correct controller
 pub struct RoutingEventProcessor {
     pub blockchain: Arc<RwLock<Blockchain>>,
@@ -48,7 +77,8 @@ pub struct RoutingEventProcessor {
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub network: Network,
-    pub reconnection_timer: u128,
+    pub reconnection_timer: Timestamp,
+    pub stats: RoutingStats,
 }
 
 impl RoutingEventProcessor {
@@ -73,6 +103,7 @@ impl RoutingEventProcessor {
             message.get_type_value(),
             peer_index
         );
+
         match message {
             Message::HandshakeChallenge(challenge) => {
                 debug!("received handshake challenge");
@@ -106,11 +137,11 @@ impl RoutingEventProcessor {
                 debug!("received buffer");
             }
             Message::Block(_) => {
-                debug!("received block");
+                unreachable!("received block");
             }
             Message::Transaction(transaction) => {
                 debug!("received transaction");
-
+                self.stats.received_transactions.increment();
                 self.sender_to_mempool
                     .send(ConsensusEvent::NewTransaction { transaction })
                     .await
@@ -229,6 +260,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                     return None;
                 }
 
+                self.stats.total_incoming_messages.increment();
                 self.process_incoming_message(peer_index, message.unwrap())
                     .await;
             }
@@ -270,7 +302,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
-        let duration_value = duration.as_micros();
+        let duration_value = duration.as_micros() as Timestamp;
 
         self.reconnection_timer = self.reconnection_timer + duration_value;
         if self.reconnection_timer >= 10_000_000 {
@@ -278,6 +310,21 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
             self.reconnection_timer = 0;
         }
 
+        #[cfg(feature = "with-stats")]
+        {
+            self.stats.stat_timer = self.stats.stat_timer + duration_value;
+            if self.stats.stat_timer > STAT_INTERVAL {
+                let time = self.time_keeper.get_timestamp();
+                self.stats.received_transactions.calculate_stats(time);
+                self.stats.received_blocks.calculate_stats(time);
+                self.stats.total_incoming_messages.calculate_stats(time);
+                self.stats.stat_timer = 0;
+
+                self.stats.received_transactions.print();
+                self.stats.received_blocks.print();
+                self.stats.total_incoming_messages.print();
+            }
+        }
         None
     }
 
