@@ -20,7 +20,7 @@ pub const STAT_BIN_COUNT: usize = 10;
 macro_rules! log_write_lock_request {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::trace!("waiting for {:?} lock for writing", $resource);
+        tracing::debug!("waiting for {:?} lock for writing", $resource);
     };
 }
 
@@ -28,7 +28,7 @@ macro_rules! log_write_lock_request {
 macro_rules! log_write_lock_receive {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::trace!("acquired {:?} lock for writing", $resource);
+        tracing::debug!("acquired {:?} lock for writing", $resource);
     };
 }
 
@@ -36,7 +36,7 @@ macro_rules! log_write_lock_receive {
 macro_rules! log_read_lock_request {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::trace!("waiting for {:?} lock for reading", $resource);
+        tracing::debug!("waiting for {:?} lock for reading", $resource);
     };
 }
 
@@ -44,7 +44,7 @@ macro_rules! log_read_lock_request {
 macro_rules! log_read_lock_receive {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::trace!("acquired {:?} lock for reading", $resource);
+        tracing::debug!("acquired {:?} lock for reading", $resource);
     };
 }
 
@@ -122,7 +122,7 @@ impl StatVariable {
         {
             println!(
                 // target : "saito_stats",
-                "--- {:?} - total : {:?} current_rate : {:?} max_rate : {:?} min_rate : {:?}",
+                "--- stats ------ {:?} - total : {:?} current_rate : {:?} max_rate : {:?} min_rate : {:?}",
                 self.name.as_str(),
                 self.total,
                 self.avg,

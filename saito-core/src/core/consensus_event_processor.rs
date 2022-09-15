@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::SaitoPublicKey;
+use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT, STAT_INTERVAL};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::Block;
@@ -33,6 +33,25 @@ pub enum ConsensusEvent {
     NewTransaction { transaction: Transaction },
 }
 
+pub struct ConsensusStats {
+    pub blocks_fetched: StatVariable,
+    pub received_tx: StatVariable,
+    pub stat_timer: Timestamp,
+}
+
+impl Default for ConsensusStats {
+    fn default() -> Self {
+        ConsensusStats {
+            blocks_fetched: StatVariable::new(
+                "consensus::blocks_fetched".to_string(),
+                STAT_BIN_COUNT,
+            ),
+            received_tx: StatVariable::new("consensus::received_tx".to_string(), STAT_BIN_COUNT),
+            stat_timer: 0,
+        }
+    }
+}
+
 /// Manages blockchain and the mempool
 pub struct ConsensusEventProcessor {
     pub mempool: Arc<RwLock<Mempool>>,
@@ -41,12 +60,13 @@ pub struct ConsensusEventProcessor {
     pub generate_genesis_block: bool,
     pub sender_to_router: Sender<RoutingEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
-    pub block_producing_timer: u128,
-    pub tx_producing_timer: u128,
+    pub block_producing_timer: Timestamp,
+    pub tx_producing_timer: Timestamp,
     pub create_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub network: Network,
     pub storage: Storage,
+    pub stats: ConsensusStats,
 }
 
 impl ConsensusEventProcessor {
@@ -89,13 +109,17 @@ impl ConsensusEventProcessor {
             let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
             vip_transaction.sign(private_key);
 
-            mempool.add_transaction(vip_transaction).await;
+            mempool
+                .add_transaction_if_validates(vip_transaction, &blockchain)
+                .await;
 
             let mut vip_transaction =
                 Transaction::create_vip_transaction(spammer_public_key, 50_000_000);
             vip_transaction.sign(private_key);
 
-            mempool.add_transaction(vip_transaction).await;
+            mempool
+                .add_transaction_if_validates(vip_transaction, &blockchain)
+                .await;
             info!(
                 "added spammer init tx for : {:?}",
                 hex::encode(spammer_public_key)
@@ -122,13 +146,13 @@ impl ConsensusEventProcessor {
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        trace!("generating mock transactions");
+        info!("generating mock transactions");
 
         let mempool_lock_clone = mempool.clone();
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let txs_to_generate = 10;
+        let txs_to_generate = 1000;
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;
@@ -163,13 +187,17 @@ impl ConsensusEventProcessor {
                     Transaction::create_vip_transaction(public_key, 50_000_000);
                 vip_transaction.sign(private_key);
 
-                mempool.add_transaction(vip_transaction).await;
+                mempool
+                    .add_transaction_if_validates(vip_transaction, &blockchain)
+                    .await;
 
                 let mut vip_transaction =
                     Transaction::create_vip_transaction(spammer_public_key, 50_000_000);
                 vip_transaction.sign(private_key);
 
-                mempool.add_transaction(vip_transaction).await;
+                mempool
+                    .add_transaction_if_validates(vip_transaction, &blockchain)
+                    .await;
             }
         }
 
@@ -196,7 +224,7 @@ impl ConsensusEventProcessor {
                     .await;
             }
         }
-        trace!("generated transaction count: {:?}", txs_to_generate);
+        info!("generated transaction count: {:?}", txs_to_generate);
     }
 }
 
@@ -214,7 +242,23 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 
         let timestamp = self.time_keeper.get_timestamp();
 
-        let duration_value = duration.as_micros();
+        let duration_value = duration.as_micros() as u64;
+
+        #[cfg(feature = "with-stats")]
+        {
+            self.stats.stat_timer = self.stats.stat_timer + duration_value;
+            if self.stats.stat_timer > STAT_INTERVAL {
+                let time = self.time_keeper.get_timestamp();
+                self.stats.blocks_fetched.calculate_stats(time);
+                self.stats.received_tx.calculate_stats(time);
+                self.stats.stat_timer = 0;
+
+                println!("------------ consensus stats -------------");
+                self.stats.blocks_fetched.print();
+                self.stats.received_tx.print();
+                println!("---------- consensus stats end -----------");
+            }
+        }
 
         if self.generate_genesis_block {
             {
@@ -257,7 +301,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         // generate test transactions
         if self.create_test_tx {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
-            if self.tx_producing_timer >= 1_000_000 {
+            if self.tx_producing_timer >= 10_000 {
                 // TODO : Remove this transaction generation once testing is done
                 ConsensusEventProcessor::generate_tx(
                     self.mempool.clone(),
@@ -369,6 +413,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     debug!("adding fetched block to mempool");
                     mempool.add_block(block);
                 }
+                self.stats.blocks_fetched.increment();
                 add_to_blockchain_from_mempool(
                     self.mempool.clone(),
                     self.blockchain.clone(),
@@ -385,10 +430,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)
                 );
+                self.stats.received_tx.increment();
                 log_write_lock_request!("mempool");
                 let mut mempool = self.mempool.write().await;
                 log_write_lock_receive!("mempool");
-                mempool.add_transaction(transaction.clone()).await;
+                log_read_lock_request!("blockchain");
+                let blockchain = self.blockchain.read().await;
+                log_read_lock_receive!("blockchain");
+                mempool
+                    .add_transaction_if_validates(transaction.clone(), &blockchain)
+                    .await;
                 self.network.propagate_transaction(&transaction).await;
 
                 Some(())
