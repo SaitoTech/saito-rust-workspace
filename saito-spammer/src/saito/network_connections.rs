@@ -410,12 +410,14 @@ impl NetworkConnections {
                 let wallet = self.wallet.read().await;
                 log_read_lock_receive!("wallet");
                 balance = wallet.get_available_balance();
+                let unspent_slips = wallet.get_unspent_slip_count();
                 public_key = wallet.public_key;
 
                 info!(
-                    "New Block Added, Wallet Balance for {:?} is {:?}",
+                    "New Block Added, Wallet Balance for {:?} is {:?}, unspent slips {:?}",
                     hex::encode(public_key),
-                    balance
+                    balance,
+                    unspent_slips,
                 );
             }
 
@@ -469,12 +471,13 @@ impl NetworkConnections {
         timer_in_milli: u64,
         burst_count: u32,
     ) {
-        info!("Transaction sending started, tx count = {:?}, timer interval = {:?}, burst count {:?}, starting thread ...", transactions.len(), timer_in_milli, burst_count);
+        let tx_count = transactions.len();
+        info!("Transaction sending started, tx count = {:?}, timer interval = {:?}, burst count {:?}, starting thread ...", tx_count, timer_in_milli, burst_count);
 
         let senders = self.senders.clone();
 
         tokio::spawn(async move {
-            let mut send_count: u64 = 0;
+            let mut sent_count: u64 = 0;
             let mut interval = interval(Duration::from_millis(timer_in_milli));
             let mut send_complete = false;
             loop {
@@ -482,14 +485,14 @@ impl NetworkConnections {
 
                 for _i in 0..burst_count {
                     if let Some(transaction) = transactions.pop_front() {
-                        send_count += 1;
-                        trace!("Sending transaction : {:?}", send_count);
+                        sent_count += 1;
+                        trace!("Sending transaction {:?} of {:?}", sent_count, tx_count);
 
                         let message = Message::Transaction(transaction);
                         let buffer = message.serialize();
                         Self::send2(&senders, peer_index, buffer).await;
                     } else {
-                        info!("Transaction sending completed, exiting loop ...");
+                        info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", sent_count);
                         send_complete = true;
                         break;
                     }

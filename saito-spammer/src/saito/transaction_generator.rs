@@ -118,6 +118,8 @@ impl TransactionGenerator {
                 }
             }
 
+            self.expected_slip_count = total_output_slips_created;
+
             info!(
                 "New slips created, current = {:?}, target = {:?}",
                 total_output_slips_created, self.tx_count
@@ -167,7 +169,7 @@ impl TransactionGenerator {
             }
         }
 
-        for _c in 1..output_slips_per_input_slip {
+        for _c in 0..output_slips_per_input_slip {
             let mut output = Slip::new();
             output.public_key = public_key;
             output.amount = payment_amount;
