@@ -1,7 +1,6 @@
 use ahash::AHashMap;
 use std::collections::VecDeque;
 use std::time::Duration;
-use tracing::info;
 
 pub type Currency = u128;
 pub type Timestamp = u64;

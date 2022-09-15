@@ -1661,16 +1661,17 @@ impl Block {
             // the block have been. we must do this prior to comparing them.
             //
             fee_transaction.generate(self.creator);
+            let checked_tx = self.transactions.get(ft_index).unwrap();
 
             let hash1 = hash(&fee_transaction.serialize_for_signature());
-            let hash2 = hash(&self.transactions[ft_index].serialize_for_signature());
+            let hash2 = hash(&checked_tx.serialize_for_signature());
             if hash1 != hash2 {
                 error!(
                     "ERROR 892032: block {} fee transaction doesn't match cv fee transaction",
                     self.id
                 );
                 info!("expected = {:?}", fee_transaction);
-                info!("actual   = {:?}", self.transactions[ft_index]);
+                info!("actual   = {:?}", checked_tx);
                 return false;
             }
         }
