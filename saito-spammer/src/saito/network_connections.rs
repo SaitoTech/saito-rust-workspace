@@ -420,8 +420,6 @@ impl NetworkConnections {
                     unspent_slips,
                 );
             }
-
-            // has_generator = self.spam_generators.lock().await.get(&peer_index).is_some();
         }
 
         let (init_transactions, test_transactions) =
@@ -443,25 +441,6 @@ impl NetworkConnections {
             self.send_transactions(peer_index, transactions, timer_in_milli, burst_count)
                 .await;
         }
-
-        /*
-        if balance > 0 && !has_generator {
-            let handle = self.start_spam_generator(peer_index).await;
-            {
-                info!("Starting the spammer for {:?}", hex::encode(public_key));
-                self.spam_generators.lock().await.insert(peer_index, handle);
-            }
-        } else if balance == 0 && has_generator {
-            info!("Stopping the spammer of {:?}", hex::encode(public_key));
-
-            self.spam_generators
-                .lock()
-                .await
-                .get(&peer_index)
-                .unwrap()
-                .abort();
-        }
-        */
     }
 
     async fn send_transactions(
@@ -475,8 +454,9 @@ impl NetworkConnections {
         info!("Transaction sending started, tx count = {:?}, timer interval = {:?}, burst count {:?}, starting thread ...", tx_count, timer_in_milli, burst_count);
 
         let senders = self.senders.clone();
+        let spam_generators = self.spam_generators.clone();
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let mut sent_count: u64 = 0;
             let mut interval = interval(Duration::from_millis(timer_in_milli));
             let mut send_complete = false;
@@ -502,77 +482,12 @@ impl NetworkConnections {
                     break;
                 }
             }
-        });
-    }
 
-    // async fn start_spam_generator(&mut self, peer_index: u64) -> JoinHandle<()> {
-    //     let timer_in_milli;
-    //     let burst_count;
-    //     {
-    //         let config = self.configuration.read().await;
-    //         timer_in_milli = config.get_spammer_configs().timer_in_milli;
-    //         burst_count = config.get_spammer_configs().burst_count;
-    //     }
-    //
-    //     let senders = self.senders.clone();
-    //
-    //     tokio::spawn(async move {
-    //         let mut send_count: u64 = 0;
-    //         let mut interval = interval(Duration::from_millis(timer_in_milli));
-    //         loop {
-    //             interval.tick().await;
-    //
-    //             for _i in 0..burst_count {
-    //                 let transaction = generator.generate_transaction();
-    //                 let message = Message::Transaction(transaction);
-    //                 let buffer = message.serialize();
-    //                 Self::send2(&senders, peer_index, buffer).await;
-    //                 send_count += 1;
-    //                 trace!("Sending transaction : {:?}", send_count);
-    //             }
-    //         }
-    //     })
-    // }
-    //
-    // async fn generate_tx(
-    //     blockchain: &Arc<RwLock<Blockchain>>,
-    //     wallet: &Arc<RwLock<Wallet>>,
-    //     bytes_per_tx: u32,
-    // ) -> Transaction {
-    //     trace!("generating mock transactions");
-    //
-    //     let public_key;
-    //     let private_key;
-    //     //let latest_block_id;
-    //     {
-    //         log_read_lock_request!("wallet");
-    //         let wallet = wallet.read().await;
-    //         log_read_lock_receive!("wallet");
-    //         public_key = wallet.public_key;
-    //         private_key = wallet.private_key;
-    //     }
-    //
-    //     {
-    //         log_read_lock_request!("blockchain");
-    //         let blockchain = blockchain.read().await;
-    //         log_read_lock_receive!("blockchain");
-    //
-    //         if blockchain.blockring.is_empty() {
-    //             unreachable!()
-    //         }
-    //     }
-    //
-    //     let mut transaction = Transaction::create(wallet.clone(), public_key, 100, 100).await;
-    //     transaction.message = generate_random_bytes(bytes_per_tx as u64);
-    //     transaction.generate(public_key);
-    //     transaction.sign(private_key);
-    //     transaction.add_hop(wallet.clone(), public_key).await;
-    //     // transaction
-    //     //     .add_hop(self.wallet.clone(), public_key)
-    //     //     .await;
-    //
-    //     return transaction;
-    // }
+            spam_generators.lock().await.remove(&peer_index);
+        });
+
+        self.spam_generators.lock().await.insert(peer_index, handle);
+    }
 
     pub async fn run(
         context: Context,
