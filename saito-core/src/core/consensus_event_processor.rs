@@ -75,7 +75,7 @@ impl ConsensusEventProcessor {
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        trace!("generating spammer init transaction");
+        info!("generating spammer init transaction");
 
         let mempool_lock_clone = mempool.clone();
         let wallet_lock_clone = wallet.clone();
@@ -152,7 +152,7 @@ impl ConsensusEventProcessor {
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let txs_to_generate = 1000;
+        let txs_to_generate = 10;
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;
@@ -301,7 +301,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         // generate test transactions
         if self.create_test_tx {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
-            if self.tx_producing_timer >= 10_000 {
+            if self.tx_producing_timer >= 1_000_000 {
                 // TODO : Remove this transaction generation once testing is done
                 ConsensusEventProcessor::generate_tx(
                     self.mempool.clone(),
