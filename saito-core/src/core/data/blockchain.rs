@@ -89,8 +89,9 @@ impl Blockchain {
         mempool: Arc<RwLock<Mempool>>,
     ) {
         // confirm hash first
-        block.generate_pre_hash();
-        block.generate_hash();
+        // block.generate_pre_hash();
+        // block.generate_hash();
+        block.generate();
 
         info!("add_block {:?}", &hex::encode(&block.hash));
 
