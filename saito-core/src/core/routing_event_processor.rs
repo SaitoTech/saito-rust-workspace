@@ -320,9 +320,11 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                 self.stats.total_incoming_messages.calculate_stats(time);
                 self.stats.stat_timer = 0;
 
+                println!("------------ routing stats -------------");
                 self.stats.received_transactions.print();
                 self.stats.received_blocks.print();
                 self.stats.total_incoming_messages.print();
+                println!("---------- routing stats end -----------");
             }
         }
         None

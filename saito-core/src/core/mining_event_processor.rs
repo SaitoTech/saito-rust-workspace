@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, Timestamp};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_event_processor::ConsensusEvent;
@@ -17,7 +17,7 @@ use crate::core::data::wallet::Wallet;
 use crate::core::routing_event_processor::RoutingEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
 
-const MINER_INTERVAL: u128 = 1_000;
+const MINER_INTERVAL: Timestamp = Duration::from_millis(100).as_micros() as Timestamp;
 
 #[derive(Debug)]
 pub enum MiningEvent {
@@ -30,7 +30,7 @@ pub struct MiningEventProcessor {
     pub sender_to_blockchain: Sender<RoutingEvent>,
     pub sender_to_mempool: Sender<ConsensusEvent>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
-    pub miner_timer: u128,
+    pub miner_timer: Timestamp,
     pub miner_active: bool,
     pub target: SaitoHash,
     pub difficulty: u64,
@@ -83,7 +83,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
-        self.miner_timer += duration.as_micros();
+        self.miner_timer += duration.as_micros() as Timestamp;
         if self.miner_active {
             if self.miner_timer >= MINER_INTERVAL {
                 self.miner_timer = 0;
