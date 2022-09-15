@@ -731,21 +731,13 @@ impl Blockchain {
         self.blocks.get(block_hash)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
-        // TODO : load from disk if not found
-
-        let block = self.blocks.get(block_hash);
-        if block.is_none() {
-            return None;
-        }
-        if let BlockType::Full = block.as_ref().unwrap().block_type {
-            return block;
-        }
-        None
+        self.blocks.get(block_hash)
     }
 
     pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {
+        //
         self.blocks.get_mut(block_hash)
     }
 
@@ -943,7 +935,10 @@ impl Blockchain {
                 .get_mut_block(&new_chain[current_wind_index])
                 .await
                 .unwrap();
-            block.generate();
+
+            block
+                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .await;
 
             let latest_block_id = block.id;
 
@@ -1131,7 +1126,13 @@ impl Blockchain {
         wind_failure: bool,
         storage: &Storage,
     ) -> bool {
-        let block = &self.blocks[&old_chain[current_unwind_index]];
+        let block = self
+            .blocks
+            .get_mut(&old_chain[current_unwind_index])
+            .unwrap();
+        block
+            .upgrade_block_to_block_type(BlockType::Full, storage)
+            .await;
 
         // utxoset update
         block.on_chain_reorganization(&mut self.utxoset, false);

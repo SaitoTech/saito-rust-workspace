@@ -126,7 +126,7 @@ impl Mempool {
         }
     }
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn add_transaction(&mut self, mut transaction: Transaction) {
+    async fn add_transaction(&mut self, mut transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
             hex::encode(transaction.hash_for_signature.unwrap()),

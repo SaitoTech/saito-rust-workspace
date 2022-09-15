@@ -132,6 +132,7 @@ pub fn new() -> SaitoWasm {
                 context.wallet.clone(),
             ),
             storage: Storage::new(Box::new(WasmIoHandler {})),
+            stats: Default::default(),
         },
         mining_event_processor: MiningEventProcessor {
             wallet: context.wallet.clone(),
