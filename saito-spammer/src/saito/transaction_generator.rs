@@ -49,7 +49,7 @@ impl TransactionGenerator {
         };
     }
 
-    pub async fn on_chain_reorganization(
+    pub async fn on_new_block(
         &mut self,
     ) -> (
         Option<LinkedList<Transaction>>,
