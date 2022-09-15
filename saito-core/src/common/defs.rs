@@ -89,7 +89,7 @@ impl StatVariable {
     pub fn calculate_stats(&mut self, current_time_in_us: Timestamp) {
         #[cfg(feature = "with-stats")]
         {
-            let time_elapsed_in_us = (current_time_in_us - self.last_stat_at);
+            let time_elapsed_in_us = current_time_in_us - self.last_stat_at;
             self.last_stat_at = current_time_in_us;
             if self.bins.len() == self.bins.capacity() - 1 {
                 self.bins.pop_front();

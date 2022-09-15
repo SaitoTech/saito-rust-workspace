@@ -34,7 +34,7 @@ pub struct MiningEventProcessor {
     pub miner_active: bool,
     pub target: SaitoHash,
     pub difficulty: u64,
-    pub public_key:SaitoPublicKey,
+    pub public_key: SaitoPublicKey,
 }
 
 impl MiningEventProcessor {
@@ -46,7 +46,7 @@ impl MiningEventProcessor {
         let random_bytes = hash(&generate_random_bytes(32));
         // The new way of validation will be wasting a GT instance if the validation fails
         // old way used a static method instead
-        let gt = GoldenTicket::create(self.target, random_bytes, public_key);
+        let gt = GoldenTicket::create(self.target, random_bytes, self.public_key);
         if gt.validate(self.difficulty) {
             info!(
                 "golden ticket found. sending to mempool. previous block : {:?} random : {:?} key : {:?} solution : {:?} for difficulty : {:?}",
@@ -108,6 +108,6 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
         log_read_lock_request!("wallet");
         let wallet = self.wallet.read().await;
         log_read_lock_receive!("wallet");
-        public_key = wallet.public_key;
+        self.public_key = wallet.public_key.clone();
     }
 }

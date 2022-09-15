@@ -734,13 +734,11 @@ impl Blockchain {
     // #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         //
-
         self.blocks.get(block_hash)
     }
 
     pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {
         //
-
         self.blocks.get_mut(block_hash)
     }
 
