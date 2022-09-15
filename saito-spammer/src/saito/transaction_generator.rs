@@ -1,7 +1,7 @@
 use crate::SpammerConfiguration;
 use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::data::crypto::generate_random_bytes;
-use saito_core::core::data::slip::Slip;
+use saito_core::core::data::slip::{Slip, SLIP_SIZE};
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::{
@@ -49,28 +49,20 @@ impl TransactionGenerator {
         };
     }
 
-    pub async fn on_new_block(
-        &mut self,
-    ) -> (
-        Option<LinkedList<Transaction>>,
-        Option<LinkedList<Transaction>>,
-    ) {
-        let mut init_transactions: Option<LinkedList<Transaction>> = None;
-        let mut test_transactions: Option<LinkedList<Transaction>> = None;
-
+    pub async fn on_new_block(&mut self) -> Option<LinkedList<Transaction>> {
         match self.state {
             GeneratorState::CreatingSlips => {
-                init_transactions = self.create_slips().await;
+                return self.create_slips().await;
             }
             GeneratorState::WaitingForBlockChainConfirmation => {
                 if self.check_blockchain_for_confirmation().await {
-                    test_transactions = self.create_test_transactions().await;
+                    return self.create_test_transactions().await;
                 }
             }
             GeneratorState::Ready => {}
         }
 
-        return (init_transactions, test_transactions);
+        return None;
     }
 
     async fn create_slips(&mut self) -> Option<LinkedList<Transaction>> {
@@ -150,7 +142,6 @@ impl TransactionGenerator {
             public_key = wallet.public_key;
             private_key = wallet.private_key;
             transaction = Transaction::new();
-            transaction.message = generate_random_bytes(8);
 
             let (mut input_slips, mut output_slips) =
                 wallet.generate_slips(total_nolans_requested_per_slip);
@@ -177,6 +168,12 @@ impl TransactionGenerator {
             *total_output_slips_created += 1;
         }
 
+        let remaining_bytes: i64 =
+            self.tx_size as i64 - (*total_output_slips_created + 1) as i64 * SLIP_SIZE as i64;
+
+        if remaining_bytes > 0 {
+            transaction.message = generate_random_bytes(remaining_bytes as u64);
+        }
         transaction.generate(public_key);
         transaction.sign(private_key);
         transaction.add_hop(self.wallet.clone(), public_key).await;

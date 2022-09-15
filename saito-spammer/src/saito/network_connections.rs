@@ -422,15 +422,9 @@ impl NetworkConnections {
             }
         }
 
-        let (init_transactions, test_transactions) =
-            self.transaction_generator.on_new_block().await;
+        let transactions = self.transaction_generator.on_new_block().await;
 
-        if let Some(transactions) = init_transactions {
-            self.send_transactions(peer_index, transactions, 50, 10)
-                .await;
-        }
-
-        if let Some(transactions) = test_transactions {
+        if let Some(transactions) = transactions {
             let timer_in_milli;
             let burst_count;
             {
