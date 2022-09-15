@@ -87,12 +87,12 @@ impl TransactionGenerator {
             available_balance = wallet.get_available_balance();
         }
 
-        info!(
-            "Trying to create new slips, current = {:?}, target = {:?}",
-            unspent_slip_count, self.tx_count
-        );
-
         if unspent_slip_count < self.tx_count && unspent_slip_count >= self.expected_slip_count {
+            info!(
+                "Creating new slips, current = {:?}, target = {:?}",
+                unspent_slip_count, self.tx_count
+            );
+
             let total_nolans_requested_per_slip = available_balance / unspent_slip_count;
             let mut total_output_slips_created: u64 = 0;
             let mut transactions: LinkedList<Transaction> = Default::default();
