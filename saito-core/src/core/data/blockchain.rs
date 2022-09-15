@@ -931,11 +931,10 @@ impl Blockchain {
         // structures. So validation is "read-only" and our "write" actions
         // happen first.
         //
+        let block_hash = new_chain.get(current_wind_index).unwrap();
+
         {
-            let mut block = self
-                .get_mut_block(&new_chain[current_wind_index])
-                .await
-                .unwrap();
+            let mut block = self.get_mut_block(block_hash).await.unwrap();
 
             block
                 .upgrade_block_to_block_type(BlockType::Full, storage)
@@ -956,7 +955,7 @@ impl Blockchain {
                 let previous_block_hash =
                     self.blockring.get_longest_chain_block_hash_by_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
-                    block = self.get_mut_block(&previous_block_hash).await.unwrap();
+                    let block = self.get_mut_block(&previous_block_hash).await.unwrap();
                     block
                         .upgrade_block_to_block_type(BlockType::Full, storage)
                         .await;
@@ -964,7 +963,9 @@ impl Blockchain {
             }
         }
 
-        let block = self.blocks.get(&new_chain[current_wind_index]).unwrap();
+        let block = self.blocks.get(block_hash).unwrap();
+        assert_eq!(block.block_type, BlockType::Full);
+
         // trace!(" ... before block.validate:      {:?}", create_timestamp());
         let does_block_validate = block.validate(&self, &self.utxoset).await;
 

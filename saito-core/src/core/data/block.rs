@@ -583,7 +583,7 @@ impl Block {
     // downgrade block
     //
     pub async fn downgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
-        info!("BLOCK_ID {:?}", self.id);
+        debug!("downgrading BLOCK_ID {:?} to type : {:?}", self.id, block_type);
 
         if self.block_type == block_type {
             return true;
@@ -1328,7 +1328,7 @@ impl Block {
         block_type: BlockType,
         storage: &Storage,
     ) -> bool {
-        trace!("UPGRADE_BLOCK_TO_BLOCK_TYPE {:?}", self.block_type);
+        debug!("upgrading block : {:?} to type : {:?}", hex::encode(self.hash), self.block_type);
         if self.block_type == block_type {
             return true;
         }
@@ -1799,15 +1799,15 @@ mod tests {
         block.previous_block_hash = <[u8; 32]>::from_hex(
             "bcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
-        .unwrap();
+            .unwrap();
         block.merkle_root = <[u8; 32]>::from_hex(
             "ccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
-        .unwrap();
+            .unwrap();
         block.creator = <[u8; 33]>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
-        .unwrap();
+            .unwrap();
         block.burnfee = 50000000;
         block.difficulty = 0;
         block.treasury = 0;
@@ -1820,13 +1820,13 @@ mod tests {
         block.creator = <[u8; 33]>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
-        .unwrap();
+            .unwrap();
 
         block.sign(
             <[u8; 32]>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
-            .unwrap(),
+                .unwrap(),
         );
 
         assert_eq!(block.signature.len(), 64);
@@ -1924,7 +1924,7 @@ mod tests {
 
         assert_eq!(block.creator, wallet.public_key);
         assert_eq!(
-            verify_hash(&block.pre_hash, block.signature, block.creator,),
+            verify_hash(&block.pre_hash, block.signature, block.creator),
             true
         );
         assert_ne!(block.hash, [0; 32]);
@@ -1965,8 +1965,8 @@ mod tests {
             transaction.sign(wallet.private_key);
             transaction
         }))
-        .await
-        .to_vec();
+            .await
+            .to_vec();
 
         block.transactions = transactions;
         block.generate();
