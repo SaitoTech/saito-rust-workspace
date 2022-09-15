@@ -17,7 +17,7 @@ use crate::core::data::wallet::Wallet;
 use crate::core::routing_event_processor::RoutingEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
 
-const MINER_INTERVAL: Timestamp = Duration::from_millis(100).as_micros() as Timestamp;
+const MINER_INTERVAL: Timestamp = Duration::from_millis(1).as_micros() as Timestamp;
 
 #[derive(Debug)]
 pub enum MiningEvent {
@@ -34,21 +34,14 @@ pub struct MiningEventProcessor {
     pub miner_active: bool,
     pub target: SaitoHash,
     pub difficulty: u64,
+    pub public_key:SaitoPublicKey,
 }
 
 impl MiningEventProcessor {
     #[tracing::instrument(level = "trace", skip_all)]
     async fn mine(&mut self) {
         assert!(self.miner_active);
-
-        let public_key: SaitoPublicKey;
-
-        {
-            log_read_lock_request!("wallet");
-            let wallet = self.wallet.read().await;
-            log_read_lock_receive!("wallet");
-            public_key = wallet.public_key;
-        }
+        debug_assert_ne!(self.public_key, [0; 33]);
 
         let random_bytes = hash(&generate_random_bytes(32));
         // The new way of validation will be wasting a GT instance if the validation fails
@@ -111,5 +104,10 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
         None
     }
 
-    async fn on_init(&mut self) {}
+    async fn on_init(&mut self) {
+        log_read_lock_request!("wallet");
+        let wallet = self.wallet.read().await;
+        log_read_lock_receive!("wallet");
+        public_key = wallet.public_key;
+    }
 }
