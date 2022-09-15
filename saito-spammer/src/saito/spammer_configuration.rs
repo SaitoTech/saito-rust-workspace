@@ -9,7 +9,8 @@ use tracing::{debug, error};
 pub struct Spammer {
     pub timer_in_milli: u64,
     pub burst_count: u32,
-    pub bytes_per_tx: u32,
+    pub tx_size: u32,
+    pub tx_count: u64,
 }
 
 #[derive(Deserialize, Debug)]
@@ -36,7 +37,8 @@ impl SpammerConfiguration {
             spammer: Spammer {
                 timer_in_milli: 0,
                 burst_count: 0,
-                bytes_per_tx: 0,
+                tx_size: 0,
+                tx_count: 0,
             },
         }
     }

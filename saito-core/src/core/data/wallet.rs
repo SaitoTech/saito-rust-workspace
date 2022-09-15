@@ -200,6 +200,17 @@ impl Wallet {
         available_balance
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
+    pub fn get_unspent_slip_count(&self) -> u64 {
+        let mut unspent_slip_count: u64 = 0;
+        for slip in &self.slips {
+            if !slip.spent {
+                unspent_slip_count += 1;
+            }
+        }
+        unspent_slip_count
+    }
+
     // the nolan_requested is omitted from the slips created - only the change
     // address is provided as an output. so make sure that any function calling
     // this manually creates the output for its desired payment
