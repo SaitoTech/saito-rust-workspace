@@ -694,6 +694,8 @@ impl Block {
         self.generate_pre_hash();
         self.generate_hash();
 
+        trace!("generating block data : {:?}", hex::encode(self.hash));
+
         let _transactions_pre_calculated = &self
             .transactions
             .par_iter_mut()

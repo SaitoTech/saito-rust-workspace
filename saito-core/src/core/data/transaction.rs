@@ -491,7 +491,8 @@ impl Transaction {
     //
     #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_total_fees(&mut self) {
-        //
+        trace!("generating total fees");
+
         // TODO - remove for uuid work
         // generate tx signature hash
         //

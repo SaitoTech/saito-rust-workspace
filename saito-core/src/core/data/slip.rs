@@ -32,6 +32,7 @@ pub struct Slip {
     pub uuid: SaitoHash,
     #[serde_as(as = "[_; 74]")]
     pub utxoset_key: SaitoUTXOSetKey,
+    // TODO : Check if this can be removed with Option<>
     pub is_utxoset_key_set: bool,
 }
 
