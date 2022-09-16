@@ -106,13 +106,19 @@ impl Mempool {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_transaction_if_validates(
         &mut self,
-        transaction: Transaction,
+        mut transaction: Transaction,
         blockchain: &Blockchain,
     ) {
         trace!(
             "add transaction if validates : {:?}",
             hex::encode(transaction.hash_for_signature.unwrap())
         );
+        {
+            log_read_lock_request!("wallet");
+            let wallet = self.wallet_lock.read().await;
+            log_read_lock_receive!("wallet");
+            transaction.generate(wallet.public_key);
+        }
         //
         // validate
         //
