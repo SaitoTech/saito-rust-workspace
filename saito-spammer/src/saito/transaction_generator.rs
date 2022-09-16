@@ -1,5 +1,7 @@
 use crate::SpammerConfiguration;
 
+use crate::saito::time_keeper::TimeKeeper;
+use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data::crypto::generate_random_bytes;
 use saito_core::core::data::slip::{Slip, SLIP_SIZE};
 use saito_core::core::data::transaction::Transaction;
@@ -25,6 +27,7 @@ pub struct TransactionGenerator {
     expected_slip_count: u64,
     tx_size: u32,
     tx_count: u64,
+    time_keeper: Box<TimeKeeper>,
 }
 
 impl TransactionGenerator {
@@ -46,6 +49,7 @@ impl TransactionGenerator {
             expected_slip_count: 1,
             tx_size,
             tx_count,
+            time_keeper: Box::new(TimeKeeper {}),
         };
     }
 
@@ -95,6 +99,7 @@ impl TransactionGenerator {
                         output_slips_per_input_slip,
                         total_nolans_requested_per_slip,
                         &mut total_output_slips_created,
+                        &self.time_keeper,
                     )
                     .await;
 
@@ -128,6 +133,7 @@ impl TransactionGenerator {
         output_slips_per_input_slip: u8,
         total_nolans_requested_per_slip: u64,
         total_output_slips_created: &mut u64,
+        time_keeper: &TimeKeeper,
     ) -> Transaction {
         let payment_amount = total_nolans_requested_per_slip / output_slips_per_input_slip as u64;
 
@@ -174,6 +180,8 @@ impl TransactionGenerator {
         if remaining_bytes > 0 {
             transaction.message = generate_random_bytes(remaining_bytes as u64);
         }
+
+        transaction.timestamp = time_keeper.get_timestamp();
         transaction.generate(public_key);
         transaction.sign(private_key);
         transaction.add_hop(self.wallet.clone(), public_key).await;

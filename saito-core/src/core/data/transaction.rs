@@ -36,7 +36,7 @@ pub enum TransactionType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Transaction {
     // the bulk of the consensus transaction data
-    pub(crate) timestamp: u64,
+    pub timestamp: u64,
     pub inputs: Vec<Slip>,
     pub outputs: Vec<Slip>,
     // #[serde(with = "serde_bytes")] TODO : check this for performance
