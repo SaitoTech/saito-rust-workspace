@@ -9,7 +9,7 @@ use saito_core::{
 };
 use std::collections::LinkedList;
 use std::sync::Arc;
-use tokio::sync::{RwLock};
+use tokio::sync::RwLock;
 use tracing::info;
 
 #[derive(Clone)]
