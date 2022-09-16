@@ -88,7 +88,7 @@ where
 
             if work_done {
                 work_done = false;
-                tokio::task::yield_now().await;
+                // tokio::task::yield_now().await;
             } else {
                 tokio::task::yield_now().await;
                 std::thread::sleep(Duration::from_millis(10));
