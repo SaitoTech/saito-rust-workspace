@@ -32,7 +32,7 @@ pub mod test {
     use rayon::prelude::*;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
-    use tracing::{debug, info, trace};
+    use tracing::{debug, info};
 
     use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet};
     use crate::common::test_io_handler::test::TestIOHandler;

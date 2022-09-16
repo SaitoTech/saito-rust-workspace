@@ -1,5 +1,5 @@
 use crate::SpammerConfiguration;
-use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
+
 use saito_core::core::data::crypto::generate_random_bytes;
 use saito_core::core::data::slip::{Slip, SLIP_SIZE};
 use saito_core::core::data::transaction::Transaction;
@@ -9,7 +9,7 @@ use saito_core::{
 };
 use std::collections::LinkedList;
 use std::sync::Arc;
-use tokio::sync::{RwLock, RwLockWriteGuard};
+use tokio::sync::{RwLock};
 use tracing::info;
 
 #[derive(Clone)]
@@ -215,7 +215,7 @@ impl TransactionGenerator {
 
         let mut transactions: LinkedList<Transaction> = Default::default();
 
-        for i in 0..self.tx_count {
+        for _i in 0..self.tx_count {
             let mut transaction = Transaction::create(self.wallet.clone(), public_key, 1, 1).await;
             transaction.message = generate_random_bytes(self.tx_size as u64);
             transaction.generate(public_key);

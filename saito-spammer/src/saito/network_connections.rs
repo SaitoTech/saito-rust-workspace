@@ -20,7 +20,7 @@ use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::core::data::context::Context;
-use saito_core::core::data::crypto::generate_random_bytes;
+
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 use saito_core::core::data::network::Network;

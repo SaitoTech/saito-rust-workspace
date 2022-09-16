@@ -21,7 +21,7 @@ use saito_core::core::data::storage::Storage;
 use crate::saito::io_event::IoEvent;
 use crate::saito::network_connections::NetworkConnections;
 use crate::saito::rust_io_handler::RustIOHandler;
-use crate::saito::spammer_configuration;
+
 use crate::saito::spammer_configuration::SpammerConfiguration;
 
 mod saito;
