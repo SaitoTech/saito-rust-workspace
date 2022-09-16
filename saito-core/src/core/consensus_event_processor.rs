@@ -495,18 +495,37 @@ pub async fn add_to_blockchain_from_mempool(
     log_write_lock_receive!("blockchain");
     // trace!("acquired the log_write_lock_request!("blockchain");");
 
+    let mut remaining_blocks = vec![];
+
     debug!("blocks to add : {:?}", blocks.len());
     while let Some(block) = blocks.pop_front() {
-        let block_hash = block.hash.clone();
+        let previous_block = block.previous_block_hash.clone();
+        if blockchain.blocks.contains_key(&previous_block) {
+            blockchain
+                .add_block(
+                    block,
+                    network,
+                    storage,
+                    sender_to_miner.clone(),
+                    mempool.clone(),
+                )
+                .await;
+        } else {
+            remaining_blocks.push(block);
+        }
+    }
+    let latest_chain_id = blockchain.get_latest_block_id();
 
-        blockchain
-            .add_block(
-                block,
-                network,
-                storage,
-                sender_to_miner.clone(),
-                mempool.clone(),
-            )
-            .await;
+    {
+        log_write_lock_request!("mempool");
+        let mut mempool = mempool.write().await;
+        log_write_lock_receive!("mempool");
+        // only adding back blocks in the after latest block
+        // TODO : what about forks ?
+        for block in remaining_blocks {
+            if block.id > latest_chain_id {
+                mempool.blocks_queue.push_back(block);
+            }
+        }
     }
 }
