@@ -276,7 +276,7 @@ impl Mempool {
             hex::encode(block_hash)
         );
 
-        self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
+        // self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
     }
 
     #[tracing::instrument(level = "info", skip_all)]
