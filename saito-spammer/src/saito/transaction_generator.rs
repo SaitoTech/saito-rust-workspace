@@ -99,7 +99,7 @@ impl TransactionGenerator {
                         output_slips_per_input_slip,
                         total_nolans_requested_per_slip,
                         &mut total_output_slips_created,
-                        &self.time_keeper,
+                        &TimeKeeper {},
                     )
                     .await;
 
