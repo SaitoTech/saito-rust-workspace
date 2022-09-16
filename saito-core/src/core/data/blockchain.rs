@@ -1,4 +1,5 @@
 use std::io::Error;
+use std::mem;
 use std::sync::Arc;
 
 use ahash::AHashMap;
@@ -405,8 +406,8 @@ impl Blockchain {
                     .unwrap();
             } else {
                 debug!("new chain doesn't validate");
-                self.add_block_failure(&block_hash, mempool).await;
                 self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = false;
+                self.add_block_failure(&block_hash, mempool).await;
             }
         } else {
             debug!("this is not the longest chain");
@@ -521,9 +522,25 @@ impl Blockchain {
         block_hash: &SaitoHash,
         mempool: Arc<RwLock<Mempool>>,
     ) {
-        debug!("add block failed");
+        debug!("add block failed : {:?}", hex::encode(block_hash));
+        log_write_lock_request!("mempool");
         let mut mempool = mempool.write().await;
+        log_write_lock_receive!("mempool");
         mempool.delete_block(block_hash);
+        let mut block = self.blocks.remove(block_hash).unwrap();
+        let public_key;
+        {
+            log_read_lock_request!("wallet");
+            let wallet = self.wallet_lock.read().await;
+            log_read_lock_receive!("wallet");
+            public_key = wallet.public_key;
+        }
+        if block.creator == public_key {
+            let mut transactions = &mut block.transactions;
+            // TODO : what other types should be added back to the mempool
+            transactions.retain(|tx| tx.transaction_type == TransactionType::Normal);
+            mempool.transactions.append(&mut transactions);
+        }
     }
 
     #[tracing::instrument(level = "info", skip_all)]

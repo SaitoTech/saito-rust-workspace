@@ -340,10 +340,18 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 let mut blockchain = self.blockchain.write().await;
                 log_write_lock_receive!("blockchain");
 
+                debug!(
+                    "mempool size before bundling : {:?}",
+                    mempool.transactions.len()
+                );
                 let block = mempool
                     .bundle_block(blockchain.deref_mut(), timestamp)
                     .await;
                 debug!("adding bundled block to mempool");
+                debug!(
+                    "mempool size after bundling : {:?}",
+                    mempool.transactions.len()
+                );
                 mempool.add_block(block);
             }
 
@@ -489,6 +497,8 @@ pub async fn add_to_blockchain_from_mempool(
 
     debug!("blocks to add : {:?}", blocks.len());
     while let Some(block) = blocks.pop_front() {
+        let block_hash = block.hash.clone();
+
         blockchain
             .add_block(
                 block,
