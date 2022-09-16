@@ -39,7 +39,7 @@ pub struct MiningEventProcessor {
 
 impl MiningEventProcessor {
     #[tracing::instrument(level = "trace", skip_all)]
-    async fn mine(&mut self) {
+    async fn mine(&mut self) -> Option<()> {
         assert!(self.miner_active);
         debug_assert_ne!(self.public_key, [0; 33]);
 
@@ -61,7 +61,10 @@ impl MiningEventProcessor {
                 .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
                 .await
                 .expect("sending to mempool failed");
+
+            return Some(());
         }
+        None
     }
 }
 
@@ -80,7 +83,10 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
         if self.miner_active {
             if self.miner_timer >= MINER_INTERVAL {
                 self.miner_timer = 0;
-                self.mine().await;
+                let result = self.mine().await;
+                if result.is_some() {
+                    return Some(());
+                }
             }
         }
 
@@ -99,6 +105,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
                 self.difficulty = difficulty;
                 self.target = hash;
                 self.miner_active = true;
+                return Some(());
             }
         }
         None

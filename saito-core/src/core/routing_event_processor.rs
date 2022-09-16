@@ -263,6 +263,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                 self.stats.total_incoming_messages.increment();
                 self.process_incoming_message(peer_index, message.unwrap())
                     .await;
+                return Some(());
             }
             NetworkEvent::PeerConnectionResult {
                 peer_details,
@@ -270,10 +271,12 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
             } => {
                 if result.is_ok() {
                     self.handle_new_peer(peer_details, result.unwrap()).await;
+                    return Some(());
                 }
             }
             NetworkEvent::PeerDisconnected { peer_index } => {
                 self.handle_peer_disconnect(peer_index).await;
+                return Some(());
             }
 
             NetworkEvent::OutgoingNetworkMessageForAll { .. } => {
@@ -295,6 +298,7 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                     .send(ConsensusEvent::BlockFetched { peer_index, buffer })
                     .await
                     .unwrap();
+                return Some(());
             }
         }
         None
@@ -331,11 +335,6 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     }
 
     async fn process_event(&mut self, _event: RoutingEvent) -> Option<()> {
-        debug!("processing blockchain event");
-
-        // match event {}
-
-        debug!("blockchain event processed successfully");
         None
     }
 
