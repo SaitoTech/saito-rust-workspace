@@ -395,13 +395,16 @@ impl NetworkConnections {
             let network = self.network.lock().await;
             let mut storage = self.storage.lock().await;
 
+            {
+                let mut mempool = self.mempool.write().await;
+                mempool.add_block(block);
+            }
             blockchain
-                .add_block(
-                    block,
+                .add_to_blockchain_from_mempool(
+                    self.mempool.clone(),
                     &network,
                     &mut storage,
                     self.sender_to_miner.clone(),
-                    self.mempool.clone(),
                 )
                 .await;
 
@@ -550,7 +553,8 @@ impl NetworkConnections {
                             let clone = network_connections.clone();
 
                             tokio::spawn(async move {
-                                if let Ok(block) = NetworkConnections::fetch_block(url).await {
+                                if let Ok(mut block) = NetworkConnections::fetch_block(url).await {
+                                    block.generate();
                                     clone.lock().await.on_block(peer_index, block).await;
                                 }
                             });
