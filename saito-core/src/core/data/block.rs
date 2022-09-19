@@ -6,7 +6,7 @@ use ahash::AHashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, span, trace, Level};
+use tracing::{debug, error, info, trace, Level};
 
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,

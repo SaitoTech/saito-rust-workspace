@@ -524,6 +524,10 @@ pub async fn add_to_blockchain_from_mempool(
         // TODO : what about forks ?
         for block in remaining_blocks {
             if block.id > latest_chain_id {
+                debug!(
+                    "adding block : {:?} back into the queue",
+                    hex::encode(block.hash)
+                );
                 mempool.blocks_queue.push_back(block);
             }
         }

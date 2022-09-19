@@ -1,7 +1,7 @@
 use std::collections::LinkedList;
 
 use rayon::prelude::*;
-use tracing::{debug, trace};
+use tracing::debug;
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;

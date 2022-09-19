@@ -1,12 +1,11 @@
 use std::io::Error;
-use std::mem;
 use std::sync::Arc;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, instrument, span, trace, warn, Level};
+use tracing::{debug, error, info, span, trace, warn, Level};
 
 use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
@@ -752,7 +751,6 @@ impl Blockchain {
     // #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         //
-
         self.blocks.get(block_hash)
     }
 
@@ -840,6 +838,28 @@ impl Blockchain {
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
         //
+
+        if !self.is_golden_ticket_count_valid(&new_chain) {
+            return false;
+        }
+
+        if !old_chain.is_empty() {
+            let res = self
+                .unwind_chain(&new_chain, &old_chain, 0, true, storage)
+                //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
+                .await;
+            res
+        } else if !new_chain.is_empty() {
+            let res = self
+                .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
+                .await;
+            res
+        } else {
+            true
+        }
+    }
+
+    pub fn is_golden_ticket_count_valid(&self, new_chain: &Vec<[u8; 32]>) -> bool {
         let mut golden_tickets_found = 0;
         let mut search_depth_index = 0;
         let mut latest_block_hash = new_chain[0];
@@ -884,21 +904,7 @@ impl Blockchain {
                 return false;
             }
         }
-
-        if !old_chain.is_empty() {
-            let res = self
-                .unwind_chain(&new_chain, &old_chain, 0, true, storage)
-                //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
-                .await;
-            res
-        } else if !new_chain.is_empty() {
-            let res = self
-                .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
-                .await;
-            res
-        } else {
-            true
-        }
+        return true;
     }
 
     //
