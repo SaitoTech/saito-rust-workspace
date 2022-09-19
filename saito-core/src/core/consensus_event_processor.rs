@@ -6,7 +6,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT, STAT_INTERVAL};

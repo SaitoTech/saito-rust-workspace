@@ -5,7 +5,7 @@ use ahash::AHashMap;
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, span, trace, warn, Level};
+use tracing::{debug, error, info, trace, warn, Level};
 
 use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
@@ -2326,6 +2326,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
+        // pretty_env_logger::init();
         let mut t = TestManager::new();
         let mut t2 = TestManager::new();
         let block1;

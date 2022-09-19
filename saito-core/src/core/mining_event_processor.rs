@@ -95,7 +95,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
 
     async fn process_event(&mut self, event: MiningEvent) -> Option<()> {
         // debug!("event received : {:?}", event);
-        match event {
+        return match event {
             MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
                 debug!(
                     "Setting miner hash : {:?} and difficulty : {:?}",
@@ -105,10 +105,9 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
                 self.difficulty = difficulty;
                 self.target = hash;
                 self.miner_active = true;
-                return Some(());
+                Some(())
             }
-        }
-        None
+        };
     }
 
     async fn on_init(&mut self) {
