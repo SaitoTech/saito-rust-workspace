@@ -93,7 +93,11 @@ impl Blockchain {
         // block.generate_hash();
         block.generate();
 
-        info!("add_block {:?}", &hex::encode(&block.hash));
+        info!(
+            "add_block {:?} with id : {:?}",
+            &hex::encode(&block.hash),
+            block.id
+        );
 
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
