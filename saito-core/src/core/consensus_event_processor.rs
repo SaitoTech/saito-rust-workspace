@@ -355,14 +355,19 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 mempool.add_block(block);
             }
 
-            add_to_blockchain_from_mempool(
-                self.mempool.clone(),
-                self.blockchain.clone(),
-                &self.network,
-                &mut self.storage,
-                self.sender_to_miner.clone(),
-            )
-            .await;
+            {
+                log_write_lock_request!("blockchain");
+                let mut blockchain = self.blockchain.write().await;
+                log_write_lock_receive!("blockchain");
+                blockchain
+                    .add_to_blockchain_from_mempool(
+                        self.mempool.clone(),
+                        &self.network,
+                        &mut self.storage,
+                        self.sender_to_miner.clone(),
+                    )
+                    .await;
+            }
 
             debug!("blocks added to blockchain");
 
@@ -422,14 +427,20 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     mempool.add_block(block);
                 }
                 self.stats.blocks_fetched.increment();
-                add_to_blockchain_from_mempool(
-                    self.mempool.clone(),
-                    self.blockchain.clone(),
-                    &self.network,
-                    &mut self.storage,
-                    self.sender_to_miner.clone(),
-                )
-                .await;
+                {
+                    log_write_lock_request!("blockchain");
+                    let mut blockchain = self.blockchain.write().await;
+                    log_write_lock_receive!("blockchain");
+                    blockchain
+                        .add_to_blockchain_from_mempool(
+                            self.mempool.clone(),
+                            &self.network,
+                            &mut self.storage,
+                            self.sender_to_miner.clone(),
+                        )
+                        .await;
+                }
+
                 Some(())
             }
             ConsensusEvent::NewTransaction { mut transaction } => {
@@ -461,77 +472,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             .load_blocks_from_disk(self.mempool.clone())
             .await;
 
-        add_to_blockchain_from_mempool(
-            self.mempool.clone(),
-            self.blockchain.clone(),
-            &self.network,
-            &mut self.storage,
-            self.sender_to_miner.clone(),
-        )
-        .await;
-    }
-}
-
-pub async fn add_to_blockchain_from_mempool(
-    mempool: Arc<RwLock<Mempool>>,
-    blockchain: Arc<RwLock<Blockchain>>,
-    network: &Network,
-    storage: &mut Storage,
-    sender_to_miner: Sender<MiningEvent>,
-) {
-    debug!("adding blocks from mempool to blockchain");
-    let mut blocks: VecDeque<Block>;
-    {
-        log_write_lock_request!("mempool");
-        let mut mempool = mempool.write().await;
-        log_write_lock_receive!("mempool");
-        blocks = mempool.blocks_queue.drain(..).collect();
-    }
-    blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
-
-    // trace!("waiting for the log_write_lock_request!("blockchain");");
-    log_write_lock_request!("blockchain");
-    let mut blockchain = blockchain.write().await;
-    log_write_lock_receive!("blockchain");
-    // trace!("acquired the log_write_lock_request!("blockchain");");
-
-    let mut remaining_blocks: Vec<Block> = vec![];
-
-    debug!("blocks to add : {:?}", blocks.len());
-    while let Some(block) = blocks.pop_front() {
-        // let previous_block = block.previous_block_hash.clone();
-        // if blockchain.blocks.contains_key(&previous_block) {
+        log_write_lock_request!("blockchain");
+        let mut blockchain = self.blockchain.write().await;
+        log_write_lock_receive!("blockchain");
         blockchain
-            .add_block(
-                block,
-                network,
-                storage,
-                sender_to_miner.clone(),
-                mempool.clone(),
+            .add_to_blockchain_from_mempool(
+                self.mempool.clone(),
+                &self.network,
+                &mut self.storage,
+                self.sender_to_miner.clone(),
             )
             .await;
-        // } else {
-        // TODO : enable this after making sure functionality works well with every failure case for add_block
-        //          and initial conditions. already parent missing blocks are being added back to mempool in blockchain.add_block
-        //     remaining_blocks.push(block);
-        // }
     }
-    // let latest_chain_id = blockchain.get_latest_block_id();
-    //
-    // {
-    //     log_write_lock_request!("mempool");
-    //     let mut mempool = mempool.write().await;
-    //     log_write_lock_receive!("mempool");
-    //     // only adding back blocks in the after latest block
-    //     // TODO : what about forks ?
-    //     for block in remaining_blocks {
-    //         if block.id > latest_chain_id {
-    //             debug!(
-    //                 "adding block : {:?} back into the queue",
-    //                 hex::encode(block.hash)
-    //             );
-    //             mempool.blocks_queue.push_back(block);
-    //         }
-    //     }
-    // }
 }

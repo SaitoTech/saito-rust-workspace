@@ -1168,7 +1168,7 @@ impl Block {
                 // previous block hash can be [0; 32] if there is no longest-chain block
 
                 if previous_block_hash != [0; 32] {
-                    let previous_block = blockchain.get_block(&previous_block_hash).await.unwrap();
+                    let previous_block = blockchain.get_block(&previous_block_hash).unwrap();
 
                     if previous_block.has_golden_ticket {
                         break;

@@ -603,7 +603,7 @@ fn run_websocket_server(
                         // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
                         log_read_lock_receive!("blockchain");
-                        let block = blockchain.get_block(&block_hash).await;
+                        let block = blockchain.get_block(&block_hash);
                         if block.is_none() {
                             debug!("block not found : {:?}", block_hash);
                             return Err(warp::reject::not_found());

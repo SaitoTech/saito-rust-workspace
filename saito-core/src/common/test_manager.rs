@@ -181,7 +181,7 @@ pub mod test {
                     .blockring
                     .get_longest_chain_block_hash_by_block_id(i as u64);
                 info!("WINDING ID HASH - {} {:?}", i, block_hash);
-                let block = blockchain.get_block(&block_hash).await.unwrap();
+                let block = blockchain.get_block(&block_hash).unwrap();
                 for j in 0..block.transactions.len() {
                     block.transactions[j].on_chain_reorganization(&mut utxoset, true, i as u64);
                 }
@@ -286,7 +286,7 @@ pub mod test {
                 let block_hash = blockchain
                     .blockring
                     .get_longest_chain_block_hash_by_block_id(i as u64);
-                let block = blockchain.get_block(&block_hash).await.unwrap();
+                let block = blockchain.get_block(&block_hash).unwrap();
 
                 block_inputs = 0;
                 block_outputs = 0;
@@ -416,7 +416,7 @@ pub mod test {
 
             if include_valid_golden_ticket {
                 let blockchain = self.blockchain_lock.read().await;
-                let block = blockchain.get_block(&parent_hash).await.unwrap();
+                let block = blockchain.get_block(&parent_hash).unwrap();
                 let golden_ticket: GoldenTicket = Self::create_golden_ticket(
                     self.wallet_lock.clone(),
                     parent_hash,
