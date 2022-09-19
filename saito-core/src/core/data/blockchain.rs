@@ -183,7 +183,7 @@ impl Blockchain {
                                 debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
                                     hex::encode(block.hash),
                                     hex::encode(block.previous_block_hash));
-                                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix
+                                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
                                 mempool.add_block(block);
                                 return;
                             } else {

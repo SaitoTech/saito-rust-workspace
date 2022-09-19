@@ -516,22 +516,22 @@ pub async fn add_to_blockchain_from_mempool(
         //     remaining_blocks.push(block);
         // }
     }
-    let latest_chain_id = blockchain.get_latest_block_id();
-
-    {
-        log_write_lock_request!("mempool");
-        let mut mempool = mempool.write().await;
-        log_write_lock_receive!("mempool");
-        // only adding back blocks in the after latest block
-        // TODO : what about forks ?
-        for block in remaining_blocks {
-            if block.id > latest_chain_id {
-                debug!(
-                    "adding block : {:?} back into the queue",
-                    hex::encode(block.hash)
-                );
-                mempool.blocks_queue.push_back(block);
-            }
-        }
-    }
+    // let latest_chain_id = blockchain.get_latest_block_id();
+    //
+    // {
+    //     log_write_lock_request!("mempool");
+    //     let mut mempool = mempool.write().await;
+    //     log_write_lock_receive!("mempool");
+    //     // only adding back blocks in the after latest block
+    //     // TODO : what about forks ?
+    //     for block in remaining_blocks {
+    //         if block.id > latest_chain_id {
+    //             debug!(
+    //                 "adding block : {:?} back into the queue",
+    //                 hex::encode(block.hash)
+    //             );
+    //             mempool.blocks_queue.push_back(block);
+    //         }
+    //     }
+    // }
 }
