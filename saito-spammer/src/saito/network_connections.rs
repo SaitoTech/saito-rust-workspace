@@ -400,7 +400,7 @@ impl NetworkConnections {
                 mempool.add_block(block);
             }
             blockchain
-                .add_to_blockchain_from_mempool(
+                .add_blocks_from_mempool(
                     self.mempool.clone(),
                     &network,
                     &mut storage,
