@@ -2322,7 +2322,7 @@ mod tests {
         t.check_token_supply().await;
     }
 
-    /// Loading blocks into a blockchain which was were created from another blockchain instance
+    /// Loading blocks into a blockchain which were created from another blockchain instance
     #[tokio::test]
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
@@ -2379,6 +2379,9 @@ mod tests {
         {
             let blockchain1 = t.blockchain_lock.read().await;
             let blockchain2 = t2.blockchain_lock.read().await;
+
+            assert_eq!(blockchain1.blocks.len(), 2);
+            assert_eq!(blockchain2.blocks.len(), 2);
 
             let block1_chain1 = blockchain1.get_block(&block1_hash).await.unwrap();
             let block1_chain2 = blockchain2.get_block(&block1_hash).await.unwrap();
