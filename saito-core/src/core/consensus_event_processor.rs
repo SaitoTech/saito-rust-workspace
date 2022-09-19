@@ -6,7 +6,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT, STAT_INTERVAL};
@@ -75,7 +75,7 @@ impl ConsensusEventProcessor {
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        trace!("generating spammer init transaction");
+        info!("generating spammer init transaction");
 
         let mempool_lock_clone = mempool.clone();
         let wallet_lock_clone = wallet.clone();
@@ -152,7 +152,7 @@ impl ConsensusEventProcessor {
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let txs_to_generate = 1000;
+        let txs_to_generate = 10;
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;
@@ -301,7 +301,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         // generate test transactions
         if self.create_test_tx {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
-            if self.tx_producing_timer >= 10_000 {
+            if self.tx_producing_timer >= 1_000_000 {
                 // TODO : Remove this transaction generation once testing is done
                 ConsensusEventProcessor::generate_tx(
                     self.mempool.clone(),
@@ -340,10 +340,18 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 let mut blockchain = self.blockchain.write().await;
                 log_write_lock_receive!("blockchain");
 
+                debug!(
+                    "mempool size before bundling : {:?}",
+                    mempool.transactions.len()
+                );
                 let block = mempool
                     .bundle_block(blockchain.deref_mut(), timestamp)
                     .await;
                 debug!("adding bundled block to mempool");
+                debug!(
+                    "mempool size after bundling : {:?}",
+                    mempool.transactions.len()
+                );
                 mempool.add_block(block);
             }
 
@@ -487,8 +495,12 @@ pub async fn add_to_blockchain_from_mempool(
     log_write_lock_receive!("blockchain");
     // trace!("acquired the log_write_lock_request!("blockchain");");
 
+    let mut remaining_blocks: Vec<Block> = vec![];
+
     debug!("blocks to add : {:?}", blocks.len());
     while let Some(block) = blocks.pop_front() {
+        // let previous_block = block.previous_block_hash.clone();
+        // if blockchain.blocks.contains_key(&previous_block) {
         blockchain
             .add_block(
                 block,
@@ -498,5 +510,28 @@ pub async fn add_to_blockchain_from_mempool(
                 mempool.clone(),
             )
             .await;
+        // } else {
+        // TODO : enable this after making sure functionality works well with every failure case for add_block
+        //          and initial conditions
+        //     remaining_blocks.push(block);
+        // }
     }
+    // let latest_chain_id = blockchain.get_latest_block_id();
+    //
+    // {
+    //     log_write_lock_request!("mempool");
+    //     let mut mempool = mempool.write().await;
+    //     log_write_lock_receive!("mempool");
+    //     // only adding back blocks in the after latest block
+    //     // TODO : what about forks ?
+    //     for block in remaining_blocks {
+    //         if block.id > latest_chain_id {
+    //             debug!(
+    //                 "adding block : {:?} back into the queue",
+    //                 hex::encode(block.hash)
+    //             );
+    //             mempool.blocks_queue.push_back(block);
+    //         }
+    //     }
+    // }
 }

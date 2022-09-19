@@ -88,12 +88,10 @@ where
 
             if work_done {
                 work_done = false;
-                tokio::task::yield_now().await;
-                // std::thread::yield_now();
+                // tokio::task::yield_now().await;
             } else {
                 tokio::task::yield_now().await;
-                std::thread::sleep(Duration::new(0, 1000_000));
-                //std::thread::sleep(Duration::new(0, 1000_000));
+                std::thread::sleep(Duration::from_millis(10));
             }
         }
     })
@@ -114,6 +112,7 @@ async fn run_mining_event_processor(
         miner_active: false,
         target: [0; 32],
         difficulty: 0,
+        public_key: [0; 33],
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
         tokio::sync::mpsc::channel::<NetworkEvent>(1000);

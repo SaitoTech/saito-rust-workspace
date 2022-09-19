@@ -31,3 +31,8 @@ ctor = "0.1.22"
 
 [profile.dev]
 panic = "unwind"
+
+[features]
+default= ["with-stats"]
+locking-logs = ["saito-core/locking-logs"]
+with-stats = ["saito-core/with-stats"]

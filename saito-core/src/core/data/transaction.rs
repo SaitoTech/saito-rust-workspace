@@ -36,7 +36,7 @@ pub enum TransactionType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Transaction {
     // the bulk of the consensus transaction data
-    pub(crate) timestamp: u64,
+    pub timestamp: u64,
     pub inputs: Vec<Slip>,
     pub outputs: Vec<Slip>,
     // #[serde(with = "serde_bytes")] TODO : check this for performance
@@ -491,11 +491,14 @@ impl Transaction {
     //
     #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_total_fees(&mut self) {
-        //
         // TODO - remove for uuid work
         // generate tx signature hash
         //
         self.generate_hash_for_signature();
+        trace!(
+            "generating total fees for tx : {:?}",
+            hex::encode(self.hash_for_signature.unwrap())
+        );
         let hash_for_signature = self.hash_for_signature;
 
         //

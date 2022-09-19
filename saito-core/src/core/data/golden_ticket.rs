@@ -1,7 +1,5 @@
 use std::convert::TryInto;
 
-use tracing::{debug, trace};
-
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};

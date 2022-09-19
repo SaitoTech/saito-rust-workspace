@@ -5,7 +5,7 @@ use ahash::AHashMap;
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, instrument, span, trace, warn, Level};
+use tracing::{debug, error, info, trace, warn, Level};
 
 use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
@@ -89,10 +89,15 @@ impl Blockchain {
         mempool: Arc<RwLock<Mempool>>,
     ) {
         // confirm hash first
-        block.generate_pre_hash();
-        block.generate_hash();
+        // block.generate_pre_hash();
+        // block.generate_hash();
+        block.generate();
 
-        info!("add_block {:?}", &hex::encode(&block.hash));
+        info!(
+            "add_block {:?} with id : {:?}",
+            &hex::encode(&block.hash),
+            block.id
+        );
 
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
@@ -182,7 +187,7 @@ impl Blockchain {
                                 debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
                                     hex::encode(block.hash),
                                     hex::encode(block.previous_block_hash));
-                                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix
+                                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
                                 mempool.add_block(block);
                                 return;
                             } else {
@@ -404,8 +409,8 @@ impl Blockchain {
                     .unwrap();
             } else {
                 debug!("new chain doesn't validate");
-                self.add_block_failure(&block_hash, mempool).await;
                 self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = false;
+                self.add_block_failure(&block_hash, mempool).await;
             }
         } else {
             debug!("this is not the longest chain");
@@ -520,9 +525,25 @@ impl Blockchain {
         block_hash: &SaitoHash,
         mempool: Arc<RwLock<Mempool>>,
     ) {
-        debug!("add block failed");
+        debug!("add block failed : {:?}", hex::encode(block_hash));
+        log_write_lock_request!("mempool");
         let mut mempool = mempool.write().await;
+        log_write_lock_receive!("mempool");
         mempool.delete_block(block_hash);
+        let mut block = self.blocks.remove(block_hash).unwrap();
+        let public_key;
+        {
+            log_read_lock_request!("wallet");
+            let wallet = self.wallet_lock.read().await;
+            log_read_lock_receive!("wallet");
+            public_key = wallet.public_key;
+        }
+        if block.creator == public_key {
+            let mut transactions = &mut block.transactions;
+            // TODO : what other types should be added back to the mempool
+            transactions.retain(|tx| tx.transaction_type == TransactionType::Normal);
+            mempool.transactions.append(&mut transactions);
+        }
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -733,6 +754,8 @@ impl Blockchain {
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
+        //
+
         self.blocks.get(block_hash)
     }
 
@@ -820,6 +843,28 @@ impl Blockchain {
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
         //
+
+        if !self.is_golden_ticket_count_valid(&new_chain) {
+            return false;
+        }
+
+        if !old_chain.is_empty() {
+            let res = self
+                .unwind_chain(&new_chain, &old_chain, 0, true, storage)
+                //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
+                .await;
+            res
+        } else if !new_chain.is_empty() {
+            let res = self
+                .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
+                .await;
+            res
+        } else {
+            true
+        }
+    }
+
+    pub fn is_golden_ticket_count_valid(&self, new_chain: &Vec<[u8; 32]>) -> bool {
         let mut golden_tickets_found = 0;
         let mut search_depth_index = 0;
         let mut latest_block_hash = new_chain[0];
@@ -864,21 +909,7 @@ impl Blockchain {
                 return false;
             }
         }
-
-        if !old_chain.is_empty() {
-            let res = self
-                .unwind_chain(&new_chain, &old_chain, 0, true, storage)
-                //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
-                .await;
-            res
-        } else if !new_chain.is_empty() {
-            let res = self
-                .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
-                .await;
-            res
-        } else {
-            true
-        }
+        return true;
     }
 
     //
@@ -930,11 +961,10 @@ impl Blockchain {
         // structures. So validation is "read-only" and our "write" actions
         // happen first.
         //
+        let block_hash = new_chain.get(current_wind_index).unwrap();
+
         {
-            let mut block = self
-                .get_mut_block(&new_chain[current_wind_index])
-                .await
-                .unwrap();
+            let mut block = self.get_mut_block(block_hash).await.unwrap();
 
             block
                 .upgrade_block_to_block_type(BlockType::Full, storage)
@@ -955,7 +985,7 @@ impl Blockchain {
                 let previous_block_hash =
                     self.blockring.get_longest_chain_block_hash_by_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
-                    block = self.get_mut_block(&previous_block_hash).await.unwrap();
+                    let block = self.get_mut_block(&previous_block_hash).await.unwrap();
                     block
                         .upgrade_block_to_block_type(BlockType::Full, storage)
                         .await;
@@ -963,7 +993,9 @@ impl Blockchain {
             }
         }
 
-        let block = self.blocks.get(&new_chain[current_wind_index]).unwrap();
+        let block = self.blocks.get(block_hash).unwrap();
+        assert_eq!(block.block_type, BlockType::Full);
+
         // trace!(" ... before block.validate:      {:?}", create_timestamp());
         let does_block_validate = block.validate(&self, &self.utxoset).await;
 
@@ -2295,10 +2327,11 @@ mod tests {
         t.check_token_supply().await;
     }
 
-    /// Loading blocks into a blockchain which was were created from another blockchain instance
+    /// Loading blocks into a blockchain which were created from another blockchain instance
     #[tokio::test]
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
+        // pretty_env_logger::init();
         let mut t = TestManager::new();
         let mut t2 = TestManager::new();
         let block1;
@@ -2351,6 +2384,9 @@ mod tests {
         {
             let blockchain1 = t.blockchain_lock.read().await;
             let blockchain2 = t2.blockchain_lock.read().await;
+
+            assert_eq!(blockchain1.blocks.len(), 2);
+            assert_eq!(blockchain2.blocks.len(), 2);
 
             let block1_chain1 = blockchain1.get_block(&block1_hash).await.unwrap();
             let block1_chain2 = blockchain2.get_block(&block1_hash).await.unwrap();

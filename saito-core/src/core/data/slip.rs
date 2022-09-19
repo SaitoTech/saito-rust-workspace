@@ -32,6 +32,7 @@ pub struct Slip {
     pub uuid: SaitoHash,
     #[serde_as(as = "[_; 74]")]
     pub utxoset_key: SaitoUTXOSetKey,
+    // TODO : Check if this can be removed with Option<>
     pub is_utxoset_key_set: bool,
 }
 
@@ -92,6 +93,7 @@ impl Slip {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
         let mut res: Vec<u8> = vec![];
+        // TODO : try to use block id, tx hash (32 or 16) and slip id for this to reduce size.
         res.extend(&self.public_key);
         res.extend(&self.uuid);
         res.extend(&self.amount.to_be_bytes());

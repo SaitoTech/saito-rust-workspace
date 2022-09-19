@@ -6,7 +6,7 @@ use ahash::AHashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, span, trace, Level};
+use tracing::{debug, error, info, trace};
 
 use crate::common::defs::{
     SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
@@ -583,7 +583,10 @@ impl Block {
     // downgrade block
     //
     pub async fn downgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
-        info!("BLOCK_ID {:?}", self.id);
+        debug!(
+            "downgrading BLOCK_ID {:?} to type : {:?}",
+            self.id, block_type
+        );
 
         if self.block_type == block_type {
             return true;
@@ -690,6 +693,8 @@ impl Block {
         // ensure hashes correct
         self.generate_pre_hash();
         self.generate_hash();
+
+        trace!("generating block data : {:?}", hex::encode(self.hash));
 
         let _transactions_pre_calculated = &self
             .transactions
@@ -1328,7 +1333,11 @@ impl Block {
         block_type: BlockType,
         storage: &Storage,
     ) -> bool {
-        trace!("UPGRADE_BLOCK_TO_BLOCK_TYPE {:?}", self.block_type);
+        debug!(
+            "upgrading block : {:?} to type : {:?}",
+            hex::encode(self.hash),
+            self.block_type
+        );
         if self.block_type == block_type {
             return true;
         }
@@ -1661,16 +1670,17 @@ impl Block {
             // the block have been. we must do this prior to comparing them.
             //
             fee_transaction.generate(self.creator);
+            let checked_tx = self.transactions.get(ft_index).unwrap();
 
             let hash1 = hash(&fee_transaction.serialize_for_signature());
-            let hash2 = hash(&self.transactions[ft_index].serialize_for_signature());
+            let hash2 = hash(&checked_tx.serialize_for_signature());
             if hash1 != hash2 {
                 error!(
                     "ERROR 892032: block {} fee transaction doesn't match cv fee transaction",
                     self.id
                 );
                 info!("expected = {:?}", fee_transaction);
-                info!("actual   = {:?}", self.transactions[ft_index]);
+                info!("actual   = {:?}", checked_tx);
                 return false;
             }
         }
@@ -1923,7 +1933,7 @@ mod tests {
 
         assert_eq!(block.creator, wallet.public_key);
         assert_eq!(
-            verify_hash(&block.pre_hash, block.signature, block.creator,),
+            verify_hash(&block.pre_hash, block.signature, block.creator),
             true
         );
         assert_ne!(block.hash, [0; 32]);

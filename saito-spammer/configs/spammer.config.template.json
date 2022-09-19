@@ -19,7 +19,8 @@
   ],
   "spammer": {
     "timer_in_milli": 100,
-    "burst_count": 1,
-    "bytes_per_tx": 1000
+    "burst_count": 100,
+    "tx_size": 1000,
+    "tx_count": 1000000
   }
 }
