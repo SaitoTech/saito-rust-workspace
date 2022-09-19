@@ -512,7 +512,7 @@ pub async fn add_to_blockchain_from_mempool(
             .await;
         // } else {
         // TODO : enable this after making sure functionality works well with every failure case for add_block
-        //          and initial conditions
+        //          and initial conditions. already parent missing blocks are being added back to mempool in blockchain.add_block
         //     remaining_blocks.push(block);
         // }
     }
