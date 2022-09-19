@@ -1401,7 +1401,7 @@ impl Blockchain {
             }
         }
     }
-    pub async fn add_to_blockchain_from_mempool(
+    pub async fn add_blocks_from_mempool(
         &mut self,
         mempool: Arc<RwLock<Mempool>>,
         network: &Network,
@@ -2404,7 +2404,7 @@ mod tests {
         {
             let mut blockchain2 = t2.blockchain_lock.write().await;
             blockchain2
-                .add_to_blockchain_from_mempool(
+                .add_blocks_from_mempool(
                     t2.mempool_lock.clone(),
                     &t2.network,
                     &mut t2.storage,

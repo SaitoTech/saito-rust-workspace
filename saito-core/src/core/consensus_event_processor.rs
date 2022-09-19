@@ -359,7 +359,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 let mut blockchain = self.blockchain.write().await;
                 log_write_lock_receive!("blockchain");
                 blockchain
-                    .add_to_blockchain_from_mempool(
+                    .add_blocks_from_mempool(
                         self.mempool.clone(),
                         &self.network,
                         &mut self.storage,
@@ -431,7 +431,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                     let mut blockchain = self.blockchain.write().await;
                     log_write_lock_receive!("blockchain");
                     blockchain
-                        .add_to_blockchain_from_mempool(
+                        .add_blocks_from_mempool(
                             self.mempool.clone(),
                             &self.network,
                             &mut self.storage,
@@ -475,7 +475,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         let mut blockchain = self.blockchain.write().await;
         log_write_lock_receive!("blockchain");
         blockchain
-            .add_to_blockchain_from_mempool(
+            .add_blocks_from_mempool(
                 self.mempool.clone(),
                 &self.network,
                 &mut self.storage,
