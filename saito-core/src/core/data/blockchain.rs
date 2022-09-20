@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::io::Error;
 use std::sync::Arc;
 
@@ -136,7 +137,7 @@ impl Blockchain {
             trace!("earliest_block_hash {:?}", hex::encode(earliest_block_hash));
 
             if earliest_block_hash != [0; 32] {
-                let earliest_block = self.get_mut_block(&earliest_block_hash).await.unwrap();
+                let earliest_block = self.get_mut_block(&earliest_block_hash).unwrap();
 
                 trace!(
                     "block.timestamp - earliest_block.timestamp = {:?}",
@@ -144,7 +145,7 @@ impl Blockchain {
                 );
                 // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
                 if block.timestamp > earliest_block.timestamp {
-                    if self.get_block(&block.previous_block_hash).await.is_none() {
+                    if self.get_block(&block.previous_block_hash).is_none() {
                         trace!(
                             "block id : {:?} earliest block id : {:?}",
                             block.id,
@@ -399,7 +400,8 @@ impl Blockchain {
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
-                debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}",hex::encode(block_hash),difficulty);
+                debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
+                // TODO : remove the sender by using a return value.
                 sender_to_miner
                     .send(MiningEvent::LongestChainBlockAdded {
                         hash: block_hash,
@@ -439,7 +441,7 @@ impl Blockchain {
         // save to disk
         //
         {
-            let block = self.get_mut_block(&block_hash).await.unwrap();
+            let block = self.get_mut_block(&block_hash).unwrap();
             if block.block_type != BlockType::Header {
                 storage.write_block_to_disk(block).await;
             } else {
@@ -461,7 +463,7 @@ impl Blockchain {
         //
         //
         {
-            let block = self.get_mut_block(&block_hash).await.unwrap();
+            let block = self.get_mut_block(&block_hash).unwrap();
             log_write_lock_request!("mempool");
             let mut mempool = mempool.write().await;
             log_write_lock_receive!("mempool");
@@ -511,7 +513,7 @@ impl Blockchain {
             // to use to check the utxoset.
             //
             {
-                let pblock = self.get_mut_block(&pruned_block_hash).await.unwrap();
+                let pblock = self.get_mut_block(&pruned_block_hash).unwrap();
                 pblock
                     .upgrade_block_to_block_type(BlockType::Full, storage)
                     .await;
@@ -753,13 +755,13 @@ impl Blockchain {
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
-    pub async fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
+    pub fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         //
 
         self.blocks.get(block_hash)
     }
 
-    pub async fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {
+    pub fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {
         //
         self.blocks.get_mut(block_hash)
     }
@@ -964,7 +966,7 @@ impl Blockchain {
         let block_hash = new_chain.get(current_wind_index).unwrap();
 
         {
-            let mut block = self.get_mut_block(block_hash).await.unwrap();
+            let mut block = self.get_mut_block(block_hash).unwrap();
 
             block
                 .upgrade_block_to_block_type(BlockType::Full, storage)
@@ -985,7 +987,7 @@ impl Blockchain {
                 let previous_block_hash =
                     self.blockring.get_longest_chain_block_hash_by_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
-                    let block = self.get_mut_block(&previous_block_hash).await.unwrap();
+                    let block = self.get_mut_block(&previous_block_hash).unwrap();
                     block
                         .upgrade_block_to_block_type(BlockType::Full, storage)
                         .await;
@@ -1392,11 +1394,40 @@ impl Blockchain {
             // ask the block to remove its transactions
             //
             {
-                let pblock = self.get_mut_block(&hash).await.unwrap();
+                let pblock = self.get_mut_block(&hash).unwrap();
                 pblock
                     .downgrade_block_to_block_type(BlockType::Pruned)
                     .await;
             }
+        }
+    }
+    pub async fn add_blocks_from_mempool(
+        &mut self,
+        mempool: Arc<RwLock<Mempool>>,
+        network: &Network,
+        storage: &mut Storage,
+        sender_to_miner: Sender<MiningEvent>,
+    ) {
+        debug!("adding blocks from mempool to blockchain");
+        let mut blocks: VecDeque<Block>;
+        {
+            log_write_lock_request!("mempool");
+            let mut mempool = mempool.write().await;
+            log_write_lock_receive!("mempool");
+            blocks = mempool.blocks_queue.drain(..).collect();
+        }
+        blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
+
+        debug!("blocks to add : {:?}", blocks.len());
+        while let Some(block) = blocks.pop_front() {
+            self.add_block(
+                block,
+                network,
+                storage,
+                sender_to_miner.clone(),
+                mempool.clone(),
+            )
+            .await;
         }
     }
 }
@@ -1409,7 +1440,6 @@ mod tests {
 
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
-    use crate::core::consensus_event_processor::add_to_blockchain_from_mempool;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
 
@@ -2371,15 +2401,17 @@ mod tests {
         t2.storage
             .load_blocks_from_disk(t2.mempool_lock.clone())
             .await;
-
-        add_to_blockchain_from_mempool(
-            t2.mempool_lock.clone(),
-            t2.blockchain_lock.clone(),
-            &t2.network,
-            &mut t2.storage,
-            t2.sender_to_miner.clone(),
-        )
-        .await;
+        {
+            let mut blockchain2 = t2.blockchain_lock.write().await;
+            blockchain2
+                .add_blocks_from_mempool(
+                    t2.mempool_lock.clone(),
+                    &t2.network,
+                    &mut t2.storage,
+                    t2.sender_to_miner.clone(),
+                )
+                .await;
+        }
 
         {
             let blockchain1 = t.blockchain_lock.read().await;
@@ -2388,11 +2420,11 @@ mod tests {
             assert_eq!(blockchain1.blocks.len(), 2);
             assert_eq!(blockchain2.blocks.len(), 2);
 
-            let block1_chain1 = blockchain1.get_block(&block1_hash).await.unwrap();
-            let block1_chain2 = blockchain2.get_block(&block1_hash).await.unwrap();
+            let block1_chain1 = blockchain1.get_block(&block1_hash).unwrap();
+            let block1_chain2 = blockchain2.get_block(&block1_hash).unwrap();
 
-            let block2_chain1 = blockchain1.get_block(&block2_hash).await.unwrap();
-            let block2_chain2 = blockchain2.get_block(&block2_hash).await.unwrap();
+            let block2_chain1 = blockchain1.get_block(&block2_hash).unwrap();
+            let block2_chain2 = blockchain2.get_block(&block2_hash).unwrap();
 
             for (block_new, block_old) in [
                 (block1_chain2, block1_chain1),
