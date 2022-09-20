@@ -1,4 +1,5 @@
 use crate::saito::config_handler::SpammerConfigs;
+use crate::saito::transaction_generator::TransactionGenerator;
 use crate::{IoEvent, TimeKeeper};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::keep_time::KeepTime;
@@ -27,10 +28,11 @@ pub struct Spammer {
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
     bootstrap_done: bool,
     sent_tx_count: u64,
+    tx_generator: TransactionGenerator,
 }
 
 impl Spammer {
-    pub fn new(
+    pub async fn new(
         blockchain: Arc<RwLock<Blockchain>>,
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
@@ -40,83 +42,32 @@ impl Spammer {
         Spammer {
             blockchain,
             mempool,
-            wallet,
+            wallet: wallet.clone(),
             sender_to_network,
-            configs,
+            configs: configs.clone(),
             bootstrap_done: false,
             sent_tx_count: 0,
+            tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone()).await,
         }
     }
     pub async fn execute(&mut self) -> bool {
-        if !self.bootstrap_done {
-            self.bootstrap().await;
-            return true;
+        let txs = self.tx_generator.on_new_block().await;
+        if txs.is_none() {
+            return false;
         }
-        return false;
-    }
-    async fn bootstrap(&mut self) {
-        info!("bootstrapping...");
-        let time_keeper = TimeKeeper {};
-        let public_key;
-        let private_key;
-        let slips;
-        {
-            let wallet = self.wallet.read().await;
-            slips = wallet.slips.clone();
-            public_key = wallet.public_key.clone();
-            private_key = wallet.private_key.clone();
-        }
-        for slip in slips.iter() {
-            if slip.amount > 1 && !slip.spent {
-                self.bootstrap_done = false;
-                let slip_count = min(100, slip.amount as u8);
-                let mut slip_value = 1;
-                if slip.amount > 100 {
-                    slip_value = slip.amount / 100;
-                }
-                debug!(
-                    "breaking slip with value : {:?} into {:?} slips with value : {:?}",
-                    slip.amount, slip_count, slip_value
-                );
-
-                let mut transaction = Transaction::new();
-
-                let mut input_slip = Slip::new();
-                input_slip.uuid = slip.uuid;
-                input_slip.public_key = public_key.clone();
-                input_slip.amount = slip.amount;
-                input_slip.utxoset_key = slip.utxokey;
-                transaction.add_input(input_slip);
-
-                for i in 0..slip_count {
-                    let mut slip = Slip::new();
-                    slip.amount = slip_value;
-                    slip.public_key = public_key.clone();
-                    slip.slip_index = i;
-                    transaction.add_output(slip);
-                }
-                transaction.timestamp = time_keeper.get_timestamp();
-                transaction.generate(public_key);
-                transaction.sign(private_key);
-                transaction.add_hop(self.wallet.clone(), public_key).await;
-
-                debug!(
-                    "sending tx {:?} with {:?} outputs",
-                    hex::encode(transaction.hash_for_signature.unwrap()),
-                    transaction.outputs.len()
-                );
-                self.sent_tx_count += 1;
-                self.sender_to_network
-                    .send(IoEvent {
-                        event_processor_id: 0,
-                        event_id: 0,
-                        event: NetworkEvent::OutgoingNetworkMessageForAll {
-                            buffer: Message::Transaction(transaction).serialize(),
-                            exceptions: vec![],
-                        },
-                    })
-                    .await;
-            }
+        let txs = txs.unwrap();
+        for tx in txs {
+            self.sent_tx_count += 1;
+            self.sender_to_network
+                .send(IoEvent {
+                    event_processor_id: 0,
+                    event_id: 0,
+                    event: NetworkEvent::OutgoingNetworkMessageForAll {
+                        buffer: Message::Transaction(tx).serialize(),
+                        exceptions: vec![],
+                    },
+                })
+                .await;
         }
         {
             let wallet = self.wallet.read().await;
@@ -127,11 +78,7 @@ impl Spammer {
                 wallet.get_available_balance()
             )
         }
-    }
-    async fn send_txs(&mut self) {
-        let public_key;
-        let wallet = self.wallet.read().await;
-        public_key = wallet.public_key.clone();
+        return true;
     }
 }
 
@@ -143,7 +90,7 @@ pub async fn run_spammer(
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
 ) {
     info!("starting the spammer");
-    let mut spammer = Spammer::new(blockchain, mempool, wallet, sender_to_network, configs);
+    let mut spammer = Spammer::new(blockchain, mempool, wallet, sender_to_network, configs).await;
     loop {
         let mut work_done = false;
         work_done = spammer.execute().await;
