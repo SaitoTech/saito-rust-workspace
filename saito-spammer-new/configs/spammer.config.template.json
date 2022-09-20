@@ -1,0 +1,24 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 12101,
+    "protocol": "http",
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 12101,
+      "protocol": "http"
+    }
+  },
+  "peers": [
+    {
+      "host": "127.0.0.1",
+      "port": 12102,
+      "protocol": "http",
+      "synctype": "full"
+    }
+  ],
+  "spammer": {
+    "txs_per_second": 1000,
+    "total_txs": 1000000
+  }
+}

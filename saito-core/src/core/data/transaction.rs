@@ -48,7 +48,7 @@ pub struct Transaction {
     path: Vec<Hop>,
 
     // hash used for merkle_root (does not include signature) and slip uuid
-    pub(crate) hash_for_signature: Option<SaitoHash>,
+    pub hash_for_signature: Option<SaitoHash>,
 
     /// total nolan in input slips
     total_in: u64,
