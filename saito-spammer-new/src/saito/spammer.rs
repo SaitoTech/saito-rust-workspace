@@ -1,6 +1,7 @@
 use crate::saito::config_handler::SpammerConfigs;
-use crate::IoEvent;
+use crate::{IoEvent, TimeKeeper};
 use saito_core::common::command::NetworkEvent;
+use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
@@ -48,22 +49,25 @@ impl Spammer {
     }
     pub async fn execute(&mut self) -> bool {
         if !self.bootstrap_done {
-            self.bootstrap();
+            self.bootstrap().await;
             return true;
         }
         return false;
     }
     async fn bootstrap(&mut self) {
-        let slips_clone;
+        info!("bootstrapping...");
+        let time_keeper = TimeKeeper {};
         let public_key;
+        let private_key;
+        let slips;
         {
-            let wallet = self.wallet.write().await;
+            let wallet = self.wallet.read().await;
+            slips = wallet.slips.clone();
             public_key = wallet.public_key.clone();
-            slips_clone = wallet.slips.clone();
+            private_key = wallet.private_key.clone();
         }
-        self.bootstrap_done = true;
-        for slip in slips_clone.iter() {
-            if slip.amount > 1 {
+        for slip in slips.iter() {
+            if slip.amount > 1 && !slip.spent {
                 self.bootstrap_done = false;
                 let slip_count = min(100, slip.amount as u8);
                 let mut slip_value = 1;
@@ -91,12 +95,16 @@ impl Spammer {
                     slip.slip_index = i;
                     transaction.add_output(slip);
                 }
-
+                transaction.timestamp = time_keeper.get_timestamp();
                 transaction.generate(public_key);
-                {
-                    let wallet = self.wallet.read().await;
-                    transaction.sign(wallet.private_key);
-                }
+                transaction.sign(private_key);
+                transaction.add_hop(self.wallet.clone(), public_key).await;
+
+                debug!(
+                    "sending tx {:?} with {:?} outputs",
+                    hex::encode(transaction.hash_for_signature.unwrap()),
+                    transaction.outputs.len()
+                );
                 self.sent_tx_count += 1;
                 self.sender_to_network
                     .send(IoEvent {
@@ -110,7 +118,15 @@ impl Spammer {
                     .await;
             }
         }
-        info!("sent tx count : {:?}", self.sent_tx_count);
+        {
+            let wallet = self.wallet.read().await;
+            info!(
+                "sent tx count : {:?} total slip count : {:?} current balance : {:?}",
+                self.sent_tx_count,
+                wallet.slips.len(),
+                wallet.get_available_balance()
+            )
+        }
     }
     async fn send_txs(&mut self) {
         let public_key;
@@ -132,7 +148,7 @@ pub async fn run_spammer(
         let mut work_done = false;
         work_done = spammer.execute().await;
         if !work_done {
-            std::thread::sleep(Duration::from_millis(10));
+            std::thread::sleep(Duration::from_millis(100));
         }
     }
 }
