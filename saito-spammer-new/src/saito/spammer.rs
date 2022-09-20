@@ -16,7 +16,7 @@ use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing::{info, trace};
+use tracing::{debug, info, trace};
 
 pub struct Spammer {
     blockchain: Arc<RwLock<Blockchain>>,
@@ -70,11 +70,9 @@ impl Spammer {
                 if slip.amount > 100 {
                     slip_value = slip.amount / 100;
                 }
-                trace!(
+                debug!(
                     "breaking slip with value : {:?} into {:?} slips with value : {:?}",
-                    slip.amount,
-                    slip_count,
-                    slip_value
+                    slip.amount, slip_count, slip_value
                 );
 
                 let mut transaction = Transaction::new();
