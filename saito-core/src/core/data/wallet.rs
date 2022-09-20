@@ -41,7 +41,7 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    slips: Vec<WalletSlip>,
+    pub slips: Vec<WalletSlip>,
     pub filename: String,
     pub filepass: String,
 }
