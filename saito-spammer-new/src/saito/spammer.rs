@@ -1,4 +1,5 @@
 use crate::saito::config_handler::SpammerConfigs;
+use crate::saito::transaction_generator::TransactionGenerator;
 use crate::{IoEvent, TimeKeeper};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::keep_time::KeepTime;
@@ -27,10 +28,11 @@ pub struct Spammer {
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
     bootstrap_done: bool,
     sent_tx_count: u64,
+    tx_generator: TransactionGenerator,
 }
 
 impl Spammer {
-    pub fn new(
+    pub async fn new(
         blockchain: Arc<RwLock<Blockchain>>,
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
@@ -40,19 +42,47 @@ impl Spammer {
         Spammer {
             blockchain,
             mempool,
-            wallet,
+            wallet: wallet.clone(),
             sender_to_network,
-            configs,
+            configs: configs.clone(),
             bootstrap_done: false,
             sent_tx_count: 0,
+            tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone()).await,
         }
     }
     pub async fn execute(&mut self) -> bool {
-        if !self.bootstrap_done {
-            self.bootstrap().await;
-            return true;
+        let txs = self.tx_generator.on_new_block().await;
+        if txs.is_none() {
+            return false;
         }
-        return false;
+        let txs = txs.unwrap();
+        for tx in txs {
+            self.sent_tx_count += 1;
+            self.sender_to_network
+                .send(IoEvent {
+                    event_processor_id: 0,
+                    event_id: 0,
+                    event: NetworkEvent::OutgoingNetworkMessageForAll {
+                        buffer: Message::Transaction(tx).serialize(),
+                        exceptions: vec![],
+                    },
+                })
+                .await;
+        }
+        {
+            let wallet = self.wallet.read().await;
+            info!(
+                "sent tx count : {:?} total slip count : {:?} current balance : {:?}",
+                self.sent_tx_count,
+                wallet.slips.len(),
+                wallet.get_available_balance()
+            )
+        }
+        // if !self.bootstrap_done {
+        //     // self.bootstrap().await;
+        //     return true;
+        // }
+        return true;
     }
     async fn bootstrap(&mut self) {
         info!("bootstrapping...");
@@ -143,7 +173,7 @@ pub async fn run_spammer(
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
 ) {
     info!("starting the spammer");
-    let mut spammer = Spammer::new(blockchain, mempool, wallet, sender_to_network, configs);
+    let mut spammer = Spammer::new(blockchain, mempool, wallet, sender_to_network, configs).await;
     loop {
         let mut work_done = false;
         work_done = spammer.execute().await;
