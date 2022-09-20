@@ -1417,15 +1417,24 @@ impl Block {
         let cv = self.generate_consensus_values(&blockchain).await;
 
         if cv.avg_income != self.avg_income {
-            error!("block is misreporting its average income");
+            error!(
+                "block is misreporting its average income. current : {:?} expected : {:?}",
+                self.avg_income, cv.avg_income
+            );
             return false;
         }
         if cv.avg_variance != self.avg_variance {
-            error!("block is misreporting its average variance");
+            error!(
+                "block is misreporting its average variance. current : {:?} expected : {:?}",
+                self.avg_variance, cv.avg_variance
+            );
             return false;
         }
         if cv.avg_atr_income != self.avg_atr_income {
-            error!("block is mis-reporting its average atr income");
+            error!(
+                "block is mis-reporting its average atr income. current : {:?} expected : {:?}",
+                self.avg_atr_income, cv.avg_atr_income
+            );
             return false;
         }
         if cv.avg_atr_variance != self.avg_atr_variance {

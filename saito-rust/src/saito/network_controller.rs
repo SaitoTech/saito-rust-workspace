@@ -520,7 +520,7 @@ pub async fn run_network_controller(
             }
 
             if !work_done {
-                std::thread::sleep(Duration::new(0, 1_000_000));
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
         }
     });

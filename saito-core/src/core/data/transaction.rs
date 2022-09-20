@@ -467,7 +467,7 @@ impl Transaction {
         //
         // ensure hash exists for signing
         //
-        self.generate_hash_for_signature();
+        // self.generate_hash_for_signature();
 
         true
     }

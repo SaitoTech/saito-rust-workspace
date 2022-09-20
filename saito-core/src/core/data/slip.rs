@@ -80,7 +80,7 @@ impl Slip {
         slip
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_utxoset_key(&mut self) {
         self.utxoset_key = self.get_utxoset_key();
         self.is_utxoset_key_set = true;
@@ -90,7 +90,7 @@ impl Slip {
     // 32 bytes uuid
     // 8 bytes amount
     // 1 byte slip_index
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
         let mut res: Vec<u8> = vec![];
         // TODO : try to use block id, tx hash (32 or 16) and slip id for this to reduce size.
@@ -113,7 +113,7 @@ impl Slip {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_net(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&self.public_key);
@@ -125,7 +125,7 @@ impl Slip {
         vbytes
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_input_for_signature(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&self.public_key);
@@ -136,7 +136,7 @@ impl Slip {
         vbytes
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_output_for_signature(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&self.public_key);

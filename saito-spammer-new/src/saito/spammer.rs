@@ -95,7 +95,7 @@ pub async fn run_spammer(
         let mut work_done = false;
         work_done = spammer.execute().await;
         if !work_done {
-            std::thread::sleep(Duration::from_millis(100));
+            tokio::time::sleep(Duration::from_millis(1)).await;
         }
     }
 }
