@@ -91,7 +91,7 @@ where
                 work_done = false;
                 // tokio::task::yield_now().await;
             } else {
-                tokio::task::yield_now().await;
+                // tokio::task::yield_now().await;
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         }
@@ -293,10 +293,10 @@ fn run_loop_thread(
             }
 
             if !work_done {
-                tokio::task::yield_now().await;
+                // tokio::task::yield_now().await;
                 tokio::time::sleep(Duration::new(0, 1_000_000)).await;
             } else {
-                tokio::task::yield_now().await;
+                // tokio::task::yield_now().await;
             }
         }
     });
