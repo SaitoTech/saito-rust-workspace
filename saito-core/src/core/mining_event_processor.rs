@@ -35,6 +35,7 @@ pub struct MiningEventProcessor {
     pub target: SaitoHash,
     pub difficulty: u64,
     pub public_key: SaitoPublicKey,
+    pub mined_golden_tickets: u64,
 }
 
 impl MiningEventProcessor {
@@ -57,6 +58,7 @@ impl MiningEventProcessor {
                 self.difficulty
             );
             self.miner_active = false;
+            self.mined_golden_tickets += 1;
             self.sender_to_mempool
                 .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
                 .await
@@ -79,15 +81,15 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
-        self.miner_timer += duration.as_micros() as Timestamp;
+        // self.miner_timer += duration.as_micros() as Timestamp;
         if self.miner_active {
-            if self.miner_timer >= MINER_INTERVAL {
-                self.miner_timer = 0;
-                let result = self.mine().await;
-                if result.is_some() {
-                    return Some(());
-                }
+            // if self.miner_timer >= MINER_INTERVAL {
+            // self.miner_timer = 0;
+            let result = self.mine().await;
+            if result.is_some() {
+                return Some(());
             }
+            // }
         }
 
         None
@@ -115,5 +117,11 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
         let wallet = self.wallet.read().await;
         log_read_lock_receive!("wallet");
         self.public_key = wallet.public_key.clone();
+    }
+
+    async fn on_stat_interval(&mut self) {
+        println!("------------ mining stats -------------");
+        println!("--- stats ------ total mined gts : {:?} current difficulty : {:?} current target : {:?}", self.mined_golden_tickets, self.difficulty, hex::encode(self.target));
+        println!("---------- mining stats end -----------");
     }
 }

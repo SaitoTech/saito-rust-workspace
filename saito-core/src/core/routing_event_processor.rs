@@ -41,7 +41,6 @@ pub struct RoutingStats {
     pub received_transactions: StatVariable,
     pub received_blocks: StatVariable,
     pub total_incoming_messages: StatVariable,
-    pub stat_timer: Timestamp,
 }
 
 impl Default for RoutingStats {
@@ -59,7 +58,6 @@ impl Default for RoutingStats {
                 "routing::incoming_msgs".to_string(),
                 STAT_BIN_COUNT,
             ),
-            stat_timer: 0,
         }
     }
 }
@@ -312,23 +310,6 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
             self.reconnection_timer = 0;
         }
 
-        #[cfg(feature = "with-stats")]
-        {
-            self.stats.stat_timer = self.stats.stat_timer + duration_value;
-            if self.stats.stat_timer > STAT_INTERVAL {
-                let time = self.time_keeper.get_timestamp();
-                self.stats.received_transactions.calculate_stats(time);
-                self.stats.received_blocks.calculate_stats(time);
-                self.stats.total_incoming_messages.calculate_stats(time);
-                self.stats.stat_timer = 0;
-
-                println!("------------ routing stats -------------");
-                self.stats.received_transactions.print();
-                self.stats.received_blocks.print();
-                self.stats.total_incoming_messages.print();
-                println!("---------- routing stats end -----------");
-            }
-        }
         None
     }
 
@@ -341,5 +322,17 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
         self.network
             .initialize_static_peers(self.configs.clone())
             .await;
+    }
+    async fn on_stat_interval(&mut self) {
+        let time = self.time_keeper.get_timestamp();
+        self.stats.received_transactions.calculate_stats(time);
+        self.stats.received_blocks.calculate_stats(time);
+        self.stats.total_incoming_messages.calculate_stats(time);
+
+        println!("------------ routing stats -------------");
+        self.stats.received_transactions.print();
+        self.stats.received_blocks.print();
+        self.stats.total_incoming_messages.print();
+        println!("---------- routing stats end -----------");
     }
 }

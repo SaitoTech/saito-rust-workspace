@@ -16,6 +16,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
+use saito_core::common::defs::{CHANNEL_SIZE, STAT_TIMER};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -42,8 +43,6 @@ const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
-const CHANNEL_SIZE: usize = 1000_000;
-
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
     mut network_event_receiver: Receiver<NetworkEvent>,
@@ -56,6 +55,7 @@ where
         info!("new thread started");
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
+        let mut stat_timer = Instant::now();
 
         event_processor.on_init().await;
 
@@ -88,11 +88,18 @@ where
                 work_done = true;
             }
 
+            #[cfg(feature = "with-stats")]
+            {
+                let duration = current_instant.duration_since(stat_timer);
+                if duration > STAT_TIMER {
+                    stat_timer = current_instant;
+                    event_processor.on_stat_interval().await;
+                }
+            }
+
             if work_done {
                 work_done = false;
-                // tokio::task::yield_now().await;
             } else {
-                // tokio::task::yield_now().await;
                 tokio::time::sleep(THREAD_SLEEP_TIME).await;
             }
         }
@@ -115,6 +122,7 @@ async fn run_mining_event_processor(
         target: [0; 32],
         difficulty: 0,
         public_key: [0; 33],
+        mined_golden_tickets: 0,
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
         tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);

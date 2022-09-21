@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::io::Error;
+use std::mem;
 use std::sync::Arc;
 
 use ahash::AHashMap;
@@ -95,9 +96,11 @@ impl Blockchain {
         block.generate();
 
         info!(
-            "add_block {:?} with id : {:?}",
+            "add_block {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
             &hex::encode(&block.hash),
-            block.id
+            block.id,
+            self.get_latest_block_id(),
+            block.transactions.len()
         );
 
         // start by extracting some variables that we will use
@@ -966,7 +969,7 @@ impl Blockchain {
         let block_hash = new_chain.get(current_wind_index).unwrap();
 
         {
-            let mut block = self.get_mut_block(block_hash).unwrap();
+            let block = self.get_mut_block(block_hash).unwrap();
 
             block
                 .upgrade_block_to_block_type(BlockType::Full, storage)
@@ -1409,12 +1412,13 @@ impl Blockchain {
         sender_to_miner: Sender<MiningEvent>,
     ) {
         debug!("adding blocks from mempool to blockchain");
-        let mut blocks: VecDeque<Block>;
+        let mut blocks: VecDeque<Block> = Default::default();
         {
             log_write_lock_request!("mempool");
             let mut mempool = mempool.write().await;
             log_write_lock_receive!("mempool");
             blocks = mempool.blocks_queue.drain(..).collect();
+            // mem::swap(&mut blocks, &mut mempool.blocks_queue);
         }
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
 
