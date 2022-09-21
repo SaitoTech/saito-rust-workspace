@@ -1,6 +1,8 @@
 use crate::saito::config_handler::SpammerConfigs;
 use crate::saito::transaction_generator::TransactionGenerator;
 use crate::{IoEvent, TimeKeeper};
+use rayon::prelude::IntoParallelRefIterator;
+
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data::block::Block;
@@ -76,7 +78,7 @@ impl Spammer {
                 self.sent_tx_count,
                 wallet.slips.len(),
                 wallet.get_available_balance()
-            )
+            );
         }
         return true;
     }
@@ -95,7 +97,7 @@ pub async fn run_spammer(
         let mut work_done = false;
         work_done = spammer.execute().await;
         if !work_done {
-            tokio::time::sleep(Duration::from_millis(1)).await;
+            tokio::time::sleep(Duration::from_millis(1000)).await;
         }
     }
 }
