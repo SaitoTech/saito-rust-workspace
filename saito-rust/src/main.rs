@@ -31,7 +31,7 @@ use saito_core::{log_read_lock_receive, log_read_lock_request};
 
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::io_event::IoEvent;
-use crate::saito::network_controller::run_network_controller;
+use crate::saito::network_controller::{run_network_controller, THREAD_SLEEP_TIME};
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::time_keeper::TimeKeeper;
 
@@ -41,6 +41,8 @@ mod test;
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
+
+const CHANNEL_SIZE: usize = 1000_000;
 
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
@@ -91,7 +93,7 @@ where
                 // tokio::task::yield_now().await;
             } else {
                 // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             }
         }
     })
@@ -115,7 +117,7 @@ async fn run_mining_event_processor(
         public_key: [0; 33],
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
 
     debug!("running miner thread");
     let _miner_handle = run_thread(
@@ -174,7 +176,7 @@ async fn run_consensus_event_processor(
         stats: Default::default(),
     };
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
     debug!("running mempool thread");
     let blockchain_handle = run_thread(
         Box::new(consensus_event_processor),
@@ -229,7 +231,7 @@ async fn run_routing_event_processor(
     }
 
     let (interface_sender_to_routing, interface_receiver_for_routing) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
 
     debug!("running blockchain thread");
     let routing_handle = run_thread(
@@ -293,7 +295,7 @@ fn run_loop_thread(
 
             if !work_done {
                 // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             } else {
                 // tokio::task::yield_now().await;
             }
@@ -393,10 +395,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )));
 
     let (event_sender_to_loop, event_receiver_in_loop) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
 
     let (sender_to_network_controller, receiver_in_network_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
 
     info!("running saito controllers");
 
@@ -404,12 +406,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =
-        tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
+        tokio::sync::mpsc::channel::<ConsensusEvent>(CHANNEL_SIZE);
 
     let (sender_to_routing, receiver_for_routing) =
-        tokio::sync::mpsc::channel::<RoutingEvent>(1000);
+        tokio::sync::mpsc::channel::<RoutingEvent>(CHANNEL_SIZE);
 
-    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(1000);
+    let (sender_to_miner, receiver_for_miner) =
+        tokio::sync::mpsc::channel::<MiningEvent>(CHANNEL_SIZE);
 
     let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),
