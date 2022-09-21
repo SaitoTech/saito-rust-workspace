@@ -7,36 +7,18 @@ use serde::Deserialize;
 use tracing::{debug, error};
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct SpammerData {
-    pub txs_per_second: u64,
-    pub total_txs: u64,
+pub struct Spammer {
+    pub timer_in_milli: u64,
+    pub burst_count: u32,
+    pub tx_size: u32,
+    pub tx_count: u64,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SpammerConfigs {
     server: Server,
     peers: Vec<PeerConfig>,
-    pub spammer: SpammerData,
-}
-
-impl Configuration for SpammerConfigs {
-    fn get_server_configs(&self) -> &Server {
-        &self.server
-    }
-
-    fn get_peer_configs(&self) -> &Vec<PeerConfig> {
-        &self.peers
-    }
-
-    fn get_block_fetch_url(&self) -> String {
-        let endpoint = &self.get_server_configs().endpoint;
-        endpoint.protocol.to_string()
-            + "://"
-            + endpoint.host.as_str()
-            + ":"
-            + endpoint.port.to_string().as_str()
-            + "/block/"
-    }
+    spammer: Spammer,
 }
 
 impl SpammerConfigs {
@@ -53,11 +35,31 @@ impl SpammerConfigs {
                 },
             },
             peers: vec![],
-            spammer: SpammerData {
-                txs_per_second: 1000,
-                total_txs: 1_000_000,
+            spammer: Spammer {
+                timer_in_milli: 0,
+                burst_count: 0,
+                tx_size: 0,
+                tx_count: 0,
             },
         }
+    }
+
+    pub fn get_spammer_configs(&self) -> &Spammer {
+        return &self.spammer;
+    }
+}
+
+impl Configuration for SpammerConfigs {
+    fn get_server_configs(&self) -> &Server {
+        return &self.server;
+    }
+
+    fn get_peer_configs(&self) -> &Vec<PeerConfig> {
+        return &self.peers;
+    }
+
+    fn get_block_fetch_url(&self) -> String {
+        return "".to_string();
     }
 }
 

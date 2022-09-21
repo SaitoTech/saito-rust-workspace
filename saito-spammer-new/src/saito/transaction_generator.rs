@@ -14,11 +14,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum GeneratorState {
     CreatingSlips,
     WaitingForBlockChainConfirmation,
-    Ready,
+    Done,
 }
 
 pub struct TransactionGenerator {
@@ -40,7 +40,7 @@ impl TransactionGenerator {
         {
             let config = configuration.read().await;
             // tx_size = config.spammer.tx_size;
-            tx_count = config.spammer.total_txs;
+            tx_count = config.get_spammer_configs().tx_count;
         }
 
         return TransactionGenerator {
@@ -53,23 +53,29 @@ impl TransactionGenerator {
         };
     }
 
-    pub async fn on_new_block(&mut self) -> Option<Vec<Transaction>> {
+    pub fn get_state(&self) -> GeneratorState {
+        return self.state.clone();
+    }
+    pub async fn on_new_block(&mut self) -> Option<LinkedList<Transaction>> {
+        let mut transactions: Option<LinkedList<Transaction>> = None;
+
         match self.state {
             GeneratorState::CreatingSlips => {
-                return self.create_slips().await;
+                transactions = self.create_slips().await;
             }
             GeneratorState::WaitingForBlockChainConfirmation => {
                 if self.check_blockchain_for_confirmation().await {
-                    return self.create_test_transactions().await;
+                    transactions = self.create_test_transactions().await;
+                    self.state = GeneratorState::Done;
                 }
             }
-            GeneratorState::Ready => {}
+            GeneratorState::Done => {}
         }
 
-        return None;
+        return transactions;
     }
 
-    async fn create_slips(&mut self) -> Option<Vec<Transaction>> {
+    async fn create_slips(&mut self) -> Option<LinkedList<Transaction>> {
         let output_slips_per_input_slip: u8 = 100;
         let unspent_slip_count;
         let available_balance;
@@ -91,7 +97,7 @@ impl TransactionGenerator {
 
             let total_nolans_requested_per_slip = available_balance / unspent_slip_count;
             let mut total_output_slips_created: u64 = 0;
-            let mut transactions: Vec<Transaction> = Default::default();
+            let mut transactions: LinkedList<Transaction> = Default::default();
 
             for _i in 0..unspent_slip_count {
                 let transaction = self
@@ -103,7 +109,7 @@ impl TransactionGenerator {
                     )
                     .await;
 
-                transactions.push(transaction);
+                transactions.push_back(transaction);
 
                 if total_output_slips_created >= self.tx_count {
                     info!(
@@ -203,14 +209,14 @@ impl TransactionGenerator {
                 "New slips detected on the blockchain, current = {:?}, target = {:?}",
                 unspent_slip_count, self.tx_count
             );
-            self.state = GeneratorState::Ready;
+            self.state = GeneratorState::Done;
             return true;
         }
 
         return false;
     }
 
-    async fn create_test_transactions(&mut self) -> Option<Vec<Transaction>> {
+    async fn create_test_transactions(&mut self) -> Option<LinkedList<Transaction>> {
         let public_key;
         let private_key;
         {
@@ -221,7 +227,7 @@ impl TransactionGenerator {
             private_key = wallet.private_key;
         }
 
-        let mut transactions: Vec<Transaction> = Default::default();
+        let mut transactions: LinkedList<Transaction> = Default::default();
 
         for _i in 0..self.tx_count {
             let mut transaction = Transaction::create(self.wallet.clone(), public_key, 1, 1).await;
@@ -230,7 +236,7 @@ impl TransactionGenerator {
             transaction.sign(private_key);
             transaction.add_hop(self.wallet.clone(), public_key).await;
 
-            transactions.push(transaction);
+            transactions.push_back(transaction);
         }
 
         info!(
