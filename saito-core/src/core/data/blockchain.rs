@@ -54,6 +54,7 @@ pub struct Blockchain {
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub genesis_block_id: u64,
     fork_id: SaitoHash,
+    pub gt_requirement_met: bool,
 }
 
 impl Blockchain {
@@ -66,6 +67,7 @@ impl Blockchain {
             wallet_lock,
             genesis_block_id: 0,
             fork_id: [0; 32],
+            gt_requirement_met: true,
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -850,8 +852,10 @@ impl Blockchain {
         //
 
         if !self.is_golden_ticket_count_valid(&new_chain) {
+            self.gt_requirement_met = false;
             return false;
         }
+        self.gt_requirement_met = true;
 
         if !old_chain.is_empty() {
             let res = self

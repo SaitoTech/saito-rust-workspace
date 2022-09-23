@@ -244,9 +244,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
         let mut work_done = false;
-
         let timestamp = self.time_keeper.get_timestamp();
-
         let duration_value = duration.as_micros() as u64;
 
         if self.generate_genesis_block {
@@ -304,18 +302,21 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             }
         }
 
+        // getting the write lock here because we cannot upgrade from read to write
+
         // generate blocks
         let mut can_bundle = false;
         self.block_producing_timer = self.block_producing_timer + duration_value;
         // TODO : make timers configurable
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
+            log_read_lock_request!("blockchain");
+            let blockchain = self.blockchain.read().await;
+            log_read_lock_receive!("blockchain");
             log_read_lock_request!("mempool");
             let mempool = self.mempool.read().await;
             log_read_lock_receive!("mempool");
 
-            can_bundle = mempool
-                .can_bundle_block(self.blockchain.clone(), timestamp)
-                .await;
+            can_bundle = mempool.can_bundle_block(&blockchain, timestamp).await;
             self.block_producing_timer = 0;
             work_done = true;
         }
@@ -324,7 +325,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             log_write_lock_request!("blockchain");
             let mut blockchain = self.blockchain.write().await;
             log_write_lock_receive!("blockchain");
-
             {
                 log_write_lock_request!("mempool");
                 let mut mempool = self.mempool.write().await;
