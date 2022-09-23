@@ -222,7 +222,9 @@ impl NetworkController {
         }
         let result = reqwest::get(url.clone()).await;
         if result.is_err() {
-            todo!()
+            // TODO : should we retry here?
+            warn!("failed fetching : {:?}", url);
+            return;
         }
         let response = result.unwrap();
         let result = response.bytes().await;
