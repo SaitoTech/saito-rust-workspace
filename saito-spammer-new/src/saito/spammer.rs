@@ -1,26 +1,23 @@
 use crate::saito::config_handler::SpammerConfigs;
 use crate::saito::transaction_generator::TransactionGenerator;
-use crate::{IoEvent, TimeKeeper};
-use rayon::prelude::IntoParallelRefIterator;
+
+use crate::IoEvent;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::keep_time::KeepTime;
-use saito_core::core::data::block::Block;
+
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::Configuration;
+
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
-use saito_core::core::data::slip::Slip;
-use saito_core::core::data::transaction::Transaction;
+
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::routing_event_processor::RoutingEvent;
-use std::cmp::min;
+
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
-use tracing::{debug, info, trace};
+
+use tracing::info;
 
 pub struct Spammer {
     blockchain: Arc<RwLock<Blockchain>>,

@@ -144,6 +144,7 @@ pub fn new() -> SaitoWasm {
             target: [0; 32],
             difficulty: 0,
             public_key: [0; 33],
+            mined_golden_tickets: 0,
         },
         receiver_in_blockchain,
         receiver_in_mempool,

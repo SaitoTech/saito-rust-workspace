@@ -220,21 +220,13 @@ impl Mempool {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn can_bundle_block(
-        &self,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
-        current_timestamp: u64,
-    ) -> bool {
+    pub async fn can_bundle_block(&self, blockchain: &Blockchain, current_timestamp: u64) -> bool {
         // if self.transactions.is_empty() {
         //     return false;
         // }
         trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
         // TODO : add checks [downloading_active,etc...] from SLR code here
-
-        log_read_lock_request!("blockchain");
-        let blockchain = blockchain_lock.read().await;
-        log_read_lock_receive!("blockchain");
 
         if blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
@@ -246,6 +238,10 @@ impl Mempool {
         }
         if self.transactions.is_empty() {
             trace!("waiting till transactions come in");
+            return false;
+        }
+        if !blockchain.gt_requirement_met {
+            trace!("waiting till more golden tickets come in");
             return false;
         }
 
@@ -429,10 +425,9 @@ mod tests {
         //     mempool.can_bundle_block(blockchain_lock.clone(), ts).await,
         //     false
         // );
+        let blockchain = blockchain_lock.read().await;
         assert_eq!(
-            mempool
-                .can_bundle_block(blockchain_lock.clone(), ts + 120000)
-                .await,
+            mempool.can_bundle_block(&blockchain, ts + 120000).await,
             true
         );
     }
