@@ -2,7 +2,7 @@ use std::panic;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Instant};
 
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
@@ -16,7 +16,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{CHANNEL_SIZE, STAT_TIMER};
+use saito_core::common::defs::{CHANNEL_SIZE};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -55,7 +55,7 @@ where
         info!("new thread started");
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
-        let mut stat_timer = Instant::now();
+        let _stat_timer = Instant::now();
 
         event_processor.on_init().await;
 

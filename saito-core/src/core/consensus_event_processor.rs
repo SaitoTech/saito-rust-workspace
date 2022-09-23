@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT, STAT_INTERVAL};
+use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::Block;

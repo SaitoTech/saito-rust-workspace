@@ -1,13 +1,13 @@
 use std::collections::VecDeque;
 use std::io::Error;
-use std::mem;
+
 use std::sync::Arc;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, trace, warn, Level};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::common::defs::{SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
