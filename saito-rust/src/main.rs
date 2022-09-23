@@ -2,7 +2,7 @@ use std::panic;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
@@ -16,6 +16,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
+use saito_core::common::defs::CHANNEL_SIZE;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -31,7 +32,7 @@ use saito_core::{log_read_lock_receive, log_read_lock_request};
 
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::io_event::IoEvent;
-use crate::saito::network_controller::run_network_controller;
+use crate::saito::network_controller::{run_network_controller, THREAD_SLEEP_TIME};
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::time_keeper::TimeKeeper;
 
@@ -54,6 +55,7 @@ where
         info!("new thread started");
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
+        let _stat_timer = Instant::now();
 
         event_processor.on_init().await;
 
@@ -86,12 +88,19 @@ where
                 work_done = true;
             }
 
+            #[cfg(feature = "with-stats")]
+            {
+                let duration = current_instant.duration_since(stat_timer);
+                if duration > STAT_TIMER {
+                    stat_timer = current_instant;
+                    event_processor.on_stat_interval().await;
+                }
+            }
+
             if work_done {
                 work_done = false;
-                // tokio::task::yield_now().await;
             } else {
-                // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             }
         }
     })
@@ -113,9 +122,10 @@ async fn run_mining_event_processor(
         target: [0; 32],
         difficulty: 0,
         public_key: [0; 33],
+        mined_golden_tickets: 0,
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
 
     debug!("running miner thread");
     let _miner_handle = run_thread(
@@ -174,7 +184,7 @@ async fn run_consensus_event_processor(
         stats: Default::default(),
     };
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
     debug!("running mempool thread");
     let blockchain_handle = run_thread(
         Box::new(consensus_event_processor),
@@ -229,7 +239,7 @@ async fn run_routing_event_processor(
     }
 
     let (interface_sender_to_routing, interface_receiver_for_routing) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
 
     debug!("running blockchain thread");
     let routing_handle = run_thread(
@@ -293,7 +303,7 @@ fn run_loop_thread(
 
             if !work_done {
                 // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             } else {
                 // tokio::task::yield_now().await;
             }
@@ -393,10 +403,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )));
 
     let (event_sender_to_loop, event_receiver_in_loop) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
 
     let (sender_to_network_controller, receiver_in_network_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
 
     info!("running saito controllers");
 
@@ -404,12 +414,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =
-        tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
+        tokio::sync::mpsc::channel::<ConsensusEvent>(CHANNEL_SIZE);
 
     let (sender_to_routing, receiver_for_routing) =
-        tokio::sync::mpsc::channel::<RoutingEvent>(1000);
+        tokio::sync::mpsc::channel::<RoutingEvent>(CHANNEL_SIZE);
 
-    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(1000);
+    let (sender_to_miner, receiver_for_miner) =
+        tokio::sync::mpsc::channel::<MiningEvent>(CHANNEL_SIZE);
 
     let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),

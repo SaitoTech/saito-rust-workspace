@@ -30,6 +30,8 @@ use crate::{IoEvent, NetworkEvent};
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
+pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(10);
+
 pub struct NetworkController {
     sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
     peer_counter: Arc<Mutex<PeerCounter>>,
@@ -520,7 +522,7 @@ pub async fn run_network_controller(
             }
 
             if !work_done {
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             }
         }
     });

@@ -53,4 +53,6 @@ where
     /// ```
     async fn process_event(&mut self, event: T) -> Option<()>;
     async fn on_init(&mut self);
+
+    async fn on_stat_interval(&mut self);
 }

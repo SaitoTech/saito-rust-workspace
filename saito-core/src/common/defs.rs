@@ -15,6 +15,19 @@ pub const BLOCK_FILE_EXTENSION: &str = ".sai";
 pub const STAT_INTERVAL: Timestamp = Duration::from_secs(5).as_micros() as Timestamp;
 pub const STAT_BIN_COUNT: usize = 10;
 
+// TODO : these should be configurable
+pub const CHANNEL_SIZE: usize = 1000_000;
+pub const STAT_TIMER: Duration = Duration::from_secs(5);
+
+/// NOTE : Lock ordering is decided from how frequent the usage is for that resource. Please make sure to follow the order given below to avoid deadlocks
+/// network controller
+/// sockets
+/// configs
+/// blockchain
+/// mempool
+/// peers
+/// wallet
+/// TODO : add a macro to check the lock ordering as a feature flag
 #[macro_export]
 macro_rules! log_write_lock_request {
     ($resource: expr) => {
@@ -87,31 +100,28 @@ impl StatVariable {
         }
     }
     pub fn calculate_stats(&mut self, current_time_in_us: Timestamp) {
-        #[cfg(feature = "with-stats")]
-        {
-            let time_elapsed_in_us = current_time_in_us - self.last_stat_at;
-            self.last_stat_at = current_time_in_us;
-            if self.bins.len() == self.bins.capacity() - 1 {
-                self.bins.pop_front();
-            }
-            self.bins
-                .push_back((self.count_since_last_stat, time_elapsed_in_us));
-            self.count_since_last_stat = 0;
+        let time_elapsed_in_us = current_time_in_us - self.last_stat_at;
+        self.last_stat_at = current_time_in_us;
+        if self.bins.len() == self.bins.capacity() - 1 {
+            self.bins.pop_front();
+        }
+        self.bins
+            .push_back((self.count_since_last_stat, time_elapsed_in_us));
+        self.count_since_last_stat = 0;
 
-            let mut total = 0;
-            let mut total_time_in_us = 0;
-            for (count, time) in self.bins.iter() {
-                total += *count;
-                total_time_in_us += *time;
-            }
+        let mut total = 0;
+        let mut total_time_in_us = 0;
+        for (count, time) in self.bins.iter() {
+            total += *count;
+            total_time_in_us += *time;
+        }
 
-            self.avg = (1_000_000.0 * total as f64) / total_time_in_us as f64;
-            if self.avg > self.max_avg {
-                self.max_avg = self.avg;
-            }
-            if self.avg < self.min_avg {
-                self.min_avg = self.avg;
-            }
+        self.avg = (1_000_000.0 * total as f64) / total_time_in_us as f64;
+        if self.avg > self.max_avg {
+            self.max_avg = self.avg;
+        }
+        if self.avg < self.min_avg {
+            self.min_avg = self.avg;
         }
     }
 
@@ -121,7 +131,7 @@ impl StatVariable {
         {
             println!(
                 // target : "saito_stats",
-                "--- stats ------ {:?} - total : {:?} current_rate : {:?} max_rate : {:?} min_rate : {:?}",
+                "--- stats ------ {:?} - total : {:?} current_rate : {:.5} max_rate : {:.5} min_rate : {:.5}",
                 self.name.as_str(),
                 self.total,
                 self.avg,

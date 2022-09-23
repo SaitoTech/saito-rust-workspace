@@ -1,4 +1,5 @@
 use crate::SpammerConfigs;
+use std::collections::LinkedList;
 
 use crate::saito::time_keeper::TimeKeeper;
 use saito_core::common::keep_time::KeepTime;
@@ -9,7 +10,7 @@ use saito_core::core::data::wallet::Wallet;
 use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
-use std::collections::{LinkedList, VecDeque};
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
