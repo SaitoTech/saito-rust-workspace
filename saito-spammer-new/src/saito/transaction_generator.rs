@@ -9,7 +9,7 @@ use saito_core::core::data::wallet::Wallet;
 use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
-use std::collections::LinkedList;
+use std::collections::{LinkedList, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -53,7 +53,7 @@ impl TransactionGenerator {
         };
     }
 
-    pub async fn on_new_block(&mut self) -> Option<LinkedList<Transaction>> {
+    pub async fn on_new_block(&mut self) -> Option<Vec<Transaction>> {
         match self.state {
             GeneratorState::CreatingSlips => {
                 return self.create_slips().await;
@@ -69,7 +69,7 @@ impl TransactionGenerator {
         return None;
     }
 
-    async fn create_slips(&mut self) -> Option<LinkedList<Transaction>> {
+    async fn create_slips(&mut self) -> Option<Vec<Transaction>> {
         let output_slips_per_input_slip: u8 = 100;
         let unspent_slip_count;
         let available_balance;
@@ -91,7 +91,7 @@ impl TransactionGenerator {
 
             let total_nolans_requested_per_slip = available_balance / unspent_slip_count;
             let mut total_output_slips_created: u64 = 0;
-            let mut transactions: LinkedList<Transaction> = Default::default();
+            let mut transactions: Vec<Transaction> = Default::default();
 
             for _i in 0..unspent_slip_count {
                 let transaction = self
@@ -103,7 +103,7 @@ impl TransactionGenerator {
                     )
                     .await;
 
-                transactions.push_back(transaction);
+                transactions.push(transaction);
 
                 if total_output_slips_created >= self.tx_count {
                     info!(
@@ -210,7 +210,7 @@ impl TransactionGenerator {
         return false;
     }
 
-    async fn create_test_transactions(&mut self) -> Option<LinkedList<Transaction>> {
+    async fn create_test_transactions(&mut self) -> Option<Vec<Transaction>> {
         let public_key;
         let private_key;
         {
@@ -221,7 +221,7 @@ impl TransactionGenerator {
             private_key = wallet.private_key;
         }
 
-        let mut transactions: LinkedList<Transaction> = Default::default();
+        let mut transactions: Vec<Transaction> = Default::default();
 
         for _i in 0..self.tx_count {
             let mut transaction = Transaction::create(self.wallet.clone(), public_key, 1, 1).await;
@@ -230,7 +230,7 @@ impl TransactionGenerator {
             transaction.sign(private_key);
             transaction.add_hop(self.wallet.clone(), public_key).await;
 
-            transactions.push_back(transaction);
+            transactions.push(transaction);
         }
 
         info!(
