@@ -1,24 +1,21 @@
 use crate::saito::config_handler::SpammerConfigs;
 use crate::saito::transaction_generator::TransactionGenerator;
-use crate::{IoEvent};
+use crate::IoEvent;
 use saito_core::common::command::NetworkEvent;
-
 
 use saito_core::core::data::blockchain::Blockchain;
 
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 
-
 use saito_core::core::data::wallet::Wallet;
-
 
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use tracing::{info};
+use tracing::info;
 
 pub struct Spammer {
     blockchain: Arc<RwLock<Blockchain>>,
