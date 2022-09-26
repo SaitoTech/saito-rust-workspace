@@ -42,8 +42,8 @@ pub struct Mempool {
     wallet_lock: Arc<RwLock<Wallet>>,
     mempool_public_key: SaitoPublicKey,
     mempool_private_key: SaitoPrivateKey,
-    new_golden_ticket_added: bool,
-    new_tx_added: bool,
+    pub new_golden_ticket_added: bool,
+    pub new_tx_added: bool,
 }
 
 impl Mempool {
@@ -196,7 +196,8 @@ impl Mempool {
         )
         .await;
         block.generate();
-
+        self.new_tx_added = false;
+        self.new_golden_ticket_added = false;
         self.routing_work_in_mempool = 0;
 
         block
@@ -219,6 +220,8 @@ impl Mempool {
         )
         .await;
         block.generate();
+        self.new_tx_added = false;
+        self.new_golden_ticket_added = false;
 
         self.routing_work_in_mempool = 0;
 
