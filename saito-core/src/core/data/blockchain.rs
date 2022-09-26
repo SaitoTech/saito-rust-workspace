@@ -448,6 +448,7 @@ impl Blockchain {
         {
             let block = self.get_mut_block(&block_hash).unwrap();
             if block.block_type != BlockType::Header {
+                // TODO : this will have an impact when the block sizes are getting large or there are many forks. need to handle this
                 storage.write_block_to_disk(block).await;
             } else {
                 debug!(
