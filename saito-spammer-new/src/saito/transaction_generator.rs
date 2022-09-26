@@ -253,7 +253,7 @@ impl TransactionGenerator {
         //     .collect();
 
         log_write_lock_request!("wallet");
-        let mut wallet = self.wallet.blocking_write();
+        let mut wallet = self.wallet.write().await;
         log_write_lock_receive!("wallet");
         for _i in 0..self.tx_count {
             let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 1);
