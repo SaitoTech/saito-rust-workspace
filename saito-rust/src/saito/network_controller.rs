@@ -33,32 +33,11 @@ type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(1);
 
-struct NetworkStats {
-    incoming_messages: StatVariable,
-    outgoing_messages: StatVariable,
-}
-
-impl Default for NetworkStats {
-    fn default() -> Self {
-        NetworkStats {
-            incoming_messages: StatVariable::new(
-                "network::incoming_msgs".to_string(),
-                STAT_BIN_COUNT,
-            ),
-            outgoing_messages: StatVariable::new(
-                "network::outgoing_msgs".to_string(),
-                STAT_BIN_COUNT,
-            ),
-        }
-    }
-}
-
 pub struct NetworkController {
     sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
     peer_counter: Arc<Mutex<PeerCounter>>,
     currently_queried_urls: Arc<Mutex<HashSet<String>>>,
     pub sender_to_saito_controller: Sender<IoEvent>,
-    network_stats: NetworkStats,
 }
 
 impl NetworkController {
@@ -453,7 +432,6 @@ pub async fn run_network_controller(
         sender_to_saito_controller: sender,
         peer_counter: peer_index_counter.clone(),
         currently_queried_urls: Arc::new(Default::default()),
-        network_stats: Default::default(),
     }));
 
     let network_controller_clone = network_controller.clone();
