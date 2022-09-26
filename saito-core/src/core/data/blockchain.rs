@@ -552,6 +552,10 @@ impl Blockchain {
             transactions.retain(|tx| tx.transaction_type == TransactionType::Normal);
             if !transactions.is_empty() {
                 mempool.new_tx_added = true;
+                info!(
+                    "adding {:?} transactions back to mempool",
+                    transactions.len()
+                );
                 mempool.transactions.append(&mut transactions);
             }
         }
