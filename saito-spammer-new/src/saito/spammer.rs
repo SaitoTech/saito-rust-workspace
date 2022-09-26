@@ -17,7 +17,7 @@ use std::collections::LinkedList;
 
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
 use saito_core::core::data::transaction::Transaction;
@@ -41,6 +41,7 @@ impl Spammer {
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
         sender_to_network: Sender<IoEvent>,
+        sender: Sender<Transaction>,
         configs: Arc<RwLock<Box<SpammerConfigs>>>,
     ) -> Spammer {
         Spammer {
@@ -51,12 +52,13 @@ impl Spammer {
             configs: configs.clone(),
             bootstrap_done: false,
             sent_tx_count: 0,
-            tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone()).await,
+            tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone(), sender)
+                .await,
             transactions: Default::default(),
         }
     }
 
-    async fn run(&mut self) {
+    async fn run(&mut self, mut receiver: Receiver<Transaction>) {
         let mut work_done = false;
         let timer_in_milli;
         let burst_count;
@@ -66,21 +68,14 @@ impl Spammer {
             timer_in_milli = config.get_spammer_configs().timer_in_milli;
             burst_count = config.get_spammer_configs().burst_count;
         }
-
-        loop {
-            if !self.bootstrap_done {
-                let mut transactions = self.tx_generator.on_new_block().await;
-                if transactions.is_some() {
-                    self.transactions.append(&mut transactions.unwrap());
-                }
-
-                self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
-            }
-
-            for _i in 0..burst_count {
-                if let Some(transaction) = self.transactions.pop_front() {
-                    self.sent_tx_count += 1;
-                    self.sender_to_network
+        let sender = self.sender_to_network.clone();
+        tokio::spawn(async move {
+            loop {
+                let mut work_done = false;
+                // for _i in 0..burst_count {
+                if let Some(transaction) = receiver.recv().await {
+                    // self.sent_tx_count += 1;
+                    sender
                         .send(IoEvent {
                             event_processor_id: 0,
                             event_id: 0,
@@ -91,17 +86,23 @@ impl Spammer {
                         })
                         .await
                         .unwrap();
-                } else if self.bootstrap_done {
-                    info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", self.sent_tx_count);
                     work_done = true;
-                    break;
                 }
+                // }
+            }
+        });
+        tokio::task::yield_now().await;
+        loop {
+            work_done = false;
+            if !self.bootstrap_done {
+                self.tx_generator.on_new_block().await;
+                self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
             }
 
             if !work_done {
                 tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
             } else {
-                break;
+                // break;
             }
         }
 
@@ -125,6 +126,16 @@ pub async fn run_spammer(
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
 ) {
     info!("starting the spammer");
-    let mut spammer = Spammer::new(blockchain, mempool, wallet, sender_to_network, configs).await;
-    spammer.run().await;
+    let (sender, mut receiver): (Sender<Transaction>, Receiver<Transaction>) =
+        tokio::sync::mpsc::channel::<Transaction>(1_000_000);
+    let mut spammer = Spammer::new(
+        blockchain,
+        mempool,
+        wallet,
+        sender_to_network,
+        sender,
+        configs,
+    )
+    .await;
+    spammer.run(receiver).await;
 }

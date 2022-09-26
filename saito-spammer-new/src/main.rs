@@ -16,7 +16,9 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey, CHANNEL_SIZE};
+use saito_core::common::defs::{
+    SaitoPrivateKey, SaitoPublicKey, CHANNEL_SIZE, STAT_TIMER, THREAD_SLEEP_TIME,
+};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -55,6 +57,7 @@ where
         info!("new thread started");
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
+        let mut stat_timer = Instant::now();
 
         event_processor.on_init().await;
 
@@ -87,12 +90,21 @@ where
                 work_done = true;
             }
 
+            #[cfg(feature = "with-stats")]
+            {
+                let duration = current_instant.duration_since(stat_timer);
+                if duration > STAT_TIMER {
+                    stat_timer = current_instant;
+                    event_processor.on_stat_interval().await;
+                }
+            }
+
             if work_done {
                 work_done = false;
                 // tokio::task::yield_now().await;
             } else {
                 // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             }
         }
     })
@@ -109,7 +121,6 @@ async fn run_mining_event_processor(
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
-        miner_timer: 0,
         miner_active: false,
         target: [0; 32],
         difficulty: 0,
@@ -296,7 +307,7 @@ fn run_loop_thread(
 
             if !work_done {
                 // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             } else {
                 // tokio::task::yield_now().await;
             }

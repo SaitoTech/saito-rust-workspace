@@ -144,10 +144,10 @@ impl Blockchain {
             if earliest_block_hash != [0; 32] {
                 let earliest_block = self.get_mut_block(&earliest_block_hash).unwrap();
 
-                trace!(
-                    "block.timestamp - earliest_block.timestamp = {:?}",
-                    block.timestamp - earliest_block.timestamp
-                );
+                // trace!(
+                //     "block.timestamp - earliest_block.timestamp = {:?}",
+                //     block.timestamp - earliest_block.timestamp
+                // );
                 // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
                 if block.timestamp > earliest_block.timestamp {
                     if self.get_block(&block.previous_block_hash).is_none() {
@@ -550,7 +550,14 @@ impl Blockchain {
             let mut transactions = &mut block.transactions;
             // TODO : what other types should be added back to the mempool
             transactions.retain(|tx| tx.transaction_type == TransactionType::Normal);
-            mempool.transactions.append(&mut transactions);
+            if !transactions.is_empty() {
+                mempool.new_tx_added = true;
+                info!(
+                    "adding {:?} transactions back to mempool",
+                    transactions.len()
+                );
+                mempool.transactions.append(&mut transactions);
+            }
         }
     }
 
