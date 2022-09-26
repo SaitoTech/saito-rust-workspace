@@ -33,7 +33,6 @@ pub struct Spammer {
     sent_tx_count: u64,
     tx_generator: TransactionGenerator,
     transactions: LinkedList<Transaction>,
-    receiver: Receiver<Transaction>,
 }
 
 impl Spammer {
@@ -42,11 +41,9 @@ impl Spammer {
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
         sender_to_network: Sender<IoEvent>,
+        sender: Sender<Transaction>,
         configs: Arc<RwLock<Box<SpammerConfigs>>>,
     ) -> Spammer {
-        let (sender, mut receiver): (Sender<Transaction>, Receiver<Transaction>) =
-            tokio::sync::mpsc::channel::<Transaction>(100000);
-
         Spammer {
             blockchain,
             mempool,
@@ -58,11 +55,10 @@ impl Spammer {
             tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone(), sender)
                 .await,
             transactions: Default::default(),
-            receiver,
         }
     }
 
-    async fn run(&mut self) {
+    async fn run(&mut self, mut receiver: Receiver<Transaction>) {
         let mut work_done = false;
         let timer_in_milli;
         let burst_count;
@@ -72,19 +68,14 @@ impl Spammer {
             timer_in_milli = config.get_spammer_configs().timer_in_milli;
             burst_count = config.get_spammer_configs().burst_count;
         }
-
         loop {
             if !self.bootstrap_done {
-                let mut transactions = self.tx_generator.on_new_block().await;
-                if transactions.is_some() {
-                    self.transactions.append(&mut transactions.unwrap());
-                }
-
+                self.tx_generator.on_new_block().await;
                 self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
             }
 
             for _i in 0..burst_count {
-                if let Ok(transaction) = self.receiver.try_recv() {
+                if let Ok(transaction) = receiver.try_recv() {
                     self.sent_tx_count += 1;
                     self.sender_to_network
                         .send(IoEvent {
@@ -131,6 +122,16 @@ pub async fn run_spammer(
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
 ) {
     info!("starting the spammer");
-    let mut spammer = Spammer::new(blockchain, mempool, wallet, sender_to_network, configs).await;
-    spammer.run().await;
+    let (sender, mut receiver): (Sender<Transaction>, Receiver<Transaction>) =
+        tokio::sync::mpsc::channel::<Transaction>(100000);
+    let mut spammer = Spammer::new(
+        blockchain,
+        mempool,
+        wallet,
+        sender_to_network,
+        sender,
+        configs,
+    )
+    .await;
+    spammer.run(receiver).await;
 }

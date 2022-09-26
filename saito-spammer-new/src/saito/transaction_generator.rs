@@ -16,6 +16,7 @@ use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
 use tracing::info;
 
 #[derive(Clone, PartialEq)]
@@ -75,26 +76,22 @@ impl TransactionGenerator {
     pub fn get_state(&self) -> GeneratorState {
         return self.state.clone();
     }
-    pub async fn on_new_block(&mut self) -> Option<LinkedList<Transaction>> {
-        let mut transactions: Option<LinkedList<Transaction>> = None;
-
+    pub async fn on_new_block(&mut self) {
         match self.state {
             GeneratorState::CreatingSlips => {
-                transactions = self.create_slips().await;
+                self.create_slips().await;
             }
             GeneratorState::WaitingForBlockChainConfirmation => {
                 if self.check_blockchain_for_confirmation().await {
-                    transactions = self.create_test_transactions().await;
+                    self.create_test_transactions().await;
                     self.state = GeneratorState::Done;
                 }
             }
             GeneratorState::Done => {}
         }
-
-        return transactions;
     }
 
-    async fn create_slips(&mut self) -> Option<LinkedList<Transaction>> {
+    async fn create_slips(&mut self) {
         let output_slips_per_input_slip: u8 = 100;
         let unspent_slip_count;
         let available_balance;
@@ -116,7 +113,6 @@ impl TransactionGenerator {
 
             let total_nolans_requested_per_slip = available_balance / unspent_slip_count;
             let mut total_output_slips_created: u64 = 0;
-            let mut transactions: LinkedList<Transaction> = Default::default();
 
             for _i in 0..unspent_slip_count {
                 let transaction = self
@@ -147,11 +143,7 @@ impl TransactionGenerator {
                 "New slips created, current = {:?}, target = {:?}",
                 total_output_slips_created, self.tx_count
             );
-
-            return Some(transactions);
         }
-
-        return None;
     }
 
     async fn create_slip_transaction(
@@ -229,9 +221,8 @@ impl TransactionGenerator {
         return false;
     }
 
-    async fn create_test_transactions(&mut self) -> Option<LinkedList<Transaction>> {
+    async fn create_test_transactions(&mut self) -> JoinHandle<()> {
         info!("creating test transactions : {:?}", self.tx_count);
-        let mut transactions: LinkedList<Transaction> = Default::default();
 
         let sender = self.sender.clone();
         // (0..self.tx_count).into_par_iter().for_each(|_| async {
@@ -255,26 +246,27 @@ impl TransactionGenerator {
         //     sender.send(transaction).await.unwrap();
         //     // transactions.push_back(transaction);
         // });
+        let sender = self.sender.clone();
+        let wallet = self.wallet.clone();
+        let public_key = self.public_key.clone();
+        let private_key = self.private_key.clone();
+        let tx_count = self.tx_count.clone();
+        let tx_size = self.tx_size.clone();
+        return tokio::spawn(async move {
+            for _i in 0..tx_count {
+                log_write_lock_request!("wallet");
+                let mut wallet = wallet.write().await;
+                log_write_lock_receive!("wallet");
+                let mut transaction = Transaction::create(&mut wallet, public_key, 1, 1);
+                transaction.message = generate_random_bytes(tx_size as u64);
+                transaction.generate(public_key);
+                transaction.sign(private_key);
+                transaction.add_hop(&wallet, public_key);
 
-        for _i in 0..self.tx_count {
-            log_write_lock_request!("wallet");
-            let mut wallet = self.wallet.write().await;
-            log_write_lock_receive!("wallet");
-            let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 1);
-            transaction.message = generate_random_bytes(self.tx_size as u64);
-            transaction.generate(self.public_key);
-            transaction.sign(self.private_key);
-            transaction.add_hop(&wallet, self.public_key);
-
-            // transactions.push_back(transaction);
-            self.sender.send(transaction).await.unwrap();
-        }
-
-        info!(
-            "Test transactions created, count = {:?}",
-            transactions.len()
-        );
-
-        return Some(transactions);
+                // transactions.push_back(transaction);
+                sender.clone().send(transaction).await.unwrap();
+            }
+            info!("Test transactions created, count");
+        });
     }
 }
