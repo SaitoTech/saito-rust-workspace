@@ -9,6 +9,7 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
+use rayon::prelude::*;
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -202,13 +203,14 @@ impl Wallet {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        let mut unspent_slip_count: u64 = 0;
-        for slip in &self.slips {
-            if !slip.spent {
-                unspent_slip_count += 1;
-            }
-        }
-        unspent_slip_count
+        // let mut unspent_slip_count: u64 = 0;
+        (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
+        // for slip in &self.slips {
+        //     if !slip.spent {
+        //         unspent_slip_count += 1;
+        //     }
+        // }
+        // unspent_slip_count
     }
 
     // the nolan_requested is omitted from the slips created - only the change
