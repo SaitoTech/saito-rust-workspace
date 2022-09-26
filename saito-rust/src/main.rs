@@ -16,7 +16,9 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{StatVariable, CHANNEL_SIZE, STAT_BIN_COUNT, STAT_TIMER};
+use saito_core::common::defs::{
+    StatVariable, CHANNEL_SIZE, STAT_BIN_COUNT, STAT_TIMER, THREAD_SLEEP_TIME,
+};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
@@ -33,7 +35,7 @@ use saito_core::{log_read_lock_receive, log_read_lock_request};
 
 use crate::saito::config_handler::ConfigHandler;
 use crate::saito::io_event::IoEvent;
-use crate::saito::network_controller::{run_network_controller, THREAD_SLEEP_TIME};
+use crate::saito::network_controller::run_network_controller;
 use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::time_keeper::TimeKeeper;
 

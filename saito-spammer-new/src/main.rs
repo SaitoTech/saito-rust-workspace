@@ -16,7 +16,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey, CHANNEL_SIZE};
+use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey, CHANNEL_SIZE, THREAD_SLEEP_TIME};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -92,7 +92,7 @@ where
                 // tokio::task::yield_now().await;
             } else {
                 // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             }
         }
     })
@@ -296,7 +296,7 @@ fn run_loop_thread(
 
             if !work_done {
                 // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
             } else {
                 // tokio::task::yield_now().await;
             }

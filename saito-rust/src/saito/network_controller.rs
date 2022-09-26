@@ -17,7 +17,9 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER};
+use saito_core::common::defs::{
+    SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER, THREAD_SLEEP_TIME,
+};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
@@ -31,8 +33,6 @@ use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
-
-pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(50);
 
 pub struct NetworkController {
     sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
