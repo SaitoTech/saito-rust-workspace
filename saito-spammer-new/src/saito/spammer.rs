@@ -123,7 +123,7 @@ pub async fn run_spammer(
 ) {
     info!("starting the spammer");
     let (sender, mut receiver): (Sender<Transaction>, Receiver<Transaction>) =
-        tokio::sync::mpsc::channel::<Transaction>(100000);
+        tokio::sync::mpsc::channel::<Transaction>(1_000_000);
     let mut spammer = Spammer::new(
         blockchain,
         mempool,

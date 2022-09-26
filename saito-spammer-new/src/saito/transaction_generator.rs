@@ -246,7 +246,7 @@ impl TransactionGenerator {
                 // transactions.push_back(transaction);
                 sender.send(transaction).await.unwrap();
             }
-            info!("Test transactions created, count");
+            info!("Test transactions created, count : {:?}", tx_count);
         });
     }
 }
