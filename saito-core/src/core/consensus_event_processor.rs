@@ -212,7 +212,7 @@ impl ConsensusEventProcessor {
 
         for _i in 0..txs_to_generate {
             let mut transaction;
-            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000).await;
+            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000);
             // TODO : generate a message buffer which can be converted back into JSON
             transaction.message = (0..bytes_per_tx)
                 .into_iter()
@@ -221,7 +221,7 @@ impl ConsensusEventProcessor {
             transaction.generate(public_key);
             transaction.sign(private_key);
 
-            transaction.add_hop(&wallet, public_key).await;
+            transaction.add_hop(&wallet, public_key);
             {
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)

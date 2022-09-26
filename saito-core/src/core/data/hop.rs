@@ -32,7 +32,7 @@ impl Hop {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn generate(wallet: &Wallet, to_public_key: SaitoPublicKey, tx: &Transaction) -> Hop {
+    pub fn generate(wallet: &Wallet, to_public_key: SaitoPublicKey, tx: &Transaction) -> Hop {
         let mut hop = Hop::new();
 
         //

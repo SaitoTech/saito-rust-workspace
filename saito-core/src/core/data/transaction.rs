@@ -87,8 +87,8 @@ impl Transaction {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn add_hop(&mut self, wallet: &Wallet, to_public_key: SaitoPublicKey) {
-        let hop = Hop::generate(wallet, to_public_key, self).await;
+    pub fn add_hop(&mut self, wallet: &Wallet, to_public_key: SaitoPublicKey) {
+        let hop = Hop::generate(wallet, to_public_key, self);
         self.path.push(hop);
     }
 
@@ -145,7 +145,7 @@ impl Transaction {
     ///
     /// ```
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn create(
+    pub fn create(
         wallet: &mut Wallet,
         to_public_key: SaitoPublicKey,
         with_payment: u64,
