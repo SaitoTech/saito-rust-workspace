@@ -233,7 +233,7 @@ impl Mempool {
         // if self.transactions.is_empty() {
         //     return false;
         // }
-        trace!("can bundle block : timestamp = {:?}", current_timestamp);
+        // trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
         // TODO : add checks [downloading_active,etc...] from SLR code here
 
@@ -243,11 +243,11 @@ impl Mempool {
             return false;
         }
         if !self.blocks_queue.is_empty() {
-            trace!("waiting till blocks in the queue are processed");
+            // trace!("waiting till blocks in the queue are processed");
             return false;
         }
         if self.transactions.is_empty() || !self.new_tx_added {
-            trace!("waiting till transactions come in");
+            // trace!("waiting till transactions come in");
             return false;
         }
         if !blockchain.gt_requirement_met && !self.new_golden_ticket_added {
