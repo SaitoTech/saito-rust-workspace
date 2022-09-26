@@ -14,6 +14,7 @@ use saito_core::{
 use rayon::prelude::*;
 use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
 use std::sync::Arc;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -33,12 +34,14 @@ pub struct TransactionGenerator {
     time_keeper: Box<TimeKeeper>,
     public_key: SaitoPublicKey,
     private_key: SaitoPrivateKey,
+    sender: Sender<Transaction>,
 }
 
 impl TransactionGenerator {
     pub async fn create(
         wallet: Arc<RwLock<Wallet>>,
         configuration: Arc<RwLock<Box<SpammerConfigs>>>,
+        sender: Sender<Transaction>,
     ) -> Self {
         let tx_size = 10;
         let tx_count;
@@ -57,6 +60,7 @@ impl TransactionGenerator {
             time_keeper: Box::new(TimeKeeper {}),
             public_key: [0; 33],
             private_key: [0; 32],
+            sender,
         };
         {
             log_read_lock_request!("wallet");
@@ -124,7 +128,8 @@ impl TransactionGenerator {
                     )
                     .await;
 
-                transactions.push_back(transaction);
+                // transactions.push_back(transaction);
+                self.sender.send(transaction).await.unwrap();
 
                 if total_output_slips_created >= self.tx_count {
                     info!(
@@ -264,7 +269,8 @@ impl TransactionGenerator {
             transaction.sign(self.private_key);
             transaction.add_hop(&wallet, self.public_key);
 
-            transactions.push_back(transaction);
+            // transactions.push_back(transaction);
+            self.sender.send(transaction).await.unwrap();
         }
 
         info!(
