@@ -68,17 +68,14 @@ impl Spammer {
             timer_in_milli = config.get_spammer_configs().timer_in_milli;
             burst_count = config.get_spammer_configs().burst_count;
         }
-        loop {
-            work_done = false;
-            if !self.bootstrap_done {
-                self.tx_generator.on_new_block().await;
-                self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
-            }
-
-            for _i in 0..burst_count {
-                if let Ok(transaction) = receiver.try_recv() {
-                    self.sent_tx_count += 1;
-                    self.sender_to_network
+        let sender = self.sender_to_network.clone();
+        tokio::spawn(async move {
+            loop {
+                let mut work_done = false;
+                // for _i in 0..burst_count {
+                if let Some(transaction) = receiver.recv().await {
+                    // self.sent_tx_count += 1;
+                    sender
                         .send(IoEvent {
                             event_processor_id: 0,
                             event_id: 0,
@@ -91,11 +88,15 @@ impl Spammer {
                         .unwrap();
                     work_done = true;
                 }
-                // else if self.bootstrap_done {
-                //     // info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", self.sent_tx_count);
-                //     work_done = true;
-                //     // break;
                 // }
+            }
+        });
+        tokio::task::yield_now().await;
+        loop {
+            work_done = false;
+            if !self.bootstrap_done {
+                self.tx_generator.on_new_block().await;
+                self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
             }
 
             if !work_done {
