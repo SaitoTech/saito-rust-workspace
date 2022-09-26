@@ -243,8 +243,16 @@ impl Mempool {
             return false;
         }
         if !blockchain.gt_requirement_met {
-            trace!("waiting till more golden tickets come in");
-            return false;
+            let gt_in_mempool = self.transactions.iter().any(|tx| {
+                if let TransactionType::GoldenTicket = tx.transaction_type {
+                    return true;
+                }
+                return false;
+            });
+            if !gt_in_mempool {
+                trace!("waiting till more golden tickets come in");
+                return false;
+            }
         }
 
         if let Some(previous_block) = blockchain.get_latest_block() {
