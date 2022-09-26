@@ -11,12 +11,13 @@ use tracing::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
+use tokio::time::{Instant, Interval};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::SaitoHash;
+use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER};
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
@@ -30,13 +31,34 @@ use crate::{IoEvent, NetworkEvent};
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
-pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(10);
+pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(1);
+
+struct NetworkStats {
+    incoming_messages: StatVariable,
+    outgoing_messages: StatVariable,
+}
+
+impl Default for NetworkStats {
+    fn default() -> Self {
+        NetworkStats {
+            incoming_messages: StatVariable::new(
+                "network::incoming_msgs".to_string(),
+                STAT_BIN_COUNT,
+            ),
+            outgoing_messages: StatVariable::new(
+                "network::outgoing_msgs".to_string(),
+                STAT_BIN_COUNT,
+            ),
+        }
+    }
+}
 
 pub struct NetworkController {
     sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
     peer_counter: Arc<Mutex<PeerCounter>>,
     currently_queried_urls: Arc<Mutex<HashSet<String>>>,
     pub sender_to_saito_controller: Sender<IoEvent>,
+    network_stats: NetworkStats,
 }
 
 impl NetworkController {
@@ -431,6 +453,7 @@ pub async fn run_network_controller(
         sender_to_saito_controller: sender,
         peer_counter: peer_index_counter.clone(),
         currently_queried_urls: Arc::new(Default::default()),
+        network_stats: Default::default(),
     }));
 
     let network_controller_clone = network_controller.clone();
@@ -445,6 +468,9 @@ pub async fn run_network_controller(
 
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
+        let mut outgoing_messages =
+            StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
+        let mut last_stat_on: Instant = Instant::now();
         loop {
             // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
             //
@@ -463,6 +489,7 @@ pub async fn run_network_controller(
                         let sockets = network_controller.read().await.sockets.clone();
                         log_write_lock_receive!("network controller");
                         NetworkController::send_to_all(sockets, buffer, exceptions).await;
+                        outgoing_messages.increment();
                     }
                     NetworkEvent::OutgoingNetworkMessage {
                         peer_index: index,
@@ -472,6 +499,7 @@ pub async fn run_network_controller(
                         let sockets = network_controller.read().await.sockets.clone();
                         log_write_lock_receive!("network controller");
                         NetworkController::send_outgoing_message(sockets, index, buffer).await;
+                        outgoing_messages.increment();
                     }
                     NetworkEvent::ConnectToPeer { peer_details } => {
                         NetworkController::connect_to_peer(
@@ -520,6 +548,14 @@ pub async fn run_network_controller(
                     NetworkEvent::BlockFetched { .. } => {
                         unreachable!()
                     }
+                }
+            }
+
+            #[cfg(feature = "with-stats")]
+            {
+                if Instant::now().duration_since(last_stat_on) > STAT_TIMER {
+                    last_stat_on = Instant::now();
+                    outgoing_messages.print();
                 }
             }
 
