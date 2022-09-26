@@ -1664,33 +1664,37 @@ impl Block {
         // that stretches back into previous blocks and finds the winning nodes
         // that should collect payment.
         //
-        if let (Some(ft_index), Some(mut fee_transaction)) = (cv.ft_index, cv.fee_transaction) {
-            //
-            // no golden ticket? invalid
-            //
-            if cv.gt_index.is_none() {
-                error!("ERROR 48203: block appears to have fee transaction without golden ticket");
-                return false;
-            }
+        if cv.ft_num > 0 {
+            if let (Some(ft_index), Some(mut fee_transaction)) = (cv.ft_index, cv.fee_transaction) {
+                //
+                // no golden ticket? invalid
+                //
+                if cv.gt_index.is_none() {
+                    error!(
+                        "ERROR 48203: block appears to have fee transaction without golden ticket"
+                    );
+                    return false;
+                }
 
-            //
-            // the fee transaction we receive from the CV needs to be updated with
-            // block-specific data in the same way that all of the transactions in
-            // the block have been. we must do this prior to comparing them.
-            //
-            fee_transaction.generate(self.creator);
-            let checked_tx = self.transactions.get(ft_index).unwrap();
+                //
+                // the fee transaction we receive from the CV needs to be updated with
+                // block-specific data in the same way that all of the transactions in
+                // the block have been. we must do this prior to comparing them.
+                //
+                fee_transaction.generate(self.creator);
+                let checked_tx = self.transactions.get(ft_index).unwrap();
 
-            let hash1 = hash(&fee_transaction.serialize_for_signature());
-            let hash2 = hash(&checked_tx.serialize_for_signature());
-            if hash1 != hash2 {
-                error!(
-                    "ERROR 892032: block {} fee transaction doesn't match cv fee transaction",
-                    self.id
-                );
-                info!("expected = {:?}", fee_transaction);
-                info!("actual   = {:?}", checked_tx);
-                return false;
+                let hash1 = hash(&fee_transaction.serialize_for_signature());
+                let hash2 = hash(&checked_tx.serialize_for_signature());
+                if hash1 != hash2 {
+                    error!(
+                        "ERROR 892032: block {} fee transaction doesn't match cv fee transaction",
+                        self.id
+                    );
+                    info!("expected = {:?}", fee_transaction);
+                    info!("actual   = {:?}", checked_tx);
+                    return false;
+                }
             }
         }
 
