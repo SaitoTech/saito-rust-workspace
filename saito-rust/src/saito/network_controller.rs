@@ -32,7 +32,7 @@ use crate::{IoEvent, NetworkEvent, TimeKeeper};
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
-pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(1);
+pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(50);
 
 pub struct NetworkController {
     sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,

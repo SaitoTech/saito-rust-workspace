@@ -44,12 +44,13 @@ impl MiningEventProcessor {
         assert!(self.miner_active);
         debug_assert_ne!(self.public_key, [0; 33]);
 
-        let random_bytes = hash(&generate_random_bytes(32));
-        // The new way of validation will be wasting a GT instance if the validation fails
-        // old way used a static method instead
-        let gt = GoldenTicket::create(self.target, random_bytes, self.public_key);
-        if gt.validate(self.difficulty) {
-            info!(
+        for _ in 0..100 {
+            let random_bytes = hash(&generate_random_bytes(32));
+            // The new way of validation will be wasting a GT instance if the validation fails
+            // old way used a static method instead
+            let gt = GoldenTicket::create(self.target, random_bytes, self.public_key);
+            if gt.validate(self.difficulty) {
+                info!(
                 "golden ticket found. sending to mempool. previous block : {:?} random : {:?} key : {:?} solution : {:?} for difficulty : {:?}",
                 hex::encode(gt.target),
                 hex::encode(gt.random),
@@ -57,14 +58,15 @@ impl MiningEventProcessor {
                 hex::encode(hash(&gt.serialize_for_net())),
                 self.difficulty
             );
-            self.miner_active = false;
-            self.mined_golden_tickets += 1;
-            self.sender_to_mempool
-                .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
-                .await
-                .expect("sending to mempool failed");
+                self.miner_active = false;
+                self.mined_golden_tickets += 1;
+                self.sender_to_mempool
+                    .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
+                    .await
+                    .expect("sending to mempool failed");
 
-            return Some(());
+                return Some(());
+            }
         }
         None
     }
