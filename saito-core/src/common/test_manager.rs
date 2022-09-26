@@ -418,7 +418,7 @@ pub mod test {
                 }
 
                 transaction.sign(private_key);
-                transaction.generate(public_key);
+                transaction.generate(public_key, 0, 0);
                 transactions.push(transaction);
             }
 
@@ -436,7 +436,7 @@ pub mod test {
                     let mut wallet = self.wallet_lock.write().await;
                     gttx = wallet.create_golden_ticket_transaction(golden_ticket).await;
                 }
-                gttx.generate(public_key);
+                gttx.generate(public_key, 0, 0);
                 transactions.push(gttx);
             }
 
@@ -531,7 +531,7 @@ pub mod test {
             //
             for _i in 0..vip_transactions {
                 let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
-                tx.generate(public_key);
+                tx.generate(public_key, 0, 0);
                 tx.sign(private_key);
                 block.add_transaction(tx);
             }

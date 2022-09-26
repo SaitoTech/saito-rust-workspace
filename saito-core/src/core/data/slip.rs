@@ -3,10 +3,10 @@ use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoUTXOSetKey, SlipUuid, UtxoSet};
 
 /// The size of a serilized slip in bytes.
-pub const SLIP_SIZE: usize = 75;
+pub const SLIP_SIZE: usize = 60;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq, FromPrimitive)]
 pub enum SlipType {
@@ -28,9 +28,12 @@ pub struct Slip {
     pub public_key: SaitoPublicKey,
     pub amount: u64,
     pub slip_index: u8,
+    // pub tx_hash: SaitoHash,
+    // pub block_id: u64,
     pub slip_type: SlipType,
-    pub uuid: SaitoHash,
-    #[serde_as(as = "[_; 74]")]
+    /// block_id + tx_id + slip_id to uniquely identify the slip
+    pub uuid: SlipUuid,
+    #[serde_as(as = "[_; 58]")]
     pub utxoset_key: SaitoUTXOSetKey,
     // TODO : Check if this can be removed with Option<>
     pub is_utxoset_key_set: bool,
@@ -43,8 +46,9 @@ impl Slip {
             amount: 0,
             slip_index: 0,
             slip_type: SlipType::Normal,
-            uuid: [0; 32],
-            utxoset_key: [0; 74],
+            // uuid: [0; 32],
+            uuid: [0; 17],
+            utxoset_key: [0; 58],
             is_utxoset_key_set: false,
         }
     }
@@ -54,7 +58,7 @@ impl Slip {
     //
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete(&self, utxoset: &mut UtxoSet) -> bool {
-        if self.get_utxoset_key() == [0; 74] {
+        if self.get_utxoset_key() == [0; 58] {
             error!("ERROR 572034: asked to remove a slip without its utxoset_key properly set!");
             false;
         }
@@ -65,10 +69,10 @@ impl Slip {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
-        let uuid: SaitoHash = bytes[33..65].try_into().unwrap();
-        let amount: u64 = u64::from_be_bytes(bytes[65..73].try_into().unwrap());
-        let slip_index: u8 = bytes[73];
-        let slip_type: SlipType = FromPrimitive::from_u8(bytes[SLIP_SIZE - 1]).unwrap();
+        let uuid: SlipUuid = bytes[33..50].try_into().unwrap();
+        let amount: u64 = u64::from_be_bytes(bytes[50..58].try_into().unwrap());
+        let slip_index: u8 = bytes[58];
+        let slip_type: SlipType = FromPrimitive::from_u8(bytes[59]).unwrap();
         let mut slip = Slip::new();
 
         slip.public_key = public_key;
@@ -82,8 +86,10 @@ impl Slip {
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_utxoset_key(&mut self) {
-        self.utxoset_key = self.get_utxoset_key();
-        self.is_utxoset_key_set = true;
+        if !self.is_utxoset_key_set {
+            self.utxoset_key = self.get_utxoset_key();
+            self.is_utxoset_key_set = true;
+        }
     }
 
     // 33 bytes public_key
@@ -97,9 +103,8 @@ impl Slip {
         res.extend(&self.public_key);
         res.extend(&self.uuid);
         res.extend(&self.amount.to_be_bytes());
-        res.extend(&self.slip_index.to_be_bytes());
 
-        res[0..74].try_into().unwrap()
+        res[0..58].try_into().unwrap()
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -140,7 +145,7 @@ impl Slip {
     pub fn serialize_output_for_signature(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(&self.public_key);
-        vbytes.extend(&[0; 32]);
+        vbytes.extend(&[0; 17]);
         vbytes.extend(&self.amount.to_be_bytes());
         vbytes.extend(&(self.slip_index.to_be_bytes()));
         vbytes.extend(&(self.slip_type as u8).to_be_bytes());
@@ -196,7 +201,7 @@ mod tests {
     fn slip_new_test() {
         let mut slip = Slip::new();
         assert_eq!(slip.public_key, [0; 33]);
-        assert_eq!(slip.uuid, [0; 32]);
+        assert_eq!(slip.uuid, [0; 17]);
         assert_eq!(slip.amount, 0);
         assert_eq!(slip.slip_type, SlipType::Normal);
         assert_eq!(slip.slip_index, 0);
@@ -207,8 +212,8 @@ mod tests {
         slip.amount = 100;
         assert_eq!(slip.amount, 100);
 
-        slip.uuid = [30; 32];
-        assert_eq!(slip.uuid, [30; 32]);
+        slip.uuid = [30; 17];
+        assert_eq!(slip.uuid, [30; 17]);
 
         slip.slip_index = 1;
         assert_eq!(slip.slip_index, 1);
@@ -226,14 +231,14 @@ mod tests {
     #[test]
     fn slip_get_utxoset_key_test() {
         let slip = Slip::new();
-        assert_eq!(slip.get_utxoset_key(), [0; 74]);
+        assert_eq!(slip.get_utxoset_key(), [0; 58]);
     }
 
     #[test]
     fn slip_serialization_for_net_test() {
         let slip = Slip::new();
         let serialized_slip = slip.serialize_for_net();
-        assert_eq!(serialized_slip.len(), 75);
+        assert_eq!(serialized_slip.len(), SLIP_SIZE);
         let deserilialized_slip = Slip::deserialize_from_net(&serialized_slip);
         assert_eq!(slip, deserilialized_slip);
     }
@@ -247,7 +252,7 @@ mod tests {
 
         let mut slip = Slip::new();
         slip.amount = 100_000;
-        slip.uuid = [1; 32];
+        slip.uuid = [1; 17];
         {
             let wallet = wallet_lock.read().await;
             slip.public_key = wallet.public_key;

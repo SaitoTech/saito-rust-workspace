@@ -1,5 +1,5 @@
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, SlipUuid,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
@@ -26,7 +26,7 @@ pub const WALLET_SIZE: usize = 65;
 ///
 #[derive(Clone, Debug, PartialEq)]
 pub struct WalletSlip {
-    pub uuid: SaitoHash,
+    pub uuid: SlipUuid,
     pub utxokey: SaitoUTXOSetKey,
     pub amount: u64,
     pub block_id: u64,
@@ -125,7 +125,7 @@ impl Wallet {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
         if lc {
-            for tx in block.transactions.iter() {
+            for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.inputs.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         self.delete_slip(input);
@@ -133,15 +133,15 @@ impl Wallet {
                 }
                 for output in tx.outputs.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        self.add_slip(block, tx, output, true);
+                        self.add_slip(block, index as u64, output, true);
                     }
                 }
             }
         } else {
-            for tx in block.transactions.iter() {
+            for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.inputs.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        self.add_slip(block, tx, input, true);
+                        self.add_slip(block, index as u64, input, true);
                     }
                 }
                 for output in tx.outputs.iter() {
@@ -171,10 +171,15 @@ impl Wallet {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn add_slip(&mut self, block: &Block, transaction: &Transaction, slip: &Slip, lc: bool) {
+    pub fn add_slip(&mut self, block: &Block, tx_index: u64, slip: &Slip, lc: bool) {
         let mut wallet_slip = WalletSlip::new();
 
-        wallet_slip.uuid = transaction.hash_for_signature.unwrap();
+        let mut uuid = vec![];
+        uuid.extend(block.id.to_be_bytes());
+        uuid.extend(tx_index.to_be_bytes());
+        uuid.extend(slip.slip_index.to_be_bytes());
+
+        wallet_slip.uuid = uuid.try_into().unwrap();
         wallet_slip.utxokey = slip.get_utxoset_key();
         wallet_slip.amount = slip.amount;
         wallet_slip.slip_index = slip.slip_index;
@@ -266,14 +271,14 @@ impl Wallet {
             let mut input = Slip::new();
             input.public_key = my_public_key;
             input.amount = 0;
-            input.uuid = [0; 32];
+            input.uuid = [0; 17];
             inputs.push(input);
         }
         if outputs.is_empty() {
             let mut output = Slip::new();
             output.public_key = my_public_key;
             output.amount = 0;
-            output.uuid = [0; 32];
+            output.uuid = [0; 17];
             outputs.push(output);
         }
 
@@ -303,12 +308,12 @@ impl Wallet {
         let mut input1 = Slip::new();
         input1.public_key = self.public_key;
         input1.amount = 0;
-        input1.uuid = [0; 32];
+        input1.uuid = [0; 17];
 
         let mut output1 = Slip::new();
         output1.public_key = self.public_key;
         output1.amount = 0;
-        output1.uuid = [0; 32];
+        output1.uuid = [0; 17];
 
         transaction.add_input(input1);
         transaction.add_output(output1);
@@ -326,8 +331,8 @@ impl WalletSlip {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         WalletSlip {
-            uuid: [0; 32],
-            utxokey: [0; 74],
+            uuid: [0; 17],
+            utxokey: [0; 58],
             amount: 0,
             block_id: 0,
             block_hash: [0; 32],

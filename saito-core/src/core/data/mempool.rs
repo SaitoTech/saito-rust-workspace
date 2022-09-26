@@ -123,7 +123,7 @@ impl Mempool {
             log_read_lock_request!("wallet");
             let wallet = self.wallet_lock.read().await;
             log_read_lock_receive!("wallet");
-            transaction.generate(wallet.public_key);
+            transaction.generate(wallet.public_key, 0, 0);
         }
         //
         // validate
@@ -162,7 +162,7 @@ impl Mempool {
         //
         // generates hashes, total fees, routing work for me, etc.
         //
-        transaction.generate(public_key);
+        transaction.generate(public_key, 0, 0);
 
         if !self
             .transactions
@@ -418,7 +418,7 @@ mod tests {
                 // _i prevents sig from being identical during test
                 // and thus from being auto-rejected from mempool
                 tx.timestamp = ts + 120000 + _i;
-                tx.generate(public_key);
+                tx.generate(public_key, 0, 0);
                 tx.sign(private_key);
             }
             let wallet = wallet_lock.read().await;

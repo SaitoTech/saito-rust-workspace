@@ -368,7 +368,8 @@ impl Block {
         // than iterating through the entire transaction set here.
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
             .par_iter_mut()
-            .all(|tx| tx.generate(public_key));
+            .enumerate()
+            .all(|(index, tx)| tx.generate(public_key, index as u64, block.id));
         if rlen > 0 {
             block.transactions.append(&mut cv.rebroadcasts);
         }
@@ -699,7 +700,8 @@ impl Block {
         let _transactions_pre_calculated = &self
             .transactions
             .par_iter_mut()
-            .all(|tx| tx.generate(creator_public_key));
+            .enumerate()
+            .all(|(index, tx)| tx.generate(creator_public_key, index as u64, self.id));
 
         // trace!(" ... block.prevalid - pst hash:  {:?}", create_timestamp());
 
@@ -1681,7 +1683,7 @@ impl Block {
                 // block-specific data in the same way that all of the transactions in
                 // the block have been. we must do this prior to comparing them.
                 //
-                fee_transaction.generate(self.creator);
+                fee_transaction.generate(self.creator, ft_index as u64, self.id);
                 let checked_tx = self.transactions.get(ft_index).unwrap();
 
                 let hash1 = hash(&fee_transaction.serialize_for_signature());

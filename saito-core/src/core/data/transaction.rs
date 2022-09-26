@@ -241,13 +241,13 @@ impl Transaction {
             let mut input1 = Slip::new();
             input1.public_key = to_public_key;
             input1.amount = 0;
-            let random_uuid = hash(&generate_random_bytes(32));
-            input1.uuid = random_uuid;
+            let random_uuid = generate_random_bytes(17);
+            input1.uuid = random_uuid.try_into().unwrap();
 
             let mut output1 = Slip::new();
             output1.public_key = wallet.public_key;
             output1.amount = 0;
-            output1.uuid = [0; 32];
+            output1.uuid = [0; 17];
 
             transaction.add_input(input1);
             transaction.add_output(output1);
@@ -445,11 +445,11 @@ impl Transaction {
     // generates all non-cumulative
     //
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate(&mut self, public_key: SaitoPublicKey) -> bool {
+    pub fn generate(&mut self, public_key: SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
         //
         // nolan_in, nolan_out, total fees
         //
-        self.generate_total_fees();
+        self.generate_total_fees(tx_index, block_id);
 
         //
         // routing work for asserted public_key
@@ -482,7 +482,7 @@ impl Transaction {
     // calculate total fees in block
     //
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate_total_fees(&mut self) {
+    pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
         // TODO - remove for uuid work
         // generate tx signature hash
         //
@@ -506,14 +506,18 @@ impl Transaction {
             nolan_in += input.amount;
             input.generate_utxoset_key();
         }
-        for output in &mut self.outputs {
+        for (index, output) in &mut self.outputs.iter_mut().enumerate() {
             nolan_out += output.amount;
             //
             // new outbound slips
             //
             if let Some(hash_for_signature) = hash_for_signature {
                 if output.slip_type != SlipType::ATR {
-                    output.uuid = hash_for_signature;
+                    let mut uuid = vec![];
+                    uuid.extend(block_id.to_be_bytes());
+                    uuid.extend(tx_index.to_be_bytes());
+                    uuid.extend((index as u8).to_be_bytes());
+                    output.uuid = uuid.try_into().unwrap();
                 }
             }
             output.generate_utxoset_key();
@@ -1034,10 +1038,7 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        input_slip.uuid = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
+        input_slip.uuid = <[u8; 17]>::from_hex("dcf6cceb74717f98c3f7239459bb36fdcd").unwrap();
         input_slip.amount = 123;
         input_slip.slip_index = 10;
         input_slip.slip_type = SlipType::ATR;
@@ -1047,10 +1048,7 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        output_slip.uuid = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
+        output_slip.uuid = <[u8; 17]>::from_hex("dcf6cceb74717f98c3f7239459bb36fdcd").unwrap();
         output_slip.amount = 345;
         output_slip.slip_index = 23;
         output_slip.slip_type = SlipType::Normal;
@@ -1064,13 +1062,11 @@ mod tests {
                 0, 0, 1, 125, 38, 221, 98, 138, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247,
                 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192,
                 176, 22, 31, 205, 139, 204, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35,
-                148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192, 176,
-                22, 31, 205, 139, 0, 0, 0, 0, 0, 0, 0, 123, 10, 1, 220, 246, 204, 235, 116, 113,
-                127, 152, 195, 247, 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204,
-                251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                89, 23, 0, 0, 0, 0, 1, 0, 0, 0, 3, 123, 34, 116, 101, 115, 116, 34, 58, 34, 116,
-                101, 115, 116, 34, 125,
+                148, 89, 187, 54, 253, 205, 0, 0, 0, 0, 0, 0, 0, 123, 10, 1, 220, 246, 204, 235,
+                116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237,
+                191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 89, 23, 0, 0, 0, 0, 1, 0, 0, 0, 3,
+                123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125
             ]
         );
     }
@@ -1089,10 +1085,7 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        input_slip.uuid = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
+        input_slip.uuid = <[u8; 17]>::from_hex("dcf6cceb74717f98c3f7239459bb36fdcd").unwrap();
         input_slip.amount = 123;
         input_slip.slip_index = 10;
         input_slip.slip_type = SlipType::ATR;
@@ -1102,10 +1095,7 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        output_slip.uuid = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
+        output_slip.uuid = <[u8; 17]>::from_hex("dcf6cceb74717f98c3f7239459bb36fdcd").unwrap();
         output_slip.amount = 345;
         output_slip.slip_index = 23;
         output_slip.slip_type = SlipType::Normal;
@@ -1124,10 +1114,10 @@ mod tests {
         assert_eq!(
             tx.signature,
             [
-                242, 172, 37, 7, 193, 75, 141, 172, 210, 8, 216, 159, 92, 61, 35, 231, 132, 197, 2,
-                117, 43, 77, 175, 246, 196, 90, 236, 3, 58, 14, 68, 80, 2, 80, 47, 241, 217, 16,
-                204, 165, 93, 247, 96, 3, 222, 170, 124, 38, 17, 72, 11, 129, 8, 75, 70, 82, 14,
-                123, 104, 120, 166, 177, 236, 128
+                127, 7, 91, 3, 206, 42, 49, 123, 10, 64, 132, 58, 96, 235, 219, 115, 223, 113, 5,
+                40, 204, 81, 168, 187, 23, 30, 180, 57, 7, 246, 96, 93, 87, 101, 169, 254, 29, 203,
+                64, 218, 138, 235, 166, 47, 77, 80, 140, 191, 185, 2, 18, 151, 108, 128, 194, 112,
+                112, 44, 193, 142, 164, 86, 246, 219
             ]
         );
     }
@@ -1166,6 +1156,8 @@ mod tests {
         assert_eq!(mock_tx, deserialized_tx);
     }
 
+    // TODO : change the uuid related changes in SLR and add the tx buffer to the test
+    #[ignore]
     #[test]
     fn deserialize_test_against_slr() {
         let tx_buffer_txt = "00000001000000010000000300000000dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec0000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b00000000000001590000616263";
@@ -1182,7 +1174,7 @@ mod tests {
             hex::encode(public_key),
             "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
         );
-        tx.generate(public_key);
+        tx.generate(public_key, 0, 0);
         let sig: SaitoSignature = tx.signature;
 
         assert_eq!(hex::decode("0000017d26dd628a03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce76100000000000000000000000000000000000000000000000000000000000000000000000000000015900000000000100000003616263").unwrap()

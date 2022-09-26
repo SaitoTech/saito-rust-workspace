@@ -218,7 +218,7 @@ impl ConsensusEventProcessor {
                 .into_iter()
                 .map(|_| rand::random::<u8>())
                 .collect();
-            transaction.generate(public_key);
+            transaction.generate(public_key, 0, 0);
             transaction.sign(private_key);
 
             transaction.add_hop(&wallet, public_key);
