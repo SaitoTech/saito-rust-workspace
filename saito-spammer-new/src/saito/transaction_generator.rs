@@ -224,27 +224,6 @@ impl TransactionGenerator {
     async fn create_test_transactions(&mut self) -> JoinHandle<()> {
         info!("creating test transactions : {:?}", self.tx_count);
 
-        // (0..self.tx_count).into_par_iter().for_each(|_| async {
-        //     let mut transaction;
-        //     {
-        //         log_write_lock_request!("wallet");
-        //         let mut wallet = self.wallet.blocking_write();
-        //         log_write_lock_receive!("wallet");
-        //         transaction = Transaction::create(&mut wallet, self.public_key, 1, 1);
-        //     }
-        //     transaction.message = generate_random_bytes(self.tx_size as u64);
-        //     transaction.generate(self.public_key);
-        //     transaction.sign(self.private_key);
-        //     {
-        //         log_write_lock_request!("wallet");
-        //         let wallet = self.wallet.blocking_read();
-        //         log_write_lock_receive!("wallet");
-        //         transaction.add_hop(&wallet, self.public_key);
-        //     }
-        //
-        //     sender.send(transaction).await.unwrap();
-        //     // transactions.push_back(transaction);
-        // });
         let sender = self.sender.clone();
         let wallet = self.wallet.clone();
         let public_key = self.public_key.clone();
