@@ -92,15 +92,15 @@ impl Network {
         log_read_lock_request!("peers");
         let peers = self.peers.read().await;
         log_read_lock_receive!("peers");
-
+        log_read_lock_request!("wallet");
+        let wallet = self.wallet.read().await;
+        log_read_lock_receive!("wallet");
         for (index, peer) in peers.index_to_peers.iter() {
             if transaction.is_in_path(&peer.public_key) {
                 continue;
             }
             let mut transaction = transaction.clone();
-            transaction
-                .add_hop(self.wallet.clone(), peer.public_key)
-                .await;
+            transaction.add_hop(&wallet, peer.public_key).await;
             let message = Message::Transaction(transaction);
             self.io_interface
                 .send_message(*index, message.serialize())

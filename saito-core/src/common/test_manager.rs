@@ -48,7 +48,10 @@ pub mod test {
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_event_processor::MiningEvent;
-    use crate::{log_read_lock_receive, log_read_lock_request};
+    use crate::{
+        log_read_lock_receive, log_read_lock_request, log_write_lock_receive,
+        log_write_lock_request,
+    };
 
     pub fn create_timestamp() -> u64 {
         SystemTime::now()
@@ -406,9 +409,15 @@ pub mod test {
             }
 
             for _i in 0..txs_number {
-                let mut transaction =
-                    Transaction::create(self.wallet_lock.clone(), public_key, txs_amount, txs_fee)
-                        .await;
+                let mut transaction;
+                {
+                    log_write_lock_request!("wallet");
+                    let mut wallet = self.wallet_lock.write().await;
+                    log_write_lock_receive!("wallet");
+                    transaction =
+                        Transaction::create(&mut wallet, public_key, txs_amount, txs_fee).await;
+                }
+
                 transaction.sign(private_key);
                 transaction.generate(public_key);
                 transactions.push(transaction);
