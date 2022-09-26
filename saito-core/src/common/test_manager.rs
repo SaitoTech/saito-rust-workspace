@@ -414,8 +414,7 @@ pub mod test {
                     log_write_lock_request!("wallet");
                     let mut wallet = self.wallet_lock.write().await;
                     log_write_lock_receive!("wallet");
-                    transaction =
-                        Transaction::create(&mut wallet, public_key, txs_amount, txs_fee).await;
+                    transaction = Transaction::create(&mut wallet, public_key, txs_amount, txs_fee);
                 }
 
                 transaction.sign(private_key);
