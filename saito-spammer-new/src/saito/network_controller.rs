@@ -11,12 +11,14 @@ use tracing::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
+use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::SaitoHash;
+use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER};
+use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
@@ -25,7 +27,7 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-use crate::{IoEvent, NetworkEvent};
+use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
@@ -441,6 +443,9 @@ pub async fn run_network_controller(
 
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
+        let mut outgoing_messages =
+            StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
+        let mut last_stat_on: Instant = Instant::now();
         loop {
             // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
             //
@@ -459,6 +464,7 @@ pub async fn run_network_controller(
                         let sockets = network_controller.read().await.sockets.clone();
                         log_write_lock_receive!("network controller");
                         NetworkController::send_to_all(sockets, buffer, exceptions).await;
+                        outgoing_messages.increment();
                     }
                     NetworkEvent::OutgoingNetworkMessage {
                         peer_index: index,
@@ -468,6 +474,7 @@ pub async fn run_network_controller(
                         let sockets = network_controller.read().await.sockets.clone();
                         log_write_lock_receive!("network controller");
                         NetworkController::send_outgoing_message(sockets, index, buffer).await;
+                        outgoing_messages.increment();
                     }
                     NetworkEvent::ConnectToPeer { peer_details } => {
                         NetworkController::connect_to_peer(
@@ -518,7 +525,14 @@ pub async fn run_network_controller(
                     }
                 }
             }
-
+            #[cfg(feature = "with-stats")]
+            {
+                if Instant::now().duration_since(last_stat_on) > STAT_TIMER {
+                    last_stat_on = Instant::now();
+                    outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
+                    outgoing_messages.print();
+                }
+            }
             if !work_done {
                 tokio::time::sleep(Duration::from_millis(1)).await;
             }
@@ -605,7 +619,7 @@ fn run_websocket_server(
                         log_read_lock_receive!("blockchain");
                         let block = blockchain.get_block(&block_hash);
                         if block.is_none() {
-                            debug!("block not found : {:?}", block_hash);
+                            warn!("block not found : {:?}", block_hash);
                             return Err(warp::reject::not_found());
                         }
                         // TODO : check if the full block is in memory or need to load from disk

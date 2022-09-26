@@ -1,7 +1,7 @@
 use crate::saito::config_handler::SpammerConfigs;
-use crate::saito::transaction_generator::TransactionGenerator;
-
-use crate::IoEvent;
+use crate::saito::transaction_generator::{GeneratorState, TransactionGenerator};
+use crate::{IoEvent, TimeKeeper};
+use rayon::prelude::IntoParallelRefIterator;
 
 use saito_core::common::command::NetworkEvent;
 
@@ -11,12 +11,16 @@ use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 
 use saito_core::core::data::wallet::Wallet;
+use saito_core::core::routing_event_processor::RoutingEvent;
+use std::cmp::min;
+use std::collections::LinkedList;
 
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use saito_core::core::data::transaction::Transaction;
 use tracing::info;
 
 pub struct Spammer {
@@ -28,6 +32,7 @@ pub struct Spammer {
     bootstrap_done: bool,
     sent_tx_count: u64,
     tx_generator: TransactionGenerator,
+    transactions: LinkedList<Transaction>,
 }
 
 impl Spammer {
@@ -47,27 +52,59 @@ impl Spammer {
             bootstrap_done: false,
             sent_tx_count: 0,
             tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone()).await,
+            transactions: Default::default(),
         }
     }
-    pub async fn execute(&mut self) -> bool {
-        let txs = self.tx_generator.on_new_block().await;
-        if txs.is_none() {
-            return false;
+
+    async fn run(&mut self) {
+        let mut work_done = false;
+        let timer_in_milli;
+        let burst_count;
+
+        {
+            let config = self.configs.read().await;
+            timer_in_milli = config.get_spammer_configs().timer_in_milli;
+            burst_count = config.get_spammer_configs().burst_count;
         }
-        let txs = txs.unwrap();
-        for tx in txs {
-            self.sent_tx_count += 1;
-            self.sender_to_network
-                .send(IoEvent {
-                    event_processor_id: 0,
-                    event_id: 0,
-                    event: NetworkEvent::OutgoingNetworkMessageForAll {
-                        buffer: Message::Transaction(tx).serialize(),
-                        exceptions: vec![],
-                    },
-                })
-                .await;
+
+        loop {
+            if !self.bootstrap_done {
+                let mut transactions = self.tx_generator.on_new_block().await;
+                if transactions.is_some() {
+                    self.transactions.append(&mut transactions.unwrap());
+                }
+
+                self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
+            }
+
+            for _i in 0..burst_count {
+                if let Some(transaction) = self.transactions.pop_front() {
+                    self.sent_tx_count += 1;
+                    self.sender_to_network
+                        .send(IoEvent {
+                            event_processor_id: 0,
+                            event_id: 0,
+                            event: NetworkEvent::OutgoingNetworkMessageForAll {
+                                buffer: Message::Transaction(transaction).serialize(),
+                                exceptions: vec![],
+                            },
+                        })
+                        .await
+                        .unwrap();
+                } else if self.bootstrap_done {
+                    info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", self.sent_tx_count);
+                    work_done = true;
+                    break;
+                }
+            }
+
+            if !work_done {
+                tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
+            } else {
+                break;
+            }
         }
+
         {
             let wallet = self.wallet.read().await;
             info!(
@@ -77,7 +114,6 @@ impl Spammer {
                 wallet.get_available_balance()
             );
         }
-        return true;
     }
 }
 
@@ -90,11 +126,5 @@ pub async fn run_spammer(
 ) {
     info!("starting the spammer");
     let mut spammer = Spammer::new(blockchain, mempool, wallet, sender_to_network, configs).await;
-    loop {
-        let mut work_done = false;
-        work_done = spammer.execute().await;
-        if !work_done {
-            tokio::time::sleep(Duration::from_millis(1000)).await;
-        }
-    }
+    spammer.run().await;
 }

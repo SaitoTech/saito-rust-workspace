@@ -16,7 +16,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
+use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey, CHANNEL_SIZE};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -117,7 +117,7 @@ async fn run_mining_event_processor(
         mined_golden_tickets: 0,
     };
     let (interface_sender_to_miner, interface_receiver_for_miner) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
 
     debug!("running miner thread");
     let _miner_handle = run_thread(
@@ -176,7 +176,7 @@ async fn run_consensus_event_processor(
         stats: Default::default(),
     };
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
     debug!("running mempool thread");
     let blockchain_handle = run_thread(
         Box::new(consensus_event_processor),
@@ -231,7 +231,7 @@ async fn run_routing_event_processor(
     }
 
     let (interface_sender_to_routing, interface_receiver_for_routing) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(1000);
+        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
 
     debug!("running blockchain thread");
     let routing_handle = run_thread(
@@ -259,6 +259,7 @@ fn run_loop_thread(
             let result = receiver.try_recv();
             if result.is_ok() {
                 let command = result.unwrap();
+                work_done = true;
                 // TODO : remove hard coded values
                 match command.event_processor_id {
                     ROUTING_EVENT_PROCESSOR_ID => {
@@ -295,7 +296,7 @@ fn run_loop_thread(
 
             if !work_done {
                 // tokio::task::yield_now().await;
-                tokio::time::sleep(Duration::new(0, 1_000_000)).await;
+                tokio::time::sleep(Duration::from_millis(1)).await;
             } else {
                 // tokio::task::yield_now().await;
             }
@@ -371,10 +372,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(RwLock::new(Box::new(config.clone())));
 
     let (event_sender_to_loop, event_receiver_in_loop) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
 
     let (sender_to_network_controller, receiver_in_network_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
+        tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
 
     info!("running saito controllers");
 
@@ -384,19 +385,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         wallet.public_key = public_key;
         wallet.private_key = private_key;
 
-        let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(1000);
+        let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
         let mut storage = Storage::new(Box::new(RustIOHandler::new(sender, 1)));
         wallet.load(&mut storage).await;
     }
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =
-        tokio::sync::mpsc::channel::<ConsensusEvent>(1000);
+        tokio::sync::mpsc::channel::<ConsensusEvent>(CHANNEL_SIZE);
 
     let (sender_to_routing, receiver_for_routing) =
-        tokio::sync::mpsc::channel::<RoutingEvent>(1000);
+        tokio::sync::mpsc::channel::<RoutingEvent>(CHANNEL_SIZE);
 
-    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(1000);
+    let (sender_to_miner, receiver_for_miner) =
+        tokio::sync::mpsc::channel::<MiningEvent>(CHANNEL_SIZE);
 
     let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),

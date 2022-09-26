@@ -32,14 +32,7 @@ impl Hop {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn generate(
-        wallet_lock: Arc<RwLock<Wallet>>,
-        to_public_key: SaitoPublicKey,
-        tx: &Transaction,
-    ) -> Hop {
-        log_read_lock_request!("wallet");
-        let wallet = wallet_lock.read().await;
-        log_read_lock_receive!("wallet");
+    pub fn generate(wallet: &Wallet, to_public_key: SaitoPublicKey, tx: &Transaction) -> Hop {
         let mut hop = Hop::new();
 
         //
@@ -109,7 +102,8 @@ mod tests {
         let tx = Transaction::new();
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let hop = Hop::generate(wallet, receiver_public_key, &tx).await;
+        let wallet = wallet.read().await;
+        let hop = Hop::generate(&wallet, receiver_public_key, &tx);
 
         assert_eq!(hop.from, sender_public_key);
         assert_eq!(hop.to, receiver_public_key);
@@ -125,7 +119,8 @@ mod tests {
         }
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let hop = Hop::generate(wallet.clone(), receiver_public_key, &tx).await;
+        let wallet = wallet.read().await;
+        let hop = Hop::generate(&wallet, receiver_public_key, &tx);
 
         let hop2 = Hop::deserialize_from_net(&hop.serialize_for_net());
 

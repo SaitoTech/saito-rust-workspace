@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
@@ -11,12 +11,14 @@ use tracing::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
+use tokio::time::{Instant, Interval};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::SaitoHash;
+use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER};
+use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
@@ -25,12 +27,12 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-use crate::{IoEvent, NetworkEvent};
+use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
-pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(10);
+pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(1);
 
 pub struct NetworkController {
     sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
@@ -222,7 +224,9 @@ impl NetworkController {
         }
         let result = reqwest::get(url.clone()).await;
         if result.is_err() {
-            todo!()
+            // TODO : should we retry here?
+            warn!("failed fetching : {:?}", url);
+            return;
         }
         let response = result.unwrap();
         let result = response.bytes().await;
@@ -443,6 +447,9 @@ pub async fn run_network_controller(
 
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
+        let mut outgoing_messages =
+            StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
+        let mut last_stat_on: Instant = Instant::now();
         loop {
             // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
             //
@@ -461,6 +468,7 @@ pub async fn run_network_controller(
                         let sockets = network_controller.read().await.sockets.clone();
                         log_write_lock_receive!("network controller");
                         NetworkController::send_to_all(sockets, buffer, exceptions).await;
+                        outgoing_messages.increment();
                     }
                     NetworkEvent::OutgoingNetworkMessage {
                         peer_index: index,
@@ -470,6 +478,7 @@ pub async fn run_network_controller(
                         let sockets = network_controller.read().await.sockets.clone();
                         log_write_lock_receive!("network controller");
                         NetworkController::send_outgoing_message(sockets, index, buffer).await;
+                        outgoing_messages.increment();
                     }
                     NetworkEvent::ConnectToPeer { peer_details } => {
                         NetworkController::connect_to_peer(
@@ -518,6 +527,15 @@ pub async fn run_network_controller(
                     NetworkEvent::BlockFetched { .. } => {
                         unreachable!()
                     }
+                }
+            }
+
+            #[cfg(feature = "with-stats")]
+            {
+                if Instant::now().duration_since(last_stat_on) > STAT_TIMER {
+                    last_stat_on = Instant::now();
+                    outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
+                    outgoing_messages.print();
                 }
             }
 

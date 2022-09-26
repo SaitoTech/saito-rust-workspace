@@ -16,7 +16,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::CHANNEL_SIZE;
+use saito_core::common::defs::{StatVariable, CHANNEL_SIZE, STAT_BIN_COUNT, STAT_TIMER};
+use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -55,7 +56,7 @@ where
         info!("new thread started");
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
-        let _stat_timer = Instant::now();
+        let mut stat_timer = Instant::now();
 
         event_processor.on_init().await;
 
@@ -261,12 +262,17 @@ fn run_loop_thread(
 ) -> JoinHandle<()> {
     let loop_handle = tokio::spawn(async move {
         let mut work_done: bool;
+        let mut incoming_msgs =
+            StatVariable::new("network::incoming_msgs".to_string(), STAT_BIN_COUNT);
+        let mut last_stat_on: Instant = Instant::now();
         loop {
             work_done = false;
 
             let result = receiver.try_recv();
             if result.is_ok() {
                 let command = result.unwrap();
+                incoming_msgs.increment();
+                work_done = true;
                 // TODO : remove hard coded values
                 match command.event_processor_id {
                     ROUTING_EVENT_PROCESSOR_ID => {
@@ -300,12 +306,16 @@ fn run_loop_thread(
                     _ => {}
                 }
             }
-
+            #[cfg(feature = "with-stats")]
+            {
+                if Instant::now().duration_since(last_stat_on) > STAT_TIMER {
+                    last_stat_on = Instant::now();
+                    incoming_msgs.calculate_stats(TimeKeeper {}.get_timestamp());
+                    incoming_msgs.print();
+                }
+            }
             if !work_done {
-                // tokio::task::yield_now().await;
                 tokio::time::sleep(THREAD_SLEEP_TIME).await;
-            } else {
-                // tokio::task::yield_now().await;
             }
         }
     });
