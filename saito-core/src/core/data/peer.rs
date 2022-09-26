@@ -93,6 +93,7 @@ impl Peer {
 
         self.public_key = challenge.public_key;
         self.block_fetch_url = challenge.block_fetch_url;
+        // TODO : validate block fetch URL
         log_read_lock_request!("wallet");
         let wallet = wallet.read().await;
         log_read_lock_receive!("wallet");
@@ -146,6 +147,7 @@ impl Peer {
         self.challenge_for_peer = None;
         self.public_key = response.public_key;
         self.block_fetch_url = response.block_fetch_url;
+        // TODO : validate block fetch URL
         self.handshake_done = true;
         log_read_lock_request!("wallet");
         let wallet = wallet.read().await;
