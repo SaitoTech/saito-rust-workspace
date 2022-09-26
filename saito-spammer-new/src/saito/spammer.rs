@@ -89,7 +89,8 @@ impl Spammer {
                                 exceptions: vec![],
                             },
                         })
-                        .await;
+                        .await
+                        .unwrap();
                 } else if self.bootstrap_done {
                     info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", self.sent_tx_count);
                     work_done = true;

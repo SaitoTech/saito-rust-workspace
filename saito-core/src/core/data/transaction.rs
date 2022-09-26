@@ -87,12 +87,8 @@ impl Transaction {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn add_hop(
-        &mut self,
-        wallet_lock: Arc<RwLock<Wallet>>,
-        to_public_key: SaitoPublicKey,
-    ) {
-        let hop = Hop::generate(wallet_lock.clone(), to_public_key, self).await;
+    pub async fn add_hop(&mut self, wallet: &Wallet, to_public_key: SaitoPublicKey) {
+        let hop = Hop::generate(wallet, to_public_key, self).await;
         self.path.push(hop);
     }
 
@@ -150,7 +146,7 @@ impl Transaction {
     /// ```
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn create(
-        wallet_lock: Arc<RwLock<Wallet>>,
+        wallet: &mut Wallet,
         to_public_key: SaitoPublicKey,
         with_payment: u64,
         with_fee: u64,
@@ -160,10 +156,6 @@ impl Transaction {
             with_payment,
             with_fee
         );
-        log_write_lock_request!("wallet");
-        let mut wallet = wallet_lock.write().await;
-        log_write_lock_receive!("wallet");
-        let wallet_public_key = wallet.public_key;
 
         let available_balance = wallet.get_available_balance();
         let total_requested = with_payment + with_fee;
@@ -253,7 +245,7 @@ impl Transaction {
             input1.uuid = random_uuid;
 
             let mut output1 = Slip::new();
-            output1.public_key = wallet_public_key;
+            output1.public_key = wallet.public_key;
             output1.amount = 0;
             output1.uuid = [0; 32];
 

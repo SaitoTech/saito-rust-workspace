@@ -59,7 +59,13 @@ impl Configuration for SpammerConfigs {
     }
 
     fn get_block_fetch_url(&self) -> String {
-        return "".to_string();
+        let endpoint = &self.get_server_configs().endpoint;
+        endpoint.protocol.to_string()
+            + "://"
+            + endpoint.host.as_str()
+            + ":"
+            + endpoint.port.to_string().as_str()
+            + "/block/"
     }
 }
 

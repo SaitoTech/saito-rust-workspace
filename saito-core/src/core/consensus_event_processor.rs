@@ -206,9 +206,13 @@ impl ConsensusEventProcessor {
             }
         }
 
+        log_write_lock_request!("wallet");
+        let mut wallet = wallet_lock_clone.write().await;
+        log_write_lock_receive!("wallet");
+
         for _i in 0..txs_to_generate {
-            let mut transaction =
-                Transaction::create(wallet_lock_clone.clone(), public_key, 5000, 5000).await;
+            let mut transaction;
+            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000).await;
             // TODO : generate a message buffer which can be converted back into JSON
             transaction.message = (0..bytes_per_tx)
                 .into_iter()
@@ -217,12 +221,7 @@ impl ConsensusEventProcessor {
             transaction.generate(public_key);
             transaction.sign(private_key);
 
-            transaction
-                .add_hop(wallet_lock_clone.clone(), public_key)
-                .await;
-            // transaction
-            //     .add_hop(wallet_lock_clone.clone(), public_key)
-            //     .await;
+            transaction.add_hop(&wallet, public_key).await;
             {
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)

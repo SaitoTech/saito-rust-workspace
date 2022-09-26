@@ -184,7 +184,7 @@ impl TransactionGenerator {
         transaction.timestamp = time_keeper.get_timestamp();
         transaction.generate(public_key);
         transaction.sign(private_key);
-        transaction.add_hop(self.wallet.clone(), public_key).await;
+        // transaction.add_hop(self.wallet.clone(), public_key).await;
 
         return transaction;
     }
@@ -222,16 +222,22 @@ impl TransactionGenerator {
         }
 
         let mut transactions: LinkedList<Transaction> = Default::default();
-
-        for _i in 0..self.tx_count {
-            let mut transaction = Transaction::create(self.wallet.clone(), public_key, 1, 1).await;
-            transaction.message = generate_random_bytes(self.tx_size as u64);
-            transaction.generate(public_key);
-            transaction.sign(private_key);
-            transaction.add_hop(self.wallet.clone(), public_key).await;
-
-            transactions.push_back(transaction);
-        }
+        //
+        // for _i in 0..self.tx_count {
+        //     let mut transaction;
+        //     {
+        //         log_write_lock_request!("wallet");
+        //         let mut wallet = self.wallet_lock.write().await;
+        //         log_write_lock_receive!("wallet");
+        //         transaction = Transaction::create(&mut wallet, public_key, 1, 1).await;
+        //     }
+        //     transaction.message = generate_random_bytes(self.tx_size as u64);
+        //     transaction.generate(public_key);
+        //     transaction.sign(private_key);
+        //     transaction.add_hop(self.wallet.clone(), public_key).await;
+        //
+        //     transactions.push_back(transaction);
+        // }
 
         info!(
             "Test transactions created, count = {:?}",

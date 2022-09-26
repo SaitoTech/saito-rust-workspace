@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 
 use tokio::sync::RwLock;
@@ -230,6 +231,7 @@ impl Mempool {
 
         if blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
+            tokio::time::sleep(Duration::from_secs(1)).await;
             return false;
         }
         if !self.blocks_queue.is_empty() {
@@ -411,8 +413,8 @@ mod tests {
                 tx.generate(public_key);
                 tx.sign(private_key);
             }
-
-            tx.add_hop(wallet_lock.clone(), public_key).await;
+            let wallet = wallet_lock.read().await;
+            tx.add_hop(&wallet, public_key).await;
 
             mempool.add_transaction(tx).await;
         }
