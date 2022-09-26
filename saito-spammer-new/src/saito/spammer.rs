@@ -17,7 +17,7 @@ use std::collections::LinkedList;
 
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
 use saito_core::core::data::transaction::Transaction;
@@ -33,6 +33,7 @@ pub struct Spammer {
     sent_tx_count: u64,
     tx_generator: TransactionGenerator,
     transactions: LinkedList<Transaction>,
+    receiver: Receiver<Transaction>,
 }
 
 impl Spammer {
@@ -43,6 +44,9 @@ impl Spammer {
         sender_to_network: Sender<IoEvent>,
         configs: Arc<RwLock<Box<SpammerConfigs>>>,
     ) -> Spammer {
+        let (sender, mut receiver): (Sender<Transaction>, Receiver<Transaction>) =
+            tokio::sync::mpsc::channel::<Transaction>(100000);
+
         Spammer {
             blockchain,
             mempool,
@@ -51,8 +55,10 @@ impl Spammer {
             configs: configs.clone(),
             bootstrap_done: false,
             sent_tx_count: 0,
-            tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone()).await,
+            tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone(), sender)
+                .await,
             transactions: Default::default(),
+            receiver,
         }
     }
 
@@ -78,7 +84,7 @@ impl Spammer {
             }
 
             for _i in 0..burst_count {
-                if let Some(transaction) = self.transactions.pop_front() {
+                if let Ok(transaction) = self.receiver.try_recv() {
                     self.sent_tx_count += 1;
                     self.sender_to_network
                         .send(IoEvent {
