@@ -44,7 +44,8 @@ impl MiningEventProcessor {
         assert!(self.miner_active);
         debug_assert_ne!(self.public_key, [0; 33]);
 
-        for _ in 0..100 {
+        // TODO : need a better responsive way
+        for _ in 0..10_000 {
             let random_bytes = hash(&generate_random_bytes(32));
             // The new way of validation will be wasting a GT instance if the validation fails
             // old way used a static method instead
