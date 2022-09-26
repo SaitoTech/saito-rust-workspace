@@ -225,6 +225,7 @@ impl TransactionGenerator {
     }
 
     async fn create_test_transactions(&mut self) -> Option<LinkedList<Transaction>> {
+        info!("creating test transactions : {:?}", self.tx_count);
         let mut transactions: LinkedList<Transaction> = Default::default();
 
         // transactions = (0..self.tx_count)
@@ -255,6 +256,7 @@ impl TransactionGenerator {
         log_write_lock_request!("wallet");
         let mut wallet = self.wallet.write().await;
         log_write_lock_receive!("wallet");
+        info!("aaaaaaaaaaaaaa");
         for _i in 0..self.tx_count {
             let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 1);
             transaction.message = generate_random_bytes(self.tx_size as u64);
