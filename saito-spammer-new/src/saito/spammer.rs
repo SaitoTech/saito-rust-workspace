@@ -69,6 +69,7 @@ impl Spammer {
             burst_count = config.get_spammer_configs().burst_count;
         }
         loop {
+            work_done = false;
             if !self.bootstrap_done {
                 self.tx_generator.on_new_block().await;
                 self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
@@ -88,17 +89,19 @@ impl Spammer {
                         })
                         .await
                         .unwrap();
-                } else if self.bootstrap_done {
-                    info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", self.sent_tx_count);
                     work_done = true;
-                    break;
                 }
+                // else if self.bootstrap_done {
+                //     // info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", self.sent_tx_count);
+                //     work_done = true;
+                //     // break;
+                // }
             }
 
             if !work_done {
                 tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
             } else {
-                break;
+                // break;
             }
         }
 
