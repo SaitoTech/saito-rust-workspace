@@ -233,36 +233,33 @@ impl TransactionGenerator {
         info!("creating test transactions : {:?}", self.tx_count);
         let mut transactions: LinkedList<Transaction> = Default::default();
 
-        // transactions = (0..self.tx_count)
-        //     .into_par_iter()
-        //     .map(|_| {
-        //         let mut transaction;
-        //         {
-        //             log_write_lock_request!("wallet");
-        //             let mut wallet = self.wallet.blocking_write();
-        //             log_write_lock_receive!("wallet");
-        //             transaction = Transaction::create(&mut wallet, self.public_key, 1, 1);
-        //         }
-        //         transaction.message = generate_random_bytes(self.tx_size as u64);
-        //         transaction.generate(self.public_key);
-        //         transaction.sign(self.private_key);
-        //         {
-        //             log_write_lock_request!("wallet");
-        //             let wallet = self.wallet.blocking_read();
-        //             log_write_lock_receive!("wallet");
-        //             transaction.add_hop(&wallet, self.public_key);
-        //         }
+        let sender = self.sender.clone();
+        // (0..self.tx_count).into_par_iter().for_each(|_| async {
+        //     let mut transaction;
+        //     {
+        //         log_write_lock_request!("wallet");
+        //         let mut wallet = self.wallet.blocking_write();
+        //         log_write_lock_receive!("wallet");
+        //         transaction = Transaction::create(&mut wallet, self.public_key, 1, 1);
+        //     }
+        //     transaction.message = generate_random_bytes(self.tx_size as u64);
+        //     transaction.generate(self.public_key);
+        //     transaction.sign(self.private_key);
+        //     {
+        //         log_write_lock_request!("wallet");
+        //         let wallet = self.wallet.blocking_read();
+        //         log_write_lock_receive!("wallet");
+        //         transaction.add_hop(&wallet, self.public_key);
+        //     }
         //
-        //         transaction
-        //         // transactions.push_back(transaction);
-        //     })
-        //     .collect();
+        //     sender.send(transaction).await.unwrap();
+        //     // transactions.push_back(transaction);
+        // });
 
-        log_write_lock_request!("wallet");
-        let mut wallet = self.wallet.write().await;
-        log_write_lock_receive!("wallet");
-        info!("aaaaaaaaaaaaaa");
         for _i in 0..self.tx_count {
+            log_write_lock_request!("wallet");
+            let mut wallet = self.wallet.write().await;
+            log_write_lock_receive!("wallet");
             let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 1);
             transaction.message = generate_random_bytes(self.tx_size as u64);
             transaction.generate(self.public_key);
