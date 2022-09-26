@@ -259,6 +259,7 @@ fn run_loop_thread(
             let result = receiver.try_recv();
             if result.is_ok() {
                 let command = result.unwrap();
+                work_done = true;
                 // TODO : remove hard coded values
                 match command.event_processor_id {
                     ROUTING_EVENT_PROCESSOR_ID => {
