@@ -16,7 +16,9 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey, CHANNEL_SIZE, THREAD_SLEEP_TIME};
+use saito_core::common::defs::{
+    SaitoPrivateKey, SaitoPublicKey, CHANNEL_SIZE, STAT_TIMER, THREAD_SLEEP_TIME,
+};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -55,6 +57,7 @@ where
         info!("new thread started");
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
+        let mut stat_timer = Instant::now();
 
         event_processor.on_init().await;
 
@@ -85,6 +88,15 @@ where
                 .is_some()
             {
                 work_done = true;
+            }
+
+            #[cfg(feature = "with-stats")]
+            {
+                let duration = current_instant.duration_since(stat_timer);
+                if duration > STAT_TIMER {
+                    stat_timer = current_instant;
+                    event_processor.on_stat_interval().await;
+                }
             }
 
             if work_done {
