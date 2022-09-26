@@ -224,7 +224,6 @@ impl TransactionGenerator {
     async fn create_test_transactions(&mut self) -> JoinHandle<()> {
         info!("creating test transactions : {:?}", self.tx_count);
 
-        let sender = self.sender.clone();
         // (0..self.tx_count).into_par_iter().for_each(|_| async {
         //     let mut transaction;
         //     {
@@ -253,18 +252,20 @@ impl TransactionGenerator {
         let tx_count = self.tx_count.clone();
         let tx_size = self.tx_size.clone();
         return tokio::spawn(async move {
+            let time_keeper = TimeKeeper {};
             for _i in 0..tx_count {
                 log_write_lock_request!("wallet");
                 let mut wallet = wallet.write().await;
                 log_write_lock_receive!("wallet");
                 let mut transaction = Transaction::create(&mut wallet, public_key, 1, 1);
                 transaction.message = generate_random_bytes(tx_size as u64);
+                transaction.timestamp = time_keeper.get_timestamp();
                 transaction.generate(public_key);
                 transaction.sign(private_key);
                 transaction.add_hop(&wallet, public_key);
 
                 // transactions.push_back(transaction);
-                sender.clone().send(transaction).await.unwrap();
+                sender.send(transaction).await.unwrap();
             }
             info!("Test transactions created, count");
         });
