@@ -109,7 +109,6 @@ async fn run_mining_event_processor(
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
-        miner_timer: 0,
         miner_active: false,
         target: [0; 32],
         difficulty: 0,

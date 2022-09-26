@@ -17,8 +17,6 @@ use crate::core::data::wallet::Wallet;
 use crate::core::routing_event_processor::RoutingEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
 
-const MINER_INTERVAL: Timestamp = Duration::from_millis(1).as_micros() as Timestamp;
-
 #[derive(Debug)]
 pub enum MiningEvent {
     LongestChainBlockAdded { hash: SaitoHash, difficulty: u64 },
@@ -30,7 +28,6 @@ pub struct MiningEventProcessor {
     pub sender_to_blockchain: Sender<RoutingEvent>,
     pub sender_to_mempool: Sender<ConsensusEvent>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
-    pub miner_timer: Timestamp,
     pub miner_active: bool,
     pub target: SaitoHash,
     pub difficulty: u64,
@@ -40,18 +37,16 @@ pub struct MiningEventProcessor {
 
 impl MiningEventProcessor {
     #[tracing::instrument(level = "trace", skip_all)]
-    async fn mine(&mut self) -> Option<()> {
+    async fn mine(&mut self) {
         assert!(self.miner_active);
         debug_assert_ne!(self.public_key, [0; 33]);
 
-        // TODO : need a better responsive way
-        for _ in 0..10_000 {
-            let random_bytes = hash(&generate_random_bytes(32));
-            // The new way of validation will be wasting a GT instance if the validation fails
-            // old way used a static method instead
-            let gt = GoldenTicket::create(self.target, random_bytes, self.public_key);
-            if gt.validate(self.difficulty) {
-                info!(
+        let random_bytes = hash(&generate_random_bytes(32));
+        // The new way of validation will be wasting a GT instance if the validation fails
+        // old way used a static method instead
+        let gt = GoldenTicket::create(self.target, random_bytes, self.public_key);
+        if gt.validate(self.difficulty) {
+            info!(
                 "golden ticket found. sending to mempool. previous block : {:?} random : {:?} key : {:?} solution : {:?} for difficulty : {:?}",
                 hex::encode(gt.target),
                 hex::encode(gt.random),
@@ -59,40 +54,26 @@ impl MiningEventProcessor {
                 hex::encode(hash(&gt.serialize_for_net())),
                 self.difficulty
             );
-                self.miner_active = false;
-                self.mined_golden_tickets += 1;
-                self.sender_to_mempool
-                    .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
-                    .await
-                    .expect("sending to mempool failed");
-
-                return Some(());
-            }
+            self.miner_active = false;
+            self.mined_golden_tickets += 1;
+            self.sender_to_mempool
+                .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
+                .await
+                .expect("sending to mempool failed");
         }
-        None
     }
 }
 
 #[async_trait]
 impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
-        // trace!("processing new interface event");
-
         None
     }
 
     async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
-        // trace!("processing timer event : {:?}", duration.as_micros());
-
-        // self.miner_timer += duration.as_micros() as Timestamp;
         if self.miner_active {
-            // if self.miner_timer >= MINER_INTERVAL {
-            // self.miner_timer = 0;
-            let result = self.mine().await;
-            if result.is_some() {
-                return Some(());
-            }
-            // }
+            self.mine().await;
+            return Some(());
         }
 
         None
@@ -124,7 +105,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
 
     async fn on_stat_interval(&mut self) {
         println!("------------ mining stats -------------");
-        println!("--- stats ------ total mined gts : {:?} current difficulty : {:?} current target : {:?}", self.mined_golden_tickets, self.difficulty, hex::encode(self.target));
+        println!("--- stats ------ total mined gts : {:?} current difficulty : {:?} current target : {:?} miner_active : {:?}", self.mined_golden_tickets, self.difficulty, hex::encode(self.target), self.miner_active);
         println!("---------- mining stats end -----------");
     }
 }

@@ -63,6 +63,7 @@ where
         event_processor.on_init().await;
 
         loop {
+            work_done = false;
             let result = network_event_receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();
@@ -100,9 +101,7 @@ where
                 }
             }
 
-            if work_done {
-                work_done = false;
-            } else {
+            if !work_done {
                 tokio::time::sleep(THREAD_SLEEP_TIME).await;
             }
         }
@@ -120,7 +119,6 @@ async fn run_mining_event_processor(
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
-        miner_timer: 0,
         miner_active: false,
         target: [0; 32],
         difficulty: 0,
