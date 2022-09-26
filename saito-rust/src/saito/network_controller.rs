@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
@@ -18,6 +18,7 @@ use warp::ws::WebSocket;
 use warp::Filter;
 
 use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER};
+use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
@@ -26,7 +27,7 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-use crate::{IoEvent, NetworkEvent};
+use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
@@ -533,6 +534,7 @@ pub async fn run_network_controller(
             {
                 if Instant::now().duration_since(last_stat_on) > STAT_TIMER {
                     last_stat_on = Instant::now();
+                    outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
                     outgoing_messages.print();
                 }
             }
