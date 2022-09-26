@@ -42,6 +42,8 @@ pub struct Mempool {
     wallet_lock: Arc<RwLock<Wallet>>,
     mempool_public_key: SaitoPublicKey,
     mempool_private_key: SaitoPrivateKey,
+    new_golden_ticket_added: bool,
+    new_tx_added: bool,
 }
 
 impl Mempool {
@@ -54,6 +56,8 @@ impl Mempool {
             wallet_lock,
             mempool_public_key: [0; 33],
             mempool_private_key: [0; 32],
+            new_golden_ticket_added: false,
+            new_tx_added: false,
         }
     }
 
@@ -94,6 +98,7 @@ impl Mempool {
                 }
             }
         }
+        self.new_golden_ticket_added = true;
         // if !self
         //     .transactions
         //     .iter()
@@ -159,14 +164,14 @@ impl Mempool {
         //
         transaction.generate(public_key);
 
-        if self
+        if !self
             .transactions
             .iter()
             .any(|transaction| transaction.signature == tx_sig_to_insert)
         {
-        } else {
             self.routing_work_in_mempool += transaction.total_work;
             self.transactions.push(transaction);
+            self.new_tx_added = true;
         }
     }
 
@@ -238,21 +243,13 @@ impl Mempool {
             trace!("waiting till blocks in the queue are processed");
             return false;
         }
-        if self.transactions.is_empty() {
+        if self.transactions.is_empty() || !self.new_tx_added {
             trace!("waiting till transactions come in");
             return false;
         }
-        if !blockchain.gt_requirement_met {
-            let gt_in_mempool = self.transactions.iter().any(|tx| {
-                if let TransactionType::GoldenTicket = tx.transaction_type {
-                    return true;
-                }
-                return false;
-            });
-            if !gt_in_mempool {
-                trace!("waiting till more golden tickets come in");
-                return false;
-            }
+        if !blockchain.gt_requirement_met && !self.new_golden_ticket_added {
+            trace!("waiting till more golden tickets come in");
+            return false;
         }
 
         if let Some(previous_block) = blockchain.get_latest_block() {
