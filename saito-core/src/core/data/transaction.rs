@@ -499,25 +499,45 @@ impl Transaction {
         let mut nolan_in: u64 = 0;
         let mut nolan_out: u64 = 0;
 
-        //
         // generate utxoset key for every slip
-        //
-        for input in &mut self.inputs {
-            nolan_in += input.amount;
-            input.generate_utxoset_key();
-        }
-        for output in &mut self.outputs {
-            nolan_out += output.amount;
-            //
-            // new outbound slips
-            //
-            if let Some(hash_for_signature) = hash_for_signature {
-                if output.slip_type != SlipType::ATR {
-                    output.uuid = hash_for_signature;
+        // for input in &mut self.inputs {
+        //     nolan_in += input.amount;
+        //     input.generate_utxoset_key();
+        // }
+        nolan_in = self
+            .inputs
+            .par_iter_mut()
+            .map(|slip| {
+                slip.generate_utxoset_key();
+                slip.amount
+            })
+            .sum::<u64>();
+
+        nolan_out = self
+            .outputs
+            .par_iter_mut()
+            .map(|slip| {
+                if let Some(hash_for_signature) = hash_for_signature {
+                    if slip.slip_type != SlipType::ATR {
+                        slip.uuid = hash_for_signature;
+                    }
                 }
-            }
-            output.generate_utxoset_key();
-        }
+                slip.generate_utxoset_key();
+                slip.amount
+            })
+            .sum::<u64>();
+        // for output in &mut self.outputs {
+        //     nolan_out += output.amount;
+        //     //
+        //     // new outbound slips
+        //     //
+        //     if let Some(hash_for_signature) = hash_for_signature {
+        //         if output.slip_type != SlipType::ATR {
+        //             output.uuid = hash_for_signature;
+        //         }
+        //     }
+        //     output.generate_utxoset_key();
+        // }
 
         self.total_in = nolan_in;
         self.total_out = nolan_out;

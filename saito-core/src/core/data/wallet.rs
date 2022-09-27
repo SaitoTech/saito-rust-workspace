@@ -9,6 +9,7 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
+use ahash::HashMap;
 use rayon::prelude::*;
 
 pub const WALLET_SIZE: usize = 65;
@@ -42,7 +43,7 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub slips: Vec<WalletSlip>,
+    pub slips: HashMap<SaitoUTXOSetKey, WalletSlip>,
     pub filename: String,
     pub filepass: String,
 }
@@ -54,7 +55,7 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            slips: vec![],
+            slips: Default::default(),
             filename: "default".to_string(),
             filepass: "password".to_string(),
         }
@@ -181,35 +182,30 @@ impl Wallet {
         wallet_slip.block_id = block.id;
         wallet_slip.block_hash = block.hash;
         wallet_slip.lc = lc;
-        self.slips.push(wallet_slip);
+        self.slips.insert(wallet_slip.utxokey.clone(), wallet_slip);
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.slips
-            .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
+        self.slips.remove(&slip.utxoset_key);
+        // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_available_balance(&self) -> u64 {
         (&self.slips)
             .into_par_iter()
-            .filter(|s| !s.spent)
-            .map(|s| s.amount)
-            // .into_par_iter()
+            .filter(|(_id, s)| !s.spent)
+            .map(|(_id, s)| s.amount)
             .sum::<u64>()
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        // let mut unspent_slip_count: u64 = 0;
-        (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
-        // for slip in &self.slips {
-        //     if !slip.spent {
-        //         unspent_slip_count += 1;
-        //     }
-        // }
-        // unspent_slip_count
+        (&self.slips)
+            .into_par_iter()
+            .filter(|(_id, s)| !s.spent)
+            .count() as u64
     }
 
     // the nolan_requested is omitted from the slips created - only the change
@@ -226,7 +222,7 @@ impl Wallet {
         //
         // grab inputs
         //
-        for slip in &mut self.slips {
+        for (id, slip) in &mut self.slips {
             if !slip.spent {
                 if nolan_in < nolan_requested {
                     nolan_in += slip.amount;

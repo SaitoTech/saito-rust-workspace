@@ -1,4 +1,5 @@
 use crate::SpammerConfigs;
+use std::cmp::min;
 use std::collections::LinkedList;
 
 use crate::saito::time_keeper::TimeKeeper;
@@ -240,7 +241,8 @@ impl TransactionGenerator {
                     log_write_lock_request!("wallet");
                     let mut wallet = wallet.write().await;
                     log_write_lock_receive!("wallet");
-                    for _i in 0..10000 {
+                    let create_count = min(1000, required_count);
+                    for _i in 0..create_count {
                         let mut transaction = Transaction::create(&mut wallet, public_key, 1, 1);
                         transaction.message = generate_random_bytes(tx_size as u64);
                         transaction.timestamp = time_keeper.get_timestamp();
@@ -248,13 +250,9 @@ impl TransactionGenerator {
                         transaction.sign(private_key);
                         transaction.add_hop(&wallet, public_key);
 
-                        // transactions.push_back(transaction);
                         sender.send(transaction).await.unwrap();
 
                         required_count -= 1;
-                        if required_count == 0 {
-                            break;
-                        }
                     }
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;
