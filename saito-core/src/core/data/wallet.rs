@@ -189,33 +189,32 @@ impl Wallet {
         self.slips.push(wallet_slip);
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
         self.slips
             .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn get_available_balance(&self) -> u64 {
-        let mut available_balance: u64 = 0;
-        for slip in &self.slips {
-            if !slip.spent {
-                available_balance += slip.amount;
-            }
-        }
-        available_balance
+        (&self.slips)
+            .into_par_iter()
+            .filter(|s| !s.spent)
+            .map(|s| s.amount)
+            // .into_par_iter()
+            .sum::<u64>()
+        // let mut available_balance: u64 = 0;
+        // for slip in &self.slips {
+        //     if !slip.spent {
+        //         available_balance += slip.amount;
+        //     }
+        // }
+        // available_balance
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        // let mut unspent_slip_count: u64 = 0;
         (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
-        // for slip in &self.slips {
-        //     if !slip.spent {
-        //         unspent_slip_count += 1;
-        //     }
-        // }
-        // unspent_slip_count
     }
 
     // the nolan_requested is omitted from the slips created - only the change

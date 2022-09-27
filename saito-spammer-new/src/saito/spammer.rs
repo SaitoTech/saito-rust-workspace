@@ -101,6 +101,7 @@ impl Spammer {
             if !self.bootstrap_done {
                 self.tx_generator.on_new_block().await;
                 self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
+                work_done = true;
             }
 
             if !work_done {
