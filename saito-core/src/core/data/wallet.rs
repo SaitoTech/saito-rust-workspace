@@ -192,13 +192,12 @@ impl Wallet {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_available_balance(&self) -> u64 {
-        let mut available_balance: u64 = 0;
-        for slip in &self.slips {
-            if !slip.spent {
-                available_balance += slip.amount;
-            }
-        }
-        available_balance
+        (&self.slips)
+            .into_par_iter()
+            .filter(|s| !s.spent)
+            .map(|s| s.amount)
+            // .into_par_iter()
+            .sum::<u64>()
     }
 
     #[tracing::instrument(level = "info", skip_all)]
