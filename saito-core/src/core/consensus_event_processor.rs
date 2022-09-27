@@ -476,10 +476,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         self.stats.blocks_created.calculate_stats(time);
         self.stats.received_tx.calculate_stats(time);
 
-        println!("------------ consensus stats -------------");
         self.stats.blocks_fetched.print();
         self.stats.blocks_created.print();
         self.stats.received_tx.print();
-        println!("---------- consensus stats end -----------");
     }
 }

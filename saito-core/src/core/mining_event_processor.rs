@@ -104,8 +104,6 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
     }
 
     async fn on_stat_interval(&mut self) {
-        println!("------------ mining stats -------------");
-        println!("--- stats ------ total mined gts : {:?} current difficulty : {:?} current target : {:?} miner_active : {:?}", self.mined_golden_tickets, self.difficulty, hex::encode(self.target), self.miner_active);
-        println!("---------- mining stats end -----------");
+        println!("--- stats ------ {} - total : {:?} current difficulty : {:?} miner_active : {:?} current target : {:?} ", format!("{:width$}", "mining::golden_tickets", width = 30), self.mined_golden_tickets, self.difficulty, self.miner_active, hex::encode(self.target));
     }
 }

@@ -133,8 +133,8 @@ impl StatVariable {
         {
             println!(
                 // target : "saito_stats",
-                "--- stats ------ {:?} - total : {:?} current_rate : {:.5} max_rate : {:.5} min_rate : {:.5}",
-                self.name.as_str(),
+                "--- stats ------ {} - total : {:?} current_rate : {:.5} max_rate : {:.5} min_rate : {:.5}",
+                format!("{:width$}", self.name, width = 30),
                 self.total,
                 self.avg,
                 self.max_avg,

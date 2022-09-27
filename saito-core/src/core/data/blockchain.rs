@@ -735,9 +735,9 @@ impl Blockchain {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
         while current_id > 0 {
-            info!(
+            debug!(
                 "{} - {:?}",
                 current_id,
                 hex::encode(
@@ -747,7 +747,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
