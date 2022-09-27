@@ -25,8 +25,8 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_millis() as u64;
-pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_millis() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_micros() as u64;
+pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_micros() as u64;
 
 #[derive(Debug)]
 pub enum ConsensusEvent {
@@ -305,7 +305,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 
         // generate blocks
         let mut can_bundle = false;
-        self.block_producing_timer = self.block_producing_timer + duration_value;
+        self.block_producing_timer += duration_value;
         // TODO : make timers configurable
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
             log_read_lock_request!("blockchain");
