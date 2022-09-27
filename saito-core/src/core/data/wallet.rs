@@ -1,5 +1,5 @@
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
@@ -43,7 +43,7 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub slips: HashMap<SaitoUTXOSetKey, WalletSlip>,
+    pub slips: Vec<WalletSlip>,
     pub filename: String,
     pub filepass: String,
 }
@@ -182,30 +182,27 @@ impl Wallet {
         wallet_slip.block_id = block.id;
         wallet_slip.block_hash = block.hash;
         wallet_slip.lc = lc;
-        self.slips.insert(wallet_slip.utxokey.clone(), wallet_slip);
+        self.slips.push(wallet_slip);
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.slips.remove(&slip.utxoset_key);
-        // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
+        self.slips //.remove(&slip.utxoset_key);
+            .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_available_balance(&self) -> u64 {
         (&self.slips)
             .into_par_iter()
-            .filter(|(_id, s)| !s.spent)
-            .map(|(_id, s)| s.amount)
+            .filter(|s| !s.spent)
+            .map(|s| s.amount)
             .sum::<u64>()
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        (&self.slips)
-            .into_par_iter()
-            .filter(|(_id, s)| !s.spent)
-            .count() as u64
+        (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
     }
 
     // the nolan_requested is omitted from the slips created - only the change
@@ -222,7 +219,7 @@ impl Wallet {
         //
         // grab inputs
         //
-        for (id, slip) in &mut self.slips {
+        for slip in &mut self.slips {
             if !slip.spent {
                 if nolan_in < nolan_requested {
                     nolan_in += slip.amount;
@@ -288,12 +285,14 @@ impl Wallet {
     pub async fn create_golden_ticket_transaction(
         &mut self,
         golden_ticket: GoldenTicket,
+        time: Timestamp,
     ) -> Transaction {
         let mut transaction = Transaction::new();
 
         // for now we'll use bincode to de/serialize
         transaction.transaction_type = TransactionType::GoldenTicket;
         transaction.message = golden_ticket.serialize_for_net();
+        transaction.timestamp = time;
 
         let mut input1 = Slip::new();
         input1.public_key = self.public_key;

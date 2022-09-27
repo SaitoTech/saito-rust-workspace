@@ -4,7 +4,7 @@ use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::{debug, info, trace, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
+use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, Timestamp};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
@@ -76,7 +76,7 @@ impl Mempool {
         }
     }
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
+    pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket, time: Timestamp) {
         debug!(
             "adding golden ticket : {:?}",
             hex::encode(hash(&golden_ticket.serialize_for_net()))
@@ -87,7 +87,9 @@ impl Mempool {
             log_write_lock_request!("wallet");
             let mut wallet = self.wallet_lock.write().await;
             log_write_lock_receive!("wallet");
-            transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
+            transaction = wallet
+                .create_golden_ticket_transaction(golden_ticket, time)
+                .await;
         }
         for tx in self.transactions.iter() {
             if let TransactionType::GoldenTicket = tx.transaction_type {
