@@ -86,10 +86,10 @@ impl Slip {
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_utxoset_key(&mut self) {
-        if !self.is_utxoset_key_set {
-            self.utxoset_key = self.get_utxoset_key();
-            self.is_utxoset_key_set = true;
-        }
+        // if !self.is_utxoset_key_set {
+        self.utxoset_key = self.get_utxoset_key();
+        self.is_utxoset_key_set = true;
+        // }
     }
 
     // 33 bytes public_key

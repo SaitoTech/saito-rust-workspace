@@ -20,6 +20,7 @@ use std::time::Duration;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
+use saito_core::common::defs::THREAD_SLEEP_TIME;
 use saito_core::core::data::transaction::Transaction;
 use tracing::info;
 
@@ -88,6 +89,9 @@ impl Spammer {
                         .unwrap();
                     work_done = true;
                 }
+                if !work_done {
+                    tokio::time::sleep(THREAD_SLEEP_TIME).await;
+                }
                 // }
             }
         });
@@ -101,8 +105,6 @@ impl Spammer {
 
             if !work_done {
                 tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
-            } else {
-                // break;
             }
         }
 
