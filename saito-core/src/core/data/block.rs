@@ -472,7 +472,8 @@ impl Block {
         //
         // hash includes pre-hash and sig, so update
         //
-        block.generate_hash();
+        // block.generate_hash();
+        block.generate();
 
         block
     }
