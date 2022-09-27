@@ -434,9 +434,7 @@ pub mod test {
                 let mut gttx: Transaction;
                 {
                     let mut wallet = self.wallet_lock.write().await;
-                    gttx = wallet
-                        .create_golden_ticket_transaction(golden_ticket, timestamp)
-                        .await;
+                    gttx = wallet.create_golden_ticket_transaction(golden_ticket).await;
                 }
                 gttx.generate(public_key);
                 transactions.push(gttx);

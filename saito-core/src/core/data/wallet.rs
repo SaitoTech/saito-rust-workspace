@@ -285,14 +285,12 @@ impl Wallet {
     pub async fn create_golden_ticket_transaction(
         &mut self,
         golden_ticket: GoldenTicket,
-        time: Timestamp,
     ) -> Transaction {
         let mut transaction = Transaction::new();
 
         // for now we'll use bincode to de/serialize
         transaction.transaction_type = TransactionType::GoldenTicket;
         transaction.message = golden_ticket.serialize_for_net();
-        transaction.timestamp = time;
 
         let mut input1 = Slip::new();
         input1.public_key = self.public_key;

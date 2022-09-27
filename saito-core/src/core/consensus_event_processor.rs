@@ -374,8 +374,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 log_write_lock_request!("mempool");
                 let mut mempool = self.mempool.write().await;
                 log_write_lock_receive!("mempool");
-                let time = self.time_keeper.get_timestamp();
-                mempool.add_golden_ticket(golden_ticket, time).await;
+                mempool.add_golden_ticket(golden_ticket).await;
                 Some(())
             }
             ConsensusEvent::BlockFetched { peer_index, buffer } => {

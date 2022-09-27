@@ -76,7 +76,7 @@ impl Mempool {
         }
     }
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket, time: Timestamp) {
+    pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
         debug!(
             "adding golden ticket : {:?}",
             hex::encode(hash(&golden_ticket.serialize_for_net()))
@@ -87,9 +87,7 @@ impl Mempool {
             log_write_lock_request!("wallet");
             let mut wallet = self.wallet_lock.write().await;
             log_write_lock_receive!("wallet");
-            transaction = wallet
-                .create_golden_ticket_transaction(golden_ticket, time)
-                .await;
+            transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
         }
         for tx in self.transactions.iter() {
             if let TransactionType::GoldenTicket = tx.transaction_type {
