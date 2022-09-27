@@ -14,7 +14,7 @@ pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 
 pub const BLOCK_FILE_EXTENSION: &str = ".sai";
 pub const STAT_INTERVAL: Timestamp = Duration::from_secs(5).as_micros() as Timestamp;
-pub const STAT_BIN_COUNT: usize = 10;
+pub const STAT_BIN_COUNT: usize = 5;
 
 // TODO : these should be configurable
 pub const CHANNEL_SIZE: usize = 1000_000;
