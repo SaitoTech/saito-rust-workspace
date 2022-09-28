@@ -459,6 +459,11 @@ impl Block {
         let block_merkle_root = block.generate_merkle_root();
         block.merkle_root = block_merkle_root;
 
+        block.avg_income = cv.avg_income;
+        block.avg_variance = cv.avg_variance;
+        block.avg_atr_income = cv.avg_atr_income;
+        block.avg_atr_variance = cv.avg_atr_variance;
+
         {
             log_read_lock_request!("wallet");
             let wallet = wallet_lock.read().await;
