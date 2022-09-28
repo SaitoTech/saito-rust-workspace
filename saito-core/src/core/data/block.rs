@@ -1502,7 +1502,8 @@ impl Block {
             //
             if self.treasury != previous_block.treasury + cv.nolan_falling_off_chain {
                 error!(
-                    "ERROR 123243: treasury does not validate: {} expected versus {} found",
+                    "ERROR 123243: treasury does not validate: expected : {:?} + {:?} = {:?} actual : {:?} found",
+                    previous_block.treasury , cv.nolan_falling_off_chain,
                     (previous_block.treasury + cv.nolan_falling_off_chain),
                     self.treasury,
                     // tracing_tracker.time_since_last();
