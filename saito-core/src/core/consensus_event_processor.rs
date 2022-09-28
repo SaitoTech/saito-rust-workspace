@@ -261,9 +261,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
                     let block;
                     {
-                        log_read_lock_request!("mempool");
+                        log_write_lock_request!("mempool");
                         let mut mempool = self.mempool.write().await;
-                        log_read_lock_receive!("mempool");
+                        log_write_lock_receive!("mempool");
 
                         block = mempool
                             .bundle_genesis_block(&mut blockchain, timestamp)
@@ -484,5 +484,36 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         self.stats.blocks_fetched.print();
         self.stats.blocks_created.print();
         self.stats.received_tx.print();
+
+        {
+            log_read_lock_request!("wallet");
+            let wallet = self.wallet.read().await;
+            log_read_lock_receive!("wallet");
+            println!(
+                "--- stats ------ wallet:state - slips : {:?}",
+                wallet.slips.len()
+            );
+        }
+        {
+            log_read_lock_request!("blockchain");
+            let blockchain = self.blockchain.read().await;
+            log_read_lock_receive!("blockchain");
+            println!(
+                "--- stats ------ blockchain:state - utxo_size : {:?} block_count : {:?} longest_chain_len : {:?}",
+                blockchain.utxoset.len(),
+                blockchain.blocks.len(),
+                blockchain.get_latest_block_id()
+            );
+        }
+        {
+            log_read_lock_request!("mempool");
+            let mempool = self.mempool.read().await;
+            log_read_lock_receive!("mempool");
+            println!(
+                "--- stats ------ mempool:state - blocks : {:?} transactions : {:?}",
+                mempool.blocks_queue.len(),
+                mempool.transactions.len(),
+            );
+        }
     }
 }
