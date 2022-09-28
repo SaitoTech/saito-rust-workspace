@@ -244,7 +244,7 @@ impl TransactionGenerator {
                     log_write_lock_receive!("wallet");
                     let create_count = min(10000, required_count);
                     for _i in 0..create_count {
-                        let mut transaction = Transaction::create(&mut wallet, public_key, 1, 1);
+                        let mut transaction = Transaction::create(&mut wallet, public_key, 1, 0);
                         transaction.message = generate_random_bytes(tx_size as u64);
                         transaction.timestamp = time_keeper.get_timestamp();
                         transaction.generate(public_key, 0, 0);
@@ -256,7 +256,7 @@ impl TransactionGenerator {
                         required_count -= 1;
                     }
                 }
-                tokio::time::sleep(Duration::from_millis(10)).await;
+                // tokio::time::sleep(Duration::from_millis(10)).await;
                 if required_count == 0 {
                     break;
                 }
