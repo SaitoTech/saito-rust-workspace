@@ -738,7 +738,7 @@ impl Blockchain {
         let mut current_id = latest_block_id;
 
         info!("------------------------------------------------------");
-        while current_id > 0 && current_id >= latest_block_id + count {
+        while current_id > 0 && current_id >= latest_block_id - count {
             info!(
                 "{} - {:?}",
                 current_id,
