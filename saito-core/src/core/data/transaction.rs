@@ -144,7 +144,7 @@ impl Transaction {
     /// ```
     ///
     /// ```
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn create(
         wallet: &mut Wallet,
         to_public_key: SaitoPublicKey,
@@ -374,7 +374,7 @@ impl Transaction {
     /// [output][output][output]...
     /// [message]
     /// [hop][hop][hop]...
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Transaction {
         let inputs_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let outputs_len: u32 = u32::from_be_bytes(bytes[4..8].try_into().unwrap());
@@ -677,7 +677,7 @@ impl Transaction {
     }
 
     /// Runs when the chain is re-organized
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(
         &self,
         utxoset: &mut UtxoSet,
@@ -716,16 +716,16 @@ impl Transaction {
         self.serialize_for_net_with_hop(None)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub(crate) fn serialize_for_net_with_hop(&self, opt_hop: Option<Hop>) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&(self.inputs.len() as u32).to_be_bytes());
-        vbytes.extend(&(self.outputs.len() as u32).to_be_bytes());
-        vbytes.extend(&(self.message.len() as u32).to_be_bytes());
         let mut path_len = self.path.len();
         if !opt_hop.is_none() {
             path_len = path_len + 1;
         }
+        let mut vbytes: Vec<u8> = vec![];
+        vbytes.extend(&(self.inputs.len() as u32).to_be_bytes());
+        vbytes.extend(&(self.outputs.len() as u32).to_be_bytes());
+        vbytes.extend(&(self.message.len() as u32).to_be_bytes());
         vbytes.extend(&(path_len as u32).to_be_bytes());
         vbytes.extend(&self.signature);
         vbytes.extend(&self.timestamp.to_be_bytes());
@@ -767,7 +767,7 @@ impl Transaction {
         vbytes
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn sign(&mut self, private_key: SaitoPrivateKey) {
         //
         // we set slip ordinals when signing

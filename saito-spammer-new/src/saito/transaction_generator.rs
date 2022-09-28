@@ -255,7 +255,7 @@ impl TransactionGenerator {
                         required_count -= 1;
                     }
                 }
-                tokio::time::sleep(Duration::from_millis(10)).await;
+                // tokio::time::sleep(Duration::from_millis(10)).await;
                 if required_count == 0 {
                     break;
                 }

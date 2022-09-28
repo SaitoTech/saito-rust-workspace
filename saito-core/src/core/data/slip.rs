@@ -62,7 +62,7 @@ impl Slip {
         true
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let uuid: SaitoHash = bytes[33..65].try_into().unwrap();
@@ -108,7 +108,7 @@ impl Slip {
         res[0..74].try_into().unwrap()
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.amount > 0 {
             if utxoset.contains_key(&self.utxoset_key) {

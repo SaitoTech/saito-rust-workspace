@@ -187,8 +187,20 @@ impl Wallet {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.slips //.remove(&slip.utxoset_key);
-            .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
+        let index = self
+            .slips
+            .iter()
+            // .into_par_iter()
+            .enumerate()
+            .find(|(_, x)| x.uuid == slip.uuid && x.slip_index == slip.slip_index);
+        if index.is_none() {
+            return;
+        }
+        let index = index.unwrap().0;
+        self.slips.remove(index);
+        // self.slips
+        // .iter_mut() //.remove(&slip.utxoset_key);
+        // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -208,7 +220,7 @@ impl Wallet {
     // the nolan_requested is omitted from the slips created - only the change
     // address is provided as an output. so make sure that any function calling
     // this manually creates the output for its desired payment
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn generate_slips(&mut self, nolan_requested: u64) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = vec![];
         let mut outputs: Vec<Slip> = vec![];
