@@ -178,7 +178,7 @@ impl NetworkController {
         buffer: Vec<u8>,
         exceptions: Vec<u64>,
     ) {
-        debug!("sending message : {:?} to all", buffer[0]);
+        trace!("sending message : {:?} to all", buffer[0]);
         log_write_lock_request!("sockets");
         let mut sockets = sockets.lock().await;
         log_write_lock_receive!("sockets");

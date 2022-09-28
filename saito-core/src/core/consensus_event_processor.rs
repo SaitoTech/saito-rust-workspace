@@ -247,6 +247,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         let duration_value = duration.as_micros() as u64;
 
         if self.generate_genesis_block {
+            Self::generate_spammer_init_tx(
+                self.mempool.clone(),
+                self.wallet.clone(),
+                self.blockchain.clone(),
+            )
+            .await;
+
             {
                 log_write_lock_request!("blockchain");
                 let mut blockchain = self.blockchain.write().await;
@@ -274,12 +281,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                         .await;
                 }
             }
-            Self::generate_spammer_init_tx(
-                self.mempool.clone(),
-                self.wallet.clone(),
-                self.blockchain.clone(),
-            )
-            .await;
+
             self.generate_genesis_block = false;
             return Some(());
         }
