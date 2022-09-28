@@ -441,7 +441,7 @@ impl Blockchain {
         //     create_timestamp()
         // );
         // print blockring longest_chain_block_hash infor
-        self.print();
+        self.print(10);
 
         //
         // save to disk
@@ -526,6 +526,7 @@ impl Blockchain {
                     .await;
             }
         }
+        info!("block {:?} added successfully", hex::encode(block_hash));
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -732,13 +733,13 @@ impl Blockchain {
         // no match? return 0 -- no shared ancestor
         0
     }
-    pub fn print(&self) {
+    pub fn print(&self, count: u64) {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
-        debug!("------------------------------------------------------");
-        while current_id > 0 {
-            debug!(
+        info!("------------------------------------------------------");
+        while current_id > 0 && current_id >= latest_block_id + count {
+            info!(
                 "{} - {:?}",
                 current_id,
                 hex::encode(
@@ -748,7 +749,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
-        debug!("------------------------------------------------------");
+        info!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
