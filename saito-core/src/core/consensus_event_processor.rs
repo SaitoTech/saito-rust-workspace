@@ -5,7 +5,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
@@ -431,7 +431,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             }
             ConsensusEvent::NewTransaction { mut transaction } => {
                 transaction.generate_hash_for_signature();
-                debug!(
+                trace!(
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)
                 );
