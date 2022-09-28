@@ -3,10 +3,10 @@ use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoUTXOSetKey, SlipUuid, UtxoSet};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
 /// The size of a serilized slip in bytes.
-pub const SLIP_SIZE: usize = 60;
+pub const SLIP_SIZE: usize = 59;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq, FromPrimitive)]
 pub enum SlipType {
@@ -28,11 +28,9 @@ pub struct Slip {
     pub public_key: SaitoPublicKey,
     pub amount: u64,
     pub slip_index: u8,
-    // pub tx_hash: SaitoHash,
-    // pub block_id: u64,
+    pub block_id: u64,
+    pub tx_ordinal: u64,
     pub slip_type: SlipType,
-    /// block_id + tx_id + slip_id to uniquely identify the slip
-    pub uuid: SlipUuid,
     #[serde_as(as = "[_; 58]")]
     pub utxoset_key: SaitoUTXOSetKey,
     // TODO : Check if this can be removed with Option<>
@@ -45,9 +43,10 @@ impl Slip {
             public_key: [0; 33],
             amount: 0,
             slip_index: 0,
+            block_id: 0,
+            tx_ordinal: 0,
             slip_type: SlipType::Normal,
             // uuid: [0; 32],
-            uuid: [0; 17],
             utxoset_key: [0; 58],
             is_utxoset_key_set: false,
         }
@@ -69,15 +68,17 @@ impl Slip {
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
-        let uuid: SlipUuid = bytes[33..50].try_into().unwrap();
-        let amount: u64 = u64::from_be_bytes(bytes[50..58].try_into().unwrap());
-        let slip_index: u8 = bytes[58];
-        let slip_type: SlipType = FromPrimitive::from_u8(bytes[59]).unwrap();
+        let amount: u64 = u64::from_be_bytes(bytes[33..41].try_into().unwrap());
+        let block_id: u64 = u64::from_be_bytes(bytes[41..49].try_into().unwrap());
+        let tx_ordinal: u64 = u64::from_be_bytes(bytes[49..57].try_into().unwrap());
+        let slip_index: u8 = bytes[57];
+        let slip_type: SlipType = FromPrimitive::from_u8(bytes[58]).unwrap();
         let mut slip = Slip::new();
 
         slip.public_key = public_key;
-        slip.uuid = uuid;
         slip.amount = amount;
+        slip.block_id = block_id;
+        slip.tx_ordinal = tx_ordinal;
         slip.slip_index = slip_index;
         slip.slip_type = slip_type;
 
@@ -100,17 +101,12 @@ impl Slip {
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
         let mut res: Vec<u8> = vec![
             self.public_key.as_slice(),
-            self.uuid.as_slice(),
+            self.block_id.to_be_bytes().as_slice(),
+            self.tx_ordinal.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
             self.amount.to_be_bytes().as_slice(),
-            // self.slip_index.to_be_bytes().as_slice(),
         ]
         .concat();
-        // TODO : try to use block id, tx hash (32 or 16) and slip id for this to reduce size.
-
-        // res.extend(&self.public_key);
-        // res.extend(&self.uuid);
-        // res.extend(&self.amount.to_be_bytes());
-        // res.extend(&self.slip_index.to_be_bytes());
 
         res[0..58].try_into().unwrap()
     }
@@ -128,56 +124,44 @@ impl Slip {
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_net(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = [
+        let vbytes: Vec<u8> = [
             self.public_key.as_slice(),
-            self.uuid.as_slice(),
             self.amount.to_be_bytes().as_slice(),
+            self.block_id.to_be_bytes().as_slice(),
+            self.tx_ordinal.to_be_bytes().as_slice(),
             self.slip_index.to_be_bytes().as_slice(),
             (self.slip_type as u8).to_be_bytes().as_slice(),
         ]
         .concat();
-        // vbytes.extend(&self.public_key);
-        // vbytes.extend(&self.uuid);
-        // vbytes.extend(&self.amount.to_be_bytes());
-        // vbytes.extend(&self.slip_index.to_be_bytes());
-        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         assert_eq!(vbytes.len(), SLIP_SIZE);
         vbytes
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_input_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = [
+        let vbytes: Vec<u8> = [
             self.public_key.as_slice(),
-            self.uuid.as_slice(),
             self.amount.to_be_bytes().as_slice(),
+            // self.block_id.to_be_bytes().as_slice(),
+            // self.tx_ordinal.to_be_bytes().as_slice(),
             self.slip_index.to_be_bytes().as_slice(),
             (self.slip_type as u8).to_be_bytes().as_slice(),
         ]
         .concat();
-        // vbytes.extend(&self.public_key);
-        // vbytes.extend(&self.uuid);
-        // vbytes.extend(&self.amount.to_be_bytes());
-        // vbytes.extend(&(self.slip_index.to_be_bytes()));
-        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_output_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = [
+        let vbytes: Vec<u8> = [
             self.public_key.as_slice(),
-            [0; 17].as_slice(),
             self.amount.to_be_bytes().as_slice(),
+            // self.block_id.to_be_bytes().as_slice(),
+            // self.tx_ordinal.to_be_bytes().as_slice(),
             self.slip_index.to_be_bytes().as_slice(),
             (self.slip_type as u8).to_be_bytes().as_slice(),
         ]
         .concat();
-        // vbytes.extend(&self.public_key);
-        // vbytes.extend(&[0; 32]);
-        // vbytes.extend(&self.amount.to_be_bytes());
-        // vbytes.extend(&(self.slip_index.to_be_bytes()));
-        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
 
@@ -230,7 +214,8 @@ mod tests {
     fn slip_new_test() {
         let mut slip = Slip::new();
         assert_eq!(slip.public_key, [0; 33]);
-        assert_eq!(slip.uuid, [0; 17]);
+        assert_eq!(slip.block_id, 0);
+        assert_eq!(slip.tx_ordinal, 0);
         assert_eq!(slip.amount, 0);
         assert_eq!(slip.slip_type, SlipType::Normal);
         assert_eq!(slip.slip_index, 0);
@@ -240,9 +225,6 @@ mod tests {
 
         slip.amount = 100;
         assert_eq!(slip.amount, 100);
-
-        slip.uuid = [30; 17];
-        assert_eq!(slip.uuid, [30; 17]);
 
         slip.slip_index = 1;
         assert_eq!(slip.slip_index, 1);
@@ -254,7 +236,15 @@ mod tests {
     #[test]
     fn slip_serialize_for_signature_test() {
         let slip = Slip::new();
-        assert_eq!(slip.serialize_input_for_signature(), vec![0; SLIP_SIZE]);
+        assert_eq!(
+            slip.serialize_input_for_signature(),
+            vec![0; SLIP_SIZE - 16]
+        );
+        assert_eq!(
+            slip.serialize_output_for_signature(),
+            vec![0; SLIP_SIZE - 16]
+        );
+        assert_eq!(slip.serialize_for_net(), vec![0; SLIP_SIZE]);
     }
 
     #[test]
@@ -281,7 +271,8 @@ mod tests {
 
         let mut slip = Slip::new();
         slip.amount = 100_000;
-        slip.uuid = [1; 17];
+        slip.block_id = 10;
+        slip.tx_ordinal = 20;
         {
             let wallet = wallet_lock.read().await;
             slip.public_key = wallet.public_key;

@@ -1,5 +1,5 @@
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, SlipUuid,
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
@@ -28,10 +28,10 @@ pub const WALLET_SIZE: usize = 65;
 ///
 #[derive(Clone, Debug, PartialEq)]
 pub struct WalletSlip {
-    pub uuid: SlipUuid,
     pub utxokey: SaitoUTXOSetKey,
     pub amount: u64,
     pub block_id: u64,
+    pub tx_ordinal: u64,
     pub block_hash: SaitoHash,
     pub lc: bool,
     pub slip_index: u8,
@@ -44,7 +44,7 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub slips: HashMap<SlipUuid, WalletSlip>,
+    pub slips: HashMap<SaitoUTXOSetKey, WalletSlip>,
     pub filename: String,
     pub filepass: String,
 }
@@ -177,25 +177,15 @@ impl Wallet {
         let mut wallet_slip = WalletSlip::new();
 
         assert_ne!(block.id, 0);
-        let mut uuid = [
-            block.id.to_be_bytes().as_slice(),
-            tx_index.to_be_bytes().as_slice(),
-            slip.slip_index.to_be_bytes().as_slice(),
-        ]
-        .concat();
-        // uuid.extend(block.id.to_be_bytes());
-        // uuid.extend(tx_index.to_be_bytes());
-        // uuid.extend(slip.slip_index.to_be_bytes());
-
-        wallet_slip.uuid = uuid.try_into().unwrap();
         wallet_slip.utxokey = slip.get_utxoset_key();
         wallet_slip.amount = slip.amount;
         wallet_slip.slip_index = slip.slip_index;
         wallet_slip.block_id = block.id;
         wallet_slip.block_hash = block.hash;
+        wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
-        assert!(!self.slips.contains_key(&wallet_slip.uuid));
-        self.slips.insert(wallet_slip.uuid.clone(), wallet_slip);
+        debug_assert!(!self.slips.contains_key(&wallet_slip.utxokey));
+        self.slips.insert(wallet_slip.utxokey.clone(), wallet_slip);
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
@@ -210,7 +200,7 @@ impl Wallet {
         //     return;
         // }
         // let index = index.unwrap().0;
-        self.slips.remove(&slip.uuid);
+        self.slips.remove(&slip.utxoset_key);
         // self.slips
         // .iter_mut() //.remove(&slip.utxoset_key);
         // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
@@ -252,7 +242,8 @@ impl Wallet {
                     let mut input = Slip::new();
                     input.public_key = my_public_key;
                     input.amount = slip.amount;
-                    input.uuid = slip.uuid;
+                    input.block_id = slip.block_id;
+                    input.tx_ordinal = slip.tx_ordinal;
                     input.slip_index = slip.slip_index;
                     inputs.push(input);
 
@@ -283,14 +274,16 @@ impl Wallet {
             let mut input = Slip::new();
             input.public_key = my_public_key;
             input.amount = 0;
-            input.uuid = [0; 17];
+            input.block_id = 0;
+            input.tx_ordinal = 0;
             inputs.push(input);
         }
         if outputs.is_empty() {
             let mut output = Slip::new();
             output.public_key = my_public_key;
             output.amount = 0;
-            output.uuid = [0; 17];
+            output.block_id = 0;
+            output.tx_ordinal = 0;
             outputs.push(output);
         }
 
@@ -320,12 +313,14 @@ impl Wallet {
         let mut input1 = Slip::new();
         input1.public_key = self.public_key;
         input1.amount = 0;
-        input1.uuid = [0; 17];
+        input1.block_id = 0;
+        input1.tx_ordinal = 0;
 
         let mut output1 = Slip::new();
         output1.public_key = self.public_key;
         output1.amount = 0;
-        output1.uuid = [0; 17];
+        output1.block_id = 0;
+        output1.tx_ordinal = 0;
 
         transaction.add_input(input1);
         transaction.add_output(output1);
@@ -343,10 +338,10 @@ impl WalletSlip {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         WalletSlip {
-            uuid: [0; 17],
             utxokey: [0; 58],
             amount: 0,
             block_id: 0,
+            tx_ordinal: 0,
             block_hash: [0; 32],
             lc: true,
             slip_index: 0,

@@ -242,12 +242,13 @@ impl Transaction {
             input1.public_key = to_public_key;
             input1.amount = 0;
             let random_uuid = generate_random_bytes(17);
-            input1.uuid = random_uuid.try_into().unwrap();
+            input1.block_id = 0;
+            input1.tx_ordinal = 0;
 
             let mut output1 = Slip::new();
             output1.public_key = wallet.public_key;
-            output1.amount = 0;
-            output1.uuid = [0; 17];
+            output1.block_id = 0;
+            output1.tx_ordinal = 0;
 
             transaction.add_input(input1);
             transaction.add_output(output1);
@@ -317,7 +318,8 @@ impl Transaction {
         output.public_key = output_slip_to_rebroadcast.public_key;
         output.amount = output_payment;
         output.slip_type = SlipType::ATR;
-        output.uuid = output_slip_to_rebroadcast.uuid;
+        output.block_id = output_slip_to_rebroadcast.block_id;
+        output.tx_ordinal = output_slip_to_rebroadcast.tx_ordinal;
 
         //
         // if this is the FIRST time we are rebroadcasting, we copy the
@@ -520,14 +522,9 @@ impl Transaction {
             .enumerate()
             .map(|(index, slip)| {
                 if slip.slip_type != SlipType::ATR {
-                    let mut uuid = [
-                        block_id.to_be_bytes().as_slice(),
-                        tx_index.to_be_bytes().as_slice(),
-                        (index as u8).to_be_bytes().as_slice(),
-                    ]
-                    .concat();
-                    slip.uuid = uuid.try_into().unwrap();
-                    // slip.uuid = hash_for_signature;
+                    slip.block_id = block_id;
+                    slip.tx_ordinal = tx_index;
+                    slip.slip_index = index as u8;
                 }
                 slip.generate_utxoset_key();
                 slip.amount
@@ -1061,7 +1058,8 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        input_slip.uuid = <[u8; 17]>::from_hex("dcf6cceb74717f98c3f7239459bb36fdcd").unwrap();
+        input_slip.block_id = 0;
+        input_slip.tx_ordinal = 0;
         input_slip.amount = 123;
         input_slip.slip_index = 10;
         input_slip.slip_type = SlipType::ATR;
@@ -1071,7 +1069,8 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        output_slip.uuid = <[u8; 17]>::from_hex("dcf6cceb74717f98c3f7239459bb36fdcd").unwrap();
+        output_slip.block_id = 0;
+        output_slip.tx_ordinal = 0;
         output_slip.amount = 345;
         output_slip.slip_index = 23;
         output_slip.slip_type = SlipType::Normal;
@@ -1084,12 +1083,11 @@ mod tests {
             vec![
                 0, 0, 1, 125, 38, 221, 98, 138, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247,
                 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192,
-                176, 22, 31, 205, 139, 204, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35,
-                148, 89, 187, 54, 253, 205, 0, 0, 0, 0, 0, 0, 0, 123, 10, 1, 220, 246, 204, 235,
+                176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 123, 10, 1, 220, 246, 204, 235,
                 116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237,
-                191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 89, 23, 0, 0, 0, 0, 1, 0, 0, 0, 3,
-                123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125
+                191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 1, 89,
+                23, 0, 0, 0, 0, 1, 0, 0, 0, 3, 123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101,
+                115, 116, 34, 125
             ]
         );
     }
@@ -1108,7 +1106,8 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        input_slip.uuid = <[u8; 17]>::from_hex("dcf6cceb74717f98c3f7239459bb36fdcd").unwrap();
+        input_slip.block_id = 0;
+        input_slip.tx_ordinal = 0;
         input_slip.amount = 123;
         input_slip.slip_index = 10;
         input_slip.slip_type = SlipType::ATR;
@@ -1118,7 +1117,8 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        output_slip.uuid = <[u8; 17]>::from_hex("dcf6cceb74717f98c3f7239459bb36fdcd").unwrap();
+        output_slip.block_id = 0;
+        output_slip.tx_ordinal = 0;
         output_slip.amount = 345;
         output_slip.slip_index = 23;
         output_slip.slip_type = SlipType::Normal;
@@ -1137,10 +1137,10 @@ mod tests {
         assert_eq!(
             tx.signature,
             [
-                127, 7, 91, 3, 206, 42, 49, 123, 10, 64, 132, 58, 96, 235, 219, 115, 223, 113, 5,
-                40, 204, 81, 168, 187, 23, 30, 180, 57, 7, 246, 96, 93, 87, 101, 169, 254, 29, 203,
-                64, 218, 138, 235, 166, 47, 77, 80, 140, 191, 185, 2, 18, 151, 108, 128, 194, 112,
-                112, 44, 193, 142, 164, 86, 246, 219
+                173, 213, 205, 24, 244, 6, 51, 69, 47, 129, 33, 129, 76, 218, 167, 11, 55, 73, 87,
+                6, 157, 228, 92, 194, 195, 157, 115, 199, 78, 111, 174, 67, 119, 178, 131, 191,
+                121, 60, 200, 179, 92, 169, 79, 161, 179, 218, 20, 135, 172, 110, 252, 33, 49, 119,
+                188, 157, 247, 0, 101, 96, 205, 202, 16, 138
             ]
         );
     }

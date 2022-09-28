@@ -1465,6 +1465,11 @@ mod tests {
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
+    use tracing_subscriber;
+    use tracing_subscriber::filter::Directive;
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::Layer;
 
     #[tokio::test]
     async fn test_blockchain_init() {
@@ -1535,6 +1540,11 @@ mod tests {
     // test we can produce five blocks in a row
     //
     async fn add_five_good_blocks() {
+        // let filter = tracing_subscriber::EnvFilter::from_default_env();
+        // let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+        //
+        // tracing_subscriber::registry().with(fmt_layer).init();
+
         let mut t = TestManager::new();
         let block1;
         let block1_id;
