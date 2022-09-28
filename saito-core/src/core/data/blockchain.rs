@@ -536,7 +536,7 @@ impl Blockchain {
         block_hash: &SaitoHash,
         mempool: Arc<RwLock<Mempool>>,
     ) {
-        debug!("add block failed : {:?}", hex::encode(block_hash));
+        info!("add block failed : {:?}", hex::encode(block_hash));
         log_write_lock_request!("mempool");
         let mut mempool = mempool.write().await;
         log_write_lock_receive!("mempool");
@@ -929,7 +929,7 @@ impl Blockchain {
                 }
             }
             if !return_value {
-                debug!("not enough golden tickets");
+                warn!("not enough golden tickets");
                 return false;
             }
         }
