@@ -43,7 +43,7 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub slips: Vec<WalletSlip>,
+    pub slips: HashMap<SlipUuid, WalletSlip>,
     pub filename: String,
     pub filepass: String,
 }
@@ -175,10 +175,16 @@ impl Wallet {
     pub fn add_slip(&mut self, block: &Block, tx_index: u64, slip: &Slip, lc: bool) {
         let mut wallet_slip = WalletSlip::new();
 
-        let mut uuid = vec![];
-        uuid.extend(block.id.to_be_bytes());
-        uuid.extend(tx_index.to_be_bytes());
-        uuid.extend(slip.slip_index.to_be_bytes());
+        assert_ne!(block.id, 0);
+        let mut uuid = [
+            block.id.to_be_bytes().as_slice(),
+            tx_index.to_be_bytes().as_slice(),
+            slip.slip_index.to_be_bytes().as_slice(),
+        ]
+        .concat();
+        // uuid.extend(block.id.to_be_bytes());
+        // uuid.extend(tx_index.to_be_bytes());
+        // uuid.extend(slip.slip_index.to_be_bytes());
 
         wallet_slip.uuid = uuid.try_into().unwrap();
         wallet_slip.utxokey = slip.get_utxoset_key();
@@ -187,22 +193,23 @@ impl Wallet {
         wallet_slip.block_id = block.id;
         wallet_slip.block_hash = block.hash;
         wallet_slip.lc = lc;
-        self.slips.push(wallet_slip);
+        assert!(!self.slips.contains_key(&wallet_slip.uuid));
+        self.slips.insert(wallet_slip.uuid.clone(), wallet_slip);
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        let index = self
-            .slips
-            .iter()
-            // .into_par_iter()
-            .enumerate()
-            .find(|(_, x)| x.uuid == slip.uuid && x.slip_index == slip.slip_index);
-        if index.is_none() {
-            return;
-        }
-        let index = index.unwrap().0;
-        self.slips.remove(index);
+        // let index = self
+        //     .slips
+        //     .iter()
+        //     // .into_par_iter()
+        //     .enumerate()
+        //     .find(|(_, (x))| x.uuid == slip.uuid && x.slip_index == slip.slip_index);
+        // if index.is_none() {
+        //     return;
+        // }
+        // let index = index.unwrap().0;
+        self.slips.remove(&slip.uuid);
         // self.slips
         // .iter_mut() //.remove(&slip.utxoset_key);
         // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
@@ -212,14 +219,14 @@ impl Wallet {
     pub fn get_available_balance(&self) -> u64 {
         (&self.slips)
             .into_par_iter()
-            .filter(|s| !s.spent)
-            .map(|s| s.amount)
+            .filter(|s| !s.1.spent)
+            .map(|s| s.1.amount)
             .sum::<u64>()
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
+        (&self.slips).into_par_iter().filter(|s| !s.1.spent).count() as u64
     }
 
     // the nolan_requested is omitted from the slips created - only the change
@@ -236,7 +243,7 @@ impl Wallet {
         //
         // grab inputs
         //
-        for slip in &mut self.slips {
+        for (id, slip) in &mut self.slips {
             if !slip.spent {
                 if nolan_in < nolan_requested {
                     nolan_in += slip.amount;

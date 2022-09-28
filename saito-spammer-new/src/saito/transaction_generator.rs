@@ -93,7 +93,7 @@ impl TransactionGenerator {
         }
     }
 
-    async fn create_slips(&mut self) {
+    async fn create_slips(&mut self) -> bool {
         let output_slips_per_input_slip: u8 = 100;
         let unspent_slip_count;
         let available_balance;
@@ -109,8 +109,8 @@ impl TransactionGenerator {
 
         if unspent_slip_count < self.tx_count && unspent_slip_count >= self.expected_slip_count {
             info!(
-                "Creating new slips, current = {:?}, target = {:?}",
-                unspent_slip_count, self.tx_count
+                "Creating new slips, current = {:?}, target = {:?} balance = {:?}",
+                unspent_slip_count, self.tx_count, available_balance
             );
 
             let total_nolans_requested_per_slip = available_balance / unspent_slip_count;
@@ -122,7 +122,6 @@ impl TransactionGenerator {
                         output_slips_per_input_slip,
                         total_nolans_requested_per_slip,
                         &mut total_output_slips_created,
-                        &TimeKeeper {},
                     )
                     .await;
 
@@ -145,7 +144,9 @@ impl TransactionGenerator {
                 "New slips created, current = {:?}, target = {:?}",
                 total_output_slips_created, self.tx_count
             );
+            return true;
         }
+        false
     }
 
     async fn create_slip_transaction(
@@ -153,7 +154,6 @@ impl TransactionGenerator {
         output_slips_per_input_slip: u8,
         total_nolans_requested_per_slip: u64,
         total_output_slips_created: &mut u64,
-        time_keeper: &TimeKeeper,
     ) -> Transaction {
         let payment_amount = total_nolans_requested_per_slip / output_slips_per_input_slip as u64;
 
@@ -194,7 +194,7 @@ impl TransactionGenerator {
             transaction.message = generate_random_bytes(remaining_bytes as u64);
         }
 
-        transaction.timestamp = time_keeper.get_timestamp();
+        transaction.timestamp = self.time_keeper.get_timestamp();
         transaction.generate(self.public_key, 0, 0);
         transaction.sign(self.private_key);
         transaction.add_hop(&wallet, self.public_key);
@@ -242,7 +242,7 @@ impl TransactionGenerator {
                     log_write_lock_request!("wallet");
                     let mut wallet = wallet.write().await;
                     log_write_lock_receive!("wallet");
-                    let create_count = min(10000, required_count);
+                    let create_count = min(1000, required_count);
                     for _i in 0..create_count {
                         let mut transaction = Transaction::create(&mut wallet, public_key, 1, 0);
                         transaction.message = generate_random_bytes(tx_size as u64);
@@ -256,6 +256,7 @@ impl TransactionGenerator {
                         required_count -= 1;
                     }
                 }
+                info!("test transactions to be created : {:?}", required_count);
                 // tokio::time::sleep(Duration::from_millis(10)).await;
                 if required_count == 0 {
                     break;
