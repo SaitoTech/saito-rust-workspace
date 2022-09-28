@@ -11,6 +11,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use ahash::HashMap;
 use rayon::prelude::*;
+use tracing::info;
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -209,7 +210,9 @@ impl Wallet {
         //     return;
         // }
         // let index = index.unwrap().0;
+        info!("wallet slips before deletion : {:?}", self.slips.len());
         self.slips.remove(&slip.uuid);
+        info!("wallet slips after deletion : {:?}", self.slips.len());
         // self.slips
         // .iter_mut() //.remove(&slip.utxoset_key);
         // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
