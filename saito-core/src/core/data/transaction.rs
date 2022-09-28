@@ -444,7 +444,7 @@ impl Transaction {
     //
     // generates all non-cumulative
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate(&mut self, public_key: SaitoPublicKey) -> bool {
         //
         // nolan_in, nolan_out, total fees

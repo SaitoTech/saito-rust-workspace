@@ -42,7 +42,7 @@ impl GoldenTicket {
     }
 
     pub fn serialize_for_net(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = [
+        let vbytes: Vec<u8> = [
             self.target.as_slice(),
             self.random.as_slice(),
             self.public_key.as_slice(),
