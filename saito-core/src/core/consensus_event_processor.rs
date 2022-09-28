@@ -490,7 +490,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("wallet");
             println!(
-                "--- stats ------ wallet:state - slips : {:?}",
+                "--- stats ------ {} - slips : {:?}",
+                format!("{:width$}", "wallet::state", width = 30)
                 wallet.slips.len()
             );
         }
@@ -499,7 +500,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             let blockchain = self.blockchain.read().await;
             log_read_lock_receive!("blockchain");
             println!(
-                "--- stats ------ blockchain:state - utxo_size : {:?} block_count : {:?} longest_chain_len : {:?}",
+                "--- stats ------ {} - utxo_size : {:?} block_count : {:?} longest_chain_len : {:?}",
+                format!("{:width$}", "blockchain::state", width = 30)
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
                 blockchain.get_latest_block_id()
@@ -510,7 +512,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             let mempool = self.mempool.read().await;
             log_read_lock_receive!("mempool");
             println!(
-                "--- stats ------ mempool:state - blocks : {:?} transactions : {:?}",
+                "--- stats ------ {} - blocks : {:?} transactions : {:?}",
+                format!("{:width$}", "mempool:state", width = 30)
                 mempool.blocks_queue.len(),
                 mempool.transactions.len(),
             );
