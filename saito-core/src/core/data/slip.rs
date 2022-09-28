@@ -121,35 +121,56 @@ impl Slip {
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_net(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.public_key);
-        vbytes.extend(&self.uuid);
-        vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&self.slip_index.to_be_bytes());
-        vbytes.extend(&(self.slip_type as u8).to_be_bytes());
+        let mut vbytes: Vec<u8> = [
+            self.public_key.as_slice(),
+            self.uuid.as_slice(),
+            self.amount.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
+            (self.slip_type as u8).to_be_bytes().as_slice(),
+        ]
+        .concat();
+        // vbytes.extend(&self.public_key);
+        // vbytes.extend(&self.uuid);
+        // vbytes.extend(&self.amount.to_be_bytes());
+        // vbytes.extend(&self.slip_index.to_be_bytes());
+        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         assert_eq!(vbytes.len(), SLIP_SIZE);
         vbytes
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_input_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.public_key);
-        vbytes.extend(&self.uuid);
-        vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&(self.slip_index.to_be_bytes()));
-        vbytes.extend(&(self.slip_type as u8).to_be_bytes());
+        let mut vbytes: Vec<u8> = [
+            self.public_key.as_slice(),
+            self.uuid.as_slice(),
+            self.amount.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
+            (self.slip_type as u8).to_be_bytes().as_slice(),
+        ]
+        .concat();
+        // vbytes.extend(&self.public_key);
+        // vbytes.extend(&self.uuid);
+        // vbytes.extend(&self.amount.to_be_bytes());
+        // vbytes.extend(&(self.slip_index.to_be_bytes()));
+        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_output_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.public_key);
-        vbytes.extend(&[0; 32]);
-        vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&(self.slip_index.to_be_bytes()));
-        vbytes.extend(&(self.slip_type as u8).to_be_bytes());
+        let mut vbytes: Vec<u8> = [
+            self.public_key.as_slice(),
+            [0; 32].as_slice(),
+            self.amount.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
+            (self.slip_type as u8).to_be_bytes().as_slice(),
+        ]
+        .concat();
+        // vbytes.extend(&self.public_key);
+        // vbytes.extend(&[0; 32]);
+        // vbytes.extend(&self.amount.to_be_bytes());
+        // vbytes.extend(&(self.slip_index.to_be_bytes()));
+        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
 
