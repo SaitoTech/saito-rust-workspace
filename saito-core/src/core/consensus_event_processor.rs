@@ -338,7 +338,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 let block = mempool
                     .bundle_block(blockchain.deref_mut(), timestamp)
                     .await;
-                debug!("adding bundled block to mempool");
+                info!(
+                    "adding bundled block : {:?} to mempool",
+                    hex::encode(block.hash)
+                );
                 debug!(
                     "mempool size after bundling : {:?}",
                     mempool.transactions.len()
