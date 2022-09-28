@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::VecDeque;
 use std::io::Error;
 use std::mem;
@@ -737,8 +738,12 @@ impl Blockchain {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
+        let mut min_id = 0;
+        if latest_block_id > count {
+            min_id = latest_block_id - count;
+        }
         info!("------------------------------------------------------");
-        while current_id > 0 && current_id >= latest_block_id - count {
+        while current_id > 0 && current_id >= min_id {
             info!(
                 "{} - {:?}",
                 current_id,
