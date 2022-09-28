@@ -92,12 +92,18 @@ impl Slip {
     // 1 byte slip_index
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
-        let mut res: Vec<u8> = vec![];
+        let mut res: Vec<u8> = vec![
+            self.public_key.as_slice(),
+            self.uuid.as_slice(),
+            self.amount.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
+        ]
+        .concat();
         // TODO : try to use block id, tx hash (32 or 16) and slip id for this to reduce size.
-        res.extend(&self.public_key);
-        res.extend(&self.uuid);
-        res.extend(&self.amount.to_be_bytes());
-        res.extend(&self.slip_index.to_be_bytes());
+        // res.extend(&self.public_key);
+        // res.extend(&self.uuid);
+        // res.extend(&self.amount.to_be_bytes());
+        // res.extend(&self.slip_index.to_be_bytes());
 
         res[0..74].try_into().unwrap()
     }

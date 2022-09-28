@@ -481,7 +481,7 @@ impl Transaction {
     //
     // calculate total fees in block
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_total_fees(&mut self) {
         // TODO - remove for uuid work
         // generate tx signature hash
@@ -500,44 +500,44 @@ impl Transaction {
         let mut nolan_out: u64 = 0;
 
         // generate utxoset key for every slip
-        for input in &mut self.inputs {
-            nolan_in += input.amount;
-            input.generate_utxoset_key();
-        }
-        // nolan_in = self
-        //     .inputs
-        //     .par_iter_mut()
-        //     .map(|slip| {
-        //         slip.generate_utxoset_key();
-        //         slip.amount
-        //     })
-        //     .sum::<u64>();
+        // for input in &mut self.inputs {
+        //     nolan_in += input.amount;
+        //     input.generate_utxoset_key();
+        // }
+        nolan_in = self
+            .inputs
+            .par_iter_mut()
+            .map(|slip| {
+                slip.generate_utxoset_key();
+                slip.amount
+            })
+            .sum::<u64>();
 
-        // nolan_out = self
-        //     .outputs
-        //     .par_iter_mut()
-        //     .map(|slip| {
-        //         if let Some(hash_for_signature) = hash_for_signature {
-        //             if slip.slip_type != SlipType::ATR {
-        //                 slip.uuid = hash_for_signature;
-        //             }
-        //         }
-        //         slip.generate_utxoset_key();
-        //         slip.amount
-        //     })
-        //     .sum::<u64>();
-        for output in &mut self.outputs {
-            nolan_out += output.amount;
-            //
-            // new outbound slips
-            //
-            if let Some(hash_for_signature) = hash_for_signature {
-                if output.slip_type != SlipType::ATR {
-                    output.uuid = hash_for_signature;
+        nolan_out = self
+            .outputs
+            .par_iter_mut()
+            .map(|slip| {
+                if let Some(hash_for_signature) = hash_for_signature {
+                    if slip.slip_type != SlipType::ATR {
+                        slip.uuid = hash_for_signature;
+                    }
                 }
-            }
-            output.generate_utxoset_key();
-        }
+                slip.generate_utxoset_key();
+                slip.amount
+            })
+            .sum::<u64>();
+        // for output in &mut self.outputs {
+        //     nolan_out += output.amount;
+        //     //
+        //     // new outbound slips
+        //     //
+        //     if let Some(hash_for_signature) = hash_for_signature {
+        //         if output.slip_type != SlipType::ATR {
+        //             output.uuid = hash_for_signature;
+        //         }
+        //     }
+        //     output.generate_utxoset_key();
+        // }
 
         self.total_in = nolan_in;
         self.total_out = nolan_out;
@@ -556,7 +556,7 @@ impl Transaction {
     //
     // calculate cumulative routing work in block
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_total_work(&mut self, public_key: SaitoPublicKey) {
         //
         // if there is no routing path, then the transaction contains
@@ -602,7 +602,7 @@ impl Transaction {
     //
     // generate hash used for signing the tx
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_hash_for_signature(&mut self) {
         self.hash_for_signature = Some(hash(&self.serialize_for_signature()));
     }
@@ -747,7 +747,7 @@ impl Transaction {
         vbytes
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
         //
         // fastest known way that isn't bincode ??
