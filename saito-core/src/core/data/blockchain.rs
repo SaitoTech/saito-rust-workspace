@@ -1689,6 +1689,14 @@ mod tests {
         t.check_blockchain().await;
         t.check_utxoset().await;
         t.check_token_supply().await;
+
+        {
+            let wallet = t.wallet_lock.read().await;
+            let count = wallet.get_unspent_slip_count();
+            assert_ne!(count, 0);
+            let balance = wallet.get_available_balance();
+            assert_ne!(balance, 0);
+        }
     }
 
     #[tokio::test]

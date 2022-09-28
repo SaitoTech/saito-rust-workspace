@@ -19,7 +19,7 @@ use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing::info;
+use tracing::{debug, info, trace};
 
 #[derive(Clone, PartialEq)]
 pub enum GeneratorState {
@@ -78,19 +78,21 @@ impl TransactionGenerator {
     pub fn get_state(&self) -> GeneratorState {
         return self.state.clone();
     }
-    pub async fn on_new_block(&mut self) {
+    pub async fn on_new_block(&mut self) -> bool {
         match self.state {
             GeneratorState::CreatingSlips => {
-                self.create_slips().await;
+                return self.create_slips().await;
             }
             GeneratorState::WaitingForBlockChainConfirmation => {
                 if self.check_blockchain_for_confirmation().await {
                     self.create_test_transactions().await;
                     self.state = GeneratorState::Done;
+                    return true;
                 }
             }
             GeneratorState::Done => {}
         }
+        return false;
     }
 
     async fn create_slips(&mut self) -> bool {
@@ -219,7 +221,10 @@ impl TransactionGenerator {
             self.state = GeneratorState::Done;
             return true;
         }
-
+        debug!(
+            "unspent slips : {:?} tx count : {:?}",
+            unspent_slip_count, self.tx_count
+        );
         return false;
     }
 
