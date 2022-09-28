@@ -82,7 +82,7 @@ impl Network {
     }
 
     pub async fn propagate_transaction(&self, transaction: &Transaction) {
-        debug!(
+        trace!(
             "propagating transaction : {:?}",
             hex::encode(transaction.signature)
         );

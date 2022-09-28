@@ -459,6 +459,11 @@ impl Block {
         let block_merkle_root = block.generate_merkle_root();
         block.merkle_root = block_merkle_root;
 
+        block.avg_income = cv.avg_income;
+        block.avg_variance = cv.avg_variance;
+        block.avg_atr_income = cv.avg_atr_income;
+        block.avg_atr_variance = cv.avg_atr_variance;
+
         {
             log_read_lock_request!("wallet");
             let wallet = wallet_lock.read().await;
@@ -1893,7 +1898,7 @@ mod tests {
         block.creator = [2; 33];
         block.merkle_root = [3; 32];
         block.signature = [4; 64];
-        block.treasury = 1;
+        block.treasury = 1_000_000;
         block.burnfee = 2;
         block.difficulty = 3;
         block.transactions = vec![mock_tx, mock_tx2];
@@ -1915,7 +1920,7 @@ mod tests {
         assert_eq!(deserialized_block.creator, [2; 33]);
         assert_eq!(deserialized_block.merkle_root, [3; 32]);
         assert_eq!(deserialized_block.signature, [4; 64]);
-        assert_eq!(deserialized_block.treasury, 1);
+        assert_eq!(deserialized_block.treasury, 1_000_000);
         assert_eq!(deserialized_block.burnfee, 2);
         assert_eq!(deserialized_block.difficulty, 3);
 
@@ -1930,7 +1935,7 @@ mod tests {
         assert_eq!(deserialized_block_header.creator, [2; 33]);
         assert_eq!(deserialized_block_header.merkle_root, [3; 32]);
         assert_eq!(deserialized_block_header.signature, [4; 64]);
-        assert_eq!(deserialized_block_header.treasury, 1);
+        assert_eq!(deserialized_block_header.treasury, 1_000_000);
         assert_eq!(deserialized_block_header.burnfee, 2);
         assert_eq!(deserialized_block_header.difficulty, 3);
     }

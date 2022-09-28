@@ -100,7 +100,8 @@ impl Spammer {
             }
 
             if !work_done {
-                tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
+                // tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
+                tokio::time::sleep(Duration::from_millis(1000)).await;
             } else {
                 // break;
             }

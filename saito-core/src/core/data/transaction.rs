@@ -144,7 +144,7 @@ impl Transaction {
     /// ```
     ///
     /// ```
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn create(
         wallet: &mut Wallet,
         to_public_key: SaitoPublicKey,
@@ -374,7 +374,7 @@ impl Transaction {
     /// [output][output][output]...
     /// [message]
     /// [hop][hop][hop]...
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Transaction {
         let inputs_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let outputs_len: u32 = u32::from_be_bytes(bytes[4..8].try_into().unwrap());
@@ -444,7 +444,7 @@ impl Transaction {
     //
     // generates all non-cumulative
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate(&mut self, public_key: SaitoPublicKey) -> bool {
         //
         // nolan_in, nolan_out, total fees
@@ -481,7 +481,7 @@ impl Transaction {
     //
     // calculate total fees in block
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_total_fees(&mut self) {
         // TODO - remove for uuid work
         // generate tx signature hash
@@ -499,25 +499,45 @@ impl Transaction {
         let mut nolan_in: u64 = 0;
         let mut nolan_out: u64 = 0;
 
-        //
         // generate utxoset key for every slip
-        //
-        for input in &mut self.inputs {
-            nolan_in += input.amount;
-            input.generate_utxoset_key();
-        }
-        for output in &mut self.outputs {
-            nolan_out += output.amount;
-            //
-            // new outbound slips
-            //
-            if let Some(hash_for_signature) = hash_for_signature {
-                if output.slip_type != SlipType::ATR {
-                    output.uuid = hash_for_signature;
+        // for input in &mut self.inputs {
+        //     nolan_in += input.amount;
+        //     input.generate_utxoset_key();
+        // }
+        nolan_in = self
+            .inputs
+            .par_iter_mut()
+            .map(|slip| {
+                slip.generate_utxoset_key();
+                slip.amount
+            })
+            .sum::<u64>();
+
+        nolan_out = self
+            .outputs
+            .par_iter_mut()
+            .map(|slip| {
+                if let Some(hash_for_signature) = hash_for_signature {
+                    if slip.slip_type != SlipType::ATR {
+                        slip.uuid = hash_for_signature;
+                    }
                 }
-            }
-            output.generate_utxoset_key();
-        }
+                slip.generate_utxoset_key();
+                slip.amount
+            })
+            .sum::<u64>();
+        // for output in &mut self.outputs {
+        //     nolan_out += output.amount;
+        //     //
+        //     // new outbound slips
+        //     //
+        //     if let Some(hash_for_signature) = hash_for_signature {
+        //         if output.slip_type != SlipType::ATR {
+        //             output.uuid = hash_for_signature;
+        //         }
+        //     }
+        //     output.generate_utxoset_key();
+        // }
 
         self.total_in = nolan_in;
         self.total_out = nolan_out;
@@ -536,7 +556,7 @@ impl Transaction {
     //
     // calculate cumulative routing work in block
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_total_work(&mut self, public_key: SaitoPublicKey) {
         //
         // if there is no routing path, then the transaction contains
@@ -582,7 +602,7 @@ impl Transaction {
     //
     // generate hash used for signing the tx
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_hash_for_signature(&mut self) {
         self.hash_for_signature = Some(hash(&self.serialize_for_signature()));
     }
@@ -657,7 +677,7 @@ impl Transaction {
     }
 
     /// Runs when the chain is re-organized
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(
         &self,
         utxoset: &mut UtxoSet,
@@ -696,16 +716,16 @@ impl Transaction {
         self.serialize_for_net_with_hop(None)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub(crate) fn serialize_for_net_with_hop(&self, opt_hop: Option<Hop>) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&(self.inputs.len() as u32).to_be_bytes());
-        vbytes.extend(&(self.outputs.len() as u32).to_be_bytes());
-        vbytes.extend(&(self.message.len() as u32).to_be_bytes());
         let mut path_len = self.path.len();
         if !opt_hop.is_none() {
             path_len = path_len + 1;
         }
+        let mut vbytes: Vec<u8> = vec![];
+        vbytes.extend(&(self.inputs.len() as u32).to_be_bytes());
+        vbytes.extend(&(self.outputs.len() as u32).to_be_bytes());
+        vbytes.extend(&(self.message.len() as u32).to_be_bytes());
         vbytes.extend(&(path_len as u32).to_be_bytes());
         vbytes.extend(&self.signature);
         vbytes.extend(&self.timestamp.to_be_bytes());
@@ -727,7 +747,7 @@ impl Transaction {
         vbytes
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
         //
         // fastest known way that isn't bincode ??
@@ -747,7 +767,7 @@ impl Transaction {
         vbytes
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn sign(&mut self, private_key: SaitoPrivateKey) {
         //
         // we set slip ordinals when signing

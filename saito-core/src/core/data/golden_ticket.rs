@@ -42,14 +42,19 @@ impl GoldenTicket {
     }
 
     pub fn serialize_for_net(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.target);
-        vbytes.extend(&self.random);
-        vbytes.extend(&self.public_key);
+        let vbytes: Vec<u8> = [
+            self.target.as_slice(),
+            self.random.as_slice(),
+            self.public_key.as_slice(),
+        ]
+        .concat();
+        // vbytes.extend(&self.target);
+        // vbytes.extend(&self.random);
+        // vbytes.extend(&self.public_key);
         vbytes
     }
 
-    #[tracing::instrument(level = "trace", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn validate(&self, difficulty: u64) -> bool {
         let solution_hash = hash(&self.serialize_for_net());
 
@@ -58,7 +63,7 @@ impl GoldenTicket {
         return GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty);
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn validate_hashing_difficulty(solution_hash: &SaitoHash, difficulty: u64) -> bool {
         let solution = primitive_types::U256::from_big_endian(solution_hash);
 

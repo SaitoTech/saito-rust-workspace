@@ -62,7 +62,7 @@ impl Slip {
         true
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let uuid: SaitoHash = bytes[33..65].try_into().unwrap();
@@ -92,17 +92,23 @@ impl Slip {
     // 1 byte slip_index
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
-        let mut res: Vec<u8> = vec![];
+        let mut res: Vec<u8> = vec![
+            self.public_key.as_slice(),
+            self.uuid.as_slice(),
+            self.amount.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
+        ]
+        .concat();
         // TODO : try to use block id, tx hash (32 or 16) and slip id for this to reduce size.
-        res.extend(&self.public_key);
-        res.extend(&self.uuid);
-        res.extend(&self.amount.to_be_bytes());
-        res.extend(&self.slip_index.to_be_bytes());
+        // res.extend(&self.public_key);
+        // res.extend(&self.uuid);
+        // res.extend(&self.amount.to_be_bytes());
+        // res.extend(&self.slip_index.to_be_bytes());
 
         res[0..74].try_into().unwrap()
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.amount > 0 {
             if utxoset.contains_key(&self.utxoset_key) {
@@ -115,35 +121,56 @@ impl Slip {
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_net(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.public_key);
-        vbytes.extend(&self.uuid);
-        vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&self.slip_index.to_be_bytes());
-        vbytes.extend(&(self.slip_type as u8).to_be_bytes());
+        let mut vbytes: Vec<u8> = [
+            self.public_key.as_slice(),
+            self.uuid.as_slice(),
+            self.amount.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
+            (self.slip_type as u8).to_be_bytes().as_slice(),
+        ]
+        .concat();
+        // vbytes.extend(&self.public_key);
+        // vbytes.extend(&self.uuid);
+        // vbytes.extend(&self.amount.to_be_bytes());
+        // vbytes.extend(&self.slip_index.to_be_bytes());
+        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         assert_eq!(vbytes.len(), SLIP_SIZE);
         vbytes
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_input_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.public_key);
-        vbytes.extend(&self.uuid);
-        vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&(self.slip_index.to_be_bytes()));
-        vbytes.extend(&(self.slip_type as u8).to_be_bytes());
+        let mut vbytes: Vec<u8> = [
+            self.public_key.as_slice(),
+            self.uuid.as_slice(),
+            self.amount.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
+            (self.slip_type as u8).to_be_bytes().as_slice(),
+        ]
+        .concat();
+        // vbytes.extend(&self.public_key);
+        // vbytes.extend(&self.uuid);
+        // vbytes.extend(&self.amount.to_be_bytes());
+        // vbytes.extend(&(self.slip_index.to_be_bytes()));
+        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_output_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.public_key);
-        vbytes.extend(&[0; 32]);
-        vbytes.extend(&self.amount.to_be_bytes());
-        vbytes.extend(&(self.slip_index.to_be_bytes()));
-        vbytes.extend(&(self.slip_type as u8).to_be_bytes());
+        let mut vbytes: Vec<u8> = [
+            self.public_key.as_slice(),
+            [0; 32].as_slice(),
+            self.amount.to_be_bytes().as_slice(),
+            self.slip_index.to_be_bytes().as_slice(),
+            (self.slip_type as u8).to_be_bytes().as_slice(),
+        ]
+        .concat();
+        // vbytes.extend(&self.public_key);
+        // vbytes.extend(&[0; 32]);
+        // vbytes.extend(&self.amount.to_be_bytes());
+        // vbytes.extend(&(self.slip_index.to_be_bytes()));
+        // vbytes.extend(&(self.slip_type as u8).to_be_bytes());
         vbytes
     }
 

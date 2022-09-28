@@ -136,7 +136,7 @@ impl RoutingEventProcessor {
                 unreachable!("received block");
             }
             Message::Transaction(transaction) => {
-                debug!("received transaction");
+                trace!("received transaction");
                 self.stats.received_transactions.increment();
                 self.sender_to_mempool
                     .send(ConsensusEvent::NewTransaction { transaction })

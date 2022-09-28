@@ -1,5 +1,5 @@
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
@@ -9,6 +9,7 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
+use ahash::HashMap;
 use rayon::prelude::*;
 
 pub const WALLET_SIZE: usize = 65;
@@ -54,7 +55,7 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            slips: vec![],
+            slips: Default::default(),
             filename: "default".to_string(),
             filepass: "password".to_string(),
         }
@@ -186,8 +187,20 @@ impl Wallet {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.slips
-            .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
+        let index = self
+            .slips
+            .iter()
+            // .into_par_iter()
+            .enumerate()
+            .find(|(_, x)| x.uuid == slip.uuid && x.slip_index == slip.slip_index);
+        if index.is_none() {
+            return;
+        }
+        let index = index.unwrap().0;
+        self.slips.remove(index);
+        // self.slips
+        // .iter_mut() //.remove(&slip.utxoset_key);
+        // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -196,26 +209,18 @@ impl Wallet {
             .into_par_iter()
             .filter(|s| !s.spent)
             .map(|s| s.amount)
-            // .into_par_iter()
             .sum::<u64>()
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        // let mut unspent_slip_count: u64 = 0;
         (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
-        // for slip in &self.slips {
-        //     if !slip.spent {
-        //         unspent_slip_count += 1;
-        //     }
-        // }
-        // unspent_slip_count
     }
 
     // the nolan_requested is omitted from the slips created - only the change
     // address is provided as an output. so make sure that any function calling
     // this manually creates the output for its desired payment
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn generate_slips(&mut self, nolan_requested: u64) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = vec![];
         let mut outputs: Vec<Slip> = vec![];
