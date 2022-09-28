@@ -1,4 +1,5 @@
 use crate::SpammerConfigs;
+use std::cmp::min;
 use std::collections::LinkedList;
 
 use crate::saito::time_keeper::TimeKeeper;
@@ -14,6 +15,7 @@ use saito_core::{
 use rayon::prelude::*;
 use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -232,19 +234,32 @@ impl TransactionGenerator {
         let tx_size = self.tx_size.clone();
         return tokio::spawn(async move {
             let time_keeper = TimeKeeper {};
-            for _i in 0..tx_count {
-                log_write_lock_request!("wallet");
-                let mut wallet = wallet.write().await;
-                log_write_lock_receive!("wallet");
-                let mut transaction = Transaction::create(&mut wallet, public_key, 1, 1);
-                transaction.message = generate_random_bytes(tx_size as u64);
-                transaction.timestamp = time_keeper.get_timestamp();
-                transaction.generate(public_key, 0, 0);
-                transaction.sign(private_key);
-                transaction.add_hop(&wallet, public_key);
 
-                // transactions.push_back(transaction);
-                sender.send(transaction).await.unwrap();
+            let mut required_count = tx_count;
+
+            loop {
+                {
+                    log_write_lock_request!("wallet");
+                    let mut wallet = wallet.write().await;
+                    log_write_lock_receive!("wallet");
+                    let create_count = min(10000, required_count);
+                    for _i in 0..create_count {
+                        let mut transaction = Transaction::create(&mut wallet, public_key, 1, 1);
+                        transaction.message = generate_random_bytes(tx_size as u64);
+                        transaction.timestamp = time_keeper.get_timestamp();
+                        transaction.generate(public_key, 0, 0);
+                        transaction.sign(private_key);
+                        transaction.add_hop(&wallet, public_key);
+
+                        sender.send(transaction).await.unwrap();
+
+                        required_count -= 1;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                if required_count == 0 {
+                    break;
+                }
             }
             info!("Test transactions created, count : {:?}", tx_count);
         });

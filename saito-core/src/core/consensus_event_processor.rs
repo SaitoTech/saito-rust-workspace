@@ -5,7 +5,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
@@ -25,8 +25,8 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_millis() as u64;
-pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_millis() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_micros() as u64;
+pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_micros() as u64;
 
 #[derive(Debug)]
 pub enum ConsensusEvent {
@@ -247,6 +247,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
         let duration_value = duration.as_micros() as u64;
 
         if self.generate_genesis_block {
+            Self::generate_spammer_init_tx(
+                self.mempool.clone(),
+                self.wallet.clone(),
+                self.blockchain.clone(),
+            )
+            .await;
+
             {
                 log_write_lock_request!("blockchain");
                 let mut blockchain = self.blockchain.write().await;
@@ -274,12 +281,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                         .await;
                 }
             }
-            Self::generate_spammer_init_tx(
-                self.mempool.clone(),
-                self.wallet.clone(),
-                self.blockchain.clone(),
-            )
-            .await;
+
             self.generate_genesis_block = false;
             return Some(());
         }
@@ -305,7 +307,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 
         // generate blocks
         let mut can_bundle = false;
-        self.block_producing_timer = self.block_producing_timer + duration_value;
+        self.block_producing_timer += duration_value;
         // TODO : make timers configurable
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
             log_read_lock_request!("blockchain");
@@ -429,7 +431,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             }
             ConsensusEvent::NewTransaction { mut transaction } => {
                 transaction.generate_hash_for_signature();
-                debug!(
+                trace!(
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)
                 );

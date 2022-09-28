@@ -57,7 +57,7 @@ pub mod test {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis() as u64
+            .as_micros() as u64
     }
 
     pub struct TestManager {

@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::io::Error;
+use std::mem;
 
 use std::sync::Arc;
 

@@ -101,11 +101,14 @@ impl Spammer {
             if !self.bootstrap_done {
                 self.tx_generator.on_new_block().await;
                 self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
-                work_done = true;
+                // work_done = true;
             }
 
             if !work_done {
-                tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
+                // tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
+                tokio::time::sleep(Duration::from_millis(1000)).await;
+            } else {
+                // break;
             }
         }
 
