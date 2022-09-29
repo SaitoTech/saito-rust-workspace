@@ -492,7 +492,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             println!(
                 "--- stats ------ {} - slips : {:?}",
                 format!("{:width$}", "wallet::state", width = 30),
-                wallet.slips.len()
+                wallet.spent_slips.len()
             );
         }
         {
