@@ -8,7 +8,7 @@ use std::sync::Arc;
 use ahash::AHashMap;
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockWriteGuard};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::common::defs::{SaitoHash, UtxoSet};
@@ -190,7 +190,7 @@ impl Blockchain {
                                     );
                                 }
                                 log_write_lock_request!("mempool");
-                                let mut mempool = mempool.write().await;
+                                let mut mempool: RwLockWriteGuard<Mempool> = mempool.write().await;
                                 log_write_lock_receive!("mempool");
                                 debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
                                     hex::encode(block.hash),
@@ -1441,7 +1441,7 @@ impl Blockchain {
         }
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
 
-        debug!("blocks to add : {:?}", blocks.len());
+        info!("blocks to add : {:?}", blocks.len());
         while let Some(block) = blocks.pop_front() {
             self.add_block(
                 block,
@@ -1452,6 +1452,7 @@ impl Blockchain {
             )
             .await;
         }
+        info!("added {:?} blocks to blockchain", blocks.len());
     }
 }
 

@@ -1,10 +1,11 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::io::Error;
 
 use async_trait::async_trait;
 
 use crate::common::defs::SaitoHash;
 use crate::core::data;
+use crate::core::data::configuration::PeerConfig;
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
 #[async_trait]
@@ -114,3 +115,4 @@ pub trait InterfaceIO: Debug {
 //         f.debug_struct("IoInterface").finish()
 //     }
 // }
+//
