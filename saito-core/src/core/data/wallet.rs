@@ -12,7 +12,7 @@ use crate::core::data::transaction::{Transaction, TransactionType};
 use ahash::HashMap;
 use rayon::prelude::*;
 use std::collections::{LinkedList, VecDeque};
-use tracing::info;
+use tracing::{info, warn};
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -184,21 +184,42 @@ impl Wallet {
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
         // assert!(!self.slips.contains_key(&wallet_slip.utxokey));
+        let existing = self.slips.par_iter().any(|x| {
+            x.block_id == slip.block_id
+                && x.tx_ordinal == slip.tx_ordinal
+                && x.slip_index == slip.slip_index
+        });
+        assert!(!existing);
         self.slips.push_back(wallet_slip);
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.slips.retain(|x| {
-            x.block_id != slip.block_id
-                || x.tx_ordinal != slip.tx_ordinal
-                || x.slip_index != slip.slip_index
+        let results: Vec<&WalletSlip> = self
+            .slips
+            .par_iter()
+            .filter(|x| {
+                x.block_id == slip.block_id
+                    && x.tx_ordinal == slip.tx_ordinal
+                    && x.slip_index == slip.slip_index
+            })
+            .collect();
+
+        assert!(results.len() <= 1);
+
+        let result = self.slips.par_iter().enumerate().find_any(|(index, x)| {
+            x.block_id == slip.block_id
+                && x.tx_ordinal == slip.tx_ordinal
+                && x.slip_index == slip.slip_index
         });
 
-        // self.slips.remove(&slip.utxoset_key).unwrap();
-        // self.slips
-        // .iter_mut() //.remove(&slip.utxoset_key);
-        // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
+        if result.is_none() {
+            warn!("slip not found");
+            return;
+        }
+
+        let result = result.unwrap();
+        self.slips.remove(result.0);
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
