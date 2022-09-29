@@ -44,6 +44,7 @@ pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
     pub slips: HashMap<SaitoUTXOSetKey, WalletSlip>,
+    pub unspent_slips: HashSet<SaitoUTXOSetKey>,
     pub filename: String,
     pub filepass: String,
 }
@@ -56,6 +57,7 @@ impl Wallet {
             public_key,
             private_key,
             slips: Default::default(),
+            unspent_slips: Default::default(),
             filename: "default".to_string(),
             filepass: "password".to_string(),
         }
@@ -194,14 +196,7 @@ impl Wallet {
         wallet_slip.block_id = block.id;
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
-        // assert!(!self.slips.contains_key(&wallet_slip.utxokey));
-        // let existing = self.slips.par_iter().any(|x| {
-        //     // x.block_id == slip.block_id
-        //     //     && x.tx_ordinal == slip.tx_ordinal
-        //     //     && x.slip_index == slip.slip_index
-        //     x.utxokey == slip.utxoset_key
-        // });
-        // assert!(!existing);
+        self.unspent_slips.insert(wallet_slip.utxokey);
         let result = self.slips.insert(wallet_slip.utxokey, wallet_slip);
         assert!(result.is_none());
     }
@@ -233,6 +228,7 @@ impl Wallet {
         //
         // let result = result.unwrap();
         // self.slips.remove(result.0);
+        self.unspent_slips.remove(&slip.utxoset_key);
         self.slips.remove(&slip.utxoset_key);
     }
 
@@ -264,24 +260,29 @@ impl Wallet {
         //
         // grab inputs
         //
-        self.slips
-            .iter_mut()
-            .filter(|(key, slip)| !slip.spent)
-            .for_each(|(key, slip)| {
-                if nolan_in < nolan_requested {
-                    nolan_in += slip.amount;
+        let mut keys_to_remove = vec![];
+        for key in self.unspent_slips.iter() {
+            if nolan_in >= nolan_requested {
+                break;
+            }
+            let slip = self.slips.get_mut(key).expect("slip should be here");
+            nolan_in += slip.amount;
 
-                    let mut input = Slip::new();
-                    input.public_key = my_public_key;
-                    input.amount = slip.amount;
-                    input.block_id = slip.block_id;
-                    input.tx_ordinal = slip.tx_ordinal;
-                    input.slip_index = slip.slip_index;
-                    inputs.push(input);
+            let mut input = Slip::new();
+            input.public_key = my_public_key;
+            input.amount = slip.amount;
+            input.block_id = slip.block_id;
+            input.tx_ordinal = slip.tx_ordinal;
+            input.slip_index = slip.slip_index;
+            inputs.push(input);
 
-                    slip.spent = true;
-                }
-            });
+            keys_to_remove.push(slip.utxokey);
+        }
+
+        for key in keys_to_remove {
+            self.unspent_slips.remove(&key);
+        }
+        // self.unspent_slips.iter_mut().for_each(|key| {});
         // for slip in &mut self.slips {
         //     if !slip.spent {
         //
