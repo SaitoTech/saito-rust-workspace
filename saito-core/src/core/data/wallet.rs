@@ -32,7 +32,6 @@ pub struct WalletSlip {
     pub amount: u64,
     pub block_id: u64,
     pub tx_ordinal: u64,
-    pub block_hash: SaitoHash,
     pub lc: bool,
     pub slip_index: u8,
     pub spent: bool,
@@ -181,10 +180,9 @@ impl Wallet {
         wallet_slip.amount = slip.amount;
         wallet_slip.slip_index = slip.slip_index;
         wallet_slip.block_id = block.id;
-        wallet_slip.block_hash = block.hash;
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
-        debug_assert!(!self.slips.contains_key(&wallet_slip.utxokey));
+        assert!(!self.slips.contains_key(&wallet_slip.utxokey));
         self.slips.insert(wallet_slip.utxokey.clone(), wallet_slip);
     }
 
@@ -200,7 +198,7 @@ impl Wallet {
         //     return;
         // }
         // let index = index.unwrap().0;
-        self.slips.remove(&slip.utxoset_key);
+        self.slips.remove(&slip.utxoset_key).unwrap();
         // self.slips
         // .iter_mut() //.remove(&slip.utxoset_key);
         // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
@@ -342,7 +340,6 @@ impl WalletSlip {
             amount: 0,
             block_id: 0,
             tx_ordinal: 0,
-            block_hash: [0; 32],
             lc: true,
             slip_index: 0,
             spent: false,
