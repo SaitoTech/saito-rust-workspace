@@ -324,10 +324,11 @@ impl Wallet {
         // TODO : to be implemented
         Transaction::new()
     }
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub async fn create_golden_ticket_transaction(
-        &mut self,
         golden_ticket: GoldenTicket,
+        public_key: &SaitoPublicKey,
+        private_key: &SaitoPrivateKey,
     ) -> Transaction {
         let mut transaction = Transaction::new();
 
@@ -336,13 +337,13 @@ impl Wallet {
         transaction.message = golden_ticket.serialize_for_net();
 
         let mut input1 = Slip::new();
-        input1.public_key = self.public_key;
+        input1.public_key = public_key.clone();
         input1.amount = 0;
         input1.block_id = 0;
         input1.tx_ordinal = 0;
 
         let mut output1 = Slip::new();
-        output1.public_key = self.public_key;
+        output1.public_key = public_key.clone();
         output1.amount = 0;
         output1.block_id = 0;
         output1.tx_ordinal = 0;
@@ -353,7 +354,7 @@ impl Wallet {
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.hash_for_signature = Some(hash_for_signature);
 
-        transaction.sign(&self.private_key);
+        transaction.sign(private_key);
 
         transaction
     }

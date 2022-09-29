@@ -1028,7 +1028,7 @@ mod tests {
         let wallet = Wallet::new();
 
         tx.outputs = vec![Slip::new()];
-        tx.sign(wallet.private_key);
+        tx.sign(&wallet.private_key);
 
         assert_eq!(tx.outputs[0].slip_index, 0);
         assert_ne!(tx.signature, [0; 64]);
@@ -1127,7 +1127,7 @@ mod tests {
         tx.outputs.push(output_slip);
 
         tx.sign(
-            <[u8; 32]>::from_hex(
+            &<[u8; 32]>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
             .unwrap(),
@@ -1197,14 +1197,14 @@ mod tests {
             hex::encode(public_key),
             "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
         );
-        tx.generate(public_key, 0, 0);
+        tx.generate(&public_key, 0, 0);
         let sig: SaitoSignature = tx.signature;
 
         assert_eq!(hex::decode("0000017d26dd628a03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce76100000000000000000000000000000000000000000000000000000000000000000000000000000015900000000000100000003616263").unwrap()
                    ,tx.serialize_for_signature());
-        let result = verify(tx.serialize_for_signature().as_slice(), sig, public_key);
+        let result = verify(tx.serialize_for_signature().as_slice(), &sig, &public_key);
         assert!(result);
-        let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), sig, public_key);
+        let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), &sig, &public_key);
         assert!(result);
     }
 }

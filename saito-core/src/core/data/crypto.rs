@@ -178,12 +178,12 @@ mod tests {
 
         let (public, _) = generate_keypair_from_private_key(&private_key);
 
-        let signature = sign(&msg, private_key);
+        let signature = sign(&msg, &private_key);
         assert_eq!(signature.len(), 64);
         let hex_str = hex::encode(signature);
         assert_eq!(hex_str, "11c0e19856726c42c8ac3ec8e469057f5f8a882f7206377525db00899835b03f6ec3010d19534a5703dd9b1004b4f0e31d19582cdd5aec794541d0d0f339db7c");
 
-        let result = verify(&msg, signature, public);
+        let result = verify(&msg, &signature, &public);
         assert!(result);
     }
 
@@ -197,9 +197,9 @@ mod tests {
         let (public_key, private_key) = generate_keys();
         let (public_key2, private_key2) = generate_keys();
 
-        assert_eq!(verify(&msg, sign(&msg, private_key), public_key), true);
-        assert_eq!(verify(&msg, sign(&msg, private_key2), public_key2), true);
-        assert_eq!(verify(&msg, sign(&msg, private_key), public_key2), false);
-        assert_eq!(verify(&msg, sign(&msg, private_key2), public_key), false);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key), &public_key), true);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key2), &public_key2), true);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key), &public_key2), false);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key2), &public_key), false);
     }
 }

@@ -182,8 +182,8 @@ impl TransactionGenerator {
         }
 
         transaction.timestamp = time_keeper.get_timestamp();
-        transaction.generate(public_key, 0, 0);
-        transaction.sign(private_key);
+        transaction.generate(&public_key, 0, 0);
+        transaction.sign(&private_key);
         // transaction.add_hop(self.wallet.clone(), public_key).await;
 
         return transaction;

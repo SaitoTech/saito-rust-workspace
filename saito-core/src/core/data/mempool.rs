@@ -81,18 +81,18 @@ impl Mempool {
     }
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
-        debug!(
+        info!(
             "adding golden ticket : {:?}",
             hex::encode(hash(&golden_ticket.serialize_for_net()))
         );
-        let transaction;
         let target = golden_ticket.target;
-        {
-            log_write_lock_request!("mempool:add_golden_ticket::wallet");
-            let mut wallet = self.wallet_lock.write().await;
-            log_write_lock_receive!("mempool:add_golden_ticket::wallet");
-            transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
-        }
+
+        let transaction = Wallet::create_golden_ticket_transaction(
+            golden_ticket,
+            &self.public_key,
+            &self.private_key,
+        )
+        .await;
         for tx in self.transactions.iter() {
             if let TransactionType::GoldenTicket = tx.transaction_type {
                 let gt = GoldenTicket::deserialize_from_net(&tx.message);
@@ -349,14 +349,14 @@ mod tests {
     #[test]
     fn mempool_new_test() {
         let wallet = Wallet::new();
-        let mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
+        let mempool = Mempool::new(Arc::new(RwLock::new(wallet)), [0; 33], [0; 32]);
         assert_eq!(mempool.blocks_queue, VecDeque::new());
     }
 
     #[test]
     fn mempool_add_block_test() {
         let wallet = Wallet::new();
-        let mut mempool = Mempool::new(Arc::new(RwLock::new(wallet)));
+        let mut mempool = Mempool::new(Arc::new(RwLock::new(wallet)), [0; 33], [0; 32]);
         let block = Block::new();
         mempool.add_block(block.clone());
         assert_eq!(Some(block), mempool.blocks_queue.pop_front())
@@ -406,11 +406,11 @@ mod tests {
                 // _i prevents sig from being identical during test
                 // and thus from being auto-rejected from mempool
                 tx.timestamp = ts + 120000 + _i;
-                tx.generate(public_key, 0, 0);
-                tx.sign(private_key);
+                tx.generate(&public_key, 0, 0);
+                tx.sign(&private_key);
             }
             let wallet = wallet_lock.read().await;
-            tx.add_hop(&wallet, public_key);
+            tx.add_hop(&wallet, &public_key);
 
             mempool.add_transaction(tx).await;
         }

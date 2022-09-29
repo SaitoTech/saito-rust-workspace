@@ -1591,7 +1591,7 @@ impl Block {
                 );
                 if !gt.validate(previous_block.difficulty) {
                     error!(
-                        "ERROR 801923: Golden Ticket solution does not validate against previous block hash : {:?}, difficulty : {:?}, random : {:?}, key : {:?}", 
+                        "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?}", 
                         hex::encode(previous_block.hash),
                         previous_block.difficulty,
                         hex::encode(gt.random),
@@ -1838,7 +1838,7 @@ mod tests {
         .unwrap();
 
         block.sign(
-            <[u8; 32]>::from_hex(
+            &<[u8; 32]>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
             .unwrap(),
@@ -1934,12 +1934,12 @@ mod tests {
         let mut block = Block::new();
         block.creator = wallet.public_key;
         block.generate();
-        block.sign(wallet.private_key);
+        block.sign(&wallet.private_key);
         block.generate_hash();
 
         assert_eq!(block.creator, wallet.public_key);
         assert_eq!(
-            verify_hash(&block.pre_hash, block.signature, block.creator),
+            verify_hash(&block.pre_hash, &block.signature, &block.creator),
             true
         );
         assert_ne!(block.hash, [0; 32]);
@@ -1955,7 +1955,7 @@ mod tests {
             .into_iter()
             .map(|_| {
                 let mut transaction = Transaction::new();
-                transaction.sign(wallet.private_key);
+                transaction.sign(&wallet.private_key);
                 transaction
             })
             .collect();
@@ -1977,7 +1977,7 @@ mod tests {
         let transactions = join_all((0..5).into_iter().map(|_| async {
             let mut transaction = Transaction::new();
             let wallet = wallet_lock.read().await;
-            transaction.sign(wallet.private_key);
+            transaction.sign(&wallet.private_key);
             transaction
         }))
         .await

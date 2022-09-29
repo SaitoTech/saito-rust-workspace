@@ -339,8 +339,8 @@ mod test {
         //     hex::encode(block.serialize_for_signature()));
         let result = verify(
             &block.serialize_for_signature(),
-            block.signature,
-            block.creator,
+            &block.signature,
+            &block.creator,
         );
         assert!(result);
 

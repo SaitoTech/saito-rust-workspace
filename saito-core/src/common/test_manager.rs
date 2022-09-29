@@ -74,10 +74,17 @@ pub mod test {
 
     impl TestManager {
         pub fn new() -> Self {
+            let wallet = Wallet::new();
+            let public_key = wallet.public_key.clone();
+            let private_key = wallet.private_key.clone();
             let peers = Arc::new(RwLock::new(PeerCollection::new()));
-            let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
+            let wallet_lock = Arc::new(RwLock::new(wallet));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-            let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
+            let mempool_lock = Arc::new(RwLock::new(Mempool::new(
+                wallet_lock.clone(),
+                public_key,
+                private_key,
+            )));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
 
             Self {
@@ -422,8 +429,8 @@ pub mod test {
                     transaction = Transaction::create(&mut wallet, public_key, txs_amount, txs_fee);
                 }
 
-                transaction.sign(private_key);
-                transaction.generate(public_key, 0, 0);
+                transaction.sign(&private_key);
+                transaction.generate(&public_key, 0, 0);
                 transactions.push(transaction);
             }
 
@@ -439,9 +446,14 @@ pub mod test {
                 let mut gttx: Transaction;
                 {
                     let mut wallet = self.wallet_lock.write().await;
-                    gttx = wallet.create_golden_ticket_transaction(golden_ticket).await;
+                    gttx = Wallet::create_golden_ticket_transaction(
+                        golden_ticket,
+                        &wallet.public_key,
+                        &wallet.private_key,
+                    )
+                    .await;
                 }
-                gttx.generate(public_key, 0, 0);
+                gttx.generate(&public_key, 0, 0);
                 transactions.push(gttx);
             }
 
@@ -451,13 +463,14 @@ pub mod test {
             let mut block = Block::create(
                 &mut transactions,
                 parent_hash,
-                self.wallet_lock.clone(),
                 self.blockchain_lock.clone().write().await.borrow_mut(),
                 timestamp,
+                &public_key,
+                &private_key,
             )
             .await;
             block.generate();
-            block.sign(private_key);
+            block.sign(&private_key);
 
             block
         }
@@ -536,17 +549,21 @@ pub mod test {
             //
             for _i in 0..vip_transactions {
                 let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
-                tx.generate(public_key, 0, 0);
-                tx.sign(private_key);
+                tx.generate(&public_key, 0, 0);
+                tx.sign(&private_key);
                 block.add_transaction(tx);
             }
 
             // we have added VIP, so need to regenerate the merkle-root
             block.merkle_root = block.generate_merkle_root();
             block.generate();
-            block.sign(private_key);
+            block.sign(&private_key);
 
-            assert!(verify_hash(&block.pre_hash, block.signature, block.creator));
+            assert!(verify_hash(
+                &block.pre_hash,
+                &block.signature,
+                &block.creator
+            ));
 
             // and add first block to blockchain
             self.add_block(block).await;

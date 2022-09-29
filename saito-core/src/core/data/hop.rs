@@ -103,7 +103,7 @@ mod tests {
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
         let wallet = wallet.read().await;
-        let hop = Hop::generate(&wallet, receiver_public_key, &tx);
+        let hop = Hop::generate(&wallet, &receiver_public_key, &tx);
 
         assert_eq!(hop.from, sender_public_key);
         assert_eq!(hop.to, receiver_public_key);
@@ -115,12 +115,12 @@ mod tests {
         let mut tx = Transaction::new();
         {
             let w = wallet.read().await;
-            tx.sign(w.private_key);
+            tx.sign(&w.private_key);
         }
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
         let wallet = wallet.read().await;
-        let hop = Hop::generate(&wallet, receiver_public_key, &tx);
+        let hop = Hop::generate(&wallet, &receiver_public_key, &tx);
 
         let hop2 = Hop::deserialize_from_net(&hop.serialize_for_net());
 
@@ -132,7 +132,7 @@ mod tests {
         buffer.extend(tx.signature.to_vec());
         buffer.extend(hop.to.to_vec());
         let hash = hash(&buffer);
-        let result = verify(&hash, hop.sig, hop.from);
+        let result = verify(&hash, &hop.sig, &hop.from);
         assert!(result);
     }
 }
