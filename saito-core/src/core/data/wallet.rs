@@ -160,7 +160,7 @@ impl Wallet {
     //
     // removes all slips in block when pruned / deleted
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_block(&mut self, block: &Block) {
         for tx in block.transactions.iter() {
             for input in tx.inputs.iter() {
@@ -174,7 +174,7 @@ impl Wallet {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn add_slip(&mut self, block: &Block, tx_index: u64, slip: &Slip, lc: bool) {
         let mut wallet_slip = WalletSlip::new();
 
@@ -189,23 +189,19 @@ impl Wallet {
         self.unspent_slips.push_back(wallet_slip);
     }
 
-    #[tracing::instrument(level = "trace", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        let index = self.spent_slips.iter().enumerate().find(|x| {
-            x.1.block_id == slip.block_id
-                && x.1.tx_ordinal == slip.tx_ordinal
-                && x.1.slip_index == slip.slip_index
+        self.spent_slips.retain(|x| {
+            x.block_id != slip.block_id
+                || x.tx_ordinal != slip.tx_ordinal
+                || x.slip_index != slip.slip_index
         });
-        if index.is_some() {
-            self.spent_slips.remove(index.unwrap().0);
-        } else {
-            let index = self.unspent_slips.iter().enumerate().find(|x| {
-                x.1.block_id == slip.block_id
-                    && x.1.tx_ordinal == slip.tx_ordinal
-                    && x.1.slip_index == slip.slip_index
-            });
-            self.unspent_slips.remove(index.unwrap().0);
-        }
+
+        self.unspent_slips.retain(|x| {
+            x.block_id != slip.block_id
+                || x.tx_ordinal != slip.tx_ordinal
+                || x.slip_index != slip.slip_index
+        });
 
         // self.slips.remove(&slip.utxoset_key).unwrap();
         // self.slips
@@ -213,7 +209,7 @@ impl Wallet {
         // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
-    #[tracing::instrument(level = "trace", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn get_available_balance(&self) -> u64 {
         (&self.unspent_slips)
             .into_par_iter()
@@ -221,9 +217,9 @@ impl Wallet {
             .sum::<u64>()
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        (&self.unspent_slips).into_par_iter().count() as u64
+        self.unspent_slips.len() as u64
     }
 
     // the nolan_requested is omitted from the slips created - only the change
