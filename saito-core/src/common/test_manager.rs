@@ -121,14 +121,19 @@ pub mod test {
         //
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
+            log_write_lock_request!("blockchain");
             let mut blockchain = self.blockchain_lock.write().await;
+            log_write_lock_receive!("blockchain");
+            log_write_lock_request!("mempool");
+            let mut mempool = self.mempool_lock.write().await;
+            log_write_lock_receive!("mempool");
             blockchain
                 .add_block(
                     block,
                     &mut self.network,
                     &mut self.storage,
                     self.sender_to_miner.clone(),
-                    self.mempool_lock.clone(),
+                    &mut mempool,
                 )
                 .await;
             debug!("block added to test manager blockchain");
