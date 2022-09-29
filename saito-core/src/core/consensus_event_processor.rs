@@ -490,9 +490,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("wallet");
             println!(
-                "--- stats ------ {} - slips : {:?}",
+                "--- stats ------ {} - total_slips : {:?} unspent : {:?} spent : {:?}",
                 format!("{:width$}", "wallet::state", width = 30),
-                wallet.spent_slips.len()
+                wallet.unspent_slips.len() + wallet.spent_slips.len(),
+                wallet.unspent_slips.len(),
+                wallet.spent_slips.len(),
             );
         }
         {
