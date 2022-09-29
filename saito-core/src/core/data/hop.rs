@@ -32,7 +32,7 @@ impl Hop {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate(wallet: &Wallet, to_public_key: SaitoPublicKey, tx: &Transaction) -> Hop {
+    pub fn generate(wallet: &Wallet, to_public_key: &SaitoPublicKey, tx: &Transaction) -> Hop {
         let mut hop = Hop::new();
 
         //
@@ -40,12 +40,12 @@ impl Hop {
         //
         let mut vbytes: Vec<u8> = vec![];
         vbytes.extend(tx.signature);
-        vbytes.extend(&to_public_key);
+        vbytes.extend(to_public_key);
         let hash_to_sign = hash(&vbytes);
 
         hop.from = wallet.public_key;
-        hop.to = to_public_key;
-        hop.sig = sign(&hash_to_sign, wallet.private_key);
+        hop.to = to_public_key.clone();
+        hop.sig = sign(&hash_to_sign, &wallet.private_key);
 
         hop
     }

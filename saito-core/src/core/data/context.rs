@@ -19,13 +19,20 @@ pub struct Context {
 
 impl Context {
     pub fn new(configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>) -> Context {
-        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let wallet = Wallet::new();
+        let public_key = wallet.public_key.clone();
+        let private_key = wallet.private_key.clone();
+        let wallet = Arc::new(RwLock::new(wallet));
         Context {
             blockchain: Arc::new(RwLock::new(Blockchain::new(
                 wallet.clone(),
                 // global_sender.clone(),
             ))),
-            mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
+            mempool: Arc::new(RwLock::new(Mempool::new(
+                wallet.clone(),
+                public_key,
+                private_key,
+            ))),
             wallet: wallet.clone(),
             configuration: configs,
         }

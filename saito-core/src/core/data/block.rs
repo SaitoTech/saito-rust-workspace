@@ -273,22 +273,16 @@ impl Block {
     pub async fn create(
         transactions: &mut Vec<Transaction>,
         previous_block_hash: SaitoHash,
-        wallet_lock: Arc<RwLock<Wallet>>,
         blockchain: &mut Blockchain,
         current_timestamp: u64,
+        public_key: &SaitoPublicKey,
+        private_key: &SaitoPrivateKey,
     ) -> Block {
         debug!(
             "Block::create : previous block hash : {:?}",
             hex::encode(previous_block_hash)
         );
 
-        let public_key;
-        {
-            log_read_lock_request!("wallet");
-            let wallet = wallet_lock.read().await;
-            log_read_lock_receive!("wallet");
-            public_key = wallet.public_key;
-        }
         let mut previous_block_id = 0;
         let mut previous_block_burnfee = 0;
         let mut previous_block_timestamp = 0;
@@ -320,7 +314,7 @@ impl Block {
         block.timestamp = current_timestamp;
         block.difficulty = previous_block_difficulty;
 
-        block.creator = public_key;
+        block.creator = public_key.clone();
 
         //
         // in-memory swap copying txs in block from mempool
@@ -369,7 +363,7 @@ impl Block {
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
             .par_iter_mut()
             .enumerate()
-            .all(|(index, tx)| tx.generate(public_key, index as u64, block.id));
+            .all(|(index, tx)| tx.generate(&public_key, index as u64, block.id));
         if rlen > 0 {
             block.transactions.append(&mut cv.rebroadcasts);
         }
@@ -388,12 +382,7 @@ impl Block {
             let mut fee_tx = cv.fee_transaction.unwrap();
             let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
             fee_tx.hash_for_signature = Some(hash_for_signature);
-            {
-                log_read_lock_request!("wallet");
-                let wallet = wallet_lock.read().await;
-                log_read_lock_receive!("wallet");
-                fee_tx.sign(wallet.private_key);
-            }
+            fee_tx.sign(private_key);
             //
             // and we add it to the block
             //
@@ -465,14 +454,8 @@ impl Block {
         block.avg_atr_income = cv.avg_atr_income;
         block.avg_atr_variance = cv.avg_atr_variance;
 
-        {
-            log_read_lock_request!("wallet");
-            let wallet = wallet_lock.read().await;
-            log_read_lock_receive!("wallet");
-
-            block.generate_pre_hash();
-            block.sign(wallet.private_key);
-        }
+        block.generate_pre_hash();
+        block.sign(private_key);
 
         //
         // hash includes pre-hash and sig, so update
@@ -695,11 +678,12 @@ impl Block {
         // public_key of the block creator when we calculate the fees
         // and the routing work.
         //
-        let creator_public_key = self.creator;
 
         // ensure hashes correct
         self.generate_pre_hash();
         self.generate_hash();
+
+        let creator_public_key = &self.creator;
 
         trace!("generating block data : {:?}", hex::encode(self.hash));
 
@@ -1214,7 +1198,7 @@ impl Block {
     // we do this together out of convenience only
 
     #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
-    pub fn sign(&mut self, private_key: SaitoPrivateKey) {
+    pub fn sign(&mut self, private_key: &SaitoPrivateKey) {
         // we set final data
         self.signature = sign(&self.serialize_for_signature(), private_key);
     }
@@ -1404,7 +1388,7 @@ impl Block {
         // );
 
         // verify signed by creator
-        if !verify_hash(&self.pre_hash, self.signature, self.creator) {
+        if !verify_hash(&self.pre_hash, &self.signature, &self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
@@ -1690,7 +1674,7 @@ impl Block {
                 // block-specific data in the same way that all of the transactions in
                 // the block have been. we must do this prior to comparing them.
                 //
-                fee_transaction.generate(self.creator, ft_index as u64, self.id);
+                fee_transaction.generate(&self.creator, ft_index as u64, self.id);
                 let checked_tx = self.transactions.get(ft_index).unwrap();
 
                 let hash1 = hash(&fee_transaction.serialize_for_signature());

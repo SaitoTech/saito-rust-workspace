@@ -121,12 +121,12 @@ pub mod test {
         //
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
-            log_write_lock_request!("blockchain");
+            log_write_lock_request!("test_manager:add_block::blockchain");
             let mut blockchain = self.blockchain_lock.write().await;
-            log_write_lock_receive!("blockchain");
-            log_write_lock_request!("mempool");
+            log_write_lock_receive!("test_manager:add_block::blockchain");
+            log_write_lock_request!("test_manager:add_block::mempool");
             let mut mempool = self.mempool_lock.write().await;
-            log_write_lock_receive!("mempool");
+            log_write_lock_receive!("test_manager:add_block::mempool");
             blockchain
                 .add_block(
                     block,
@@ -416,9 +416,9 @@ pub mod test {
             for _i in 0..txs_number {
                 let mut transaction;
                 {
-                    log_write_lock_request!("wallet");
+                    log_write_lock_request!("test_manager:create_block::wallet");
                     let mut wallet = self.wallet_lock.write().await;
-                    log_write_lock_receive!("wallet");
+                    log_write_lock_receive!("test_manager:create_block::wallet");
                     transaction = Transaction::create(&mut wallet, public_key, txs_amount, txs_fee);
                 }
 

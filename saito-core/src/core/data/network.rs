@@ -100,7 +100,7 @@ impl Network {
                 continue;
             }
             let mut transaction = transaction.clone();
-            transaction.add_hop(&wallet, peer.public_key);
+            transaction.add_hop(&wallet, &peer.public_key);
             let message = Message::Transaction(transaction);
             self.io_interface
                 .send_message(*index, message.serialize())

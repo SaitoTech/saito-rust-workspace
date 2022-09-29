@@ -68,7 +68,10 @@ pub fn generate_keypair_from_private_key(slice: &[u8]) -> (SaitoPublicKey, Saito
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn sign_blob(vbytes: &mut Vec<u8>, private_key: SaitoPrivateKey) -> &mut Vec<u8> {
+pub fn sign_blob<'a, 'b>(
+    vbytes: &'a mut Vec<u8>,
+    private_key: &'b SaitoPrivateKey,
+) -> &'a mut Vec<u8> {
     let sig = sign(&hash(vbytes.as_ref()), private_key);
     vbytes.extend(&sig);
     vbytes
@@ -97,25 +100,25 @@ pub fn hash(data: &Vec<u8>) -> SaitoHash {
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn sign(message_bytes: &[u8], private_key: SaitoPrivateKey) -> SaitoSignature {
+pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignature {
     let hash = hash(&message_bytes.to_vec());
     let msg = Message::from_slice(&hash).unwrap();
-    let secret = SecretKey::from_slice(&private_key).unwrap();
+    let secret = SecretKey::from_slice(private_key).unwrap();
     let sig = SECP256K1.sign(&msg, &secret);
     sig.serialize_compact()
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn verify(msg: &[u8], sig: SaitoSignature, public_key: SaitoPublicKey) -> bool {
+pub fn verify(msg: &[u8], sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let hash = hash(&msg.to_vec());
     verify_hash(&hash, sig, public_key)
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn verify_hash(hash: &SaitoHash, sig: SaitoSignature, public_key: SaitoPublicKey) -> bool {
+pub fn verify_hash(hash: &SaitoHash, sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let m = Message::from_slice(hash);
-    let p = PublicKey::from_slice(&public_key);
-    let s = Signature::from_compact(&sig);
+    let p = PublicKey::from_slice(public_key);
+    let s = Signature::from_compact(sig);
     if m.is_err() || p.is_err() || s.is_err() {
         false
     } else {

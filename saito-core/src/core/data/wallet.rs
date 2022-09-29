@@ -118,13 +118,13 @@ impl Wallet {
 
     /// [private_key - 32 bytes
     /// [public_key - 33 bytes]
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
         self.private_key = bytes[0..32].try_into().unwrap();
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
@@ -184,28 +184,29 @@ impl Wallet {
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
         // assert!(!self.slips.contains_key(&wallet_slip.utxokey));
-        let existing = self.slips.par_iter().any(|x| {
-            x.block_id == slip.block_id
-                && x.tx_ordinal == slip.tx_ordinal
-                && x.slip_index == slip.slip_index
-        });
-        assert!(!existing);
+        // let existing = self.slips.par_iter().any(|x| {
+        //     // x.block_id == slip.block_id
+        //     //     && x.tx_ordinal == slip.tx_ordinal
+        //     //     && x.slip_index == slip.slip_index
+        //     x.utxokey == slip.utxoset_key
+        // });
+        // assert!(!existing);
         self.slips.push_back(wallet_slip);
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        let results: Vec<&WalletSlip> = self
-            .slips
-            .par_iter()
-            .filter(|x| {
-                x.block_id == slip.block_id
-                    && x.tx_ordinal == slip.tx_ordinal
-                    && x.slip_index == slip.slip_index
-            })
-            .collect();
-
-        assert!(results.len() <= 1);
+        // let results: Vec<&WalletSlip> = self
+        //     .slips
+        //     .par_iter()
+        //     .filter(|x| {
+        //         x.block_id == slip.block_id
+        //             && x.tx_ordinal == slip.tx_ordinal
+        //             && x.slip_index == slip.slip_index
+        //     })
+        //     .collect();
+        //
+        // assert!(results.len() <= 1);
 
         let result = self.slips.par_iter().enumerate().find_any(|(index, x)| {
             x.block_id == slip.block_id
@@ -314,7 +315,7 @@ impl Wallet {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn sign(&self, message_bytes: &[u8]) -> SaitoSignature {
-        sign(message_bytes, self.private_key)
+        sign(message_bytes, &self.private_key)
     }
 
     pub async fn create_transaction_with_default_fees(&self) -> Transaction {
@@ -350,7 +351,7 @@ impl Wallet {
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.hash_for_signature = Some(hash_for_signature);
 
-        transaction.sign(self.private_key);
+        transaction.sign(&self.private_key);
 
         transaction
     }

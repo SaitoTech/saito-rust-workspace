@@ -40,24 +40,28 @@ pub struct Mempool {
     // vector so we just copy it over
     routing_work_in_mempool: u64,
     wallet_lock: Arc<RwLock<Wallet>>,
-    mempool_public_key: SaitoPublicKey,
-    mempool_private_key: SaitoPrivateKey,
     pub new_golden_ticket_added: bool,
     pub new_tx_added: bool,
+    public_key: SaitoPublicKey,
+    private_key: SaitoPrivateKey,
 }
 
 impl Mempool {
     #[allow(clippy::new_without_default)]
-    pub fn new(wallet_lock: Arc<RwLock<Wallet>>) -> Self {
+    pub fn new(
+        wallet_lock: Arc<RwLock<Wallet>>,
+        public_key: SaitoPublicKey,
+        private_key: SaitoPrivateKey,
+    ) -> Self {
         Mempool {
             blocks_queue: VecDeque::new(),
             transactions: vec![],
             routing_work_in_mempool: 0,
             wallet_lock,
-            mempool_public_key: [0; 33],
-            mempool_private_key: [0; 32],
             new_golden_ticket_added: false,
             new_tx_added: false,
+            public_key,
+            private_key,
         }
     }
 
@@ -84,9 +88,9 @@ impl Mempool {
         let transaction;
         let target = golden_ticket.target;
         {
-            log_write_lock_request!("wallet");
+            log_write_lock_request!("mempool:add_golden_ticket::wallet");
             let mut wallet = self.wallet_lock.write().await;
-            log_write_lock_receive!("wallet");
+            log_write_lock_receive!("mempool:add_golden_ticket::wallet");
             transaction = wallet.create_golden_ticket_transaction(golden_ticket).await;
         }
         for tx in self.transactions.iter() {
@@ -120,10 +124,7 @@ impl Mempool {
             hex::encode(transaction.hash_for_signature.unwrap())
         );
         {
-            log_read_lock_request!("wallet");
-            let wallet = self.wallet_lock.read().await;
-            log_read_lock_receive!("wallet");
-            transaction.generate(wallet.public_key, 0, 0);
+            transaction.generate(&self.public_key, 0, 0);
         }
         //
         // validate
@@ -151,18 +152,11 @@ impl Mempool {
         // contains to us, which is why we need to provide our public_key
         // so that we can calculate routing work.
         //
-        let public_key;
-        {
-            log_read_lock_request!("wallet");
-            let wallet = self.wallet_lock.read().await;
-            log_read_lock_receive!("wallet");
-            public_key = wallet.public_key;
-        }
 
         //
         // generates hashes, total fees, routing work for me, etc.
         //
-        transaction.generate(public_key, 0, 0);
+        transaction.generate(&self.public_key, 0, 0);
 
         if !self
             .transactions
@@ -190,9 +184,10 @@ impl Mempool {
         let mut block = Block::create(
             &mut self.transactions,
             previous_block_hash,
-            self.wallet_lock.clone(),
             blockchain,
             current_timestamp,
+            &self.public_key,
+            &self.private_key,
         )
         .await;
         block.generate();
@@ -214,9 +209,10 @@ impl Mempool {
         let mut block = Block::create(
             &mut self.transactions,
             [0; 32],
-            self.wallet_lock.clone(),
             blockchain,
             current_timestamp,
+            &self.public_key,
+            &self.private_key,
         )
         .await;
         block.generate();
@@ -329,14 +325,6 @@ impl Mempool {
         );
 
         work_needed
-    }
-
-    pub fn set_mempool_public_key(&mut self, public_key: SaitoPublicKey) {
-        self.mempool_public_key = public_key;
-    }
-
-    pub fn set_mempool_private_key(&mut self, private_key: SaitoPrivateKey) {
-        self.mempool_private_key = private_key;
     }
 
     #[tracing::instrument(level = "info", skip_all)]

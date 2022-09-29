@@ -34,7 +34,7 @@ pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(100);
 macro_rules! log_write_lock_request {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::debug!("waiting for {:?} lock for writing", $resource);
+        println!("waiting for {:?} lock for writing", $resource);
     };
 }
 
@@ -42,7 +42,7 @@ macro_rules! log_write_lock_request {
 macro_rules! log_write_lock_receive {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::debug!("acquired {:?} lock for writing", $resource);
+        println!("acquired {:?} lock for writing", $resource);
     };
 }
 
@@ -50,7 +50,7 @@ macro_rules! log_write_lock_receive {
 macro_rules! log_read_lock_request {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::debug!("waiting for {:?} lock for reading", $resource);
+        println!("waiting for {:?} lock for reading", $resource);
     };
 }
 
@@ -58,15 +58,7 @@ macro_rules! log_read_lock_request {
 macro_rules! log_read_lock_receive {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::debug!("acquired {:?} lock for reading", $resource);
-    };
-}
-
-#[macro_export]
-macro_rules! stat {
-    ($resource:expr) => {
-        #[cfg(feature = "with-stats")]
-        tracing::info!("{:?}", $resource);
+        println!("acquired {:?} lock for reading", $resource);
     };
 }
 

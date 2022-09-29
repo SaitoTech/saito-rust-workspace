@@ -1046,9 +1046,9 @@ impl Blockchain {
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
 
-                log_write_lock_request!("wallet");
+                log_write_lock_request!("blockchain:wind_chain::wallet");
                 let mut wallet = self.wallet_lock.write().await;
-                log_write_lock_receive!("wallet");
+                log_write_lock_receive!("blockchain:wind_chain::wallet");
                 wallet.on_chain_reorganization(&block, true);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
@@ -1195,9 +1195,9 @@ impl Blockchain {
 
         // wallet update
         {
-            log_write_lock_request!("wallet");
+            log_write_lock_request!("blockchain:unwind_chain::wallet");
             let mut wallet = self.wallet_lock.write().await;
-            log_write_lock_receive!("wallet");
+            log_write_lock_receive!("blockchain:unwind_chain::wallet");
             wallet.on_chain_reorganization(&block, false);
         }
 
@@ -1356,9 +1356,9 @@ impl Blockchain {
             // remove slips from wallet
             //
             {
-                log_write_lock_request!("wallet");
+                log_write_lock_request!("blockchain:delete_block::wallet");
                 let mut wallet = self.wallet_lock.write().await;
-                log_write_lock_receive!("wallet");
+                log_write_lock_receive!("blockchain:delete_block::wallet");
                 wallet.delete_block(pblock);
             }
             //
@@ -1428,9 +1428,9 @@ impl Blockchain {
     ) {
         debug!("adding blocks from mempool to blockchain");
         let mut blocks: VecDeque<Block> = Default::default();
-        log_write_lock_request!("mempool");
+        log_write_lock_request!("blockchain:add_blocks_from_mempool::mempool");
         let mut mempool = mempool.write().await;
-        log_write_lock_receive!("mempool");
+        log_write_lock_receive!("blockchain:add_blocks_from_mempool::mempool");
         {
             blocks = mempool.blocks_queue.drain(..).collect();
             // mem::swap(&mut blocks, &mut mempool.blocks_queue);

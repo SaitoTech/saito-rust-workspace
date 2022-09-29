@@ -197,9 +197,9 @@ impl TransactionGenerator {
         }
 
         transaction.timestamp = self.time_keeper.get_timestamp();
-        transaction.generate(self.public_key, 0, 0);
-        transaction.sign(self.private_key);
-        transaction.add_hop(&wallet, self.public_key);
+        transaction.generate(&self.public_key, 0, 0);
+        transaction.sign(&self.private_key);
+        transaction.add_hop(&wallet, &self.public_key);
 
         return transaction;
     }
@@ -252,9 +252,9 @@ impl TransactionGenerator {
                         let mut transaction = Transaction::create(&mut wallet, public_key, 1, 0);
                         transaction.message = generate_random_bytes(tx_size as u64);
                         transaction.timestamp = time_keeper.get_timestamp();
-                        transaction.generate(public_key, 0, 0);
-                        transaction.sign(private_key);
-                        transaction.add_hop(&wallet, public_key);
+                        transaction.generate(&public_key, 0, 0);
+                        transaction.sign(&private_key);
+                        transaction.add_hop(&wallet, &public_key);
 
                         sender.send(transaction).await.unwrap();
 

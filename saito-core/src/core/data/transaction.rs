@@ -87,7 +87,7 @@ impl Transaction {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn add_hop(&mut self, wallet: &Wallet, to_public_key: SaitoPublicKey) {
+    pub fn add_hop(&mut self, wallet: &Wallet, to_public_key: &SaitoPublicKey) {
         let hop = Hop::generate(wallet, to_public_key, self);
         self.path.push(hop);
     }
@@ -447,7 +447,7 @@ impl Transaction {
     // generates all non-cumulative
     //
     // #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate(&mut self, public_key: SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
+    pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
         //
         // nolan_in, nolan_out, total fees
         //
@@ -561,7 +561,7 @@ impl Transaction {
     // calculate cumulative routing work in block
     //
     // #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate_total_work(&mut self, public_key: SaitoPublicKey) {
+    pub fn generate_total_work(&mut self, public_key: &SaitoPublicKey) {
         //
         // if there is no routing path, then the transaction contains
         // no usable work for producing a block, and any payout associated
@@ -577,7 +577,7 @@ impl Transaction {
         // something is wrong if we are not the last routing node
         //
         let last_hop = &self.path[self.path.len() - 1];
-        if last_hop.to != public_key {
+        if last_hop.to.ne(public_key) {
             self.total_work = 0;
             return;
         }
@@ -772,7 +772,7 @@ impl Transaction {
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
-    pub fn sign(&mut self, private_key: SaitoPrivateKey) {
+    pub fn sign(&mut self, private_key: &SaitoPrivateKey) {
         //
         // we set slip ordinals when signing
         //
@@ -840,7 +840,7 @@ impl Transaction {
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
                 let public_key: SaitoPublicKey = self.inputs[0].public_key;
-                if !verify_hash(hash_for_signature, sig, public_key) {
+                if !verify_hash(hash_for_signature, &sig, &public_key) {
                     error!(
                         "tx verification failed : hash = {:?}, sig = {:?}, pub_key = {:?}",
                         hex::encode(hash_for_signature),
@@ -955,7 +955,7 @@ impl Transaction {
             vbytes.extend(&self.path[i].to);
 
             // check sig is valid
-            if !verify(&hash(&vbytes), self.path[i].sig, self.path[i].from) {
+            if !verify(&hash(&vbytes), &self.path[i].sig, &self.path[i].from) {
                 warn!("signature is not valid");
                 return false;
             }
