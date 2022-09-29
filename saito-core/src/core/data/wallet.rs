@@ -9,9 +9,8 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
-use ahash::HashMap;
 use rayon::prelude::*;
-use std::collections::{HashSet, LinkedList, VecDeque};
+use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
 use tracing::{info, warn};
 
 pub const WALLET_SIZE: usize = 65;
@@ -44,7 +43,7 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub slips: VecDeque<WalletSlip>,
+    pub slips: HashMap<SaitoUTXOSetKey, WalletSlip>,
     pub filename: String,
     pub filepass: String,
 }
@@ -153,18 +152,18 @@ impl Wallet {
                 }
             }
         }
-        let mut set = HashSet::with_capacity(self.slips.len());
-        for slip in self.slips.iter() {
-            set.insert(slip.utxokey);
-        }
-
-        if set.len() != self.slips.len() {
-            panic!(
-                "set len = {:?} slips len = {:?}",
-                set.len(),
-                self.slips.len()
-            );
-        }
+        // let mut set = HashSet::with_capacity(self.slips.len());
+        // for slip in self.slips.iter() {
+        //     set.insert(slip.utxokey);
+        // }
+        //
+        // if set.len() != self.slips.len() {
+        //     panic!(
+        //         "set len = {:?} slips len = {:?}",
+        //         set.len(),
+        //         self.slips.len()
+        //     );
+        // }
     }
 
     //
@@ -203,7 +202,8 @@ impl Wallet {
         //     x.utxokey == slip.utxoset_key
         // });
         // assert!(!existing);
-        self.slips.push_back(wallet_slip);
+        let result = self.slips.insert(wallet_slip.utxokey, wallet_slip);
+        assert!(result.is_none());
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
@@ -220,33 +220,34 @@ impl Wallet {
         //
         // assert!(results.len() <= 1);
 
-        let result = self.slips.par_iter().enumerate().find_any(|(index, x)| {
-            x.block_id == slip.block_id
-                && x.tx_ordinal == slip.tx_ordinal
-                && x.slip_index == slip.slip_index
-        });
-
-        if result.is_none() {
-            warn!("slip not found");
-            return;
-        }
-
-        let result = result.unwrap();
-        self.slips.remove(result.0);
+        // let result = self.slips.par_iter().enumerate().find_any(|(index, x)| {
+        //     x.block_id == slip.block_id
+        //         && x.tx_ordinal == slip.tx_ordinal
+        //         && x.slip_index == slip.slip_index
+        // });
+        //
+        // if result.is_none() {
+        //     warn!("slip not found");
+        //     return;
+        // }
+        //
+        // let result = result.unwrap();
+        // self.slips.remove(result.0);
+        self.slips.remove(&slip.utxoset_key);
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn get_available_balance(&self) -> u64 {
         (&self.slips)
             .into_par_iter()
-            .filter(|s| !s.spent)
-            .map(|s| s.amount)
+            .filter(|s| !s.1.spent)
+            .map(|s| s.1.amount)
             .sum::<u64>()
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
+        (&self.slips).into_par_iter().filter(|s| !s.1.spent).count() as u64
     }
 
     // the nolan_requested is omitted from the slips created - only the change
@@ -265,8 +266,8 @@ impl Wallet {
         //
         self.slips
             .iter_mut()
-            .filter(|slip| !slip.spent)
-            .for_each(|slip| {
+            .filter(|(key, slip)| !slip.spent)
+            .for_each(|(key, slip)| {
                 if nolan_in < nolan_requested {
                     nolan_in += slip.amount;
 
