@@ -116,7 +116,7 @@ impl Spammer {
             info!(
                 "sent tx count : {:?} total slip count : {:?} current balance : {:?}",
                 self.sent_tx_count,
-                wallet.spent_slips.len(),
+                wallet.slips.len(),
                 wallet.get_available_balance()
             );
         }

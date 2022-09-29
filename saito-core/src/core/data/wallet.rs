@@ -44,8 +44,7 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub spent_slips: VecDeque<WalletSlip>,
-    pub unspent_slips: VecDeque<WalletSlip>,
+    pub slips: VecDeque<WalletSlip>,
     pub filename: String,
     pub filepass: String,
 }
@@ -57,8 +56,7 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            spent_slips: Default::default(),
-            unspent_slips: Default::default(),
+            slips: Default::default(),
             filename: "default".to_string(),
             filepass: "password".to_string(),
         }
@@ -186,18 +184,12 @@ impl Wallet {
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
         // assert!(!self.slips.contains_key(&wallet_slip.utxokey));
-        self.unspent_slips.push_back(wallet_slip);
+        self.slips.push_back(wallet_slip);
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.spent_slips.retain(|x| {
-            x.block_id != slip.block_id
-                || x.tx_ordinal != slip.tx_ordinal
-                || x.slip_index != slip.slip_index
-        });
-
-        self.unspent_slips.retain(|x| {
+        self.slips.retain(|x| {
             x.block_id != slip.block_id
                 || x.tx_ordinal != slip.tx_ordinal
                 || x.slip_index != slip.slip_index
@@ -211,15 +203,16 @@ impl Wallet {
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn get_available_balance(&self) -> u64 {
-        (&self.unspent_slips)
+        (&self.slips)
             .into_par_iter()
+            .filter(|s| !s.spent)
             .map(|s| s.amount)
             .sum::<u64>()
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        self.unspent_slips.len() as u64
+        (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
     }
 
     // the nolan_requested is omitted from the slips created - only the change
@@ -236,32 +229,29 @@ impl Wallet {
         //
         // grab inputs
         //
-        let mut index = 0;
-        loop {
-            if self.unspent_slips.len() <= index {
-                break;
-            }
-            let mut slip = self.unspent_slips.pop_front().unwrap();
-            index += 1;
-            debug_assert!(!slip.spent);
-            if nolan_in < nolan_requested {
-                nolan_in += slip.amount;
+        self.slips
+            .iter_mut()
+            .filter(|slip| !slip.spent)
+            .for_each(|slip| {
+                if nolan_in < nolan_requested {
+                    nolan_in += slip.amount;
 
-                let mut input = Slip::new();
-                input.public_key = my_public_key;
-                input.amount = slip.amount;
-                input.block_id = slip.block_id;
-                input.tx_ordinal = slip.tx_ordinal;
-                input.slip_index = slip.slip_index;
-                inputs.push(input);
+                    let mut input = Slip::new();
+                    input.public_key = my_public_key;
+                    input.amount = slip.amount;
+                    input.block_id = slip.block_id;
+                    input.tx_ordinal = slip.tx_ordinal;
+                    input.slip_index = slip.slip_index;
+                    inputs.push(input);
 
-                slip.spent = true;
-
-                self.spent_slips.push_back(slip);
-            } else {
-                self.unspent_slips.push_back(slip);
-            }
-        }
+                    slip.spent = true;
+                }
+            });
+        // for slip in &mut self.slips {
+        //     if !slip.spent {
+        //
+        //     }
+        // }
 
         //
         // create outputs
