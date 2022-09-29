@@ -11,7 +11,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use ahash::HashMap;
 use rayon::prelude::*;
-use std::collections::{LinkedList, VecDeque};
+use std::collections::{HashSet, LinkedList, VecDeque};
 use tracing::{info, warn};
 
 pub const WALLET_SIZE: usize = 65;
@@ -152,6 +152,18 @@ impl Wallet {
                     }
                 }
             }
+        }
+        let mut set = HashSet::with_capacity(self.slips.len());
+        for slip in self.slips.iter() {
+            set.insert(slip.utxokey);
+        }
+
+        if set.len() != self.slips.len() {
+            panic!(
+                "set len = {:?} slips len = {:?}",
+                set.len(),
+                self.slips.len()
+            );
         }
     }
 

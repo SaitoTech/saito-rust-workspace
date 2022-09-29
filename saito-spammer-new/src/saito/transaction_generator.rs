@@ -247,7 +247,8 @@ impl TransactionGenerator {
                     log_write_lock_request!("wallet");
                     let mut wallet = wallet.write().await;
                     log_write_lock_receive!("wallet");
-                    let create_count = min(1000, required_count);
+                    let create_count = min(10000, required_count);
+                    let mut txs = Vec::with_capacity(create_count as usize);
                     for _i in 0..create_count {
                         let mut transaction = Transaction::create(&mut wallet, public_key, 1, 0);
                         transaction.message = generate_random_bytes(tx_size as u64);
@@ -256,9 +257,12 @@ impl TransactionGenerator {
                         transaction.sign(&private_key);
                         transaction.add_hop(&wallet, &public_key);
 
-                        sender.send(transaction).await.unwrap();
+                        txs.push(transaction);
 
                         required_count -= 1;
+                    }
+                    for tx in txs {
+                        sender.send(tx).await.unwrap();
                     }
                 }
                 info!("test transactions to be created : {:?}", required_count);
