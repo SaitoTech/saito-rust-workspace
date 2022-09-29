@@ -260,11 +260,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 log_write_lock_receive!("blockchain");
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
                     let block;
+                    log_write_lock_request!("mempool");
+                    let mut mempool = self.mempool.write().await;
+                    log_write_lock_receive!("mempool");
                     {
-                        log_write_lock_request!("mempool");
-                        let mut mempool = self.mempool.write().await;
-                        log_write_lock_receive!("mempool");
-
                         block = mempool
                             .bundle_genesis_block(&mut blockchain, timestamp)
                             .await;
@@ -276,7 +275,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                             &self.network,
                             &mut self.storage,
                             self.sender_to_miner.clone(),
-                            self.mempool.clone(),
+                            &mut mempool,
                         )
                         .await;
                 }

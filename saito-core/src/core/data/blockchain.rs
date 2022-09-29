@@ -92,7 +92,7 @@ impl Blockchain {
         network: &Network,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
-        mempool: Arc<RwLock<Mempool>>,
+        mempool: &mut Mempool,
     ) {
         // confirm hash first
         // block.generate_pre_hash();
@@ -163,9 +163,9 @@ impl Blockchain {
                                 let block_hash = block.previous_block_hash;
                                 let block_in_mempool_queue;
                                 {
-                                    log_read_lock_request!("mempool");
-                                    let mempool = mempool.read().await;
-                                    log_read_lock_receive!("mempool");
+                                    // log_read_lock_request!("mempool");
+                                    // let mempool = mempool.read().await;
+                                    // log_read_lock_receive!("mempool");
                                     block_in_mempool_queue =
                                         mempool.blocks_queue.iter().any(|b| block_hash == b.hash);
                                 }
@@ -189,9 +189,9 @@ impl Blockchain {
                                         hex::encode(block_hash)
                                     );
                                 }
-                                log_write_lock_request!("mempool");
-                                let mut mempool: RwLockWriteGuard<Mempool> = mempool.write().await;
-                                log_write_lock_receive!("mempool");
+                                // log_write_lock_request!("mempool");
+                                // let mut mempool: RwLockWriteGuard<Mempool> = mempool.write().await;
+                                // log_write_lock_receive!("mempool");
                                 debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
                                     hex::encode(block.hash),
                                     hex::encode(block.previous_block_hash));
@@ -434,7 +434,7 @@ impl Blockchain {
         block_hash: SaitoHash,
         network: &Network,
         storage: &mut Storage,
-        mempool: Arc<RwLock<Mempool>>,
+        mempool: &mut Mempool,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -472,9 +472,9 @@ impl Blockchain {
         //
         {
             let block = self.get_mut_block(&block_hash).unwrap();
-            log_write_lock_request!("mempool");
-            let mut mempool = mempool.write().await;
-            log_write_lock_receive!("mempool");
+            // log_write_lock_request!("mempool");
+            // let mut mempool = mempool.write().await;
+            // log_write_lock_receive!("mempool");
             mempool.delete_transactions(&block.transactions);
         }
 
@@ -531,15 +531,11 @@ impl Blockchain {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn add_block_failure(
-        &mut self,
-        block_hash: &SaitoHash,
-        mempool: Arc<RwLock<Mempool>>,
-    ) {
+    pub async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
         info!("add block failed : {:?}", hex::encode(block_hash));
-        log_write_lock_request!("mempool");
-        let mut mempool = mempool.write().await;
-        log_write_lock_receive!("mempool");
+        // log_write_lock_request!("mempool");
+        // let mut mempool = mempool.write().await;
+        // log_write_lock_receive!("mempool");
         mempool.delete_block(block_hash);
         let mut block = self.blocks.remove(block_hash).unwrap();
         let public_key;
@@ -1432,10 +1428,10 @@ impl Blockchain {
     ) {
         debug!("adding blocks from mempool to blockchain");
         let mut blocks: VecDeque<Block> = Default::default();
+        log_write_lock_request!("mempool");
+        let mut mempool = mempool.write().await;
+        log_write_lock_receive!("mempool");
         {
-            log_write_lock_request!("mempool");
-            let mut mempool = mempool.write().await;
-            log_write_lock_receive!("mempool");
             blocks = mempool.blocks_queue.drain(..).collect();
             // mem::swap(&mut blocks, &mut mempool.blocks_queue);
         }
@@ -1448,7 +1444,7 @@ impl Blockchain {
                 network,
                 storage,
                 sender_to_miner.clone(),
-                mempool.clone(),
+                &mut mempool,
             )
             .await;
         }
