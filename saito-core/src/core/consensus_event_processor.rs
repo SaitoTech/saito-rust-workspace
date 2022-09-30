@@ -25,7 +25,7 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_secs(5).as_micros() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_secs(1).as_micros() as u64;
 pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_micros() as u64;
 
 #[derive(Debug)]
