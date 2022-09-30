@@ -1,8 +1,9 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
@@ -17,9 +18,11 @@ use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
+use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
+use rayon::prelude::*;
 
 #[derive(Debug)]
 pub enum RoutingEvent {}
@@ -142,7 +145,10 @@ impl RoutingEventProcessor {
                 let sender = self.sender_to_mempool.clone();
                 let blockchain = self.blockchain.clone();
                 let public_key = self.public_key.clone();
+
                 tokio::spawn(async move {
+                    transaction.generate(&public_key, 0, 0);
+
                     log_read_lock_request!(
                         "RoutingEventProcessor:process_incoming_message::blockchain"
                     );
@@ -150,8 +156,6 @@ impl RoutingEventProcessor {
                     log_read_lock_receive!(
                         "RoutingEventProcessor:process_incoming_message::blockchain"
                     );
-
-                    transaction.generate(&public_key, 0, 0);
                     if transaction.validate(&blockchain.utxoset) {
                         sender
                             .send(ConsensusEvent::NewTransaction { transaction })
