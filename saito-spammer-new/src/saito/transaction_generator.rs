@@ -230,10 +230,10 @@ impl TransactionGenerator {
         // let sender = self.sender.clone();
         let time_keeper = TimeKeeper {};
 
+        log_write_lock_request!("wallet");
+        let mut wallet = self.wallet.write().await;
+        log_write_lock_receive!("wallet");
         for _i in 0..self.tx_count {
-            log_write_lock_request!("wallet");
-            let mut wallet = self.wallet.write().await;
-            log_write_lock_receive!("wallet");
             let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 0);
             transaction.message = generate_random_bytes(self.tx_size as u64);
             transaction.timestamp = time_keeper.get_timestamp();
