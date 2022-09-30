@@ -225,6 +225,7 @@ async fn run_routing_event_processor(
         ),
         reconnection_timer: 0,
         stats: Default::default(),
+        public_key: [0; 33],
     };
     {
         log_read_lock_request!("configs");

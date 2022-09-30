@@ -432,22 +432,24 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 Some(())
             }
             ConsensusEvent::NewTransaction { mut transaction } => {
-                transaction.generate_hash_for_signature();
+                self.stats.received_tx.increment();
+
+                // {
+                //     log_read_lock_request!("ConsensusEventProcessor:process_event::blockchain");
+                //     let blockchain = self.blockchain.read().await;
+                //     log_read_lock_receive!("ConsensusEventProcessor:process_event::blockchain");
+                //
+                //     transaction.generate(&self.public_key, 0, 0);
+                //     is_valid = transaction.validate(&blockchain.utxoset);
+                // }
                 trace!(
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)
                 );
-                self.stats.received_tx.increment();
-
-                log_read_lock_request!("ConsensusEventProcessor:process_event::blockchain");
-                let blockchain = self.blockchain.read().await;
-                log_read_lock_receive!("ConsensusEventProcessor:process_event::blockchain");
                 log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
                 let mut mempool = self.mempool.write().await;
                 log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
-                mempool
-                    .add_transaction_if_validates(transaction.clone(), &blockchain)
-                    .await;
+                mempool.add_transaction(transaction.clone()).await;
                 self.network.propagate_transaction(&transaction).await;
 
                 Some(())

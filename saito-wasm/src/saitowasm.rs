@@ -120,6 +120,7 @@ pub fn new() -> SaitoWasm {
             ),
             reconnection_timer: 0,
             stats: Default::default(),
+            public_key,
         },
         routing_event_processor: ConsensusEventProcessor {
             mempool: context.mempool.clone(),

@@ -15,6 +15,7 @@ use crate::core::data::wallet::Wallet;
 use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
+use rayon::prelude::*;
 
 //
 // In addition to responding to global broadcast messages, the
@@ -112,7 +113,6 @@ impl Mempool {
         info!("golden ticket added to mempool");
         // }
     }
-
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_transaction_if_validates(
         &mut self,
@@ -123,12 +123,8 @@ impl Mempool {
             "add transaction if validates : {:?}",
             hex::encode(transaction.hash_for_signature.unwrap())
         );
-        {
-            transaction.generate(&self.public_key, 0, 0);
-        }
-        //
+        transaction.generate(&self.public_key, 0, 0);
         // validate
-        //
         if transaction.validate(&blockchain.utxoset) {
             self.add_transaction(transaction).await;
         } else {
@@ -139,7 +135,7 @@ impl Mempool {
         }
     }
     #[tracing::instrument(level = "info", skip_all)]
-    async fn add_transaction(&mut self, mut transaction: Transaction) {
+    pub async fn add_transaction(&mut self, transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
             hex::encode(transaction.hash_for_signature.unwrap()),
@@ -147,6 +143,7 @@ impl Mempool {
         );
         let tx_sig_to_insert = transaction.signature;
 
+        debug_assert!(transaction.hash_for_signature.is_some());
         //
         // this assigns the amount of routing work that this transaction
         // contains to us, which is why we need to provide our public_key
@@ -156,11 +153,11 @@ impl Mempool {
         //
         // generates hashes, total fees, routing work for me, etc.
         //
-        transaction.generate(&self.public_key, 0, 0);
+        // transaction.generate(&self.public_key, 0, 0);
 
         if !self
             .transactions
-            .iter()
+            .par_iter()
             .any(|transaction| transaction.signature == tx_sig_to_insert)
         {
             self.routing_work_in_mempool += transaction.total_work;
@@ -411,7 +408,7 @@ mod tests {
             }
             let wallet = wallet_lock.read().await;
             tx.add_hop(&wallet, &public_key);
-
+            tx.generate(&public_key, 0, 0);
             mempool.add_transaction(tx).await;
         }
 

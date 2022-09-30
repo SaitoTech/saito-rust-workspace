@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_event_processor::ConsensusEvent;
@@ -75,6 +75,7 @@ pub struct RoutingEventProcessor {
     pub network: Network,
     pub reconnection_timer: Timestamp,
     pub stats: RoutingStats,
+    pub public_key: SaitoPublicKey,
 }
 
 impl RoutingEventProcessor {
@@ -135,13 +136,29 @@ impl RoutingEventProcessor {
             Message::Block(_) => {
                 unreachable!("received block");
             }
-            Message::Transaction(transaction) => {
+            Message::Transaction(mut transaction) => {
                 trace!("received transaction");
                 self.stats.received_transactions.increment();
-                self.sender_to_mempool
-                    .send(ConsensusEvent::NewTransaction { transaction })
-                    .await
-                    .unwrap();
+                let sender = self.sender_to_mempool.clone();
+                let blockchain = self.blockchain.clone();
+                let public_key = self.public_key.clone();
+                tokio::spawn(async move {
+                    log_read_lock_request!(
+                        "RoutingEventProcessor:process_incoming_message::blockchain"
+                    );
+                    let blockchain = blockchain.read().await;
+                    log_read_lock_receive!(
+                        "RoutingEventProcessor:process_incoming_message::blockchain"
+                    );
+
+                    transaction.generate(&public_key, 0, 0);
+                    if transaction.validate(&blockchain.utxoset) {
+                        sender
+                            .send(ConsensusEvent::NewTransaction { transaction })
+                            .await
+                            .unwrap();
+                    }
+                });
             }
             Message::BlockchainRequest(request) => {
                 self.process_incoming_blockchain_request(request, peer_index)
@@ -323,6 +340,13 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
         self.network
             .initialize_static_peers(self.configs.clone())
             .await;
+
+        {
+            log_read_lock_request!("ConsensusEventProcessor:on_init::wallet");
+            let wallet = self.wallet.read().await;
+            log_read_lock_receive!("ConsensusEventProcessor:on_init::wallet");
+            self.public_key = wallet.public_key.clone();
+        }
     }
     async fn on_stat_interval(&mut self) {
         let time = self.time_keeper.get_timestamp();
