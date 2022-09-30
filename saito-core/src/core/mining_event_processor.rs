@@ -84,7 +84,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
         return match event {
             MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
                 info!(
-                    "Setting miner hash : {:?} and difficulty : {:?}",
+                    "Activating miner with hash : {:?} and difficulty : {:?}",
                     hex::encode(hash),
                     difficulty
                 );
