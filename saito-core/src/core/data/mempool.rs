@@ -42,7 +42,7 @@ pub struct Mempool {
     wallet_lock: Arc<RwLock<Wallet>>,
     pub new_golden_ticket_added: bool,
     pub new_tx_added: bool,
-    public_key: SaitoPublicKey,
+    pub(crate) public_key: SaitoPublicKey,
     private_key: SaitoPrivateKey,
 }
 

@@ -785,7 +785,7 @@ impl Transaction {
         self.signature = sign(&self.serialize_for_signature(), private_key);
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         // trace!(
         //     "validating transaction : {:?}",
