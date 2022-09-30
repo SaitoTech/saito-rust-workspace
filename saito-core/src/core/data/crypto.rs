@@ -5,7 +5,7 @@ use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
 pub use merkle::MerkleTree;
 use secp256k1::ecdsa;
-pub use secp256k1::{Message, PublicKey, SecretKey, Signature, SECP256K1};
+pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 
