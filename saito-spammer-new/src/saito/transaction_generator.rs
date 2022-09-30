@@ -1,6 +1,6 @@
 use crate::SpammerConfigs;
 use std::cmp::min;
-use std::collections::LinkedList;
+use std::collections::{LinkedList, VecDeque};
 
 use crate::saito::time_keeper::TimeKeeper;
 use saito_core::common::keep_time::KeepTime;
@@ -78,24 +78,22 @@ impl TransactionGenerator {
     pub fn get_state(&self) -> GeneratorState {
         return self.state.clone();
     }
-    pub async fn on_new_block(&mut self) -> bool {
+    pub async fn on_new_block(&mut self, txs: &mut VecDeque<Transaction>) {
         match self.state {
             GeneratorState::CreatingSlips => {
-                return self.create_slips().await;
+                self.create_slips(txs).await;
             }
             GeneratorState::WaitingForBlockChainConfirmation => {
                 if self.check_blockchain_for_confirmation().await {
-                    self.create_test_transactions().await;
+                    self.create_test_transactions(txs).await;
                     self.state = GeneratorState::Done;
-                    return true;
                 }
             }
             GeneratorState::Done => {}
         }
-        return false;
     }
 
-    async fn create_slips(&mut self) -> bool {
+    async fn create_slips(&mut self, txs: &mut VecDeque<Transaction>) {
         let output_slips_per_input_slip: u8 = 100;
         let unspent_slip_count;
         let available_balance;
@@ -127,8 +125,8 @@ impl TransactionGenerator {
                     )
                     .await;
 
-                // transactions.push_back(transaction);
-                self.sender.send(transaction).await.unwrap();
+                txs.push_back(transaction);
+                // self.sender.send(transaction).await.unwrap();
 
                 if total_output_slips_created >= self.tx_count {
                     info!(
@@ -146,9 +144,7 @@ impl TransactionGenerator {
                 "New slips created, current = {:?}, target = {:?}",
                 total_output_slips_created, self.tx_count
             );
-            return true;
         }
-        false
     }
 
     async fn create_slip_transaction(
@@ -228,45 +224,26 @@ impl TransactionGenerator {
         return false;
     }
 
-    async fn create_test_transactions(&mut self) -> JoinHandle<()> {
+    async fn create_test_transactions(&mut self, txs: &mut VecDeque<Transaction>) {
         info!("creating test transactions : {:?}", self.tx_count);
 
-        let sender = self.sender.clone();
-        let wallet = self.wallet.clone();
-        let public_key = self.public_key.clone();
-        let private_key = self.private_key.clone();
-        let tx_count = self.tx_count.clone();
-        let tx_size = self.tx_size.clone();
-        return tokio::spawn(async move {
-            let time_keeper = TimeKeeper {};
+        // let sender = self.sender.clone();
+        let time_keeper = TimeKeeper {};
 
-            let mut required_count = tx_count;
+        for _i in 0..self.tx_count {
+            log_write_lock_request!("wallet");
+            let mut wallet = self.wallet.write().await;
+            log_write_lock_receive!("wallet");
+            let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 0);
+            transaction.message = generate_random_bytes(self.tx_size as u64);
+            transaction.timestamp = time_keeper.get_timestamp();
+            transaction.generate(&self.public_key, 0, 0);
+            transaction.sign(&self.private_key);
+            transaction.add_hop(&wallet, &self.public_key);
 
-            loop {
-                {
-                    log_write_lock_request!("wallet");
-                    let mut wallet = wallet.write().await;
-                    log_write_lock_receive!("wallet");
-                    let create_count = min(1000, required_count);
-                    for _i in 0..create_count {
-                        let mut transaction = Transaction::create(&mut wallet, public_key, 1, 0);
-                        transaction.message = generate_random_bytes(tx_size as u64);
-                        transaction.timestamp = time_keeper.get_timestamp();
-                        transaction.generate(&public_key, 0, 0);
-                        transaction.sign(&private_key);
-                        transaction.add_hop(&wallet, &public_key);
-
-                        sender.send(transaction).await.unwrap();
-
-                        required_count -= 1;
-                    }
-                }
-                info!("test transactions to be created : {:?}", required_count);
-                if required_count == 0 {
-                    break;
-                }
-            }
-            info!("Test transactions created, count : {:?}", tx_count);
-        });
+            // sender.send(transaction).await.unwrap();
+            txs.push_back(transaction);
+        }
+        info!("Test transactions created, count : {:?}", txs.len());
     }
 }
