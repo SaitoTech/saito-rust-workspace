@@ -4,6 +4,7 @@ use blake3::Hasher;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
 pub use merkle::MerkleTree;
+use secp256k1::ecdsa;
 pub use secp256k1::{Message, PublicKey, SecretKey, Signature, SECP256K1};
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
@@ -104,7 +105,7 @@ pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignatu
     let hash = hash(&message_bytes.to_vec());
     let msg = Message::from_slice(&hash).unwrap();
     let secret = SecretKey::from_slice(private_key).unwrap();
-    let sig = SECP256K1.sign(&msg, &secret);
+    let sig = SECP256K1.sign_ecdsa(&msg, &secret);
     sig.serialize_compact()
 }
 
@@ -118,12 +119,12 @@ pub fn verify(msg: &[u8], sig: &SaitoSignature, public_key: &SaitoPublicKey) -> 
 pub fn verify_hash(hash: &SaitoHash, sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let m = Message::from_slice(hash);
     let p = PublicKey::from_slice(public_key);
-    let s = Signature::from_compact(sig);
+    let s = ecdsa::Signature::from_compact(sig);
     if m.is_err() || p.is_err() || s.is_err() {
         false
     } else {
         SECP256K1
-            .verify(&m.unwrap(), &s.unwrap(), &p.unwrap())
+            .verify_ecdsa(&m.unwrap(), &s.unwrap(), &p.unwrap())
             .is_ok()
     }
 }
