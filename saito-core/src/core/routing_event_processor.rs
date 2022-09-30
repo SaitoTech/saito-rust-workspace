@@ -12,6 +12,7 @@ use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_event_processor::ConsensusEvent;
 use crate::core::data;
+use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
@@ -309,10 +310,27 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                 buffer,
             } => {
                 debug!("block received : {:?}", hex::encode(block_hash));
-                self.sender_to_mempool
-                    .send(ConsensusEvent::BlockFetched { peer_index, buffer })
-                    .await
-                    .unwrap();
+                let sender = self.sender_to_mempool.clone();
+                let peers = self.network.peers.clone();
+                tokio::spawn(async move {
+                    let mut block = Block::deserialize_from_net(&buffer);
+
+                    log_read_lock_request!("RoutingEventProcessor:process_network_event::peers");
+                    let peers = peers.read().await;
+                    log_read_lock_receive!("RoutingEventProcessor:process_network_event::peers");
+                    let peer = peers.index_to_peers.get(&peer_index);
+                    if peer.is_some() {
+                        let peer = peer.unwrap();
+                        block.source_connection_id = Some(peer.public_key);
+                    }
+                    block.generate();
+
+                    sender
+                        .send(ConsensusEvent::BlockFetched { peer_index, block })
+                        .await
+                        .unwrap();
+                });
+
                 return Some(());
             }
         }

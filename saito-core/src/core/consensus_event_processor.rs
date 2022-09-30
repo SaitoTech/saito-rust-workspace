@@ -31,7 +31,7 @@ pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_mic
 #[derive(Debug)]
 pub enum ConsensusEvent {
     NewGoldenTicket { golden_ticket: GoldenTicket },
-    BlockFetched { peer_index: u64, buffer: Vec<u8> },
+    BlockFetched { peer_index: u64, block: Block },
     NewTransaction { transaction: Transaction },
 }
 
@@ -381,29 +381,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
                 mempool.add_golden_ticket(golden_ticket).await;
                 Some(())
             }
-            ConsensusEvent::BlockFetched { peer_index, buffer } => {
-                let mut block = Block::deserialize_from_net(&buffer);
+            ConsensusEvent::BlockFetched { peer_index, block } => {
                 log_write_lock_request!("ConsensusEventProcessor:process_event::blockchain");
                 let mut blockchain = self.blockchain.write().await;
                 log_write_lock_receive!("ConsensusEventProcessor:process_event::blockchain");
                 {
-                    // log_read_lock_request!("blockchain");
-                    // let blockchain = self.blockchain.read().await;
-                    // log_read_lock_receive!("blockchain");
-
-                    {
-                        log_read_lock_request!("ConsensusEventProcessor:process_event::peers");
-                        let peers = self.network.peers.read().await;
-                        log_read_lock_receive!("ConsensusEventProcessor:process_event::peers");
-                        let peer = peers.index_to_peers.get(&peer_index);
-                        if peer.is_some() {
-                            let peer = peer.unwrap();
-                            block.source_connection_id = Some(peer.public_key);
-                        }
-                    }
-
-                    block.generate();
-
                     debug!("block : {:?} fetched from peer", hex::encode(block.hash));
 
                     if blockchain.blocks.contains_key(&block.hash) {
