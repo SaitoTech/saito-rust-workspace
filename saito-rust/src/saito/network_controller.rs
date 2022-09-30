@@ -16,8 +16,11 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT, THREAD_SLEEP_TIME};
+use saito_core::common::defs::{
+    SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER, THREAD_SLEEP_TIME,
+};
 
+use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
@@ -26,7 +29,7 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-use crate::{IoEvent, NetworkEvent};
+use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
@@ -446,7 +449,7 @@ pub async fn run_network_controller(
     let controller_handle = tokio::spawn(async move {
         let mut outgoing_messages =
             StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
-        let _last_stat_on: Instant = Instant::now();
+        let mut last_stat_on: Instant = Instant::now();
         loop {
             // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
             //

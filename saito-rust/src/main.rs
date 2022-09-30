@@ -20,6 +20,7 @@ use saito_core::common::defs::{
     StatVariable, CHANNEL_SIZE, STAT_BIN_COUNT, STAT_TIMER, THREAD_SLEEP_TIME,
 };
 
+use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
 use saito_core::core::data::configuration::Configuration;
@@ -264,7 +265,7 @@ fn run_loop_thread(
         let mut work_done: bool;
         let mut incoming_msgs =
             StatVariable::new("network::incoming_msgs".to_string(), STAT_BIN_COUNT);
-        let _last_stat_on: Instant = Instant::now();
+        let mut last_stat_on: Instant = Instant::now();
         loop {
             work_done = false;
 
