@@ -57,8 +57,8 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            slips: Default::default(),
-            unspent_slips: Default::default(),
+            slips: HashMap::with_capacity(1_000_000),
+            unspent_slips: HashSet::with_capacity(1_000_000),
             filename: "default".to_string(),
             filepass: "password".to_string(),
             available_balance: 0,
@@ -156,18 +156,6 @@ impl Wallet {
                 }
             }
         }
-        // let mut set = HashSet::with_capacity(self.slips.len());
-        // for slip in self.slips.iter() {
-        //     set.insert(slip.utxokey);
-        // }
-        //
-        // if set.len() != self.slips.len() {
-        //     panic!(
-        //         "set len = {:?} slips len = {:?}",
-        //         set.len(),
-        //         self.slips.len()
-        //     );
-        // }
     }
 
     //
