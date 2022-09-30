@@ -4,7 +4,7 @@ use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::{debug, info, trace, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, Timestamp};
+use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
@@ -12,9 +12,6 @@ use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
-use crate::{
-    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
-};
 use rayon::prelude::*;
 
 //
@@ -40,7 +37,6 @@ pub struct Mempool {
     pub transactions: Vec<Transaction>,
     // vector so we just copy it over
     routing_work_in_mempool: u64,
-    wallet_lock: Arc<RwLock<Wallet>>,
     pub new_golden_ticket_added: bool,
     pub new_tx_added: bool,
     pub(crate) public_key: SaitoPublicKey,
@@ -49,16 +45,11 @@ pub struct Mempool {
 
 impl Mempool {
     #[allow(clippy::new_without_default)]
-    pub fn new(
-        wallet_lock: Arc<RwLock<Wallet>>,
-        public_key: SaitoPublicKey,
-        private_key: SaitoPrivateKey,
-    ) -> Self {
+    pub fn new(public_key: SaitoPublicKey, private_key: SaitoPrivateKey) -> Self {
         Mempool {
             blocks_queue: VecDeque::new(),
             transactions: vec![],
             routing_work_in_mempool: 0,
-            wallet_lock,
             new_golden_ticket_added: false,
             new_tx_added: false,
             public_key,
@@ -346,14 +337,14 @@ mod tests {
     #[test]
     fn mempool_new_test() {
         let wallet = Wallet::new();
-        let mempool = Mempool::new(Arc::new(RwLock::new(wallet)), [0; 33], [0; 32]);
+        let mempool = Mempool::new([0; 33], [0; 32]);
         assert_eq!(mempool.blocks_queue, VecDeque::new());
     }
 
     #[test]
     fn mempool_add_block_test() {
         let wallet = Wallet::new();
-        let mut mempool = Mempool::new(Arc::new(RwLock::new(wallet)), [0; 33], [0; 32]);
+        let mut mempool = Mempool::new([0; 33], [0; 32]);
         let block = Block::new();
         mempool.add_block(block.clone());
         assert_eq!(Some(block), mempool.blocks_queue.pop_front())

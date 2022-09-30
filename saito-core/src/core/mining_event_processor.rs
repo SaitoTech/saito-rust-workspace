@@ -4,10 +4,10 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoHash, SaitoPublicKey, Timestamp};
+use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_event_processor::ConsensusEvent;

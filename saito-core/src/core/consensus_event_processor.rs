@@ -431,17 +431,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
 
                 Some(())
             }
-            ConsensusEvent::NewTransaction { mut transaction } => {
+            ConsensusEvent::NewTransaction { transaction } => {
                 self.stats.received_tx.increment();
 
-                // {
-                //     log_read_lock_request!("ConsensusEventProcessor:process_event::blockchain");
-                //     let blockchain = self.blockchain.read().await;
-                //     log_read_lock_receive!("ConsensusEventProcessor:process_event::blockchain");
-                //
-                //     transaction.generate(&self.public_key, 0, 0);
-                //     is_valid = transaction.validate(&blockchain.utxoset);
-                // }
                 trace!(
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)

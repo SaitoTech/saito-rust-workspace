@@ -1,13 +1,9 @@
-use std::sync::Arc;
-
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 
 use crate::common::defs::{SaitoPublicKey, SaitoSignature};
 use crate::core::data::crypto::{hash, sign};
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
-use crate::{log_read_lock_receive, log_read_lock_request};
 
 pub const HOP_SIZE: usize = 130;
 
@@ -78,6 +74,8 @@ impl Hop {
 mod tests {
     use crate::core::data::crypto::{generate_keys, verify};
     use crate::core::data::hop::Hop;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
 
     use super::*;
 

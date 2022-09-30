@@ -1,19 +1,15 @@
-use std::sync::Arc;
-
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 use tracing::{debug, error, trace, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet};
-use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify, verify_hash};
+use crate::core::data::crypto::{hash, sign, verify, verify_hash};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
-use crate::{log_write_lock_receive, log_write_lock_request};
 
 pub const TRANSACTION_SIZE: usize = 93;
 
@@ -241,7 +237,6 @@ impl Transaction {
             let mut input1 = Slip::new();
             input1.public_key = to_public_key;
             input1.amount = 0;
-            let random_uuid = generate_random_bytes(17);
             input1.block_id = 0;
             input1.tx_ordinal = 0;
 
@@ -487,38 +482,26 @@ impl Transaction {
     pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
         // TODO - remove for uuid work
         // generate tx signature hash
-        //
         self.generate_hash_for_signature();
         trace!(
             "generating total fees for tx : {:?}",
             hex::encode(self.hash_for_signature.unwrap())
         );
-        let hash_for_signature = self.hash_for_signature;
 
-        //
         // calculate nolan in / out, fees
-        //
-        let mut nolan_in: u64 = 0;
-        let mut nolan_out: u64 = 0;
-
         // generate utxoset key for every slip
-
-        // for input in &mut self.inputs {
-        //     nolan_in += input.amount;
-        //     input.generate_utxoset_key();
-        // }
-        nolan_in = self
+        let nolan_in = self
             .inputs
-            .par_iter_mut()
+            .iter_mut()
             .map(|slip| {
                 slip.generate_utxoset_key();
                 slip.amount
             })
             .sum::<u64>();
 
-        nolan_out = self
+        let nolan_out = self
             .outputs
-            .par_iter_mut()
+            .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
                 if slip.slip_type != SlipType::ATR {
@@ -530,18 +513,6 @@ impl Transaction {
                 slip.amount
             })
             .sum::<u64>();
-        // for output in &mut self.outputs {
-        //     nolan_out += output.amount;
-        //     //
-        //     // new outbound slips
-        //     //
-        //     if let Some(hash_for_signature) = hash_for_signature {
-        //         if output.slip_type != SlipType::ATR {
-        //             output.uuid = hash_for_signature;
-        //         }
-        //     }
-        //     output.generate_utxoset_key();
-        // }
 
         self.total_in = nolan_in;
         self.total_out = nolan_out;

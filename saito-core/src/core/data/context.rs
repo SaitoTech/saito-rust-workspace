@@ -28,11 +28,7 @@ impl Context {
                 wallet.clone(),
                 // global_sender.clone(),
             ))),
-            mempool: Arc::new(RwLock::new(Mempool::new(
-                wallet.clone(),
-                public_key,
-                private_key,
-            ))),
+            mempool: Arc::new(RwLock::new(Mempool::new(public_key, private_key))),
             wallet: wallet.clone(),
             configuration: configs,
         }

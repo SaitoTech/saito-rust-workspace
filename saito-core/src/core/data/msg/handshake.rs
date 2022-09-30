@@ -169,7 +169,7 @@ mod tests {
         assert_eq!(challenge.public_key, challenge2.public_key);
         assert_eq!(challenge.block_fetch_url, challenge2.block_fetch_url);
 
-        let signature = crypto.sign(
+        let signature = crypto.sign_ecdsa(
             &secp256k1::Message::from_slice(&challenge.challenge).unwrap(),
             &secret_key_2,
         );

@@ -1,14 +1,12 @@
-use std::cmp::{max, min};
 use std::collections::VecDeque;
 use std::io::Error;
-use std::mem;
 
 use std::sync::Arc;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{RwLock, RwLockWriteGuard};
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::common::defs::{SaitoHash, UtxoSet};
@@ -20,9 +18,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
-use crate::{
-    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
-};
+use crate::{log_write_lock_receive, log_write_lock_request};
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 50;
@@ -1419,14 +1415,11 @@ impl Blockchain {
         sender_to_miner: Sender<MiningEvent>,
     ) {
         debug!("adding blocks from mempool to blockchain");
-        let mut blocks: VecDeque<Block> = Default::default();
+        let mut blocks: VecDeque<Block>;
         log_write_lock_request!("blockchain:add_blocks_from_mempool::mempool");
         let mut mempool = mempool.write().await;
         log_write_lock_receive!("blockchain:add_blocks_from_mempool::mempool");
-        {
-            blocks = mempool.blocks_queue.drain(..).collect();
-            // mem::swap(&mut blocks, &mut mempool.blocks_queue);
-        }
+        blocks = mempool.blocks_queue.drain(..).collect();
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
 
         info!("blocks to add : {:?}", blocks.len());

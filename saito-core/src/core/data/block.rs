@@ -1,11 +1,10 @@
 use std::convert::TryInto;
+use std::mem;
 use std::ops::Rem;
-use std::{mem, sync::Arc};
 
 use ahash::AHashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 use tracing::{debug, error, info, trace};
 
 use crate::common::defs::{
@@ -20,8 +19,6 @@ use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
-use crate::core::data::wallet::Wallet;
-use crate::{log_read_lock_receive, log_read_lock_request};
 
 pub const BLOCK_HEADER_SIZE: usize = 245;
 

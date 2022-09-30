@@ -88,11 +88,7 @@ pub fn new() -> SaitoWasm {
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
         blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
-        mempool: Arc::new(RwLock::new(Mempool::new(
-            wallet.clone(),
-            public_key,
-            private_key,
-        ))),
+        mempool: Arc::new(RwLock::new(Mempool::new(public_key, private_key))),
         wallet: wallet.clone(),
         configuration: configuration.clone(),
     };

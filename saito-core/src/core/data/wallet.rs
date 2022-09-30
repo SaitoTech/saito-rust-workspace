@@ -10,8 +10,8 @@ use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet, LinkedList, VecDeque};
-use tracing::{info, warn};
+use std::collections::{HashMap, HashSet};
+use tracing::warn;
 
 pub const WALLET_SIZE: usize = 65;
 

@@ -3,7 +3,7 @@ use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
+use crate::common::defs::{SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
 /// The size of a serilized slip in bytes.
 pub const SLIP_SIZE: usize = 59;
@@ -99,7 +99,7 @@ impl Slip {
     // 1 byte slip_index
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
-        let mut res: Vec<u8> = vec![
+        let res: Vec<u8> = vec![
             self.public_key.as_slice(),
             self.block_id.to_be_bytes().as_slice(),
             self.tx_ordinal.to_be_bytes().as_slice(),

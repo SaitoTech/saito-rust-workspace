@@ -1,9 +1,8 @@
-use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
@@ -18,7 +17,6 @@ use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
-use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_event_processor::MiningEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
