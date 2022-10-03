@@ -16,7 +16,7 @@ use tokio::sync::RwLock;
 use tracing::debug;
 
 // TODO : make this configurable
-pub const VERIFICATION_THREAD_COUNT: u64 = 3;
+pub const VERIFICATION_THREAD_COUNT: u64 = 10;
 
 #[derive(Debug)]
 pub enum VerifyRequest {
