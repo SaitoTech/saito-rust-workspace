@@ -103,7 +103,7 @@ pub fn new() -> SaitoWasm {
     SaitoWasm {
         consensus_event_processor: RoutingThread {
             blockchain: context.blockchain.clone(),
-            sender_to_mempool: sender_to_mempool.clone(),
+            sender_to_consensus: sender_to_mempool.clone(),
             sender_to_miner: sender_to_miner.clone(),
             static_peers: vec![],
             configs: context.configuration.clone(),

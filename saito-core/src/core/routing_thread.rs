@@ -71,7 +71,7 @@ impl Default for RoutingStats {
 /// Manages peers and routes messages to correct controller
 pub struct RoutingThread {
     pub blockchain: Arc<RwLock<Blockchain>>,
-    pub sender_to_mempool: Sender<ConsensusEvent>,
+    pub sender_to_consensus: Sender<ConsensusEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
@@ -370,5 +370,22 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         self.stats.received_transactions.print();
         self.stats.received_blocks.print();
         self.stats.total_incoming_messages.print();
+
+        println!(
+            "--- stats ------ {} - size : {:?}",
+            format!("{:width$}", "consensus::queue", width = 30),
+            self.sender_to_consensus.capacity(),
+        );
+        for (index, sender) in self.senders_to_verification.iter().enumerate() {
+            println!(
+                "--- stats ------ {} - size : {:?}",
+                format!(
+                    "{:width$}",
+                    format!("verification_{:?}::queue", index),
+                    width = 30
+                ),
+                sender.capacity(),
+            );
+        }
     }
 }
