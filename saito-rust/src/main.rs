@@ -275,7 +275,7 @@ async fn run_verification_threads(
     let mut thread_handles = vec![];
 
     for i in 0..VERIFICATION_THREAD_COUNT {
-        let (sender, receiver) = tokio::sync::mpsc::channel(10_000);
+        let (sender, receiver) = tokio::sync::mpsc::channel(100_000);
         senders.push(sender);
         let mut verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
