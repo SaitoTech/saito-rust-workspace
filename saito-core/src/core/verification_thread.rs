@@ -111,11 +111,11 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
         self.processed_msgs.calculate_stats(current_time);
-        self.processed_txs.calculate_stats(current_time);
-        self.processed_blocks.calculate_stats(current_time);
+        // self.processed_txs.calculate_stats(current_time);
+        // self.processed_blocks.calculate_stats(current_time);
 
         self.processed_msgs.print();
-        self.processed_txs.print();
-        self.processed_blocks.print();
+        // self.processed_txs.print();
+        // self.processed_blocks.print();
     }
 }

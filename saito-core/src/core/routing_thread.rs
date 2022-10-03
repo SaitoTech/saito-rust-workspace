@@ -367,8 +367,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             .total_incoming_messages
             .calculate_stats(current_time);
 
-        // self.stats.received_transactions.print();
-        // self.stats.received_blocks.print();
+        self.stats.received_transactions.print();
+        self.stats.received_blocks.print();
         self.stats.total_incoming_messages.print();
     }
 }
