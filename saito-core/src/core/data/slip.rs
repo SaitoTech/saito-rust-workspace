@@ -5,7 +5,7 @@ use tracing::{error, warn};
 
 use crate::common::defs::{SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
-/// The size of a serilized slip in bytes.
+/// The size of a serialized slip in bytes.
 pub const SLIP_SIZE: usize = 59;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq, FromPrimitive)]

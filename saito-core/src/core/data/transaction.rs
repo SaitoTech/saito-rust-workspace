@@ -43,7 +43,7 @@ pub struct Transaction {
     pub(crate) signature: SaitoSignature,
     path: Vec<Hop>,
 
-    // hash used for merkle_root (does not include signature) and slip uuid
+    // hash used for merkle_root (does not include signature)
     pub hash_for_signature: Option<SaitoHash>,
 
     /// total nolan in input slips

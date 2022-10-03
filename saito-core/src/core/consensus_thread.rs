@@ -72,6 +72,7 @@ pub struct ConsensusThread {
     pub network: Network,
     pub storage: Storage,
     pub stats: ConsensusStats,
+    pub txs_for_mempool: Vec<Transaction>,
 }
 
 impl ConsensusThread {
@@ -302,13 +303,21 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             }
         }
 
-        // getting the write lock here because we cannot upgrade from read to write
-
         // generate blocks
         let mut can_bundle = false;
         self.block_producing_timer += duration_value;
         // TODO : make timers configurable
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
+            if !self.txs_for_mempool.is_empty() {
+                log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
+                let mut mempool = self.mempool.write().await;
+                log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
+
+                for tx in self.txs_for_mempool.drain(..) {
+                    mempool.add_transaction(tx).await;
+                }
+            }
+
             log_read_lock_request!("ConsensusEventProcessor:process_timer_event::blockchain");
             let blockchain = self.blockchain.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:process_timer_event::blockchain");
@@ -420,11 +429,12 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)
                 );
-                log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
-                let mut mempool = self.mempool.write().await;
-                log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
-                mempool.add_transaction(transaction.clone()).await;
+                // log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
+                // let mut mempool = self.mempool.write().await;
+                // log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
+                // mempool.add_transaction(transaction.clone()).await;
                 self.network.propagate_transaction(&transaction).await;
+                self.txs_for_mempool.push(transaction);
 
                 Some(())
             }

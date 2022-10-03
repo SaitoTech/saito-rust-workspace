@@ -191,6 +191,7 @@ async fn run_consensus_event_processor(
             CONSENSUS_EVENT_PROCESSOR_ID,
         ))),
         stats: Default::default(),
+        txs_for_mempool: Vec::with_capacity(CHANNEL_SIZE),
     };
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
@@ -274,7 +275,7 @@ async fn run_verification_threads(
     let mut thread_handles = vec![];
 
     for i in 0..VERIFICATION_THREAD_COUNT {
-        let (sender, receiver) = tokio::sync::mpsc::channel(100_000);
+        let (sender, receiver) = tokio::sync::mpsc::channel(10_000);
         senders.push(sender);
         let mut verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),

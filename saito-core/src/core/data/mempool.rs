@@ -1,10 +1,11 @@
+use ahash::AHashMap;
 use std::time::Duration;
 use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 
 use tokio::sync::RwLock;
 use tracing::{debug, info, trace, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey};
+use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
@@ -34,7 +35,7 @@ pub enum MempoolMessage {
 #[derive(Debug)]
 pub struct Mempool {
     pub blocks_queue: VecDeque<Block>,
-    pub transactions: Vec<Transaction>,
+    pub transactions: AHashMap<SaitoSignature, Transaction>,
     // vector so we just copy it over
     routing_work_in_mempool: u64,
     pub new_golden_ticket_added: bool,
@@ -48,7 +49,7 @@ impl Mempool {
     pub fn new(public_key: SaitoPublicKey, private_key: SaitoPrivateKey) -> Self {
         Mempool {
             blocks_queue: VecDeque::new(),
-            transactions: vec![],
+            transactions: Default::default(),
             routing_work_in_mempool: 0,
             new_golden_ticket_added: false,
             new_tx_added: false,
@@ -85,7 +86,7 @@ impl Mempool {
             &self.private_key,
         )
         .await;
-        for tx in self.transactions.iter() {
+        for (sig, tx) in self.transactions.iter() {
             if let TransactionType::GoldenTicket = tx.transaction_type {
                 let gt = GoldenTicket::deserialize_from_net(&tx.message);
                 if gt.target == target {
@@ -100,7 +101,7 @@ impl Mempool {
         //     .iter()
         //     .any(|transaction| transaction.is_golden_ticket())
         // {
-        self.transactions.push(transaction);
+        self.transactions.insert(transaction.signature, transaction);
         info!("golden ticket added to mempool");
         // }
     }
@@ -132,7 +133,6 @@ impl Mempool {
             hex::encode(transaction.hash_for_signature.unwrap()),
             transaction.transaction_type
         );
-        let tx_sig_to_insert = transaction.signature;
 
         debug_assert!(transaction.hash_for_signature.is_some());
         //
@@ -146,13 +146,9 @@ impl Mempool {
         //
         // transaction.generate(&self.public_key, 0, 0);
 
-        if !self
-            .transactions
-            .par_iter()
-            .any(|transaction| transaction.signature == tx_sig_to_insert)
-        {
+        if !self.transactions.contains_key(&transaction.signature) {
             self.routing_work_in_mempool += transaction.total_work;
-            self.transactions.push(transaction);
+            self.transactions.insert(transaction.signature, transaction);
             self.new_tx_added = true;
         }
     }
@@ -271,19 +267,14 @@ impl Mempool {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
-        let mut tx_hashmap = HashMap::new();
         for transaction in transactions {
-            let hash = transaction.hash_for_signature;
-            tx_hashmap.entry(hash).or_insert(true);
+            self.transactions.remove(&transaction.signature);
         }
 
         self.routing_work_in_mempool = 0;
 
-        self.transactions
-            .retain(|x| tx_hashmap.contains_key(&x.hash_for_signature) != true);
-
         // add routing work from remaining tx
-        for transaction in &self.transactions {
+        for (sig, transaction) in &self.transactions {
             self.routing_work_in_mempool += transaction.total_work;
         }
     }
@@ -313,13 +304,6 @@ impl Mempool {
         );
 
         work_needed
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    pub fn transaction_exists(&self, tx_hash: Option<SaitoHash>) -> bool {
-        self.transactions
-            .iter()
-            .any(|transaction| transaction.hash_for_signature == tx_hash)
     }
 }
 

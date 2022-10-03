@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::mem;
 use std::ops::Rem;
@@ -268,7 +269,7 @@ impl Block {
     // returns valid block
     //
     pub async fn create(
-        transactions: &mut Vec<Transaction>,
+        transactions: &mut AHashMap<SaitoSignature, Transaction>,
         previous_block_hash: SaitoHash,
         blockchain: &mut Blockchain,
         current_timestamp: u64,
@@ -313,10 +314,12 @@ impl Block {
 
         block.creator = public_key.clone();
 
-        //
-        // in-memory swap copying txs in block from mempool
-        //
-        mem::swap(&mut block.transactions, transactions);
+        block.transactions.reserve(transactions.len());
+        for (sig, tx) in transactions.drain() {
+            block.transactions.push(tx);
+        }
+        // block.transactions = transactions.drain().collect();
+        transactions.clear();
 
         //
         // update slips_spent_this_block so that we have a record of

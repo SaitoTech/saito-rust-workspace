@@ -536,15 +536,16 @@ impl Blockchain {
         if block.creator == mempool.public_key {
             let mut transactions = &mut block.transactions;
             // TODO : what other types should be added back to the mempool
-            transactions.retain(|tx| tx.transaction_type == TransactionType::Normal);
-            if !transactions.is_empty() {
-                mempool.new_tx_added = true;
-                info!(
-                    "adding {:?} transactions back to mempool",
-                    transactions.len()
-                );
-                mempool.transactions.append(&mut transactions);
+            info!(
+                "adding {:?} transactions back to mempool",
+                transactions.len()
+            );
+            for tx in block.transactions {
+                if tx.transaction_type == TransactionType::Normal {
+                    mempool.transactions.insert(tx.signature, tx);
+                }
             }
+            mempool.new_tx_added = true;
         }
     }
 
