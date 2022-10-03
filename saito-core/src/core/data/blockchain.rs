@@ -17,7 +17,7 @@ use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
 use crate::core::data::wallet::Wallet;
-use crate::core::mining_event_processor::MiningEvent;
+use crate::core::mining_thread::MiningEvent;
 use crate::{log_write_lock_receive, log_write_lock_request};
 
 // length of 1 genesis period

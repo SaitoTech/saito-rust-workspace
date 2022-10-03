@@ -7,14 +7,14 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, Timestamp};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::consensus_event_processor::ConsensusEvent;
+use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data::crypto::{generate_random_bytes, hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::wallet::Wallet;
-use crate::core::routing_event_processor::RoutingEvent;
+use crate::core::routing_thread::RoutingEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
 
 #[derive(Debug)]
@@ -23,7 +23,7 @@ pub enum MiningEvent {
 }
 
 /// Manages the miner
-pub struct MiningEventProcessor {
+pub struct MiningThread {
     pub wallet: Arc<RwLock<Wallet>>,
     pub sender_to_blockchain: Sender<RoutingEvent>,
     pub sender_to_mempool: Sender<ConsensusEvent>,
@@ -35,7 +35,7 @@ pub struct MiningEventProcessor {
     pub mined_golden_tickets: u64,
 }
 
-impl MiningEventProcessor {
+impl MiningThread {
     #[tracing::instrument(level = "trace", skip_all)]
     async fn mine(&mut self) {
         assert!(self.miner_active);
@@ -65,7 +65,7 @@ impl MiningEventProcessor {
 }
 
 #[async_trait]
-impl ProcessEvent<MiningEvent> for MiningEventProcessor {
+impl ProcessEvent<MiningEvent> for MiningThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         None
     }
@@ -103,7 +103,7 @@ impl ProcessEvent<MiningEvent> for MiningEventProcessor {
         self.public_key = wallet.public_key.clone();
     }
 
-    async fn on_stat_interval(&mut self) {
+    async fn on_stat_interval(&mut self, current_time: Timestamp) {
         println!("--- stats ------ {} - total : {:?} current difficulty : {:?} miner_active : {:?} current target : {:?} ", format!("{:width$}", "mining::golden_tickets", width = 30), self.mined_golden_tickets, self.difficulty, self.miner_active, hex::encode(self.target));
     }
 }

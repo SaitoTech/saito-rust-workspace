@@ -19,8 +19,8 @@ use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
-use crate::core::mining_event_processor::MiningEvent;
-use crate::core::routing_event_processor::RoutingEvent;
+use crate::core::mining_thread::MiningEvent;
+use crate::core::routing_thread::RoutingEvent;
 use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
@@ -58,7 +58,7 @@ impl Default for ConsensusStats {
 }
 
 /// Manages blockchain and the mempool
-pub struct ConsensusEventProcessor {
+pub struct ConsensusThread {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub wallet: Arc<RwLock<Wallet>>,
@@ -74,7 +74,7 @@ pub struct ConsensusEventProcessor {
     pub stats: ConsensusStats,
 }
 
-impl ConsensusEventProcessor {
+impl ConsensusThread {
     async fn generate_spammer_init_tx(
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
@@ -233,7 +233,7 @@ impl ConsensusEventProcessor {
 }
 
 #[async_trait]
-impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
+impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         // trace!("processing new interface event");
 
@@ -290,7 +290,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             self.tx_producing_timer = self.tx_producing_timer + duration_value;
             if self.tx_producing_timer >= SPAM_TX_PRODUCING_TIMER {
                 // TODO : Remove this transaction generation once testing is done
-                ConsensusEventProcessor::generate_tx(
+                ConsensusThread::generate_tx(
                     self.mempool.clone(),
                     self.wallet.clone(),
                     self.blockchain.clone(),
@@ -450,7 +450,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusEventProcessor {
             .await;
     }
 
-    async fn on_stat_interval(&mut self) {
+    async fn on_stat_interval(&mut self, current_time: Timestamp) {
         let time = self.time_keeper.get_timestamp();
         self.stats.blocks_fetched.calculate_stats(time);
         self.stats.blocks_created.calculate_stats(time);

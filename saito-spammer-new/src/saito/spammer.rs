@@ -11,7 +11,7 @@ use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::routing_event_processor::RoutingEvent;
+use saito_core::core::routing_thread::RoutingEvent;
 use std::cmp::min;
 use std::collections::{LinkedList, VecDeque};
 
