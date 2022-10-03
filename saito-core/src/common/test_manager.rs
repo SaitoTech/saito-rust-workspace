@@ -34,7 +34,9 @@ pub mod test {
     use tokio::sync::RwLock;
     use tracing::{debug, info};
 
-    use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet};
+    use crate::common::defs::{
+        SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
+    };
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
@@ -406,7 +408,7 @@ pub mod test {
             txs_fee: u64,
             include_valid_golden_ticket: bool,
         ) -> Block {
-            let mut transactions: Vec<Transaction> = vec![];
+            let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
 
@@ -427,7 +429,7 @@ pub mod test {
 
                 transaction.sign(&private_key);
                 transaction.generate(&public_key, 0, 0);
-                transactions.push(transaction);
+                transactions.insert(transaction.signature, transaction);
             }
 
             if include_valid_golden_ticket {
@@ -450,7 +452,7 @@ pub mod test {
                     .await;
                 }
                 gttx.generate(&public_key, 0, 0);
-                transactions.push(gttx);
+                transactions.insert(gttx.signature, gttx);
             }
 
             //
