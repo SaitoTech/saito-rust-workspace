@@ -252,8 +252,10 @@ impl RoutingThread {
                     selected_sender = Some(sender);
                 }
             }
-            // waiting till we get an acceptable sender
-            tokio::time::sleep(THREAD_SLEEP_TIME).await;
+            if selected_sender.is_none() {
+                // waiting till we get an acceptable sender
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
+            }
         }
 
         selected_sender.unwrap().send(request).await.unwrap();
