@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::io::Error;
-use std::mem;
 
 use std::sync::Arc;
 
@@ -18,10 +17,8 @@ use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::TransactionType;
 use crate::core::data::wallet::Wallet;
-use crate::core::mining_event_processor::MiningEvent;
-use crate::{
-    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
-};
+use crate::core::mining_thread::MiningEvent;
+use crate::{log_write_lock_receive, log_write_lock_request};
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 50;
@@ -91,7 +88,7 @@ impl Blockchain {
         network: &Network,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
-        mempool: Arc<RwLock<Mempool>>,
+        mempool: &mut Mempool,
     ) {
         // confirm hash first
         // block.generate_pre_hash();
@@ -162,9 +159,9 @@ impl Blockchain {
                                 let block_hash = block.previous_block_hash;
                                 let block_in_mempool_queue;
                                 {
-                                    log_read_lock_request!("mempool");
-                                    let mempool = mempool.read().await;
-                                    log_read_lock_receive!("mempool");
+                                    // log_read_lock_request!("mempool");
+                                    // let mempool = mempool.read().await;
+                                    // log_read_lock_receive!("mempool");
                                     block_in_mempool_queue =
                                         mempool.blocks_queue.iter().any(|b| block_hash == b.hash);
                                 }
@@ -188,9 +185,9 @@ impl Blockchain {
                                         hex::encode(block_hash)
                                     );
                                 }
-                                log_write_lock_request!("mempool");
-                                let mut mempool = mempool.write().await;
-                                log_write_lock_receive!("mempool");
+                                // log_write_lock_request!("mempool");
+                                // let mut mempool: RwLockWriteGuard<Mempool> = mempool.write().await;
+                                // log_write_lock_receive!("mempool");
                                 debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
                                     hex::encode(block.hash),
                                     hex::encode(block.previous_block_hash));
@@ -433,7 +430,7 @@ impl Blockchain {
         block_hash: SaitoHash,
         network: &Network,
         storage: &mut Storage,
-        mempool: Arc<RwLock<Mempool>>,
+        mempool: &mut Mempool,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -441,7 +438,7 @@ impl Blockchain {
         //     create_timestamp()
         // );
         // print blockring longest_chain_block_hash infor
-        self.print();
+        self.print(10);
 
         //
         // save to disk
@@ -471,9 +468,9 @@ impl Blockchain {
         //
         {
             let block = self.get_mut_block(&block_hash).unwrap();
-            log_write_lock_request!("mempool");
-            let mut mempool = mempool.write().await;
-            log_write_lock_receive!("mempool");
+            // log_write_lock_request!("mempool");
+            // let mut mempool = mempool.write().await;
+            // log_write_lock_receive!("mempool");
             mempool.delete_transactions(&block.transactions);
         }
 
@@ -526,39 +523,29 @@ impl Blockchain {
                     .await;
             }
         }
+        info!("block {:?} added successfully", hex::encode(block_hash));
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn add_block_failure(
-        &mut self,
-        block_hash: &SaitoHash,
-        mempool: Arc<RwLock<Mempool>>,
-    ) {
-        debug!("add block failed : {:?}", hex::encode(block_hash));
-        log_write_lock_request!("mempool");
-        let mut mempool = mempool.write().await;
-        log_write_lock_receive!("mempool");
+    pub async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
+        info!("add block failed : {:?}", hex::encode(block_hash));
+
         mempool.delete_block(block_hash);
         let mut block = self.blocks.remove(block_hash).unwrap();
-        let public_key;
-        {
-            log_read_lock_request!("wallet");
-            let wallet = self.wallet_lock.read().await;
-            log_read_lock_receive!("wallet");
-            public_key = wallet.public_key;
-        }
-        if block.creator == public_key {
+
+        if block.creator == mempool.public_key {
             let mut transactions = &mut block.transactions;
             // TODO : what other types should be added back to the mempool
-            transactions.retain(|tx| tx.transaction_type == TransactionType::Normal);
-            if !transactions.is_empty() {
-                mempool.new_tx_added = true;
-                info!(
-                    "adding {:?} transactions back to mempool",
-                    transactions.len()
-                );
-                mempool.transactions.append(&mut transactions);
+            info!(
+                "adding {:?} transactions back to mempool",
+                transactions.len()
+            );
+            for tx in block.transactions {
+                if tx.transaction_type == TransactionType::Normal {
+                    mempool.transactions.insert(tx.signature, tx);
+                }
             }
+            mempool.new_tx_added = true;
         }
     }
 
@@ -732,12 +719,16 @@ impl Blockchain {
         // no match? return 0 -- no shared ancestor
         0
     }
-    pub fn print(&self) {
+    pub fn print(&self, count: u64) {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
+        let mut min_id = 0;
+        if latest_block_id > count {
+            min_id = latest_block_id - count;
+        }
         info!("------------------------------------------------------");
-        while current_id > 0 {
+        while current_id > 0 && current_id >= min_id {
             info!(
                 "{} - {:?}",
                 current_id,
@@ -923,7 +914,7 @@ impl Blockchain {
                 }
             }
             if !return_value {
-                debug!("not enough golden tickets");
+                warn!("not enough golden tickets");
                 return false;
             }
         }
@@ -1044,9 +1035,9 @@ impl Blockchain {
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
 
-                log_write_lock_request!("wallet");
+                log_write_lock_request!("blockchain:wind_chain::wallet");
                 let mut wallet = self.wallet_lock.write().await;
-                log_write_lock_receive!("wallet");
+                log_write_lock_receive!("blockchain:wind_chain::wallet");
                 wallet.on_chain_reorganization(&block, true);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
@@ -1193,9 +1184,9 @@ impl Blockchain {
 
         // wallet update
         {
-            log_write_lock_request!("wallet");
+            log_write_lock_request!("blockchain:unwind_chain::wallet");
             let mut wallet = self.wallet_lock.write().await;
-            log_write_lock_receive!("wallet");
+            log_write_lock_receive!("blockchain:unwind_chain::wallet");
             wallet.on_chain_reorganization(&block, false);
         }
 
@@ -1354,9 +1345,9 @@ impl Blockchain {
             // remove slips from wallet
             //
             {
-                log_write_lock_request!("wallet");
+                log_write_lock_request!("blockchain:delete_block::wallet");
                 let mut wallet = self.wallet_lock.write().await;
-                log_write_lock_receive!("wallet");
+                log_write_lock_receive!("blockchain:delete_block::wallet");
                 wallet.delete_block(pblock);
             }
             //
@@ -1425,27 +1416,25 @@ impl Blockchain {
         sender_to_miner: Sender<MiningEvent>,
     ) {
         debug!("adding blocks from mempool to blockchain");
-        let mut blocks: VecDeque<Block> = Default::default();
-        {
-            log_write_lock_request!("mempool");
-            let mut mempool = mempool.write().await;
-            log_write_lock_receive!("mempool");
-            blocks = mempool.blocks_queue.drain(..).collect();
-            // mem::swap(&mut blocks, &mut mempool.blocks_queue);
-        }
+        let mut blocks: VecDeque<Block>;
+        log_write_lock_request!("blockchain:add_blocks_from_mempool::mempool");
+        let mut mempool = mempool.write().await;
+        log_write_lock_receive!("blockchain:add_blocks_from_mempool::mempool");
+        blocks = mempool.blocks_queue.drain(..).collect();
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
 
-        debug!("blocks to add : {:?}", blocks.len());
+        info!("blocks to add : {:?}", blocks.len());
         while let Some(block) = blocks.pop_front() {
             self.add_block(
                 block,
                 network,
                 storage,
                 sender_to_miner.clone(),
-                mempool.clone(),
+                &mut mempool,
             )
             .await;
         }
+        info!("added {:?} blocks to blockchain", blocks.len());
     }
 }
 
@@ -1459,6 +1448,11 @@ mod tests {
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
+    use tracing_subscriber;
+    use tracing_subscriber::filter::Directive;
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::Layer;
 
     #[tokio::test]
     async fn test_blockchain_init() {
@@ -1529,6 +1523,11 @@ mod tests {
     // test we can produce five blocks in a row
     //
     async fn add_five_good_blocks() {
+        // let filter = tracing_subscriber::EnvFilter::from_default_env();
+        // let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+        //
+        // tracing_subscriber::registry().with(fmt_layer).init();
+
         let mut t = TestManager::new();
         let block1;
         let block1_id;
@@ -1683,6 +1682,14 @@ mod tests {
         t.check_blockchain().await;
         t.check_utxoset().await;
         t.check_token_supply().await;
+
+        {
+            let wallet = t.wallet_lock.read().await;
+            let count = wallet.get_unspent_slip_count();
+            assert_ne!(count, 0);
+            let balance = wallet.get_available_balance();
+            assert_ne!(balance, 0);
+        }
     }
 
     #[tokio::test]

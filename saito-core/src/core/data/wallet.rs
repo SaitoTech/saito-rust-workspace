@@ -1,5 +1,5 @@
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp,
+    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
@@ -9,8 +9,9 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
-use ahash::HashMap;
 use rayon::prelude::*;
+use std::collections::{HashMap, HashSet};
+use tracing::warn;
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -27,11 +28,10 @@ pub const WALLET_SIZE: usize = 65;
 ///
 #[derive(Clone, Debug, PartialEq)]
 pub struct WalletSlip {
-    pub uuid: SaitoHash,
     pub utxokey: SaitoUTXOSetKey,
     pub amount: u64,
     pub block_id: u64,
-    pub block_hash: SaitoHash,
+    pub tx_ordinal: u64,
     pub lc: bool,
     pub slip_index: u8,
     pub spent: bool,
@@ -43,9 +43,11 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub slips: Vec<WalletSlip>,
+    pub slips: HashMap<SaitoUTXOSetKey, WalletSlip>,
+    unspent_slips: HashSet<SaitoUTXOSetKey>,
     pub filename: String,
     pub filepass: String,
+    available_balance: u64,
 }
 
 impl Wallet {
@@ -55,9 +57,11 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            slips: Default::default(),
+            slips: HashMap::with_capacity(1_000_000),
+            unspent_slips: HashSet::with_capacity(1_000_000),
             filename: "default".to_string(),
             filepass: "password".to_string(),
+            available_balance: 0,
         }
     }
 
@@ -117,16 +121,16 @@ impl Wallet {
 
     /// [private_key - 32 bytes
     /// [public_key - 33 bytes]
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
         self.private_key = bytes[0..32].try_into().unwrap();
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
         if lc {
-            for tx in block.transactions.iter() {
+            for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.inputs.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         self.delete_slip(input);
@@ -134,15 +138,15 @@ impl Wallet {
                 }
                 for output in tx.outputs.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        self.add_slip(block, tx, output, true);
+                        self.add_slip(block, index as u64, output, true);
                     }
                 }
             }
         } else {
-            for tx in block.transactions.iter() {
+            for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.inputs.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        self.add_slip(block, tx, input, true);
+                        self.add_slip(block, index as u64, input, true);
                     }
                 }
                 for output in tx.outputs.iter() {
@@ -157,7 +161,7 @@ impl Wallet {
     //
     // removes all slips in block when pruned / deleted
     //
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_block(&mut self, block: &Block) {
         for tx in block.transactions.iter() {
             for input in tx.inputs.iter() {
@@ -171,50 +175,48 @@ impl Wallet {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
-    pub fn add_slip(&mut self, block: &Block, transaction: &Transaction, slip: &Slip, lc: bool) {
+    // #[tracing::instrument(level = "info", skip_all)]
+    pub fn add_slip(&mut self, block: &Block, tx_index: u64, slip: &Slip, lc: bool) {
         let mut wallet_slip = WalletSlip::new();
 
-        wallet_slip.uuid = transaction.hash_for_signature.unwrap();
+        assert_ne!(block.id, 0);
         wallet_slip.utxokey = slip.get_utxoset_key();
         wallet_slip.amount = slip.amount;
         wallet_slip.slip_index = slip.slip_index;
         wallet_slip.block_id = block.id;
-        wallet_slip.block_hash = block.hash;
+        wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
-        self.slips.push(wallet_slip);
+        self.unspent_slips.insert(wallet_slip.utxokey);
+        self.available_balance += slip.amount;
+        let result = self.slips.insert(wallet_slip.utxokey, wallet_slip);
+        assert!(result.is_none());
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        let index = self
-            .slips
-            .iter()
-            // .into_par_iter()
-            .enumerate()
-            .find(|(_, x)| x.uuid == slip.uuid && x.slip_index == slip.slip_index);
-        if index.is_none() {
-            return;
+        self.unspent_slips.remove(&slip.utxoset_key);
+        let result = self.slips.remove(&slip.utxoset_key);
+        if result.is_some() {
+            let result = result.unwrap();
+            if !result.spent {
+                self.available_balance -= result.amount;
+            }
         }
-        let index = index.unwrap().0;
-        self.slips.remove(index);
-        // self.slips
-        // .iter_mut() //.remove(&slip.utxoset_key);
-        // .retain(|x| x.uuid != slip.uuid || x.slip_index != slip.slip_index);
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn get_available_balance(&self) -> u64 {
-        (&self.slips)
-            .into_par_iter()
-            .filter(|s| !s.spent)
-            .map(|s| s.amount)
-            .sum::<u64>()
+        // (&self.slips)
+        //     .into_par_iter()
+        //     .filter(|s| !s.1.spent)
+        //     .map(|s| s.1.amount)
+        //     .sum::<u64>()
+        self.available_balance
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
-        (&self.slips).into_par_iter().filter(|s| !s.spent).count() as u64
+        self.unspent_slips.len() as u64
     }
 
     // the nolan_requested is omitted from the slips created - only the change
@@ -231,22 +233,37 @@ impl Wallet {
         //
         // grab inputs
         //
-        for slip in &mut self.slips {
-            if !slip.spent {
-                if nolan_in < nolan_requested {
-                    nolan_in += slip.amount;
-
-                    let mut input = Slip::new();
-                    input.public_key = my_public_key;
-                    input.amount = slip.amount;
-                    input.uuid = slip.uuid;
-                    input.slip_index = slip.slip_index;
-                    inputs.push(input);
-
-                    slip.spent = true;
-                }
+        let mut keys_to_remove = vec![];
+        for key in self.unspent_slips.iter() {
+            if nolan_in >= nolan_requested {
+                break;
             }
+            let slip = self.slips.get_mut(key).expect("slip should be here");
+            nolan_in += slip.amount;
+
+            let mut input = Slip::new();
+            input.public_key = my_public_key;
+            input.amount = slip.amount;
+            input.block_id = slip.block_id;
+            input.tx_ordinal = slip.tx_ordinal;
+            input.slip_index = slip.slip_index;
+            inputs.push(input);
+
+            slip.spent = true;
+            self.available_balance -= slip.amount;
+
+            keys_to_remove.push(slip.utxokey);
         }
+
+        for key in keys_to_remove {
+            self.unspent_slips.remove(&key);
+        }
+        // self.unspent_slips.iter_mut().for_each(|key| {});
+        // for slip in &mut self.slips {
+        //     if !slip.spent {
+        //
+        //     }
+        // }
 
         //
         // create outputs
@@ -270,14 +287,16 @@ impl Wallet {
             let mut input = Slip::new();
             input.public_key = my_public_key;
             input.amount = 0;
-            input.uuid = [0; 32];
+            input.block_id = 0;
+            input.tx_ordinal = 0;
             inputs.push(input);
         }
         if outputs.is_empty() {
             let mut output = Slip::new();
             output.public_key = my_public_key;
             output.amount = 0;
-            output.uuid = [0; 32];
+            output.block_id = 0;
+            output.tx_ordinal = 0;
             outputs.push(output);
         }
 
@@ -286,17 +305,18 @@ impl Wallet {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn sign(&self, message_bytes: &[u8]) -> SaitoSignature {
-        sign(message_bytes, self.private_key)
+        sign(message_bytes, &self.private_key)
     }
 
     pub async fn create_transaction_with_default_fees(&self) -> Transaction {
         // TODO : to be implemented
         Transaction::new()
     }
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     pub async fn create_golden_ticket_transaction(
-        &mut self,
         golden_ticket: GoldenTicket,
+        public_key: &SaitoPublicKey,
+        private_key: &SaitoPrivateKey,
     ) -> Transaction {
         let mut transaction = Transaction::new();
 
@@ -305,14 +325,16 @@ impl Wallet {
         transaction.message = golden_ticket.serialize_for_net();
 
         let mut input1 = Slip::new();
-        input1.public_key = self.public_key;
+        input1.public_key = public_key.clone();
         input1.amount = 0;
-        input1.uuid = [0; 32];
+        input1.block_id = 0;
+        input1.tx_ordinal = 0;
 
         let mut output1 = Slip::new();
-        output1.public_key = self.public_key;
+        output1.public_key = public_key.clone();
         output1.amount = 0;
-        output1.uuid = [0; 32];
+        output1.block_id = 0;
+        output1.tx_ordinal = 0;
 
         transaction.add_input(input1);
         transaction.add_output(output1);
@@ -320,7 +342,7 @@ impl Wallet {
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.hash_for_signature = Some(hash_for_signature);
 
-        transaction.sign(self.private_key);
+        transaction.sign(private_key);
 
         transaction
     }
@@ -330,11 +352,10 @@ impl WalletSlip {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         WalletSlip {
-            uuid: [0; 32],
-            utxokey: [0; 74],
+            utxokey: [0; 58],
             amount: 0,
             block_id: 0,
-            block_hash: [0; 32],
+            tx_ordinal: 0,
             lc: true,
             slip_index: 0,
             spent: false,

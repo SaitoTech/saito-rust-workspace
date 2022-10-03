@@ -8,7 +8,8 @@ pub type SaitoSignature = [u8; 64];
 pub type SaitoPublicKey = [u8; 33];
 pub type SaitoPrivateKey = [u8; 32];
 pub type SaitoHash = [u8; 32];
-pub type SaitoUTXOSetKey = [u8; 74];
+// pub type SlipUuid = [u8; 17];
+pub type SaitoUTXOSetKey = [u8; 58];
 pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 
 pub const BLOCK_FILE_EXTENSION: &str = ".sai";
@@ -33,7 +34,7 @@ pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(100);
 macro_rules! log_write_lock_request {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::debug!("waiting for {:?} lock for writing", $resource);
+        println!("waiting for {:?} lock for writing", $resource);
     };
 }
 
@@ -41,7 +42,7 @@ macro_rules! log_write_lock_request {
 macro_rules! log_write_lock_receive {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::debug!("acquired {:?} lock for writing", $resource);
+        println!("acquired {:?} lock for writing", $resource);
     };
 }
 
@@ -49,7 +50,7 @@ macro_rules! log_write_lock_receive {
 macro_rules! log_read_lock_request {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::debug!("waiting for {:?} lock for reading", $resource);
+        println!("waiting for {:?} lock for reading", $resource);
     };
 }
 
@@ -57,15 +58,7 @@ macro_rules! log_read_lock_request {
 macro_rules! log_read_lock_receive {
     ($resource: expr) => {
         #[cfg(feature = "locking-logs")]
-        tracing::debug!("acquired {:?} lock for reading", $resource);
-    };
-}
-
-#[macro_export]
-macro_rules! stat {
-    ($resource:expr) => {
-        #[cfg(feature = "with-stats")]
-        tracing::info!("{:?}", $resource);
+        println!("acquired {:?} lock for reading", $resource);
     };
 }
 
@@ -132,8 +125,8 @@ impl StatVariable {
         {
             println!(
                 // target : "saito_stats",
-                "--- stats ------ {:?} - total : {:?} current_rate : {:.5} max_rate : {:.5} min_rate : {:.5}",
-                self.name.as_str(),
+                "--- stats ------ {} - total : {:?} current_rate : {:.2} max_rate : {:.2} min_rate : {:.2}",
+                format!("{:width$}", self.name, width = 30),
                 self.total,
                 self.avg,
                 self.max_avg,

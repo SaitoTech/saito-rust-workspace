@@ -34,7 +34,9 @@ pub mod test {
     use tokio::sync::RwLock;
     use tracing::{debug, info};
 
-    use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, UtxoSet};
+    use crate::common::defs::{
+        SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
+    };
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
@@ -47,7 +49,7 @@ pub mod test {
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
-    use crate::core::mining_event_processor::MiningEvent;
+    use crate::core::mining_thread::MiningEvent;
     use crate::{
         log_read_lock_receive, log_read_lock_request, log_write_lock_receive,
         log_write_lock_request,
@@ -74,10 +76,13 @@ pub mod test {
 
     impl TestManager {
         pub fn new() -> Self {
+            let wallet = Wallet::new();
+            let public_key = wallet.public_key.clone();
+            let private_key = wallet.private_key.clone();
             let peers = Arc::new(RwLock::new(PeerCollection::new()));
-            let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
+            let wallet_lock = Arc::new(RwLock::new(wallet));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-            let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
+            let mempool_lock = Arc::new(RwLock::new(Mempool::new(public_key, private_key)));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
 
             Self {
@@ -121,14 +126,19 @@ pub mod test {
         //
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
+            log_write_lock_request!("test_manager:add_block::blockchain");
             let mut blockchain = self.blockchain_lock.write().await;
+            log_write_lock_receive!("test_manager:add_block::blockchain");
+            log_write_lock_request!("test_manager:add_block::mempool");
+            let mut mempool = self.mempool_lock.write().await;
+            log_write_lock_receive!("test_manager:add_block::mempool");
             blockchain
                 .add_block(
                     block,
                     &mut self.network,
                     &mut self.storage,
                     self.sender_to_miner.clone(),
-                    self.mempool_lock.clone(),
+                    &mut mempool,
                 )
                 .await;
             debug!("block added to test manager blockchain");
@@ -398,7 +408,7 @@ pub mod test {
             txs_fee: u64,
             include_valid_golden_ticket: bool,
         ) -> Block {
-            let mut transactions: Vec<Transaction> = vec![];
+            let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
 
@@ -411,15 +421,15 @@ pub mod test {
             for _i in 0..txs_number {
                 let mut transaction;
                 {
-                    log_write_lock_request!("wallet");
+                    log_write_lock_request!("test_manager:create_block::wallet");
                     let mut wallet = self.wallet_lock.write().await;
-                    log_write_lock_receive!("wallet");
+                    log_write_lock_receive!("test_manager:create_block::wallet");
                     transaction = Transaction::create(&mut wallet, public_key, txs_amount, txs_fee);
                 }
 
-                transaction.sign(private_key);
-                transaction.generate(public_key);
-                transactions.push(transaction);
+                transaction.sign(&private_key);
+                transaction.generate(&public_key, 0, 0);
+                transactions.insert(transaction.signature, transaction);
             }
 
             if include_valid_golden_ticket {
@@ -434,10 +444,15 @@ pub mod test {
                 let mut gttx: Transaction;
                 {
                     let mut wallet = self.wallet_lock.write().await;
-                    gttx = wallet.create_golden_ticket_transaction(golden_ticket).await;
+                    gttx = Wallet::create_golden_ticket_transaction(
+                        golden_ticket,
+                        &wallet.public_key,
+                        &wallet.private_key,
+                    )
+                    .await;
                 }
-                gttx.generate(public_key);
-                transactions.push(gttx);
+                gttx.generate(&public_key, 0, 0);
+                transactions.insert(gttx.signature, gttx);
             }
 
             //
@@ -446,13 +461,14 @@ pub mod test {
             let mut block = Block::create(
                 &mut transactions,
                 parent_hash,
-                self.wallet_lock.clone(),
                 self.blockchain_lock.clone().write().await.borrow_mut(),
                 timestamp,
+                &public_key,
+                &private_key,
             )
             .await;
             block.generate();
-            block.sign(private_key);
+            block.sign(&private_key);
 
             block
         }
@@ -531,17 +547,21 @@ pub mod test {
             //
             for _i in 0..vip_transactions {
                 let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
-                tx.generate(public_key);
-                tx.sign(private_key);
+                tx.generate(&public_key, 0, 0);
+                tx.sign(&private_key);
                 block.add_transaction(tx);
             }
 
             // we have added VIP, so need to regenerate the merkle-root
             block.merkle_root = block.generate_merkle_root();
             block.generate();
-            block.sign(private_key);
+            block.sign(&private_key);
 
-            assert!(verify_hash(&block.pre_hash, block.signature, block.creator));
+            assert!(verify_hash(
+                &block.pre_hash,
+                &block.signature,
+                &block.creator
+            ));
 
             // and add first block to blockchain
             self.add_block(block).await;

@@ -4,7 +4,8 @@ use blake3::Hasher;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
 pub use merkle::MerkleTree;
-pub use secp256k1::{Message, PublicKey, SecretKey, Signature, SECP256K1};
+use secp256k1::ecdsa;
+pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 
@@ -68,7 +69,10 @@ pub fn generate_keypair_from_private_key(slice: &[u8]) -> (SaitoPublicKey, Saito
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn sign_blob(vbytes: &mut Vec<u8>, private_key: SaitoPrivateKey) -> &mut Vec<u8> {
+pub fn sign_blob<'a, 'b>(
+    vbytes: &'a mut Vec<u8>,
+    private_key: &'b SaitoPrivateKey,
+) -> &'a mut Vec<u8> {
     let sig = sign(&hash(vbytes.as_ref()), private_key);
     vbytes.extend(&sig);
     vbytes
@@ -97,30 +101,30 @@ pub fn hash(data: &Vec<u8>) -> SaitoHash {
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn sign(message_bytes: &[u8], private_key: SaitoPrivateKey) -> SaitoSignature {
+pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignature {
     let hash = hash(&message_bytes.to_vec());
     let msg = Message::from_slice(&hash).unwrap();
-    let secret = SecretKey::from_slice(&private_key).unwrap();
-    let sig = SECP256K1.sign(&msg, &secret);
+    let secret = SecretKey::from_slice(private_key).unwrap();
+    let sig = SECP256K1.sign_ecdsa(&msg, &secret);
     sig.serialize_compact()
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn verify(msg: &[u8], sig: SaitoSignature, public_key: SaitoPublicKey) -> bool {
+pub fn verify(msg: &[u8], sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let hash = hash(&msg.to_vec());
     verify_hash(&hash, sig, public_key)
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn verify_hash(hash: &SaitoHash, sig: SaitoSignature, public_key: SaitoPublicKey) -> bool {
+pub fn verify_hash(hash: &SaitoHash, sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let m = Message::from_slice(hash);
-    let p = PublicKey::from_slice(&public_key);
-    let s = Signature::from_compact(&sig);
+    let p = PublicKey::from_slice(public_key);
+    let s = ecdsa::Signature::from_compact(sig);
     if m.is_err() || p.is_err() || s.is_err() {
         false
     } else {
         SECP256K1
-            .verify(&m.unwrap(), &s.unwrap(), &p.unwrap())
+            .verify_ecdsa(&m.unwrap(), &s.unwrap(), &p.unwrap())
             .is_ok()
     }
 }
@@ -175,12 +179,12 @@ mod tests {
 
         let (public, _) = generate_keypair_from_private_key(&private_key);
 
-        let signature = sign(&msg, private_key);
+        let signature = sign(&msg, &private_key);
         assert_eq!(signature.len(), 64);
         let hex_str = hex::encode(signature);
         assert_eq!(hex_str, "11c0e19856726c42c8ac3ec8e469057f5f8a882f7206377525db00899835b03f6ec3010d19534a5703dd9b1004b4f0e31d19582cdd5aec794541d0d0f339db7c");
 
-        let result = verify(&msg, signature, public);
+        let result = verify(&msg, &signature, &public);
         assert!(result);
     }
 
@@ -194,9 +198,9 @@ mod tests {
         let (public_key, private_key) = generate_keys();
         let (public_key2, private_key2) = generate_keys();
 
-        assert_eq!(verify(&msg, sign(&msg, private_key), public_key), true);
-        assert_eq!(verify(&msg, sign(&msg, private_key2), public_key2), true);
-        assert_eq!(verify(&msg, sign(&msg, private_key), public_key2), false);
-        assert_eq!(verify(&msg, sign(&msg, private_key2), public_key), false);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key), &public_key), true);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key2), &public_key2), true);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key), &public_key2), false);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key2), &public_key), false);
     }
 }

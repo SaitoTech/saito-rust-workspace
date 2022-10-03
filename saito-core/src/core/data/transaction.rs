@@ -1,19 +1,15 @@
-use std::sync::Arc;
-
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 use tracing::{debug, error, trace, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet};
-use crate::core::data::crypto::{generate_random_bytes, hash, sign, verify, verify_hash};
+use crate::core::data::crypto::{hash, sign, verify, verify_hash};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
-use crate::{log_write_lock_receive, log_write_lock_request};
 
 pub const TRANSACTION_SIZE: usize = 93;
 
@@ -47,7 +43,7 @@ pub struct Transaction {
     pub(crate) signature: SaitoSignature,
     path: Vec<Hop>,
 
-    // hash used for merkle_root (does not include signature) and slip uuid
+    // hash used for merkle_root (does not include signature)
     pub hash_for_signature: Option<SaitoHash>,
 
     /// total nolan in input slips
@@ -87,7 +83,7 @@ impl Transaction {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn add_hop(&mut self, wallet: &Wallet, to_public_key: SaitoPublicKey) {
+    pub fn add_hop(&mut self, wallet: &Wallet, to_public_key: &SaitoPublicKey) {
         let hop = Hop::generate(wallet, to_public_key, self);
         self.path.push(hop);
     }
@@ -241,13 +237,13 @@ impl Transaction {
             let mut input1 = Slip::new();
             input1.public_key = to_public_key;
             input1.amount = 0;
-            let random_uuid = hash(&generate_random_bytes(32));
-            input1.uuid = random_uuid;
+            input1.block_id = 0;
+            input1.tx_ordinal = 0;
 
             let mut output1 = Slip::new();
             output1.public_key = wallet.public_key;
-            output1.amount = 0;
-            output1.uuid = [0; 32];
+            output1.block_id = 0;
+            output1.tx_ordinal = 0;
 
             transaction.add_input(input1);
             transaction.add_output(output1);
@@ -317,7 +313,8 @@ impl Transaction {
         output.public_key = output_slip_to_rebroadcast.public_key;
         output.amount = output_payment;
         output.slip_type = SlipType::ATR;
-        output.uuid = output_slip_to_rebroadcast.uuid;
+        output.block_id = output_slip_to_rebroadcast.block_id;
+        output.tx_ordinal = output_slip_to_rebroadcast.tx_ordinal;
 
         //
         // if this is the FIRST time we are rebroadcasting, we copy the
@@ -445,11 +442,11 @@ impl Transaction {
     // generates all non-cumulative
     //
     // #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate(&mut self, public_key: SaitoPublicKey) -> bool {
+    pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
         //
         // nolan_in, nolan_out, total fees
         //
-        self.generate_total_fees();
+        self.generate_total_fees(tx_index, block_id);
 
         //
         // routing work for asserted public_key
@@ -482,62 +479,40 @@ impl Transaction {
     // calculate total fees in block
     //
     // #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate_total_fees(&mut self) {
+    pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
         // TODO - remove for uuid work
         // generate tx signature hash
-        //
         self.generate_hash_for_signature();
         trace!(
             "generating total fees for tx : {:?}",
             hex::encode(self.hash_for_signature.unwrap())
         );
-        let hash_for_signature = self.hash_for_signature;
 
-        //
         // calculate nolan in / out, fees
-        //
-        let mut nolan_in: u64 = 0;
-        let mut nolan_out: u64 = 0;
-
         // generate utxoset key for every slip
-        // for input in &mut self.inputs {
-        //     nolan_in += input.amount;
-        //     input.generate_utxoset_key();
-        // }
-        nolan_in = self
+        let nolan_in = self
             .inputs
-            .par_iter_mut()
+            .iter_mut()
             .map(|slip| {
                 slip.generate_utxoset_key();
                 slip.amount
             })
             .sum::<u64>();
 
-        nolan_out = self
+        let nolan_out = self
             .outputs
-            .par_iter_mut()
-            .map(|slip| {
-                if let Some(hash_for_signature) = hash_for_signature {
-                    if slip.slip_type != SlipType::ATR {
-                        slip.uuid = hash_for_signature;
-                    }
+            .iter_mut()
+            .enumerate()
+            .map(|(index, slip)| {
+                if slip.slip_type != SlipType::ATR {
+                    slip.block_id = block_id;
+                    slip.tx_ordinal = tx_index;
+                    slip.slip_index = index as u8;
                 }
                 slip.generate_utxoset_key();
                 slip.amount
             })
             .sum::<u64>();
-        // for output in &mut self.outputs {
-        //     nolan_out += output.amount;
-        //     //
-        //     // new outbound slips
-        //     //
-        //     if let Some(hash_for_signature) = hash_for_signature {
-        //         if output.slip_type != SlipType::ATR {
-        //             output.uuid = hash_for_signature;
-        //         }
-        //     }
-        //     output.generate_utxoset_key();
-        // }
 
         self.total_in = nolan_in;
         self.total_out = nolan_out;
@@ -557,7 +532,7 @@ impl Transaction {
     // calculate cumulative routing work in block
     //
     // #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate_total_work(&mut self, public_key: SaitoPublicKey) {
+    pub fn generate_total_work(&mut self, public_key: &SaitoPublicKey) {
         //
         // if there is no routing path, then the transaction contains
         // no usable work for producing a block, and any payout associated
@@ -573,7 +548,7 @@ impl Transaction {
         // something is wrong if we are not the last routing node
         //
         let last_hop = &self.path[self.path.len() - 1];
-        if last_hop.to != public_key {
+        if last_hop.to.ne(public_key) {
             self.total_work = 0;
             return;
         }
@@ -768,7 +743,7 @@ impl Transaction {
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
-    pub fn sign(&mut self, private_key: SaitoPrivateKey) {
+    pub fn sign(&mut self, private_key: &SaitoPrivateKey) {
         //
         // we set slip ordinals when signing
         //
@@ -781,7 +756,7 @@ impl Transaction {
         self.signature = sign(&self.serialize_for_signature(), private_key);
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         // trace!(
         //     "validating transaction : {:?}",
@@ -836,7 +811,7 @@ impl Transaction {
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
                 let public_key: SaitoPublicKey = self.inputs[0].public_key;
-                if !verify_hash(hash_for_signature, sig, public_key) {
+                if !verify_hash(hash_for_signature, &sig, &public_key) {
                     error!(
                         "tx verification failed : hash = {:?}, sig = {:?}, pub_key = {:?}",
                         hex::encode(hash_for_signature),
@@ -951,7 +926,7 @@ impl Transaction {
             vbytes.extend(&self.path[i].to);
 
             // check sig is valid
-            if !verify(&hash(&vbytes), self.path[i].sig, self.path[i].from) {
+            if !verify(&hash(&vbytes), &self.path[i].sig, &self.path[i].from) {
                 warn!("signature is not valid");
                 return false;
             }
@@ -1024,7 +999,7 @@ mod tests {
         let wallet = Wallet::new();
 
         tx.outputs = vec![Slip::new()];
-        tx.sign(wallet.private_key);
+        tx.sign(&wallet.private_key);
 
         assert_eq!(tx.outputs[0].slip_index, 0);
         assert_ne!(tx.signature, [0; 64]);
@@ -1054,10 +1029,8 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        input_slip.uuid = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
+        input_slip.block_id = 0;
+        input_slip.tx_ordinal = 0;
         input_slip.amount = 123;
         input_slip.slip_index = 10;
         input_slip.slip_type = SlipType::ATR;
@@ -1067,10 +1040,8 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        output_slip.uuid = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
+        output_slip.block_id = 0;
+        output_slip.tx_ordinal = 0;
         output_slip.amount = 345;
         output_slip.slip_index = 23;
         output_slip.slip_type = SlipType::Normal;
@@ -1083,14 +1054,11 @@ mod tests {
             vec![
                 0, 0, 1, 125, 38, 221, 98, 138, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247,
                 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192,
-                176, 22, 31, 205, 139, 204, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35,
-                148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192, 176,
-                22, 31, 205, 139, 0, 0, 0, 0, 0, 0, 0, 123, 10, 1, 220, 246, 204, 235, 116, 113,
-                127, 152, 195, 247, 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237, 191, 204,
-                251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                89, 23, 0, 0, 0, 0, 1, 0, 0, 0, 3, 123, 34, 116, 101, 115, 116, 34, 58, 34, 116,
-                101, 115, 116, 34, 125,
+                176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 0, 123, 10, 1, 220, 246, 204, 235,
+                116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253, 205, 143, 53, 14, 237,
+                191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0, 0, 0, 0, 0, 0, 1, 89,
+                23, 0, 0, 0, 0, 1, 0, 0, 0, 3, 123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101,
+                115, 116, 34, 125
             ]
         );
     }
@@ -1109,10 +1077,8 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        input_slip.uuid = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
+        input_slip.block_id = 0;
+        input_slip.tx_ordinal = 0;
         input_slip.amount = 123;
         input_slip.slip_index = 10;
         input_slip.slip_type = SlipType::ATR;
@@ -1122,10 +1088,8 @@ mod tests {
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
-        output_slip.uuid = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
+        output_slip.block_id = 0;
+        output_slip.tx_ordinal = 0;
         output_slip.amount = 345;
         output_slip.slip_index = 23;
         output_slip.slip_type = SlipType::Normal;
@@ -1134,7 +1098,7 @@ mod tests {
         tx.outputs.push(output_slip);
 
         tx.sign(
-            <[u8; 32]>::from_hex(
+            &<[u8; 32]>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
             .unwrap(),
@@ -1144,10 +1108,10 @@ mod tests {
         assert_eq!(
             tx.signature,
             [
-                242, 172, 37, 7, 193, 75, 141, 172, 210, 8, 216, 159, 92, 61, 35, 231, 132, 197, 2,
-                117, 43, 77, 175, 246, 196, 90, 236, 3, 58, 14, 68, 80, 2, 80, 47, 241, 217, 16,
-                204, 165, 93, 247, 96, 3, 222, 170, 124, 38, 17, 72, 11, 129, 8, 75, 70, 82, 14,
-                123, 104, 120, 166, 177, 236, 128
+                173, 213, 205, 24, 244, 6, 51, 69, 47, 129, 33, 129, 76, 218, 167, 11, 55, 73, 87,
+                6, 157, 228, 92, 194, 195, 157, 115, 199, 78, 111, 174, 67, 119, 178, 131, 191,
+                121, 60, 200, 179, 92, 169, 79, 161, 179, 218, 20, 135, 172, 110, 252, 33, 49, 119,
+                188, 157, 247, 0, 101, 96, 205, 202, 16, 138
             ]
         );
     }
@@ -1186,6 +1150,8 @@ mod tests {
         assert_eq!(mock_tx, deserialized_tx);
     }
 
+    // TODO : change the uuid related changes in SLR and add the tx buffer to the test
+    #[ignore]
     #[test]
     fn deserialize_test_against_slr() {
         let tx_buffer_txt = "00000001000000010000000300000000dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec0000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b00000000000001590000616263";
@@ -1202,14 +1168,14 @@ mod tests {
             hex::encode(public_key),
             "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
         );
-        tx.generate(public_key);
+        tx.generate(&public_key, 0, 0);
         let sig: SaitoSignature = tx.signature;
 
         assert_eq!(hex::decode("0000017d26dd628a03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce76100000000000000000000000000000000000000000000000000000000000000000000000000000015900000000000100000003616263").unwrap()
                    ,tx.serialize_for_signature());
-        let result = verify(tx.serialize_for_signature().as_slice(), sig, public_key);
+        let result = verify(tx.serialize_for_signature().as_slice(), &sig, &public_key);
         assert!(result);
-        let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), sig, public_key);
+        let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), &sig, &public_key);
         assert!(result);
     }
 }

@@ -17,18 +17,23 @@ use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    SaitoPrivateKey, SaitoPublicKey, CHANNEL_SIZE, STAT_TIMER, THREAD_SLEEP_TIME,
+    SaitoPrivateKey, SaitoPublicKey, StatVariable, CHANNEL_SIZE, STAT_BIN_COUNT, STAT_TIMER,
+    THREAD_SLEEP_TIME,
 };
+use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
+use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusThread};
+use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
-use saito_core::core::mining_event_processor::{MiningEvent, MiningEventProcessor};
-use saito_core::core::routing_event_processor::{
-    PeerState, RoutingEvent, RoutingEventProcessor, StaticPeer,
+use saito_core::core::data::wallet::Wallet;
+use saito_core::core::mining_thread::{MiningEvent, MiningThread};
+use saito_core::core::routing_thread::{PeerState, RoutingEvent, RoutingThread, StaticPeer};
+use saito_core::core::verification_thread::{
+    VerificationThread, VerifyRequest, VERIFICATION_THREAD_COUNT,
 };
 use saito_core::{log_read_lock_receive, log_read_lock_request};
 
@@ -58,6 +63,7 @@ where
         let mut work_done = false;
         let mut last_timestamp = Instant::now();
         let mut stat_timer = Instant::now();
+        let time_keeper = TimeKeeper {};
 
         event_processor.on_init().await;
 
@@ -95,7 +101,9 @@ where
                 let duration = current_instant.duration_since(stat_timer);
                 if duration > STAT_TIMER {
                     stat_timer = current_instant;
-                    event_processor.on_stat_interval().await;
+                    event_processor
+                        .on_stat_interval(time_keeper.get_timestamp())
+                        .await;
                 }
             }
 
@@ -116,7 +124,7 @@ async fn run_mining_event_processor(
     sender_to_blockchain: &Sender<RoutingEvent>,
     receiver_for_miner: Receiver<MiningEvent>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let mining_event_processor = MiningEventProcessor {
+    let mining_event_processor = MiningThread {
         wallet: context.wallet.clone(),
         sender_to_blockchain: sender_to_blockchain.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
@@ -160,7 +168,7 @@ async fn run_consensus_event_processor(
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
         generate_genesis_block = configs.get_peer_configs().is_empty();
     }
-    let consensus_event_processor = ConsensusEventProcessor {
+    let consensus_event_processor = ConsensusThread {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
         wallet: context.wallet.clone(),
@@ -185,6 +193,7 @@ async fn run_consensus_event_processor(
             CONSENSUS_EVENT_PROCESSOR_ID,
         ))),
         stats: Default::default(),
+        txs_for_mempool: vec![],
     };
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
@@ -199,6 +208,51 @@ async fn run_consensus_event_processor(
     (interface_sender_to_blockchain, blockchain_handle)
 }
 
+async fn run_verification_threads(
+    sender_to_consensus: Sender<ConsensusEvent>,
+    blockchain: Arc<RwLock<Blockchain>>,
+    peers: Arc<RwLock<PeerCollection>>,
+    wallet: Arc<RwLock<Wallet>>,
+) -> (Vec<Sender<VerifyRequest>>, Vec<JoinHandle<()>>) {
+    let mut senders = vec![];
+    let mut thread_handles = vec![];
+
+    for i in 0..VERIFICATION_THREAD_COUNT {
+        let (sender, receiver) = tokio::sync::mpsc::channel(10_000);
+        senders.push(sender);
+        let mut verification_thread = VerificationThread {
+            sender_to_consensus: sender_to_consensus.clone(),
+            blockchain: blockchain.clone(),
+            peers: peers.clone(),
+            wallet: wallet.clone(),
+            public_key: [0; 33],
+            processed_txs: StatVariable::new(
+                format!("verification_{:?}::processed_txs", i),
+                STAT_BIN_COUNT,
+            ),
+            processed_blocks: StatVariable::new(
+                format!("verification_{:?}::processed_blocks", i),
+                STAT_BIN_COUNT,
+            ),
+            processed_msgs: StatVariable::new(
+                format!("verification_{:?}::processed_msgs", i),
+                STAT_BIN_COUNT,
+            ),
+        };
+        let (interface_sender_to_verification, interface_receiver_for_verification) =
+            tokio::sync::mpsc::channel::<NetworkEvent>(1);
+        let thread_handle = run_thread(
+            Box::new(verification_thread),
+            interface_receiver_for_verification,
+            receiver,
+        )
+        .await;
+        thread_handles.push(thread_handle);
+    }
+
+    (senders, thread_handles)
+}
+
 async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
     configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
@@ -207,10 +261,11 @@ async fn run_routing_event_processor(
     sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MiningEvent>,
+    senders: Vec<Sender<VerifyRequest>>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let mut routing_event_processor = RoutingEventProcessor {
+    let mut routing_event_processor = RoutingThread {
         blockchain: context.blockchain.clone(),
-        sender_to_mempool: sender_to_mempool.clone(),
+        sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         static_peers: vec![],
@@ -226,6 +281,8 @@ async fn run_routing_event_processor(
         ),
         reconnection_timer: 0,
         stats: Default::default(),
+        public_key: [0; 33],
+        senders_to_verification: senders,
     };
     {
         log_read_lock_request!("configs");
@@ -411,6 +468,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (sender_to_miner, receiver_for_miner) =
         tokio::sync::mpsc::channel::<MiningEvent>(CHANNEL_SIZE);
 
+    let (senders, verification_handles) = run_verification_threads(
+        sender_to_consensus.clone(),
+        context.blockchain.clone(),
+        peers.clone(),
+        context.wallet.clone(),
+    )
+    .await;
+
     let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),
         configs_clone.clone(),
@@ -419,6 +484,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &sender_to_consensus,
         receiver_for_routing,
         &sender_to_miner,
+        senders,
     )
     .await;
 
@@ -468,7 +534,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         miner_handle,
         loop_handle,
         network_handle,
-        spammer_handle
+        spammer_handle,
+        futures::future::join_all(verification_handles)
     );
     Ok(())
 }

@@ -11,15 +11,16 @@ use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::routing_event_processor::RoutingEvent;
+use saito_core::core::routing_thread::RoutingEvent;
 use std::cmp::min;
-use std::collections::LinkedList;
+use std::collections::{LinkedList, VecDeque};
 
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
+use saito_core::common::defs::THREAD_SLEEP_TIME;
 use saito_core::core::data::transaction::Transaction;
 use tracing::info;
 
@@ -32,7 +33,7 @@ pub struct Spammer {
     bootstrap_done: bool,
     sent_tx_count: u64,
     tx_generator: TransactionGenerator,
-    transactions: LinkedList<Transaction>,
+    transactions: VecDeque<Transaction>,
 }
 
 impl Spammer {
@@ -54,7 +55,7 @@ impl Spammer {
             sent_tx_count: 0,
             tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone(), sender)
                 .await,
-            transactions: Default::default(),
+            transactions: VecDeque::with_capacity(1_000_000),
         }
     }
 
@@ -68,14 +69,17 @@ impl Spammer {
             timer_in_milli = config.get_spammer_configs().timer_in_milli;
             burst_count = config.get_spammer_configs().burst_count;
         }
-        let sender = self.sender_to_network.clone();
-        tokio::spawn(async move {
-            loop {
-                let mut work_done = false;
-                // for _i in 0..burst_count {
-                if let Some(transaction) = receiver.recv().await {
-                    // self.sent_tx_count += 1;
-                    sender
+
+        loop {
+            if !self.bootstrap_done {
+                self.tx_generator.on_new_block(&mut self.transactions).await;
+                self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
+            }
+
+            for _i in 0..burst_count {
+                if let Some(transaction) = self.transactions.pop_front() {
+                    self.sent_tx_count += 1;
+                    self.sender_to_network
                         .send(IoEvent {
                             event_processor_id: 0,
                             event_id: 0,
@@ -86,24 +90,17 @@ impl Spammer {
                         })
                         .await
                         .unwrap();
+                } else if self.bootstrap_done {
+                    info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", self.sent_tx_count);
                     work_done = true;
+                    break;
                 }
-                // }
-            }
-        });
-        tokio::task::yield_now().await;
-        loop {
-            work_done = false;
-            if !self.bootstrap_done {
-                self.tx_generator.on_new_block().await;
-                self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
             }
 
             if !work_done {
-                // tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
-                tokio::time::sleep(Duration::from_millis(1000)).await;
+                tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
             } else {
-                // break;
+                break;
             }
         }
 

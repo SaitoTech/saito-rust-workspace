@@ -48,17 +48,12 @@ impl GoldenTicket {
             self.public_key.as_slice(),
         ]
         .concat();
-        // vbytes.extend(&self.target);
-        // vbytes.extend(&self.random);
-        // vbytes.extend(&self.public_key);
         vbytes
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn validate(&self, difficulty: u64) -> bool {
         let solution_hash = hash(&self.serialize_for_net());
-
-        // trace!("gt sol hash = {:?}", hex::encode(solution_hash));
 
         return GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty);
     }
@@ -67,21 +62,7 @@ impl GoldenTicket {
     pub fn validate_hashing_difficulty(solution_hash: &SaitoHash, difficulty: u64) -> bool {
         let solution = primitive_types::U256::from_big_endian(solution_hash);
 
-        if solution.leading_zeros() >= difficulty as u32 {
-            // debug!(
-            //     "GT : difficulty : {:?} solution : {:?}",
-            //     difficulty,
-            //     hex::encode(solution_hash)
-            // );
-
-            return true;
-        }
-        // trace!(
-        //     "difficulty = {:?} leading zeros = {:?}",
-        //     difficulty,
-        //     solution.leading_zeros()
-        // );
-        return false;
+        solution.leading_zeros() >= difficulty as u32
     }
 }
 

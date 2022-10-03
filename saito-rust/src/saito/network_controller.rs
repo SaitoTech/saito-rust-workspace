@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
@@ -11,7 +10,7 @@ use tracing::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
-use tokio::time::{Instant, Interval};
+use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
@@ -20,6 +19,7 @@ use warp::Filter;
 use saito_core::common::defs::{
     SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER, THREAD_SLEEP_TIME,
 };
+
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;

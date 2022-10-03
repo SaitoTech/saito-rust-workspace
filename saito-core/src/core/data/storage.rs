@@ -1,8 +1,10 @@
+use futures::future::{join_all, try_join_all};
+use futures::StreamExt;
 use std::sync::Arc;
 
 use crate::common::defs::BLOCK_FILE_EXTENSION;
 use tokio::sync::RwLock;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
@@ -12,6 +14,9 @@ use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
 
 use crate::{log_write_lock_receive, log_write_lock_request};
+use rayon::prelude::*;
+use tokio::task::JoinHandle;
+use tokio::try_join;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -90,15 +95,9 @@ impl Storage {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
-        debug!("loading blocks from disk");
+        info!("loading blocks from disk");
         let file_names = self.io_interface.load_block_file_list().await;
-        // trace!("waiting for the log_write_lock_request!("blockchain");");
-        // let mut blockchain = blockchain_lock.write().await;
-        // trace!("acquired the log_write_lock_request!("blockchain");");
 
-        log_write_lock_request!("mempool");
-        let mut mempool = mempool.write().await;
-        log_write_lock_receive!("mempool");
         if file_names.is_err() {
             error!("{:?}", file_names.err().unwrap());
             return;
@@ -106,7 +105,34 @@ impl Storage {
         let mut file_names = file_names.unwrap();
         file_names.sort();
         debug!("block file names : {:?}", file_names);
+
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
+
+        let mut waiting_count = file_names.len();
+        let handle = tokio::spawn(async move {
+            log_write_lock_request!("mempool");
+            let mut mempool = mempool.write().await;
+            log_write_lock_receive!("mempool");
+            loop {
+                if waiting_count == 0 {
+                    break;
+                }
+                waiting_count -= 1;
+                // TODO : if this fails we need to make sure `waiting_count` is reduced correctly. or should terminate the node
+                let buffer = receiver.recv().await;
+                if buffer.is_none() {
+                    continue;
+                }
+                let buffer = buffer.unwrap();
+                let mut block = Block::deserialize_from_net(&buffer);
+                block.generate();
+                info!("block : {:?} loaded from disk", hex::encode(block.hash));
+                mempool.add_block(block);
+            }
+        });
+
         for file_name in file_names {
+            info!("loading file : {:?}", file_name);
             let result = self
                 .io_interface
                 .read_value(self.io_interface.get_block_dir() + file_name.as_str())
@@ -114,14 +140,14 @@ impl Storage {
             if result.is_err() {
                 todo!()
             }
-            let buffer = result.unwrap();
-            let mut block = Block::deserialize_from_net(&buffer);
-            block.generate();
-            debug!("adding block from file : {:?}", file_name);
-            mempool.add_block(block);
-            debug!("block added from file : {:?}", file_name);
+            info!("file : {:?} loaded", file_name);
+            let buffer: Vec<u8> = result.unwrap();
+            sender.send(buffer).await.unwrap();
         }
-        debug!("loading blocks to mempool completed");
+
+        handle.await.unwrap();
+
+        info!("loading blocks to mempool completed");
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -313,8 +339,8 @@ mod test {
         //     hex::encode(block.serialize_for_signature()));
         let result = verify(
             &block.serialize_for_signature(),
-            block.signature,
-            block.creator,
+            &block.signature,
+            &block.creator,
         );
         assert!(result);
 

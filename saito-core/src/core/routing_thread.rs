@@ -7,19 +7,25 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT};
+use crate::common::defs::{
+    SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT, THREAD_SLEEP_TIME,
+};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::consensus_event_processor::ConsensusEvent;
+use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data;
+use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
 use crate::core::data::wallet::Wallet;
-use crate::core::mining_event_processor::MiningEvent;
+use crate::core::mining_thread::MiningEvent;
+use crate::core::verification_thread::VerifyRequest;
 use crate::{log_read_lock_receive, log_read_lock_request};
+use rayon::prelude::*;
+use tokio::task::JoinHandle;
 
 #[derive(Debug)]
 pub enum RoutingEvent {}
@@ -63,9 +69,9 @@ impl Default for RoutingStats {
 }
 
 /// Manages peers and routes messages to correct controller
-pub struct RoutingEventProcessor {
+pub struct RoutingThread {
     pub blockchain: Arc<RwLock<Blockchain>>,
-    pub sender_to_mempool: Sender<ConsensusEvent>,
+    pub sender_to_consensus: Sender<ConsensusEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
@@ -75,9 +81,11 @@ pub struct RoutingEventProcessor {
     pub network: Network,
     pub reconnection_timer: Timestamp,
     pub stats: RoutingStats,
+    pub public_key: SaitoPublicKey,
+    pub senders_to_verification: Vec<Sender<VerifyRequest>>,
 }
 
-impl RoutingEventProcessor {
+impl RoutingThread {
     ///
     ///
     /// # Arguments
@@ -135,13 +143,11 @@ impl RoutingEventProcessor {
             Message::Block(_) => {
                 unreachable!("received block");
             }
-            Message::Transaction(transaction) => {
+            Message::Transaction(mut transaction) => {
                 trace!("received transaction");
                 self.stats.received_transactions.increment();
-                self.sender_to_mempool
-                    .send(ConsensusEvent::NewTransaction { transaction })
-                    .await
-                    .unwrap();
+                self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
+                    .await;
             }
             Message::BlockchainRequest(request) => {
                 self.process_incoming_blockchain_request(request, peer_index)
@@ -234,10 +240,30 @@ impl RoutingEventProcessor {
             .process_incoming_block_hash(block_hash, peer_index, self.blockchain.clone())
             .await;
     }
+
+    async fn send_to_verification_thread(&self, request: VerifyRequest) {
+        let mut selected_sender: Option<&Sender<VerifyRequest>> = None;
+        let mut capacity = 0;
+
+        while selected_sender.is_none() {
+            for sender in self.senders_to_verification.iter() {
+                if sender.capacity() > capacity {
+                    capacity = sender.capacity();
+                    selected_sender = Some(sender);
+                }
+            }
+            if selected_sender.is_none() {
+                // waiting till we get an acceptable sender
+                tokio::time::sleep(THREAD_SLEEP_TIME).await;
+            }
+        }
+
+        selected_sender.unwrap().send(request).await.unwrap();
+    }
 }
 
 #[async_trait]
-impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
+impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         // trace!("processing new interface event");
         match event {
@@ -290,10 +316,10 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
                 buffer,
             } => {
                 debug!("block received : {:?}", hex::encode(block_hash));
-                self.sender_to_mempool
-                    .send(ConsensusEvent::BlockFetched { peer_index, buffer })
-                    .await
-                    .unwrap();
+
+                self.send_to_verification_thread(VerifyRequest::Block(buffer, peer_index))
+                    .await;
+
                 return Some(());
             }
         }
@@ -319,21 +345,47 @@ impl ProcessEvent<RoutingEvent> for RoutingEventProcessor {
     }
 
     async fn on_init(&mut self) {
+        assert!(!self.senders_to_verification.is_empty());
         // connect to peers
         self.network
             .initialize_static_peers(self.configs.clone())
             .await;
-    }
-    async fn on_stat_interval(&mut self) {
-        let time = self.time_keeper.get_timestamp();
-        self.stats.received_transactions.calculate_stats(time);
-        self.stats.received_blocks.calculate_stats(time);
-        self.stats.total_incoming_messages.calculate_stats(time);
 
-        println!("------------ routing stats -------------");
+        {
+            log_read_lock_request!("RoutingThread:on_init::wallet");
+            let wallet = self.wallet.read().await;
+            log_read_lock_receive!("RoutingThread:on_init::wallet");
+            self.public_key = wallet.public_key.clone();
+        }
+    }
+    async fn on_stat_interval(&mut self, current_time: Timestamp) {
+        self.stats
+            .received_transactions
+            .calculate_stats(current_time);
+        self.stats.received_blocks.calculate_stats(current_time);
+        self.stats
+            .total_incoming_messages
+            .calculate_stats(current_time);
+
         self.stats.received_transactions.print();
         self.stats.received_blocks.print();
         self.stats.total_incoming_messages.print();
-        println!("---------- routing stats end -----------");
+
+        println!(
+            "--- stats ------ {} - size : {:?}",
+            format!("{:width$}", "consensus::queue", width = 30),
+            self.sender_to_consensus.capacity(),
+        );
+        for (index, sender) in self.senders_to_verification.iter().enumerate() {
+            println!(
+                "--- stats ------ {} - size : {:?}",
+                format!(
+                    "{:width$}",
+                    format!("verification_{:?}::queue", index),
+                    width = 30
+                ),
+                sender.capacity(),
+            );
+        }
     }
 }

@@ -16,7 +16,7 @@ use wasm_bindgen::prelude::*;
 use crate::wasm_configuration::WasmConfiguration;
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::consensus_event_processor::{ConsensusEvent, ConsensusEventProcessor};
+use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
@@ -26,8 +26,8 @@ use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::mining_event_processor::{MiningEvent, MiningEventProcessor};
-use saito_core::core::routing_event_processor::{RoutingEvent, RoutingEventProcessor};
+use saito_core::core::mining_thread::{MiningEvent, MiningThread};
+use saito_core::core::routing_thread::{RoutingEvent, RoutingThread};
 
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_slip::WasmSlip;
@@ -59,9 +59,9 @@ impl Future for NetworkResultFuture {
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    consensus_event_processor: RoutingEventProcessor,
-    routing_event_processor: ConsensusEventProcessor,
-    mining_event_processor: MiningEventProcessor,
+    consensus_event_processor: RoutingThread,
+    routing_event_processor: ConsensusThread,
+    mining_event_processor: MiningThread,
     receiver_in_blockchain: Receiver<RoutingEvent>,
     receiver_in_mempool: Receiver<ConsensusEvent>,
     receiver_in_miner: Receiver<MiningEvent>,
@@ -78,14 +78,17 @@ lazy_static! {
 // impl SaitoWasm {}
 
 pub fn new() -> SaitoWasm {
-    let wallet = Arc::new(RwLock::new(Wallet::new()));
+    let wallet = Wallet::new();
+    let public_key = wallet.public_key.clone();
+    let private_key = wallet.private_key.clone();
+    let wallet = Arc::new(RwLock::new(wallet));
     let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
         Arc::new(RwLock::new(Box::new(WasmConfiguration::new())));
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
         blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
-        mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
+        mempool: Arc::new(RwLock::new(Mempool::new(public_key, private_key))),
         wallet: wallet.clone(),
         configuration: configuration.clone(),
     };
@@ -98,9 +101,9 @@ pub fn new() -> SaitoWasm {
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
     SaitoWasm {
-        consensus_event_processor: RoutingEventProcessor {
+        consensus_event_processor: RoutingThread {
             blockchain: context.blockchain.clone(),
-            sender_to_mempool: sender_to_mempool.clone(),
+            sender_to_consensus: sender_to_mempool.clone(),
             sender_to_miner: sender_to_miner.clone(),
             static_peers: vec![],
             configs: context.configuration.clone(),
@@ -113,8 +116,10 @@ pub fn new() -> SaitoWasm {
             ),
             reconnection_timer: 0,
             stats: Default::default(),
+            public_key,
+            senders_to_verification: vec![],
         },
-        routing_event_processor: ConsensusEventProcessor {
+        routing_event_processor: ConsensusThread {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
@@ -133,8 +138,9 @@ pub fn new() -> SaitoWasm {
             ),
             storage: Storage::new(Box::new(WasmIoHandler {})),
             stats: Default::default(),
+            txs_for_mempool: vec![],
         },
-        mining_event_processor: MiningEventProcessor {
+        mining_event_processor: MiningThread {
             wallet: context.wallet.clone(),
             sender_to_blockchain: sender_to_blockchain.clone(),
             sender_to_mempool: sender_to_mempool.clone(),

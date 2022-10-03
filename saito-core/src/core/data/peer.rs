@@ -99,7 +99,7 @@ impl Peer {
         log_read_lock_receive!("wallet");
         let response = HandshakeResponse {
             public_key: wallet.public_key,
-            signature: sign(&challenge.challenge.to_vec(), wallet.private_key),
+            signature: sign(&challenge.challenge.to_vec(), &wallet.private_key),
             challenge: generate_random_bytes(32).try_into().unwrap(),
             is_lite: 0,
             block_fetch_url,
@@ -134,7 +134,7 @@ impl Peer {
             todo!()
         }
         let sent_challenge = self.challenge_for_peer.unwrap();
-        let result = verify(&sent_challenge, response.signature, response.public_key);
+        let result = verify(&sent_challenge, &response.signature, &response.public_key);
         if !result {
             warn!(
                 "handshake failed. signature is not valid. sig : {:?} challenge : {:?} key : {:?}",
@@ -153,7 +153,7 @@ impl Peer {
         let wallet = wallet.read().await;
         log_read_lock_receive!("wallet");
         let response = HandshakeCompletion {
-            signature: sign(&response.challenge, wallet.private_key),
+            signature: sign(&response.challenge, &wallet.private_key),
         };
         io_handler
             .send_message(
@@ -180,7 +180,7 @@ impl Peer {
             todo!()
         }
         let sent_challenge = self.challenge_for_peer.unwrap();
-        let result = verify(&sent_challenge, response.signature, self.public_key);
+        let result = verify(&sent_challenge, &response.signature, &self.public_key);
         if !result {
             warn!("handshake failed. signature is not valid");
             todo!()
