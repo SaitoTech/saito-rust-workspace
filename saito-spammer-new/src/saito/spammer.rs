@@ -20,7 +20,6 @@ use std::time::Duration;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
-use saito_core::common::defs::THREAD_SLEEP_TIME;
 use saito_core::core::data::transaction::Transaction;
 use tracing::info;
 

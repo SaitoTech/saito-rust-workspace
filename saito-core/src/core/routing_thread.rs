@@ -7,9 +7,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{
-    SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT, THREAD_SLEEP_TIME,
-};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
@@ -254,7 +252,13 @@ impl RoutingThread {
             }
             if selected_sender.is_none() {
                 // waiting till we get an acceptable sender
-                tokio::time::sleep(THREAD_SLEEP_TIME).await;
+                log_read_lock_request!("configs");
+                let configs = self.configs.read().await;
+                log_read_lock_receive!("configs");
+                tokio::time::sleep(Duration::from_millis(
+                    configs.get_server_configs().thread_sleep_time_in_ms,
+                ))
+                .await;
             }
         }
 

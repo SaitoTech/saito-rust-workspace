@@ -1,5 +1,5 @@
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, THREAD_SLEEP_TIME};
+use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp};
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data::block::Block;
@@ -14,9 +14,6 @@ use std::time::Duration;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tracing::debug;
-
-// TODO : make this configurable
-pub const VERIFICATION_THREAD_COUNT: u64 = 16;
 
 #[derive(Debug)]
 pub enum VerifyRequest {

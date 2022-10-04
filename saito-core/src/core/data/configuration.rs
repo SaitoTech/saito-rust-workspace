@@ -21,6 +21,11 @@ pub struct Server {
     pub port: u16,
     pub protocol: String,
     pub endpoint: Endpoint,
+    pub verification_threads: u16,
+    pub channel_size: u64,
+    pub stat_timer_in_ms: u64,
+    pub thread_sleep_time_in_ms: u64,
+    pub block_producing_timer_in_ms: u64,
 }
 
 pub trait Configuration {
