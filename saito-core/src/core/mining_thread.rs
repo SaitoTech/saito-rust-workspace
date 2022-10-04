@@ -103,7 +103,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         self.public_key = wallet.public_key.clone();
     }
 
-    async fn on_stat_interval(&mut self, current_time: Timestamp) {
+    async fn on_stat_interval(&mut self, _current_time: Timestamp) {
         println!("--- stats ------ {} - total : {:?} current difficulty : {:?} miner_active : {:?} current target : {:?} ", format!("{:width$}", "mining::golden_tickets", width = 30), self.mined_golden_tickets, self.difficulty, self.miner_active, hex::encode(self.target));
     }
 }

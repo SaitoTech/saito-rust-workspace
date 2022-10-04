@@ -1,8 +1,7 @@
 use ahash::AHashMap;
+use std::collections::VecDeque;
 use std::time::Duration;
-use std::{collections::HashMap, collections::VecDeque, sync::Arc};
 
-use tokio::sync::RwLock;
 use tracing::{debug, info, trace, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
@@ -13,7 +12,6 @@ use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
-use rayon::prelude::*;
 
 //
 // In addition to responding to global broadcast messages, the
@@ -86,7 +84,7 @@ impl Mempool {
             &self.private_key,
         )
         .await;
-        for (sig, tx) in self.transactions.iter() {
+        for (_, tx) in self.transactions.iter() {
             if let TransactionType::GoldenTicket = tx.transaction_type {
                 let gt = GoldenTicket::deserialize_from_net(&tx.message);
                 if gt.target == target {
@@ -274,7 +272,7 @@ impl Mempool {
         self.routing_work_in_mempool = 0;
 
         // add routing work from remaining tx
-        for (sig, transaction) in &self.transactions {
+        for (_, transaction) in &self.transactions {
             self.routing_work_in_mempool += transaction.total_work;
         }
     }
@@ -320,14 +318,12 @@ mod tests {
 
     #[test]
     fn mempool_new_test() {
-        let wallet = Wallet::new();
         let mempool = Mempool::new([0; 33], [0; 32]);
         assert_eq!(mempool.blocks_queue, VecDeque::new());
     }
 
     #[test]
     fn mempool_add_block_test() {
-        let wallet = Wallet::new();
         let mut mempool = Mempool::new([0; 33], [0; 32]);
         let block = Block::new();
         mempool.add_block(block.clone());

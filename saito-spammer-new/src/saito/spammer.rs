@@ -1,7 +1,6 @@
 use crate::saito::config_handler::SpammerConfigs;
 use crate::saito::transaction_generator::{GeneratorState, TransactionGenerator};
-use crate::{IoEvent, TimeKeeper};
-use rayon::prelude::IntoParallelRefIterator;
+use crate::IoEvent;
 
 use saito_core::common::command::NetworkEvent;
 
@@ -11,9 +10,7 @@ use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::routing_thread::RoutingEvent;
-use std::cmp::min;
-use std::collections::{LinkedList, VecDeque};
+use std::collections::VecDeque;
 
 use std::sync::Arc;
 use std::time::Duration;

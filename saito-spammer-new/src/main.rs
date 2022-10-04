@@ -230,7 +230,7 @@ async fn run_verification_threads(
     for i in 0..verification_thread_count {
         let (sender, receiver) = tokio::sync::mpsc::channel(10_000);
         senders.push(sender);
-        let mut verification_thread = VerificationThread {
+        let verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
             blockchain: blockchain.clone(),
             peers: peers.clone(),
@@ -249,7 +249,7 @@ async fn run_verification_threads(
                 STAT_BIN_COUNT,
             ),
         };
-        let (interface_sender_to_verification, interface_receiver_for_verification) =
+        let (_interface_sender_to_verification, interface_receiver_for_verification) =
             tokio::sync::mpsc::channel::<NetworkEvent>(1);
         let thread_handle = run_thread(
             Box::new(verification_thread),
@@ -335,7 +335,7 @@ fn run_loop_thread(
     network_event_sender_to_routing_ep: Sender<NetworkEvent>,
     network_event_sender_to_consensus_ep: Sender<NetworkEvent>,
     network_event_sender_to_mining_ep: Sender<NetworkEvent>,
-    stat_timer_in_ms: u64,
+    _stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()> {
     let loop_handle = tokio::spawn(async move {

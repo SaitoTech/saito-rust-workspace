@@ -11,7 +11,7 @@ use crate::{log_read_lock_receive, log_read_lock_request};
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::debug;
 
@@ -77,11 +77,11 @@ impl VerificationThread {
 
 #[async_trait]
 impl ProcessEvent<VerifyRequest> for VerificationThread {
-    async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
+    async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         None
     }
 
-    async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
+    async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
         None
     }
 

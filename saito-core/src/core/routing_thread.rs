@@ -12,7 +12,6 @@ use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data;
-use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
@@ -22,8 +21,6 @@ use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::verification_thread::VerifyRequest;
 use crate::{log_read_lock_receive, log_read_lock_request};
-use rayon::prelude::*;
-use tokio::task::JoinHandle;
 
 #[derive(Debug)]
 pub enum RoutingEvent {}
@@ -141,7 +138,7 @@ impl RoutingThread {
             Message::Block(_) => {
                 unreachable!("received block");
             }
-            Message::Transaction(mut transaction) => {
+            Message::Transaction(transaction) => {
                 trace!("received transaction");
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))

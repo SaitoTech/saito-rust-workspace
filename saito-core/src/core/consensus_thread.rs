@@ -390,7 +390,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 mempool.add_golden_ticket(golden_ticket).await;
                 Some(())
             }
-            ConsensusEvent::BlockFetched { peer_index, block } => {
+            ConsensusEvent::BlockFetched { block, .. } => {
                 log_write_lock_request!("ConsensusEventProcessor:process_event::blockchain");
                 let mut blockchain = self.blockchain.write().await;
                 log_write_lock_receive!("ConsensusEventProcessor:process_event::blockchain");
@@ -461,10 +461,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
-        let time = self.time_keeper.get_timestamp();
-        self.stats.blocks_fetched.calculate_stats(time);
-        self.stats.blocks_created.calculate_stats(time);
-        self.stats.received_tx.calculate_stats(time);
+        self.stats.blocks_fetched.calculate_stats(current_time);
+        self.stats.blocks_created.calculate_stats(current_time);
+        self.stats.received_tx.calculate_stats(current_time);
 
         self.stats.blocks_fetched.print();
         self.stats.blocks_created.print();

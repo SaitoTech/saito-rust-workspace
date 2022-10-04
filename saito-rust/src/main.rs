@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::panic;
 use std::process;
 use std::str::FromStr;
@@ -17,7 +16,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{StatVariable, Timestamp, STAT_BIN_COUNT};
+use saito_core::common::defs::{StatVariable, STAT_BIN_COUNT};
 
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
@@ -59,7 +58,7 @@ where
 {
     tokio::spawn(async move {
         info!("new thread started");
-        let mut work_done = false;
+        let mut work_done;
         let mut last_timestamp = Instant::now();
         let mut stat_timer = Instant::now();
         let time_keeper = TimeKeeper {};
@@ -121,6 +120,7 @@ async fn run_mining_event_processor(
     receiver_for_miner: Receiver<MiningEvent>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
+    channel_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mining_event_processor = MiningThread {
         wallet: context.wallet.clone(),
@@ -133,13 +133,7 @@ async fn run_mining_event_processor(
         public_key: [0; 33],
         mined_golden_tickets: 0,
     };
-    let mut channel_size: usize = 1000;
-    {
-        log_read_lock_request!("configs");
-        let configs = context.configuration.read().await;
-        log_read_lock_receive!("configs");
-        channel_size = configs.get_server_configs().channel_size as usize;
-    }
+
     let (interface_sender_to_miner, interface_receiver_for_miner) =
         tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
 
@@ -164,6 +158,7 @@ async fn run_consensus_event_processor(
     sender_to_network_controller: Sender<IoEvent>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
+    channel_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
     let mut create_test_tx = false;
@@ -177,13 +172,7 @@ async fn run_consensus_event_processor(
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
         generate_genesis_block = configs.get_peer_configs().is_empty();
     }
-    let mut channel_size: usize = 1000;
-    {
-        log_read_lock_request!("configs");
-        let configs = context.configuration.read().await;
-        log_read_lock_receive!("configs");
-        channel_size = configs.get_server_configs().channel_size as usize;
-    }
+
     let consensus_event_processor = ConsensusThread {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
@@ -237,6 +226,7 @@ async fn run_routing_event_processor(
     senders: Vec<Sender<VerifyRequest>>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
+    channel_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
         blockchain: context.blockchain.clone(),
@@ -259,13 +249,7 @@ async fn run_routing_event_processor(
         public_key: [0; 33],
         senders_to_verification: senders,
     };
-    let mut channel_size: usize = 1000;
-    {
-        log_read_lock_request!("configs");
-        let configs = context.configuration.read().await;
-        log_read_lock_receive!("configs");
-        channel_size = configs.get_server_configs().channel_size as usize;
-    }
+
     {
         log_read_lock_request!("configs");
         let configs = configs.read().await;
@@ -311,7 +295,7 @@ async fn run_verification_threads(
     for i in 0..verification_thread_count {
         let (sender, receiver) = tokio::sync::mpsc::channel(100_000);
         senders.push(sender);
-        let mut verification_thread = VerificationThread {
+        let verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
             blockchain: blockchain.clone(),
             peers: peers.clone(),
@@ -330,7 +314,7 @@ async fn run_verification_threads(
                 STAT_BIN_COUNT,
             ),
         };
-        let (interface_sender_to_verification, interface_receiver_for_verification) =
+        let (_interface_sender_to_verification, interface_receiver_for_verification) =
             tokio::sync::mpsc::channel::<NetworkEvent>(1);
         let thread_handle = run_thread(
             Box::new(verification_thread),
@@ -526,6 +510,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         senders,
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
+        channel_size,
     )
     .await;
 
@@ -538,6 +523,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_network_controller.clone(),
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
+        channel_size,
     )
     .await;
 
@@ -548,6 +534,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         receiver_for_miner,
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
+        channel_size,
     )
     .await;
 
