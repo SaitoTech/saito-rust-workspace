@@ -62,7 +62,7 @@ pub struct ConsensusValues {
     // dust falling off chain, needs adding to treasury
     pub nolan_falling_off_chain: Currency,
     // staker treasury -> amount to add
-    pub staking_treasury: i128,
+    pub staking_treasury: Currency,
     // block payout
     pub block_payout: Vec<BlockPayout>,
     // average income
@@ -170,7 +170,7 @@ pub struct Block {
     pub(crate) treasury: Currency,
     pub(crate) burnfee: Currency,
     pub(crate) difficulty: u64,
-    pub(crate) staking_treasury: i128,
+    pub(crate) staking_treasury: Currency,
     avg_income: Currency,
     avg_variance: Currency,
     avg_atr_income: Currency,
@@ -424,16 +424,16 @@ impl Block {
         // set staking treasury
         //
         if cv.staking_treasury != 0 {
-            let mut adjusted_staking_treasury = previous_block_staking_treasury as i128;
+            let mut adjusted_staking_treasury = previous_block_staking_treasury;
             if cv.staking_treasury < 0 {
-                let x: i128 = cv.staking_treasury * -1;
-                if adjusted_staking_treasury > x {
-                    adjusted_staking_treasury -= x;
+                let x: i128 = cv.staking_treasury as i128 * -1 as i128;
+                if adjusted_staking_treasury > x as Currency {
+                    adjusted_staking_treasury -= x as Currency;
                 } else {
                     adjusted_staking_treasury = 0;
                 }
             } else {
-                adjusted_staking_treasury += cv.staking_treasury;
+                adjusted_staking_treasury += cv.staking_treasury as Currency;
             }
             // info!(
             //     "adjusted staking treasury written into block {}",
@@ -499,7 +499,8 @@ impl Block {
         let signature: SaitoSignature = bytes[117..181].try_into().unwrap();
 
         let treasury: Currency = Currency::from_be_bytes(bytes[181..197].try_into().unwrap());
-        let staking_treasury: i128 = i128::from_be_bytes(bytes[197..213].try_into().unwrap());
+        let staking_treasury: Currency =
+            Currency::from_be_bytes(bytes[197..213].try_into().unwrap());
 
         let burnfee: Currency = Currency::from_be_bytes(bytes[213..229].try_into().unwrap());
         let difficulty: u64 = u64::from_be_bytes(bytes[229..237].try_into().unwrap());
@@ -1502,10 +1503,10 @@ impl Block {
             //
             let mut adjusted_staking_treasury = previous_block.staking_treasury;
             if cv.staking_treasury < 0 {
-                let x = cv.staking_treasury * -1;
+                let x: i128 = cv.staking_treasury as i128 * -1 as i128;
                 // TODO SYNC : SLR checks the opposite for this validation, i.e adjusted_staking_treasury < x
-                if adjusted_staking_treasury > x {
-                    adjusted_staking_treasury -= x;
+                if adjusted_staking_treasury > x as Currency {
+                    adjusted_staking_treasury -= x as Currency;
                 } else {
                     adjusted_staking_treasury = 0;
                 }

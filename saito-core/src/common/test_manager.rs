@@ -1,6 +1,5 @@
 #[cfg(test)]
 pub mod test {
-
     //
     // TestManager provides a set of functions to simplify the testing of dynamic
     // interactions, such as chain-reorganizations and/or other tests that require
@@ -39,7 +38,6 @@ pub mod test {
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
-
     use crate::core::data::crypto::{generate_random_bytes, hash, verify_hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
@@ -331,10 +329,7 @@ pub mod test {
                     // block one sets circulation
                     //
                     if i == 1 {
-                        token_supply = (block_outputs as i128
-                            + block.treasury as i128
-                            + block.staking_treasury)
-                            as Currency;
+                        token_supply = block_outputs + block.treasury + block.staking_treasury;
                         current_supply = token_supply;
                     } else {
                         //
@@ -384,11 +379,10 @@ pub mod test {
                         //
                         // token supply should be constant
                         //
-                        let total_in_circulation = (current_supply as i128
-                            + unpaid_but_uncollected as i128
-                            + block.treasury as i128
-                            + block.staking_treasury)
-                            as Currency;
+                        let total_in_circulation = current_supply
+                            + unpaid_but_uncollected
+                            + block.treasury
+                            + block.staking_treasury;
 
                         //
                         // we check that overall token supply has not changed
