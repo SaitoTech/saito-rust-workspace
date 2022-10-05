@@ -1,3 +1,8 @@
+use ahash::{AHashMap, AHashSet};
+use std::collections::{HashMap, HashSet};
+
+use tracing::warn;
+
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
@@ -9,8 +14,6 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
-use std::collections::{HashMap, HashSet};
-use tracing::warn;
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -42,8 +45,8 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub slips: HashMap<SaitoUTXOSetKey, WalletSlip>,
-    unspent_slips: HashSet<SaitoUTXOSetKey>,
+    pub slips: AHashMap<SaitoUTXOSetKey, WalletSlip>,
+    unspent_slips: AHashSet<SaitoUTXOSetKey>,
     pub filename: String,
     pub filepass: String,
     available_balance: Currency,
@@ -56,8 +59,8 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            slips: HashMap::with_capacity(1_000_000),
-            unspent_slips: HashSet::with_capacity(1_000_000),
+            slips: AHashMap::with_capacity(1_000_000),
+            unspent_slips: AHashSet::with_capacity(1_000_000),
             filename: "default".to_string(),
             filepass: "password".to_string(),
             available_balance: 0,
@@ -252,31 +255,19 @@ impl Wallet {
         for key in keys_to_remove {
             self.unspent_slips.remove(&key);
         }
-        // self.unspent_slips.iter_mut().for_each(|key| {});
-        // for slip in &mut self.slips {
-        //     if !slip.spent {
-        //
-        //     }
-        // }
 
-        //
         // create outputs
-        //
         if nolan_in > nolan_requested {
             nolan_out = nolan_in - nolan_requested;
         }
 
-        //
         // add change address
-        //
         let mut output = Slip::new();
         output.public_key = my_public_key;
         output.amount = nolan_out;
         outputs.push(output);
 
-        //
         // ensure not empty
-        //
         if inputs.is_empty() {
             let mut input = Slip::new();
             input.public_key = my_public_key;
