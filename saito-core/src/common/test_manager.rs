@@ -34,7 +34,7 @@ pub mod test {
     use tracing::{debug, info};
 
     use crate::common::defs::{
-        SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
+        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
     };
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
@@ -281,14 +281,14 @@ pub mod test {
         }
 
         pub async fn check_token_supply(&self) {
-            let mut token_supply: u64 = 0;
-            let mut current_supply: u64 = 0;
-            let mut block_inputs: u64;
-            let mut block_outputs: u64;
-            let mut previous_block_treasury: u64;
-            let mut current_block_treasury: u64 = 0;
-            let mut unpaid_but_uncollected: u64 = 0;
-            let mut block_contains_fee_tx: u64;
+            let mut token_supply: Currency = 0;
+            let mut current_supply: Currency = 0;
+            let mut block_inputs: Currency;
+            let mut block_outputs: Currency;
+            let mut previous_block_treasury: Currency;
+            let mut current_block_treasury: Currency = 0;
+            let mut unpaid_but_uncollected: Currency = 0;
+            let mut block_contains_fee_tx: bool;
             let mut block_fee_tx_index: usize = 0;
 
             let blockchain = self.blockchain_lock.read().await;
@@ -302,7 +302,7 @@ pub mod test {
 
                 block_inputs = 0;
                 block_outputs = 0;
-                block_contains_fee_tx = 0;
+                block_contains_fee_tx = false;
 
                 previous_block_treasury = current_block_treasury;
                 current_block_treasury = block.treasury;
@@ -316,7 +316,7 @@ pub mod test {
                     // the difference in the staking_treasury.
                     //
                     if block.transactions[t].transaction_type == TransactionType::Fee {
-                        block_contains_fee_tx = 1;
+                        block_contains_fee_tx = true;
                         block_fee_tx_index = t as usize;
                     } else {
                         for z in 0..block.transactions[t].inputs.len() {
@@ -337,7 +337,7 @@ pub mod test {
                         //
                         // figure out how much is in circulation
                         //
-                        if block_contains_fee_tx == 0 {
+                        if block_contains_fee_tx == false {
                             current_supply -= block_inputs;
                             current_supply += block_outputs;
 
@@ -355,7 +355,7 @@ pub mod test {
                             //
                             // calculate total amount paid
                             //
-                            let mut total_fees_paid: u64 = 0;
+                            let mut total_fees_paid: Currency = 0;
                             let fee_transaction = &block.transactions[block_fee_tx_index];
                             for output in fee_transaction.outputs.iter() {
                                 total_fees_paid += output.amount;
@@ -403,8 +403,8 @@ pub mod test {
             parent_hash: SaitoHash,
             timestamp: u64,
             txs_number: usize,
-            txs_amount: u64,
-            txs_fee: u64,
+            txs_amount: Currency,
+            txs_fee: Currency,
             include_valid_golden_ticket: bool,
         ) -> Block {
             let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
@@ -442,7 +442,7 @@ pub mod test {
                 .await;
                 let mut gttx: Transaction;
                 {
-                    let mut wallet = self.wallet_lock.write().await;
+                    let wallet = self.wallet_lock.write().await;
                     gttx = Wallet::create_golden_ticket_transaction(
                         golden_ticket,
                         &wallet.public_key,
@@ -496,7 +496,7 @@ pub mod test {
             GoldenTicket::new(block_hash, random_bytes, public_key)
         }
 
-        pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: u64) {
+        pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: Currency) {
             let timestamp = create_timestamp();
             self.initialize_with_timestamp(vip_transactions, vip_amount, timestamp)
                 .await;
@@ -510,7 +510,7 @@ pub mod test {
         pub async fn initialize_with_timestamp(
             &mut self,
             vip_transactions: u64,
-            vip_amount: u64,
+            vip_amount: Currency,
             timestamp: u64,
         ) {
             //

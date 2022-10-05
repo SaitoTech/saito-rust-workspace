@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use tracing::{debug, info, trace, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
+use crate::common::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
@@ -35,7 +35,7 @@ pub struct Mempool {
     pub blocks_queue: VecDeque<Block>,
     pub transactions: AHashMap<SaitoSignature, Transaction>,
     // vector so we just copy it over
-    routing_work_in_mempool: u64,
+    routing_work_in_mempool: Currency,
     pub new_golden_ticket_added: bool,
     pub new_tx_added: bool,
     pub(crate) public_key: SaitoPublicKey,
@@ -280,7 +280,7 @@ impl Mempool {
     ///
     /// Calculates the work available in mempool to produce a block
     ///
-    pub fn get_routing_work_available(&self) -> u64 {
+    pub fn get_routing_work_available(&self) -> Currency {
         if self.routing_work_in_mempool > 0 {
             return self.routing_work_in_mempool;
         }
@@ -291,11 +291,15 @@ impl Mempool {
     // Return work needed in Nolan
     //
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn get_routing_work_needed(&self, previous_block: &Block, current_timestamp: u64) -> u64 {
+    pub fn get_routing_work_needed(
+        &self,
+        previous_block: &Block,
+        current_timestamp: u64,
+    ) -> Currency {
         let previous_block_timestamp = previous_block.timestamp;
         let previous_block_burnfee = previous_block.burnfee;
 
-        let work_needed: u64 = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
+        let work_needed: Currency = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
             previous_block_burnfee,
             current_timestamp,
             previous_block_timestamp,

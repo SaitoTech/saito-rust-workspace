@@ -5,7 +5,9 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, trace, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet};
+use crate::common::defs::{
+    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
+};
 use crate::core::data::crypto::{hash, sign, verify, verify_hash};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
@@ -47,17 +49,17 @@ pub struct Transaction {
     pub hash_for_signature: Option<SaitoHash>,
 
     /// total nolan in input slips
-    total_in: u64,
+    total_in: Currency,
     /// total nolan in output slips
-    total_out: u64,
+    total_out: Currency,
     /// total fees
-    pub total_fees: u64,
+    pub total_fees: Currency,
     /// total work to creator
-    pub total_work: u64,
+    pub total_work: Currency,
     /// cumulative fees for this tx-in-block
-    pub cumulative_fees: u64,
+    pub cumulative_fees: Currency,
     /// cumulative work for this tx-in-block
-    pub cumulative_work: u64,
+    pub cumulative_work: Currency,
 }
 
 impl Transaction {
@@ -144,8 +146,8 @@ impl Transaction {
     pub fn create(
         wallet: &mut Wallet,
         to_public_key: SaitoPublicKey,
-        with_payment: u64,
-        with_fee: u64,
+        with_payment: Currency,
+        with_fee: Currency,
     ) -> Transaction {
         trace!(
             "generating transaction : payment = {:?}, fee = {:?}",
@@ -267,7 +269,10 @@ impl Transaction {
     ///
     /// ```
 
-    pub fn create_vip_transaction(to_public_key: SaitoPublicKey, with_amount: u64) -> Transaction {
+    pub fn create_vip_transaction(
+        to_public_key: SaitoPublicKey,
+        with_amount: Currency,
+    ) -> Transaction {
         debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::new();
         transaction.transaction_type = TransactionType::Vip;
@@ -298,8 +303,8 @@ impl Transaction {
     pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
         output_slip_to_rebroadcast: &Slip,
-        with_fee: u64,
-        with_staking_subsidy: u64,
+        with_fee: Currency,
+        with_staking_subsidy: Currency,
     ) -> Transaction {
         let mut transaction = Transaction::new();
         let mut output_payment = 0;
@@ -464,14 +469,14 @@ impl Transaction {
     //
     // calculate cumulative fee share in block
     //
-    pub fn generate_cumulative_fees(&mut self, cumulative_fees: u64) -> u64 {
+    pub fn generate_cumulative_fees(&mut self, cumulative_fees: Currency) -> Currency {
         self.cumulative_fees = cumulative_fees + self.total_fees;
         self.cumulative_fees
     }
     //
     // calculate cumulative routing work in block
     //
-    pub fn generate_cumulative_work(&mut self, cumulative_work: u64) -> u64 {
+    pub fn generate_cumulative_work(&mut self, cumulative_work: Currency) -> Currency {
         self.cumulative_work = cumulative_work + self.cumulative_work;
         self.cumulative_work
     }
@@ -497,7 +502,7 @@ impl Transaction {
                 slip.generate_utxoset_key();
                 slip.amount
             })
-            .sum::<u64>();
+            .sum::<Currency>();
 
         let nolan_out = self
             .outputs
@@ -512,7 +517,7 @@ impl Transaction {
                 slip.generate_utxoset_key();
                 slip.amount
             })
-            .sum::<u64>();
+            .sum::<Currency>();
 
         self.total_in = nolan_in;
         self.total_out = nolan_out;
@@ -567,7 +572,7 @@ impl Transaction {
             }
 
             // otherwise halve the work
-            let half_of_routing_work: u64 = routing_work_available_to_public_key / 2;
+            let half_of_routing_work: Currency = routing_work_available_to_public_key / 2;
             routing_work_available_to_public_key -= half_of_routing_work;
         }
 
@@ -619,13 +624,13 @@ impl Transaction {
         // not be confused with total_work which represents the amount
         // of work available in the transaction itself.
         //
-        let mut aggregate_routing_work: u64 = self.total_fees;
-        let mut routing_work_this_hop: u64 = aggregate_routing_work;
-        let mut work_by_hop: Vec<u64> = vec![];
+        let mut aggregate_routing_work: Currency = self.total_fees;
+        let mut routing_work_this_hop: Currency = aggregate_routing_work;
+        let mut work_by_hop: Vec<Currency> = vec![];
         work_by_hop.push(aggregate_routing_work);
 
         for _i in 1..self.path.len() {
-            let new_routing_work_this_hop: u64 = routing_work_this_hop / 2;
+            let new_routing_work_this_hop: Currency = routing_work_this_hop / 2;
             aggregate_routing_work += new_routing_work_this_hop;
             routing_work_this_hop = new_routing_work_this_hop;
             work_by_hop.push(aggregate_routing_work);

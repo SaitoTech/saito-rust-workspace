@@ -3,7 +3,7 @@ use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-use crate::common::defs::{SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
+use crate::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
 /// The size of a serialized slip in bytes.
 pub const SLIP_SIZE: usize = 59;
@@ -26,7 +26,7 @@ pub enum SlipType {
 pub struct Slip {
     #[serde_as(as = "[_; 33]")]
     pub public_key: SaitoPublicKey,
-    pub amount: u64,
+    pub amount: Currency,
     pub slip_index: u8,
     pub block_id: u64,
     pub tx_ordinal: u64,
@@ -68,7 +68,7 @@ impl Slip {
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
-        let amount: u64 = u64::from_be_bytes(bytes[33..41].try_into().unwrap());
+        let amount: Currency = Currency::from_be_bytes(bytes[33..41].try_into().unwrap());
         let block_id: u64 = u64::from_be_bytes(bytes[41..49].try_into().unwrap());
         let tx_ordinal: u64 = u64::from_be_bytes(bytes[49..57].try_into().unwrap());
         let slip_index: u8 = bytes[57];

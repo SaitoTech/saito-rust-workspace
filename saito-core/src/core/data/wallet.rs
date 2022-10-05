@@ -1,5 +1,5 @@
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
@@ -28,7 +28,7 @@ pub const WALLET_SIZE: usize = 65;
 #[derive(Clone, Debug, PartialEq)]
 pub struct WalletSlip {
     pub utxokey: SaitoUTXOSetKey,
-    pub amount: u64,
+    pub amount: Currency,
     pub block_id: u64,
     pub tx_ordinal: u64,
     pub lc: bool,
@@ -46,7 +46,7 @@ pub struct Wallet {
     unspent_slips: HashSet<SaitoUTXOSetKey>,
     pub filename: String,
     pub filepass: String,
-    available_balance: u64,
+    available_balance: Currency,
 }
 
 impl Wallet {
@@ -204,12 +204,7 @@ impl Wallet {
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
-    pub fn get_available_balance(&self) -> u64 {
-        // (&self.slips)
-        //     .into_par_iter()
-        //     .filter(|s| !s.1.spent)
-        //     .map(|s| s.1.amount)
-        //     .sum::<u64>()
+    pub fn get_available_balance(&self) -> Currency {
         self.available_balance
     }
 
@@ -222,11 +217,11 @@ impl Wallet {
     // address is provided as an output. so make sure that any function calling
     // this manually creates the output for its desired payment
     // #[tracing::instrument(level = "trace", skip_all)]
-    pub fn generate_slips(&mut self, nolan_requested: u64) -> (Vec<Slip>, Vec<Slip>) {
+    pub fn generate_slips(&mut self, nolan_requested: Currency) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = vec![];
         let mut outputs: Vec<Slip> = vec![];
-        let mut nolan_in: u64 = 0;
-        let mut nolan_out: u64 = 0;
+        let mut nolan_in: Currency = 0;
+        let mut nolan_out: Currency = 0;
         let my_public_key = self.public_key;
 
         //

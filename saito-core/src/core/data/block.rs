@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, trace};
 
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
+    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
 };
 use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
 use crate::core::data::burnfee::BurnFee;
@@ -44,7 +44,7 @@ pub struct ConsensusValues {
     // index of GT in transactions if exists
     pub gt_index: Option<usize>,
     // total fees in block
-    pub total_fees: u64,
+    pub total_fees: Currency,
     // expected difficulty
     pub expected_difficulty: u64,
     // rebroadcast txs
@@ -52,27 +52,27 @@ pub struct ConsensusValues {
     // number of rebroadcast slips
     pub total_rebroadcast_slips: u64,
     // number of rebroadcast txs
-    pub total_rebroadcast_nolan: u64,
+    pub total_rebroadcast_nolan: Currency,
     // number of rebroadcast fees in block
-    pub total_rebroadcast_fees_nolan: u64,
+    pub total_rebroadcast_fees_nolan: Currency,
     // number of rebroadcast staking payouts in block
-    pub total_rebroadcast_staking_payouts_nolan: u64,
+    pub total_rebroadcast_staking_payouts_nolan: Currency,
     // all ATR txs hashed together
     pub rebroadcast_hash: [u8; 32],
     // dust falling off chain, needs adding to treasury
-    pub nolan_falling_off_chain: u64,
+    pub nolan_falling_off_chain: Currency,
     // staker treasury -> amount to add
-    pub staking_treasury: i64,
+    pub staking_treasury: i128,
     // block payout
     pub block_payout: Vec<BlockPayout>,
     // average income
-    pub avg_income: u64,
+    pub avg_income: Currency,
     // average variance
-    pub avg_variance: u64,
+    pub avg_variance: Currency,
     // average atr income
-    pub avg_atr_income: u64,
+    pub avg_atr_income: Currency,
     // average atr variance
-    pub avg_atr_variance: u64,
+    pub avg_atr_variance: Currency,
 }
 
 impl ConsensusValues {
@@ -116,8 +116,8 @@ impl ConsensusValues {
 pub struct BlockPayout {
     pub miner: SaitoPublicKey,
     pub router: SaitoPublicKey,
-    pub miner_payout: u64,
-    pub router_payout: u64,
+    pub miner_payout: Currency,
+    pub router_payout: Currency,
     pub staking_treasury: i64,
     pub random_number: SaitoHash,
 }
@@ -167,14 +167,14 @@ pub struct Block {
     pub(crate) merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
     pub signature: [u8; 64],
-    pub(crate) treasury: u64,
-    pub(crate) burnfee: u64,
+    pub(crate) treasury: Currency,
+    pub(crate) burnfee: Currency,
     pub(crate) difficulty: u64,
-    pub(crate) staking_treasury: u64,
-    avg_income: u64,
-    avg_variance: u64,
-    avg_atr_income: u64,
-    avg_atr_variance: u64,
+    pub(crate) staking_treasury: Currency,
+    avg_income: Currency,
+    avg_variance: Currency,
+    avg_atr_income: Currency,
+    avg_atr_variance: Currency,
     /// Transactions
     pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
@@ -182,9 +182,9 @@ pub struct Block {
     /// Self-Calculated / Validated
     pub hash: SaitoHash,
     /// total fees paid into block
-    total_fees: u64,
+    total_fees: Currency,
     /// total routing work in block, given creator
-    total_work: u64,
+    total_work: Currency,
     /// Is Block on longest chain
     pub(crate) in_longest_chain: bool,
     // has golden ticket
@@ -202,7 +202,7 @@ pub struct Block {
     // number of rebroadcast slips
     total_rebroadcast_slips: u64,
     // number of rebroadcast txs
-    total_rebroadcast_nolan: u64,
+    total_rebroadcast_nolan: Currency,
     // all ATR txs hashed together
     rebroadcast_hash: [u8; 32],
     // the state of the block w/ pruning etc
@@ -298,7 +298,7 @@ impl Block {
 
         let mut block = Block::new();
 
-        let current_burnfee: u64 =
+        let current_burnfee: Currency =
             BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
                 previous_block_burnfee,
                 current_timestamp,
@@ -427,13 +427,14 @@ impl Block {
             let mut adjusted_staking_treasury = previous_block_staking_treasury;
             if cv.staking_treasury < 0 {
                 let x = cv.staking_treasury * -1;
-                if adjusted_staking_treasury > x as u64 {
-                    adjusted_staking_treasury -= x as u64;
+                // TODO : check if this cast is a bug
+                if adjusted_staking_treasury > x as Currency {
+                    adjusted_staking_treasury -= x as Currency;
                 } else {
                     adjusted_staking_treasury = 0;
                 }
             } else {
-                adjusted_staking_treasury += cv.staking_treasury as u64;
+                adjusted_staking_treasury += cv.staking_treasury as Currency;
             }
             // info!(
             //     "adjusted staking treasury written into block {}",
@@ -498,16 +499,18 @@ impl Block {
         let merkle_root: SaitoHash = bytes[85..117].try_into().unwrap();
         let signature: SaitoSignature = bytes[117..181].try_into().unwrap();
 
-        let treasury: u64 = u64::from_be_bytes(bytes[181..189].try_into().unwrap());
-        let staking_treasury: u64 = u64::from_be_bytes(bytes[189..197].try_into().unwrap());
+        let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
+        let staking_treasury: Currency =
+            Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
 
-        let burnfee: u64 = u64::from_be_bytes(bytes[197..205].try_into().unwrap());
+        let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
         let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
 
-        let avg_income: u64 = u64::from_be_bytes(bytes[213..221].try_into().unwrap());
-        let avg_variance: u64 = u64::from_be_bytes(bytes[221..229].try_into().unwrap());
-        let avg_atr_income: u64 = u64::from_be_bytes(bytes[229..237].try_into().unwrap());
-        let avg_atr_variance: u64 = u64::from_be_bytes(bytes[237..245].try_into().unwrap());
+        let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
+        let avg_variance: Currency = Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
+        let avg_atr_income: Currency = Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
+        let avg_atr_variance: Currency =
+            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -937,13 +940,15 @@ impl Block {
             cv.avg_atr_variance = previous_block.avg_atr_variance;
 
             if previous_block.avg_income > cv.total_fees {
-                let adjustment = (previous_block.avg_income - cv.total_fees) / GENESIS_PERIOD;
+                let adjustment =
+                    (previous_block.avg_income - cv.total_fees) / GENESIS_PERIOD as Currency;
                 if adjustment > 0 {
                     cv.avg_income -= adjustment;
                 }
             }
             if previous_block.avg_income < cv.total_fees {
-                let adjustment = (cv.total_fees - previous_block.avg_income) / GENESIS_PERIOD;
+                let adjustment =
+                    (cv.total_fees - previous_block.avg_income) / GENESIS_PERIOD as Currency;
                 if adjustment > 0 {
                     cv.avg_income += adjustment;
                 }
@@ -953,15 +958,15 @@ impl Block {
             // average atr income and variance adjusts slowly.
             //
             if previous_block.avg_atr_income > cv.total_rebroadcast_nolan {
-                let adjustment =
-                    (previous_block.avg_atr_income - cv.total_rebroadcast_nolan) / GENESIS_PERIOD;
+                let adjustment = (previous_block.avg_atr_income - cv.total_rebroadcast_nolan)
+                    / GENESIS_PERIOD as Currency;
                 if adjustment > 0 {
                     cv.avg_atr_income -= adjustment;
                 }
             }
             if previous_block.avg_atr_income < cv.total_rebroadcast_nolan {
-                let adjustment =
-                    (cv.total_rebroadcast_nolan - previous_block.avg_atr_income) / GENESIS_PERIOD;
+                let adjustment = (cv.total_rebroadcast_nolan - previous_block.avg_atr_income)
+                    / GENESIS_PERIOD as Currency;
                 if adjustment > 0 {
                     cv.avg_atr_income += adjustment;
                 }
@@ -1007,10 +1012,10 @@ impl Block {
                 // limit previous block payout to avg income
                 //
                 let mut previous_block_payout = previous_block.total_fees;
-                if previous_block_payout > (previous_block.avg_income as f64 * 1.25) as u64
+                if previous_block_payout > (previous_block.avg_income as f64 * 1.25) as Currency
                     && previous_block_payout > 50
                 {
-                    previous_block_payout = (previous_block.avg_income as f64 * 1.24) as u64;
+                    previous_block_payout = (previous_block.avg_income as f64 * 1.24) as Currency;
                 }
 
                 let miner_payment = previous_block_payout / 2;
@@ -1077,11 +1082,11 @@ impl Block {
                                 //
                                 let mut previous_staking_block_payout = staking_block.total_fees;
                                 if previous_staking_block_payout
-                                    > (staking_block.avg_income as f64 * 1.25) as u64
+                                    > (staking_block.avg_income as f64 * 1.25) as Currency
                                     && previous_staking_block_payout > 50
                                 {
                                     previous_staking_block_payout =
-                                        (staking_block.avg_income as f64 * 1.24) as u64;
+                                        (staking_block.avg_income as f64 * 1.24) as Currency;
                                 }
 
                                 let sp = previous_staking_block_payout / 2;
@@ -1501,13 +1506,13 @@ impl Block {
             if cv.staking_treasury < 0 {
                 let x = cv.staking_treasury * -1;
                 // TODO SYNC : SLR checks the opposite for this validation, i.e adjusted_staking_treasury < x
-                if adjusted_staking_treasury > x as u64 {
-                    adjusted_staking_treasury -= x as u64;
+                if adjusted_staking_treasury > x as Currency {
+                    adjusted_staking_treasury -= x as Currency;
                 } else {
                     adjusted_staking_treasury = 0;
                 }
             } else {
-                adjusted_staking_treasury += cv.staking_treasury as u64;
+                adjusted_staking_treasury += cv.staking_treasury as Currency;
             }
 
             if self.staking_treasury != adjusted_staking_treasury {
@@ -1524,7 +1529,7 @@ impl Block {
             //
             // validate burn fee
             //
-            let new_burnfee: u64 =
+            let new_burnfee: Currency =
                 BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
                     previous_block.burnfee,
                     self.timestamp,
@@ -1546,7 +1551,7 @@ impl Block {
             // this checks the total amount of fees that need to be burned in this
             // block to be considered valid according to consensus criteria.
             //
-            let amount_of_routing_work_needed: u64 =
+            let amount_of_routing_work_needed: Currency =
                 BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
                     previous_block.burnfee,
                     self.timestamp,

@@ -9,7 +9,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::common::defs::{SaitoHash, UtxoSet};
+use crate::common::defs::{Currency, SaitoHash, UtxoSet};
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::mempool::Mempool;
@@ -27,7 +27,7 @@ pub const PRUNE_AFTER_BLOCKS: u64 = 10;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
 pub const MAX_STAKER_RECURSION: u64 = 3;
 // max token supply - used in validating block #1
-pub const MAX_TOKEN_SUPPLY: u64 = 1_000_000_000_000_000_000;
+pub const MAX_TOKEN_SUPPLY: Currency = 10_000_000_000_000_000_000_000_000_000;
 // minimum golden tickets required ( NUMBER_OF_TICKETS / number of preceding blocks )
 pub const MIN_GOLDEN_TICKETS_NUMERATOR: u64 = 2;
 // minimum golden tickets required ( number of tickets / NUMBER_OF_PRECEDING_BLOCKS )
@@ -802,8 +802,8 @@ impl Blockchain {
             return false;
         }
 
-        let mut old_bf: u64 = 0;
-        let mut new_bf: u64 = 0;
+        let mut old_bf: Currency = 0;
+        let mut new_bf: Currency = 0;
 
         for hash in old_chain.iter() {
             old_bf += self.blocks.get(hash).unwrap().burnfee;
