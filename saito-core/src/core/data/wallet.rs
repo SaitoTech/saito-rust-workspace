@@ -346,7 +346,7 @@ impl WalletSlip {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         WalletSlip {
-            utxokey: [0; 58],
+            utxokey: [0; 66],
             amount: 0,
             block_id: 0,
             tx_ordinal: 0,

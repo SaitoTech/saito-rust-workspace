@@ -11,7 +11,7 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey};
+use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -109,7 +109,8 @@ impl TransactionGenerator {
                 unspent_slip_count, self.tx_count, available_balance
             );
 
-            let total_nolans_requested_per_slip = available_balance / unspent_slip_count;
+            let total_nolans_requested_per_slip =
+                available_balance / unspent_slip_count as Currency;
             let mut total_output_slips_created: u64 = 0;
 
             for _i in 0..unspent_slip_count {
@@ -146,10 +147,11 @@ impl TransactionGenerator {
     async fn create_slip_transaction(
         &mut self,
         output_slips_per_input_slip: u8,
-        total_nolans_requested_per_slip: u64,
+        total_nolans_requested_per_slip: Currency,
         total_output_slips_created: &mut u64,
     ) -> Transaction {
-        let payment_amount = total_nolans_requested_per_slip / output_slips_per_input_slip as u64;
+        let payment_amount =
+            total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
 
         log_write_lock_request!("wallet");
         let mut wallet = self.wallet.write().await;

@@ -1,6 +1,6 @@
 use std::convert::TryInto;
-use std::mem;
 use std::ops::Rem;
+use std::{i128, mem};
 
 use ahash::AHashMap;
 use rayon::prelude::*;
@@ -20,7 +20,7 @@ use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 
-pub const BLOCK_HEADER_SIZE: usize = 245;
+pub const BLOCK_HEADER_SIZE: usize = 301;
 
 //
 // object used when generating and validation transactions, containing the
@@ -170,7 +170,7 @@ pub struct Block {
     pub(crate) treasury: Currency,
     pub(crate) burnfee: Currency,
     pub(crate) difficulty: u64,
-    pub(crate) staking_treasury: Currency,
+    pub(crate) staking_treasury: i128,
     avg_income: Currency,
     avg_variance: Currency,
     avg_atr_income: Currency,
@@ -424,17 +424,16 @@ impl Block {
         // set staking treasury
         //
         if cv.staking_treasury != 0 {
-            let mut adjusted_staking_treasury = previous_block_staking_treasury;
+            let mut adjusted_staking_treasury = previous_block_staking_treasury as i128;
             if cv.staking_treasury < 0 {
-                let x = cv.staking_treasury * -1;
-                // TODO : check if this cast is a bug
-                if adjusted_staking_treasury > x as Currency {
-                    adjusted_staking_treasury -= x as Currency;
+                let x: i128 = cv.staking_treasury * -1;
+                if adjusted_staking_treasury > x {
+                    adjusted_staking_treasury -= x;
                 } else {
                     adjusted_staking_treasury = 0;
                 }
             } else {
-                adjusted_staking_treasury += cv.staking_treasury as Currency;
+                adjusted_staking_treasury += cv.staking_treasury;
             }
             // info!(
             //     "adjusted staking treasury written into block {}",
@@ -499,18 +498,17 @@ impl Block {
         let merkle_root: SaitoHash = bytes[85..117].try_into().unwrap();
         let signature: SaitoSignature = bytes[117..181].try_into().unwrap();
 
-        let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
-        let staking_treasury: Currency =
-            Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
+        let treasury: Currency = Currency::from_be_bytes(bytes[181..197].try_into().unwrap());
+        let staking_treasury: i128 = i128::from_be_bytes(bytes[197..213].try_into().unwrap());
 
-        let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
-        let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
+        let burnfee: Currency = Currency::from_be_bytes(bytes[213..229].try_into().unwrap());
+        let difficulty: u64 = u64::from_be_bytes(bytes[229..237].try_into().unwrap());
 
-        let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
-        let avg_variance: Currency = Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
-        let avg_atr_income: Currency = Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
+        let avg_income: Currency = Currency::from_be_bytes(bytes[237..253].try_into().unwrap());
+        let avg_variance: Currency = Currency::from_be_bytes(bytes[253..269].try_into().unwrap());
+        let avg_atr_income: Currency = Currency::from_be_bytes(bytes[269..285].try_into().unwrap());
         let avg_atr_variance: Currency =
-            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
+            Currency::from_be_bytes(bytes[285..301].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -623,7 +621,7 @@ impl Block {
 
         let z = primitive_types::U256::from_big_endian(&y.to_be_bytes());
         let zy = x.rem(z);
-        let winning_nolan = zy.low_u64();
+        let winning_nolan = zy.low_u128();
         // we may need function-timelock object if we need to recreate
         // an ATR transaction to pick the winning routing node.
         let winning_tx_placeholder: Transaction;
@@ -1506,13 +1504,13 @@ impl Block {
             if cv.staking_treasury < 0 {
                 let x = cv.staking_treasury * -1;
                 // TODO SYNC : SLR checks the opposite for this validation, i.e adjusted_staking_treasury < x
-                if adjusted_staking_treasury > x as Currency {
-                    adjusted_staking_treasury -= x as Currency;
+                if adjusted_staking_treasury > x {
+                    adjusted_staking_treasury -= x;
                 } else {
                     adjusted_staking_treasury = 0;
                 }
             } else {
-                adjusted_staking_treasury += cv.staking_treasury as Currency;
+                adjusted_staking_treasury += cv.staking_treasury;
             }
 
             if self.staking_treasury != adjusted_staking_treasury {
@@ -1834,7 +1832,7 @@ mod tests {
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 177);
+        assert_eq!(serialized_body.len(), 233);
 
         block.creator = <[u8; 33]>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
@@ -1852,10 +1850,10 @@ mod tests {
         assert_eq!(
             block.signature,
             [
-                181, 196, 195, 189, 82, 225, 56, 124, 169, 36, 245, 199, 95, 50, 182, 135, 95, 153,
-                228, 2, 162, 21, 248, 254, 42, 1, 106, 1, 25, 208, 145, 191, 21, 187, 69, 52, 225,
-                214, 86, 94, 116, 168, 14, 58, 70, 186, 16, 164, 215, 211, 153, 107, 226, 236, 231,
-                190, 0, 62, 12, 122, 68, 24, 2, 109
+                59, 78, 162, 0, 116, 90, 145, 136, 114, 203, 136, 133, 159, 36, 59, 185, 105, 151,
+                154, 67, 47, 227, 172, 196, 54, 205, 145, 179, 198, 189, 221, 198, 96, 136, 38, 5,
+                177, 115, 81, 221, 120, 197, 77, 250, 185, 154, 18, 248, 8, 50, 49, 217, 179, 172,
+                237, 103, 34, 75, 46, 130, 108, 190, 5, 193
             ]
         )
     }

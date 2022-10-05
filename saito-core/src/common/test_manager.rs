@@ -331,7 +331,10 @@ pub mod test {
                     // block one sets circulation
                     //
                     if i == 1 {
-                        token_supply = block_outputs + block.treasury + block.staking_treasury;
+                        token_supply = (block_outputs as i128
+                            + block.treasury as i128
+                            + block.staking_treasury)
+                            as Currency;
                         current_supply = token_supply;
                     } else {
                         //
@@ -381,10 +384,11 @@ pub mod test {
                         //
                         // token supply should be constant
                         //
-                        let total_in_circulation = current_supply
-                            + unpaid_but_uncollected
-                            + block.treasury
-                            + block.staking_treasury;
+                        let total_in_circulation = (current_supply as i128
+                            + unpaid_but_uncollected as i128
+                            + block.treasury as i128
+                            + block.staking_treasury)
+                            as Currency;
 
                         //
                         // we check that overall token supply has not changed
