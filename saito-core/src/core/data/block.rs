@@ -938,17 +938,17 @@ impl Block {
             cv.avg_atr_variance = previous_block.avg_atr_variance;
 
             if previous_block.avg_income > cv.total_fees {
-                let adjustment =
-                    (previous_block.avg_income - cv.total_fees) / GENESIS_PERIOD as Currency;
+                let adjustment = (previous_block.avg_income as i128 - cv.total_fees as i128)
+                    / GENESIS_PERIOD as i128;
                 if adjustment > 0 {
-                    cv.avg_income -= adjustment;
+                    cv.avg_income -= adjustment as Currency;
                 }
             }
             if previous_block.avg_income < cv.total_fees {
-                let adjustment =
-                    (cv.total_fees - previous_block.avg_income) / GENESIS_PERIOD as Currency;
+                let adjustment = (cv.total_fees as i128 - previous_block.avg_income as i128)
+                    / GENESIS_PERIOD as i128;
                 if adjustment > 0 {
-                    cv.avg_income += adjustment;
+                    cv.avg_income += adjustment as Currency;
                 }
             }
 
