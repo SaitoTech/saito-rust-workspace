@@ -1,5 +1,3 @@
-use futures::future::{join_all, try_join_all};
-use futures::StreamExt;
 use std::sync::Arc;
 
 use crate::common::defs::BLOCK_FILE_EXTENSION;
@@ -14,9 +12,6 @@ use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
 
 use crate::{log_write_lock_receive, log_write_lock_request};
-use rayon::prelude::*;
-use tokio::task::JoinHandle;
-use tokio::try_join;
 
 #[derive(Debug)]
 pub struct Storage {

@@ -1,5 +1,5 @@
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp, THREAD_SLEEP_TIME};
+use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp};
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data::block::Block;
@@ -11,12 +11,9 @@ use crate::{log_read_lock_receive, log_read_lock_request};
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::debug;
-
-// TODO : make this configurable
-pub const VERIFICATION_THREAD_COUNT: u64 = 7;
 
 #[derive(Debug)]
 pub enum VerifyRequest {
@@ -80,11 +77,11 @@ impl VerificationThread {
 
 #[async_trait]
 impl ProcessEvent<VerifyRequest> for VerificationThread {
-    async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
+    async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         None
     }
 
-    async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
+    async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
         None
     }
 

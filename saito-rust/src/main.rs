@@ -1,9 +1,8 @@
-use std::future::Future;
 use std::panic;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
@@ -17,9 +16,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{
-    StatVariable, CHANNEL_SIZE, STAT_BIN_COUNT, STAT_TIMER, THREAD_SLEEP_TIME,
-};
+use saito_core::common::defs::{StatVariable, STAT_BIN_COUNT};
 
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
@@ -33,9 +30,7 @@ use saito_core::core::data::storage::Storage;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{PeerState, RoutingEvent, RoutingThread, StaticPeer};
-use saito_core::core::verification_thread::{
-    VerificationThread, VerifyRequest, VERIFICATION_THREAD_COUNT,
-};
+use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::{log_read_lock_receive, log_read_lock_request};
 
 use crate::saito::config_handler::ConfigHandler;
@@ -55,13 +50,15 @@ async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
     mut network_event_receiver: Receiver<NetworkEvent>,
     mut event_receiver: Receiver<T>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()>
 where
     T: Send + 'static,
 {
     tokio::spawn(async move {
         info!("new thread started");
-        let mut work_done = false;
+        let mut work_done;
         let mut last_timestamp = Instant::now();
         let mut stat_timer = Instant::now();
         let time_keeper = TimeKeeper {};
@@ -101,7 +98,7 @@ where
             #[cfg(feature = "with-stats")]
             {
                 let duration = current_instant.duration_since(stat_timer);
-                if duration > STAT_TIMER {
+                if duration > Duration::from_millis(stat_timer_in_ms) {
                     stat_timer = current_instant;
                     event_processor
                         .on_stat_interval(time_keeper.get_timestamp())
@@ -110,7 +107,7 @@ where
             }
 
             if !work_done {
-                tokio::time::sleep(THREAD_SLEEP_TIME).await;
+                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
             }
         }
     })
@@ -121,6 +118,9 @@ async fn run_mining_event_processor(
     sender_to_mempool: &Sender<ConsensusEvent>,
     sender_to_blockchain: &Sender<RoutingEvent>,
     receiver_for_miner: Receiver<MiningEvent>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
+    channel_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mining_event_processor = MiningThread {
         wallet: context.wallet.clone(),
@@ -133,17 +133,20 @@ async fn run_mining_event_processor(
         public_key: [0; 33],
         mined_golden_tickets: 0,
     };
+
     let (interface_sender_to_miner, interface_receiver_for_miner) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
+        tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
 
     debug!("running miner thread");
-    let _miner_handle = run_thread(
+    let miner_handle = run_thread(
         Box::new(mining_event_processor),
         interface_receiver_for_miner,
         receiver_for_miner,
+        stat_timer_in_ms,
+        thread_sleep_time_in_ms,
     )
     .await;
-    (interface_sender_to_miner, _miner_handle)
+    (interface_sender_to_miner, miner_handle)
 }
 
 async fn run_consensus_event_processor(
@@ -153,6 +156,9 @@ async fn run_consensus_event_processor(
     sender_to_routing: &Sender<RoutingEvent>,
     sender_to_miner: Sender<MiningEvent>,
     sender_to_network_controller: Sender<IoEvent>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
+    channel_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
     let mut create_test_tx = false;
@@ -166,6 +172,7 @@ async fn run_consensus_event_processor(
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
         generate_genesis_block = configs.get_peer_configs().is_empty();
     }
+
     let consensus_event_processor = ConsensusThread {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
@@ -191,15 +198,17 @@ async fn run_consensus_event_processor(
             CONSENSUS_EVENT_PROCESSOR_ID,
         ))),
         stats: Default::default(),
-        txs_for_mempool: Vec::with_capacity(CHANNEL_SIZE),
+        txs_for_mempool: Vec::with_capacity(channel_size),
     };
     let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
+        tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
     debug!("running mempool thread");
     let blockchain_handle = run_thread(
         Box::new(consensus_event_processor),
         interface_receiver_for_mempool,
         receiver_for_blockchain,
+        stat_timer_in_ms,
+        thread_sleep_time_in_ms,
     )
     .await;
 
@@ -215,6 +224,9 @@ async fn run_routing_event_processor(
     receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MiningEvent>,
     senders: Vec<Sender<VerifyRequest>>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
+    channel_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
         blockchain: context.blockchain.clone(),
@@ -237,6 +249,7 @@ async fn run_routing_event_processor(
         public_key: [0; 33],
         senders_to_verification: senders,
     };
+
     {
         log_read_lock_request!("configs");
         let configs = configs.read().await;
@@ -252,13 +265,15 @@ async fn run_routing_event_processor(
     }
 
     let (interface_sender_to_routing, interface_receiver_for_routing) =
-        tokio::sync::mpsc::channel::<NetworkEvent>(CHANNEL_SIZE);
+        tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
 
     debug!("running blockchain thread");
     let routing_handle = run_thread(
         Box::new(routing_event_processor),
         interface_receiver_for_routing,
         receiver_for_routing,
+        stat_timer_in_ms,
+        thread_sleep_time_in_ms,
     )
     .await;
 
@@ -270,14 +285,17 @@ async fn run_verification_threads(
     blockchain: Arc<RwLock<Blockchain>>,
     peers: Arc<RwLock<PeerCollection>>,
     wallet: Arc<RwLock<Wallet>>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
+    verification_thread_count: u16,
 ) -> (Vec<Sender<VerifyRequest>>, Vec<JoinHandle<()>>) {
     let mut senders = vec![];
     let mut thread_handles = vec![];
 
-    for i in 0..VERIFICATION_THREAD_COUNT {
+    for i in 0..verification_thread_count {
         let (sender, receiver) = tokio::sync::mpsc::channel(100_000);
         senders.push(sender);
-        let mut verification_thread = VerificationThread {
+        let verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
             blockchain: blockchain.clone(),
             peers: peers.clone(),
@@ -296,12 +314,14 @@ async fn run_verification_threads(
                 STAT_BIN_COUNT,
             ),
         };
-        let (interface_sender_to_verification, interface_receiver_for_verification) =
+        let (_interface_sender_to_verification, interface_receiver_for_verification) =
             tokio::sync::mpsc::channel::<NetworkEvent>(1);
         let thread_handle = run_thread(
             Box::new(verification_thread),
             interface_receiver_for_verification,
             receiver,
+            stat_timer_in_ms,
+            thread_sleep_time_in_ms,
         )
         .await;
         thread_handles.push(thread_handle);
@@ -316,6 +336,8 @@ fn run_loop_thread(
     network_event_sender_to_routing_ep: Sender<NetworkEvent>,
     network_event_sender_to_consensus_ep: Sender<NetworkEvent>,
     network_event_sender_to_mining_ep: Sender<NetworkEvent>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()> {
     let loop_handle = tokio::spawn(async move {
         let mut work_done: bool;
@@ -365,14 +387,16 @@ fn run_loop_thread(
             }
             #[cfg(feature = "with-stats")]
             {
-                if Instant::now().duration_since(last_stat_on) > STAT_TIMER {
+                if Instant::now().duration_since(last_stat_on)
+                    > Duration::from_millis(stat_timer_in_ms)
+                {
                     last_stat_on = Instant::now();
                     incoming_msgs.calculate_stats(TimeKeeper {}.get_timestamp());
                     incoming_msgs.print();
                 }
             }
             if !work_done {
-                tokio::time::sleep(THREAD_SLEEP_TIME).await;
+                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
             }
         }
     });
@@ -429,11 +453,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("loading configs failed"),
         )));
 
+    let channel_size;
+    let thread_sleep_time_in_ms;
+    let stat_timer_in_ms;
+    let verification_thread_count;
+
+    {
+        log_read_lock_request!("configs");
+        let configs = configs.read().await;
+        log_read_lock_receive!("configs");
+        channel_size = configs.get_server_configs().channel_size as usize;
+        thread_sleep_time_in_ms = configs.get_server_configs().thread_sleep_time_in_ms;
+        stat_timer_in_ms = configs.get_server_configs().stat_timer_in_ms;
+        verification_thread_count = configs.get_server_configs().verification_threads;
+    }
+
     let (event_sender_to_loop, event_receiver_in_loop) =
-        tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
+        tokio::sync::mpsc::channel::<IoEvent>(channel_size);
 
     let (sender_to_network_controller, receiver_in_network_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(CHANNEL_SIZE);
+        tokio::sync::mpsc::channel::<IoEvent>(channel_size);
 
     info!("running saito controllers");
 
@@ -441,19 +480,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =
-        tokio::sync::mpsc::channel::<ConsensusEvent>(CHANNEL_SIZE);
+        tokio::sync::mpsc::channel::<ConsensusEvent>(channel_size);
 
     let (sender_to_routing, receiver_for_routing) =
-        tokio::sync::mpsc::channel::<RoutingEvent>(CHANNEL_SIZE);
+        tokio::sync::mpsc::channel::<RoutingEvent>(channel_size);
 
     let (sender_to_miner, receiver_for_miner) =
-        tokio::sync::mpsc::channel::<MiningEvent>(CHANNEL_SIZE);
+        tokio::sync::mpsc::channel::<MiningEvent>(channel_size);
 
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
         context.blockchain.clone(),
         peers.clone(),
         context.wallet.clone(),
+        stat_timer_in_ms,
+        thread_sleep_time_in_ms,
+        verification_thread_count,
     )
     .await;
 
@@ -466,6 +508,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         receiver_for_routing,
         &sender_to_miner,
         senders,
+        stat_timer_in_ms,
+        thread_sleep_time_in_ms,
+        channel_size,
     )
     .await;
 
@@ -476,6 +521,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &sender_to_routing,
         sender_to_miner,
         sender_to_network_controller.clone(),
+        stat_timer_in_ms,
+        thread_sleep_time_in_ms,
+        channel_size,
     )
     .await;
 
@@ -484,6 +532,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &sender_to_consensus,
         &sender_to_routing,
         receiver_for_miner,
+        stat_timer_in_ms,
+        thread_sleep_time_in_ms,
+        channel_size,
     )
     .await;
 
@@ -492,6 +543,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         network_event_sender_to_routing,
         network_event_sender_to_consensus,
         network_event_sender_to_mining,
+        stat_timer_in_ms,
+        thread_sleep_time_in_ms,
     );
 
     let network_handle = tokio::spawn(run_network_controller(

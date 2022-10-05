@@ -9,7 +9,6 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
-use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use tracing::warn;
 

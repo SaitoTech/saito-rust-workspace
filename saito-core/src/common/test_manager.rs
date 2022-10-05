@@ -29,7 +29,6 @@ pub mod test {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
-    use rayon::prelude::*;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
     use tracing::{debug, info};

@@ -17,6 +17,11 @@ impl WasmConfiguration {
                     port: 12101,
                     protocol: "http".to_string(),
                 },
+                verification_threads: 2,
+                channel_size: 1000,
+                stat_timer_in_ms: 10000,
+                thread_sleep_time_in_ms: 10,
+                block_producing_timer_in_ms: 1000,
             },
             peers: vec![],
         }

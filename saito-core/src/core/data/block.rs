@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::convert::TryInto;
 use std::mem;
 use std::ops::Rem;
@@ -315,7 +314,7 @@ impl Block {
         block.creator = public_key.clone();
 
         block.transactions.reserve(transactions.len());
-        for (sig, tx) in transactions.drain() {
+        for (_, tx) in transactions.drain() {
             block.transactions.push(tx);
         }
         // block.transactions = transactions.drain().collect();

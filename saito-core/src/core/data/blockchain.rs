@@ -534,7 +534,7 @@ impl Blockchain {
         let mut block = self.blocks.remove(block_hash).unwrap();
 
         if block.creator == mempool.public_key {
-            let mut transactions = &mut block.transactions;
+            let transactions = &mut block.transactions;
             // TODO : what other types should be added back to the mempool
             info!(
                 "adding {:?} transactions back to mempool",
@@ -1448,11 +1448,11 @@ mod tests {
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
-    use tracing_subscriber;
-    use tracing_subscriber::filter::Directive;
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
-    use tracing_subscriber::Layer;
+    // use tracing_subscriber;
+    // use tracing_subscriber::filter::Directive;
+    // use tracing_subscriber::layer::SubscriberExt;
+    // use tracing_subscriber::util::SubscriberInitExt;
+    // use tracing_subscriber::Layer;
 
     #[tokio::test]
     async fn test_blockchain_init() {

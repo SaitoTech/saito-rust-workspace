@@ -33,6 +33,11 @@ impl SpammerConfigs {
                     port: 12101,
                     protocol: "http".to_string(),
                 },
+                verification_threads: 4,
+                channel_size: 1000,
+                stat_timer_in_ms: 5000,
+                thread_sleep_time_in_ms: 10,
+                block_producing_timer_in_ms: 1000,
             },
             peers: vec![],
             spammer: Spammer {

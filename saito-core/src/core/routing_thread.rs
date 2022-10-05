@@ -7,14 +7,11 @@ use tokio::sync::RwLock;
 use tracing::{debug, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{
-    SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT, THREAD_SLEEP_TIME,
-};
+use crate::common::defs::{SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data;
-use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
@@ -24,8 +21,6 @@ use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::verification_thread::VerifyRequest;
 use crate::{log_read_lock_receive, log_read_lock_request};
-use rayon::prelude::*;
-use tokio::task::JoinHandle;
 
 #[derive(Debug)]
 pub enum RoutingEvent {}
@@ -143,7 +138,7 @@ impl RoutingThread {
             Message::Block(_) => {
                 unreachable!("received block");
             }
-            Message::Transaction(mut transaction) => {
+            Message::Transaction(transaction) => {
                 trace!("received transaction");
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
@@ -254,7 +249,13 @@ impl RoutingThread {
             }
             if selected_sender.is_none() {
                 // waiting till we get an acceptable sender
-                tokio::time::sleep(THREAD_SLEEP_TIME).await;
+                log_read_lock_request!("configs");
+                let configs = self.configs.read().await;
+                log_read_lock_receive!("configs");
+                tokio::time::sleep(Duration::from_millis(
+                    configs.get_server_configs().thread_sleep_time_in_ms,
+                ))
+                .await;
             }
         }
 

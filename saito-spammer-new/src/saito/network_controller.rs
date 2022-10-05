@@ -17,9 +17,7 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::{
-    SaitoHash, StatVariable, STAT_BIN_COUNT, STAT_TIMER, THREAD_SLEEP_TIME,
-};
+use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
@@ -408,6 +406,8 @@ pub async fn run_network_controller(
     sender: Sender<IoEvent>,
     configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     blockchain: Arc<RwLock<Blockchain>>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -529,14 +529,16 @@ pub async fn run_network_controller(
             }
             #[cfg(feature = "with-stats")]
             {
-                if Instant::now().duration_since(last_stat_on) > STAT_TIMER {
+                if Instant::now().duration_since(last_stat_on)
+                    > Duration::from_millis(stat_timer_in_ms)
+                {
                     last_stat_on = Instant::now();
                     outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
                     outgoing_messages.print();
                 }
             }
             if !work_done {
-                tokio::time::sleep(THREAD_SLEEP_TIME).await;
+                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
             }
         }
     });

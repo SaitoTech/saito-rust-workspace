@@ -1,6 +1,5 @@
 use ahash::AHashMap;
 use std::collections::VecDeque;
-use std::time::Duration;
 
 pub type Currency = u128;
 pub type Timestamp = u64;
@@ -13,13 +12,7 @@ pub type SaitoUTXOSetKey = [u8; 58];
 pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 
 pub const BLOCK_FILE_EXTENSION: &str = ".sai";
-pub const STAT_INTERVAL: Timestamp = Duration::from_secs(5).as_micros() as Timestamp;
 pub const STAT_BIN_COUNT: usize = 3;
-
-// TODO : these should be configurable
-pub const CHANNEL_SIZE: usize = 1000_000;
-pub const STAT_TIMER: Duration = Duration::from_secs(5);
-pub const THREAD_SLEEP_TIME: Duration = Duration::from_millis(100);
 
 /// NOTE : Lock ordering is decided from how frequent the usage is for that resource. Please make sure to follow the order given below to avoid deadlocks
 /// network controller
