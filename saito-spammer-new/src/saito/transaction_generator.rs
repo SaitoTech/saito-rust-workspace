@@ -122,8 +122,8 @@ impl TransactionGenerator {
                     )
                     .await;
 
-                txs.push_back(transaction);
-                // self.sender.send(transaction).await.unwrap();
+                // txs.push_back(transaction);
+                self.sender.send(transaction).await.unwrap();
 
                 if total_output_slips_created >= self.tx_count {
                     info!(
@@ -239,8 +239,8 @@ impl TransactionGenerator {
             transaction.sign(&self.private_key);
             transaction.add_hop(&wallet, &self.public_key);
 
-            // sender.send(transaction).await.unwrap();
-            txs.push_back(transaction);
+            self.sender.send(transaction).await.unwrap();
+            // txs.push_back(transaction);
         }
         info!("Test transactions created, count : {:?}", txs.len());
     }
