@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -228,23 +229,36 @@ impl TransactionGenerator {
 
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet.clone();
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(10000);
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(100000);
         let tx_count = self.tx_count.clone();
         let public_key = self.public_key.clone();
+        let payment: Currency = 1;
+        let fee: Currency = 0;
+        let count = 50000;
+        let required_balance = (payment + fee) * count as Currency;
         tokio::spawn(async move {
             let sender = sender.clone();
-            log_write_lock_request!("wallet");
-            let mut wallet = wallet.write().await;
-            log_write_lock_receive!("wallet");
-            for _i in 0..tx_count {
-                let transaction = Transaction::create(&mut wallet, public_key, 1, 0);
-                sender.send(transaction).await.unwrap();
+            loop {
+                let mut work_done = false;
+                {
+                    log_write_lock_request!("wallet");
+                    let mut wallet = wallet.write().await;
+                    log_write_lock_receive!("wallet");
+                    if wallet.get_available_balance() > required_balance {
+                        for _i in 0..count {
+                            let transaction = Transaction::create(&mut wallet, public_key, 1, 0);
+                            sender.send(transaction).await.unwrap();
+                        }
+                        work_done = true;
+                    }
+                }
+                if !work_done {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
             }
         });
 
-        let mut count = 0;
         while let Some(mut transaction) = receiver.recv().await {
-            count += 1;
             // let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 0);
             transaction.message = generate_random_bytes(self.tx_size as u64);
             transaction.timestamp = time_keeper.get_timestamp();
@@ -253,9 +267,6 @@ impl TransactionGenerator {
             transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
 
             self.sender.send(transaction).await.unwrap();
-            if count == self.tx_count {
-                break;
-            }
         }
         info!("Test transactions created, count : {:?}", txs.len());
     }
