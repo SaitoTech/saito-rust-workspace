@@ -63,28 +63,31 @@ impl Spammer {
             burst_count = config.get_spammer_configs().burst_count;
         }
         let sender = self.sender_to_network.clone();
-        let mut handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             // let mut txs = vec![];
             // while txs.len() < burst_count as usize {
             //     if let Some(transaction) = receiver.recv().await {
             //         txs.push(transaction);
             //     }
             // }
-            for _i in 0..burst_count {
-                if let Some(transaction) = receiver.recv().await {
-                    // self.sent_tx_count += 1;
-                    sender
-                        .send(IoEvent {
-                            event_processor_id: 0,
-                            event_id: 0,
-                            event: NetworkEvent::OutgoingNetworkMessageForAll {
-                                buffer: Message::Transaction(transaction).serialize(),
-                                exceptions: vec![],
-                            },
-                        })
-                        .await
-                        .unwrap();
+            loop {
+                for _i in 0..burst_count {
+                    if let Some(transaction) = receiver.recv().await {
+                        // self.sent_tx_count += 1;
+                        sender
+                            .send(IoEvent {
+                                event_processor_id: 0,
+                                event_id: 0,
+                                event: NetworkEvent::OutgoingNetworkMessageForAll {
+                                    buffer: Message::Transaction(transaction).serialize(),
+                                    exceptions: vec![],
+                                },
+                            })
+                            .await
+                            .unwrap();
+                    }
                 }
+                tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
             }
         });
         tokio::task::yield_now().await;
@@ -123,7 +126,6 @@ impl Spammer {
                 // break;
             }
         }
-        tokio::join!(handle);
         // handle.await.join();
         {
             let wallet = self.wallet.read().await;
