@@ -237,7 +237,7 @@ impl TransactionGenerator {
             let mut wallet = wallet.write().await;
             log_write_lock_receive!("wallet");
             for _i in 0..tx_count {
-                let mut transaction = Transaction::create(&mut wallet, public_key, 1, 0);
+                let transaction = Transaction::create(&mut wallet, public_key, 1, 0);
                 sender.send(transaction).await.unwrap();
             }
         });

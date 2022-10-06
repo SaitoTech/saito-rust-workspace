@@ -1,6 +1,6 @@
-use ahash::{AHashMap, AHashSet};
 use std::collections::{HashMap, HashSet};
 
+use ahash::{AHashMap, AHashSet};
 use tracing::warn;
 
 use crate::common::defs::{
@@ -227,9 +227,7 @@ impl Wallet {
         let mut nolan_out: Currency = 0;
         let my_public_key = self.public_key;
 
-        //
         // grab inputs
-        //
         let mut keys_to_remove = vec![];
         for key in self.unspent_slips.iter() {
             if nolan_in >= nolan_requested {
