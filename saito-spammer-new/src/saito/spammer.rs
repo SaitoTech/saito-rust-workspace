@@ -29,7 +29,7 @@ impl Spammer {
     pub async fn new(
         wallet: Arc<RwLock<Wallet>>,
         sender_to_network: Sender<IoEvent>,
-        sender: Sender<Vec<Transaction>>,
+        sender: Sender<VecDeque<Transaction>>,
         configs: Arc<RwLock<Box<SpammerConfigs>>>,
     ) -> Spammer {
         Spammer {
@@ -42,7 +42,7 @@ impl Spammer {
         }
     }
 
-    async fn run(&mut self, mut receiver: Receiver<Vec<Transaction>>) {
+    async fn run(&mut self, mut receiver: Receiver<VecDeque<Transaction>>) {
         let mut work_done = false;
         let timer_in_milli;
         let burst_count;
@@ -101,7 +101,7 @@ pub async fn run_spammer(
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
 ) {
     info!("starting the spammer");
-    let (sender, receiver) = tokio::sync::mpsc::channel::<Vec<Transaction>>(1_000_000);
+    let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(1_000_000);
     let mut spammer = Spammer::new(wallet, sender_to_network, sender, configs).await;
     spammer.run(receiver).await;
 }

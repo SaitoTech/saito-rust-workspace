@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::future::join_all;
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -37,14 +36,14 @@ pub struct TransactionGenerator {
     time_keeper: Box<TimeKeeper>,
     public_key: SaitoPublicKey,
     private_key: SaitoPrivateKey,
-    sender: Sender<Vec<Transaction>>,
+    sender: Sender<VecDeque<Transaction>>,
 }
 
 impl TransactionGenerator {
     pub async fn create(
         wallet: Arc<RwLock<Wallet>>,
         configuration: Arc<RwLock<Box<SpammerConfigs>>>,
-        sender: Sender<Vec<Transaction>>,
+        sender: Sender<VecDeque<Transaction>>,
     ) -> Self {
         let tx_size = 10;
         let tx_count;
@@ -117,7 +116,7 @@ impl TransactionGenerator {
                 available_balance / unspent_slip_count as Currency;
             let mut total_output_slips_created: u64 = 0;
 
-            let mut txs = vec![];
+            let mut txs: VecDeque<Transaction> = Default::default();
             for _i in 0..unspent_slip_count {
                 let transaction = self
                     .create_slip_transaction(
@@ -128,7 +127,7 @@ impl TransactionGenerator {
                     .await;
 
                 // txs.push_back(transaction);
-                txs.push(transaction);
+                txs.push_back(transaction);
 
                 if total_output_slips_created >= self.tx_count {
                     info!(
@@ -248,11 +247,11 @@ impl TransactionGenerator {
                     let mut wallet = wallet.write().await;
                     log_write_lock_receive!("wallet");
                     if wallet.get_available_balance() >= required_balance {
-                        let mut vec = Vec::with_capacity(count);
+                        let mut vec = VecDeque::with_capacity(count);
                         for _ in 0..count {
                             let transaction =
                                 Transaction::create(&mut wallet, public_key, payment, fee);
-                            vec.push(transaction);
+                            vec.push_back(transaction);
                         }
                         sender.send(vec).await.unwrap();
                         work_done = true;
@@ -268,7 +267,7 @@ impl TransactionGenerator {
             let sender = self.sender.clone();
             let tx_size = self.tx_size;
 
-            let txs = transactions
+            let txs: VecDeque<Transaction> = transactions
                 .par_drain(..)
                 .into_par_iter()
                 .map(|mut transaction| {
