@@ -86,7 +86,6 @@ impl Spammer {
                         .unwrap();
                 }
             }
-            tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
         });
         std::thread::yield_now();
         loop {
