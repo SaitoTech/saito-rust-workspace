@@ -259,7 +259,6 @@ impl TransactionGenerator {
         });
 
         while let Some(mut transaction) = receiver.recv().await {
-            // let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 0);
             transaction.message = generate_random_bytes(self.tx_size as u64);
             transaction.timestamp = time_keeper.get_timestamp();
             transaction.generate(&self.public_key, 0, 0);
@@ -268,6 +267,7 @@ impl TransactionGenerator {
 
             self.sender.send(transaction).await.unwrap();
         }
+
         info!("Test transactions created, count : {:?}", txs.len());
     }
 }

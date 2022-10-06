@@ -64,12 +64,6 @@ impl Spammer {
         }
         let sender = self.sender_to_network.clone();
         tokio::spawn(async move {
-            // let mut txs = vec![];
-            // while txs.len() < burst_count as usize {
-            //     if let Some(transaction) = receiver.recv().await {
-            //         txs.push(transaction);
-            //     }
-            // }
             loop {
                 for _i in 0..burst_count {
                     if let Some(transaction) = receiver.recv().await {
@@ -101,19 +95,7 @@ impl Spammer {
 
             if !work_done {
                 tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
-            } else {
-                // break;
             }
-        }
-        // handle.await.join();
-        {
-            let wallet = self.wallet.read().await;
-            info!(
-                "sent tx count : {:?} total slip count : {:?} current balance : {:?}",
-                self.sent_tx_count,
-                wallet.slips.len(),
-                wallet.get_available_balance()
-            );
         }
     }
 }
