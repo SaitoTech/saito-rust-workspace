@@ -571,8 +571,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     let spammer_handle = tokio::spawn(run_spammer(
-        context.blockchain.clone(),
-        context.mempool.clone(),
         context.wallet.clone(),
         sender_to_network_controller.clone(),
         configs.clone(),

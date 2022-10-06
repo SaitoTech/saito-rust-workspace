@@ -233,8 +233,7 @@ impl TransactionGenerator {
 
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet.clone();
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(1000000);
-        let tx_count = self.tx_count.clone();
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
         let public_key = self.public_key.clone();
         let payment: Currency = 1;
         let fee: Currency = 0;
