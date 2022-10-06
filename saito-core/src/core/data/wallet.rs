@@ -196,12 +196,12 @@ impl Wallet {
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.unspent_slips.remove(&slip.utxoset_key);
         let result = self.slips.remove(&slip.utxoset_key);
+        let in_unspent_list = self.unspent_slips.remove(&slip.utxoset_key);
         if result.is_some() {
-            let result = result.unwrap();
-            if !result.spent {
-                self.available_balance -= result.amount;
+            let removed_slip = result.unwrap();
+            if in_unspent_list {
+                self.available_balance -= removed_slip.amount;
             }
         }
     }
