@@ -87,7 +87,7 @@ impl Spammer {
                 }
             }
         });
-        std::thread::yield_now();
+        tokio::task::yield_now().await;
         loop {
             work_done = false;
             if !self.bootstrap_done {
