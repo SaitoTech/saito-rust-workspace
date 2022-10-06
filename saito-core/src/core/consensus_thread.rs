@@ -222,7 +222,7 @@ impl ConsensusThread {
             transaction.generate(&public_key, 0, 0);
             transaction.sign(&private_key);
 
-            transaction.add_hop(&wallet, &public_key);
+            transaction.add_hop(&private_key, &public_key, &public_key);
             {
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)

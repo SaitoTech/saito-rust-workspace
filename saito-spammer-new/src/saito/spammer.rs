@@ -99,27 +99,6 @@ impl Spammer {
                 work_done = true;
             }
 
-            // for _i in 0..burst_count {
-            //     if let Some(transaction) = self.transactions.pop_front() {
-            //         self.sent_tx_count += 1;
-            //         self.sender_to_network
-            //             .send(IoEvent {
-            //                 event_processor_id: 0,
-            //                 event_id: 0,
-            //                 event: NetworkEvent::OutgoingNetworkMessageForAll {
-            //                     buffer: Message::Transaction(transaction).serialize(),
-            //                     exceptions: vec![],
-            //                 },
-            //             })
-            //             .await
-            //             .unwrap();
-            //     } else if self.bootstrap_done {
-            //         info!("Transaction sending completed, a total of {:?} transactions sent, exiting loop ...", self.sent_tx_count);
-            //         work_done = true;
-            //         break;
-            //     }
-            // }
-
             if !work_done {
                 tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
             } else {

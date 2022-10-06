@@ -85,8 +85,13 @@ impl Transaction {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn add_hop(&mut self, wallet: &Wallet, to_public_key: &SaitoPublicKey) {
-        let hop = Hop::generate(wallet, to_public_key, self);
+    pub fn add_hop(
+        &mut self,
+        my_private_key: &SaitoPrivateKey,
+        my_public_key: &SaitoPublicKey,
+        to_public_key: &SaitoPublicKey,
+    ) {
+        let hop = Hop::generate(my_private_key, my_public_key, to_public_key, self);
         self.path.push(hop);
     }
 

@@ -382,7 +382,7 @@ mod tests {
                 tx.sign(&private_key);
             }
             let wallet = wallet_lock.read().await;
-            tx.add_hop(&wallet, &public_key);
+            tx.add_hop(&wallet.private_key, &wallet.public_key, &public_key);
             tx.generate(&public_key, 0, 0);
             mempool.add_transaction(tx).await;
         }

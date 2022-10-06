@@ -1,7 +1,11 @@
-use crate::SpammerConfigs;
 use std::collections::VecDeque;
+use std::sync::Arc;
 
-use crate::saito::time_keeper::TimeKeeper;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::RwLock;
+use tracing::{debug, info};
+
+use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data::crypto::generate_random_bytes;
 use saito_core::core::data::slip::{Slip, SLIP_SIZE};
@@ -11,11 +15,8 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
-use std::sync::Arc;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
-use tracing::{debug, info};
+use crate::saito::time_keeper::TimeKeeper;
+use crate::SpammerConfigs;
 
 #[derive(Clone, PartialEq)]
 pub enum GeneratorState {
@@ -193,7 +194,7 @@ impl TransactionGenerator {
         transaction.timestamp = self.time_keeper.get_timestamp();
         transaction.generate(&self.public_key, 0, 0);
         transaction.sign(&self.private_key);
-        transaction.add_hop(&wallet, &self.public_key);
+        transaction.add_hop(&wallet.private_key, &wallet.public_key, &self.public_key);
 
         return transaction;
     }
@@ -225,22 +226,36 @@ impl TransactionGenerator {
     async fn create_test_transactions(&mut self, txs: &mut VecDeque<Transaction>) {
         info!("creating test transactions : {:?}", self.tx_count);
 
-        // let sender = self.sender.clone();
         let time_keeper = TimeKeeper {};
+        let wallet = self.wallet.clone();
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(10000);
+        let tx_count = self.tx_count.clone();
+        let public_key = self.public_key.clone();
+        tokio::spawn(async move {
+            let sender = sender.clone();
+            log_write_lock_request!("wallet");
+            let mut wallet = wallet.write().await;
+            log_write_lock_receive!("wallet");
+            for _i in 0..tx_count {
+                let mut transaction = Transaction::create(&mut wallet, public_key, 1, 0);
+                sender.send(transaction).await.unwrap();
+            }
+        });
 
-        log_write_lock_request!("wallet");
-        let mut wallet = self.wallet.write().await;
-        log_write_lock_receive!("wallet");
-        for _i in 0..self.tx_count {
-            let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 0);
+        let mut count = 0;
+        while let Some(mut transaction) = receiver.recv().await {
+            count += 1;
+            // let mut transaction = Transaction::create(&mut wallet, self.public_key, 1, 0);
             transaction.message = generate_random_bytes(self.tx_size as u64);
             transaction.timestamp = time_keeper.get_timestamp();
             transaction.generate(&self.public_key, 0, 0);
             transaction.sign(&self.private_key);
-            transaction.add_hop(&wallet, &self.public_key);
+            transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
 
             self.sender.send(transaction).await.unwrap();
-            // txs.push_back(transaction);
+            if count == self.tx_count {
+                break;
+            }
         }
         info!("Test transactions created, count : {:?}", txs.len());
     }
