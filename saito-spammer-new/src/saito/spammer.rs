@@ -26,7 +26,6 @@ pub struct Spammer {
     bootstrap_done: bool,
     sent_tx_count: u64,
     tx_generator: TransactionGenerator,
-    transactions: VecDeque<Transaction>,
 }
 
 impl Spammer {
@@ -35,7 +34,7 @@ impl Spammer {
         mempool: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
         sender_to_network: Sender<IoEvent>,
-        sender: Sender<Transaction>,
+        sender: Sender<Vec<Transaction>>,
         configs: Arc<RwLock<Box<SpammerConfigs>>>,
     ) -> Spammer {
         Spammer {
@@ -48,11 +47,10 @@ impl Spammer {
             sent_tx_count: 0,
             tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone(), sender)
                 .await,
-            transactions: VecDeque::with_capacity(1_000_000),
         }
     }
 
-    async fn run(&mut self, mut receiver: Receiver<Transaction>) {
+    async fn run(&mut self, mut receiver: Receiver<Vec<Transaction>>) {
         let mut work_done = false;
         let timer_in_milli;
         let burst_count;
@@ -65,15 +63,15 @@ impl Spammer {
         let sender = self.sender_to_network.clone();
         tokio::spawn(async move {
             loop {
-                for _i in 0..burst_count {
-                    if let Some(transaction) = receiver.recv().await {
-                        // self.sent_tx_count += 1;
+                // for _i in 0..burst_count {
+                if let Some(transactions) = receiver.recv().await {
+                    for tx in transactions {
                         sender
                             .send(IoEvent {
                                 event_processor_id: 0,
                                 event_id: 0,
                                 event: NetworkEvent::OutgoingNetworkMessageForAll {
-                                    buffer: Message::Transaction(transaction).serialize(),
+                                    buffer: Message::Transaction(tx).serialize(),
                                     exceptions: vec![],
                                 },
                             })
@@ -81,6 +79,7 @@ impl Spammer {
                             .unwrap();
                     }
                 }
+                // }
                 tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
             }
         });
@@ -88,7 +87,7 @@ impl Spammer {
         loop {
             work_done = false;
             if !self.bootstrap_done {
-                self.tx_generator.on_new_block(&mut self.transactions).await;
+                self.tx_generator.on_new_block().await;
                 self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
                 work_done = true;
             }
@@ -108,8 +107,7 @@ pub async fn run_spammer(
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
 ) {
     info!("starting the spammer");
-    let (sender, receiver): (Sender<Transaction>, Receiver<Transaction>) =
-        tokio::sync::mpsc::channel::<Transaction>(1_000_000);
+    let (sender, receiver) = tokio::sync::mpsc::channel::<Vec<Transaction>>(1_000_000);
     let mut spammer = Spammer::new(
         blockchain,
         mempool,
