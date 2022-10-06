@@ -234,7 +234,7 @@ impl TransactionGenerator {
         let public_key = self.public_key.clone();
         let payment: Currency = 1;
         let fee: Currency = 0;
-        let count = 50000;
+        let count = 100000;
         let required_balance = (payment + fee) * count as Currency;
         tokio::spawn(async move {
             let sender = sender.clone();
@@ -244,9 +244,10 @@ impl TransactionGenerator {
                     log_write_lock_request!("wallet");
                     let mut wallet = wallet.write().await;
                     log_write_lock_receive!("wallet");
-                    if wallet.get_available_balance() > required_balance {
-                        for _i in 0..count {
-                            let transaction = Transaction::create(&mut wallet, public_key, 1, 0);
+                    if wallet.get_available_balance() >= required_balance {
+                        for _ in 0..count {
+                            let transaction =
+                                Transaction::create(&mut wallet, public_key, payment, fee);
                             sender.send(transaction).await.unwrap();
                         }
                         work_done = true;
