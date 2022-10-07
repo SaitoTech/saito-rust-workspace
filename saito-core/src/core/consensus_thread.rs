@@ -112,15 +112,15 @@ impl ConsensusThread {
                 .unwrap();
 
         {
-            let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
-            vip_transaction.sign(&private_key);
-
-            mempool
-                .add_transaction_if_validates(vip_transaction, &blockchain)
-                .await;
+            // let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
+            // vip_transaction.sign(&private_key);
+            //
+            // mempool
+            //     .add_transaction_if_validates(vip_transaction, &blockchain)
+            //     .await;
 
             let mut vip_transaction =
-                Transaction::create_vip_transaction(spammer_public_key, 50_000_000);
+                Transaction::create_vip_transaction(spammer_public_key, 1_000_000);
             vip_transaction.sign(&private_key);
 
             mempool
