@@ -451,7 +451,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Public Key : {:?}", hex::encode(public_key));
     println!("Private Key : {:?}", hex::encode(private_key));
 
-    let config = ConfigHandler::load_configs("configs/spammer.config.json".to_string())
+    let config = ConfigHandler::load_configs("configs/config.json".to_string())
         .expect("loading configs failed");
     let configs: Arc<RwLock<Box<SpammerConfigs>>> = Arc::new(RwLock::new(Box::new(config.clone())));
 

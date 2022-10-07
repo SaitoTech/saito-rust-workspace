@@ -26,18 +26,18 @@ impl SpammerConfigs {
         SpammerConfigs {
             server: Server {
                 host: "127.0.0.1".to_string(),
-                port: 12100,
+                port: 0,
                 protocol: "http".to_string(),
                 endpoint: Endpoint {
                     host: "127.0.0.1".to_string(),
-                    port: 12101,
+                    port: 0,
                     protocol: "http".to_string(),
                 },
                 verification_threads: 4,
-                channel_size: 1000,
-                stat_timer_in_ms: 5000,
+                channel_size: 0,
+                stat_timer_in_ms: 0,
                 thread_sleep_time_in_ms: 10,
-                block_producing_timer_in_ms: 1000,
+                block_producing_timer_in_ms: 0,
             },
             peers: vec![],
             spammer: Spammer {
