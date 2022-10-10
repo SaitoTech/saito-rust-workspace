@@ -14,8 +14,8 @@ pub struct Spammer {
     pub burst_count: u32,
     pub tx_size: u32,
     pub tx_count: u64,
-    pub tx_payment: Currency,
-    pub tx_fee: Currency,
+    pub tx_payment: u64,
+    pub tx_fee: u64,
 }
 
 #[derive(Deserialize, Debug, Clone)]

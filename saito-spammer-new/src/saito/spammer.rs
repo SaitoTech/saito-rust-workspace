@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use saito_core::common::command::NetworkEvent;
+use saito_core::common::defs::Currency;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
@@ -48,8 +49,8 @@ impl Spammer {
                 wallet.clone(),
                 configs.clone(),
                 sender,
-                tx_payment,
-                tx_fee,
+                tx_payment as Currency,
+                tx_fee as Currency,
             )
             .await,
         }
