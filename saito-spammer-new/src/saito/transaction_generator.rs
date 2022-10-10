@@ -236,7 +236,7 @@ impl TransactionGenerator {
         let public_key = self.public_key.clone();
         let payment: Currency = 1;
         let fee: Currency = 1;
-        let count = 100000;
+        let count = 1000000;
         let required_balance = (payment + fee) * count as Currency;
         tokio::spawn(async move {
             let sender = sender.clone();
