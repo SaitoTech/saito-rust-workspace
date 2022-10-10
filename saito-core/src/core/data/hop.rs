@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::data::crypto::{hash, sign};
 use crate::core::data::transaction::Transaction;
-use crate::core::data::wallet::Wallet;
 
 pub const HOP_SIZE: usize = 130;
 
@@ -83,6 +82,7 @@ mod tests {
 
     use crate::core::data::crypto::{generate_keys, verify};
     use crate::core::data::hop::Hop;
+    use crate::core::data::wallet::Wallet;
 
     use super::*;
 

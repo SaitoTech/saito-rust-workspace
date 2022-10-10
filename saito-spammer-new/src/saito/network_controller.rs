@@ -454,8 +454,8 @@ pub async fn run_network_controller(
             // sender_to_saito_controller.send(command).await;
             // info!("sending test message to saito controller");
 
-            let result = receiver.recv().await;
-            if result.is_some() {
+            let result = receiver.try_recv();
+            if result.is_ok() {
                 let event = result.unwrap();
                 let event_id = event.event_id;
                 let interface_event = event.event;

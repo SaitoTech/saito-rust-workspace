@@ -87,14 +87,12 @@ impl ConsensusThread {
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let public_key;
         let private_key;
 
         {
             log_read_lock_request!("ConsensusEventProcessor:generate_spammer_init_tx::wallet");
             let wallet = wallet_lock_clone.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:generate_spammer_init_tx::wallet");
-            public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
@@ -473,9 +471,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::wallet");
             println!(
-                "--- stats ------ {} - total_slips : {:?}",
+                "--- stats ------ {} - total_slips : {:?} unspent_slips : {:?} current_balance : {:?}",
                 format!("{:width$}", "wallet::state", width = 30),
                 wallet.slips.len(),
+                wallet.get_unspent_slip_count(),
+                wallet.get_available_balance()
             );
         }
         {
