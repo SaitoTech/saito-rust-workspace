@@ -19,6 +19,7 @@ use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::data::wallet::Wallet;
 
 pub const BLOCK_HEADER_SIZE: usize = 301;
 
@@ -274,6 +275,7 @@ impl Block {
         current_timestamp: u64,
         public_key: &SaitoPublicKey,
         private_key: &SaitoPrivateKey,
+        golden_ticket: Option<GoldenTicket>,
     ) -> Block {
         debug!(
             "Block::create : previous block hash : {:?}",
@@ -313,6 +315,12 @@ impl Block {
 
         block.creator = public_key.clone();
 
+        if golden_ticket.is_some() {
+            let gt = golden_ticket.unwrap();
+            let transaction =
+                Wallet::create_golden_ticket_transaction(gt, &public_key, &private_key).await;
+            block.transactions.push(transaction);
+        }
         block.transactions.reserve(transactions.len());
         for (_, tx) in transactions.drain() {
             block.transactions.push(tx);

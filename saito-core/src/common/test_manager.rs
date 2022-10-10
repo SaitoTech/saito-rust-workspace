@@ -462,6 +462,7 @@ pub mod test {
                 timestamp,
                 &public_key,
                 &private_key,
+                None,
             )
             .await;
             block.generate();
