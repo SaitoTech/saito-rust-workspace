@@ -1594,11 +1594,12 @@ impl Block {
                 );
                 if !gt.validate(previous_block.difficulty) {
                     error!(
-                        "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?}", 
+                        "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}", 
                         hex::encode(previous_block.hash),
                         previous_block.difficulty,
                         hex::encode(gt.random),
                         hex::encode(gt.public_key),
+                        hex::encode(gt.target)
                     );
                     let solution = hash(&gt.serialize_for_net());
                     let solution_num = primitive_types::U256::from_big_endian(&solution);
