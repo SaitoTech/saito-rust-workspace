@@ -306,7 +306,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         // generate blocks
         let mut can_bundle = false;
         self.block_producing_timer += duration_value;
-        // TODO : make timers configurable
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
             if !self.txs_for_mempool.is_empty() {
                 log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");

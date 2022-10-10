@@ -248,6 +248,7 @@ async fn run_routing_event_processor(
         stats: Default::default(),
         public_key: [0; 33],
         senders_to_verification: senders,
+        last_verification_thread_index: 0,
     };
 
     {
