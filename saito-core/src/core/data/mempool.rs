@@ -252,6 +252,7 @@ impl Mempool {
             hex::encode(block_hash)
         );
 
+        self.golden_tickets.clear();
         // self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
     }
 
@@ -267,6 +268,7 @@ impl Mempool {
         for (_, transaction) in &self.transactions {
             self.routing_work_in_mempool += transaction.total_work;
         }
+        self.golden_tickets.clear();
     }
 
     ///
