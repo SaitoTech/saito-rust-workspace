@@ -118,7 +118,7 @@ impl ConsensusThread {
             //     .await;
 
             let mut vip_transaction =
-                Transaction::create_vip_transaction(spammer_public_key, 1_000_000);
+                Transaction::create_vip_transaction(spammer_public_key, 10_000_000);
             vip_transaction.sign(&private_key);
 
             mempool

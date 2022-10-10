@@ -235,7 +235,7 @@ impl TransactionGenerator {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
         let public_key = self.public_key.clone();
         let payment: Currency = 1;
-        let fee: Currency = 1;
+        let fee: Currency = 0;
         let count = 1000000;
         let required_balance = (payment + fee) * count as Currency;
         tokio::spawn(async move {
