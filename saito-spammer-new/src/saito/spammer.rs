@@ -32,13 +32,26 @@ impl Spammer {
         sender: Sender<VecDeque<Transaction>>,
         configs: Arc<RwLock<Box<SpammerConfigs>>>,
     ) -> Spammer {
+        let tx_payment;
+        let tx_fee;
+        {
+            let configs = configs.read().await;
+            tx_payment = configs.get_spammer_configs().tx_payment;
+            tx_fee = configs.get_spammer_configs().tx_fee;
+        }
         Spammer {
             sender_to_network,
             configs: configs.clone(),
             bootstrap_done: false,
             sent_tx_count: 0,
-            tx_generator: TransactionGenerator::create(wallet.clone(), configs.clone(), sender)
-                .await,
+            tx_generator: TransactionGenerator::create(
+                wallet.clone(),
+                configs.clone(),
+                sender,
+                tx_payment,
+                tx_fee,
+            )
+            .await,
         }
     }
 

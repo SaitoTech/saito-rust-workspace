@@ -2,9 +2,11 @@ use std::io::{Error, ErrorKind};
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 use serde::Deserialize;
 use tracing::{debug, error};
+
+use saito_core::common::defs::Currency;
+use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Spammer {
@@ -12,6 +14,8 @@ pub struct Spammer {
     pub burst_count: u32,
     pub tx_size: u32,
     pub tx_count: u64,
+    pub tx_payment: Currency,
+    pub tx_fee: Currency,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -44,6 +48,8 @@ impl SpammerConfigs {
                 burst_count: 0,
                 tx_size: 0,
                 tx_count: 0,
+                tx_payment: 0,
+                tx_fee: 0,
             },
         }
     }

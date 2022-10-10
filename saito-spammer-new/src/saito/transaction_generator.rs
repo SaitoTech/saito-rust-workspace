@@ -37,6 +37,8 @@ pub struct TransactionGenerator {
     public_key: SaitoPublicKey,
     private_key: SaitoPrivateKey,
     sender: Sender<VecDeque<Transaction>>,
+    tx_payment: Currency,
+    tx_fee: Currency,
 }
 
 impl TransactionGenerator {
@@ -44,6 +46,8 @@ impl TransactionGenerator {
         wallet: Arc<RwLock<Wallet>>,
         configuration: Arc<RwLock<Box<SpammerConfigs>>>,
         sender: Sender<VecDeque<Transaction>>,
+        tx_payment: Currency,
+        tx_fee: Currency,
     ) -> Self {
         let tx_size = 10;
         let tx_count;
@@ -63,6 +67,8 @@ impl TransactionGenerator {
             public_key: [0; 33],
             private_key: [0; 32],
             sender,
+            tx_payment,
+            tx_fee,
         };
         {
             log_read_lock_request!("wallet");
@@ -234,10 +240,10 @@ impl TransactionGenerator {
         let wallet = self.wallet.clone();
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
         let public_key = self.public_key.clone();
-        let payment: Currency = 1;
-        let fee: Currency = 0;
         let count = 1000000;
-        let required_balance = (payment + fee) * count as Currency;
+        let required_balance = (self.tx_payment + self.tx_fee) * count as Currency;
+        let payment = self.tx_payment;
+        let fee = self.tx_fee;
         tokio::spawn(async move {
             let sender = sender.clone();
             loop {

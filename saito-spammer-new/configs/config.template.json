@@ -25,6 +25,8 @@
     "timer_in_milli": 100,
     "burst_count": 100,
     "tx_size": 1000,
-    "tx_count": 1000000
+    "tx_count": 1000000,
+    "tx_payment": 1,
+    "tx_fee": 0
   }
 }
