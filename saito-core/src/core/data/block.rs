@@ -1444,31 +1444,6 @@ impl Block {
             error!("block is mis-reporting its average atr variance");
             return false;
         }
-        //
-        // average income and average income variance
-        //
-        if cv.avg_income != self.avg_income {
-            error!("ERROR 712923: block is mis-reporting its average income");
-            return false;
-        }
-
-        if cv.avg_variance != self.avg_variance {
-            error!("ERROR 712923: block is mis-reporting its average variance");
-            return false;
-        }
-
-        //
-        // average atr income and average atr income variance
-        //
-        if cv.avg_atr_income != self.avg_atr_income {
-            error!("ERROR 712923: block is mis-reporting its average atr income");
-            return false;
-        }
-
-        if cv.avg_atr_variance != self.avg_atr_variance {
-            error!("ERROR 712923: block is mis-reporting its average atr variance");
-            return false;
-        }
 
         //
         // only block #1 can have an issuance transaction
