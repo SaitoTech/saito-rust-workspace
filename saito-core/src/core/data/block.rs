@@ -421,16 +421,12 @@ impl Block {
         //
         block.difficulty = cv.expected_difficulty;
 
-        //
         // set treasury
-        //
-        if cv.nolan_falling_off_chain != 0 {
-            block.treasury = previous_block_treasury + cv.nolan_falling_off_chain;
-        }
+        // if cv.nolan_falling_off_chain != 0 {
+        block.treasury = previous_block_treasury + cv.nolan_falling_off_chain;
+        // }
 
-        //
         // set staking treasury
-        //
         if cv.staking_treasury != 0 {
             let mut adjusted_staking_treasury = previous_block_staking_treasury;
             if cv.staking_treasury < 0 {
