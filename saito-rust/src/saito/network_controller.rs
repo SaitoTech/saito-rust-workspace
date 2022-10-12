@@ -1,4 +1,6 @@
 use std::collections::{HashMap, HashSet};
+use std::net::SocketAddr;
+use std::str::FromStr;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -413,14 +415,17 @@ pub async fn run_network_controller(
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
 
+    let host;
     let url;
     let port;
     {
         log_read_lock_request!("configs");
         let configs = configs.read().await;
         log_read_lock_receive!("configs");
-        url = "localhost:".to_string() + configs.get_server_configs().port.to_string().as_str();
+        url = configs.get_server_configs().host.clone()
+            + configs.get_server_configs().port.to_string().as_str();
         port = configs.get_server_configs().port;
+        host = configs.get_server_configs().host.clone();
     }
 
     info!("starting server on : {:?}", url);
@@ -441,6 +446,7 @@ pub async fn run_network_controller(
         sender_clone.clone(),
         network_controller_clone.clone(),
         port,
+        host,
         blockchain.clone(),
     );
 
@@ -572,6 +578,7 @@ fn run_websocket_server(
     sender_clone: Sender<IoEvent>,
     io_controller: Arc<RwLock<NetworkController>>,
     port: u16,
+    host: String,
     blockchain: Arc<RwLock<Blockchain>>,
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
@@ -653,6 +660,8 @@ fn run_websocket_server(
         //         // tokio::signal::ctrl_c().await.ok();
         //     });
         // server.await;
-        warp::serve(routes).run(([127, 0, 0, 1], port)).await;
+        let address =
+            SocketAddr::from_str((host + ":" + port.to_string().as_str()).as_str()).unwrap();
+        warp::serve(routes).run(address).await;
     })
 }

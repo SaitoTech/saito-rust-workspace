@@ -239,10 +239,12 @@ impl RoutingThread {
 
     async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
         // waiting till we get an acceptable sender
+        let sender_count = self.senders_to_verification.len();
+        let mut trials = 0;
         loop {
+            trials += 1;
             self.last_verification_thread_index += 1;
-            let sender_index: usize =
-                self.last_verification_thread_index % self.senders_to_verification.len();
+            let sender_index: usize = self.last_verification_thread_index % sender_count;
             let sender = self
                 .senders_to_verification
                 .get(sender_index)
@@ -252,8 +254,11 @@ impl RoutingThread {
                 sender.send(request).await.unwrap();
                 return;
             }
-
-            tokio::time::sleep(Duration::from_millis(10)).await;
+            if trials == sender_count {
+                // if all the channels are full, we will sleep for a bit till some space is available
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                trials = 0;
+            }
         }
     }
 }
