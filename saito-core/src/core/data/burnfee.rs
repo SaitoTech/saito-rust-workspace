@@ -1,3 +1,5 @@
+use crate::common::defs::{Currency, Timestamp};
+
 //
 // our target blocktime
 //
@@ -28,10 +30,10 @@ impl BurnFee {
     /// * `previous_block_timestamp` - timestamp of previous block
     ///
     pub fn return_routing_work_needed_to_produce_block_in_nolan(
-        burn_fee_previous_block: u64,
+        burn_fee_previous_block: Currency,
         current_block_timestamp: u64,
         previous_block_timestamp: u64,
-    ) -> u64 {
+    ) -> Currency {
         //
         // impossible if times misordered
         //
@@ -54,7 +56,7 @@ impl BurnFee {
         let work_needed_float: f64 = burn_fee_previous_block_as_float / elapsed_time_float;
 
         // convert back to nolan for rounding / safety
-        (work_needed_float * 100_000_000.0).round() as u64
+        (work_needed_float * 100_000_000.0).round() as Currency
     }
 
     /// Returns an adjusted burnfee based on the start value provided
@@ -66,10 +68,10 @@ impl BurnFee {
     /// * `previous_block_timestamp` - The timestamp of the previous `Block`
     ///
     pub fn return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-        burn_fee_previous_block: u64,
-        current_block_timestamp: u64,
-        previous_block_timestamp: u64,
-    ) -> u64 {
+        burn_fee_previous_block: Currency,
+        current_block_timestamp: Timestamp,
+        previous_block_timestamp: Timestamp,
+    ) -> Currency {
         //
         // impossible if times misordered
         //
@@ -91,7 +93,7 @@ impl BurnFee {
         let res0 = HEARTBEAT as f64 / timestamp_difference as f64;
         let res1 = res0.sqrt();
         let res2: f64 = burn_fee_previous_block_as_float * res1;
-        let new_burnfee: u64 = (res2 * 100_000_000.0).round() as u64;
+        let new_burnfee: Currency = (res2 * 100_000_000.0).round() as Currency;
 
         new_burnfee
     }
@@ -136,12 +138,12 @@ mod tests {
             );
         assert_eq!(
             new_start_burnfee,
-            (100_000_000.0 * (10 as f64).sqrt()).round() as u64
+            (100_000_000.0 * (10 as f64).sqrt()).round() as Currency
         );
     }
     #[test]
     fn burnfee_slr_match() {
-        let burn_fee_previous_block: u64 = 50000000;
+        let burn_fee_previous_block = 50000000;
         let current_block_timestamp: u64 = 1658821423410;
         let previous_block_timestamp: u64 = 1658821412997;
 

@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{SaitoPublicKey, SaitoSignature};
+use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::data::crypto::{hash, sign};
 use crate::core::data::transaction::Transaction;
-use crate::core::data::wallet::Wallet;
 
 pub const HOP_SIZE: usize = 130;
 
@@ -28,7 +27,12 @@ impl Hop {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn generate(wallet: &Wallet, to_public_key: &SaitoPublicKey, tx: &Transaction) -> Hop {
+    pub fn generate(
+        my_private_key: &SaitoPrivateKey,
+        my_public_key: &SaitoPublicKey,
+        to_public_key: &SaitoPublicKey,
+        tx: &Transaction,
+    ) -> Hop {
         let mut hop = Hop::new();
 
         //
@@ -39,9 +43,9 @@ impl Hop {
         vbytes.extend(to_public_key);
         let hash_to_sign = hash(&vbytes);
 
-        hop.from = wallet.public_key;
+        hop.from = my_public_key.clone();
         hop.to = to_public_key.clone();
-        hop.sig = sign(&hash_to_sign, &wallet.private_key);
+        hop.sig = sign(&hash_to_sign, &my_private_key);
 
         hop
     }
@@ -72,10 +76,13 @@ impl Hop {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use tokio::sync::RwLock;
+
     use crate::core::data::crypto::{generate_keys, verify};
     use crate::core::data::hop::Hop;
-    use std::sync::Arc;
-    use tokio::sync::RwLock;
+    use crate::core::data::wallet::Wallet;
 
     use super::*;
 
@@ -101,7 +108,12 @@ mod tests {
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
         let wallet = wallet.read().await;
-        let hop = Hop::generate(&wallet, &receiver_public_key, &tx);
+        let hop = Hop::generate(
+            &wallet.private_key,
+            &wallet.public_key,
+            &receiver_public_key,
+            &tx,
+        );
 
         assert_eq!(hop.from, sender_public_key);
         assert_eq!(hop.to, receiver_public_key);
@@ -118,7 +130,12 @@ mod tests {
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
         let wallet = wallet.read().await;
-        let hop = Hop::generate(&wallet, &receiver_public_key, &tx);
+        let hop = Hop::generate(
+            &wallet.private_key,
+            &wallet.public_key,
+            &receiver_public_key,
+            &tx,
+        );
 
         let hop2 = Hop::deserialize_from_net(&hop.serialize_for_net());
 

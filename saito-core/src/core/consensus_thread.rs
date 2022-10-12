@@ -25,7 +25,7 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_secs(1).as_micros() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(5000).as_micros() as u64;
 pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_micros() as u64;
 
 #[derive(Debug)]
@@ -87,14 +87,12 @@ impl ConsensusThread {
         let wallet_lock_clone = wallet.clone();
         let blockchain_lock_clone = blockchain.clone();
 
-        let public_key;
         let private_key;
 
         {
             log_read_lock_request!("ConsensusEventProcessor:generate_spammer_init_tx::wallet");
             let wallet = wallet_lock_clone.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:generate_spammer_init_tx::wallet");
-            public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
@@ -112,15 +110,15 @@ impl ConsensusThread {
                 .unwrap();
 
         {
-            let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
-            vip_transaction.sign(&private_key);
-
-            mempool
-                .add_transaction_if_validates(vip_transaction, &blockchain)
-                .await;
+            // let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
+            // vip_transaction.sign(&private_key);
+            //
+            // mempool
+            //     .add_transaction_if_validates(vip_transaction, &blockchain)
+            //     .await;
 
             let mut vip_transaction =
-                Transaction::create_vip_transaction(spammer_public_key, 50_000_000);
+                Transaction::create_vip_transaction(spammer_public_key, 100_000_000);
             vip_transaction.sign(&private_key);
 
             mempool
@@ -222,7 +220,7 @@ impl ConsensusThread {
             transaction.generate(&public_key, 0, 0);
             transaction.sign(&private_key);
 
-            transaction.add_hop(&wallet, &public_key);
+            transaction.add_hop(&private_key, &public_key, &public_key);
             {
                 mempool
                     .add_transaction_if_validates(transaction, &blockchain)
@@ -306,7 +304,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         // generate blocks
         let mut can_bundle = false;
         self.block_producing_timer += duration_value;
-        // TODO : make timers configurable
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
             if !self.txs_for_mempool.is_empty() {
                 log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
@@ -474,9 +471,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::wallet");
             println!(
-                "--- stats ------ {} - total_slips : {:?}",
+                "--- stats ------ {} - total_slips : {:?} unspent_slips : {:?} current_balance : {:?}",
                 format!("{:width$}", "wallet::state", width = 30),
                 wallet.slips.len(),
+                wallet.get_unspent_slip_count(),
+                wallet.get_available_balance()
             );
         }
         {

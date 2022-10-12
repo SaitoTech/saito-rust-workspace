@@ -298,6 +298,7 @@ async fn run_routing_event_processor(
         stats: Default::default(),
         public_key: [0; 33],
         senders_to_verification: senders,
+        last_verification_thread_index: 0,
     };
     {
         log_read_lock_request!("configs");
@@ -451,7 +452,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Public Key : {:?}", hex::encode(public_key));
     println!("Private Key : {:?}", hex::encode(private_key));
 
-    let config = ConfigHandler::load_configs("configs/spammer.config.json".to_string())
+    let config = ConfigHandler::load_configs("configs/config.json".to_string())
         .expect("loading configs failed");
     let configs: Arc<RwLock<Box<SpammerConfigs>>> = Arc::new(RwLock::new(Box::new(config.clone())));
 
@@ -571,8 +572,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     let spammer_handle = tokio::spawn(run_spammer(
-        context.blockchain.clone(),
-        context.mempool.clone(),
         context.wallet.clone(),
         sender_to_network_controller.clone(),
         configs.clone(),

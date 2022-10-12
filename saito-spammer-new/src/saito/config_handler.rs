@@ -2,9 +2,11 @@ use std::io::{Error, ErrorKind};
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 use serde::Deserialize;
 use tracing::{debug, error};
+
+use saito_core::common::defs::Currency;
+use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Spammer {
@@ -12,6 +14,8 @@ pub struct Spammer {
     pub burst_count: u32,
     pub tx_size: u32,
     pub tx_count: u64,
+    pub tx_payment: u64,
+    pub tx_fee: u64,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -26,18 +30,17 @@ impl SpammerConfigs {
         SpammerConfigs {
             server: Server {
                 host: "127.0.0.1".to_string(),
-                port: 12100,
+                port: 0,
                 protocol: "http".to_string(),
                 endpoint: Endpoint {
                     host: "127.0.0.1".to_string(),
-                    port: 12101,
+                    port: 0,
                     protocol: "http".to_string(),
                 },
                 verification_threads: 4,
-                channel_size: 1000,
-                stat_timer_in_ms: 5000,
+                channel_size: 0,
+                stat_timer_in_ms: 0,
                 thread_sleep_time_in_ms: 10,
-                block_producing_timer_in_ms: 1000,
             },
             peers: vec![],
             spammer: Spammer {
@@ -45,6 +48,8 @@ impl SpammerConfigs {
                 burst_count: 0,
                 tx_size: 0,
                 tx_count: 0,
+                tx_payment: 0,
+                tx_fee: 0,
             },
         }
     }

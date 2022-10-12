@@ -1,18 +1,16 @@
 use std::collections::{HashMap, HashSet};
-
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
-use tracing::{debug, error, info, trace, warn};
-
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tracing::{debug, error, info, trace, warn};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
@@ -443,19 +441,16 @@ pub async fn run_network_controller(
         blockchain.clone(),
     );
 
-    let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
         let mut outgoing_messages =
             StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
         let mut last_stat_on: Instant = Instant::now();
+        let mut work_done;
         loop {
-            // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
-            //
-            // sender_to_saito_controller.send(command).await;
-            // info!("sending test message to saito controller");
+            work_done = false;
 
-            let result = receiver.recv().await;
-            if result.is_some() {
+            let result = receiver.try_recv();
+            if result.is_ok() {
                 let event = result.unwrap();
                 let event_id = event.event_id;
                 let interface_event = event.event;

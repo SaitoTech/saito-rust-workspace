@@ -4,6 +4,7 @@ use blake3::Hasher;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
 pub use merkle::MerkleTree;
+use rand::{thread_rng, Rng};
 use secp256k1::ecdsa;
 pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
 
@@ -83,7 +84,9 @@ pub fn generate_random_bytes(len: u64) -> Vec<u8> {
         let x: Vec<u8> = vec![];
         return x;
     }
-    (0..len).map(|_| rand::random::<u8>()).collect()
+    let mut rng = thread_rng();
+
+    (0..len).map(|_| rng.gen::<u8>()).collect()
 }
 
 #[tracing::instrument(level = "trace", skip_all)]

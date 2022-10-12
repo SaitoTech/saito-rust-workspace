@@ -1,5 +1,8 @@
+use ahash::{AHashMap, AHashSet};
+use tracing::warn;
+
 use crate::common::defs::{
-    SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{
@@ -9,8 +12,6 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
-use std::collections::{HashMap, HashSet};
-use tracing::warn;
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -28,7 +29,7 @@ pub const WALLET_SIZE: usize = 65;
 #[derive(Clone, Debug, PartialEq)]
 pub struct WalletSlip {
     pub utxokey: SaitoUTXOSetKey,
-    pub amount: u64,
+    pub amount: Currency,
     pub block_id: u64,
     pub tx_ordinal: u64,
     pub lc: bool,
@@ -42,11 +43,11 @@ pub struct WalletSlip {
 pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
-    pub slips: HashMap<SaitoUTXOSetKey, WalletSlip>,
-    unspent_slips: HashSet<SaitoUTXOSetKey>,
+    pub slips: AHashMap<SaitoUTXOSetKey, WalletSlip>,
+    unspent_slips: AHashSet<SaitoUTXOSetKey>,
     pub filename: String,
     pub filepass: String,
-    available_balance: u64,
+    available_balance: Currency,
 }
 
 impl Wallet {
@@ -56,8 +57,8 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            slips: HashMap::with_capacity(1_000_000),
-            unspent_slips: HashSet::with_capacity(1_000_000),
+            slips: AHashMap::with_capacity(1_000_000),
+            unspent_slips: AHashSet::with_capacity(1_000_000),
             filename: "default".to_string(),
             filepass: "password".to_string(),
             available_balance: 0,
@@ -193,23 +194,18 @@ impl Wallet {
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
-        self.unspent_slips.remove(&slip.utxoset_key);
         let result = self.slips.remove(&slip.utxoset_key);
+        let in_unspent_list = self.unspent_slips.remove(&slip.utxoset_key);
         if result.is_some() {
-            let result = result.unwrap();
-            if !result.spent {
-                self.available_balance -= result.amount;
+            let removed_slip = result.unwrap();
+            if in_unspent_list {
+                self.available_balance -= removed_slip.amount;
             }
         }
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
-    pub fn get_available_balance(&self) -> u64 {
-        // (&self.slips)
-        //     .into_par_iter()
-        //     .filter(|s| !s.1.spent)
-        //     .map(|s| s.1.amount)
-        //     .sum::<u64>()
+    pub fn get_available_balance(&self) -> Currency {
         self.available_balance
     }
 
@@ -222,16 +218,14 @@ impl Wallet {
     // address is provided as an output. so make sure that any function calling
     // this manually creates the output for its desired payment
     // #[tracing::instrument(level = "trace", skip_all)]
-    pub fn generate_slips(&mut self, nolan_requested: u64) -> (Vec<Slip>, Vec<Slip>) {
+    pub fn generate_slips(&mut self, nolan_requested: Currency) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = vec![];
         let mut outputs: Vec<Slip> = vec![];
-        let mut nolan_in: u64 = 0;
-        let mut nolan_out: u64 = 0;
+        let mut nolan_in: Currency = 0;
+        let mut nolan_out: Currency = 0;
         let my_public_key = self.public_key;
 
-        //
         // grab inputs
-        //
         let mut keys_to_remove = vec![];
         for key in self.unspent_slips.iter() {
             if nolan_in >= nolan_requested {
@@ -257,31 +251,19 @@ impl Wallet {
         for key in keys_to_remove {
             self.unspent_slips.remove(&key);
         }
-        // self.unspent_slips.iter_mut().for_each(|key| {});
-        // for slip in &mut self.slips {
-        //     if !slip.spent {
-        //
-        //     }
-        // }
 
-        //
         // create outputs
-        //
         if nolan_in > nolan_requested {
             nolan_out = nolan_in - nolan_requested;
         }
 
-        //
         // add change address
-        //
         let mut output = Slip::new();
         output.public_key = my_public_key;
         output.amount = nolan_out;
         outputs.push(output);
 
-        //
         // ensure not empty
-        //
         if inputs.is_empty() {
             let mut input = Slip::new();
             input.public_key = my_public_key;
@@ -351,7 +333,7 @@ impl WalletSlip {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         WalletSlip {
-            utxokey: [0; 58],
+            utxokey: [0; 66],
             amount: 0,
             block_id: 0,
             tx_ordinal: 0,

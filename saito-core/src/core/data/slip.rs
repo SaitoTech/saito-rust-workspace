@@ -3,10 +3,10 @@ use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
-use crate::common::defs::{SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
+use crate::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
 /// The size of a serialized slip in bytes.
-pub const SLIP_SIZE: usize = 59;
+pub const SLIP_SIZE: usize = 67;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq, FromPrimitive)]
 pub enum SlipType {
@@ -26,12 +26,12 @@ pub enum SlipType {
 pub struct Slip {
     #[serde_as(as = "[_; 33]")]
     pub public_key: SaitoPublicKey,
-    pub amount: u64,
+    pub amount: Currency,
     pub slip_index: u8,
     pub block_id: u64,
     pub tx_ordinal: u64,
     pub slip_type: SlipType,
-    #[serde_as(as = "[_; 58]")]
+    #[serde_as(as = "[_; 66]")]
     pub utxoset_key: SaitoUTXOSetKey,
     // TODO : Check if this can be removed with Option<>
     pub is_utxoset_key_set: bool,
@@ -47,7 +47,7 @@ impl Slip {
             tx_ordinal: 0,
             slip_type: SlipType::Normal,
             // uuid: [0; 32],
-            utxoset_key: [0; 58],
+            utxoset_key: [0; 66],
             is_utxoset_key_set: false,
         }
     }
@@ -57,7 +57,7 @@ impl Slip {
     //
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete(&self, utxoset: &mut UtxoSet) -> bool {
-        if self.get_utxoset_key() == [0; 58] {
+        if self.get_utxoset_key() == [0; 66] {
             error!("ERROR 572034: asked to remove a slip without its utxoset_key properly set!");
             false;
         }
@@ -68,11 +68,11 @@ impl Slip {
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
-        let amount: u64 = u64::from_be_bytes(bytes[33..41].try_into().unwrap());
-        let block_id: u64 = u64::from_be_bytes(bytes[41..49].try_into().unwrap());
-        let tx_ordinal: u64 = u64::from_be_bytes(bytes[49..57].try_into().unwrap());
-        let slip_index: u8 = bytes[57];
-        let slip_type: SlipType = FromPrimitive::from_u8(bytes[58]).unwrap();
+        let amount: Currency = Currency::from_be_bytes(bytes[33..49].try_into().unwrap());
+        let block_id: u64 = u64::from_be_bytes(bytes[49..57].try_into().unwrap());
+        let tx_ordinal: u64 = u64::from_be_bytes(bytes[57..65].try_into().unwrap());
+        let slip_index: u8 = bytes[65];
+        let slip_type: SlipType = FromPrimitive::from_u8(bytes[66]).unwrap();
         let mut slip = Slip::new();
 
         slip.public_key = public_key;
@@ -108,7 +108,7 @@ impl Slip {
         ]
         .concat();
 
-        res[0..58].try_into().unwrap()
+        res[0..66].try_into().unwrap()
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn slip_get_utxoset_key_test() {
         let slip = Slip::new();
-        assert_eq!(slip.get_utxoset_key(), [0; 58]);
+        assert_eq!(slip.get_utxoset_key(), [0; 66]);
     }
 
     #[test]

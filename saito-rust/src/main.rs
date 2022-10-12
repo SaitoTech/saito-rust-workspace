@@ -248,6 +248,7 @@ async fn run_routing_event_processor(
         stats: Default::default(),
         public_key: [0; 33],
         senders_to_verification: senders,
+        last_verification_thread_index: 0,
     };
 
     {
@@ -449,7 +450,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
         Arc::new(RwLock::new(Box::new(
-            ConfigHandler::load_configs("configs/saito.config.json".to_string())
+            ConfigHandler::load_configs("configs/config.json".to_string())
                 .expect("loading configs failed"),
         )));
 

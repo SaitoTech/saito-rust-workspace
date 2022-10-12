@@ -8,4 +8,4 @@ bash
 cargo install flamegraph
 cargo build || exit
 
-# setup the saito-rust/saito.config.json file from the template and run `cargo run`
+# setup the saito-rust/config.json file from the template and run `cargo run`

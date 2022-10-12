@@ -11,8 +11,7 @@
     "verification_threads": 4,
     "channel_size": 1000,
     "stat_timer_in_ms": 5000,
-    "thread_sleep_time_in_ms": 10,
-    "block_producing_timer_in_ms": 1000
+    "thread_sleep_time_in_ms": 10
   },
   "peers": [
     {
@@ -26,6 +25,8 @@
     "timer_in_milli": 100,
     "burst_count": 100,
     "tx_size": 1000,
-    "tx_count": 1000000
+    "tx_count": 1000000,
+    "tx_payment": 1,
+    "tx_fee": 0
   }
 }

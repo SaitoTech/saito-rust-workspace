@@ -78,6 +78,7 @@ pub struct RoutingThread {
     pub stats: RoutingStats,
     pub public_key: SaitoPublicKey,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
+    pub last_verification_thread_index: usize,
 }
 
 impl RoutingThread {
@@ -236,30 +237,24 @@ impl RoutingThread {
             .await;
     }
 
-    async fn send_to_verification_thread(&self, request: VerifyRequest) {
-        let mut selected_sender: Option<&Sender<VerifyRequest>> = None;
-        let mut capacity = 0;
+    async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
+        // waiting till we get an acceptable sender
+        loop {
+            self.last_verification_thread_index += 1;
+            let sender_index: usize =
+                self.last_verification_thread_index % self.senders_to_verification.len();
+            let sender = self
+                .senders_to_verification
+                .get(sender_index)
+                .expect("sender should be here as we are using the modulus on index");
 
-        while selected_sender.is_none() {
-            for sender in self.senders_to_verification.iter() {
-                if sender.capacity() > capacity {
-                    capacity = sender.capacity();
-                    selected_sender = Some(sender);
-                }
+            if sender.capacity() > 0 {
+                sender.send(request).await.unwrap();
+                return;
             }
-            if selected_sender.is_none() {
-                // waiting till we get an acceptable sender
-                log_read_lock_request!("configs");
-                let configs = self.configs.read().await;
-                log_read_lock_receive!("configs");
-                tokio::time::sleep(Duration::from_millis(
-                    configs.get_server_configs().thread_sleep_time_in_ms,
-                ))
-                .await;
-            }
+
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
-
-        selected_sender.unwrap().send(request).await.unwrap();
     }
 }
 

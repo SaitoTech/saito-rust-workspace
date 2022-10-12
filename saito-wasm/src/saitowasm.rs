@@ -118,6 +118,7 @@ pub fn new() -> SaitoWasm {
             stats: Default::default(),
             public_key,
             senders_to_verification: vec![],
+            last_verification_thread_index: 0,
         },
         routing_event_processor: ConsensusThread {
             mempool: context.mempool.clone(),

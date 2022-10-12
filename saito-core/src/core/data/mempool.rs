@@ -1,17 +1,16 @@
-use ahash::AHashMap;
 use std::collections::VecDeque;
 use std::time::Duration;
 
+use ahash::AHashMap;
 use tracing::{debug, info, trace, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
+use crate::common::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::transaction::{Transaction, TransactionType};
-use crate::core::data::wallet::Wallet;
+use crate::core::data::transaction::Transaction;
 
 //
 // In addition to responding to global broadcast messages, the
@@ -34,8 +33,9 @@ pub enum MempoolMessage {
 pub struct Mempool {
     pub blocks_queue: VecDeque<Block>,
     pub transactions: AHashMap<SaitoSignature, Transaction>,
+    pub golden_tickets: AHashMap<SaitoHash, GoldenTicket>,
     // vector so we just copy it over
-    routing_work_in_mempool: u64,
+    routing_work_in_mempool: Currency,
     pub new_golden_ticket_added: bool,
     pub new_tx_added: bool,
     pub(crate) public_key: SaitoPublicKey,
@@ -48,6 +48,7 @@ impl Mempool {
         Mempool {
             blocks_queue: VecDeque::new(),
             transactions: Default::default(),
+            golden_tickets: Default::default(),
             routing_work_in_mempool: 0,
             new_golden_ticket_added: false,
             new_tx_added: false,
@@ -76,32 +77,19 @@ impl Mempool {
             "adding golden ticket : {:?}",
             hex::encode(hash(&golden_ticket.serialize_for_net()))
         );
-        let target = golden_ticket.target;
-
-        let transaction = Wallet::create_golden_ticket_transaction(
-            golden_ticket,
-            &self.public_key,
-            &self.private_key,
-        )
-        .await;
-        for (_, tx) in self.transactions.iter() {
-            if let TransactionType::GoldenTicket = tx.transaction_type {
-                let gt = GoldenTicket::deserialize_from_net(&tx.message);
-                if gt.target == target {
-                    debug!("similar golden ticket already exists : {:?}", target);
-                    return;
-                }
-            }
+        if self.golden_tickets.contains_key(&golden_ticket.target) {
+            debug!(
+                "similar golden ticket already exists : {:?}",
+                hex::encode(golden_ticket.target)
+            );
+            return;
         }
+        self.golden_tickets
+            .insert(golden_ticket.target, golden_ticket);
+
         self.new_golden_ticket_added = true;
-        // if !self
-        //     .transactions
-        //     .iter()
-        //     .any(|transaction| transaction.is_golden_ticket())
-        // {
-        self.transactions.insert(transaction.signature, transaction);
+
         info!("golden ticket added to mempool");
-        // }
     }
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_transaction_if_validates(
@@ -163,6 +151,8 @@ impl Mempool {
             previous_block_hash = blockchain.get_latest_block_hash();
         }
 
+        let gt_result = self.golden_tickets.remove(&previous_block_hash);
+
         let mut block = Block::create(
             &mut self.transactions,
             previous_block_hash,
@@ -170,6 +160,7 @@ impl Mempool {
             current_timestamp,
             &self.public_key,
             &self.private_key,
+            gt_result,
         )
         .await;
         block.generate();
@@ -195,6 +186,7 @@ impl Mempool {
             current_timestamp,
             &self.public_key,
             &self.private_key,
+            None,
         )
         .await;
         block.generate();
@@ -260,6 +252,7 @@ impl Mempool {
             hex::encode(block_hash)
         );
 
+        self.golden_tickets.clear();
         // self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
     }
 
@@ -275,12 +268,13 @@ impl Mempool {
         for (_, transaction) in &self.transactions {
             self.routing_work_in_mempool += transaction.total_work;
         }
+        self.golden_tickets.clear();
     }
 
     ///
     /// Calculates the work available in mempool to produce a block
     ///
-    pub fn get_routing_work_available(&self) -> u64 {
+    pub fn get_routing_work_available(&self) -> Currency {
         if self.routing_work_in_mempool > 0 {
             return self.routing_work_in_mempool;
         }
@@ -291,11 +285,15 @@ impl Mempool {
     // Return work needed in Nolan
     //
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn get_routing_work_needed(&self, previous_block: &Block, current_timestamp: u64) -> u64 {
+    pub fn get_routing_work_needed(
+        &self,
+        previous_block: &Block,
+        current_timestamp: u64,
+    ) -> Currency {
         let previous_block_timestamp = previous_block.timestamp;
         let previous_block_burnfee = previous_block.burnfee;
 
-        let work_needed: u64 = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
+        let work_needed: Currency = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
             previous_block_burnfee,
             current_timestamp,
             previous_block_timestamp,
@@ -313,6 +311,7 @@ mod tests {
 
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::burnfee::HEARTBEAT;
+    use crate::core::data::wallet::Wallet;
 
     use super::*;
 
@@ -378,7 +377,7 @@ mod tests {
                 tx.sign(&private_key);
             }
             let wallet = wallet_lock.read().await;
-            tx.add_hop(&wallet, &public_key);
+            tx.add_hop(&wallet.private_key, &wallet.public_key, &public_key);
             tx.generate(&public_key, 0, 0);
             mempool.add_transaction(tx).await;
         }
