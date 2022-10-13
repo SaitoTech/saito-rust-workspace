@@ -119,11 +119,11 @@ impl Slip {
             // } else {
             //     utxoset.entry(self.utxoset_key).or_insert(spendable);
             // }
-            // if spendable {
-            utxoset.insert(self.utxoset_key, spendable);
-            // } else {
-            //     utxoset.remove(&self.utxoset_key);
-            // }
+            if spendable {
+                utxoset.insert(self.utxoset_key, spendable);
+            } else {
+                utxoset.remove(&self.utxoset_key);
+            }
         }
     }
 
@@ -173,31 +173,32 @@ impl Slip {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         if self.amount > 0 {
-            match utxoset.get(&self.utxoset_key) {
-                Some(value) => {
-                    if *value == true {
-                        true
-                    } else {
-                        debug!(
-                            "in utxoset but invalid: value is {} at {:?}",
-                            *value,
-                            hex::encode(self.utxoset_key)
-                        );
-                        false
-                    }
-                }
-                None => {
-                    debug!("not in utxoset so invalid");
-                    debug!(
-                        "value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
-                        hex::encode(self.utxoset_key),
-                        self.slip_type,
-                        self.slip_index,
-                        self.amount
-                    );
-                    false
-                }
-            }
+            return *utxoset.get(&self.utxoset_key).unwrap_or(&false);
+            // match utxoset.get(&self.utxoset_key) {
+            //     Some(value) => {
+            //         if *value == true {
+            //             true
+            //         } else {
+            //             debug!(
+            //                 "in utxoset but invalid: value is {} at {:?}",
+            //                 *value,
+            //                 hex::encode(self.utxoset_key)
+            //             );
+            //             false
+            //         }
+            //     }
+            //     None => {
+            //         debug!("not in utxoset so invalid");
+            //         debug!(
+            //             "value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
+            //             hex::encode(self.utxoset_key),
+            //             self.slip_type,
+            //             self.slip_index,
+            //             self.amount
+            //         );
+            //         false
+            //     }
+            // }
         } else {
             true
         }

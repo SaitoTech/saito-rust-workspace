@@ -29,6 +29,7 @@ pub struct Spammer {
 impl Spammer {
     pub async fn new(
         wallet: Arc<RwLock<Wallet>>,
+        blockchain: Arc<RwLock<Blockchain>>,
         sender_to_network: Sender<IoEvent>,
         sender: Sender<VecDeque<Transaction>>,
         configs: Arc<RwLock<Box<SpammerConfigs>>>,
@@ -47,6 +48,7 @@ impl Spammer {
             sent_tx_count: 0,
             tx_generator: TransactionGenerator::create(
                 wallet.clone(),
+                blockchain.clone(),
                 configs.clone(),
                 sender,
                 tx_payment as Currency,
@@ -111,11 +113,12 @@ impl Spammer {
 
 pub async fn run_spammer(
     wallet: Arc<RwLock<Wallet>>,
+    blockchain: Arc<RwLock<Blockchain>>,
     sender_to_network: Sender<IoEvent>,
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
 ) {
     info!("starting the spammer");
     let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(1_000_000);
-    let mut spammer = Spammer::new(wallet, sender_to_network, sender, configs).await;
+    let mut spammer = Spammer::new(wallet, blockchain, sender_to_network, sender, configs).await;
     spammer.run(receiver).await;
 }

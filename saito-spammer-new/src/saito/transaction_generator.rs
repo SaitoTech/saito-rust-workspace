@@ -9,6 +9,7 @@ use tracing::{debug, info};
 
 use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::common::keep_time::KeepTime;
+use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::crypto::generate_random_bytes;
 use saito_core::core::data::slip::{Slip, SLIP_SIZE};
 use saito_core::core::data::transaction::Transaction;
@@ -30,6 +31,7 @@ pub enum GeneratorState {
 pub struct TransactionGenerator {
     state: GeneratorState,
     wallet: Arc<RwLock<Wallet>>,
+    blockchain: Arc<RwLock<Blockchain>>,
     expected_slip_count: u64,
     tx_size: u32,
     tx_count: u64,
@@ -44,6 +46,7 @@ pub struct TransactionGenerator {
 impl TransactionGenerator {
     pub async fn create(
         wallet: Arc<RwLock<Wallet>>,
+        blockchain: Arc<RwLock<Blockchain>>,
         configuration: Arc<RwLock<Box<SpammerConfigs>>>,
         sender: Sender<VecDeque<Transaction>>,
         tx_payment: Currency,
@@ -60,6 +63,7 @@ impl TransactionGenerator {
         let mut res = TransactionGenerator {
             state: GeneratorState::CreatingSlips,
             wallet: wallet.clone(),
+            blockchain,
             expected_slip_count: 1,
             tx_size,
             tx_count,
@@ -238,6 +242,7 @@ impl TransactionGenerator {
 
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet.clone();
+        let blockchain = self.blockchain.clone();
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
         let public_key = self.public_key.clone();
         let count = 1000000;
@@ -249,10 +254,14 @@ impl TransactionGenerator {
             loop {
                 let mut work_done = false;
                 {
+                    log_write_lock_request!("blockchain");
+                    let mut blockchain = blockchain.write().await;
+                    log_write_lock_receive!("blockchain");
                     log_write_lock_request!("wallet");
                     let mut wallet = wallet.write().await;
                     log_write_lock_receive!("wallet");
                     if wallet.get_available_balance() >= required_balance {
+                        assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count);
                         for _ in 0..count {
                             let transaction =
