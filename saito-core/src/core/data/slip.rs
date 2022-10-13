@@ -119,11 +119,11 @@ impl Slip {
             // } else {
             //     utxoset.entry(self.utxoset_key).or_insert(spendable);
             // }
-            if spendable {
-                utxoset.insert(self.utxoset_key, true);
-            } else {
-                utxoset.remove(&self.utxoset_key);
-            }
+            // if spendable {
+            utxoset.insert(self.utxoset_key, spendable);
+            // } else {
+            //     utxoset.remove(&self.utxoset_key);
+            // }
         }
     }
 
