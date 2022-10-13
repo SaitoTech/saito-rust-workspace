@@ -927,30 +927,28 @@ impl Transaction {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn validate_routing_path(&self) -> bool {
-        for i in 0..self.path.len() {
-            // msg is transaction signature and next peer
-            let vbytes: Vec<u8> = [self.signature.as_slice(), self.path[i].to.as_slice()].concat();
+        self.path.iter().enumerate().all(|(index, hop)| {
+            let bytes: Vec<u8> = [self.signature.as_slice(), hop.to.as_slice()].concat();
 
             // check sig is valid
-            if !verify(&hash(&vbytes), &self.path[i].sig, &self.path[i].from) {
+            if !verify(&hash(&bytes), &hop.sig, &hop.from) {
                 warn!("signature is not valid");
                 return false;
             }
 
             // check path is continuous
-            if i > 0 {
-                if self.path[i].from != self.path[i - 1].to {
+            if index > 0 {
+                if self.path[index].from != self.path[index - 1].to {
                     warn!(
                         "from : {:?} not matching with previous to : {:?}",
-                        hex::encode(self.path[i].from),
-                        hex::encode(self.path[i - 1].to)
+                        hex::encode(self.path[index].from),
+                        hex::encode(self.path[index - 1].to)
                     );
                     return false;
                 }
             }
-        }
-
-        true
+            true
+        })
     }
     #[tracing::instrument(level = "info", skip_all)]
     pub fn is_in_path(&self, public_key: &SaitoPublicKey) -> bool {
