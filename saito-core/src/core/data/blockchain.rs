@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::io::Error;
-
 use std::sync::Arc;
 
 use ahash::AHashMap;
@@ -21,7 +20,7 @@ use crate::core::mining_thread::MiningEvent;
 use crate::{log_write_lock_receive, log_write_lock_request};
 
 // length of 1 genesis period
-pub const GENESIS_PERIOD: u64 = 50;
+pub const GENESIS_PERIOD: u64 = 100;
 // prune blocks from index after N blocks
 pub const PRUNE_AFTER_BLOCKS: u64 = 10;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
@@ -1290,8 +1289,9 @@ impl Blockchain {
             // in either case, we are OK to throw out everything below the
             // lowest_block_id that we have found. we use the purge_id to
             // handle purges.
-            //
-            self.delete_blocks(purge_bid, storage).await;
+            if purge_bid > 0 {
+                self.delete_blocks(purge_bid, storage).await;
+            }
         }
 
         //TODO: we already had in update_genesis_period() in self method - maybe no need to call here?
@@ -1448,6 +1448,7 @@ mod tests {
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::wallet::Wallet;
+
     // use tracing_subscriber;
     // use tracing_subscriber::filter::Directive;
     // use tracing_subscriber::layer::SubscriberExt;
