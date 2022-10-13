@@ -173,7 +173,17 @@ impl Slip {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         if self.amount > 0 {
-            return *utxoset.get(&self.utxoset_key).unwrap_or(&false);
+            if !utxoset.contains_key(&self.utxoset_key) {
+                warn!(
+                    "slip not in the utxoset. key : {:?}. ordinal : {:?} amount : {:?}",
+                    hex::encode(self.utxoset_key),
+                    self.slip_index,
+                    self.amount
+                );
+                return false;
+            }
+            return true;
+            // return *utxoset.get(&self.utxoset_key).unwrap_or(&false);
             // match utxoset.get(&self.utxoset_key) {
             //     Some(value) => {
             //         if *value == true {

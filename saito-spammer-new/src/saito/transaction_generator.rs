@@ -291,6 +291,10 @@ impl TransactionGenerator {
                     transaction.generate(&public_key, 0, 0);
                     transaction.sign(&self.private_key);
                     transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
+                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
+                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
+                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
+                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
 
                     transaction
                     // sender.send(transaction).await.unwrap();
