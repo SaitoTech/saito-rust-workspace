@@ -43,3 +43,4 @@ with-stats = ["saito-core/with-stats"]
 
 [profile.release]
 debug = true
+lto = true

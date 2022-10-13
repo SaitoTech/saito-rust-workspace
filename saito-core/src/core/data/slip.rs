@@ -1,7 +1,7 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
-use tracing::{error, warn};
+use tracing::{debug, error, warn};
 
 use crate::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
@@ -178,7 +178,7 @@ impl Slip {
                     if *value == true {
                         true
                     } else {
-                        warn!(
+                        debug!(
                             "in utxoset but invalid: value is {} at {:?}",
                             *value,
                             hex::encode(self.utxoset_key)
@@ -187,8 +187,8 @@ impl Slip {
                     }
                 }
                 None => {
-                    warn!("not in utxoset so invalid");
-                    error!(
+                    debug!("not in utxoset so invalid");
+                    debug!(
                         "value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
                         hex::encode(self.utxoset_key),
                         self.slip_type,
