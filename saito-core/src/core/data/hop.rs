@@ -38,9 +38,9 @@ impl Hop {
         //
         // msg-to-sign is hash of transaction signature + next_peer.public_key
         //
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(tx.signature);
-        vbytes.extend(to_public_key);
+        let vbytes: Vec<u8> = [tx.signature.as_slice(), to_public_key.as_slice()].concat();
+        // vbytes.extend(tx.signature);
+        // vbytes.extend(to_public_key);
         let hash_to_sign = hash(&vbytes);
 
         hop.from = my_public_key.clone();
@@ -66,10 +66,15 @@ impl Hop {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_net(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.from);
-        vbytes.extend(&self.to);
-        vbytes.extend(&self.sig);
+        let vbytes: Vec<u8> = [
+            self.from.as_slice(),
+            self.to.as_slice(),
+            self.sig.as_slice(),
+        ]
+        .concat();
+        // vbytes.extend(&self.from);
+        // vbytes.extend(&self.to);
+        // vbytes.extend(&self.sig);
         vbytes
     }
 }

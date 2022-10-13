@@ -673,7 +673,7 @@ impl Transaction {
         let mut output_slip_value = false;
 
         if longest_chain {
-            input_slip_value = true;
+            input_slip_value = false;
             output_slip_value = true;
         }
 
@@ -931,9 +931,9 @@ impl Transaction {
             //
             // msg is transaction signature and next peer
             //
-            let mut vbytes: Vec<u8> = vec![];
-            vbytes.extend(&self.signature);
-            vbytes.extend(&self.path[i].to);
+            let vbytes: Vec<u8> = [self.signature.as_slice(), self.path[i].to.as_slice()].concat();
+            // vbytes.extend(&self.signature);
+            // vbytes.extend(&self.path[i].to);
 
             // check sig is valid
             if !verify(&hash(&vbytes), &self.path[i].sig, &self.path[i].from) {
