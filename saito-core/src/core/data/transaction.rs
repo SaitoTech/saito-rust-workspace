@@ -927,21 +927,16 @@ impl Transaction {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn validate_routing_path(&self) -> bool {
-        let result = self.path.par_iter().all(|hop| {
+        for i in 0..self.path.len() {
             // msg is transaction signature and next peer
-            let buffer: Vec<u8> = [self.signature.as_slice(), hop.to.as_slice()].concat();
+            let vbytes: Vec<u8> = [self.signature.as_slice(), self.path[i].to.as_slice()].concat();
 
             // check sig is valid
-            if !verify(&hash(&buffer), &hop.sig, &hop.from) {
+            if !verify(&hash(&vbytes), &self.path[i].sig, &self.path[i].from) {
                 warn!("signature is not valid");
                 return false;
             }
-            return true;
-        });
-        if !result {
-            return false;
-        }
-        for i in 0..self.path.len() {
+
             // check path is continuous
             if i > 0 {
                 if self.path[i].from != self.path[i - 1].to {
@@ -1069,7 +1064,7 @@ mod tests {
                 1, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253,
                 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 89, 23, 0, 0, 0, 0, 1, 0, 0, 0, 3, 123,
-                34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
+                34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125
             ]
         );
     }
