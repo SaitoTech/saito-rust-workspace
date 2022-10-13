@@ -114,10 +114,15 @@ impl Slip {
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.amount > 0 {
-            if utxoset.contains_key(&self.utxoset_key) {
-                utxoset.insert(self.utxoset_key, spendable);
+            // if utxoset.contains_key(&self.utxoset_key) {
+            //     utxoset.insert(self.utxoset_key, spendable);
+            // } else {
+            //     utxoset.entry(self.utxoset_key).or_insert(spendable);
+            // }
+            if spendable {
+                utxoset.insert(self.utxoset_key, true);
             } else {
-                utxoset.entry(self.utxoset_key).or_insert(spendable);
+                utxoset.remove(&self.utxoset_key);
             }
         }
     }
