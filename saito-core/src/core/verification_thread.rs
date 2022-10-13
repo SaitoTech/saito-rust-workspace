@@ -11,7 +11,7 @@ use crate::{log_read_lock_receive, log_read_lock_request};
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tracing::debug;
 
@@ -73,6 +73,24 @@ impl VerificationThread {
             .await
             .unwrap();
     }
+    // async fn on_init(&mut self) {
+    //     log_read_lock_request!("VerificationThread:on_init::wallet");
+    //     let wallet = self.wallet.read().await;
+    //     log_read_lock_receive!("VerificationThread:on_init::wallet");
+    //     self.public_key = wallet.public_key.clone();
+    // }
+    // async fn run(&mut self) {
+    //     let mut work_done = false;
+    //     let batch_count = 1000;
+    //     loop {
+    //         work_done = false;
+    //
+    //
+    //         if !work_done {
+    //             tokio::time::sleep(Duration::from_millis(10)).await;
+    //         }
+    //     }
+    // }
 }
 
 #[async_trait]

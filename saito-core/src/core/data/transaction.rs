@@ -927,20 +927,21 @@ impl Transaction {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn validate_routing_path(&self) -> bool {
-        for i in 0..self.path.len() {
-            //
+        let result = self.path.par_iter().all(|hop| {
             // msg is transaction signature and next peer
-            //
-            let vbytes: Vec<u8> = [self.signature.as_slice(), self.path[i].to.as_slice()].concat();
-            // vbytes.extend(&self.signature);
-            // vbytes.extend(&self.path[i].to);
+            let buffer: Vec<u8> = [self.signature.as_slice(), hop.to.as_slice()].concat();
 
             // check sig is valid
-            if !verify(&hash(&vbytes), &self.path[i].sig, &self.path[i].from) {
+            if !verify(&hash(&buffer), &hop.sig, &hop.from) {
                 warn!("signature is not valid");
                 return false;
             }
-
+            return true;
+        });
+        if !result {
+            return false;
+        }
+        for i in 0..self.path.len() {
             // check path is continuous
             if i > 0 {
                 if self.path[i].from != self.path[i - 1].to {
@@ -1068,7 +1069,7 @@ mod tests {
                 1, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253,
                 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 89, 23, 0, 0, 0, 0, 1, 0, 0, 0, 3, 123,
-                34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125
+                34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
             ]
         );
     }
@@ -1182,7 +1183,7 @@ mod tests {
         let sig: SaitoSignature = tx.signature;
 
         assert_eq!(hex::decode("0000017d26dd628a03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce76100000000000000000000000000000000000000000000000000000000000000000000000000000015900000000000100000003616263").unwrap()
-                   ,tx.serialize_for_signature());
+                   , tx.serialize_for_signature());
         let result = verify(tx.serialize_for_signature().as_slice(), &sig, &public_key);
         assert!(result);
         let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), &sig, &public_key);
