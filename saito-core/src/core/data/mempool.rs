@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use ahash::AHashMap;
+use rayon::prelude::*;
 use tracing::{debug, info, trace, warn};
 
 use crate::common::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
@@ -63,7 +64,7 @@ impl Mempool {
         let hash_to_insert = block.hash;
         if !self
             .blocks_queue
-            .iter()
+            .par_iter()
             .any(|block| block.hash == hash_to_insert)
         {
             self.blocks_queue.push_back(block);

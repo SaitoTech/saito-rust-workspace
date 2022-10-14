@@ -161,8 +161,10 @@ impl Blockchain {
                                     // log_read_lock_request!("mempool");
                                     // let mempool = mempool.read().await;
                                     // log_read_lock_receive!("mempool");
-                                    block_in_mempool_queue =
-                                        mempool.blocks_queue.iter().any(|b| block_hash == b.hash);
+                                    block_in_mempool_queue = mempool
+                                        .blocks_queue
+                                        .par_iter()
+                                        .any(|b| block_hash == b.hash);
                                 }
                                 if !block_in_mempool_queue {
                                     let result = network

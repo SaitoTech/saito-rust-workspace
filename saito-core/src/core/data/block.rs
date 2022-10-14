@@ -1718,7 +1718,7 @@ impl Block {
         // as to determine spendability.
         //
 
-        let transactions_valid = self.transactions.iter().all(|tx| tx.validate(utxoset));
+        let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
 
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");

@@ -860,9 +860,9 @@ impl Transaction {
                 && self.transaction_type != TransactionType::Vip
             {
                 warn!("{} in and {} out", self.total_in, self.total_out);
-                for _z in self.outputs.iter() {
-                    // info!("{:?} --- ", z.amount);
-                }
+                // for _z in self.outputs.iter() {
+                //     // info!("{:?} --- ", z.amount);
+                // }
                 error!("ERROR 802394: transaction spends more than it has available");
                 return false;
             }
@@ -921,7 +921,7 @@ impl Transaction {
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
         //
-        let inputs_validate = self.inputs.iter().all(|input| input.validate(utxoset));
+        let inputs_validate = self.inputs.par_iter().all(|input| input.validate(utxoset));
         inputs_validate
     }
 
@@ -964,12 +964,12 @@ impl Transaction {
     }
     pub fn is_from(&self, public_key: &SaitoPublicKey) -> bool {
         self.inputs
-            .iter()
+            .par_iter()
             .any(|input| input.public_key.eq(public_key))
     }
     pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
         self.outputs
-            .iter()
+            .par_iter()
             .any(|slip| slip.public_key.eq(public_key))
     }
 }
