@@ -921,7 +921,7 @@ impl Transaction {
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
         //
-        let inputs_validate = self.inputs.par_iter().all(|input| input.validate(utxoset));
+        let inputs_validate = self.inputs.iter().all(|input| input.validate(utxoset));
         inputs_validate
     }
 

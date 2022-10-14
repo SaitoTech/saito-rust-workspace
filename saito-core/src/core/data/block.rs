@@ -368,7 +368,7 @@ impl Block {
         // TODO -- figure out if there is a more efficient solution
         // than iterating through the entire transaction set here.
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
-            .par_iter_mut()
+            .iter_mut()
             .enumerate()
             .all(|(index, tx)| tx.generate(&public_key, index as u64, block.id));
         if rlen > 0 {
@@ -694,7 +694,7 @@ impl Block {
 
         let _transactions_pre_calculated = &self
             .transactions
-            .par_iter_mut()
+            .iter_mut()
             .enumerate()
             .all(|(index, tx)| tx.generate(creator_public_key, index as u64, self.id));
 
@@ -1718,7 +1718,7 @@ impl Block {
         // as to determine spendability.
         //
 
-        let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
+        let transactions_valid = self.transactions.iter().all(|tx| tx.validate(utxoset));
 
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");
