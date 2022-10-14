@@ -56,6 +56,7 @@ impl VerificationThread {
         }
 
         self.processed_txs.increment();
+        self.processed_msgs.increment();
         self.sender_to_consensus
             .send(ConsensusEvent::NewTransaction { transaction })
             .await
@@ -63,13 +64,14 @@ impl VerificationThread {
     }
     pub async fn verify_txs(&mut self, transactions: &mut VecDeque<Transaction>) {
         self.processed_txs.increment_by(transactions.len() as u64);
+        self.processed_msgs.increment_by(transactions.len() as u64);
         log_read_lock_request!("VerificationThread:verify_txs::blockchain");
         let blockchain = self.blockchain.read().await;
         log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
         let transactions: Vec<Transaction> = transactions
             .par_drain(..)
-            .with_min_len(10)
-            .with_max_len(1000)
+            // .with_min_len(10)
+            // .with_max_len(1000)
             .filter_map(|mut transaction| {
                 transaction.generate(&self.public_key, 0, 0);
 
@@ -90,9 +92,7 @@ impl VerificationThread {
             .unwrap();
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
-        self.processed_blocks.increment();
         let mut block = Block::deserialize_from_net(&buffer);
-
         log_read_lock_request!("RoutingEventProcessor:process_network_event::peers");
         let peers = self.peers.read().await;
         log_read_lock_receive!("RoutingEventProcessor:process_network_event::peers");
@@ -102,6 +102,8 @@ impl VerificationThread {
             block.source_connection_id = Some(peer.public_key);
         }
         block.generate();
+        self.processed_blocks.increment();
+        self.processed_msgs.increment();
 
         self.sender_to_consensus
             .send(ConsensusEvent::BlockFetched { peer_index, block })
@@ -139,7 +141,6 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
     }
 
     async fn process_event(&mut self, request: VerifyRequest) -> Option<()> {
-        self.processed_msgs.increment();
         match request {
             VerifyRequest::Transaction(transaction) => {
                 self.verify_tx(transaction).await;
