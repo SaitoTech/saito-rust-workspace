@@ -428,24 +428,20 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)
                 );
-                // log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
-                // let mut mempool = self.mempool.write().await;
-                // log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
-                // mempool.add_transaction(transaction.clone()).await;
                 self.network.propagate_transaction(&transaction).await;
                 self.txs_for_mempool.push(transaction);
 
                 Some(())
             }
-            ConsensusEvent::NewTransactions { transactions } => {
+            ConsensusEvent::NewTransactions { mut transactions } => {
                 self.stats
                     .received_tx
                     .increment_by(transactions.len() as u64);
 
-                for transaction in transactions {
-                    self.network.propagate_transaction(&transaction).await;
-                    self.txs_for_mempool.push(transaction);
+                for transaction in &transactions {
+                    self.network.propagate_transaction(transaction).await;
                 }
+                self.txs_for_mempool.append(&mut transactions);
                 Some(())
             }
         };
