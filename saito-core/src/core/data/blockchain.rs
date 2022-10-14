@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::collections::VecDeque;
 use std::io::Error;
 use std::sync::Arc;
