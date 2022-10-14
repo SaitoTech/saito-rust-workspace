@@ -124,7 +124,7 @@ async fn run_verification_thread(
         let mut work_done;
         let mut stat_timer = Instant::now();
         let time_keeper = TimeKeeper {};
-        let batch_size = 1000;
+        let batch_size = 100;
 
         event_processor.on_init().await;
         let mut queued_requests = vec![];
@@ -383,10 +383,11 @@ async fn run_verification_threads(
                 STAT_BIN_COUNT,
             ),
         };
-        // let (_interface_sender_to_verification, interface_receiver_for_verification) =
-        //     tokio::sync::mpsc::channel::<NetworkEvent>(1);
-        let thread_handle = run_verification_thread(
+        let (_interface_sender_to_verification, interface_receiver_for_verification) =
+            tokio::sync::mpsc::channel::<NetworkEvent>(1);
+        let thread_handle = run_thread(
             Box::new(verification_thread),
+            interface_receiver_for_verification,
             receiver,
             stat_timer_in_ms,
             thread_sleep_time_in_ms,
