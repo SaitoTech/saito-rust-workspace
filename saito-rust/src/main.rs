@@ -153,7 +153,7 @@ async fn run_verification_thread(
             }
             if !requests.is_empty() {
                 event_processor
-                    .processed_txs
+                    .processed_msgs
                     .increment_by(requests.len() as u64);
                 event_processor.verify_txs(&mut requests).await;
                 work_done = true;
