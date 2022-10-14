@@ -921,7 +921,11 @@ impl Transaction {
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
         //
-        let inputs_validate = self.inputs.par_iter().all(|input| input.validate(utxoset));
+        let inputs_validate = self
+            .inputs
+            .par_iter()
+            .with_min_len(10)
+            .all(|input| input.validate(utxoset));
         inputs_validate
     }
 
@@ -965,11 +969,13 @@ impl Transaction {
     pub fn is_from(&self, public_key: &SaitoPublicKey) -> bool {
         self.inputs
             .par_iter()
+            .with_min_len(10)
             .any(|input| input.public_key.eq(public_key))
     }
     pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
         self.outputs
             .par_iter()
+            .with_min_len(10)
             .any(|slip| slip.public_key.eq(public_key))
     }
 }

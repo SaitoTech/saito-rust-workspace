@@ -68,6 +68,8 @@ impl VerificationThread {
         log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
         let transactions: Vec<Transaction> = transactions
             .par_drain(..)
+            .with_min_len(10)
+            .with_max_len(1000)
             .filter_map(|mut transaction| {
                 transaction.generate(&self.public_key, 0, 0);
 

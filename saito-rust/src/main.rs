@@ -124,7 +124,7 @@ async fn run_verification_thread(
         let mut work_done;
         let mut stat_timer = Instant::now();
         let time_keeper = TimeKeeper {};
-        let batch_size = 10000;
+        let batch_size = 1000;
 
         event_processor.on_init().await;
         let mut queued_requests = vec![];

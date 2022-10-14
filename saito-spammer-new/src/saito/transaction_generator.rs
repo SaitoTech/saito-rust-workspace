@@ -284,7 +284,7 @@ impl TransactionGenerator {
 
             let txs: VecDeque<Transaction> = transactions
                 .par_drain(..)
-                .into_par_iter()
+                .with_min_len(100)
                 .map(|mut transaction| {
                     transaction.message = vec![0; tx_size as usize]; //;generate_random_bytes(tx_size as u64);
                     transaction.timestamp = time_keeper.get_timestamp();
