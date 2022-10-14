@@ -66,21 +66,26 @@ impl VerificationThread {
         log_read_lock_request!("VerificationThread:verify_txs::blockchain");
         let blockchain = self.blockchain.read().await;
         log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
-        transactions.par_drain(..).for_each(|mut transaction| {
-            transaction.generate(&self.public_key, 0, 0);
+        let transactions: Vec<Transaction> = transactions
+            .par_drain(..)
+            .filter_map(|mut transaction| {
+                transaction.generate(&self.public_key, 0, 0);
 
-            if !transaction.validate(&blockchain.utxoset) {
-                debug!(
-                    "transaction : {:?} not valid",
-                    hex::encode(transaction.signature)
-                );
+                if !transaction.validate(&blockchain.utxoset) {
+                    debug!(
+                        "transaction : {:?} not valid",
+                        hex::encode(transaction.signature)
+                    );
 
-                return;
-            }
-            self.sender_to_consensus
-                .blocking_send(ConsensusEvent::NewTransaction { transaction })
-                .unwrap();
-        });
+                    return None;
+                }
+                return Some(transaction);
+            })
+            .collect();
+        self.sender_to_consensus
+            .send(ConsensusEvent::NewTransactions { transactions })
+            .await
+            .unwrap();
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
         self.processed_blocks.increment();
