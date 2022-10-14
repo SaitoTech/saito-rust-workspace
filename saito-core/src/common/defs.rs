@@ -86,6 +86,13 @@ impl StatVariable {
             self.count_since_last_stat += 1;
         }
     }
+    pub fn increment_by(&mut self, amount: u64) {
+        #[cfg(feature = "with-stats")]
+        {
+            self.total += amount;
+            self.count_since_last_stat += amount;
+        }
+    }
     pub fn calculate_stats(&mut self, current_time_in_us: Timestamp) {
         let time_elapsed_in_us = current_time_in_us - self.last_stat_at;
         self.last_stat_at = current_time_in_us;

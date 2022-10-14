@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::panic;
 use std::process;
 use std::str::FromStr;
@@ -17,7 +18,6 @@ use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{StatVariable, STAT_BIN_COUNT};
-
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusThread};
@@ -97,6 +97,71 @@ where
 
             #[cfg(feature = "with-stats")]
             {
+                let duration = current_instant.duration_since(stat_timer);
+                if duration > Duration::from_millis(stat_timer_in_ms) {
+                    stat_timer = current_instant;
+                    event_processor
+                        .on_stat_interval(time_keeper.get_timestamp())
+                        .await;
+                }
+            }
+
+            if !work_done {
+                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
+            }
+        }
+    })
+}
+
+async fn run_verification_thread(
+    mut event_processor: Box<VerificationThread>,
+    mut event_receiver: Receiver<VerifyRequest>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        info!("verification thread started");
+        let mut work_done;
+        let mut stat_timer = Instant::now();
+        let time_keeper = TimeKeeper {};
+        let batch_size = 10000;
+
+        event_processor.on_init().await;
+
+        loop {
+            work_done = false;
+
+            let mut queued_requests = vec![];
+            let mut requests = VecDeque::with_capacity(batch_size);
+            loop {
+                let result = event_receiver.try_recv();
+                if result.is_ok() {
+                    let request = result.unwrap();
+                    if let VerifyRequest::Block(..) = &request {
+                        queued_requests.push(request);
+                        break;
+                    }
+                    if let VerifyRequest::Transaction(tx) = request {
+                        requests.push_back(tx);
+                    }
+                } else {
+                    break;
+                }
+                if requests.len() == batch_size {
+                    break;
+                }
+            }
+            if !requests.is_empty() {
+                event_processor.verify_txs(requests).await;
+                work_done = true;
+            }
+            for request in queued_requests {
+                event_processor.process_event(request).await;
+                work_done = true;
+            }
+            #[cfg(feature = "with-stats")]
+            {
+                let current_instant = Instant::now();
                 let duration = current_instant.duration_since(stat_timer);
                 if duration > Duration::from_millis(stat_timer_in_ms) {
                     stat_timer = current_instant;
