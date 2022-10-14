@@ -438,9 +438,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     .received_tx
                     .increment_by(transactions.len() as u64);
 
-                // for transaction in &transactions {
-                //     self.network.propagate_transaction(transaction).await;
-                // }
+                for transaction in &transactions {
+                    self.network.propagate_transaction(transaction).await;
+                }
                 self.txs_for_mempool.append(&mut transactions);
                 Some(())
             }

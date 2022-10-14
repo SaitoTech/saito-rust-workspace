@@ -322,9 +322,10 @@ impl Block {
             block.transactions.push(transaction);
         }
         block.transactions.reserve(transactions.len());
-        for (_, tx) in transactions.drain() {
-            block.transactions.push(tx);
-        }
+        let mut txs: Vec<Transaction> = transactions.par_drain().map(|(_, tx)| tx).collect();
+
+        block.transactions.append(&mut txs);
+
         // block.transactions = transactions.drain().collect();
         transactions.clear();
 
