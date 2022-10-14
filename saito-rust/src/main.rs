@@ -124,15 +124,15 @@ async fn run_verification_thread(
         let mut work_done;
         let mut stat_timer = Instant::now();
         let time_keeper = TimeKeeper {};
-        let batch_size = 10000;
+        let batch_size = 1000;
 
         event_processor.on_init().await;
+        let mut queued_requests = vec![];
+        let mut requests = VecDeque::with_capacity(batch_size);
 
         loop {
             work_done = false;
 
-            let mut queued_requests = vec![];
-            let mut requests = VecDeque::with_capacity(batch_size);
             loop {
                 let result = event_receiver.try_recv();
                 if result.is_ok() {
@@ -152,10 +152,13 @@ async fn run_verification_thread(
                 }
             }
             if !requests.is_empty() {
-                event_processor.verify_txs(requests).await;
+                event_processor
+                    .processed_txs
+                    .increment_by(requests.len() as u64);
+                event_processor.verify_txs(&mut requests).await;
                 work_done = true;
             }
-            for request in queued_requests {
+            for request in queued_requests.drain(..) {
                 event_processor.process_event(request).await;
                 work_done = true;
             }

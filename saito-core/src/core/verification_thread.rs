@@ -61,7 +61,7 @@ impl VerificationThread {
             .await
             .unwrap();
     }
-    pub async fn verify_txs(&mut self, mut transactions: VecDeque<Transaction>) {
+    pub async fn verify_txs(&mut self, transactions: &mut VecDeque<Transaction>) {
         self.processed_txs.increment_by(transactions.len() as u64);
         log_read_lock_request!("VerificationThread:verify_txs::blockchain");
         let blockchain = self.blockchain.read().await;
@@ -140,8 +140,8 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
             VerifyRequest::Block(block, peer_index) => {
                 self.verify_block(block, peer_index).await;
             }
-            VerifyRequest::Transactions(txs) => {
-                self.verify_txs(txs).await;
+            VerifyRequest::Transactions(mut txs) => {
+                self.verify_txs(&mut txs).await;
             }
         }
 
