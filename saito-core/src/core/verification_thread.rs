@@ -86,10 +86,16 @@ impl VerificationThread {
                 return Some(transaction);
             })
             .collect();
-        self.sender_to_consensus
-            .send(ConsensusEvent::NewTransactions { transactions })
-            .await
-            .unwrap();
+        for transaction in transactions {
+            self.sender_to_consensus
+                .send(ConsensusEvent::NewTransaction { transaction })
+                .await
+                .unwrap();
+        }
+        // self.sender_to_consensus
+        //     .send(ConsensusEvent::NewTransactions { transactions })
+        //     .await
+        //     .unwrap();
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
         let mut block = Block::deserialize_from_net(&buffer);
