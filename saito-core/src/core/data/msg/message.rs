@@ -5,9 +5,7 @@ use tracing::{trace, warn};
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::msg::block_request::BlockchainRequest;
-use crate::core::data::msg::handshake::{
-    HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
-};
+use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;
 
@@ -15,7 +13,7 @@ use crate::core::data::transaction::Transaction;
 pub enum Message {
     HandshakeChallenge(HandshakeChallenge),
     HandshakeResponse(HandshakeResponse),
-    HandshakeCompletion(HandshakeCompletion),
+    // HandshakeCompletion(HandshakeCompletion),
     ApplicationMessage(Vec<u8>),
     Block(Block),
     Transaction(Transaction),
@@ -40,7 +38,7 @@ impl Message {
         buffer.append(&mut match self {
             Message::HandshakeChallenge(data) => data.serialize(),
             Message::HandshakeResponse(data) => data.serialize(),
-            Message::HandshakeCompletion(data) => data.serialize(),
+            // Message::HandshakeCompletion(data) => data.serialize(),
             Message::ApplicationMessage(data) => data.clone(),
             Message::Block(data) => data.serialize_for_net(BlockType::Full),
             Message::Transaction(data) => data.serialize_for_net(),
@@ -73,10 +71,10 @@ impl Message {
                 let result = HandshakeResponse::deserialize(&buffer)?;
                 return Ok(Message::HandshakeResponse(result));
             }
-            3 => {
-                let result = HandshakeCompletion::deserialize(&buffer)?;
-                return Ok(Message::HandshakeCompletion(result));
-            }
+            // 3 => {
+            //     let result = HandshakeCompletion::deserialize(&buffer)?;
+            //     return Ok(Message::HandshakeCompletion(result));
+            // }
             4 => {
                 return Ok(Message::ApplicationMessage(buffer));
             }
@@ -116,7 +114,7 @@ impl Message {
         match self {
             Message::HandshakeChallenge(_) => 1,
             Message::HandshakeResponse(_) => 2,
-            Message::HandshakeCompletion(_) => 3,
+            // Message::HandshakeCompletion(_) => 3,
             Message::ApplicationMessage(_) => 4,
             Message::Block(_) => 5,
             Message::Transaction(_) => 6,

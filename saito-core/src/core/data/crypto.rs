@@ -15,29 +15,29 @@ type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 pub const PARALLEL_HASH_BYTE_THRESHOLD: usize = 128_000;
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn encrypt_with_password(msg: Vec<u8>, password: &str) -> Vec<u8> {
-    let hash = hash(&password.as_bytes().to_vec());
+pub fn encrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
+    let hash = hash(password.as_bytes());
     let mut key: [u8; 16] = [0; 16];
     let mut iv: [u8; 16] = [0; 16];
     key.clone_from_slice(&hash[0..16]);
     iv.clone_from_slice(&hash[16..32]);
 
     let cipher = Aes128Cbc::new_from_slices(&key, &iv).unwrap();
-    let encrypt_msg = cipher.encrypt_vec(&msg);
+    let encrypt_msg = cipher.encrypt_vec(msg);
 
     return encrypt_msg;
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn decrypt_with_password(msg: Vec<u8>, password: &str) -> Vec<u8> {
-    let hash = hash(&password.as_bytes().to_vec());
+pub fn decrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
+    let hash = hash(password.as_bytes());
     let mut key: [u8; 16] = [0; 16];
     let mut iv: [u8; 16] = [0; 16];
     key.clone_from_slice(&hash[0..16]);
     iv.clone_from_slice(&hash[16..32]);
 
     let cipher = Aes128Cbc::new_from_slices(&key, &iv).unwrap();
-    let decrypt_msg = cipher.decrypt_vec(&msg).unwrap();
+    let decrypt_msg = cipher.decrypt_vec(msg).unwrap();
 
     return decrypt_msg;
 }
@@ -90,7 +90,7 @@ pub fn generate_random_bytes(len: u64) -> Vec<u8> {
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub fn hash(data: &Vec<u8>) -> SaitoHash {
+pub fn hash(data: &[u8]) -> SaitoHash {
     let mut hasher = Hasher::new();
     // Hashing in parallel can be faster if large enough
     // TODO: Blake3 has benchmarked 128 kb as the cutoff,
@@ -105,7 +105,7 @@ pub fn hash(data: &Vec<u8>) -> SaitoHash {
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignature {
-    let hash = hash(&message_bytes.to_vec());
+    let hash = hash(message_bytes);
     let msg = Message::from_slice(&hash).unwrap();
     let secret = SecretKey::from_slice(private_key).unwrap();
     let sig = SECP256K1.sign_ecdsa(&msg, &secret);
@@ -114,7 +114,7 @@ pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignatu
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub fn verify(msg: &[u8], sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
-    let hash = hash(&msg.to_vec());
+    let hash = hash(msg);
     verify_hash(&hash, sig, public_key)
 }
 
@@ -146,8 +146,8 @@ mod tests {
     //
     fn symmetrical_encryption_test() {
         let text = "This is our unencrypted text";
-        let e = encrypt_with_password(text.as_bytes().to_vec(), "asdf");
-        let d = decrypt_with_password(e, "asdf");
+        let e = encrypt_with_password(text.as_bytes(), "asdf");
+        let d = decrypt_with_password(e.as_slice(), "asdf");
         let dtext = str::from_utf8(&d).unwrap();
         assert_eq!(text, dtext);
     }
@@ -167,7 +167,7 @@ mod tests {
         )
         .unwrap();
 
-        let hex = hash(&msg.to_vec());
+        let hex = hash(msg.as_slice());
 
         let hex_str = hex::encode(hex);
         assert_eq!(

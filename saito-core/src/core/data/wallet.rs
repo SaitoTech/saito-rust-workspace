@@ -73,7 +73,7 @@ impl Wallet {
         if storage.file_exists(&filename).await {
             let password = self.filepass.clone();
             let encoded = storage.read(&filename).await.unwrap();
-            let decrypted_encoded = decrypt_with_password(encoded, &password);
+            let decrypted_encoded = decrypt_with_password(encoded.as_ref(), &password);
             self.deserialize_from_disk(&decrypted_encoded);
         } else {
             //
@@ -102,7 +102,7 @@ impl Wallet {
 
         let password = self.filepass.clone();
         let byte_array: Vec<u8> = self.serialize_for_disk();
-        let encrypted_wallet = encrypt_with_password((&byte_array[..]).to_vec(), &password);
+        let encrypted_wallet = encrypt_with_password(byte_array.as_ref(), &password);
 
         storage.write(encrypted_wallet, &filename).await;
     }

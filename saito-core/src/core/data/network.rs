@@ -12,9 +12,7 @@ use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
 use crate::core::data::msg::block_request::BlockchainRequest;
-use crate::core::data::msg::handshake::{
-    HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
-};
+use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
@@ -57,7 +55,7 @@ impl Network {
             let peers = self.peers.read().await;
             log_read_lock_receive!("peers");
             for (index, peer) in peers.index_to_peers.iter() {
-                if !peer.handshake_done {
+                if peer.public_key.is_none() {
                     excluded_peers.push(*index);
                     continue;
                 }
@@ -96,11 +94,15 @@ impl Network {
         let wallet = self.wallet.read().await;
         log_read_lock_receive!("wallet");
         for (index, peer) in peers.index_to_peers.iter() {
-            if transaction.is_in_path(&peer.public_key) {
+            if transaction.is_in_path(peer.public_key.as_ref().unwrap()) {
                 continue;
             }
             let mut transaction = transaction.clone();
-            transaction.add_hop(&wallet.private_key, &wallet.public_key, &peer.public_key);
+            transaction.add_hop(
+                &wallet.private_key,
+                &wallet.public_key,
+                peer.public_key.as_ref().unwrap(),
+            );
             let message = Message::Transaction(transaction);
             self.io_interface
                 .send_message(*index, message.serialize())
@@ -157,7 +159,7 @@ impl Network {
                 info!(
                     "Static peer disconnected, reconnecting .., Peer ID = {}, Public Key = {:?}",
                     peer.index,
-                    hex::encode(peer.public_key)
+                    hex::encode(peer.public_key.as_ref().unwrap())
                 );
 
                 self.io_interface
@@ -169,7 +171,7 @@ impl Network {
                     .push(peer.static_peer_config.as_ref().unwrap().clone());
             } else {
                 info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
-                    peer.index, hex::encode(peer.public_key));
+                    peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
             }
         } else {
             todo!("Handle the unknown peer disconnect");
@@ -200,11 +202,7 @@ impl Network {
                 .retain(|config| config != peer.static_peer_config.as_ref().unwrap());
         }
 
-        info!(
-            "new peer added : {:?} - {:?}",
-            peer_index,
-            hex::encode(peer.public_key)
-        );
+        info!("new peer added : {:?}", peer_index);
         peers.index_to_peers.insert(peer_index, peer);
     }
     pub async fn handle_handshake_challenge(
@@ -232,6 +230,7 @@ impl Network {
         response: HandshakeResponse,
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
+        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) {
         debug!("received handshake response");
         log_write_lock_request!("peers");
@@ -242,58 +241,63 @@ impl Network {
             todo!()
         }
         let peer = peer.unwrap();
-        peer.handle_handshake_response(response, &self.io_interface, wallet.clone())
-            .await
-            .unwrap();
-        if peer.handshake_done {
+        peer.handle_handshake_response(
+            response,
+            &self.io_interface,
+            wallet.clone(),
+            configs.clone(),
+        )
+        .await
+        .unwrap();
+        if peer.public_key.is_some() {
             debug!(
                 "peer : {:?} handshake successful for peer : {:?}",
                 peer.index,
-                hex::encode(peer.public_key)
+                hex::encode(peer.public_key.as_ref().unwrap())
             );
-            let public_key = peer.public_key;
+            let public_key = peer.public_key.clone().unwrap();
             peers.address_to_peers.insert(public_key, peer_index);
             // start block syncing here
             self.request_blockchain_from_peer(peer_index, blockchain.clone())
                 .await;
         }
     }
-    pub async fn handle_handshake_completion(
-        &self,
-        peer_index: u64,
-        response: HandshakeCompletion,
-        blockchain: Arc<RwLock<Blockchain>>,
-    ) {
-        debug!("received handshake completion");
-        let public_key;
-        {
-            log_write_lock_request!("peers");
-            let mut peers = self.peers.write().await;
-            log_write_lock_receive!("peers");
-            let peer = peers.index_to_peers.get_mut(&peer_index);
-            if peer.is_none() {
-                todo!()
-            }
-            let peer = peer.unwrap();
-            let _result = peer
-                .handle_handshake_completion(response, &self.io_interface)
-                .await;
-            if !peer.handshake_done {
-                return;
-            }
-            public_key = peer.public_key;
-            peers.address_to_peers.insert(public_key, peer_index);
-        }
-
-        debug!(
-            "peer : {:?} handshake successful for peer : {:?}",
-            peer_index,
-            hex::encode(public_key)
-        );
-        // start block syncing here
-        self.request_blockchain_from_peer(peer_index, blockchain.clone())
-            .await;
-    }
+    // pub async fn handle_handshake_completion(
+    //     &self,
+    //     peer_index: u64,
+    //     response: HandshakeCompletion,
+    //     blockchain: Arc<RwLock<Blockchain>>,
+    // ) {
+    //     debug!("received handshake completion");
+    //     let public_key;
+    //     {
+    //         log_write_lock_request!("peers");
+    //         let mut peers = self.peers.write().await;
+    //         log_write_lock_receive!("peers");
+    //         let peer = peers.index_to_peers.get_mut(&peer_index);
+    //         if peer.is_none() {
+    //             todo!()
+    //         }
+    //         let peer = peer.unwrap();
+    //         let _result = peer
+    //             .handle_handshake_completion(response, &self.io_interface)
+    //             .await;
+    //         if !peer.handshake_done {
+    //             return;
+    //         }
+    //         public_key = peer.public_key;
+    //         peers.address_to_peers.insert(public_key, peer_index);
+    //     }
+    //
+    //     debug!(
+    //         "peer : {:?} handshake successful for peer : {:?}",
+    //         peer_index,
+    //         hex::encode(public_key)
+    //     );
+    //     // start block syncing here
+    //     self.request_blockchain_from_peer(peer_index, blockchain.clone())
+    //         .await;
+    // }
     async fn request_blockchain_from_peer(
         &self,
         peer_index: u64,

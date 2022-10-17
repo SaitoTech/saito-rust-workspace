@@ -139,7 +139,6 @@ impl NetworkController {
 
         let result = connect_async(url.clone()).await;
         if result.is_ok() {
-            info!("connected to peer : {:?}", url);
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
@@ -154,6 +153,10 @@ impl NetworkController {
                 let mut counter = io_controller.peer_counter.lock().await;
                 peer_index = counter.get_next_index();
             }
+            info!(
+                "connected to peer : {:?} with index : {:?}",
+                url, peer_index
+            );
 
             NetworkController::send_new_peer(
                 event_id,

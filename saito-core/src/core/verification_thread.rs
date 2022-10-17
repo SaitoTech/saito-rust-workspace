@@ -105,7 +105,7 @@ impl VerificationThread {
         let peer = peers.index_to_peers.get(&peer_index);
         if peer.is_some() {
             let peer = peer.unwrap();
-            block.source_connection_id = Some(peer.public_key);
+            block.source_connection_id = peer.public_key.clone();
         }
         block.generate();
         self.processed_blocks.increment();

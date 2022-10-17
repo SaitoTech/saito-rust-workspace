@@ -124,15 +124,16 @@ impl RoutingThread {
                         response,
                         self.wallet.clone(),
                         self.blockchain.clone(),
+                        self.configs.clone(),
                     )
                     .await;
             }
-            Message::HandshakeCompletion(response) => {
-                debug!("received handshake completion");
-                self.network
-                    .handle_handshake_completion(peer_index, response, self.blockchain.clone())
-                    .await;
-            }
+            // Message::HandshakeCompletion(response) => {
+            //     debug!("received handshake completion");
+            //     self.network
+            //         .handle_handshake_completion(peer_index, response, self.blockchain.clone())
+            //         .await;
+            // }
             Message::ApplicationMessage(_) => {
                 debug!("received buffer");
             }
