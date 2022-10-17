@@ -200,8 +200,12 @@ impl Network {
                 .retain(|config| config != peer.static_peer_config.as_ref().unwrap());
         }
 
+        info!(
+            "new peer added : {:?} - {:?}",
+            peer_index,
+            hex::encode(peer.public_key)
+        );
         peers.index_to_peers.insert(peer_index, peer);
-        info!("new peer added : {:?}", peer_index);
     }
     pub async fn handle_handshake_challenge(
         &self,
