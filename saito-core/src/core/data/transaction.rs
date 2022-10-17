@@ -3,7 +3,7 @@ use num_traits::FromPrimitive;
 use primitive_types::U256;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
@@ -942,12 +942,18 @@ impl Transaction {
 
             // check path is continuous
             if index > 0 {
-                if self.path[index].from != self.path[index - 1].to {
+                if hop.from != self.path[index - 1].to {
                     warn!(
-                        "from : {:?} not matching with previous to : {:?}",
-                        hex::encode(self.path[index].from),
-                        hex::encode(self.path[index - 1].to)
+                        "from {:?}: {:?} not matching with previous to {:?}: {:?}. path length = {:?}",
+                        index,
+                        hex::encode(hop.from),
+                        index - 1,
+                        hex::encode(self.path[index - 1].to),
+                        self.path.len()
                     );
+                    for hop in self.path.iter() {
+                        info!("hop : {:?} --> {:?}",hex::encode(hop.from),hex::encode(hop.to));
+                    }
                     return false;
                 }
             }
@@ -1068,7 +1074,7 @@ mod tests {
                 1, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253,
                 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 89, 23, 0, 0, 0, 0, 1, 0, 0, 0, 3, 123,
-                34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125
+                34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
             ]
         );
     }
