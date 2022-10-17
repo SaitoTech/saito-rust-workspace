@@ -1,3 +1,13 @@
+use std::collections::VecDeque;
+use std::sync::Arc;
+use std::time::Duration;
+
+use async_trait::async_trait;
+use rayon::prelude::*;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::RwLock;
+use tracing::debug;
+
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp};
 use crate::common::process_event::ProcessEvent;
@@ -8,18 +18,14 @@ use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::{log_read_lock_receive, log_read_lock_request};
-use async_trait::async_trait;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
-use tracing::debug;
 
 #[derive(Debug)]
 pub enum VerifyRequest {
     Transaction(Transaction),
+    Transactions(VecDeque<Transaction>),
     Block(Vec<u8>, u64),
 }
+
 pub struct VerificationThread {
     pub sender_to_consensus: Sender<ConsensusEvent>,
     pub blockchain: Arc<RwLock<Blockchain>>,
@@ -32,32 +38,67 @@ pub struct VerificationThread {
 }
 
 impl VerificationThread {
-    async fn verify_tx(&mut self, mut transaction: Transaction) {
-        self.processed_txs.increment();
+    pub async fn verify_tx(&mut self, mut transaction: Transaction) {
         {
             transaction.generate(&self.public_key, 0, 0);
 
-            log_read_lock_request!("RoutingEventProcessor:process_incoming_message::blockchain");
+            log_read_lock_request!("VerificationThread:verify_tx::blockchain");
             let blockchain = self.blockchain.read().await;
-            log_read_lock_receive!("RoutingEventProcessor:process_incoming_message::blockchain");
+            log_read_lock_receive!("VerificationThread:verify_tx::blockchain");
             if !transaction.validate(&blockchain.utxoset) {
                 debug!(
                     "transaction : {:?} not valid",
                     hex::encode(transaction.signature)
                 );
+                self.processed_txs.increment();
                 return;
             }
         }
 
+        self.processed_txs.increment();
+        self.processed_msgs.increment();
         self.sender_to_consensus
             .send(ConsensusEvent::NewTransaction { transaction })
             .await
             .unwrap();
     }
-    async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
-        self.processed_blocks.increment();
-        let mut block = Block::deserialize_from_net(&buffer);
+    pub async fn verify_txs(&mut self, transactions: &mut VecDeque<Transaction>) {
+        self.processed_txs.increment_by(transactions.len() as u64);
+        self.processed_msgs.increment_by(transactions.len() as u64);
+        log_read_lock_request!("VerificationThread:verify_txs::blockchain");
+        let blockchain = self.blockchain.read().await;
+        log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
+        let transactions: Vec<Transaction> = transactions
+            .par_drain(..)
+            .with_min_len(10)
+            // .with_max_len(1000)
+            .filter_map(|mut transaction| {
+                transaction.generate(&self.public_key, 0, 0);
 
+                if !transaction.validate(&blockchain.utxoset) {
+                    debug!(
+                        "transaction : {:?} not valid",
+                        hex::encode(transaction.signature)
+                    );
+
+                    return None;
+                }
+                return Some(transaction);
+            })
+            .collect();
+        for transaction in transactions {
+            self.sender_to_consensus
+                .send(ConsensusEvent::NewTransaction { transaction })
+                .await
+                .unwrap();
+        }
+        // self.sender_to_consensus
+        //     .send(ConsensusEvent::NewTransactions { transactions })
+        //     .await
+        //     .unwrap();
+    }
+    pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
+        let mut block = Block::deserialize_from_net(&buffer);
         log_read_lock_request!("RoutingEventProcessor:process_network_event::peers");
         let peers = self.peers.read().await;
         log_read_lock_receive!("RoutingEventProcessor:process_network_event::peers");
@@ -67,12 +108,32 @@ impl VerificationThread {
             block.source_connection_id = Some(peer.public_key);
         }
         block.generate();
+        self.processed_blocks.increment();
+        self.processed_msgs.increment();
 
         self.sender_to_consensus
             .send(ConsensusEvent::BlockFetched { peer_index, block })
             .await
             .unwrap();
     }
+    // async fn on_init(&mut self) {
+    //     log_read_lock_request!("VerificationThread:on_init::wallet");
+    //     let wallet = self.wallet.read().await;
+    //     log_read_lock_receive!("VerificationThread:on_init::wallet");
+    //     self.public_key = wallet.public_key.clone();
+    // }
+    // async fn run(&mut self) {
+    //     let mut work_done = false;
+    //     let batch_count = 1000;
+    //     loop {
+    //         work_done = false;
+    //
+    //
+    //         if !work_done {
+    //             tokio::time::sleep(Duration::from_millis(10)).await;
+    //         }
+    //     }
+    // }
 }
 
 #[async_trait]
@@ -86,13 +147,15 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
     }
 
     async fn process_event(&mut self, request: VerifyRequest) -> Option<()> {
-        self.processed_msgs.increment();
         match request {
             VerifyRequest::Transaction(transaction) => {
                 self.verify_tx(transaction).await;
             }
             VerifyRequest::Block(block, peer_index) => {
                 self.verify_block(block, peer_index).await;
+            }
+            VerifyRequest::Transactions(mut txs) => {
+                self.verify_txs(&mut txs).await;
             }
         }
 

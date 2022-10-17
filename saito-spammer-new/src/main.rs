@@ -394,7 +394,7 @@ fn run_loop_thread(
     loop_handle
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 10)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ctrlc::set_handler(move || {
         info!("shutting down the node");
@@ -573,6 +573,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let spammer_handle = tokio::spawn(run_spammer(
         context.wallet.clone(),
+        peers.clone(),
+        context.blockchain.clone(),
         sender_to_network_controller.clone(),
         configs.clone(),
     ));

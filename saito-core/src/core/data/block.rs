@@ -322,9 +322,10 @@ impl Block {
             block.transactions.push(transaction);
         }
         block.transactions.reserve(transactions.len());
-        for (_, tx) in transactions.drain() {
-            block.transactions.push(tx);
-        }
+        let mut txs: Vec<Transaction> = transactions.par_drain().map(|(_, tx)| tx).collect();
+
+        block.transactions.append(&mut txs);
+
         // block.transactions = transactions.drain().collect();
         transactions.clear();
 
@@ -368,7 +369,7 @@ impl Block {
         // TODO -- figure out if there is a more efficient solution
         // than iterating through the entire transaction set here.
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
-            .par_iter_mut()
+            .iter_mut()
             .enumerate()
             .all(|(index, tx)| tx.generate(&public_key, index as u64, block.id));
         if rlen > 0 {
@@ -694,7 +695,7 @@ impl Block {
 
         let _transactions_pre_calculated = &self
             .transactions
-            .par_iter_mut()
+            .iter_mut()
             .enumerate()
             .all(|(index, tx)| tx.generate(creator_public_key, index as u64, self.id));
 

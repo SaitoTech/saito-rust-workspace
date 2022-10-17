@@ -3,7 +3,7 @@ use num_traits::FromPrimitive;
 use primitive_types::U256;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
@@ -673,7 +673,7 @@ impl Transaction {
         let mut output_slip_value = false;
 
         if longest_chain {
-            input_slip_value = true;
+            input_slip_value = false;
             output_slip_value = true;
         }
 
@@ -860,9 +860,9 @@ impl Transaction {
                 && self.transaction_type != TransactionType::Vip
             {
                 warn!("{} in and {} out", self.total_in, self.total_out);
-                for _z in self.outputs.iter() {
-                    // info!("{:?} --- ", z.amount);
-                }
+                // for _z in self.outputs.iter() {
+                //     // info!("{:?} --- ", z.amount);
+                // }
                 error!("ERROR 802394: transaction spends more than it has available");
                 return false;
             }
@@ -921,40 +921,44 @@ impl Transaction {
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
         //
-        let inputs_validate = self.inputs.par_iter().all(|input| input.validate(utxoset));
+        let inputs_validate = self
+            .inputs
+            .par_iter()
+            .with_min_len(10)
+            .all(|input| input.validate(utxoset));
         inputs_validate
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn validate_routing_path(&self) -> bool {
-        for i in 0..self.path.len() {
-            //
-            // msg is transaction signature and next peer
-            //
-            let mut vbytes: Vec<u8> = vec![];
-            vbytes.extend(&self.signature);
-            vbytes.extend(&self.path[i].to);
+        self.path.iter().enumerate().all(|(index, hop)| {
+            let bytes: Vec<u8> = [self.signature.as_slice(), hop.to.as_slice()].concat();
 
             // check sig is valid
-            if !verify(&hash(&vbytes), &self.path[i].sig, &self.path[i].from) {
+            if !verify(&hash(&bytes), &hop.sig, &hop.from) {
                 warn!("signature is not valid");
                 return false;
             }
 
             // check path is continuous
-            if i > 0 {
-                if self.path[i].from != self.path[i - 1].to {
+            if index > 0 {
+                if hop.from != self.path[index - 1].to {
                     warn!(
-                        "from : {:?} not matching with previous to : {:?}",
-                        hex::encode(self.path[i].from),
-                        hex::encode(self.path[i - 1].to)
+                        "from {:?}: {:?} not matching with previous to {:?}: {:?}. path length = {:?}",
+                        index,
+                        hex::encode(hop.from),
+                        index - 1,
+                        hex::encode(self.path[index - 1].to),
+                        self.path.len()
                     );
+                    for hop in self.path.iter() {
+                        info!("hop : {:?} --> {:?}",hex::encode(hop.from),hex::encode(hop.to));
+                    }
                     return false;
                 }
             }
-        }
-
-        true
+            true
+        })
     }
     #[tracing::instrument(level = "info", skip_all)]
     pub fn is_in_path(&self, public_key: &SaitoPublicKey) -> bool {
@@ -970,12 +974,14 @@ impl Transaction {
     }
     pub fn is_from(&self, public_key: &SaitoPublicKey) -> bool {
         self.inputs
-            .iter()
+            .par_iter()
+            .with_min_len(10)
             .any(|input| input.public_key.eq(public_key))
     }
     pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
         self.outputs
-            .iter()
+            .par_iter()
+            .with_min_len(10)
             .any(|slip| slip.public_key.eq(public_key))
     }
 }
@@ -1068,7 +1074,7 @@ mod tests {
                 1, 220, 246, 204, 235, 116, 113, 127, 152, 195, 247, 35, 148, 89, 187, 54, 253,
                 205, 143, 53, 14, 237, 191, 204, 251, 235, 247, 192, 176, 22, 31, 205, 139, 204, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 89, 23, 0, 0, 0, 0, 1, 0, 0, 0, 3, 123,
-                34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125
+                34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
             ]
         );
     }
@@ -1182,7 +1188,7 @@ mod tests {
         let sig: SaitoSignature = tx.signature;
 
         assert_eq!(hex::decode("0000017d26dd628a03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce76100000000000000000000000000000000000000000000000000000000000000000000000000000015900000000000100000003616263").unwrap()
-                   ,tx.serialize_for_signature());
+                   , tx.serialize_for_signature());
         let result = verify(tx.serialize_for_signature().as_slice(), &sig, &public_key);
         assert!(result);
         let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), &sig, &public_key);

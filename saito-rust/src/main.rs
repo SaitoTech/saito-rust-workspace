@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::panic;
 use std::process;
 use std::str::FromStr;
@@ -17,7 +18,6 @@ use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{StatVariable, STAT_BIN_COUNT};
-
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusThread};
@@ -97,6 +97,74 @@ where
 
             #[cfg(feature = "with-stats")]
             {
+                let duration = current_instant.duration_since(stat_timer);
+                if duration > Duration::from_millis(stat_timer_in_ms) {
+                    stat_timer = current_instant;
+                    event_processor
+                        .on_stat_interval(time_keeper.get_timestamp())
+                        .await;
+                }
+            }
+
+            if !work_done {
+                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
+            }
+        }
+    })
+}
+
+async fn run_verification_thread(
+    mut event_processor: Box<VerificationThread>,
+    mut event_receiver: Receiver<VerifyRequest>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        info!("verification thread started");
+        let mut work_done;
+        let mut stat_timer = Instant::now();
+        let time_keeper = TimeKeeper {};
+        let batch_size = 100;
+
+        event_processor.on_init().await;
+        let mut queued_requests = vec![];
+        let mut requests = VecDeque::with_capacity(batch_size);
+
+        loop {
+            work_done = false;
+
+            loop {
+                let result = event_receiver.try_recv();
+                if result.is_ok() {
+                    let request = result.unwrap();
+                    if let VerifyRequest::Block(..) = &request {
+                        queued_requests.push(request);
+                        break;
+                    }
+                    if let VerifyRequest::Transaction(tx) = request {
+                        requests.push_back(tx);
+                    }
+                } else {
+                    break;
+                }
+                if requests.len() == batch_size {
+                    break;
+                }
+            }
+            if !requests.is_empty() {
+                event_processor
+                    .processed_msgs
+                    .increment_by(requests.len() as u64);
+                event_processor.verify_txs(&mut requests).await;
+                work_done = true;
+            }
+            for request in queued_requests.drain(..) {
+                event_processor.process_event(request).await;
+                work_done = true;
+            }
+            #[cfg(feature = "with-stats")]
+            {
+                let current_instant = Instant::now();
                 let duration = current_instant.duration_since(stat_timer);
                 if duration > Duration::from_millis(stat_timer_in_ms) {
                     stat_timer = current_instant;
@@ -294,7 +362,7 @@ async fn run_verification_threads(
     let mut thread_handles = vec![];
 
     for i in 0..verification_thread_count {
-        let (sender, receiver) = tokio::sync::mpsc::channel(100_000);
+        let (sender, receiver) = tokio::sync::mpsc::channel(1_000_000);
         senders.push(sender);
         let verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
@@ -317,9 +385,9 @@ async fn run_verification_threads(
         };
         let (_interface_sender_to_verification, interface_receiver_for_verification) =
             tokio::sync::mpsc::channel::<NetworkEvent>(1);
-        let thread_handle = run_thread(
+        let thread_handle = run_verification_thread(
             Box::new(verification_thread),
-            interface_receiver_for_verification,
+            // interface_receiver_for_verification,
             receiver,
             stat_timer_in_ms,
             thread_sleep_time_in_ms,
@@ -405,7 +473,7 @@ fn run_loop_thread(
     loop_handle
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 20)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ctrlc::set_handler(move || {
         info!("shutting down the node");
