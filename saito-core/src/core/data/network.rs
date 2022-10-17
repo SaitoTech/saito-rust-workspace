@@ -94,6 +94,9 @@ impl Network {
         let wallet = self.wallet.read().await;
         log_read_lock_receive!("wallet");
         for (index, peer) in peers.index_to_peers.iter() {
+            if peer.public_key.is_none() {
+                continue;
+            }
             if transaction.is_in_path(peer.public_key.as_ref().unwrap()) {
                 continue;
             }
