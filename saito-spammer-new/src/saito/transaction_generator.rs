@@ -291,8 +291,8 @@ impl TransactionGenerator {
                 log_read_lock_request!("peers");
                 let peers = self.peers.read().await;
                 log_read_lock_receive!("peers");
-                for peer in peers.address_to_peers.iter() {
-                    to_public_key = peer.0.clone();
+                for peer in peers.index_to_peers.iter() {
+                    to_public_key = peer.1.public_key.clone().unwrap();
                     break;
                 }
             }
