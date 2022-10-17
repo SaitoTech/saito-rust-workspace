@@ -11,6 +11,7 @@ use saito_core::common::defs::Currency;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
+use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 
@@ -20,6 +21,7 @@ use crate::IoEvent;
 
 pub struct Spammer {
     sender_to_network: Sender<IoEvent>,
+    peers: Arc<RwLock<PeerCollection>>,
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
     bootstrap_done: bool,
     sent_tx_count: u64,
@@ -29,6 +31,7 @@ pub struct Spammer {
 impl Spammer {
     pub async fn new(
         wallet: Arc<RwLock<Wallet>>,
+        peers: Arc<RwLock<PeerCollection>>,
         blockchain: Arc<RwLock<Blockchain>>,
         sender_to_network: Sender<IoEvent>,
         sender: Sender<VecDeque<Transaction>>,
@@ -43,11 +46,13 @@ impl Spammer {
         }
         Spammer {
             sender_to_network,
+            peers: peers.clone(),
             configs: configs.clone(),
             bootstrap_done: false,
             sent_tx_count: 0,
             tx_generator: TransactionGenerator::create(
                 wallet.clone(),
+                peers.clone(),
                 blockchain.clone(),
                 configs.clone(),
                 sender,
@@ -113,12 +118,21 @@ impl Spammer {
 
 pub async fn run_spammer(
     wallet: Arc<RwLock<Wallet>>,
+    peers: Arc<RwLock<PeerCollection>>,
     blockchain: Arc<RwLock<Blockchain>>,
     sender_to_network: Sender<IoEvent>,
     configs: Arc<RwLock<Box<SpammerConfigs>>>,
 ) {
     info!("starting the spammer");
     let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(1_000_000);
-    let mut spammer = Spammer::new(wallet, blockchain, sender_to_network, sender, configs).await;
+    let mut spammer = Spammer::new(
+        wallet,
+        peers,
+        blockchain,
+        sender_to_network,
+        sender,
+        configs,
+    )
+    .await;
     spammer.run(receiver).await;
 }

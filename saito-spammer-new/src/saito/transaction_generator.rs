@@ -11,6 +11,7 @@ use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::crypto::generate_random_bytes;
+use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::slip::{Slip, SLIP_SIZE};
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
@@ -41,11 +42,13 @@ pub struct TransactionGenerator {
     sender: Sender<VecDeque<Transaction>>,
     tx_payment: Currency,
     tx_fee: Currency,
+    peers: Arc<RwLock<PeerCollection>>,
 }
 
 impl TransactionGenerator {
     pub async fn create(
         wallet: Arc<RwLock<Wallet>>,
+        peers: Arc<RwLock<PeerCollection>>,
         blockchain: Arc<RwLock<Blockchain>>,
         configuration: Arc<RwLock<Box<SpammerConfigs>>>,
         sender: Sender<VecDeque<Transaction>>,
@@ -73,6 +76,7 @@ impl TransactionGenerator {
             sender,
             tx_payment,
             tx_fee,
+            peers,
         };
         {
             log_read_lock_request!("wallet");
@@ -281,6 +285,17 @@ impl TransactionGenerator {
         while let Some(mut transactions) = receiver.recv().await {
             let sender = self.sender.clone();
             let tx_size = self.tx_size;
+            let mut to_public_key = [0; 33];
+
+            {
+                log_read_lock_request!("peers");
+                let peers = self.peers.read().await;
+                log_read_lock_receive!("peers");
+                for peer in peers.address_to_peers.iter() {
+                    to_public_key = peer.0.clone();
+                    break;
+                }
+            }
 
             let txs: VecDeque<Transaction> = transactions
                 .par_drain(..)
@@ -290,11 +305,11 @@ impl TransactionGenerator {
                     transaction.timestamp = time_keeper.get_timestamp();
                     transaction.generate(&public_key, 0, 0);
                     transaction.sign(&self.private_key);
-                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
+                    transaction.add_hop(&self.private_key, &self.public_key, &to_public_key);
+                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
+                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
+                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
+                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
 
                     transaction
                     // sender.send(transaction).await.unwrap();
