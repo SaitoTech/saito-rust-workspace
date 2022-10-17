@@ -180,13 +180,7 @@ impl Network {
             todo!("Handle the unknown peer disconnect");
         }
     }
-    pub async fn handle_new_peer(
-        &mut self,
-        peer_data: Option<data::configuration::PeerConfig>,
-        peer_index: u64,
-        wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
-    ) {
+    pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
         log_write_lock_request!("peers");
@@ -197,10 +191,12 @@ impl Network {
 
         if peer.static_peer_config.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-            peer.initiate_handshake(&self.io_interface, wallet.clone(), configs.clone())
-                .await
-                .unwrap();
+            peer.initiate_handshake(&self.io_interface).await.unwrap();
         } else {
+            info!(
+                "removing static peer config : {:?}",
+                peer.static_peer_config.as_ref().unwrap()
+            );
             self.static_peer_configs
                 .retain(|config| config != peer.static_peer_config.as_ref().unwrap());
         }
@@ -265,42 +261,7 @@ impl Network {
                 .await;
         }
     }
-    // pub async fn handle_handshake_completion(
-    //     &self,
-    //     peer_index: u64,
-    //     response: HandshakeCompletion,
-    //     blockchain: Arc<RwLock<Blockchain>>,
-    // ) {
-    //     debug!("received handshake completion");
-    //     let public_key;
-    //     {
-    //         log_write_lock_request!("peers");
-    //         let mut peers = self.peers.write().await;
-    //         log_write_lock_receive!("peers");
-    //         let peer = peers.index_to_peers.get_mut(&peer_index);
-    //         if peer.is_none() {
-    //             todo!()
-    //         }
-    //         let peer = peer.unwrap();
-    //         let _result = peer
-    //             .handle_handshake_completion(response, &self.io_interface)
-    //             .await;
-    //         if !peer.handshake_done {
-    //             return;
-    //         }
-    //         public_key = peer.public_key;
-    //         peers.address_to_peers.insert(public_key, peer_index);
-    //     }
-    //
-    //     debug!(
-    //         "peer : {:?} handshake successful for peer : {:?}",
-    //         peer_index,
-    //         hex::encode(public_key)
-    //     );
-    //     // start block syncing here
-    //     self.request_blockchain_from_peer(peer_index, blockchain.clone())
-    //         .await;
-    // }
+
     async fn request_blockchain_from_peer(
         &self,
         peer_index: u64,

@@ -171,14 +171,7 @@ impl RoutingThread {
         peer_index: u64,
     ) {
         trace!("handling new peer : {:?}", peer_index);
-        self.network
-            .handle_new_peer(
-                peer_data,
-                peer_index,
-                self.wallet.clone(),
-                self.configs.clone(),
-            )
-            .await;
+        self.network.handle_new_peer(peer_data, peer_index).await;
     }
 
     #[tracing::instrument(level = "info", skip_all)]

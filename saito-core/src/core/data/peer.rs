@@ -37,20 +37,9 @@ impl Peer {
     pub async fn initiate_handshake(
         &mut self,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
-        wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) -> Result<(), Error> {
-        debug!("initiating handshake : {:?}", self.index);
-        log_read_lock_request!("wallet");
-        let wallet = wallet.read().await;
-        log_read_lock_receive!("wallet");
-        let block_fetch_url;
-        {
-            log_read_lock_request!("configs");
-            let configs = configs.read().await;
-            log_read_lock_receive!("configs");
-            block_fetch_url = configs.get_block_fetch_url();
-        }
+        info!("initiating handshake : {:?}", self.index);
+
         let challenge = HandshakeChallenge {
             challenge: generate_random_bytes(32).try_into().unwrap(),
         };
@@ -60,7 +49,7 @@ impl Peer {
             .send_message(self.index, message.serialize())
             .await
             .unwrap();
-        debug!("handshake challenge sent for peer: {:?}", self.index);
+        info!("handshake challenge sent for peer: {:?}", self.index);
 
         Ok(())
     }
@@ -169,30 +158,6 @@ impl Peer {
 
         Ok(())
     }
-    // pub async fn handle_handshake_completion(
-    //     &mut self,
-    //     response: HandshakeCompletion,
-    //     _io_handler: &Box<dyn InterfaceIO + Send + Sync>,
-    // ) -> Result<(), Error> {
-    //     debug!("handling handshake completion : {:?}", self.index);
-    //     if self.challenge_for_peer.is_none() {
-    //         warn!(
-    //             "we don't have a challenge to verify for peer : {:?}",
-    //             self.index
-    //         );
-    //         // TODO : handle the scenario.
-    //         todo!()
-    //     }
-    //     let sent_challenge = self.challenge_for_peer.unwrap();
-    //     let result = verify(&sent_challenge, &response.signature, &self.public_key);
-    //     if !result {
-    //         warn!("handshake failed. signature is not valid");
-    //         todo!()
-    //     }
-    //     self.challenge_for_peer = None;
-    //     self.handshake_done = true;
-    //     Ok(())
-    // }
     /// Since each peer have a different url for a block to be fetched, this function will generate the correct url from a given block hash
     ///
     /// # Arguments
