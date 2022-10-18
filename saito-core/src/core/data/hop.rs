@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
-use crate::core::data::crypto::{hash, sign};
+use crate::core::data::crypto::sign;
 use crate::core::data::transaction::Transaction;
 
 pub const HOP_SIZE: usize = 130;
@@ -35,17 +35,12 @@ impl Hop {
     ) -> Hop {
         let mut hop = Hop::new();
 
-        //
         // msg-to-sign is hash of transaction signature + next_peer.public_key
-        //
-        let vbytes: Vec<u8> = [tx.signature.as_slice(), to_public_key.as_slice()].concat();
-        // vbytes.extend(tx.signature);
-        // vbytes.extend(to_public_key);
-        let hash_to_sign = hash(&vbytes);
+        let buffer: Vec<u8> = [tx.signature.as_slice(), to_public_key.as_slice()].concat();
 
         hop.from = my_public_key.clone();
         hop.to = to_public_key.clone();
-        hop.sig = sign(&hash_to_sign, &my_private_key);
+        hop.sig = sign(buffer.as_slice(), &my_private_key);
 
         hop
     }
@@ -151,8 +146,7 @@ mod tests {
         let mut buffer = vec![];
         buffer.extend(tx.signature.to_vec());
         buffer.extend(hop.to.to_vec());
-        let hash = hash(&buffer);
-        let result = verify(&hash, &hop.sig, &hop.from);
+        let result = verify(buffer.as_slice(), &hop.sig, &hop.from);
         assert!(result);
     }
 }

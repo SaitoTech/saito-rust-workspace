@@ -935,7 +935,7 @@ impl Transaction {
             let bytes: Vec<u8> = [self.signature.as_slice(), hop.to.as_slice()].concat();
 
             // check sig is valid
-            if !verify(&hash(&bytes), &hop.sig, &hop.from) {
+            if !verify(bytes.as_slice(), &hop.sig, &hop.from) {
                 warn!("signature is not valid");
                 return false;
             }

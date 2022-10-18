@@ -157,7 +157,7 @@ impl Peer {
         } else {
             info!(
                 "handshake completed for peer : {:?}",
-                self.public_key.as_ref().unwrap()
+                hex::encode(self.public_key.as_ref().unwrap())
             );
         }
 

@@ -1103,8 +1103,8 @@ impl Block {
                                 payout.staking_treasury = sp as i64;
 
                                 // router consumes 2 hashes
-                                next_random_number = hash(&next_random_number.to_vec());
-                                next_random_number = hash(&next_random_number.to_vec());
+                                next_random_number = hash(next_random_number.as_slice());
+                                next_random_number = hash(next_random_number.as_slice());
 
                                 cv.block_payout.push(payout);
                             }
