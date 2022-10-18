@@ -35,6 +35,7 @@ pub struct VerificationThread {
     pub processed_txs: StatVariable,
     pub processed_blocks: StatVariable,
     pub processed_msgs: StatVariable,
+    pub invalid_txs: StatVariable,
 }
 
 impl VerificationThread {
@@ -68,6 +69,7 @@ impl VerificationThread {
         log_read_lock_request!("VerificationThread:verify_txs::blockchain");
         let blockchain = self.blockchain.read().await;
         log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
+        let prev_count = transactions.len();
         let transactions: Vec<Transaction> = transactions
             .par_drain(..)
             .with_min_len(10)
@@ -86,16 +88,14 @@ impl VerificationThread {
                 return Some(transaction);
             })
             .collect();
+        let invalid_txs = prev_count - transactions.len();
         for transaction in transactions {
             self.sender_to_consensus
                 .send(ConsensusEvent::NewTransaction { transaction })
                 .await
                 .unwrap();
         }
-        // self.sender_to_consensus
-        //     .send(ConsensusEvent::NewTransactions { transactions })
-        //     .await
-        //     .unwrap();
+        self.invalid_txs.increment_by(invalid_txs as u64);
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
         let mut block = Block::deserialize_from_net(&buffer);
@@ -171,10 +171,12 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
         self.processed_msgs.calculate_stats(current_time);
+        self.invalid_txs.calculate_stats(current_time);
         // self.processed_txs.calculate_stats(current_time);
         // self.processed_blocks.calculate_stats(current_time);
 
         self.processed_msgs.print();
+        self.invalid_txs.print();
         // self.processed_txs.print();
         // self.processed_blocks.print();
     }

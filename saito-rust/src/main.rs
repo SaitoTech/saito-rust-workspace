@@ -382,6 +382,10 @@ async fn run_verification_threads(
                 format!("verification_{:?}::processed_msgs", i),
                 STAT_BIN_COUNT,
             ),
+            invalid_txs: StatVariable::new(
+                format!("verification_{:?}::invalid_txs", i),
+                STAT_BIN_COUNT,
+            ),
         };
         let (_interface_sender_to_verification, interface_receiver_for_verification) =
             tokio::sync::mpsc::channel::<NetworkEvent>(1);
