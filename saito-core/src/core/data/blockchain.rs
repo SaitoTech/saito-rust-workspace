@@ -542,7 +542,9 @@ impl Blockchain {
                 "adding {:?} transactions back to mempool",
                 transactions.len()
             );
-            for tx in block.transactions {
+            // TODO : is there a way to not validate these again ?
+            transactions.retain(|tx| tx.validate(&self.utxoset));
+            for tx in transactions.drain(..) {
                 if tx.transaction_type == TransactionType::Normal {
                     mempool.transactions.insert(tx.signature, tx);
                 }
