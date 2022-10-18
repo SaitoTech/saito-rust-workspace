@@ -130,6 +130,19 @@ impl TransactionGenerator {
                 available_balance / unspent_slip_count as Currency;
             let mut total_output_slips_created: u64 = 0;
 
+            let mut to_public_key = [0; 33];
+
+            {
+                log_read_lock_request!("peers");
+                let peers = self.peers.read().await;
+                log_read_lock_receive!("peers");
+                for peer in peers.index_to_peers.iter() {
+                    to_public_key = peer.1.public_key.clone().unwrap();
+                    break;
+                }
+                assert_eq!(peers.address_to_peers.len(), 1 as usize,"we have assumed connecting to a single node. move add_hop to correct place if not.");
+                assert_ne!(to_public_key, self.public_key);
+            }
             let mut txs: VecDeque<Transaction> = Default::default();
             for _i in 0..unspent_slip_count {
                 let transaction = self
@@ -137,6 +150,7 @@ impl TransactionGenerator {
                         output_slips_per_input_slip,
                         total_nolans_requested_per_slip,
                         &mut total_output_slips_created,
+                        &to_public_key,
                     )
                     .await;
 
@@ -168,6 +182,7 @@ impl TransactionGenerator {
         output_slips_per_input_slip: u8,
         total_nolans_requested_per_slip: Currency,
         total_output_slips_created: &mut u64,
+        to_public_key: &SaitoPublicKey,
     ) -> Transaction {
         let payment_amount =
             total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
@@ -212,7 +227,7 @@ impl TransactionGenerator {
         transaction.timestamp = self.time_keeper.get_timestamp();
         transaction.generate(&self.public_key, 0, 0);
         transaction.sign(&self.private_key);
-        transaction.add_hop(&wallet.private_key, &wallet.public_key, &self.public_key);
+        transaction.add_hop(&wallet.private_key, &wallet.public_key, to_public_key);
 
         return transaction;
     }

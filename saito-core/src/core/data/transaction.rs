@@ -91,6 +91,7 @@ impl Transaction {
         my_public_key: &SaitoPublicKey,
         to_public_key: &SaitoPublicKey,
     ) {
+        assert_ne!(my_public_key, to_public_key);
         let hop = Hop::generate(my_private_key, my_public_key, to_public_key, self);
         self.path.push(hop);
     }
@@ -940,6 +941,9 @@ impl Transaction {
                 return false;
             }
 
+            if hop.from == hop.to {
+                return false;
+            }
             // check path is continuous
             if index > 0 {
                 if hop.from != self.path[index - 1].to {

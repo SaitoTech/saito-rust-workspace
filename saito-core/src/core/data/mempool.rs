@@ -378,13 +378,13 @@ mod tests {
                 tx.sign(&private_key);
             }
             let wallet = wallet_lock.read().await;
-            tx.add_hop(&wallet.private_key, &wallet.public_key, &public_key);
+            tx.add_hop(&wallet.private_key, &wallet.public_key, &[1; 33]);
             tx.generate(&public_key, 0, 0);
             mempool.add_transaction(tx).await;
         }
 
         assert_eq!(mempool.transactions.len(), 5);
-        assert_eq!(mempool.get_routing_work_available(), 3_600_000);
+        assert_eq!(mempool.get_routing_work_available(), 0);
 
         // TODO : FIX THIS TEST
         // assert_eq!(
