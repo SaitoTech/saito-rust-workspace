@@ -26,7 +26,7 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(5000).as_micros() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(10_000).as_micros() as u64;
 pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_micros() as u64;
 
 #[derive(Debug)]
@@ -304,7 +304,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         }
 
         // generate blocks
-        let mut can_bundle = false;
         self.block_producing_timer += duration_value;
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
             if !self.txs_for_mempool.is_empty() {
@@ -317,57 +316,54 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 }
             }
 
-            log_read_lock_request!("ConsensusEventProcessor:process_timer_event::blockchain");
-            let blockchain = self.blockchain.read().await;
-            log_read_lock_receive!("ConsensusEventProcessor:process_timer_event::blockchain");
-            log_read_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
-            let mempool = self.mempool.read().await;
-            log_read_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
-
-            can_bundle = mempool.can_bundle_block(&blockchain, timestamp).await;
-            self.block_producing_timer = 0;
-            work_done = true;
-        }
-
-        if can_bundle {
             log_write_lock_request!("ConsensusEventProcessor:process_timer_event::blockchain");
             let mut blockchain = self.blockchain.write().await;
             log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::blockchain");
+            log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
+            let mut mempool = self.mempool.write().await;
+            log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
+            let mut can_bundle = false;
             {
-                log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
-                let mut mempool = self.mempool.write().await;
-                log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
-
-                debug!(
-                    "mempool size before bundling : {:?}",
-                    mempool.transactions.len()
-                );
-                let block = mempool
-                    .bundle_block(blockchain.deref_mut(), timestamp)
-                    .await;
-                info!(
-                    "adding bundled block : {:?} to mempool",
-                    hex::encode(block.hash)
-                );
-                debug!(
-                    "mempool size after bundling : {:?}",
-                    mempool.transactions.len()
-                );
-                mempool.add_block(block);
+                can_bundle = mempool.can_bundle_block(&blockchain, timestamp).await;
+                self.block_producing_timer = 0;
+                work_done = true;
             }
-            self.stats.blocks_created.increment();
-            blockchain
-                .add_blocks_from_mempool(
-                    self.mempool.clone(),
-                    &self.network,
-                    &mut self.storage,
-                    self.sender_to_miner.clone(),
-                )
-                .await;
 
-            debug!("blocks added to blockchain");
+            if can_bundle {
+                {
+                    debug!(
+                        "mempool size before bundling : {:?}",
+                        mempool.transactions.len()
+                    );
+                    let block = mempool
+                        .bundle_block(blockchain.deref_mut(), timestamp)
+                        .await;
+                    info!(
+                        "adding bundled block : {:?} to mempool",
+                        hex::encode(block.hash)
+                    );
+                    debug!(
+                        "mempool size after bundling : {:?}",
+                        mempool.transactions.len()
+                    );
+                    mempool.add_block(block);
+                    // dropping the lock here since blockchain needs the write lock to add blocks
+                    drop(mempool);
+                }
+                self.stats.blocks_created.increment();
+                blockchain
+                    .add_blocks_from_mempool(
+                        self.mempool.clone(),
+                        &self.network,
+                        &mut self.storage,
+                        self.sender_to_miner.clone(),
+                    )
+                    .await;
 
-            work_done = true;
+                debug!("blocks added to blockchain");
+
+                work_done = true;
+            }
         }
 
         if work_done {

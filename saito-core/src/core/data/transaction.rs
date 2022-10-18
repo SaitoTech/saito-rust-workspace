@@ -916,18 +916,22 @@ impl Transaction {
             return false;
         }
 
-        //
+        let inputs_validate = self.validate_against_utxoset(utxoset);
+        inputs_validate
+    }
+
+    pub fn validate_against_utxoset(&self, utxoset: &UtxoSet) -> bool {
+        if self.transaction_type == TransactionType::Fee {
+            return true;
+        }
         // if inputs exist, they must validate against the UTXOSET
         // if they claim to spend tokens. if the slip has no spendable
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
-        //
-        let inputs_validate = self
-            .inputs
+        self.inputs
             .par_iter()
             .with_min_len(10)
-            .all(|input| input.validate(utxoset));
-        inputs_validate
+            .all(|input| input.validate(utxoset))
     }
 
     #[tracing::instrument(level = "info", skip_all)]

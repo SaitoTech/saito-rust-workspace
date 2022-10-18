@@ -1,10 +1,10 @@
-use rayon::prelude::*;
 use std::collections::VecDeque;
 use std::io::Error;
 use std::sync::Arc;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
+use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, trace, warn};
@@ -469,10 +469,11 @@ impl Blockchain {
         //
         //
         {
+            mempool
+                .transactions
+                .retain(|_, tx| tx.validate_against_utxoset(&self.utxoset));
             let block = self.get_mut_block(&block_hash).unwrap();
-            // log_write_lock_request!("mempool");
-            // let mut mempool = mempool.write().await;
-            // log_write_lock_receive!("mempool");
+            // we calling delete_tx after removing invalidated txs, to make sure routing work is calculated after removing all the txs
             mempool.delete_transactions(&block.transactions);
         }
 
@@ -537,14 +538,16 @@ impl Blockchain {
 
         if block.creator == mempool.public_key {
             let transactions = &mut block.transactions;
-            // TODO : what other types should be added back to the mempool
-            info!(
-                "adding {:?} transactions back to mempool",
-                transactions.len()
-            );
+            let prev_count = transactions.len();
             // TODO : is there a way to not validate these again ?
             transactions.retain(|tx| tx.validate(&self.utxoset));
+            info!(
+                "adding {:?} transactions back to mempool. dropped {:?} invalid transactions",
+                transactions.len(),
+                (prev_count - transactions.len())
+            );
             for tx in transactions.drain(..) {
+                // TODO : what other types should be added back to the mempool
                 if tx.transaction_type == TransactionType::Normal {
                     mempool.transactions.insert(tx.signature, tx);
                 }
