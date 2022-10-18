@@ -426,6 +426,7 @@ pub async fn run_network_controller(
         let configs = configs.read().await;
         log_read_lock_receive!("configs");
         url = configs.get_server_configs().host.clone()
+            + ":"
             + configs.get_server_configs().port.to_string().as_str();
         port = configs.get_server_configs().port;
         host = configs.get_server_configs().host.clone();

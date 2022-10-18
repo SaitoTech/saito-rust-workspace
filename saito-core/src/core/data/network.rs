@@ -3,7 +3,7 @@ use std::io::Error;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::interface_io::InterfaceIO;
@@ -237,6 +237,7 @@ impl Network {
         log_write_lock_receive!("peers");
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
+            warn!("peer not found : {:?}", peer_index);
             todo!()
         }
         let peer = peer.unwrap();

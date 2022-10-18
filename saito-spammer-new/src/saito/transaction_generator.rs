@@ -295,6 +295,8 @@ impl TransactionGenerator {
                     to_public_key = peer.1.public_key.clone().unwrap();
                     break;
                 }
+                assert_eq!(peers.address_to_peers.len(), 1 as usize);
+                assert_ne!(to_public_key, self.public_key);
             }
 
             let txs: VecDeque<Transaction> = transactions

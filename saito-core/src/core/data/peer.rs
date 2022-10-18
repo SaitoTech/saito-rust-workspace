@@ -154,6 +154,11 @@ impl Peer {
                 .await
                 .unwrap();
             info!("handshake response sent for peer: {:?}", self.index);
+        } else {
+            info!(
+                "handshake completed for peer : {:?}",
+                self.public_key.as_ref().unwrap()
+            );
         }
 
         Ok(())
