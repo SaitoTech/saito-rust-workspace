@@ -219,15 +219,15 @@ impl Wallet {
     // this manually creates the output for its desired payment
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn generate_slips(&mut self, nolan_requested: Currency) -> (Vec<Slip>, Vec<Slip>) {
-        let mut inputs: Vec<Slip> = vec![];
-        let mut outputs: Vec<Slip> = vec![];
+        let mut inputs: Vec<Slip> = Vec::new();
+        let mut outputs: Vec<Slip> = Vec::new();
         let mut nolan_in: Currency = 0;
         let mut nolan_out: Currency = 0;
         let my_public_key = self.public_key;
 
         // grab inputs
-        let mut keys_to_remove = vec![];
-        for key in self.unspent_slips.iter() {
+        let mut keys_to_remove = Vec::with_capacity(1000);
+        for key in &self.unspent_slips {
             if nolan_in >= nolan_requested {
                 break;
             }

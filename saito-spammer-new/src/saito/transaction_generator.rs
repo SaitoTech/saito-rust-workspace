@@ -140,7 +140,7 @@ impl TransactionGenerator {
                     to_public_key = peer.1.public_key.clone().unwrap();
                     break;
                 }
-                assert_eq!(peers.address_to_peers.len(), 1 as usize,"we have assumed connecting to a single node. move add_hop to correct place if not.");
+                assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
                 assert_ne!(to_public_key, self.public_key);
             }
             let mut txs: VecDeque<Transaction> = Default::default();
@@ -297,22 +297,23 @@ impl TransactionGenerator {
             }
         });
 
+        let mut to_public_key = [0; 33];
+
+        {
+            log_read_lock_request!("peers");
+            let peers = self.peers.read().await;
+            log_read_lock_receive!("peers");
+            for peer in peers.index_to_peers.iter() {
+                to_public_key = peer.1.public_key.clone().unwrap();
+                break;
+            }
+            assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+            assert_ne!(to_public_key, self.public_key);
+        }
+
         while let Some(mut transactions) = receiver.recv().await {
             let sender = self.sender.clone();
             let tx_size = self.tx_size;
-            let mut to_public_key = [0; 33];
-
-            {
-                log_read_lock_request!("peers");
-                let peers = self.peers.read().await;
-                log_read_lock_receive!("peers");
-                for peer in peers.index_to_peers.iter() {
-                    to_public_key = peer.1.public_key.clone().unwrap();
-                    break;
-                }
-                assert_eq!(peers.address_to_peers.len(), 1 as usize,"we have assumed connecting to a single node. move add_hop to correct place if not.");
-                assert_ne!(to_public_key, self.public_key);
-            }
 
             let txs: VecDeque<Transaction> = transactions
                 .par_drain(..)
@@ -323,10 +324,6 @@ impl TransactionGenerator {
                     transaction.generate(&public_key, 0, 0);
                     transaction.sign(&self.private_key);
                     transaction.add_hop(&self.private_key, &self.public_key, &to_public_key);
-                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
 
                     transaction
                     // sender.send(transaction).await.unwrap();
