@@ -37,7 +37,7 @@ criterion = "0.4.0"
 panic = "unwind"
 
 [features]
-default = ["with-stats"]
+default = []
 locking-logs = ["saito-core/locking-logs"]
 with-stats = ["saito-core/with-stats"]
 
