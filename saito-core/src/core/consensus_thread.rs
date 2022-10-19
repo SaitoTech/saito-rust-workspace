@@ -306,23 +306,19 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         // generate blocks
         self.block_producing_timer += duration_value;
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
-            if !self.txs_for_mempool.is_empty() {
-                log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
-                let mut mempool = self.mempool.write().await;
-                log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
-
-                for tx in self.txs_for_mempool.drain(..) {
-                    mempool.add_transaction(tx).await;
-                }
-            }
-
             log_write_lock_request!("ConsensusEventProcessor:process_timer_event::blockchain");
             let mut blockchain = self.blockchain.write().await;
             log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::blockchain");
             log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
             let mut mempool = self.mempool.write().await;
             log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
-            let mut can_bundle = false;
+            if !self.txs_for_mempool.is_empty() {
+                for tx in self.txs_for_mempool.drain(..) {
+                    mempool.add_transaction(tx).await;
+                }
+            }
+
+            let can_bundle;
             {
                 can_bundle = mempool.can_bundle_block(&blockchain, timestamp).await;
                 self.block_producing_timer = 0;
