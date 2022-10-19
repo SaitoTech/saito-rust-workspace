@@ -159,9 +159,6 @@ impl Blockchain {
                                 let block_hash = block.previous_block_hash;
                                 let block_in_mempool_queue;
                                 {
-                                    // log_read_lock_request!("mempool");
-                                    // let mempool = mempool.read().await;
-                                    // log_read_lock_receive!("mempool");
                                     block_in_mempool_queue = mempool
                                         .blocks_queue
                                         .par_iter()

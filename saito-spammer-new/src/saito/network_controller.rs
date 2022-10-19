@@ -138,9 +138,9 @@ impl NetworkController {
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-            log_write_lock_request!("network controller");
-            let io_controller = io_controller.write().await;
-            log_write_lock_receive!("network controller");
+            log_read_lock_request!("network controller");
+            let io_controller = io_controller.read().await;
+            log_read_lock_receive!("network controller");
             let sender_to_controller = io_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
 
@@ -574,9 +574,9 @@ fn run_websocket_server(
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
 
-                    trace!("waiting for the io controller lock for writing");
-                    let controller = clone.write().await;
-                    trace!("acquired the io controller lock for writing");
+                    log_read_lock_request!("network controller");
+                    let controller = clone.read().await;
+                    log_read_lock_receive!("network controller");
 
                     let peer_index;
                     {

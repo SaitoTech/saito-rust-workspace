@@ -350,7 +350,7 @@ mod tests {
         }
 
         {
-            let wallet = wallet_lock.write().await;
+            let wallet = wallet_lock.read().await;
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
