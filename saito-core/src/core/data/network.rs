@@ -51,9 +51,9 @@ impl Network {
         // finding block sender to avoid resending the block to that node
 
         {
-            log_read_lock_request!("peers");
+            log_read_lock_request!("network:propagate_block:peers");
             let peers = self.peers.read().await;
-            log_read_lock_receive!("peers");
+            log_read_lock_receive!("network:propagate_block:peers");
             for (index, peer) in peers.index_to_peers.iter() {
                 if peer.public_key.is_none() {
                     excluded_peers.push(*index);
@@ -87,12 +87,12 @@ impl Network {
 
         // TODO : return if tx is not valid
 
-        log_read_lock_request!("peers");
+        log_read_lock_request!("network:propagate_transaction:peers");
         let peers = self.peers.read().await;
-        log_read_lock_receive!("peers");
-        log_read_lock_request!("wallet");
+        log_read_lock_receive!("network:propagate_transaction:peers");
+        log_read_lock_request!("network:propagate_transaction:wallet");
         let wallet = self.wallet.read().await;
-        log_read_lock_receive!("wallet");
+        log_read_lock_receive!("network:propagate_transaction:wallet");
         for (index, peer) in peers.index_to_peers.iter() {
             if peer.public_key.is_none() {
                 continue;
@@ -127,9 +127,9 @@ impl Network {
         let peer_index;
         let url;
         {
-            log_read_lock_request!("peers");
+            log_read_lock_request!("network:fetch_missing_block:peers");
             let peers = self.peers.read().await;
-            log_read_lock_receive!("peers");
+            log_read_lock_receive!("network:fetch_missing_block:peers");
             let peer = peers.find_peer_by_address(public_key);
             if peer.is_none() {
                 debug!("a = {:?}", peers.address_to_peers.len());
@@ -146,9 +146,9 @@ impl Network {
     }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
-        log_read_lock_request!("peers");
+        log_read_lock_request!("network:handle_peer_disconnect:peers");
         let peers = self.peers.read().await;
-        log_read_lock_receive!("peers");
+        log_read_lock_receive!("network:handle_peer_disconnect:peers");
         let result = peers.find_peer_by_index(peer_index);
 
         if result.is_some() {
@@ -183,9 +183,9 @@ impl Network {
     pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
-        log_write_lock_request!("peers");
+        log_write_lock_request!("network:handle_new_peer:peers");
         let mut peers = self.peers.write().await;
-        log_write_lock_receive!("peers");
+        log_write_lock_receive!("network:handle_new_peer:peers");
         let mut peer = Peer::new(peer_index);
         peer.static_peer_config = peer_data;
 
@@ -211,9 +211,9 @@ impl Network {
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) {
-        log_write_lock_request!("peers");
+        log_write_lock_request!("network:handle_handshake_challenge:peers");
         let mut peers = self.peers.write().await;
-        log_write_lock_receive!("peers");
+        log_write_lock_receive!("network:handle_handshake_challenge:peers");
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             todo!()
@@ -232,9 +232,9 @@ impl Network {
         configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) {
         debug!("received handshake response");
-        log_write_lock_request!("peers");
+        log_write_lock_request!("network:handle_handshake_response:peers");
         let mut peers = self.peers.write().await;
-        log_write_lock_receive!("peers");
+        log_write_lock_receive!("network:handle_handshake_response:peers");
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             warn!("peer not found : {:?}", peer_index);
@@ -304,9 +304,9 @@ impl Network {
         }
         let url;
         {
-            log_read_lock_request!("peers");
+            log_read_lock_request!("network:process_incoming_block_hash:peers");
             let peers = self.peers.read().await;
-            log_read_lock_receive!("peers");
+            log_read_lock_receive!("network:process_incoming_block_hash:peers");
             let peer = peers
                 .index_to_peers
                 .get(&peer_index)
