@@ -66,30 +66,34 @@ impl VerificationThread {
     pub async fn verify_txs(&mut self, transactions: &mut VecDeque<Transaction>) {
         self.processed_txs.increment_by(transactions.len() as u64);
         self.processed_msgs.increment_by(transactions.len() as u64);
-        log_read_lock_request!("VerificationThread:verify_txs::blockchain");
-        let blockchain = self.blockchain.read().await;
-        log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
         let prev_count = transactions.len();
-        let transactions: Vec<Transaction> = transactions
-            .par_drain(..)
-            .with_min_len(10)
-            // .with_max_len(1000)
-            .filter_map(|mut transaction| {
-                transaction.generate(&self.public_key, 0, 0);
+        let txs: Vec<Transaction>;
+        {
+            log_read_lock_request!("VerificationThread:verify_txs::blockchain");
+            let blockchain = self.blockchain.read().await;
+            log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
+            txs = transactions
+                .par_drain(..)
+                .with_min_len(10)
+                // .with_max_len(1000)
+                .filter_map(|mut transaction| {
+                    transaction.generate(&self.public_key, 0, 0);
 
-                if !transaction.validate(&blockchain.utxoset) {
-                    debug!(
-                        "transaction : {:?} not valid",
-                        hex::encode(transaction.signature)
-                    );
+                    if !transaction.validate(&blockchain.utxoset) {
+                        debug!(
+                            "transaction : {:?} not valid",
+                            hex::encode(transaction.signature)
+                        );
 
-                    return None;
-                }
-                return Some(transaction);
-            })
-            .collect();
-        let invalid_txs = prev_count - transactions.len();
-        for transaction in transactions {
+                        return None;
+                    }
+                    return Some(transaction);
+                })
+                .collect();
+        }
+
+        let invalid_txs = prev_count - txs.len();
+        for transaction in txs {
             self.sender_to_consensus
                 .send(ConsensusEvent::NewTransaction { transaction })
                 .await
