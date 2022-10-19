@@ -422,9 +422,9 @@ pub async fn run_network_controller(
     let url;
     let port;
     {
-        log_read_lock_request!("configs");
+        log_read_lock_request!("network_controller:run_network_controller:configs");
         let configs = configs.read().await;
-        log_read_lock_receive!("configs");
+        log_read_lock_receive!("network_controller:run_network_controller:configs");
         url = configs.get_server_configs().host.clone()
             + ":"
             + configs.get_server_configs().port.to_string().as_str();
@@ -640,10 +640,10 @@ fn run_websocket_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
-                        log_read_lock_request!("blockchain");
+                        log_read_lock_request!("run_websocket_server:blockchain");
                         // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
-                        log_read_lock_receive!("blockchain");
+                        log_read_lock_receive!("run_websocket_server:blockchain");
                         let block = blockchain.get_block(&block_hash);
                         if block.is_none() {
                             debug!("block not found : {:?}", block_hash);

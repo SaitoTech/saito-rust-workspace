@@ -145,9 +145,9 @@ pub mod test {
         // check that the blockchain connects properly
         //
         pub async fn check_blockchain(&self) {
-            log_read_lock_request!("blockchain");
+            log_read_lock_request!("check_blockchain:blockchain");
             let blockchain = self.blockchain_lock.read().await;
-            log_read_lock_receive!("blockchain");
+            log_read_lock_receive!("check_blockchain:blockchain");
 
             for i in 1..blockchain.blocks.len() {
                 let block_hash = blockchain

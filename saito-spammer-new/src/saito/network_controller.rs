@@ -612,10 +612,10 @@ fn run_websocket_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
-                        log_read_lock_request!("blockchain");
+                        log_read_lock_request!("run_websocket_server:blockchain");
                         // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
-                        log_read_lock_receive!("blockchain");
+                        log_read_lock_receive!("run_websocket_server:blockchain");
                         let block = blockchain.get_block(&block_hash);
                         if block.is_none() {
                             warn!("block not found : {:?}", block_hash);

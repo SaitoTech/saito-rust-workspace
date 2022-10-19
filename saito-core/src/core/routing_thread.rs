@@ -195,9 +195,9 @@ impl RoutingThread {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        log_read_lock_request!("blockchain");
+        log_read_lock_request!("routing_thread:process_incoming_blockchain_request:blockchain");
         let blockchain = self.blockchain.read().await;
-        log_read_lock_receive!("blockchain");
+        log_read_lock_receive!("routing_thread:process_incoming_blockchain_request:blockchain");
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);

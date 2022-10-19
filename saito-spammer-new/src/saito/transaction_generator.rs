@@ -273,12 +273,12 @@ impl TransactionGenerator {
             loop {
                 let mut work_done = false;
                 {
-                    log_write_lock_request!("blockchain");
+                    log_write_lock_request!("create_test_transactions:blockchain");
                     let mut blockchain = blockchain.write().await;
-                    log_write_lock_receive!("blockchain");
-                    log_write_lock_request!("wallet");
+                    log_write_lock_receive!("create_test_transactions:blockchain");
+                    log_write_lock_request!("create_test_transactions:wallet");
                     let mut wallet = wallet.write().await;
-                    log_write_lock_receive!("wallet");
+                    log_write_lock_receive!("create_test_transactions:wallet");
                     if wallet.get_available_balance() >= required_balance {
                         assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count);

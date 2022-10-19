@@ -273,9 +273,9 @@ impl Network {
         // TODO : should this be moved inside peer ?
         let request;
         {
-            log_read_lock_request!("blockchain");
+            log_read_lock_request!("network:request_blockchain_from_peer:blockchain");
             let blockchain = blockchain.read().await;
-            log_read_lock_receive!("blockchain");
+            log_read_lock_receive!("network:request_blockchain_from_peer:blockchain");
             request = BlockchainRequest {
                 latest_block_id: blockchain.get_latest_block_id(),
                 latest_block_hash: blockchain.get_latest_block_hash(),
@@ -297,9 +297,9 @@ impl Network {
     ) {
         let block_exists;
         {
-            log_read_lock_request!("blockchain");
+            log_read_lock_request!("network:process_incoming_block_hash:blockchain");
             let blockchain = blockchain.read().await;
-            log_read_lock_receive!("blockchain");
+            log_read_lock_receive!("network:process_incoming_block_hash:blockchain");
             block_exists = blockchain.is_block_indexed(block_hash);
         }
         let url;
