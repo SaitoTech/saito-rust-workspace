@@ -177,7 +177,7 @@ impl Slip {
                     if *value == true {
                         true
                     } else {
-                        error!(
+                        debug!(
                             "in utxoset but invalid: value is {} at {:?}",
                             *value,
                             hex::encode(self.utxoset_key)
@@ -187,7 +187,7 @@ impl Slip {
                 }
                 None => {
                     debug!("not in utxoset so invalid");
-                    error!(
+                    debug!(
                         "value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
                         hex::encode(self.utxoset_key),
                         self.slip_type,
