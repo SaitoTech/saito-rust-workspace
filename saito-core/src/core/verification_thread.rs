@@ -36,6 +36,7 @@ pub struct VerificationThread {
     pub processed_blocks: StatVariable,
     pub processed_msgs: StatVariable,
     pub invalid_txs: StatVariable,
+    pub stat_sender: Sender<String>,
 }
 
 impl VerificationThread {
@@ -143,7 +144,7 @@ impl VerificationThread {
 #[async_trait]
 impl ProcessEvent<VerifyRequest> for VerificationThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
-        None
+        unreachable!();
     }
 
     async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
@@ -174,14 +175,9 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
     }
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
-        self.processed_msgs.calculate_stats(current_time);
-        self.invalid_txs.calculate_stats(current_time);
-        // self.processed_txs.calculate_stats(current_time);
-        // self.processed_blocks.calculate_stats(current_time);
-
-        self.processed_msgs.print();
-        self.invalid_txs.print();
-        // self.processed_txs.print();
-        // self.processed_blocks.print();
+        self.processed_msgs.calculate_stats(current_time).await;
+        self.invalid_txs.calculate_stats(current_time).await;
+        self.processed_txs.calculate_stats(current_time).await;
+        self.processed_blocks.calculate_stats(current_time).await;
     }
 }

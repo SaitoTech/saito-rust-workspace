@@ -406,6 +406,7 @@ pub async fn run_network_controller(
     blockchain: Arc<RwLock<Blockchain>>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
+    sender_to_stat: Sender<String>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -442,8 +443,11 @@ pub async fn run_network_controller(
     );
 
     let controller_handle = tokio::spawn(async move {
-        let mut outgoing_messages =
-            StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
+        let mut outgoing_messages = StatVariable::new(
+            "network::outgoing_msgs".to_string(),
+            STAT_BIN_COUNT,
+            sender_to_stat.clone(),
+        );
         let mut last_stat_on: Instant = Instant::now();
         let mut work_done;
         loop {
@@ -529,7 +533,6 @@ pub async fn run_network_controller(
                 {
                     last_stat_on = Instant::now();
                     outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
-                    outgoing_messages.print();
                 }
             }
             if !work_done {

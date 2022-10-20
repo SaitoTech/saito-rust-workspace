@@ -25,7 +25,6 @@ pub enum MiningEvent {
 /// Manages the miner
 pub struct MiningThread {
     pub wallet: Arc<RwLock<Wallet>>,
-    pub sender_to_blockchain: Sender<RoutingEvent>,
     pub sender_to_mempool: Sender<ConsensusEvent>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub miner_active: bool,
@@ -33,6 +32,7 @@ pub struct MiningThread {
     pub difficulty: u64,
     pub public_key: SaitoPublicKey,
     pub mined_golden_tickets: u64,
+    pub stat_sender: Sender<String>,
 }
 
 impl MiningThread {
@@ -67,6 +67,7 @@ impl MiningThread {
 #[async_trait]
 impl ProcessEvent<MiningEvent> for MiningThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
+        unreachable!();
         None
     }
 
@@ -104,6 +105,12 @@ impl ProcessEvent<MiningEvent> for MiningThread {
     }
 
     async fn on_stat_interval(&mut self, _current_time: Timestamp) {
-        println!("--- stats ------ {} - total : {:?} current difficulty : {:?} miner_active : {:?} current target : {:?} ", format!("{:width$}", "mining::golden_tickets", width = 30), self.mined_golden_tickets, self.difficulty, self.miner_active, hex::encode(self.target));
+        let stat = format!("--- stats ------ {} - total : {:?} current difficulty : {:?} miner_active : {:?} current target : {:?} ",
+                           format!("{:width$}", "mining::golden_tickets", width = 30),
+                           self.mined_golden_tickets,
+                           self.difficulty,
+                           self.miner_active,
+                           hex::encode(self.target));
+        self.stat_sender.send(stat).await.unwrap();
     }
 }

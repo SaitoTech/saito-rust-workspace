@@ -43,18 +43,24 @@ pub struct ConsensusStats {
     pub received_tx: StatVariable,
 }
 
-impl Default for ConsensusStats {
-    fn default() -> Self {
+impl ConsensusStats {
+    pub fn new(sender: Sender<String>) -> Self {
         ConsensusStats {
             blocks_fetched: StatVariable::new(
                 "consensus::blocks_fetched".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
             blocks_created: StatVariable::new(
                 "consensus::blocks_created".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
-            received_tx: StatVariable::new("consensus::received_tx".to_string(), STAT_BIN_COUNT),
+            received_tx: StatVariable::new(
+                "consensus::received_tx".to_string(),
+                STAT_BIN_COUNT,
+                sender.clone(),
+            ),
         }
     }
 }
@@ -75,6 +81,7 @@ pub struct ConsensusThread {
     pub storage: Storage,
     pub stats: ConsensusStats,
     pub txs_for_mempool: Vec<Transaction>,
+    pub stat_sender: Sender<String>,
 }
 
 impl ConsensusThread {
@@ -237,7 +244,7 @@ impl ConsensusThread {
 impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         // trace!("processing new interface event");
-
+        unreachable!();
         None
     }
 
@@ -459,48 +466,57 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
-        self.stats.blocks_fetched.calculate_stats(current_time);
-        self.stats.blocks_created.calculate_stats(current_time);
-        self.stats.received_tx.calculate_stats(current_time);
+        self.stats
+            .blocks_fetched
+            .calculate_stats(current_time)
+            .await;
+        self.stats
+            .blocks_created
+            .calculate_stats(current_time)
+            .await;
+        self.stats.received_tx.calculate_stats(current_time).await;
 
-        self.stats.blocks_fetched.print();
-        self.stats.blocks_created.print();
-        self.stats.received_tx.print();
-
+        // self.stats.blocks_fetched.print();
+        // self.stats.blocks_created.print();
+        // self.stats.received_tx.print();
+        //
         {
             log_read_lock_request!("ConsensusEventProcessor:on_stat_interval::wallet");
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::wallet");
-            println!(
+            let stat =format!(
                 "--- stats ------ {} - total_slips : {:?} unspent_slips : {:?} current_balance : {:?}",
                 format!("{:width$}", "wallet::state", width = 30),
                 wallet.slips.len(),
                 wallet.get_unspent_slip_count(),
                 wallet.get_available_balance()
             );
+            self.stat_sender.send(stat).await.unwrap();
         }
         {
             log_read_lock_request!("ConsensusEventProcessor:on_stat_interval::blockchain");
             let blockchain = self.blockchain.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::blockchain");
-            println!(
+            let stat = format!(
                 "--- stats ------ {} - utxo_size : {:?} block_count : {:?} longest_chain_len : {:?}",
                 format!("{:width$}", "blockchain::state", width = 30),
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
                 blockchain.get_latest_block_id()
             );
+            self.stat_sender.send(stat).await.unwrap();
         }
         {
             log_read_lock_request!("ConsensusEventProcessor:on_stat_interval::mempool");
             let mempool = self.mempool.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::mempool");
-            println!(
+            let stat = format!(
                 "--- stats ------ {} - blocks : {:?} transactions : {:?}",
                 format!("{:width$}", "mempool:state", width = 30),
                 mempool.blocks_queue.len(),
                 mempool.transactions.len(),
             );
+            self.stat_sender.send(stat).await.unwrap();
         }
     }
 }

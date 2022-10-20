@@ -414,6 +414,7 @@ pub async fn run_network_controller(
     sender: Sender<IoEvent>,
     configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     blockchain: Arc<RwLock<Blockchain>>,
+    sender_to_stat: Sender<String>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -456,8 +457,11 @@ pub async fn run_network_controller(
 
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
-        let mut outgoing_messages =
-            StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
+        let mut outgoing_messages = StatVariable::new(
+            "network::outgoing_msgs".to_string(),
+            STAT_BIN_COUNT,
+            sender_to_stat.clone(),
+        );
         let mut last_stat_on: Instant = Instant::now();
         loop {
             // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
@@ -549,7 +553,6 @@ pub async fn run_network_controller(
                 {
                     last_stat_on = Instant::now();
                     outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
-                    outgoing_messages.print();
                 }
             }
 

@@ -44,20 +44,23 @@ pub struct RoutingStats {
     pub total_incoming_messages: StatVariable,
 }
 
-impl Default for RoutingStats {
-    fn default() -> Self {
+impl RoutingStats {
+    pub fn new(sender: Sender<String>) -> Self {
         RoutingStats {
             received_transactions: StatVariable::new(
                 "routing::received_txs".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
             received_blocks: StatVariable::new(
                 "routing::received_blocks".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
             total_incoming_messages: StatVariable::new(
                 "routing::incoming_msgs".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
         }
     }
@@ -79,6 +82,7 @@ pub struct RoutingThread {
     pub public_key: SaitoPublicKey,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
     pub last_verification_thread_index: usize,
+    pub stat_sender: Sender<String>,
 }
 
 impl RoutingThread {
@@ -356,23 +360,25 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
         self.stats
             .received_transactions
-            .calculate_stats(current_time);
-        self.stats.received_blocks.calculate_stats(current_time);
+            .calculate_stats(current_time)
+            .await;
+        self.stats
+            .received_blocks
+            .calculate_stats(current_time)
+            .await;
         self.stats
             .total_incoming_messages
-            .calculate_stats(current_time);
+            .calculate_stats(current_time)
+            .await;
 
-        self.stats.received_transactions.print();
-        self.stats.received_blocks.print();
-        self.stats.total_incoming_messages.print();
-
-        println!(
+        let stat = format!(
             "--- stats ------ {} - size : {:?}",
             format!("{:width$}", "consensus::queue", width = 30),
             self.sender_to_consensus.capacity(),
         );
+        self.stat_sender.send(stat).await.unwrap();
         for (index, sender) in self.senders_to_verification.iter().enumerate() {
-            println!(
+            let stat = format!(
                 "--- stats ------ {} - size : {:?}",
                 format!(
                     "{:width$}",
@@ -381,6 +387,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 ),
                 sender.capacity(),
             );
+            self.stat_sender.send(stat).await.unwrap();
         }
     }
 }
