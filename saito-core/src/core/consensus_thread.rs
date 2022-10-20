@@ -26,7 +26,7 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1_000).as_micros() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(100).as_micros() as u64;
 pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_micros() as u64;
 
 #[derive(Debug)]
@@ -319,40 +319,55 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
             let mut mempool = self.mempool.write().await;
             log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
+            // TODO : optimize this. too much cloning
             if !self.txs_for_mempool.is_empty() {
-                for tx in self.txs_for_mempool.drain(..) {
-                    mempool.add_transaction(tx).await;
+                for tx in self.txs_for_mempool.iter() {
+                    mempool.add_transaction(tx.clone()).await;
                 }
             }
 
-            let can_bundle;
-            {
-                can_bundle = mempool.can_bundle_block(&blockchain, timestamp).await;
-                self.block_producing_timer = 0;
-                work_done = true;
-            }
-
-            if can_bundle {
+            let gt_result = mempool
+                .golden_tickets
+                .remove(&blockchain.get_latest_block_hash());
+            let mut gt_tx = None;
+            if gt_result.is_some() {
+                let gt = gt_result.unwrap();
+                let public_key;
+                let private_key;
                 {
-                    debug!(
-                        "mempool size before bundling : {:?}",
-                        mempool.transactions.len()
-                    );
-                    let block = mempool
-                        .bundle_block(blockchain.deref_mut(), timestamp)
-                        .await;
-                    info!(
-                        "adding bundled block : {:?} to mempool",
-                        hex::encode(block.hash)
-                    );
-                    debug!(
-                        "mempool size after bundling : {:?}",
-                        mempool.transactions.len()
-                    );
-                    mempool.add_block(block);
-                    // dropping the lock here since blockchain needs the write lock to add blocks
-                    drop(mempool);
+                    log_read_lock_request!("wallet");
+                    let wallet = self.wallet.read().await;
+                    log_read_lock_receive!("wallet");
+                    public_key = wallet.public_key;
+                    private_key = wallet.private_key;
                 }
+                let transaction =
+                    Wallet::create_golden_ticket_transaction(gt, &public_key, &private_key).await;
+                gt_tx = Some(transaction);
+            }
+
+            self.block_producing_timer = 0;
+
+            debug!(
+                "mempool size before bundling : {:?}",
+                mempool.transactions.len()
+            );
+            let block = mempool
+                .bundle_block(blockchain.deref_mut(), timestamp, gt_tx.clone())
+                .await;
+            if block.is_some() {
+                let block = block.unwrap();
+                info!(
+                    "adding bundled block : {:?} to mempool",
+                    hex::encode(block.hash)
+                );
+                debug!(
+                    "mempool size after bundling : {:?}",
+                    mempool.transactions.len()
+                );
+                mempool.add_block(block);
+                // dropping the lock here since blockchain needs the write lock to add blocks
+                drop(mempool);
                 self.stats.blocks_created.increment();
                 blockchain
                     .add_blocks_from_mempool(
@@ -366,6 +381,17 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 debug!("blocks added to blockchain");
 
                 work_done = true;
+            } else {
+                // route messages to peers
+                for tx in self.txs_for_mempool.drain(..) {
+                    self.network.propagate_transaction(&tx).await;
+                }
+                // route golden tickets to peers
+                if gt_tx.is_some() {
+                    self.network
+                        .propagate_transaction(gt_tx.as_ref().unwrap())
+                        .await;
+                }
             }
         }
 
@@ -427,7 +453,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)
                 );
-                self.network.propagate_transaction(&transaction).await;
                 self.txs_for_mempool.push(transaction);
 
                 Some(())
@@ -437,9 +462,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     .received_tx
                     .increment_by(transactions.len() as u64);
 
-                for transaction in &transactions {
-                    self.network.propagate_transaction(transaction).await;
-                }
+                // for transaction in &transactions {
+                //     self.network.propagate_transaction(transaction).await;
+                // }
                 self.txs_for_mempool.append(&mut transactions);
                 Some(())
             }
@@ -484,7 +509,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             log_read_lock_request!("ConsensusEventProcessor:on_stat_interval::wallet");
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::wallet");
-            let stat =format!(
+            let stat = format!(
                 "--- stats ------ {} - total_slips : {:?} unspent_slips : {:?} current_balance : {:?}",
                 format!("{:width$}", "wallet::state", width = 30),
                 wallet.slips.len(),

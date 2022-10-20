@@ -275,7 +275,7 @@ impl Block {
         current_timestamp: u64,
         public_key: &SaitoPublicKey,
         private_key: &SaitoPrivateKey,
-        golden_ticket: Option<GoldenTicket>,
+        golden_ticket: Option<Transaction>,
     ) -> Block {
         debug!(
             "Block::create : previous block hash : {:?}",
@@ -316,15 +316,12 @@ impl Block {
         block.creator = public_key.clone();
 
         if golden_ticket.is_some() {
-            let gt = golden_ticket.unwrap();
-            let transaction =
-                Wallet::create_golden_ticket_transaction(gt, &public_key, &private_key).await;
-            block.transactions.push(transaction);
+            block.transactions.push(golden_ticket.unwrap());
         }
         block.transactions.reserve(transactions.len());
-        let mut txs: Vec<Transaction> = transactions.par_drain().map(|(_, tx)| tx).collect();
+        let iter = transactions.drain().map(|(_, tx)| tx).into_iter();
 
-        block.transactions.append(&mut txs);
+        block.transactions.extend(iter);
 
         // block.transactions = transactions.drain().collect();
         transactions.clear();
@@ -1003,7 +1000,7 @@ impl Block {
         //
         if let Some(gt_index) = cv.gt_index {
             let golden_ticket: GoldenTicket =
-                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message.to_vec());
+                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message);
             // generate input hash for router
             let mut next_random_number = hash(&golden_ticket.random.to_vec());
             let _miner_public_key = golden_ticket.public_key;
@@ -1558,9 +1555,8 @@ impl Block {
             // we find that out now, and it invalidates the block.
             //
             if let Some(gt_index) = cv.gt_index {
-                let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
-                    &self.transactions[gt_index].message.to_vec(),
-                );
+                let golden_ticket: GoldenTicket =
+                    GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message);
                 //
                 // we already have a golden ticket, but create a new one pulling the
                 // target hash from our previous block to ensure that this ticket is

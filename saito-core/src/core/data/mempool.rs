@@ -11,7 +11,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::transaction::Transaction;
+use crate::core::data::transaction::{Transaction, TransactionType};
 
 //
 // In addition to responding to global broadcast messages, the
@@ -135,8 +135,17 @@ impl Mempool {
 
         if !self.transactions.contains_key(&transaction.signature) {
             self.routing_work_in_mempool += transaction.total_work;
-            self.transactions.insert(transaction.signature, transaction);
-            self.new_tx_added = true;
+            if let TransactionType::GoldenTicket = transaction.transaction_type {
+                let gt = GoldenTicket::deserialize_from_net(&transaction.message);
+                // if we already have a gt mined by us we ignore this tx
+                if !self.golden_tickets.contains_key(&gt.target) {
+                    self.new_golden_ticket_added = true;
+                    self.transactions.insert(transaction.signature, transaction);
+                }
+            } else {
+                self.transactions.insert(transaction.signature, transaction);
+                self.new_tx_added = true;
+            }
         }
     }
 
@@ -145,14 +154,18 @@ impl Mempool {
         &mut self,
         blockchain: &mut Blockchain,
         current_timestamp: u64,
-    ) -> Block {
+        gt_tx: Option<Transaction>,
+    ) -> Option<Block> {
         debug!("bundling block...");
+
+        if !self.can_bundle_block(blockchain, current_timestamp).await {
+            return None;
+        }
+
         let previous_block_hash: SaitoHash;
         {
             previous_block_hash = blockchain.get_latest_block_hash();
         }
-
-        let gt_result = self.golden_tickets.remove(&previous_block_hash);
 
         let mut block = Block::create(
             &mut self.transactions,
@@ -161,7 +174,7 @@ impl Mempool {
             current_timestamp,
             &self.public_key,
             &self.private_key,
-            gt_result,
+            gt_tx,
         )
         .await;
         block.generate();
@@ -169,7 +182,7 @@ impl Mempool {
         self.new_golden_ticket_added = false;
         self.routing_work_in_mempool = 0;
 
-        block
+        Some(block)
     }
 
     #[tracing::instrument(level = "info", skip_all)]
