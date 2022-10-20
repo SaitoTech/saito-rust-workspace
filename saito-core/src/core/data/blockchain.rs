@@ -21,9 +21,9 @@ use crate::core::mining_thread::MiningEvent;
 use crate::{log_write_lock_receive, log_write_lock_request};
 
 // length of 1 genesis period
-pub const GENESIS_PERIOD: u64 = 100;
+pub const GENESIS_PERIOD: u64 = 100_000;
 // prune blocks from index after N blocks
-pub const PRUNE_AFTER_BLOCKS: u64 = 10;
+pub const PRUNE_AFTER_BLOCKS: u64 = 1000;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
 pub const MAX_STAKER_RECURSION: u64 = 3;
 // max token supply - used in validating block #1
