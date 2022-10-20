@@ -372,20 +372,22 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             .await;
 
         let stat = format!(
-            "--- stats ------ {} - size : {:?}",
+            "--- stats ------ {} - capacity : {:?} / {:?}",
             format!("{:width$}", "consensus::queue", width = 30),
             self.sender_to_consensus.capacity(),
+            self.sender_to_consensus.max_capacity()
         );
         self.stat_sender.send(stat).await.unwrap();
         for (index, sender) in self.senders_to_verification.iter().enumerate() {
             let stat = format!(
-                "--- stats ------ {} - size : {:?}",
+                "--- stats ------ {} - capacity : {:?} / {:?}",
                 format!(
                     "{:width$}",
                     format!("verification_{:?}::queue", index),
                     width = 30
                 ),
                 sender.capacity(),
+                sender.max_capacity()
             );
             self.stat_sender.send(stat).await.unwrap();
         }

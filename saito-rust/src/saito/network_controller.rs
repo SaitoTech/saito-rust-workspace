@@ -1,26 +1,23 @@
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::str::FromStr;
-
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
-use tracing::{debug, error, info, trace, warn};
-
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tracing::{debug, error, info, trace, warn};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
 use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT};
-
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
@@ -555,6 +552,16 @@ pub async fn run_network_controller(
                     outgoing_messages
                         .calculate_stats(TimeKeeper {}.get_timestamp())
                         .await;
+                    log_read_lock_request!("network controller");
+                    let io_controller = network_controller.read().await;
+                    log_read_lock_receive!("network controller");
+                    let stat = format!(
+                        "--- stats ------ {} - capacity : {:?} / {:?}",
+                        format!("{:width$}", "network::queue", width = 30),
+                        io_controller.sender_to_saito_controller.capacity(),
+                        io_controller.sender_to_saito_controller.max_capacity()
+                    );
+                    sender_to_stat.send(stat).await.unwrap();
                 }
             }
 
