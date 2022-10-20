@@ -552,7 +552,9 @@ pub async fn run_network_controller(
                     > Duration::from_millis(configs.get_server_configs().stat_timer_in_ms)
                 {
                     last_stat_on = Instant::now();
-                    outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
+                    outgoing_messages
+                        .calculate_stats(TimeKeeper {}.get_timestamp())
+                        .await;
                 }
             }
 

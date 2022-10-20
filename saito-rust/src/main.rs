@@ -483,7 +483,9 @@ fn run_loop_thread(
                     > Duration::from_millis(stat_timer_in_ms)
                 {
                     last_stat_on = Instant::now();
-                    incoming_msgs.calculate_stats(TimeKeeper {}.get_timestamp());
+                    incoming_msgs
+                        .calculate_stats(TimeKeeper {}.get_timestamp())
+                        .await;
                 }
             }
             if !work_done {
