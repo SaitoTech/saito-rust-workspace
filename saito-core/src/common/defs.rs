@@ -131,17 +131,14 @@ impl StatVariable {
 
     #[tracing::instrument(level = "info", skip_all)]
     fn print(&self) -> String {
-        #[cfg(feature = "with-stats")]
-        {
-            format!(
-                // target : "saito_stats",
-                "--- stats ------ {} - total : {:?} current_rate : {:.2} max_rate : {:.2} min_rate : {:.2}",
-                format!("{:width$}", self.name, width = 30),
-                self.total,
-                self.avg,
-                self.max_avg,
-                self.min_avg
-            )
-        }
+        format!(
+            // target : "saito_stats",
+            "--- stats ------ {} - total : {:?} current_rate : {:.2} max_rate : {:.2} min_rate : {:.2}",
+            format!("{:width$}", self.name, width = 30),
+            self.total,
+            self.avg,
+            self.max_avg,
+            self.min_avg
+        )
     }
 }
