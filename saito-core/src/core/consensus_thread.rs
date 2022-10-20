@@ -18,7 +18,7 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
-use crate::core::data::transaction::Transaction;
+use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::routing_thread::RoutingEvent;
@@ -319,12 +319,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
             let mut mempool = self.mempool.write().await;
             log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
-            // TODO : optimize this. too much cloning
-            if !self.txs_for_mempool.is_empty() {
-                for tx in self.txs_for_mempool.iter() {
-                    mempool.add_transaction(tx.clone()).await;
-                }
-            }
 
             let gt_result = mempool
                 .golden_tickets
@@ -344,6 +338,21 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let transaction =
                     Wallet::create_golden_ticket_transaction(gt, &public_key, &private_key).await;
                 gt_tx = Some(transaction);
+            }
+            // TODO : optimize this. too much cloning
+            if !self.txs_for_mempool.is_empty() {
+                for tx in self.txs_for_mempool.iter() {
+                    if let TransactionType::GoldenTicket = tx.transaction_type {
+                        if gt_tx.is_none() {
+                            let gt = GoldenTicket::deserialize_from_net(&tx.message);
+                            if gt.target == blockchain.get_latest_block_hash() {
+                                mempool.add_transaction(tx.clone()).await;
+                            }
+                        }
+                    } else {
+                        mempool.add_transaction(tx.clone()).await;
+                    }
+                }
             }
 
             self.block_producing_timer = 0;
@@ -366,6 +375,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     mempool.transactions.len()
                 );
                 mempool.add_block(block);
+                self.txs_for_mempool.clear();
                 // dropping the lock here since blockchain needs the write lock to add blocks
                 drop(mempool);
                 self.stats.blocks_created.increment();

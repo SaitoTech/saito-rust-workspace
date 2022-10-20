@@ -860,7 +860,7 @@ impl Transaction {
                 && self.transaction_type != TransactionType::Fee
                 && self.transaction_type != TransactionType::Vip
             {
-                warn!("{} in and {} out", self.total_in, self.total_out);
+                warn!("{:?} in and {:?} out", self.total_in, self.total_out);
                 // for _z in self.outputs.iter() {
                 //     // info!("{:?} --- ", z.amount);
                 // }

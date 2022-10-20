@@ -19,7 +19,6 @@ use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
-use crate::core::data::wallet::Wallet;
 
 pub const BLOCK_HEADER_SIZE: usize = 301;
 
@@ -1717,6 +1716,18 @@ impl Block {
 
         let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
 
+        // let mut transactions_valid = true;
+        // for tx in self.transactions.iter() {
+        //     if !tx.validate(utxoset) {
+        //         transactions_valid = false;
+        //         error!(
+        //             "tx : {:?} of type : {:?} is not valid",
+        //             hex::encode(tx.signature),
+        //             tx.transaction_type
+        //         );
+        //         break;
+        //     }
+        // }
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");
         }
