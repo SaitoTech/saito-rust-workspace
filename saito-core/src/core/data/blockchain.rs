@@ -1439,7 +1439,10 @@ impl Blockchain {
             )
             .await;
         }
-        info!("added {:?} blocks to blockchain", blocks.len());
+        info!(
+            "added blocks to blockchain. added back : {:?}",
+            mempool.blocks_queue.len()
+        );
     }
 }
 
