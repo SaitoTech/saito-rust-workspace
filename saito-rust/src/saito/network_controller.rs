@@ -1,11 +1,15 @@
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::net::SocketAddr;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
@@ -17,7 +21,7 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT};
+use saito_core::common::defs::{SaitoHash, StatVariable, BLOCK_FILE_EXTENSION, STAT_BIN_COUNT};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
@@ -27,6 +31,7 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
+use crate::saito::rust_io_handler::BLOCKS_DIR_PATH;
 use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
@@ -636,40 +641,56 @@ fn run_websocket_server(
                     .await
                 })
             });
-        let http_route = warp::path!("block" / String)
-            .and(warp::any().map(move || blockchain.clone()))
-            .and_then(
-                |block_hash: String, blockchain: Arc<RwLock<Blockchain>>| async move {
-                    debug!("serving block : {:?}", block_hash);
-                    let buffer: Vec<u8>;
-                    {
-                        let block_hash = hex::decode(block_hash);
-                        if block_hash.is_err() {
-                            todo!()
-                        }
-                        let block_hash = block_hash.unwrap();
-                        if block_hash.len() != 32 {
-                            todo!()
-                        }
-                        let block_hash: SaitoHash = block_hash.try_into().unwrap();
-                        log_read_lock_request!("run_websocket_server:blockchain");
-                        // TODO : load disk from disk and serve rather than locking the blockchain
-                        let blockchain = blockchain.read().await;
-                        log_read_lock_receive!("run_websocket_server:blockchain");
-                        let block = blockchain.get_block(&block_hash);
-                        if block.is_none() {
-                            debug!("block not found : {:?}", block_hash);
-                            return Err(warp::reject::not_found());
-                        }
-                        // TODO : check if the full block is in memory or need to load from disk
-                        buffer = block.unwrap().serialize_for_net(BlockType::Full);
+        let http_route = warp::path!("block" / String).and_then(|block_hash: String| async move {
+            debug!("serving block : {:?}", block_hash);
+            let mut buffer: Vec<u8> = Default::default();
+            let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
+            if result.is_err() {
+                debug!("no blocks found");
+                return Err(warp::reject::not_found());
+            }
+            let paths: Vec<_> = result
+                .unwrap()
+                .map(|r| r.unwrap())
+                .filter(|r| {
+                    let filename = r.file_name().into_string().unwrap();
+                    if !filename.contains(BLOCK_FILE_EXTENSION) {
+                        return false;
                     }
-                    let buffer_len = buffer.len();
-                    let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
-                    debug!("served block with : {:?} length", buffer_len);
-                    return result;
-                },
-            );
+                    if !filename.contains(block_hash.as_str()) {
+                        return false;
+                    }
+                    debug!("selected file : {:?}", filename);
+                    return true;
+                })
+                .collect();
+
+            if paths.is_empty() {
+                return Err(warp::reject::not_found());
+            }
+            let path = paths.first().unwrap();
+            let file_path = BLOCKS_DIR_PATH.to_string()
+                + "/"
+                + path.file_name().into_string().unwrap().as_str();
+            let result = File::open(file_path.as_str()).await;
+            if result.is_err() {
+                error!("failed opening file : {:?}", result.err().unwrap());
+                todo!()
+            }
+            let mut file = result.unwrap();
+
+            let result = file.read_to_end(&mut buffer).await;
+            if result.is_err() {
+                error!("failed reading file : {:?}", result.err().unwrap());
+                todo!()
+            }
+            drop(file);
+
+            let buffer_len = buffer.len();
+            let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
+            debug!("served block with : {:?} length", buffer_len);
+            return result;
+        });
         let routes = http_route.or(ws_route);
         // let (_, server) =
         //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
