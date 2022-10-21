@@ -4,7 +4,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
@@ -190,7 +190,7 @@ impl RoutingThread {
         request: BlockchainRequest,
         peer_index: u64,
     ) {
-        debug!(
+        info!(
             "processing incoming blockchain request : {:?}-{:?}-{:?} from peer : {:?}",
             request.latest_block_id,
             hex::encode(request.latest_block_hash),

@@ -268,7 +268,7 @@ impl Network {
         peer_index: u64,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        debug!("requesting blockchain from peer : {:?}", peer_index);
+        info!("requesting blockchain from peer : {:?}", peer_index);
 
         // TODO : should this be moved inside peer ?
         let request;
