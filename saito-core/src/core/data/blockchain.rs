@@ -95,7 +95,7 @@ impl Blockchain {
         // block.generate_hash();
         block.generate();
 
-        info!(
+        debug!(
             "add_block {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
             &hex::encode(&block.hash),
             block.id,
