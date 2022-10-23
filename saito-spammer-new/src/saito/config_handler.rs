@@ -16,6 +16,7 @@ pub struct Spammer {
     pub tx_count: u64,
     pub tx_payment: u64,
     pub tx_fee: u64,
+    pub stop_after: u64,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -50,6 +51,7 @@ impl SpammerConfigs {
                 tx_count: 0,
                 tx_payment: 0,
                 tx_fee: 0,
+                stop_after: 0,
             },
         }
     }

@@ -67,19 +67,24 @@ impl Spammer {
         let mut work_done = false;
         let timer_in_milli;
         let burst_count;
+        let stop_after;
 
         {
             let config = self.configs.read().await;
             timer_in_milli = config.get_spammer_configs().timer_in_milli;
             burst_count = config.get_spammer_configs().burst_count;
+            stop_after = config.get_spammer_configs().stop_after;
         }
+
         let sender = self.sender_to_network.clone();
         tokio::spawn(async move {
+            let mut total_count = 0;
             let mut count = burst_count;
             loop {
                 if let Some(transactions) = receiver.recv().await {
                     for tx in transactions {
                         count -= 1;
+                        total_count += 1;
                         sender
                             .send(IoEvent {
                                 event_processor_id: 0,
@@ -95,6 +100,11 @@ impl Spammer {
                         if count == 0 {
                             tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
                             count = burst_count;
+                        }
+                        if total_count == stop_after {
+                            tokio::time::sleep(Duration::from_millis(10_000)).await;
+                            info!("terminating spammer after sending : {:?} txs", total_count);
+                            std::process::exit(0);
                         }
                     }
                 }
