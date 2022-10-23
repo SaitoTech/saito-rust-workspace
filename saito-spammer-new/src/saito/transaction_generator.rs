@@ -34,7 +34,7 @@ pub struct TransactionGenerator {
     wallet: Arc<RwLock<Wallet>>,
     blockchain: Arc<RwLock<Blockchain>>,
     expected_slip_count: u64,
-    tx_size: u32,
+    tx_size: u64,
     tx_count: u64,
     time_keeper: Box<TimeKeeper>,
     public_key: SaitoPublicKey,
@@ -55,11 +55,11 @@ impl TransactionGenerator {
         tx_payment: Currency,
         tx_fee: Currency,
     ) -> Self {
-        let tx_size = 10;
+        let mut tx_size = 10;
         let tx_count;
         {
             let config = configuration.read().await;
-            // tx_size = config.spammer.tx_size;
+            tx_size = config.get_spammer_configs().tx_size;
             tx_count = config.get_spammer_configs().tx_count;
         }
 

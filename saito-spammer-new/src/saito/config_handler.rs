@@ -5,14 +5,13 @@ use figment::Figment;
 use serde::Deserialize;
 use tracing::{debug, error};
 
-use saito_core::common::defs::Currency;
 use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Spammer {
     pub timer_in_milli: u64,
     pub burst_count: u32,
-    pub tx_size: u32,
+    pub tx_size: u64,
     pub tx_count: u64,
     pub tx_payment: u64,
     pub tx_fee: u64,
