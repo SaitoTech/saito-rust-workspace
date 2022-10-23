@@ -708,29 +708,32 @@ impl Transaction {
         if !opt_hop.is_none() {
             path_len = path_len + 1;
         }
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&(self.inputs.len() as u32).to_be_bytes());
-        vbytes.extend(&(self.outputs.len() as u32).to_be_bytes());
-        vbytes.extend(&(self.message.len() as u32).to_be_bytes());
-        vbytes.extend(&(path_len as u32).to_be_bytes());
-        vbytes.extend(&self.signature);
-        vbytes.extend(&self.timestamp.to_be_bytes());
-        vbytes.extend(&self.replaces_txs.to_be_bytes());
-        vbytes.extend(&(self.transaction_type as u8).to_be_bytes());
+        let mut buffer: Vec<u8> = [
+            (self.inputs.len() as u32).to_be_bytes().as_slice(),
+            (self.outputs.len() as u32).to_be_bytes().as_slice(),
+            (self.message.len() as u32).to_be_bytes().as_slice(),
+            (path_len as u32).to_be_bytes().as_slice(),
+            &self.signature.as_slice(),
+            self.timestamp.to_be_bytes().as_slice(),
+            self.replaces_txs.to_be_bytes().as_slice(),
+            (self.transaction_type as u8).to_be_bytes().as_slice(),
+        ]
+        .concat();
+
         for input in &self.inputs {
-            vbytes.extend(&input.serialize_for_net());
+            buffer.extend(&input.serialize_for_net());
         }
         for output in &self.outputs {
-            vbytes.extend(&output.serialize_for_net());
+            buffer.extend(&output.serialize_for_net());
         }
-        vbytes.extend(&self.message);
+        buffer.extend(&self.message);
         for hop in &self.path {
-            vbytes.extend(&hop.serialize_for_net());
+            buffer.extend(&hop.serialize_for_net());
         }
         if !opt_hop.is_none() {
-            vbytes.extend(opt_hop.unwrap().serialize_for_net());
+            buffer.extend(opt_hop.unwrap().serialize_for_net());
         }
-        vbytes
+        buffer
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]
@@ -738,19 +741,19 @@ impl Transaction {
         //
         // fastest known way that isn't bincode ??
         //
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.timestamp.to_be_bytes());
+        let mut buffer: Vec<u8> = vec![];
+        buffer.extend(&self.timestamp.to_be_bytes());
         for input in &self.inputs {
-            vbytes.extend(&input.serialize_input_for_signature());
+            buffer.extend(&input.serialize_input_for_signature());
         }
         for output in &self.outputs {
-            vbytes.extend(&output.serialize_output_for_signature());
+            buffer.extend(&output.serialize_output_for_signature());
         }
-        vbytes.extend(&(self.replaces_txs as u32).to_be_bytes());
-        vbytes.extend(&(self.transaction_type as u32).to_be_bytes());
-        vbytes.extend(&self.message);
+        buffer.extend(&(self.replaces_txs as u32).to_be_bytes());
+        buffer.extend(&(self.transaction_type as u32).to_be_bytes());
+        buffer.extend(&self.message);
 
-        vbytes
+        buffer
     }
 
     // #[tracing::instrument(level = "info", skip_all)]

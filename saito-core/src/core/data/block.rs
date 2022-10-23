@@ -1260,29 +1260,32 @@ impl Block {
     /// [transaction][transaction][transaction]...
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
+        let mut buffer: Vec<u8> = vec![];
 
         // block headers do not get tx data
         if block_type == BlockType::Header {
-            vbytes.extend(&(0 as u32).to_be_bytes());
+            buffer.extend(&(0 as u32).to_be_bytes());
         } else {
-            vbytes.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
+            buffer.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
         }
-
-        vbytes.extend(&self.id.to_be_bytes());
-        vbytes.extend(&self.timestamp.to_be_bytes());
-        vbytes.extend(&self.previous_block_hash);
-        vbytes.extend(&self.creator);
-        vbytes.extend(&self.merkle_root);
-        vbytes.extend(&self.signature);
-        vbytes.extend(&self.treasury.to_be_bytes());
-        vbytes.extend(&self.staking_treasury.to_be_bytes());
-        vbytes.extend(&self.burnfee.to_be_bytes());
-        vbytes.extend(&self.difficulty.to_be_bytes());
-        vbytes.extend(&self.avg_income.to_be_bytes());
-        vbytes.extend(&self.avg_variance.to_be_bytes());
-        vbytes.extend(&self.avg_atr_income.to_be_bytes());
-        vbytes.extend(&self.avg_atr_variance.to_be_bytes());
+        let mut buffer = [
+            buffer.as_slice(),
+            self.id.to_be_bytes().as_slice(),
+            self.timestamp.to_be_bytes().as_slice(),
+            self.previous_block_hash.as_slice(),
+            self.creator.as_slice(),
+            self.merkle_root.as_slice(),
+            self.signature.as_slice(),
+            self.treasury.to_be_bytes().as_slice(),
+            self.staking_treasury.to_be_bytes().as_slice(),
+            self.burnfee.to_be_bytes().as_slice(),
+            self.difficulty.to_be_bytes().as_slice(),
+            self.avg_income.to_be_bytes().as_slice(),
+            self.avg_variance.to_be_bytes().as_slice(),
+            self.avg_atr_income.to_be_bytes().as_slice(),
+            self.avg_atr_variance.to_be_bytes().as_slice(),
+        ]
+        .concat();
 
         let mut serialized_txs = vec![];
 
@@ -1291,10 +1294,10 @@ impl Block {
             self.transactions.iter().for_each(|transaction| {
                 serialized_txs.extend(transaction.serialize_for_net());
             });
-            vbytes.extend(serialized_txs);
+            buffer.extend(serialized_txs);
         }
 
-        vbytes
+        buffer
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
