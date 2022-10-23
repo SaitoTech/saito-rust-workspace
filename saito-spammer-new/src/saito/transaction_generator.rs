@@ -262,9 +262,9 @@ impl TransactionGenerator {
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet.clone();
         let blockchain = self.blockchain.clone();
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
         let public_key = self.public_key.clone();
-        let count = 1000000;
+        let count = 200000;
         let required_balance = (self.tx_payment + self.tx_fee) * count as Currency;
         let payment = self.tx_payment;
         let fee = self.tx_fee;
