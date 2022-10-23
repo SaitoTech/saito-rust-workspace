@@ -14,7 +14,7 @@ pub type SaitoUTXOSetKey = [u8; 66];
 pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 
 pub const BLOCK_FILE_EXTENSION: &str = ".sai";
-pub const STAT_BIN_COUNT: usize = 10;
+pub const STAT_BIN_COUNT: usize = 3;
 
 /// NOTE : Lock ordering is decided from how frequent the usage is for that resource. Please make sure to follow the order given below to avoid deadlocks
 /// network controller
