@@ -615,6 +615,7 @@ fn run_websocket_server(
                 let clone = io_controller.clone();
                 let _peer_counter = peer_counter.clone();
                 let sender_to_io = sender_to_io.clone();
+                let ws = ws.max_message_size(10_000_000_000);
                 ws.on_upgrade(move |socket| async move {
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
