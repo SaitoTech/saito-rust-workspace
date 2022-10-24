@@ -51,7 +51,7 @@ impl NetworkController {
 
         match connection {
             PeerSender::Warp(sender) => {
-                if let Err(error) = sender.send(warp::ws::Message::binary(buffer.clone())).await {
+                if let Err(error) = sender.send(warp::ws::Message::binary(buffer)).await {
                     error!(
                         "Error sending message, Peer Index = {:?}, Reason {:?}",
                         peer_index, error
@@ -59,19 +59,17 @@ impl NetworkController {
 
                     send_failed = true;
                 }
-                if let Err(error) = sender.flush().await {
-                    error!(
-                        "Error flushing connection, Peer Index = {:?}, Reason {:?}",
-                        peer_index, error
-                    );
-                    send_failed = true;
-                }
+                // if let Err(error) = sender.flush().await {
+                //     error!(
+                //         "Error flushing connection, Peer Index = {:?}, Reason {:?}",
+                //         peer_index, error
+                //     );
+                //     send_failed = true;
+                // }
             }
             PeerSender::Tungstenite(sender) => {
                 if let Err(error) = sender
-                    .send(tokio_tungstenite::tungstenite::Message::Binary(
-                        buffer.clone(),
-                    ))
+                    .send(tokio_tungstenite::tungstenite::Message::Binary(buffer))
                     .await
                 {
                     error!(
@@ -80,13 +78,13 @@ impl NetworkController {
                     );
                     send_failed = true;
                 }
-                if let Err(error) = sender.flush().await {
-                    error!(
-                        "Error flushing connection, Peer Index = {:?}, Reason {:?}",
-                        peer_index, error
-                    );
-                    send_failed = true;
-                }
+                // if let Err(error) = sender.flush().await {
+                //     error!(
+                //         "Error flushing connection, Peer Index = {:?}, Reason {:?}",
+                //         peer_index, error
+                //     );
+                //     send_failed = true;
+                // }
             }
         }
 
