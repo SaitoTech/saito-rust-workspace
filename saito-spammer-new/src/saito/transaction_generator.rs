@@ -264,7 +264,7 @@ impl TransactionGenerator {
         let blockchain = self.blockchain.clone();
         let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
         let public_key = self.public_key.clone();
-        let count = 200000;
+        let count = self.tx_count;
         let required_balance = (self.tx_payment + self.tx_fee) * count as Currency;
         let payment = self.tx_payment;
         let fee = self.tx_fee;
@@ -281,7 +281,7 @@ impl TransactionGenerator {
                     log_write_lock_receive!("create_test_transactions:wallet");
                     if wallet.get_available_balance() >= required_balance {
                         assert_ne!(blockchain.utxoset.len(), 0);
-                        let mut vec = VecDeque::with_capacity(count);
+                        let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
                             let transaction =
                                 Transaction::create(&mut wallet, public_key, payment, fee);
