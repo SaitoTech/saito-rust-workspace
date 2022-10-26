@@ -123,11 +123,17 @@ impl BlockchainSyncState {
             if res.is_some() {
                 count = res.unwrap().len();
             }
+            let mut last_id = 0;
+            let last = vec.last();
+            if last.is_some() {
+                last_id = last.unwrap().2;
+            }
             let stat = format!(
-                "--- stats ------ {} - peer : {:?} fetching : {:?} waiting_to_order : {:?}",
+                "--- stats ------ {} - peer : {:?} fetching_count : {:?} fetching_till : {:?} waiting_to_order : {:?}",
                 format!("{:width$}", "routing:sync_state", width = 30),
                 peer_index,
                 vec.len(),
+                last_id,
                 count
             );
             stats.push(stat);
