@@ -250,6 +250,8 @@ impl RoutingThread {
                     .await;
                 if result.is_some() {
                     fetched_blocks.push((peer_index, *hash));
+                } else {
+                    self.blockchain_sync_state.remove_entry(*hash, peer_index);
                 }
             }
         }
@@ -353,6 +355,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                             .await;
                         if result.is_some() {
                             fetched_blocks.push((peer_index, *hash));
+                        } else {
+                            self.blockchain_sync_state.remove_entry(*hash, peer_index);
                         }
                     }
                 }

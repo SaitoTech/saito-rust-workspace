@@ -5,7 +5,7 @@ use tracing::debug;
 
 use crate::common::defs::SaitoHash;
 
-const BLOCK_FETCH_BATCH_SIZE: usize = 10;
+const BLOCK_FETCH_BATCH_SIZE: usize = 20;
 
 pub struct BlockchainSyncState {
     received_block_picture: HashMap<u64, HashMap<u64, SaitoHash>>,
@@ -124,20 +124,12 @@ mod tests {
     #[test]
     fn single_peer_window_test() {
         let mut state = BlockchainSyncState::new();
-        state.add_entry([1; 32], 1, 1);
-        state.add_entry([2; 32], 2, 1);
-        state.add_entry([3; 32], 3, 1);
-        state.add_entry([4; 32], 4, 1);
-        state.add_entry([5; 32], 5, 1);
-        state.add_entry([6; 32], 6, 1);
-        state.add_entry([7; 32], 7, 1);
-        state.add_entry([8; 32], 8, 1);
-        state.add_entry([9; 32], 9, 1);
-        state.add_entry([10; 32], 10, 1);
-        state.add_entry([11; 32], 11, 1);
-        state.add_entry([12; 32], 12, 1);
-        state.add_entry([20; 32], 20, 1);
-        state.add_entry([21; 32], 21, 1);
+
+        for i in 0..BLOCK_FETCH_BATCH_SIZE + 2 {
+            state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1);
+        }
+        state.add_entry([200; 32], 200, 1);
+        state.add_entry([201; 32], 201, 1);
 
         state.build_peer_block_picture();
         let mut result = state.request_blocks_from_waitlist();
@@ -158,7 +150,7 @@ mod tests {
         let vec = result.get_mut(&1);
         assert!(vec.is_some());
         let vec = vec.unwrap();
-        assert_eq!(vec.len(), 8);
+        assert_eq!(vec.len(), BLOCK_FETCH_BATCH_SIZE - 2);
 
         state.remove_entry([2; 32], 1);
         state.remove_entry([5; 32], 1);
@@ -170,6 +162,6 @@ mod tests {
         let vec = result.get_mut(&1);
         assert!(vec.is_some());
         let vec = vec.unwrap();
-        assert_eq!(vec.len(), 9);
+        assert_eq!(vec.len(), BLOCK_FETCH_BATCH_SIZE - 1);
     }
 }
