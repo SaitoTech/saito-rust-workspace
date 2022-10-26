@@ -45,7 +45,6 @@ impl Hop {
         hop
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Hop {
         let from: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let to: SaitoPublicKey = bytes[33..66].try_into().unwrap();
@@ -59,7 +58,6 @@ impl Hop {
         hop
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_net(&self) -> Vec<u8> {
         let vbytes: Vec<u8> = [
             self.from.as_slice(),
