@@ -2,7 +2,7 @@ use std::io::Error;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::interface_io::InterfaceIO;

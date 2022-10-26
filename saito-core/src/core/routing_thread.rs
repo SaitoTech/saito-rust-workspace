@@ -1,3 +1,4 @@
+use ahash::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,6 +14,7 @@ use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data;
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
@@ -83,6 +85,7 @@ pub struct RoutingThread {
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
     pub last_verification_thread_index: usize,
     pub stat_sender: Sender<String>,
+    pub blockchain_sync_state: BlockchainSyncState,
 }
 
 impl RoutingThread {
@@ -132,12 +135,6 @@ impl RoutingThread {
                     )
                     .await;
             }
-            // Message::HandshakeCompletion(response) => {
-            //     debug!("received handshake completion");
-            //     self.network
-            //         .handle_handshake_completion(peer_index, response, self.blockchain.clone())
-            //         .await;
-            // }
             Message::ApplicationMessage(_) => {
                 debug!("received buffer");
             }
@@ -154,8 +151,9 @@ impl RoutingThread {
                 self.process_incoming_blockchain_request(request, peer_index)
                     .await;
             }
-            Message::BlockHeaderHash(hash) => {
-                self.process_incoming_block_hash(hash, peer_index).await;
+            Message::BlockHeaderHash(hash, prev_hash) => {
+                self.process_incoming_block_hash(hash, prev_hash, peer_index)
+                    .await;
             }
             Message::Ping() => {}
             Message::SPVChain() => {}
@@ -215,7 +213,7 @@ impl RoutingThread {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
             }
-            let buffer = Message::BlockHeaderHash(block_hash).serialize();
+            let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
                 .send_message(peer_index, buffer)
@@ -224,15 +222,38 @@ impl RoutingThread {
         }
     }
     #[tracing::instrument(level = "info", skip_all)]
-    async fn process_incoming_block_hash(&self, block_hash: SaitoHash, peer_index: u64) {
+    async fn process_incoming_block_hash(
+        &mut self,
+        block_hash: SaitoHash,
+        block_id: u64,
+        peer_index: u64,
+    ) {
         debug!(
             "processing incoming block hash : {:?} from peer : {:?}",
             hex::encode(block_hash),
             peer_index
         );
-        self.network
-            .process_incoming_block_hash(block_hash, peer_index, self.blockchain.clone())
-            .await;
+
+        self.blockchain_sync_state
+            .add_entry(block_hash, block_id, peer_index);
+
+        self.blockchain_sync_state.build_peer_block_picture();
+
+        let map = self.blockchain_sync_state.request_blocks_from_waitlist();
+
+        let mut fetched_blocks: Vec<(u64, SaitoHash)> = Default::default();
+        for (peer_index, vec) in map {
+            for hash in vec.iter() {
+                let result = self
+                    .network
+                    .process_incoming_block_hash(*hash, peer_index, self.blockchain.clone())
+                    .await;
+                if result.is_some() {
+                    fetched_blocks.push((peer_index, *hash));
+                }
+            }
+        }
+        self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
     }
 
     async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
@@ -318,6 +339,24 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
                 self.send_to_verification_thread(VerifyRequest::Block(buffer, peer_index))
                     .await;
+
+                self.blockchain_sync_state
+                    .remove_entry(block_hash, peer_index);
+                let map = self.blockchain_sync_state.request_blocks_from_waitlist();
+
+                let mut fetched_blocks: Vec<(u64, SaitoHash)> = Default::default();
+                for (peer_index, vec) in map {
+                    for hash in vec.iter() {
+                        let result = self
+                            .network
+                            .process_incoming_block_hash(*hash, peer_index, self.blockchain.clone())
+                            .await;
+                        if result.is_some() {
+                            fetched_blocks.push((peer_index, *hash));
+                        }
+                    }
+                }
+                self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
 
                 return Some(());
             }

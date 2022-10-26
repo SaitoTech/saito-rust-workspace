@@ -1,5 +1,6 @@
 pub mod block;
 pub mod blockchain;
+pub mod blockchain_sync_state;
 pub mod blockring;
 pub mod burnfee;
 pub mod configuration;

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use rayon::prelude::*;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::debug;
 

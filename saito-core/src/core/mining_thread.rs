@@ -14,7 +14,6 @@ use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data::crypto::{generate_random_bytes, hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::wallet::Wallet;
-use crate::core::routing_thread::RoutingEvent;
 use crate::{log_read_lock_receive, log_read_lock_request};
 
 #[derive(Debug)]

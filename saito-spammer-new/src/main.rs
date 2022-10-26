@@ -21,6 +21,7 @@ use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
+use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::network::Network;
@@ -313,6 +314,7 @@ async fn run_routing_event_processor(
         senders_to_verification: senders,
         last_verification_thread_index: 0,
         stat_sender: sender_to_stat.clone(),
+        blockchain_sync_state: BlockchainSyncState::new(),
     };
     {
         log_read_lock_request!("configs");

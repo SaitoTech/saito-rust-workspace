@@ -17,6 +17,7 @@ use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignatu
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
+use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::mempool::Mempool;
@@ -122,6 +123,7 @@ pub fn new() -> SaitoWasm {
             senders_to_verification: vec![],
             last_verification_thread_index: 0,
             stat_sender: sender_to_stat.clone(),
+            blockchain_sync_state: BlockchainSyncState::new(),
         },
         routing_event_processor: ConsensusThread {
             mempool: context.mempool.clone(),

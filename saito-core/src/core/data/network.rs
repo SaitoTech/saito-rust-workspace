@@ -7,7 +7,6 @@ use tracing::{debug, info, trace, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::common::interface_io::InterfaceIO;
-use crate::core::data;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
@@ -72,7 +71,7 @@ impl Network {
         }
 
         debug!("sending block : {:?} to peers", hex::encode(&block.hash));
-        let message = Message::BlockHeaderHash(block.hash);
+        let message = Message::BlockHeaderHash(block.hash, block.id);
         self.io_interface
             .send_message_to_all(message.serialize(), excluded_peers)
             .await
@@ -294,13 +293,16 @@ impl Network {
         block_hash: SaitoHash,
         peer_index: u64,
         blockchain: Arc<RwLock<Blockchain>>,
-    ) {
+    ) -> Option<()> {
         let block_exists;
         {
             log_read_lock_request!("network:process_incoming_block_hash:blockchain");
             let blockchain = blockchain.read().await;
             log_read_lock_receive!("network:process_incoming_block_hash:blockchain");
             block_exists = blockchain.is_block_indexed(block_hash);
+        }
+        if block_exists {
+            return None;
         }
         let url;
         {
@@ -313,12 +315,11 @@ impl Network {
                 .expect("peer not found");
             url = peer.get_block_fetch_url(block_hash);
         }
-        if !block_exists {
-            self.io_interface
-                .fetch_block_from_peer(block_hash, peer_index, url)
-                .await
-                .unwrap();
-        }
+        self.io_interface
+            .fetch_block_from_peer(block_hash, peer_index, url)
+            .await
+            .unwrap();
+        return Some(());
     }
 
     pub async fn initialize_static_peers(
