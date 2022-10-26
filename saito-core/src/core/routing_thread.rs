@@ -238,7 +238,13 @@ impl RoutingThread {
             .add_entry(block_hash, block_id, peer_index);
 
         self.blockchain_sync_state.build_peer_block_picture();
-
+        {
+            log_read_lock_request!("VerificationThread:verify_tx::blockchain");
+            let blockchain = self.blockchain.read().await;
+            log_read_lock_receive!("VerificationThread:verify_tx::blockchain");
+            self.blockchain_sync_state
+                .set_latest_blockchain_id(blockchain.get_latest_block_id());
+        }
         let map = self.blockchain_sync_state.request_blocks_from_waitlist();
 
         let mut fetched_blocks: Vec<(u64, SaitoHash)> = Default::default();
@@ -344,6 +350,13 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
                 self.blockchain_sync_state
                     .remove_entry(block_hash, peer_index);
+                {
+                    log_read_lock_request!("VerificationThread:verify_tx::blockchain");
+                    let blockchain = self.blockchain.read().await;
+                    log_read_lock_receive!("VerificationThread:verify_tx::blockchain");
+                    self.blockchain_sync_state
+                        .set_latest_blockchain_id(blockchain.get_latest_block_id());
+                }
                 let map = self.blockchain_sync_state.request_blocks_from_waitlist();
 
                 let mut fetched_blocks: Vec<(u64, SaitoHash)> = Default::default();

@@ -10,6 +10,8 @@ const BLOCK_FETCH_BATCH_SIZE: usize = 20;
 pub struct BlockchainSyncState {
     received_block_picture: HashMap<u64, HashMap<u64, SaitoHash>>,
     blocks_to_fetch: HashMap<u64, Vec<(SaitoHash, bool, u64)>>,
+    /// since we are maintaining this state in routing thread and adding to blockchain in other thread, we need to keep a ceiling value for allowed block ids
+    block_ceiling: u64,
 }
 
 impl BlockchainSyncState {
@@ -17,6 +19,7 @@ impl BlockchainSyncState {
         BlockchainSyncState {
             received_block_picture: Default::default(),
             blocks_to_fetch: Default::default(),
+            block_ceiling: 0,
         }
     }
     pub(crate) fn build_peer_block_picture(&mut self) {
@@ -67,9 +70,12 @@ impl BlockchainSyncState {
             // check if we have blocks to fetch within our batch size
             for i in 0..min(hashes.len(), BLOCK_FETCH_BATCH_SIZE) {
                 // TODO : same block can be fetched from multiple peers as of now. need to define the expected behaviour
-                let (hash, fetching, _) = hashes
+                let (hash, fetching, block_id) = hashes
                     .get_mut(i)
                     .expect("entry should exist since we are checking the length");
+                if *block_id > self.block_ceiling {
+                    break;
+                }
                 if !*fetching {
                     debug!("fetching : {:?}", hex::encode(*hash));
                     if res.contains_key(peer_index) {
@@ -138,7 +144,16 @@ impl BlockchainSyncState {
             );
             stats.push(stat);
         }
+        let stat = format!(
+            "--- stats ------ {} - block_ceiling : {:?}",
+            format!("{:width$}", "routing:sync_state", width = 30),
+            self.block_ceiling
+        );
+        stats.push(stat);
         stats
+    }
+    pub fn set_latest_blockchain_id(&mut self, id: u64) {
+        self.block_ceiling = id + BLOCK_FETCH_BATCH_SIZE as u64;
     }
 }
 
