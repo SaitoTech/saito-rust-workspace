@@ -19,7 +19,7 @@ impl BlockchainSyncState {
         BlockchainSyncState {
             received_block_picture: Default::default(),
             blocks_to_fetch: Default::default(),
-            block_ceiling: 0,
+            block_ceiling: BLOCK_FETCH_BATCH_SIZE as u64,
         }
     }
     pub(crate) fn build_peer_block_picture(&mut self) {
@@ -203,6 +203,7 @@ mod tests {
         state.remove_entry([8; 32], 1);
 
         state.build_peer_block_picture();
+        state.set_latest_blockchain_id(30);
         let mut result = state.request_blocks_from_waitlist();
         assert_eq!(result.len(), 1);
         let vec = result.get_mut(&1);
