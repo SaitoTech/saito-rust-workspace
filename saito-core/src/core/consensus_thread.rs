@@ -545,7 +545,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let mempool = self.mempool.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::mempool");
             let stat = format!(
-                "--- stats ------ {} - blocks : {:?} transactions : {:?}",
+                "--- stats ------ {} - blocks_queue : {:?} transactions : {:?}",
                 format!("{:width$}", "mempool:state", width = 30),
                 mempool.blocks_queue.len(),
                 mempool.transactions.len(),

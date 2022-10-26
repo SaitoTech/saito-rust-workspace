@@ -434,5 +434,10 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             );
             self.stat_sender.send(stat).await.unwrap();
         }
+
+        let stats = self.blockchain_sync_state.get_stats();
+        for stat in stats {
+            self.stat_sender.send(stat).await.unwrap();
+        }
     }
 }

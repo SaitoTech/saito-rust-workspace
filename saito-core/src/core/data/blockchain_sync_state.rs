@@ -115,6 +115,25 @@ impl BlockchainSyncState {
         }
         self.blocks_to_fetch.retain(|index, map| !map.is_empty());
     }
+    pub fn get_stats(&self) -> Vec<String> {
+        let mut stats = vec![];
+        for (peer_index, vec) in self.blocks_to_fetch.iter() {
+            let res = self.received_block_picture.get(peer_index);
+            let mut count = 0;
+            if res.is_some() {
+                count = res.unwrap().len();
+            }
+            let stat = format!(
+                "--- stats ------ {} - peer : {:?} fetching : {:?} waiting_to_order : {:?}",
+                format!("{:width$}", "routing:sync_state", width = 30),
+                peer_index,
+                vec.len(),
+                count
+            );
+            stats.push(stat);
+        }
+        stats
+    }
 }
 
 #[cfg(test)]
