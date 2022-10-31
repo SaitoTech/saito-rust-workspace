@@ -34,7 +34,7 @@ pub struct TransactionGenerator {
     wallet: Arc<RwLock<Wallet>>,
     blockchain: Arc<RwLock<Blockchain>>,
     expected_slip_count: u64,
-    tx_size: u32,
+    tx_size: u64,
     tx_count: u64,
     time_keeper: Box<TimeKeeper>,
     public_key: SaitoPublicKey,
@@ -55,11 +55,11 @@ impl TransactionGenerator {
         tx_payment: Currency,
         tx_fee: Currency,
     ) -> Self {
-        let tx_size = 10;
+        let mut tx_size = 10;
         let tx_count;
         {
             let config = configuration.read().await;
-            // tx_size = config.spammer.tx_size;
+            tx_size = config.get_spammer_configs().tx_size;
             tx_count = config.get_spammer_configs().tx_count;
         }
 
@@ -130,6 +130,19 @@ impl TransactionGenerator {
                 available_balance / unspent_slip_count as Currency;
             let mut total_output_slips_created: u64 = 0;
 
+            let mut to_public_key = [0; 33];
+
+            {
+                log_read_lock_request!("peers");
+                let peers = self.peers.read().await;
+                log_read_lock_receive!("peers");
+                for peer in peers.index_to_peers.iter() {
+                    to_public_key = peer.1.public_key.clone().unwrap();
+                    break;
+                }
+                assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+                assert_ne!(to_public_key, self.public_key);
+            }
             let mut txs: VecDeque<Transaction> = Default::default();
             for _i in 0..unspent_slip_count {
                 let transaction = self
@@ -137,6 +150,7 @@ impl TransactionGenerator {
                         output_slips_per_input_slip,
                         total_nolans_requested_per_slip,
                         &mut total_output_slips_created,
+                        &to_public_key,
                     )
                     .await;
 
@@ -168,6 +182,7 @@ impl TransactionGenerator {
         output_slips_per_input_slip: u8,
         total_nolans_requested_per_slip: Currency,
         total_output_slips_created: &mut u64,
+        to_public_key: &SaitoPublicKey,
     ) -> Transaction {
         let payment_amount =
             total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
@@ -212,7 +227,7 @@ impl TransactionGenerator {
         transaction.timestamp = self.time_keeper.get_timestamp();
         transaction.generate(&self.public_key, 0, 0);
         transaction.sign(&self.private_key);
-        transaction.add_hop(&wallet.private_key, &wallet.public_key, &self.public_key);
+        transaction.add_hop(&wallet.private_key, &wallet.public_key, to_public_key);
 
         return transaction;
     }
@@ -247,9 +262,9 @@ impl TransactionGenerator {
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet.clone();
         let blockchain = self.blockchain.clone();
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
         let public_key = self.public_key.clone();
-        let count = 1000000;
+        let count = self.tx_count;
         let required_balance = (self.tx_payment + self.tx_fee) * count as Currency;
         let payment = self.tx_payment;
         let fee = self.tx_fee;
@@ -258,15 +273,15 @@ impl TransactionGenerator {
             loop {
                 let mut work_done = false;
                 {
-                    log_write_lock_request!("blockchain");
+                    log_write_lock_request!("create_test_transactions:blockchain");
                     let mut blockchain = blockchain.write().await;
-                    log_write_lock_receive!("blockchain");
-                    log_write_lock_request!("wallet");
+                    log_write_lock_receive!("create_test_transactions:blockchain");
+                    log_write_lock_request!("create_test_transactions:wallet");
                     let mut wallet = wallet.write().await;
-                    log_write_lock_receive!("wallet");
+                    log_write_lock_receive!("create_test_transactions:wallet");
                     if wallet.get_available_balance() >= required_balance {
                         assert_ne!(blockchain.utxoset.len(), 0);
-                        let mut vec = VecDeque::with_capacity(count);
+                        let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
                             let transaction =
                                 Transaction::create(&mut wallet, public_key, payment, fee);
@@ -282,20 +297,23 @@ impl TransactionGenerator {
             }
         });
 
+        let mut to_public_key = [0; 33];
+
+        {
+            log_read_lock_request!("peers");
+            let peers = self.peers.read().await;
+            log_read_lock_receive!("peers");
+            for peer in peers.index_to_peers.iter() {
+                to_public_key = peer.1.public_key.clone().unwrap();
+                break;
+            }
+            assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+            assert_ne!(to_public_key, self.public_key);
+        }
+
         while let Some(mut transactions) = receiver.recv().await {
             let sender = self.sender.clone();
             let tx_size = self.tx_size;
-            let mut to_public_key = [0; 33];
-
-            {
-                log_read_lock_request!("peers");
-                let peers = self.peers.read().await;
-                log_read_lock_receive!("peers");
-                for peer in peers.address_to_peers.iter() {
-                    to_public_key = peer.0.clone();
-                    break;
-                }
-            }
 
             let txs: VecDeque<Transaction> = transactions
                 .par_drain(..)
@@ -306,10 +324,6 @@ impl TransactionGenerator {
                     transaction.generate(&public_key, 0, 0);
                     transaction.sign(&self.private_key);
                     transaction.add_hop(&self.private_key, &self.public_key, &to_public_key);
-                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
-                    // transaction.add_hop(&self.private_key, &self.public_key, &self.public_key);
 
                     transaction
                     // sender.send(transaction).await.unwrap();

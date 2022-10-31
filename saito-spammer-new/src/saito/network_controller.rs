@@ -44,7 +44,7 @@ impl NetworkController {
 
         match connection {
             PeerSender::Warp(sender) => {
-                if let Err(error) = sender.send(warp::ws::Message::binary(buffer.clone())).await {
+                if let Err(error) = sender.send(warp::ws::Message::binary(buffer)).await {
                     error!(
                         "Error sending message, Peer Index = {:?}, Reason {:?}",
                         peer_index, error
@@ -52,19 +52,17 @@ impl NetworkController {
 
                     send_failed = true;
                 }
-                if let Err(error) = sender.flush().await {
-                    error!(
-                        "Error flushing connection, Peer Index = {:?}, Reason {:?}",
-                        peer_index, error
-                    );
-                    send_failed = true;
-                }
+                // if let Err(error) = sender.flush().await {
+                //     error!(
+                //         "Error flushing connection, Peer Index = {:?}, Reason {:?}",
+                //         peer_index, error
+                //     );
+                //     send_failed = true;
+                // }
             }
             PeerSender::Tungstenite(sender) => {
                 if let Err(error) = sender
-                    .send(tokio_tungstenite::tungstenite::Message::Binary(
-                        buffer.clone(),
-                    ))
+                    .send(tokio_tungstenite::tungstenite::Message::Binary(buffer))
                     .await
                 {
                     error!(
@@ -73,13 +71,13 @@ impl NetworkController {
                     );
                     send_failed = true;
                 }
-                if let Err(error) = sender.flush().await {
-                    error!(
-                        "Error flushing connection, Peer Index = {:?}, Reason {:?}",
-                        peer_index, error
-                    );
-                    send_failed = true;
-                }
+                // if let Err(error) = sender.flush().await {
+                //     error!(
+                //         "Error flushing connection, Peer Index = {:?}, Reason {:?}",
+                //         peer_index, error
+                //     );
+                //     send_failed = true;
+                // }
             }
         }
 
@@ -138,9 +136,9 @@ impl NetworkController {
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-            log_write_lock_request!("network controller");
-            let io_controller = io_controller.write().await;
-            log_write_lock_receive!("network controller");
+            log_read_lock_request!("network controller");
+            let io_controller = io_controller.read().await;
+            log_read_lock_receive!("network controller");
             let sender_to_controller = io_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
 
@@ -406,6 +404,7 @@ pub async fn run_network_controller(
     blockchain: Arc<RwLock<Blockchain>>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
+    sender_to_stat: Sender<String>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -442,8 +441,11 @@ pub async fn run_network_controller(
     );
 
     let controller_handle = tokio::spawn(async move {
-        let mut outgoing_messages =
-            StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
+        let mut outgoing_messages = StatVariable::new(
+            "network::outgoing_msgs".to_string(),
+            STAT_BIN_COUNT,
+            sender_to_stat.clone(),
+        );
         let mut last_stat_on: Instant = Instant::now();
         let mut work_done;
         loop {
@@ -528,8 +530,9 @@ pub async fn run_network_controller(
                     > Duration::from_millis(stat_timer_in_ms)
                 {
                     last_stat_on = Instant::now();
-                    outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
-                    outgoing_messages.print();
+                    outgoing_messages
+                        .calculate_stats(TimeKeeper {}.get_timestamp())
+                        .await;
                 }
             }
             if !work_done {
@@ -570,13 +573,14 @@ fn run_websocket_server(
                 let clone = io_controller.clone();
                 let _peer_counter = peer_counter.clone();
                 let sender_to_io = sender_to_io.clone();
+                let ws = ws.max_message_size(10_000_000_000);
                 ws.on_upgrade(move |socket| async move {
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
 
-                    trace!("waiting for the io controller lock for writing");
-                    let controller = clone.write().await;
-                    trace!("acquired the io controller lock for writing");
+                    log_read_lock_request!("network controller");
+                    let controller = clone.read().await;
+                    log_read_lock_receive!("network controller");
 
                     let peer_index;
                     {
@@ -612,10 +616,10 @@ fn run_websocket_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
-                        log_read_lock_request!("blockchain");
+                        log_read_lock_request!("run_websocket_server:blockchain");
                         // TODO : load disk from disk and serve rather than locking the blockchain
                         let blockchain = blockchain.read().await;
-                        log_read_lock_receive!("blockchain");
+                        log_read_lock_receive!("run_websocket_server:blockchain");
                         let block = blockchain.get_block(&block_hash);
                         if block.is_none() {
                             warn!("block not found : {:?}", block_hash);

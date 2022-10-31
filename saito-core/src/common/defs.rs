@@ -1,5 +1,7 @@
-use ahash::AHashMap;
 use std::collections::VecDeque;
+
+use ahash::AHashMap;
+use tokio::sync::mpsc::Sender;
 
 pub type Currency = u128;
 pub type Timestamp = u64;
@@ -55,6 +57,7 @@ macro_rules! log_read_lock_receive {
     };
 }
 
+#[derive(Clone, Debug)]
 pub struct StatVariable {
     pub total: u64,
     pub count_since_last_stat: u64,
@@ -64,10 +67,11 @@ pub struct StatVariable {
     pub max_avg: f64,
     pub min_avg: f64,
     pub name: String,
+    pub sender: Sender<String>,
 }
 
 impl StatVariable {
-    pub fn new(name: String, bin_count: usize) -> StatVariable {
+    pub fn new(name: String, bin_count: usize, sender: Sender<String>) -> StatVariable {
         StatVariable {
             total: 0,
             count_since_last_stat: 0,
@@ -77,6 +81,7 @@ impl StatVariable {
             max_avg: 0.0,
             min_avg: f64::MAX,
             name,
+            sender,
         }
     }
     pub fn increment(&mut self) {
@@ -93,7 +98,7 @@ impl StatVariable {
             self.count_since_last_stat += amount;
         }
     }
-    pub fn calculate_stats(&mut self, current_time_in_us: Timestamp) {
+    pub async fn calculate_stats(&mut self, current_time_in_us: Timestamp) {
         let time_elapsed_in_us = current_time_in_us - self.last_stat_at;
         self.last_stat_at = current_time_in_us;
         if self.bins.len() == self.bins.capacity() - 1 {
@@ -117,21 +122,23 @@ impl StatVariable {
         if self.avg < self.min_avg {
             self.min_avg = self.avg;
         }
+        #[cfg(feature = "with-stats")]
+        self.sender
+            .send(self.print())
+            .await
+            .expect("failed sending stat update");
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub fn print(&self) {
-        #[cfg(feature = "with-stats")]
-        {
-            println!(
-                // target : "saito_stats",
-                "--- stats ------ {} - total : {:?} current_rate : {:.2} max_rate : {:.2} min_rate : {:.2}",
-                format!("{:width$}", self.name, width = 30),
-                self.total,
-                self.avg,
-                self.max_avg,
-                self.min_avg
-            );
-        }
+    fn print(&self) -> String {
+        format!(
+            // target : "saito_stats",
+            "--- stats ------ {} - total : {:?} current_rate : {:.2} max_rate : {:.2} min_rate : {:.2}",
+            format!("{:width$}", self.name, width = 30),
+            self.total,
+            self.avg,
+            self.max_avg,
+            self.min_avg
+        )
     }
 }

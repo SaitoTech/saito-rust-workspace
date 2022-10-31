@@ -1,26 +1,27 @@
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::net::SocketAddr;
+use std::path::Path;
 use std::str::FromStr;
-
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
-use tracing::{debug, error, info, trace, warn};
-
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tracing::{debug, error, info, trace, warn};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT};
-
+use saito_core::common::defs::{SaitoHash, StatVariable, BLOCK_FILE_EXTENSION, STAT_BIN_COUNT};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
@@ -30,6 +31,7 @@ use saito_core::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
+use crate::saito::rust_io_handler::BLOCKS_DIR_PATH;
 use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
@@ -49,7 +51,7 @@ impl NetworkController {
 
         match connection {
             PeerSender::Warp(sender) => {
-                if let Err(error) = sender.send(warp::ws::Message::binary(buffer.clone())).await {
+                if let Err(error) = sender.send(warp::ws::Message::binary(buffer)).await {
                     error!(
                         "Error sending message, Peer Index = {:?}, Reason {:?}",
                         peer_index, error
@@ -57,19 +59,17 @@ impl NetworkController {
 
                     send_failed = true;
                 }
-                if let Err(error) = sender.flush().await {
-                    error!(
-                        "Error flushing connection, Peer Index = {:?}, Reason {:?}",
-                        peer_index, error
-                    );
-                    send_failed = true;
-                }
+                // if let Err(error) = sender.flush().await {
+                //     error!(
+                //         "Error flushing connection, Peer Index = {:?}, Reason {:?}",
+                //         peer_index, error
+                //     );
+                //     send_failed = true;
+                // }
             }
             PeerSender::Tungstenite(sender) => {
                 if let Err(error) = sender
-                    .send(tokio_tungstenite::tungstenite::Message::Binary(
-                        buffer.clone(),
-                    ))
+                    .send(tokio_tungstenite::tungstenite::Message::Binary(buffer))
                     .await
                 {
                     error!(
@@ -78,13 +78,13 @@ impl NetworkController {
                     );
                     send_failed = true;
                 }
-                if let Err(error) = sender.flush().await {
-                    error!(
-                        "Error flushing connection, Peer Index = {:?}, Reason {:?}",
-                        peer_index, error
-                    );
-                    send_failed = true;
-                }
+                // if let Err(error) = sender.flush().await {
+                //     error!(
+                //         "Error flushing connection, Peer Index = {:?}, Reason {:?}",
+                //         peer_index, error
+                //     );
+                //     send_failed = true;
+                // }
             }
         }
 
@@ -139,13 +139,12 @@ impl NetworkController {
 
         let result = connect_async(url.clone()).await;
         if result.is_ok() {
-            info!("connected to peer : {:?}", url);
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-            log_write_lock_request!("network controller");
-            let io_controller = io_controller.write().await;
-            log_write_lock_receive!("network controller");
+            log_read_lock_request!("network controller");
+            let io_controller = io_controller.read().await;
+            log_read_lock_receive!("network controller");
             let sender_to_controller = io_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
 
@@ -154,6 +153,10 @@ impl NetworkController {
                 let mut counter = io_controller.peer_counter.lock().await;
                 peer_index = counter.get_next_index();
             }
+            info!(
+                "connected to peer : {:?} with index : {:?}",
+                url, peer_index
+            );
 
             NetworkController::send_new_peer(
                 event_id,
@@ -411,6 +414,7 @@ pub async fn run_network_controller(
     sender: Sender<IoEvent>,
     configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     blockchain: Arc<RwLock<Blockchain>>,
+    sender_to_stat: Sender<String>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -419,10 +423,11 @@ pub async fn run_network_controller(
     let url;
     let port;
     {
-        log_read_lock_request!("configs");
+        log_read_lock_request!("network_controller:run_network_controller:configs");
         let configs = configs.read().await;
-        log_read_lock_receive!("configs");
+        log_read_lock_receive!("network_controller:run_network_controller:configs");
         url = configs.get_server_configs().host.clone()
+            + ":"
             + configs.get_server_configs().port.to_string().as_str();
         port = configs.get_server_configs().port;
         host = configs.get_server_configs().host.clone();
@@ -452,8 +457,11 @@ pub async fn run_network_controller(
 
     let mut work_done = false;
     let controller_handle = tokio::spawn(async move {
-        let mut outgoing_messages =
-            StatVariable::new("network::outgoing_msgs".to_string(), STAT_BIN_COUNT);
+        let mut outgoing_messages = StatVariable::new(
+            "network::outgoing_msgs".to_string(),
+            STAT_BIN_COUNT,
+            sender_to_stat.clone(),
+        );
         let mut last_stat_on: Instant = Instant::now();
         loop {
             // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
@@ -469,9 +477,9 @@ pub async fn run_network_controller(
                 work_done = true;
                 match interface_event {
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
-                        log_write_lock_request!("network controller");
+                        log_read_lock_request!("network controller");
                         let sockets = network_controller.read().await.sockets.clone();
-                        log_write_lock_receive!("network controller");
+                        log_read_lock_receive!("network controller");
                         NetworkController::send_to_all(sockets, buffer, exceptions).await;
                         outgoing_messages.increment();
                     }
@@ -479,9 +487,9 @@ pub async fn run_network_controller(
                         peer_index: index,
                         buffer,
                     } => {
-                        log_write_lock_request!("network controller");
+                        log_read_lock_request!("network controller");
                         let sockets = network_controller.read().await.sockets.clone();
-                        log_write_lock_receive!("network controller");
+                        log_read_lock_receive!("network controller");
                         NetworkController::send_outgoing_message(sockets, index, buffer).await;
                         outgoing_messages.increment();
                     }
@@ -544,8 +552,19 @@ pub async fn run_network_controller(
                     > Duration::from_millis(configs.get_server_configs().stat_timer_in_ms)
                 {
                     last_stat_on = Instant::now();
-                    outgoing_messages.calculate_stats(TimeKeeper {}.get_timestamp());
-                    outgoing_messages.print();
+                    outgoing_messages
+                        .calculate_stats(TimeKeeper {}.get_timestamp())
+                        .await;
+                    log_read_lock_request!("network controller");
+                    let io_controller = network_controller.read().await;
+                    log_read_lock_receive!("network controller");
+                    let stat = format!(
+                        "--- stats ------ {} - capacity : {:?} / {:?}",
+                        format!("{:width$}", "network::queue", width = 30),
+                        io_controller.sender_to_saito_controller.capacity(),
+                        io_controller.sender_to_saito_controller.max_capacity()
+                    );
+                    sender_to_stat.send(stat).await.unwrap();
                 }
             }
 
@@ -594,13 +613,15 @@ fn run_websocket_server(
                 let clone = io_controller.clone();
                 let _peer_counter = peer_counter.clone();
                 let sender_to_io = sender_to_io.clone();
+                let ws = ws.max_message_size(10_000_000_000);
+                let ws = ws.max_frame_size(10_000_000_000);
                 ws.on_upgrade(move |socket| async move {
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
 
-                    trace!("waiting for the io controller lock for writing");
-                    let controller = clone.write().await;
-                    trace!("acquired the io controller lock for writing");
+                    log_read_lock_request!("network controller");
+                    let controller = clone.read().await;
+                    log_read_lock_receive!("network controller");
 
                     let peer_index;
                     {
@@ -620,40 +641,56 @@ fn run_websocket_server(
                     .await
                 })
             });
-        let http_route = warp::path!("block" / String)
-            .and(warp::any().map(move || blockchain.clone()))
-            .and_then(
-                |block_hash: String, blockchain: Arc<RwLock<Blockchain>>| async move {
-                    debug!("serving block : {:?}", block_hash);
-                    let buffer: Vec<u8>;
-                    {
-                        let block_hash = hex::decode(block_hash);
-                        if block_hash.is_err() {
-                            todo!()
-                        }
-                        let block_hash = block_hash.unwrap();
-                        if block_hash.len() != 32 {
-                            todo!()
-                        }
-                        let block_hash: SaitoHash = block_hash.try_into().unwrap();
-                        log_read_lock_request!("blockchain");
-                        // TODO : load disk from disk and serve rather than locking the blockchain
-                        let blockchain = blockchain.read().await;
-                        log_read_lock_receive!("blockchain");
-                        let block = blockchain.get_block(&block_hash);
-                        if block.is_none() {
-                            debug!("block not found : {:?}", block_hash);
-                            return Err(warp::reject::not_found());
-                        }
-                        // TODO : check if the full block is in memory or need to load from disk
-                        buffer = block.unwrap().serialize_for_net(BlockType::Full);
+        let http_route = warp::path!("block" / String).and_then(|block_hash: String| async move {
+            debug!("serving block : {:?}", block_hash);
+            let mut buffer: Vec<u8> = Default::default();
+            let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
+            if result.is_err() {
+                debug!("no blocks found");
+                return Err(warp::reject::not_found());
+            }
+            let paths: Vec<_> = result
+                .unwrap()
+                .map(|r| r.unwrap())
+                .filter(|r| {
+                    let filename = r.file_name().into_string().unwrap();
+                    if !filename.contains(BLOCK_FILE_EXTENSION) {
+                        return false;
                     }
-                    let buffer_len = buffer.len();
-                    let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
-                    debug!("served block with : {:?} length", buffer_len);
-                    return result;
-                },
-            );
+                    if !filename.contains(block_hash.as_str()) {
+                        return false;
+                    }
+                    debug!("selected file : {:?}", filename);
+                    return true;
+                })
+                .collect();
+
+            if paths.is_empty() {
+                return Err(warp::reject::not_found());
+            }
+            let path = paths.first().unwrap();
+            let file_path = BLOCKS_DIR_PATH.to_string()
+                + "/"
+                + path.file_name().into_string().unwrap().as_str();
+            let result = File::open(file_path.as_str()).await;
+            if result.is_err() {
+                error!("failed opening file : {:?}", result.err().unwrap());
+                todo!()
+            }
+            let mut file = result.unwrap();
+
+            let result = file.read_to_end(&mut buffer).await;
+            if result.is_err() {
+                error!("failed reading file : {:?}", result.err().unwrap());
+                todo!()
+            }
+            drop(file);
+
+            let buffer_len = buffer.len();
+            let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
+            debug!("served block with : {:?} length", buffer_len);
+            return result;
+        });
         let routes = http_route.or(ws_route);
         // let (_, server) =
         //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {

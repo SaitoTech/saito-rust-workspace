@@ -1,10 +1,10 @@
-use rayon::prelude::*;
 use std::collections::VecDeque;
 use std::io::Error;
 use std::sync::Arc;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
+use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, trace, warn};
@@ -21,9 +21,9 @@ use crate::core::mining_thread::MiningEvent;
 use crate::{log_write_lock_receive, log_write_lock_request};
 
 // length of 1 genesis period
-pub const GENESIS_PERIOD: u64 = 100;
+pub const GENESIS_PERIOD: u64 = 100_000;
 // prune blocks from index after N blocks
-pub const PRUNE_AFTER_BLOCKS: u64 = 10;
+pub const PRUNE_AFTER_BLOCKS: u64 = 10000;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
 pub const MAX_STAKER_RECURSION: u64 = 3;
 // max token supply - used in validating block #1
@@ -95,7 +95,7 @@ impl Blockchain {
         // block.generate_hash();
         block.generate();
 
-        info!(
+        debug!(
             "add_block {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
             &hex::encode(&block.hash),
             block.id,
@@ -159,9 +159,6 @@ impl Blockchain {
                                 let block_hash = block.previous_block_hash;
                                 let block_in_mempool_queue;
                                 {
-                                    // log_read_lock_request!("mempool");
-                                    // let mempool = mempool.read().await;
-                                    // log_read_lock_receive!("mempool");
                                     block_in_mempool_queue = mempool
                                         .blocks_queue
                                         .par_iter()
@@ -469,10 +466,11 @@ impl Blockchain {
         //
         //
         {
+            mempool
+                .transactions
+                .retain(|_, tx| tx.validate_against_utxoset(&self.utxoset));
             let block = self.get_mut_block(&block_hash).unwrap();
-            // log_write_lock_request!("mempool");
-            // let mut mempool = mempool.write().await;
-            // log_write_lock_receive!("mempool");
+            // we calling delete_tx after removing invalidated txs, to make sure routing work is calculated after removing all the txs
             mempool.delete_transactions(&block.transactions);
         }
 
@@ -537,12 +535,16 @@ impl Blockchain {
 
         if block.creator == mempool.public_key {
             let transactions = &mut block.transactions;
-            // TODO : what other types should be added back to the mempool
+            let prev_count = transactions.len();
+            // TODO : is there a way to not validate these again ?
+            transactions.retain(|tx| tx.validate(&self.utxoset));
             info!(
-                "adding {:?} transactions back to mempool",
-                transactions.len()
+                "adding {:?} transactions back to mempool. dropped {:?} invalid transactions",
+                transactions.len(),
+                (prev_count - transactions.len())
             );
-            for tx in block.transactions {
+            for tx in transactions.drain(..) {
+                // TODO : what other types should be added back to the mempool
                 if tx.transaction_type == TransactionType::Normal {
                     mempool.transactions.insert(tx.signature, tx);
                 }
@@ -1316,7 +1318,7 @@ impl Blockchain {
         {
             let block_hashes = self.blockring.get_block_hashes_at_block_id(delete_block_id);
             for hash in block_hashes {
-                block_hashes_copy.push(hash.clone());
+                block_hashes_copy.push(hash);
             }
         }
 
@@ -1395,7 +1397,7 @@ impl Blockchain {
                 .blockring
                 .get_block_hashes_at_block_id(prune_blocks_at_block_id);
             for hash in block_hashes {
-                block_hashes_copy.push(hash.clone());
+                block_hashes_copy.push(hash);
             }
         }
 
@@ -1437,7 +1439,10 @@ impl Blockchain {
             )
             .await;
         }
-        info!("added {:?} blocks to blockchain", blocks.len());
+        info!(
+            "added blocks to blockchain. added back : {:?}",
+            mempool.blocks_queue.len()
+        );
     }
 }
 

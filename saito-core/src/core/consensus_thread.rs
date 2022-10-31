@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,7 +17,7 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
-use crate::core::data::transaction::Transaction;
+use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::routing_thread::RoutingEvent;
@@ -26,7 +25,7 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(5000).as_micros() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_micros() as u64;
 pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_micros() as u64;
 
 #[derive(Debug)]
@@ -43,18 +42,24 @@ pub struct ConsensusStats {
     pub received_tx: StatVariable,
 }
 
-impl Default for ConsensusStats {
-    fn default() -> Self {
+impl ConsensusStats {
+    pub fn new(sender: Sender<String>) -> Self {
         ConsensusStats {
             blocks_fetched: StatVariable::new(
                 "consensus::blocks_fetched".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
             blocks_created: StatVariable::new(
                 "consensus::blocks_created".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
-            received_tx: StatVariable::new("consensus::received_tx".to_string(), STAT_BIN_COUNT),
+            received_tx: StatVariable::new(
+                "consensus::received_tx".to_string(),
+                STAT_BIN_COUNT,
+                sender.clone(),
+            ),
         }
     }
 }
@@ -75,6 +80,7 @@ pub struct ConsensusThread {
     pub storage: Storage,
     pub stats: ConsensusStats,
     pub txs_for_mempool: Vec<Transaction>,
+    pub stat_sender: Sender<String>,
 }
 
 impl ConsensusThread {
@@ -237,7 +243,7 @@ impl ConsensusThread {
 impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         // trace!("processing new interface event");
-
+        unreachable!();
         None
     }
 
@@ -304,70 +310,77 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         }
 
         // generate blocks
-        let mut can_bundle = false;
         self.block_producing_timer += duration_value;
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
-            if !self.txs_for_mempool.is_empty() {
-                log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
-                let mut mempool = self.mempool.write().await;
-                log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
-
-                for tx in self.txs_for_mempool.drain(..) {
-                    mempool.add_transaction(tx).await;
-                }
-            }
-
-            log_read_lock_request!("ConsensusEventProcessor:process_timer_event::blockchain");
-            let blockchain = self.blockchain.read().await;
-            log_read_lock_receive!("ConsensusEventProcessor:process_timer_event::blockchain");
-            log_read_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
-            let mempool = self.mempool.read().await;
-            log_read_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
-
-            can_bundle = mempool.can_bundle_block(&blockchain, timestamp).await;
-            self.block_producing_timer = 0;
-            work_done = true;
-        }
-
-        if can_bundle {
             log_write_lock_request!("ConsensusEventProcessor:process_timer_event::blockchain");
             let mut blockchain = self.blockchain.write().await;
             log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::blockchain");
-            {
-                log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
-                let mut mempool = self.mempool.write().await;
-                log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
+            log_write_lock_request!("ConsensusEventProcessor:process_timer_event::mempool");
+            let mut mempool = self.mempool.write().await;
+            log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
 
-                debug!(
-                    "mempool size before bundling : {:?}",
-                    mempool.transactions.len()
-                );
-                let block = mempool
-                    .bundle_block(blockchain.deref_mut(), timestamp)
-                    .await;
+            let gt_result = mempool
+                .golden_tickets
+                .remove(&blockchain.get_latest_block_hash());
+
+            if !self.txs_for_mempool.is_empty() {
+                for tx in self.txs_for_mempool.iter() {
+                    if let TransactionType::GoldenTicket = tx.transaction_type {
+                        unreachable!("golden tickets shouldn't be here");
+                    } else {
+                        mempool.add_transaction(tx.clone()).await;
+                    }
+                }
+            }
+
+            self.block_producing_timer = 0;
+
+            trace!(
+                "mempool size before bundling : {:?}",
+                mempool.transactions.len()
+            );
+            let block = mempool
+                .bundle_block(blockchain.deref_mut(), timestamp, gt_result.clone())
+                .await;
+            if block.is_some() {
+                let block = block.unwrap();
                 info!(
                     "adding bundled block : {:?} to mempool",
                     hex::encode(block.hash)
                 );
-                debug!(
+                trace!(
                     "mempool size after bundling : {:?}",
                     mempool.transactions.len()
                 );
                 mempool.add_block(block);
+                self.txs_for_mempool.clear();
+                // dropping the lock here since blockchain needs the write lock to add blocks
+                drop(mempool);
+                self.stats.blocks_created.increment();
+                blockchain
+                    .add_blocks_from_mempool(
+                        self.mempool.clone(),
+                        &self.network,
+                        &mut self.storage,
+                        self.sender_to_miner.clone(),
+                    )
+                    .await;
+
+                debug!("blocks added to blockchain");
+
+                work_done = true;
+            } else {
+                // route messages to peers
+                for tx in self.txs_for_mempool.drain(..) {
+                    self.network.propagate_transaction(&tx).await;
+                }
+                // route golden tickets to peers
+                if gt_result.is_some() {
+                    self.network
+                        .propagate_transaction(gt_result.as_ref().unwrap())
+                        .await;
+                }
             }
-            self.stats.blocks_created.increment();
-            blockchain
-                .add_blocks_from_mempool(
-                    self.mempool.clone(),
-                    &self.network,
-                    &mut self.storage,
-                    self.sender_to_miner.clone(),
-                )
-                .await;
-
-            debug!("blocks added to blockchain");
-
-            work_done = true;
         }
 
         if work_done {
@@ -386,7 +399,22 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
                 let mut mempool = self.mempool.write().await;
                 log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
-                mempool.add_golden_ticket(golden_ticket).await;
+                let public_key;
+                let private_key;
+                {
+                    log_read_lock_request!("wallet");
+                    let wallet = self.wallet.read().await;
+                    log_read_lock_receive!("wallet");
+                    public_key = wallet.public_key;
+                    private_key = wallet.private_key;
+                }
+                let transaction = Wallet::create_golden_ticket_transaction(
+                    golden_ticket,
+                    &public_key,
+                    &private_key,
+                )
+                .await;
+                mempool.add_golden_ticket(transaction).await;
                 Some(())
             }
             ConsensusEvent::BlockFetched { block, .. } => {
@@ -428,8 +456,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "tx received with sig: {:?}",
                     hex::encode(transaction.signature)
                 );
-                self.network.propagate_transaction(&transaction).await;
-                self.txs_for_mempool.push(transaction);
+                if let TransactionType::GoldenTicket = transaction.transaction_type {
+                    let gt = GoldenTicket::deserialize_from_net(&transaction.message);
+                    log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
+                    let mut mempool = self.mempool.write().await;
+                    log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
+
+                    mempool.add_golden_ticket(transaction).await;
+                } else {
+                    self.txs_for_mempool.push(transaction);
+                }
 
                 Some(())
             }
@@ -438,10 +474,19 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     .received_tx
                     .increment_by(transactions.len() as u64);
 
-                for transaction in &transactions {
-                    self.network.propagate_transaction(transaction).await;
+                self.txs_for_mempool.reserve(transactions.len());
+                for transaction in transactions {
+                    if let TransactionType::GoldenTicket = transaction.transaction_type {
+                        let gt = GoldenTicket::deserialize_from_net(&transaction.message);
+                        log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
+                        let mut mempool = self.mempool.write().await;
+                        log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
+
+                        mempool.add_golden_ticket(transaction).await;
+                    } else {
+                        self.txs_for_mempool.push(transaction);
+                    }
                 }
-                self.txs_for_mempool.append(&mut transactions);
                 Some(())
             }
         };
@@ -467,48 +512,57 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
-        self.stats.blocks_fetched.calculate_stats(current_time);
-        self.stats.blocks_created.calculate_stats(current_time);
-        self.stats.received_tx.calculate_stats(current_time);
+        self.stats
+            .blocks_fetched
+            .calculate_stats(current_time)
+            .await;
+        self.stats
+            .blocks_created
+            .calculate_stats(current_time)
+            .await;
+        self.stats.received_tx.calculate_stats(current_time).await;
 
-        self.stats.blocks_fetched.print();
-        self.stats.blocks_created.print();
-        self.stats.received_tx.print();
-
+        // self.stats.blocks_fetched.print();
+        // self.stats.blocks_created.print();
+        // self.stats.received_tx.print();
+        //
         {
             log_read_lock_request!("ConsensusEventProcessor:on_stat_interval::wallet");
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::wallet");
-            println!(
+            let stat = format!(
                 "--- stats ------ {} - total_slips : {:?} unspent_slips : {:?} current_balance : {:?}",
                 format!("{:width$}", "wallet::state", width = 30),
                 wallet.slips.len(),
                 wallet.get_unspent_slip_count(),
                 wallet.get_available_balance()
             );
+            self.stat_sender.send(stat).await.unwrap();
         }
         {
             log_read_lock_request!("ConsensusEventProcessor:on_stat_interval::blockchain");
             let blockchain = self.blockchain.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::blockchain");
-            println!(
+            let stat = format!(
                 "--- stats ------ {} - utxo_size : {:?} block_count : {:?} longest_chain_len : {:?}",
                 format!("{:width$}", "blockchain::state", width = 30),
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
                 blockchain.get_latest_block_id()
             );
+            self.stat_sender.send(stat).await.unwrap();
         }
         {
             log_read_lock_request!("ConsensusEventProcessor:on_stat_interval::mempool");
             let mempool = self.mempool.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::mempool");
-            println!(
-                "--- stats ------ {} - blocks : {:?} transactions : {:?}",
+            let stat = format!(
+                "--- stats ------ {} - blocks_queue : {:?} transactions : {:?}",
                 format!("{:width$}", "mempool:state", width = 30),
                 mempool.blocks_queue.len(),
                 mempool.transactions.len(),
             );
+            self.stat_sender.send(stat).await.unwrap();
         }
     }
 }

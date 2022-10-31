@@ -1,10 +1,11 @@
+use ahash::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
@@ -13,6 +14,7 @@ use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data;
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
@@ -44,20 +46,23 @@ pub struct RoutingStats {
     pub total_incoming_messages: StatVariable,
 }
 
-impl Default for RoutingStats {
-    fn default() -> Self {
+impl RoutingStats {
+    pub fn new(sender: Sender<String>) -> Self {
         RoutingStats {
             received_transactions: StatVariable::new(
                 "routing::received_txs".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
             received_blocks: StatVariable::new(
                 "routing::received_blocks".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
             total_incoming_messages: StatVariable::new(
                 "routing::incoming_msgs".to_string(),
                 STAT_BIN_COUNT,
+                sender.clone(),
             ),
         }
     }
@@ -79,6 +84,8 @@ pub struct RoutingThread {
     pub public_key: SaitoPublicKey,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
     pub last_verification_thread_index: usize,
+    pub stat_sender: Sender<String>,
+    pub blockchain_sync_state: BlockchainSyncState,
 }
 
 impl RoutingThread {
@@ -124,13 +131,8 @@ impl RoutingThread {
                         response,
                         self.wallet.clone(),
                         self.blockchain.clone(),
+                        self.configs.clone(),
                     )
-                    .await;
-            }
-            Message::HandshakeCompletion(response) => {
-                debug!("received handshake completion");
-                self.network
-                    .handle_handshake_completion(peer_index, response, self.blockchain.clone())
                     .await;
             }
             Message::ApplicationMessage(_) => {
@@ -149,8 +151,9 @@ impl RoutingThread {
                 self.process_incoming_blockchain_request(request, peer_index)
                     .await;
             }
-            Message::BlockHeaderHash(hash) => {
-                self.process_incoming_block_hash(hash, peer_index).await;
+            Message::BlockHeaderHash(hash, prev_hash) => {
+                self.process_incoming_block_hash(hash, prev_hash, peer_index)
+                    .await;
             }
             Message::Ping() => {}
             Message::SPVChain() => {}
@@ -170,14 +173,7 @@ impl RoutingThread {
         peer_index: u64,
     ) {
         trace!("handling new peer : {:?}", peer_index);
-        self.network
-            .handle_new_peer(
-                peer_data,
-                peer_index,
-                self.wallet.clone(),
-                self.configs.clone(),
-            )
-            .await;
+        self.network.handle_new_peer(peer_data, peer_index).await;
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -192,7 +188,7 @@ impl RoutingThread {
         request: BlockchainRequest,
         peer_index: u64,
     ) {
-        debug!(
+        info!(
             "processing incoming blockchain request : {:?}-{:?}-{:?} from peer : {:?}",
             request.latest_block_id,
             hex::encode(request.latest_block_hash),
@@ -201,9 +197,9 @@ impl RoutingThread {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        log_read_lock_request!("blockchain");
+        log_read_lock_request!("routing_thread:process_incoming_blockchain_request:blockchain");
         let blockchain = self.blockchain.read().await;
-        log_read_lock_receive!("blockchain");
+        log_read_lock_receive!("routing_thread:process_incoming_blockchain_request:blockchain");
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
@@ -217,7 +213,7 @@ impl RoutingThread {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
             }
-            let buffer = Message::BlockHeaderHash(block_hash).serialize();
+            let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
                 .send_message(peer_index, buffer)
@@ -226,15 +222,46 @@ impl RoutingThread {
         }
     }
     #[tracing::instrument(level = "info", skip_all)]
-    async fn process_incoming_block_hash(&self, block_hash: SaitoHash, peer_index: u64) {
+    async fn process_incoming_block_hash(
+        &mut self,
+        block_hash: SaitoHash,
+        block_id: u64,
+        peer_index: u64,
+    ) {
         debug!(
             "processing incoming block hash : {:?} from peer : {:?}",
             hex::encode(block_hash),
             peer_index
         );
-        self.network
-            .process_incoming_block_hash(block_hash, peer_index, self.blockchain.clone())
-            .await;
+
+        self.blockchain_sync_state
+            .add_entry(block_hash, block_id, peer_index);
+
+        self.blockchain_sync_state.build_peer_block_picture();
+        {
+            log_read_lock_request!("VerificationThread:verify_tx::blockchain");
+            let blockchain = self.blockchain.read().await;
+            log_read_lock_receive!("VerificationThread:verify_tx::blockchain");
+            self.blockchain_sync_state
+                .set_latest_blockchain_id(blockchain.get_latest_block_id());
+        }
+        let map = self.blockchain_sync_state.request_blocks_from_waitlist();
+
+        let mut fetched_blocks: Vec<(u64, SaitoHash)> = Default::default();
+        for (peer_index, vec) in map {
+            for hash in vec.iter() {
+                let result = self
+                    .network
+                    .process_incoming_block_hash(*hash, peer_index, self.blockchain.clone())
+                    .await;
+                if result.is_some() {
+                    fetched_blocks.push((peer_index, *hash));
+                } else {
+                    self.blockchain_sync_state.remove_entry(*hash, peer_index);
+                }
+            }
+        }
+        self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
     }
 
     async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
@@ -321,6 +348,33 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 self.send_to_verification_thread(VerifyRequest::Block(buffer, peer_index))
                     .await;
 
+                self.blockchain_sync_state
+                    .remove_entry(block_hash, peer_index);
+                {
+                    log_read_lock_request!("VerificationThread:verify_tx::blockchain");
+                    let blockchain = self.blockchain.read().await;
+                    log_read_lock_receive!("VerificationThread:verify_tx::blockchain");
+                    self.blockchain_sync_state
+                        .set_latest_blockchain_id(blockchain.get_latest_block_id());
+                }
+                let map = self.blockchain_sync_state.request_blocks_from_waitlist();
+
+                let mut fetched_blocks: Vec<(u64, SaitoHash)> = Default::default();
+                for (peer_index, vec) in map {
+                    for hash in vec.iter() {
+                        let result = self
+                            .network
+                            .process_incoming_block_hash(*hash, peer_index, self.blockchain.clone())
+                            .await;
+                        if result.is_some() {
+                            fetched_blocks.push((peer_index, *hash));
+                        } else {
+                            self.blockchain_sync_state.remove_entry(*hash, peer_index);
+                        }
+                    }
+                }
+                self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
+
                 return Some(());
             }
         }
@@ -362,31 +416,41 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
         self.stats
             .received_transactions
-            .calculate_stats(current_time);
-        self.stats.received_blocks.calculate_stats(current_time);
+            .calculate_stats(current_time)
+            .await;
+        self.stats
+            .received_blocks
+            .calculate_stats(current_time)
+            .await;
         self.stats
             .total_incoming_messages
-            .calculate_stats(current_time);
+            .calculate_stats(current_time)
+            .await;
 
-        self.stats.received_transactions.print();
-        self.stats.received_blocks.print();
-        self.stats.total_incoming_messages.print();
-
-        println!(
-            "--- stats ------ {} - size : {:?}",
+        let stat = format!(
+            "--- stats ------ {} - capacity : {:?} / {:?}",
             format!("{:width$}", "consensus::queue", width = 30),
             self.sender_to_consensus.capacity(),
+            self.sender_to_consensus.max_capacity()
         );
+        self.stat_sender.send(stat).await.unwrap();
         for (index, sender) in self.senders_to_verification.iter().enumerate() {
-            println!(
-                "--- stats ------ {} - size : {:?}",
+            let stat = format!(
+                "--- stats ------ {} - capacity : {:?} / {:?}",
                 format!(
                     "{:width$}",
                     format!("verification_{:?}::queue", index),
                     width = 30
                 ),
                 sender.capacity(),
+                sender.max_capacity()
             );
+            self.stat_sender.send(stat).await.unwrap();
+        }
+
+        let stats = self.blockchain_sync_state.get_stats();
+        for stat in stats {
+            self.stat_sender.send(stat).await.unwrap();
         }
     }
 }

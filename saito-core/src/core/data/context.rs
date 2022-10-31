@@ -34,10 +34,6 @@ impl Context {
         }
     }
     pub async fn init(&self, _task_runner: &dyn RunTask) -> Result<(), Error> {
-        // self.miner.write().await.init(task_runner)?;
-        // self.mempool.write().await.init(task_runner)?;
-        // self.blockchain.write().await.init()?;
-
         Ok(())
     }
 }

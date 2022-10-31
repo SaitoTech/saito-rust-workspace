@@ -19,7 +19,6 @@ use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
-use crate::core::data::wallet::Wallet;
 
 pub const BLOCK_HEADER_SIZE: usize = 301;
 
@@ -275,7 +274,7 @@ impl Block {
         current_timestamp: u64,
         public_key: &SaitoPublicKey,
         private_key: &SaitoPrivateKey,
-        golden_ticket: Option<GoldenTicket>,
+        golden_ticket: Option<Transaction>,
     ) -> Block {
         debug!(
             "Block::create : previous block hash : {:?}",
@@ -316,15 +315,13 @@ impl Block {
         block.creator = public_key.clone();
 
         if golden_ticket.is_some() {
-            let gt = golden_ticket.unwrap();
-            let transaction =
-                Wallet::create_golden_ticket_transaction(gt, &public_key, &private_key).await;
-            block.transactions.push(transaction);
+            debug!("golden ticket found. adding to block.");
+            block.transactions.push(golden_ticket.unwrap());
         }
         block.transactions.reserve(transactions.len());
-        let mut txs: Vec<Transaction> = transactions.par_drain().map(|(_, tx)| tx).collect();
+        let iter = transactions.drain().map(|(_, tx)| tx).into_iter();
 
-        block.transactions.append(&mut txs);
+        block.transactions.extend(iter);
 
         // block.transactions = transactions.drain().collect();
         transactions.clear();
@@ -1003,7 +1000,7 @@ impl Block {
         //
         if let Some(gt_index) = cv.gt_index {
             let golden_ticket: GoldenTicket =
-                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message.to_vec());
+                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message);
             // generate input hash for router
             let mut next_random_number = hash(&golden_ticket.random.to_vec());
             let _miner_public_key = golden_ticket.public_key;
@@ -1103,8 +1100,8 @@ impl Block {
                                 payout.staking_treasury = sp as i64;
 
                                 // router consumes 2 hashes
-                                next_random_number = hash(&next_random_number.to_vec());
-                                next_random_number = hash(&next_random_number.to_vec());
+                                next_random_number = hash(next_random_number.as_slice());
+                                next_random_number = hash(next_random_number.as_slice());
 
                                 cv.block_payout.push(payout);
                             }
@@ -1264,29 +1261,32 @@ impl Block {
     /// [transaction][transaction][transaction]...
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
+        let mut buffer: Vec<u8> = vec![];
 
         // block headers do not get tx data
         if block_type == BlockType::Header {
-            vbytes.extend(&(0 as u32).to_be_bytes());
+            buffer.extend(&(0 as u32).to_be_bytes());
         } else {
-            vbytes.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
+            buffer.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
         }
-
-        vbytes.extend(&self.id.to_be_bytes());
-        vbytes.extend(&self.timestamp.to_be_bytes());
-        vbytes.extend(&self.previous_block_hash);
-        vbytes.extend(&self.creator);
-        vbytes.extend(&self.merkle_root);
-        vbytes.extend(&self.signature);
-        vbytes.extend(&self.treasury.to_be_bytes());
-        vbytes.extend(&self.staking_treasury.to_be_bytes());
-        vbytes.extend(&self.burnfee.to_be_bytes());
-        vbytes.extend(&self.difficulty.to_be_bytes());
-        vbytes.extend(&self.avg_income.to_be_bytes());
-        vbytes.extend(&self.avg_variance.to_be_bytes());
-        vbytes.extend(&self.avg_atr_income.to_be_bytes());
-        vbytes.extend(&self.avg_atr_variance.to_be_bytes());
+        let mut buffer = [
+            buffer.as_slice(),
+            self.id.to_be_bytes().as_slice(),
+            self.timestamp.to_be_bytes().as_slice(),
+            self.previous_block_hash.as_slice(),
+            self.creator.as_slice(),
+            self.merkle_root.as_slice(),
+            self.signature.as_slice(),
+            self.treasury.to_be_bytes().as_slice(),
+            self.staking_treasury.to_be_bytes().as_slice(),
+            self.burnfee.to_be_bytes().as_slice(),
+            self.difficulty.to_be_bytes().as_slice(),
+            self.avg_income.to_be_bytes().as_slice(),
+            self.avg_variance.to_be_bytes().as_slice(),
+            self.avg_atr_income.to_be_bytes().as_slice(),
+            self.avg_atr_variance.to_be_bytes().as_slice(),
+        ]
+        .concat();
 
         let mut serialized_txs = vec![];
 
@@ -1295,10 +1295,10 @@ impl Block {
             self.transactions.iter().for_each(|transaction| {
                 serialized_txs.extend(transaction.serialize_for_net());
             });
-            vbytes.extend(serialized_txs);
+            buffer.extend(serialized_txs);
         }
 
-        vbytes
+        buffer
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
@@ -1558,9 +1558,8 @@ impl Block {
             // we find that out now, and it invalidates the block.
             //
             if let Some(gt_index) = cv.gt_index {
-                let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(
-                    &self.transactions[gt_index].message.to_vec(),
-                );
+                let golden_ticket: GoldenTicket =
+                    GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message);
                 //
                 // we already have a golden ticket, but create a new one pulling the
                 // target hash from our previous block to ensure that this ticket is
@@ -1721,6 +1720,18 @@ impl Block {
 
         let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
 
+        // let mut transactions_valid = true;
+        // for tx in self.transactions.iter() {
+        //     if !tx.validate(utxoset) {
+        //         transactions_valid = false;
+        //         error!(
+        //             "tx : {:?} of type : {:?} is not valid",
+        //             hex::encode(tx.signature),
+        //             tx.transaction_type
+        //         );
+        //         break;
+        //     }
+        // }
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");
         }

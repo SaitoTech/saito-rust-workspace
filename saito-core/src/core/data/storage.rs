@@ -105,9 +105,9 @@ impl Storage {
 
         let mut waiting_count = file_names.len();
         let handle = tokio::spawn(async move {
-            log_write_lock_request!("mempool");
+            log_write_lock_request!("storage:load_blocks_from_disk:mempool");
             let mut mempool = mempool.write().await;
-            log_write_lock_receive!("mempool");
+            log_write_lock_receive!("storage:load_blocks_from_disk:mempool");
             loop {
                 if waiting_count == 0 {
                     break;

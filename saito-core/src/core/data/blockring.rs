@@ -123,7 +123,7 @@ impl BlockRing {
         let mut v: Vec<SaitoHash> = vec![];
         for i in 0..self.ring[(insert_pos as usize)].block_hashes.len() {
             if self.ring[(insert_pos as usize)].block_ids[i] == block_id {
-                v.push(self.ring[(insert_pos as usize)].block_hashes[i].clone());
+                v.push(self.ring[(insert_pos as usize)].block_hashes[i]);
             }
         }
         v

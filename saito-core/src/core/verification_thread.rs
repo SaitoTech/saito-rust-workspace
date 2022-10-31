@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use rayon::prelude::*;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::debug;
 
@@ -35,6 +35,8 @@ pub struct VerificationThread {
     pub processed_txs: StatVariable,
     pub processed_blocks: StatVariable,
     pub processed_msgs: StatVariable,
+    pub invalid_txs: StatVariable,
+    pub stat_sender: Sender<String>,
 }
 
 impl VerificationThread {
@@ -65,37 +67,40 @@ impl VerificationThread {
     pub async fn verify_txs(&mut self, transactions: &mut VecDeque<Transaction>) {
         self.processed_txs.increment_by(transactions.len() as u64);
         self.processed_msgs.increment_by(transactions.len() as u64);
-        log_read_lock_request!("VerificationThread:verify_txs::blockchain");
-        let blockchain = self.blockchain.read().await;
-        log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
-        let transactions: Vec<Transaction> = transactions
-            .par_drain(..)
-            .with_min_len(10)
-            // .with_max_len(1000)
-            .filter_map(|mut transaction| {
-                transaction.generate(&self.public_key, 0, 0);
+        let prev_count = transactions.len();
+        let txs: Vec<Transaction>;
+        {
+            log_read_lock_request!("VerificationThread:verify_txs::blockchain");
+            let blockchain = self.blockchain.read().await;
+            log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
+            txs = transactions
+                .par_drain(..)
+                .with_min_len(10)
+                // .with_max_len(1000)
+                .filter_map(|mut transaction| {
+                    transaction.generate(&self.public_key, 0, 0);
 
-                if !transaction.validate(&blockchain.utxoset) {
-                    debug!(
-                        "transaction : {:?} not valid",
-                        hex::encode(transaction.signature)
-                    );
+                    if !transaction.validate(&blockchain.utxoset) {
+                        debug!(
+                            "transaction : {:?} not valid",
+                            hex::encode(transaction.signature)
+                        );
 
-                    return None;
-                }
-                return Some(transaction);
-            })
-            .collect();
-        for transaction in transactions {
+                        return None;
+                    }
+                    return Some(transaction);
+                })
+                .collect();
+        }
+
+        let invalid_txs = prev_count - txs.len();
+        for transaction in txs {
             self.sender_to_consensus
                 .send(ConsensusEvent::NewTransaction { transaction })
                 .await
                 .unwrap();
         }
-        // self.sender_to_consensus
-        //     .send(ConsensusEvent::NewTransactions { transactions })
-        //     .await
-        //     .unwrap();
+        self.invalid_txs.increment_by(invalid_txs as u64);
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
         let mut block = Block::deserialize_from_net(&buffer);
@@ -105,7 +110,7 @@ impl VerificationThread {
         let peer = peers.index_to_peers.get(&peer_index);
         if peer.is_some() {
             let peer = peer.unwrap();
-            block.source_connection_id = Some(peer.public_key);
+            block.source_connection_id = peer.public_key.clone();
         }
         block.generate();
         self.processed_blocks.increment();
@@ -139,7 +144,7 @@ impl VerificationThread {
 #[async_trait]
 impl ProcessEvent<VerifyRequest> for VerificationThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
-        None
+        unreachable!();
     }
 
     async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
@@ -170,12 +175,9 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
     }
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
-        self.processed_msgs.calculate_stats(current_time);
-        // self.processed_txs.calculate_stats(current_time);
-        // self.processed_blocks.calculate_stats(current_time);
-
-        self.processed_msgs.print();
-        // self.processed_txs.print();
-        // self.processed_blocks.print();
+        self.processed_msgs.calculate_stats(current_time).await;
+        self.invalid_txs.calculate_stats(current_time).await;
+        self.processed_txs.calculate_stats(current_time).await;
+        self.processed_blocks.calculate_stats(current_time).await;
     }
 }

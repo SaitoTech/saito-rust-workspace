@@ -13,11 +13,11 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
-use crate::wasm_configuration::WasmConfiguration;
 use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
 use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusThread};
+use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
+use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
 use saito_core::core::data::mempool::Mempool;
@@ -27,8 +27,9 @@ use saito_core::core::data::storage::Storage;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
-use saito_core::core::routing_thread::{RoutingEvent, RoutingThread};
+use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
 
+use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_slip::WasmSlip;
 use crate::wasm_task_runner::WasmTaskRunner;
@@ -100,6 +101,8 @@ pub fn new() -> SaitoWasm {
     let (sender_to_mempool, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
+    let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(100);
+
     SaitoWasm {
         consensus_event_processor: RoutingThread {
             blockchain: context.blockchain.clone(),
@@ -115,10 +118,12 @@ pub fn new() -> SaitoWasm {
                 context.wallet.clone(),
             ),
             reconnection_timer: 0,
-            stats: Default::default(),
+            stats: RoutingStats::new(sender_to_stat.clone()),
             public_key,
             senders_to_verification: vec![],
             last_verification_thread_index: 0,
+            stat_sender: sender_to_stat.clone(),
+            blockchain_sync_state: BlockchainSyncState::new(),
         },
         routing_event_processor: ConsensusThread {
             mempool: context.mempool.clone(),
@@ -138,12 +143,13 @@ pub fn new() -> SaitoWasm {
                 context.wallet.clone(),
             ),
             storage: Storage::new(Box::new(WasmIoHandler {})),
-            stats: Default::default(),
+            stats: ConsensusStats::new(sender_to_stat.clone()),
             txs_for_mempool: vec![],
+            stat_sender: sender_to_stat.clone(),
         },
         mining_event_processor: MiningThread {
             wallet: context.wallet.clone(),
-            sender_to_blockchain: sender_to_blockchain.clone(),
+
             sender_to_mempool: sender_to_mempool.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
             miner_active: false,
@@ -151,6 +157,7 @@ pub fn new() -> SaitoWasm {
             difficulty: 0,
             public_key: [0; 33],
             mined_golden_tickets: 0,
+            stat_sender: sender_to_stat.clone(),
         },
         receiver_in_blockchain,
         receiver_in_mempool,

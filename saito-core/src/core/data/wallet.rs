@@ -73,7 +73,7 @@ impl Wallet {
         if storage.file_exists(&filename).await {
             let password = self.filepass.clone();
             let encoded = storage.read(&filename).await.unwrap();
-            let decrypted_encoded = decrypt_with_password(encoded, &password);
+            let decrypted_encoded = decrypt_with_password(encoded.as_ref(), &password);
             self.deserialize_from_disk(&decrypted_encoded);
         } else {
             //
@@ -102,7 +102,7 @@ impl Wallet {
 
         let password = self.filepass.clone();
         let byte_array: Vec<u8> = self.serialize_for_disk();
-        let encrypted_wallet = encrypt_with_password((&byte_array[..]).to_vec(), &password);
+        let encrypted_wallet = encrypt_with_password(byte_array.as_ref(), &password);
 
         storage.write(encrypted_wallet, &filename).await;
     }
@@ -219,15 +219,15 @@ impl Wallet {
     // this manually creates the output for its desired payment
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn generate_slips(&mut self, nolan_requested: Currency) -> (Vec<Slip>, Vec<Slip>) {
-        let mut inputs: Vec<Slip> = vec![];
-        let mut outputs: Vec<Slip> = vec![];
+        let mut inputs: Vec<Slip> = Vec::new();
+        let mut outputs: Vec<Slip> = Vec::new();
         let mut nolan_in: Currency = 0;
         let mut nolan_out: Currency = 0;
         let my_public_key = self.public_key;
 
         // grab inputs
-        let mut keys_to_remove = vec![];
-        for key in self.unspent_slips.iter() {
+        let mut keys_to_remove = Vec::with_capacity(1000);
+        for key in &self.unspent_slips {
             if nolan_in >= nolan_requested {
                 break;
             }
