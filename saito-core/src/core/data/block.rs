@@ -315,6 +315,7 @@ impl Block {
         block.creator = public_key.clone();
 
         if golden_ticket.is_some() {
+            debug!("golden ticket found. adding to block.");
             block.transactions.push(golden_ticket.unwrap());
         }
         block.transactions.reserve(transactions.len());

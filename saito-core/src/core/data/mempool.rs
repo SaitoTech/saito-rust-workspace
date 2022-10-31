@@ -156,11 +156,10 @@ impl Mempool {
         current_timestamp: u64,
         gt_tx: Option<Transaction>,
     ) -> Option<Block> {
-        debug!("bundling block...");
-
         if !self.can_bundle_block(blockchain, current_timestamp).await {
             return None;
         }
+        debug!("bundling block with {:?} txs", self.transactions.len());
 
         let previous_block_hash: SaitoHash;
         {

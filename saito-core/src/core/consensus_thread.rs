@@ -338,13 +338,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     Wallet::create_golden_ticket_transaction(gt, &public_key, &private_key).await;
                 gt_tx = Some(transaction);
             }
-            // TODO : optimize this. too much cloning
             if !self.txs_for_mempool.is_empty() {
                 for tx in self.txs_for_mempool.iter() {
                     if let TransactionType::GoldenTicket = tx.transaction_type {
                         if gt_tx.is_none() {
                             let gt = GoldenTicket::deserialize_from_net(&tx.message);
                             if gt.target == blockchain.get_latest_block_hash() {
+                                // TODO : optimize this. too much cloning
                                 mempool.add_transaction(tx.clone()).await;
                             }
                         }
@@ -356,7 +356,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             self.block_producing_timer = 0;
 
-            debug!(
+            trace!(
                 "mempool size before bundling : {:?}",
                 mempool.transactions.len()
             );
@@ -369,7 +369,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "adding bundled block : {:?} to mempool",
                     hex::encode(block.hash)
                 );
-                debug!(
+                trace!(
                     "mempool size after bundling : {:?}",
                     mempool.transactions.len()
                 );
