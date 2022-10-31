@@ -462,7 +462,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     let mut mempool = self.mempool.write().await;
                     log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
 
-                    mempool.add_transaction(transaction).await;
+                    mempool.add_golden_ticket(transaction).await;
                 } else {
                     self.txs_for_mempool.push(transaction);
                 }
@@ -482,7 +482,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         let mut mempool = self.mempool.write().await;
                         log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
 
-                        mempool.add_transaction(transaction).await;
+                        mempool.add_golden_ticket(transaction).await;
                     } else {
                         self.txs_for_mempool.push(transaction);
                     }
