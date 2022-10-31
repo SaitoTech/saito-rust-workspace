@@ -457,7 +457,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     hex::encode(transaction.signature)
                 );
                 if let TransactionType::GoldenTicket = transaction.transaction_type {
-                    let gt = GoldenTicket::deserialize_from_net(&transaction.message);
                     log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
                     let mut mempool = self.mempool.write().await;
                     log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
@@ -477,7 +476,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 self.txs_for_mempool.reserve(transactions.len());
                 for transaction in transactions {
                     if let TransactionType::GoldenTicket = transaction.transaction_type {
-                        let gt = GoldenTicket::deserialize_from_net(&transaction.message);
                         log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
                         let mut mempool = self.mempool.write().await;
                         log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
