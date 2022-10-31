@@ -1318,7 +1318,7 @@ impl Blockchain {
         {
             let block_hashes = self.blockring.get_block_hashes_at_block_id(delete_block_id);
             for hash in block_hashes {
-                block_hashes_copy.push(hash.clone());
+                block_hashes_copy.push(hash);
             }
         }
 
@@ -1397,7 +1397,7 @@ impl Blockchain {
                 .blockring
                 .get_block_hashes_at_block_id(prune_blocks_at_block_id);
             for hash in block_hashes {
-                block_hashes_copy.push(hash.clone());
+                block_hashes_copy.push(hash);
             }
         }
 
