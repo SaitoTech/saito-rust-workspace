@@ -40,6 +40,7 @@ pub struct ConsensusStats {
     pub blocks_fetched: StatVariable,
     pub blocks_created: StatVariable,
     pub received_tx: StatVariable,
+    pub received_gts: StatVariable,
 }
 
 impl ConsensusStats {
@@ -57,6 +58,11 @@ impl ConsensusStats {
             ),
             received_tx: StatVariable::new(
                 "consensus::received_tx".to_string(),
+                STAT_BIN_COUNT,
+                sender.clone(),
+            ),
+            received_gts: StatVariable::new(
+                "consensus::received_gts".to_string(),
                 STAT_BIN_COUNT,
                 sender.clone(),
             ),
@@ -242,9 +248,7 @@ impl ConsensusThread {
 #[async_trait]
 impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
-        // trace!("processing new interface event");
         unreachable!();
-        None
     }
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
@@ -396,6 +400,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "received new golden ticket : {:?}",
                     hex::encode(golden_ticket.target)
                 );
+
                 log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
                 let mut mempool = self.mempool.write().await;
                 log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
@@ -414,6 +419,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     &private_key,
                 )
                 .await;
+                self.stats.received_gts.increment();
                 mempool.add_golden_ticket(transaction).await;
                 Some(())
             }
@@ -461,6 +467,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     let mut mempool = self.mempool.write().await;
                     log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
 
+                    self.stats.received_gts.increment();
                     mempool.add_golden_ticket(transaction).await;
                 } else {
                     self.txs_for_mempool.push(transaction);
@@ -474,12 +481,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     .increment_by(transactions.len() as u64);
 
                 self.txs_for_mempool.reserve(transactions.len());
-                for transaction in transactions {
+                for transaction in transactions.drain(..) {
                     if let TransactionType::GoldenTicket = transaction.transaction_type {
                         log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
                         let mut mempool = self.mempool.write().await;
                         log_write_lock_receive!("ConsensusEventProcessor:process_event::mempool");
 
+                        self.stats.received_gts.increment();
                         mempool.add_golden_ticket(transaction).await;
                     } else {
                         self.txs_for_mempool.push(transaction);
@@ -519,11 +527,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             .calculate_stats(current_time)
             .await;
         self.stats.received_tx.calculate_stats(current_time).await;
+        self.stats.received_gts.calculate_stats(current_time).await;
 
-        // self.stats.blocks_fetched.print();
-        // self.stats.blocks_created.print();
-        // self.stats.received_tx.print();
-        //
         {
             log_read_lock_request!("ConsensusEventProcessor:on_stat_interval::wallet");
             let wallet = self.wallet.read().await;
