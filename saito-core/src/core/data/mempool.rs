@@ -34,7 +34,7 @@ pub enum MempoolMessage {
 pub struct Mempool {
     pub blocks_queue: VecDeque<Block>,
     pub transactions: AHashMap<SaitoSignature, Transaction>,
-    pub golden_tickets: AHashMap<SaitoHash, GoldenTicket>,
+    pub golden_tickets: AHashMap<SaitoHash, Transaction>,
     // vector so we just copy it over
     routing_work_in_mempool: Currency,
     pub new_golden_ticket_added: bool,
@@ -73,20 +73,21 @@ impl Mempool {
         }
     }
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn add_golden_ticket(&mut self, golden_ticket: GoldenTicket) {
+    pub async fn add_golden_ticket(&mut self, golden_ticket: Transaction) {
         info!(
             "adding golden ticket : {:?}",
             hex::encode(hash(&golden_ticket.serialize_for_net()))
         );
-        if self.golden_tickets.contains_key(&golden_ticket.target) {
+        // TODO : should we replace others' GT with our GT if targets are similar ?
+        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.message);
+        if self.golden_tickets.contains_key(&gt.target) {
             debug!(
                 "similar golden ticket already exists : {:?}",
-                hex::encode(golden_ticket.target)
+                hex::encode(gt.target)
             );
             return;
         }
-        self.golden_tickets
-            .insert(golden_ticket.target, golden_ticket);
+        self.golden_tickets.insert(gt.target, golden_ticket);
 
         self.new_golden_ticket_added = true;
 
