@@ -13,9 +13,9 @@ pub struct BlockchainRequest {
 impl Serialize<Self> for BlockchainRequest {
     fn serialize(&self) -> Vec<u8> {
         [
-            self.latest_block_id.to_be_bytes().to_vec(),
-            self.latest_block_hash.to_vec(),
-            self.fork_id.to_vec(),
+            self.latest_block_id.to_be_bytes().as_slice(),
+            self.latest_block_hash.as_slice(),
+            self.fork_id.as_slice(),
         ]
         .concat()
     }
