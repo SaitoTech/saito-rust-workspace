@@ -1722,7 +1722,11 @@ impl Block {
         // as to determine spendability.
         //
 
-        let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
+        let transactions_valid = self
+            .transactions
+            .par_iter()
+            .with_min_len(100)
+            .all(|tx| tx.validate(utxoset));
 
         // let mut transactions_valid = true;
         // for tx in self.transactions.iter() {
