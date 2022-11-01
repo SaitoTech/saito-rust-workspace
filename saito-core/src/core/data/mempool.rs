@@ -148,7 +148,10 @@ impl Mempool {
         current_timestamp: u64,
         gt_tx: Option<Transaction>,
     ) -> Option<Block> {
-        if !self.can_bundle_block(blockchain, current_timestamp).await {
+        if !self
+            .can_bundle_block(blockchain, current_timestamp, &gt_tx)
+            .await
+        {
             return None;
         }
         debug!("bundling block with {:?} txs", self.transactions.len());
@@ -201,7 +204,12 @@ impl Mempool {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn can_bundle_block(&self, blockchain: &Blockchain, current_timestamp: u64) -> bool {
+    pub async fn can_bundle_block(
+        &self,
+        blockchain: &Blockchain,
+        current_timestamp: u64,
+        gt_tx: &Option<Transaction>,
+    ) -> bool {
         // if self.transactions.is_empty() {
         //     return false;
         // }
@@ -220,7 +228,7 @@ impl Mempool {
         if self.transactions.is_empty() || !self.new_tx_added {
             return false;
         }
-        if !blockchain.gt_requirement_met && self.golden_tickets.is_empty() {
+        if !blockchain.gt_requirement_met && gt_tx.is_none() {
             trace!("waiting till more golden tickets come in");
             return false;
         }
@@ -252,14 +260,19 @@ impl Mempool {
             hex::encode(block_hash)
         );
 
-        self.golden_tickets.clear();
+        self.golden_tickets.remove(block_hash);
         // self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         for transaction in transactions {
-            self.transactions.remove(&transaction.signature);
+            if let TransactionType::GoldenTicket = transaction.transaction_type {
+                let gt = GoldenTicket::deserialize_from_net(&transaction.message);
+                self.golden_tickets.remove(&gt.target);
+            } else {
+                self.transactions.remove(&transaction.signature);
+            }
         }
 
         self.routing_work_in_mempool = 0;
@@ -268,7 +281,6 @@ impl Mempool {
         for (_, transaction) in &self.transactions {
             self.routing_work_in_mempool += transaction.total_work;
         }
-        self.golden_tickets.clear();
     }
 
     ///
@@ -392,7 +404,9 @@ mod tests {
         // );
         let blockchain = blockchain_lock.read().await;
         assert_eq!(
-            mempool.can_bundle_block(&blockchain, ts + 120000).await,
+            mempool
+                .can_bundle_block(&blockchain, ts + 120000, &None)
+                .await,
             true
         );
     }
