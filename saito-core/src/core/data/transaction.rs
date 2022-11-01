@@ -765,9 +765,10 @@ impl Transaction {
             output.slip_index = i as u8;
         }
 
-        let hash_for_signature = hash(&self.serialize_for_signature());
+        let buffer = self.serialize_for_signature();
+        let hash_for_signature = hash(&buffer);
         self.hash_for_signature = Some(hash_for_signature);
-        self.signature = sign(&self.serialize_for_signature(), private_key);
+        self.signature = sign(&buffer, private_key);
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
