@@ -37,7 +37,6 @@ pub struct Mempool {
     pub golden_tickets: AHashMap<SaitoHash, Transaction>,
     // vector so we just copy it over
     routing_work_in_mempool: Currency,
-    pub new_golden_ticket_added: bool,
     pub new_tx_added: bool,
     pub(crate) public_key: SaitoPublicKey,
     private_key: SaitoPrivateKey,
@@ -51,7 +50,6 @@ impl Mempool {
             transactions: Default::default(),
             golden_tickets: Default::default(),
             routing_work_in_mempool: 0,
-            new_golden_ticket_added: false,
             new_tx_added: false,
             public_key,
             private_key,
@@ -88,8 +86,6 @@ impl Mempool {
             return;
         }
         self.golden_tickets.insert(gt.target, golden_ticket);
-
-        self.new_golden_ticket_added = true;
 
         info!("golden ticket added to mempool");
     }
@@ -137,12 +133,7 @@ impl Mempool {
         if !self.transactions.contains_key(&transaction.signature) {
             self.routing_work_in_mempool += transaction.total_work;
             if let TransactionType::GoldenTicket = transaction.transaction_type {
-                let gt = GoldenTicket::deserialize_from_net(&transaction.message);
-                // if we already have a gt mined by us we ignore this tx
-                if !self.golden_tickets.contains_key(&gt.target) {
-                    self.new_golden_ticket_added = true;
-                    self.transactions.insert(transaction.signature, transaction);
-                }
+                panic!("golden tickets should be in gt collection");
             } else {
                 self.transactions.insert(transaction.signature, transaction);
                 self.new_tx_added = true;
@@ -179,7 +170,6 @@ impl Mempool {
         .await;
         block.generate();
         self.new_tx_added = false;
-        self.new_golden_ticket_added = false;
         self.routing_work_in_mempool = 0;
 
         Some(block)
@@ -205,8 +195,6 @@ impl Mempool {
         .await;
         block.generate();
         self.new_tx_added = false;
-        self.new_golden_ticket_added = false;
-
         self.routing_work_in_mempool = 0;
 
         block
@@ -227,14 +215,12 @@ impl Mempool {
             return false;
         }
         if !self.blocks_queue.is_empty() {
-            // trace!("waiting till blocks in the queue are processed");
             return false;
         }
         if self.transactions.is_empty() || !self.new_tx_added {
-            // trace!("waiting till transactions come in");
             return false;
         }
-        if !blockchain.gt_requirement_met && !self.new_golden_ticket_added {
+        if !blockchain.gt_requirement_met && self.golden_tickets.is_empty() {
             trace!("waiting till more golden tickets come in");
             return false;
         }

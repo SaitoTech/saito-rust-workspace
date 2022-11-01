@@ -323,10 +323,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let mut mempool = self.mempool.write().await;
             log_write_lock_receive!("ConsensusEventProcessor:process_timer_event::mempool");
 
-            let gt_result = mempool
-                .golden_tickets
-                .remove(&blockchain.get_latest_block_hash());
-
             if !self.txs_for_mempool.is_empty() {
                 for tx in self.txs_for_mempool.iter() {
                     if let TransactionType::GoldenTicket = tx.transaction_type {
@@ -343,6 +339,14 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 "mempool size before bundling : {:?}",
                 mempool.transactions.len()
             );
+            let gt_result;
+            {
+                gt_result = mempool
+                    .golden_tickets
+                    .get(&blockchain.get_latest_block_hash())
+                    .cloned();
+            }
+
             let block = mempool
                 .bundle_block(blockchain.deref_mut(), timestamp, gt_result.clone())
                 .await;
@@ -356,6 +360,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "mempool size after bundling : {:?}",
                     mempool.transactions.len()
                 );
+
                 mempool.add_block(block);
                 self.txs_for_mempool.clear();
                 // dropping the lock here since blockchain needs the write lock to add blocks
