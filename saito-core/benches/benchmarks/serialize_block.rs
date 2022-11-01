@@ -199,77 +199,77 @@ pub fn serialize_block(c: &mut Criterion) {
             black_box(Block::deserialize_from_net(&buffer));
         });
     });
-    let block = generate_block(1_000_000_000, 1_000);
-    c.bench_function("serializing 1GB block with 1KB transaction", |b| {
-        b.iter(|| {
-            black_box(block.serialize_for_net(BlockType::Full));
-        });
-    });
-    let buffer = block.serialize_for_net(BlockType::Full);
-    c.bench_function("deserializing 1GB block with 1KB transaction", |b| {
-        b.iter(|| {
-            black_box(Block::deserialize_from_net(&buffer));
-        });
-    });
-    let block = generate_block(1_000_000_000, 10_000);
-    c.bench_function("serializing 1GB block with 10KB transaction", |b| {
-        b.iter(|| {
-            black_box(block.serialize_for_net(BlockType::Full));
-        });
-    });
-    let buffer = block.serialize_for_net(BlockType::Full);
-    c.bench_function("deserializing 1GB block with 10KB transaction", |b| {
-        b.iter(|| {
-            black_box(Block::deserialize_from_net(&buffer));
-        });
-    });
-    let block = generate_block(1_000_000_000, 100_000);
-    c.bench_function("serializing 1GB block with 100KB transaction", |b| {
-        b.iter(|| {
-            black_box(block.serialize_for_net(BlockType::Full));
-        });
-    });
-    let buffer = block.serialize_for_net(BlockType::Full);
-    c.bench_function("deserializing 1GB block with 100KB transaction", |b| {
-        b.iter(|| {
-            black_box(Block::deserialize_from_net(&buffer));
-        });
-    });
-    let block = generate_block(1_000_000_000, 1_000_000);
-    c.bench_function("serializing 1GB block with 1MB transaction", |b| {
-        b.iter(|| {
-            black_box(block.serialize_for_net(BlockType::Full));
-        });
-    });
-    let buffer = block.serialize_for_net(BlockType::Full);
-    c.bench_function("deserializing 1GB block with 1MB transaction", |b| {
-        b.iter(|| {
-            black_box(Block::deserialize_from_net(&buffer));
-        });
-    });
-    let block = generate_block(1_000_000_000, 10_000_000);
-    c.bench_function("serializing 1GB block with 10MB transaction", |b| {
-        b.iter(|| {
-            black_box(block.serialize_for_net(BlockType::Full));
-        });
-    });
-    let buffer = block.serialize_for_net(BlockType::Full);
-    c.bench_function("deserializing 1GB block with 10MB transaction", |b| {
-        b.iter(|| {
-            black_box(Block::deserialize_from_net(&buffer));
-        });
-    });
-    let block = generate_block(1_000_000_000, 100_000_000);
-    c.bench_function("serializing 1GB block with 100MB transaction", |b| {
-        b.iter(|| {
-            black_box(block.serialize_for_net(BlockType::Full));
-        });
-    });
-    let buffer = block.serialize_for_net(BlockType::Full);
-    c.bench_function("deserializing 1GB block with 100MB transaction", |b| {
-        b.iter(|| {
-            black_box(Block::deserialize_from_net(&buffer));
-        });
-    });
+    // let block = generate_block(1_000_000_000, 1_000);
+    // c.bench_function("serializing 1GB block with 1KB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(block.serialize_for_net(BlockType::Full));
+    //     });
+    // });
+    // let buffer = block.serialize_for_net(BlockType::Full);
+    // c.bench_function("deserializing 1GB block with 1KB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(Block::deserialize_from_net(&buffer));
+    //     });
+    // });
+    // let block = generate_block(1_000_000_000, 10_000);
+    // c.bench_function("serializing 1GB block with 10KB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(block.serialize_for_net(BlockType::Full));
+    //     });
+    // });
+    // let buffer = block.serialize_for_net(BlockType::Full);
+    // c.bench_function("deserializing 1GB block with 10KB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(Block::deserialize_from_net(&buffer));
+    //     });
+    // });
+    // let block = generate_block(1_000_000_000, 100_000);
+    // c.bench_function("serializing 1GB block with 100KB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(block.serialize_for_net(BlockType::Full));
+    //     });
+    // });
+    // let buffer = block.serialize_for_net(BlockType::Full);
+    // c.bench_function("deserializing 1GB block with 100KB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(Block::deserialize_from_net(&buffer));
+    //     });
+    // });
+    // let block = generate_block(1_000_000_000, 1_000_000);
+    // c.bench_function("serializing 1GB block with 1MB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(block.serialize_for_net(BlockType::Full));
+    //     });
+    // });
+    // let buffer = block.serialize_for_net(BlockType::Full);
+    // c.bench_function("deserializing 1GB block with 1MB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(Block::deserialize_from_net(&buffer));
+    //     });
+    // });
+    // let block = generate_block(1_000_000_000, 10_000_000);
+    // c.bench_function("serializing 1GB block with 10MB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(block.serialize_for_net(BlockType::Full));
+    //     });
+    // });
+    // let buffer = block.serialize_for_net(BlockType::Full);
+    // c.bench_function("deserializing 1GB block with 10MB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(Block::deserialize_from_net(&buffer));
+    //     });
+    // });
+    // let block = generate_block(1_000_000_000, 100_000_000);
+    // c.bench_function("serializing 1GB block with 100MB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(block.serialize_for_net(BlockType::Full));
+    //     });
+    // });
+    // let buffer = block.serialize_for_net(BlockType::Full);
+    // c.bench_function("deserializing 1GB block with 100MB transaction", |b| {
+    //     b.iter(|| {
+    //         black_box(Block::deserialize_from_net(&buffer));
+    //     });
+    // });
 }
 criterion_group!(serializing_block_group, serialize_block);

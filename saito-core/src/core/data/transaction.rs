@@ -758,9 +758,7 @@ impl Transaction {
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn sign(&mut self, private_key: &SaitoPrivateKey) {
-        //
         // we set slip ordinals when signing
-        //
         for (i, output) in self.outputs.iter_mut().enumerate() {
             output.slip_index = i as u8;
         }
