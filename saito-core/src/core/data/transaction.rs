@@ -708,6 +708,25 @@ impl Transaction {
         if !opt_hop.is_none() {
             path_len = path_len + 1;
         }
+        let inputs = self
+            .inputs
+            .iter()
+            .map(|slip| slip.serialize_for_net())
+            .collect::<Vec<_>>()
+            .concat();
+        let outputs = self
+            .outputs
+            .iter()
+            .map(|slip| slip.serialize_output_for_signature())
+            .collect::<Vec<_>>()
+            .concat();
+        let hops = self
+            .path
+            .iter()
+            .map(|hop| hop.serialize_for_net())
+            .collect::<Vec<_>>()
+            .concat();
+
         let mut buffer: Vec<u8> = [
             (self.inputs.len() as u32).to_be_bytes().as_slice(),
             (self.outputs.len() as u32).to_be_bytes().as_slice(),
@@ -717,19 +736,13 @@ impl Transaction {
             self.timestamp.to_be_bytes().as_slice(),
             self.replaces_txs.to_be_bytes().as_slice(),
             (self.transaction_type as u8).to_be_bytes().as_slice(),
+            inputs.as_slice(),
+            outputs.as_slice(),
+            self.message.as_slice(),
+            hops.as_slice(),
         ]
         .concat();
 
-        for input in &self.inputs {
-            buffer.extend(&input.serialize_for_net());
-        }
-        for output in &self.outputs {
-            buffer.extend(&output.serialize_for_net());
-        }
-        buffer.extend(&self.message);
-        for hop in &self.path {
-            buffer.extend(&hop.serialize_for_net());
-        }
         if !opt_hop.is_none() {
             buffer.extend(opt_hop.unwrap().serialize_for_net());
         }
@@ -739,28 +752,21 @@ impl Transaction {
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
         // fastest known way that isn't bincode ??
-        let mut inputs: Vec<u8> = vec![];
-        let mut outputs: Vec<u8> = vec![];
 
         let inputs = self
             .inputs
             .iter()
             .map(|slip| slip.serialize_input_for_signature())
             .collect::<Vec<_>>()
-            .join(&0);
-        // let inputs = inputs.concat();
-        // for input in &self.inputs {
-        //     inputs.extend(&input.serialize_input_for_signature());
-        // }
+            .concat();
+
         let outputs = self
             .outputs
             .iter()
             .map(|slip| slip.serialize_output_for_signature())
             .collect::<Vec<_>>()
-            .join(&0);
-        // for output in &self.outputs {
-        //     outputs.extend(&output.serialize_output_for_signature());
-        // }
+            .concat();
+
         [
             self.timestamp.to_be_bytes().as_slice(),
             inputs.as_slice(),

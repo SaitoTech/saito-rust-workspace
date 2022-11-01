@@ -1212,10 +1212,11 @@ impl Block {
     // bytes array that can be hashed and then have the hash set.
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_hash(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        // vbytes.extend(&self.signature);
-        vbytes.extend(&self.previous_block_hash);
-        vbytes.extend(&self.pre_hash);
+        let mut vbytes: Vec<u8> = [
+            self.previous_block_hash.as_slice(),
+            self.pre_hash.as_slice(),
+        ]
+        .concat();
         vbytes
     }
 
@@ -1270,7 +1271,18 @@ impl Block {
         } else {
             buffer.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
         }
-        let mut buffer = [
+        let mut tx_buf = vec![];
+        if block_type != BlockType::Header {
+            // block headers do not get tx data
+            tx_buf = self
+                .transactions
+                .par_iter()
+                .with_min_len(10)
+                .map(|transaction| transaction.serialize_for_net())
+                .collect::<Vec<_>>()
+                .concat();
+        }
+        let buffer = [
             buffer.as_slice(),
             self.id.to_be_bytes().as_slice(),
             self.timestamp.to_be_bytes().as_slice(),
@@ -1286,18 +1298,9 @@ impl Block {
             self.avg_variance.to_be_bytes().as_slice(),
             self.avg_atr_income.to_be_bytes().as_slice(),
             self.avg_atr_variance.to_be_bytes().as_slice(),
+            tx_buf.as_slice(),
         ]
         .concat();
-
-        let mut serialized_txs = vec![];
-
-        // block headers do not get tx data
-        if block_type != BlockType::Header {
-            self.transactions.iter().for_each(|transaction| {
-                serialized_txs.extend(transaction.serialize_for_net());
-            });
-            buffer.extend(serialized_txs);
-        }
 
         buffer
     }
