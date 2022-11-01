@@ -717,7 +717,7 @@ impl Transaction {
         let outputs = self
             .outputs
             .iter()
-            .map(|slip| slip.serialize_output_for_signature())
+            .map(|slip| slip.serialize_for_net())
             .collect::<Vec<_>>()
             .concat();
         let hops = self
