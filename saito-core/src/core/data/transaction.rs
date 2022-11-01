@@ -742,12 +742,25 @@ impl Transaction {
         let mut inputs: Vec<u8> = vec![];
         let mut outputs: Vec<u8> = vec![];
 
-        for input in &self.inputs {
-            inputs.extend(&input.serialize_input_for_signature());
-        }
-        for output in &self.outputs {
-            outputs.extend(&output.serialize_output_for_signature());
-        }
+        let inputs = self
+            .inputs
+            .iter()
+            .map(|slip| slip.serialize_input_for_signature())
+            .collect::<Vec<_>>()
+            .join(&0);
+        // let inputs = inputs.concat();
+        // for input in &self.inputs {
+        //     inputs.extend(&input.serialize_input_for_signature());
+        // }
+        let outputs = self
+            .outputs
+            .iter()
+            .map(|slip| slip.serialize_output_for_signature())
+            .collect::<Vec<_>>()
+            .join(&0);
+        // for output in &self.outputs {
+        //     outputs.extend(&output.serialize_output_for_signature());
+        // }
         [
             self.timestamp.to_be_bytes().as_slice(),
             inputs.as_slice(),
