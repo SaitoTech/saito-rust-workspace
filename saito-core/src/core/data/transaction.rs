@@ -738,22 +738,25 @@ impl Transaction {
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
-        //
         // fastest known way that isn't bincode ??
-        //
-        let mut buffer: Vec<u8> = vec![];
-        buffer.extend(&self.timestamp.to_be_bytes());
+        let mut inputs: Vec<u8> = vec![];
+        let mut outputs: Vec<u8> = vec![];
+
         for input in &self.inputs {
-            buffer.extend(&input.serialize_input_for_signature());
+            inputs.extend(&input.serialize_input_for_signature());
         }
         for output in &self.outputs {
-            buffer.extend(&output.serialize_output_for_signature());
+            outputs.extend(&output.serialize_output_for_signature());
         }
-        buffer.extend(&(self.replaces_txs as u32).to_be_bytes());
-        buffer.extend(&(self.transaction_type as u32).to_be_bytes());
-        buffer.extend(&self.message);
-
-        buffer
+        [
+            self.timestamp.to_be_bytes().as_slice(),
+            inputs.as_slice(),
+            outputs.as_slice(),
+            (self.replaces_txs as u32).to_be_bytes().as_slice(),
+            (self.transaction_type as u32).to_be_bytes().as_slice(),
+            self.message.as_slice(),
+        ]
+        .concat()
     }
 
     // #[tracing::instrument(level = "info", skip_all)]

@@ -1225,21 +1225,22 @@ impl Block {
     // to avoid speed issues.
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.id.to_be_bytes());
-        vbytes.extend(&self.timestamp.to_be_bytes());
-        vbytes.extend(&self.previous_block_hash);
-        vbytes.extend(&self.creator);
-        vbytes.extend(&self.merkle_root);
-        vbytes.extend(&self.treasury.to_be_bytes());
-        vbytes.extend(&self.staking_treasury.to_be_bytes());
-        vbytes.extend(&self.burnfee.to_be_bytes());
-        vbytes.extend(&self.difficulty.to_be_bytes());
-        vbytes.extend(&self.avg_income.to_be_bytes());
-        vbytes.extend(&self.avg_variance.to_be_bytes());
-        vbytes.extend(&self.avg_atr_income.to_be_bytes());
-        vbytes.extend(&self.avg_atr_variance.to_be_bytes());
-        vbytes
+        [
+            self.id.to_be_bytes().as_slice(),
+            self.timestamp.to_be_bytes().as_slice(),
+            self.previous_block_hash.as_slice(),
+            self.creator.as_slice(),
+            self.merkle_root.as_slice(),
+            self.treasury.to_be_bytes().as_slice(),
+            self.staking_treasury.to_be_bytes().as_slice(),
+            self.burnfee.to_be_bytes().as_slice(),
+            self.difficulty.to_be_bytes().as_slice(),
+            self.avg_income.to_be_bytes().as_slice(),
+            self.avg_variance.to_be_bytes().as_slice(),
+            self.avg_atr_income.to_be_bytes().as_slice(),
+            self.avg_atr_variance.to_be_bytes().as_slice(),
+        ]
+        .concat()
     }
 
     /// Serialize a Block for transport or disk.
