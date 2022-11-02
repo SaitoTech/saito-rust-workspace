@@ -5,21 +5,21 @@ use tracing::debug;
 
 use crate::common::defs::SaitoHash;
 
-const BLOCK_FETCH_BATCH_SIZE: usize = 20;
-
 pub struct BlockchainSyncState {
     received_block_picture: HashMap<u64, HashMap<u64, SaitoHash>>,
     blocks_to_fetch: HashMap<u64, Vec<(SaitoHash, bool, u64)>>,
     /// since we are maintaining this state in routing thread and adding to blockchain in other thread, we need to keep a ceiling value for allowed block ids
     block_ceiling: u64,
+    batch_size: usize,
 }
 
 impl BlockchainSyncState {
-    pub fn new() -> BlockchainSyncState {
+    pub fn new(batch_size: usize) -> BlockchainSyncState {
         BlockchainSyncState {
             received_block_picture: Default::default(),
             blocks_to_fetch: Default::default(),
-            block_ceiling: BLOCK_FETCH_BATCH_SIZE as u64,
+            block_ceiling: batch_size as u64,
+            batch_size,
         }
     }
     pub(crate) fn build_peer_block_picture(&mut self) {
@@ -68,7 +68,7 @@ impl BlockchainSyncState {
         // for each peer check if we can fetch block
         for (peer_index, hashes) in self.blocks_to_fetch.iter_mut() {
             // check if we have blocks to fetch within our batch size
-            for i in 0..min(hashes.len(), BLOCK_FETCH_BATCH_SIZE) {
+            for i in 0..min(hashes.len(), self.batch_size) {
                 // TODO : same block can be fetched from multiple peers as of now. need to define the expected behaviour
                 let (hash, fetching, block_id) = hashes
                     .get_mut(i)
@@ -159,19 +159,19 @@ impl BlockchainSyncState {
         stats
     }
     pub fn set_latest_blockchain_id(&mut self, id: u64) {
-        self.block_ceiling = id + BLOCK_FETCH_BATCH_SIZE as u64;
+        self.block_ceiling = id + self.batch_size as u64;
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::data::blockchain_sync_state::{BlockchainSyncState, BLOCK_FETCH_BATCH_SIZE};
+    use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 
     #[test]
     fn single_peer_window_test() {
-        let mut state = BlockchainSyncState::new();
+        let mut state = BlockchainSyncState::new(20);
 
-        for i in 0..BLOCK_FETCH_BATCH_SIZE + 2 {
+        for i in 0..state.batch_size + 2 {
             state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1);
         }
         state.add_entry([200; 32], 200, 1);
@@ -183,8 +183,8 @@ mod tests {
         let vec = result.get_mut(&1);
         assert!(vec.is_some());
         let vec = vec.unwrap();
-        assert_eq!(vec.len(), BLOCK_FETCH_BATCH_SIZE);
-        for i in 0..BLOCK_FETCH_BATCH_SIZE {
+        assert_eq!(vec.len(), state.batch_size);
+        for i in 0..state.batch_size {
             let entry = vec.get(i).unwrap();
             assert_eq!(*entry, [(i + 1) as u8; 32]);
         }
@@ -196,7 +196,7 @@ mod tests {
         let vec = result.get_mut(&1);
         assert!(vec.is_some());
         let vec = vec.unwrap();
-        assert_eq!(vec.len(), BLOCK_FETCH_BATCH_SIZE - 2);
+        assert_eq!(vec.len(), state.batch_size - 2);
 
         state.remove_entry([2; 32], 1);
         state.remove_entry([5; 32], 1);
@@ -209,6 +209,6 @@ mod tests {
         let vec = result.get_mut(&1);
         assert!(vec.is_some());
         let vec = vec.unwrap();
-        assert_eq!(vec.len(), BLOCK_FETCH_BATCH_SIZE - 1);
+        assert_eq!(vec.len(), state.batch_size - 1);
     }
 }

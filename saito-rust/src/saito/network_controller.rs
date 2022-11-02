@@ -24,7 +24,6 @@ use warp::Filter;
 use saito_core::common::defs::{SaitoHash, StatVariable, BLOCK_FILE_EXTENSION, STAT_BIN_COUNT};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
-use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::{

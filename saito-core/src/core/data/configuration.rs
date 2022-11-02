@@ -25,6 +25,7 @@ pub struct Server {
     pub channel_size: u64,
     pub stat_timer_in_ms: u64,
     pub thread_sleep_time_in_ms: u64,
+    pub block_fetch_batch_size: u64,
 }
 
 pub trait Configuration {

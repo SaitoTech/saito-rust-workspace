@@ -123,7 +123,7 @@ pub fn new() -> SaitoWasm {
             senders_to_verification: vec![],
             last_verification_thread_index: 0,
             stat_sender: sender_to_stat.clone(),
-            blockchain_sync_state: BlockchainSyncState::new(),
+            blockchain_sync_state: BlockchainSyncState::new(10),
         },
         routing_event_processor: ConsensusThread {
             mempool: context.mempool.clone(),

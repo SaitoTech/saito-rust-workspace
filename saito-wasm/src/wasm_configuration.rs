@@ -21,6 +21,7 @@ impl WasmConfiguration {
                 channel_size: 1000,
                 stat_timer_in_ms: 10000,
                 thread_sleep_time_in_ms: 10,
+                block_fetch_batch_size: 10,
             },
             peers: vec![],
         }
