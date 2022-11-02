@@ -564,6 +564,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_timer_in_ms = configs.get_server_configs().stat_timer_in_ms;
         verification_thread_count = configs.get_server_configs().verification_threads;
         fetch_batch_size = configs.get_server_configs().block_fetch_batch_size as usize;
+        assert_ne!(fetch_batch_size, 0);
     }
 
     let (event_sender_to_loop, event_receiver_in_loop) =
