@@ -72,12 +72,14 @@ impl Mempool {
     }
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_golden_ticket(&mut self, golden_ticket: Transaction) {
+        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.message);
         info!(
-            "adding golden ticket : {:?}",
-            hex::encode(hash(&golden_ticket.serialize_for_net()))
+            "adding golden ticket : {:?} target : {:?} public_key : {:?}",
+            hex::encode(hash(&golden_ticket.serialize_for_net())),
+            hex::encode(gt.target),
+            hex::encode(gt.public_key)
         );
         // TODO : should we replace others' GT with our GT if targets are similar ?
-        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.message);
         if self.golden_tickets.contains_key(&gt.target) {
             debug!(
                 "similar golden ticket already exists : {:?}",
