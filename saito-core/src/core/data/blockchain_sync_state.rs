@@ -168,12 +168,22 @@ impl BlockchainSyncState {
             if first.is_some() {
                 first_id = first.unwrap().2;
             }
+            let fetching_count = vec
+                .iter()
+                .filter(|(_, status, _)| {
+                    if let BlockStatus::Fetching = status {
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .count();
             let stat = format!(
                 "--- stats ------ {} - peer : {:?} first: {:?} fetching_count : {:?} ordered_till : {:?} waiting_to_order : {:?}",
                 format!("{:width$}", "routing:sync_state", width = 30),
                 peer_index,
                 first_id,
-                vec.len(),
+                fetching_count,
                 last_id,
                 count
             );
