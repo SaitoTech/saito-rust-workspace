@@ -101,6 +101,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         let wallet = self.wallet.read().await;
         log_read_lock_receive!("wallet");
         self.public_key = wallet.public_key.clone();
+        info!("node public key = {:?}", hex::encode(self.public_key));
     }
 
     async fn on_stat_interval(&mut self, _current_time: Timestamp) {
