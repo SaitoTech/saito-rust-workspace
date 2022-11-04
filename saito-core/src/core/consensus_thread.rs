@@ -13,6 +13,7 @@ use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
@@ -393,6 +394,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     self.network
                         .propagate_transaction(gt_result.as_ref().unwrap())
                         .await;
+                    debug!(
+                        "propagating gt : {:?} to peers",
+                        hex::encode(hash(&gt_result.unwrap().serialize_for_net()))
+                    );
                     let (_, propagated) = mempool
                         .golden_tickets
                         .get_mut(&blockchain.get_latest_block_hash())
@@ -473,9 +478,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             ConsensusEvent::NewTransaction { transaction } => {
                 self.stats.received_tx.increment();
 
-                trace!(
-                    "tx received with sig: {:?}",
-                    hex::encode(transaction.signature)
+                debug!(
+                    "tx received with sig: {:?} hash : {:?}",
+                    hex::encode(transaction.signature),
+                    hex::encode(hash(&transaction.serialize_for_net()))
                 );
                 if let TransactionType::GoldenTicket = transaction.transaction_type {
                     log_write_lock_request!("ConsensusEventProcessor:process_event::mempool");
