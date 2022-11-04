@@ -583,6 +583,11 @@ impl Transaction {
         }
 
         self.total_work = routing_work_available_to_public_key;
+        debug!(
+            "total work calculated = {:?} for tx : {:?}",
+            self.total_work,
+            hex::encode(self.signature)
+        );
     }
 
     //
