@@ -34,7 +34,7 @@ pub enum MempoolMessage {
 pub struct Mempool {
     pub blocks_queue: VecDeque<Block>,
     pub transactions: AHashMap<SaitoSignature, Transaction>,
-    pub golden_tickets: AHashMap<SaitoHash, Transaction>,
+    pub golden_tickets: AHashMap<SaitoHash, (Transaction, bool)>,
     // vector so we just copy it over
     routing_work_in_mempool: Currency,
     pub new_tx_added: bool,
@@ -87,7 +87,8 @@ impl Mempool {
             );
             return;
         }
-        self.golden_tickets.insert(gt.target, golden_ticket);
+        self.golden_tickets
+            .insert(gt.target, (golden_ticket, false));
 
         info!("golden ticket added to mempool");
     }

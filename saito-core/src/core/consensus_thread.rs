@@ -339,12 +339,17 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 "mempool size before bundling : {:?}",
                 mempool.transactions.len()
             );
-            let gt_result;
+            let mut gt_result = None;
+            let mut gt_propagated = false;
             {
-                gt_result = mempool
+                let result: Option<&(Transaction, bool)> = mempool
                     .golden_tickets
-                    .get(&blockchain.get_latest_block_hash())
-                    .cloned();
+                    .get(&blockchain.get_latest_block_hash());
+                if result.is_some() {
+                    let (tx, propagated) = result.unwrap();
+                    gt_result = Some(tx.clone());
+                    gt_propagated = *propagated;
+                }
             }
 
             let block = mempool
@@ -384,10 +389,15 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     self.network.propagate_transaction(&tx).await;
                 }
                 // route golden tickets to peers
-                if gt_result.is_some() {
+                if gt_result.is_some() && !gt_propagated {
                     self.network
                         .propagate_transaction(gt_result.as_ref().unwrap())
                         .await;
+                    let (_, propagated) = mempool
+                        .golden_tickets
+                        .get_mut(&blockchain.get_latest_block_hash())
+                        .unwrap();
+                    *propagated = true;
                 }
             }
         }
