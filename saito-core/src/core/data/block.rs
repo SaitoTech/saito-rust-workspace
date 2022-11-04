@@ -1212,10 +1212,11 @@ impl Block {
     // bytes array that can be hashed and then have the hash set.
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_hash(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        // vbytes.extend(&self.signature);
-        vbytes.extend(&self.previous_block_hash);
-        vbytes.extend(&self.pre_hash);
+        let mut vbytes: Vec<u8> = [
+            self.previous_block_hash.as_slice(),
+            self.pre_hash.as_slice(),
+        ]
+        .concat();
         vbytes
     }
 
@@ -1225,21 +1226,22 @@ impl Block {
     // to avoid speed issues.
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.id.to_be_bytes());
-        vbytes.extend(&self.timestamp.to_be_bytes());
-        vbytes.extend(&self.previous_block_hash);
-        vbytes.extend(&self.creator);
-        vbytes.extend(&self.merkle_root);
-        vbytes.extend(&self.treasury.to_be_bytes());
-        vbytes.extend(&self.staking_treasury.to_be_bytes());
-        vbytes.extend(&self.burnfee.to_be_bytes());
-        vbytes.extend(&self.difficulty.to_be_bytes());
-        vbytes.extend(&self.avg_income.to_be_bytes());
-        vbytes.extend(&self.avg_variance.to_be_bytes());
-        vbytes.extend(&self.avg_atr_income.to_be_bytes());
-        vbytes.extend(&self.avg_atr_variance.to_be_bytes());
-        vbytes
+        [
+            self.id.to_be_bytes().as_slice(),
+            self.timestamp.to_be_bytes().as_slice(),
+            self.previous_block_hash.as_slice(),
+            self.creator.as_slice(),
+            self.merkle_root.as_slice(),
+            self.treasury.to_be_bytes().as_slice(),
+            self.staking_treasury.to_be_bytes().as_slice(),
+            self.burnfee.to_be_bytes().as_slice(),
+            self.difficulty.to_be_bytes().as_slice(),
+            self.avg_income.to_be_bytes().as_slice(),
+            self.avg_variance.to_be_bytes().as_slice(),
+            self.avg_atr_income.to_be_bytes().as_slice(),
+            self.avg_atr_variance.to_be_bytes().as_slice(),
+        ]
+        .concat()
     }
 
     /// Serialize a Block for transport or disk.
@@ -1269,7 +1271,18 @@ impl Block {
         } else {
             buffer.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
         }
-        let mut buffer = [
+        let mut tx_buf = vec![];
+        if block_type != BlockType::Header {
+            // block headers do not get tx data
+            tx_buf = self
+                .transactions
+                .par_iter()
+                .with_min_len(10)
+                .map(|transaction| transaction.serialize_for_net())
+                .collect::<Vec<_>>()
+                .concat();
+        }
+        let buffer = [
             buffer.as_slice(),
             self.id.to_be_bytes().as_slice(),
             self.timestamp.to_be_bytes().as_slice(),
@@ -1285,18 +1298,9 @@ impl Block {
             self.avg_variance.to_be_bytes().as_slice(),
             self.avg_atr_income.to_be_bytes().as_slice(),
             self.avg_atr_variance.to_be_bytes().as_slice(),
+            tx_buf.as_slice(),
         ]
         .concat();
-
-        let mut serialized_txs = vec![];
-
-        // block headers do not get tx data
-        if block_type != BlockType::Header {
-            self.transactions.iter().for_each(|transaction| {
-                serialized_txs.extend(transaction.serialize_for_net());
-            });
-            buffer.extend(serialized_txs);
-        }
 
         buffer
     }
@@ -1718,7 +1722,11 @@ impl Block {
         // as to determine spendability.
         //
 
-        let transactions_valid = self.transactions.par_iter().all(|tx| tx.validate(utxoset));
+        let transactions_valid = self
+            .transactions
+            .par_iter()
+            .with_min_len(100)
+            .all(|tx| tx.validate(utxoset));
 
         // let mut transactions_valid = true;
         // for tx in self.transactions.iter() {

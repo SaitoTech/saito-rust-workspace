@@ -34,10 +34,9 @@ pub enum MempoolMessage {
 pub struct Mempool {
     pub blocks_queue: VecDeque<Block>,
     pub transactions: AHashMap<SaitoSignature, Transaction>,
-    pub golden_tickets: AHashMap<SaitoHash, Transaction>,
+    pub golden_tickets: AHashMap<SaitoHash, (Transaction, bool)>,
     // vector so we just copy it over
     routing_work_in_mempool: Currency,
-    pub new_golden_ticket_added: bool,
     pub new_tx_added: bool,
     pub(crate) public_key: SaitoPublicKey,
     private_key: SaitoPrivateKey,
@@ -51,7 +50,6 @@ impl Mempool {
             transactions: Default::default(),
             golden_tickets: Default::default(),
             routing_work_in_mempool: 0,
-            new_golden_ticket_added: false,
             new_tx_added: false,
             public_key,
             private_key,
@@ -74,12 +72,14 @@ impl Mempool {
     }
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_golden_ticket(&mut self, golden_ticket: Transaction) {
+        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.message);
         info!(
-            "adding golden ticket : {:?}",
-            hex::encode(hash(&golden_ticket.serialize_for_net()))
+            "adding golden ticket : {:?} target : {:?} public_key : {:?}",
+            hex::encode(hash(&golden_ticket.serialize_for_net())),
+            hex::encode(gt.target),
+            hex::encode(gt.public_key)
         );
         // TODO : should we replace others' GT with our GT if targets are similar ?
-        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.message);
         if self.golden_tickets.contains_key(&gt.target) {
             debug!(
                 "similar golden ticket already exists : {:?}",
@@ -87,9 +87,8 @@ impl Mempool {
             );
             return;
         }
-        self.golden_tickets.insert(gt.target, golden_ticket);
-
-        self.new_golden_ticket_added = true;
+        self.golden_tickets
+            .insert(gt.target, (golden_ticket, false));
 
         info!("golden ticket added to mempool");
     }
@@ -137,12 +136,7 @@ impl Mempool {
         if !self.transactions.contains_key(&transaction.signature) {
             self.routing_work_in_mempool += transaction.total_work;
             if let TransactionType::GoldenTicket = transaction.transaction_type {
-                let gt = GoldenTicket::deserialize_from_net(&transaction.message);
-                // if we already have a gt mined by us we ignore this tx
-                if !self.golden_tickets.contains_key(&gt.target) {
-                    self.new_golden_ticket_added = true;
-                    self.transactions.insert(transaction.signature, transaction);
-                }
+                panic!("golden tickets should be in gt collection");
             } else {
                 self.transactions.insert(transaction.signature, transaction);
                 self.new_tx_added = true;
@@ -157,10 +151,13 @@ impl Mempool {
         current_timestamp: u64,
         gt_tx: Option<Transaction>,
     ) -> Option<Block> {
-        if !self.can_bundle_block(blockchain, current_timestamp).await {
+        if !self
+            .can_bundle_block(blockchain, current_timestamp, &gt_tx)
+            .await
+        {
             return None;
         }
-        debug!("bundling block with {:?} txs", self.transactions.len());
+        info!("bundling block with {:?} txs", self.transactions.len());
 
         let previous_block_hash: SaitoHash;
         {
@@ -179,7 +176,6 @@ impl Mempool {
         .await;
         block.generate();
         self.new_tx_added = false;
-        self.new_golden_ticket_added = false;
         self.routing_work_in_mempool = 0;
 
         Some(block)
@@ -205,15 +201,18 @@ impl Mempool {
         .await;
         block.generate();
         self.new_tx_added = false;
-        self.new_golden_ticket_added = false;
-
         self.routing_work_in_mempool = 0;
 
         block
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    pub async fn can_bundle_block(&self, blockchain: &Blockchain, current_timestamp: u64) -> bool {
+    pub async fn can_bundle_block(
+        &self,
+        blockchain: &Blockchain,
+        current_timestamp: u64,
+        gt_tx: &Option<Transaction>,
+    ) -> bool {
         // if self.transactions.is_empty() {
         //     return false;
         // }
@@ -227,14 +226,12 @@ impl Mempool {
             return false;
         }
         if !self.blocks_queue.is_empty() {
-            // trace!("waiting till blocks in the queue are processed");
             return false;
         }
         if self.transactions.is_empty() || !self.new_tx_added {
-            // trace!("waiting till transactions come in");
             return false;
         }
-        if !blockchain.gt_requirement_met && !self.new_golden_ticket_added {
+        if !blockchain.gt_requirement_met && gt_tx.is_none() {
             trace!("waiting till more golden tickets come in");
             return false;
         }
@@ -242,12 +239,12 @@ impl Mempool {
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
-            debug!(
+            info!(
                 "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}",
                 previous_block.timestamp, current_timestamp, work_available, work_needed
             );
             let time_elapsed = current_timestamp - previous_block.timestamp;
-            debug!(
+            info!(
                 "can_bundle_block. work available: {:?} -- work needed: {:?} -- time elapsed: {:?} ",
                 work_available,
                 work_needed,
@@ -266,14 +263,19 @@ impl Mempool {
             hex::encode(block_hash)
         );
 
-        self.golden_tickets.clear();
+        self.golden_tickets.remove(block_hash);
         // self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
     }
 
     #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         for transaction in transactions {
-            self.transactions.remove(&transaction.signature);
+            if let TransactionType::GoldenTicket = transaction.transaction_type {
+                let gt = GoldenTicket::deserialize_from_net(&transaction.message);
+                self.golden_tickets.remove(&gt.target);
+            } else {
+                self.transactions.remove(&transaction.signature);
+            }
         }
 
         self.routing_work_in_mempool = 0;
@@ -282,7 +284,6 @@ impl Mempool {
         for (_, transaction) in &self.transactions {
             self.routing_work_in_mempool += transaction.total_work;
         }
-        self.golden_tickets.clear();
     }
 
     ///
@@ -406,7 +407,9 @@ mod tests {
         // );
         let blockchain = blockchain_lock.read().await;
         assert_eq!(
-            mempool.can_bundle_block(&blockchain, ts + 120000).await,
+            mempool
+                .can_bundle_block(&blockchain, ts + 120000, &None)
+                .await,
             true
         );
     }

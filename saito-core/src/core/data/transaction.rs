@@ -583,6 +583,11 @@ impl Transaction {
         }
 
         self.total_work = routing_work_available_to_public_key;
+        debug!(
+            "total work calculated = {:?} for tx : {:?}",
+            self.total_work,
+            hex::encode(self.signature)
+        );
     }
 
     //
@@ -708,6 +713,25 @@ impl Transaction {
         if !opt_hop.is_none() {
             path_len = path_len + 1;
         }
+        let inputs = self
+            .inputs
+            .iter()
+            .map(|slip| slip.serialize_for_net())
+            .collect::<Vec<_>>()
+            .concat();
+        let outputs = self
+            .outputs
+            .iter()
+            .map(|slip| slip.serialize_for_net())
+            .collect::<Vec<_>>()
+            .concat();
+        let hops = self
+            .path
+            .iter()
+            .map(|hop| hop.serialize_for_net())
+            .collect::<Vec<_>>()
+            .concat();
+
         let mut buffer: Vec<u8> = [
             (self.inputs.len() as u32).to_be_bytes().as_slice(),
             (self.outputs.len() as u32).to_be_bytes().as_slice(),
@@ -717,19 +741,13 @@ impl Transaction {
             self.timestamp.to_be_bytes().as_slice(),
             self.replaces_txs.to_be_bytes().as_slice(),
             (self.transaction_type as u8).to_be_bytes().as_slice(),
+            inputs.as_slice(),
+            outputs.as_slice(),
+            self.message.as_slice(),
+            hops.as_slice(),
         ]
         .concat();
 
-        for input in &self.inputs {
-            buffer.extend(&input.serialize_for_net());
-        }
-        for output in &self.outputs {
-            buffer.extend(&output.serialize_for_net());
-        }
-        buffer.extend(&self.message);
-        for hop in &self.path {
-            buffer.extend(&hop.serialize_for_net());
-        }
         if !opt_hop.is_none() {
             buffer.extend(opt_hop.unwrap().serialize_for_net());
         }
@@ -738,36 +756,44 @@ impl Transaction {
 
     // #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
-        //
         // fastest known way that isn't bincode ??
-        //
-        let mut buffer: Vec<u8> = vec![];
-        buffer.extend(&self.timestamp.to_be_bytes());
-        for input in &self.inputs {
-            buffer.extend(&input.serialize_input_for_signature());
-        }
-        for output in &self.outputs {
-            buffer.extend(&output.serialize_output_for_signature());
-        }
-        buffer.extend(&(self.replaces_txs as u32).to_be_bytes());
-        buffer.extend(&(self.transaction_type as u32).to_be_bytes());
-        buffer.extend(&self.message);
 
-        buffer
+        let inputs = self
+            .inputs
+            .iter()
+            .map(|slip| slip.serialize_input_for_signature())
+            .collect::<Vec<_>>()
+            .concat();
+
+        let outputs = self
+            .outputs
+            .iter()
+            .map(|slip| slip.serialize_output_for_signature())
+            .collect::<Vec<_>>()
+            .concat();
+
+        [
+            self.timestamp.to_be_bytes().as_slice(),
+            inputs.as_slice(),
+            outputs.as_slice(),
+            (self.replaces_txs as u32).to_be_bytes().as_slice(),
+            (self.transaction_type as u32).to_be_bytes().as_slice(),
+            self.message.as_slice(),
+        ]
+        .concat()
     }
 
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn sign(&mut self, private_key: &SaitoPrivateKey) {
-        //
         // we set slip ordinals when signing
-        //
         for (i, output) in self.outputs.iter_mut().enumerate() {
             output.slip_index = i as u8;
         }
 
-        let hash_for_signature = hash(&self.serialize_for_signature());
+        let buffer = self.serialize_for_signature();
+        let hash_for_signature = hash(&buffer);
         self.hash_for_signature = Some(hash_for_signature);
-        self.signature = sign(&self.serialize_for_signature(), private_key);
+        self.signature = sign(&buffer, private_key);
     }
 
     #[tracing::instrument(level = "trace", skip_all)]

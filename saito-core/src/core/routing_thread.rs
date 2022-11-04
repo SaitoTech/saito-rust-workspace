@@ -1,4 +1,3 @@
-use ahash::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -257,6 +256,7 @@ impl RoutingThread {
                 if result.is_some() {
                     fetched_blocks.push((peer_index, *hash));
                 } else {
+                    // if we already have the block added don't need to request it from peer
                     self.blockchain_sync_state.remove_entry(*hash, peer_index);
                 }
             }
@@ -349,7 +349,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     .await;
 
                 self.blockchain_sync_state
-                    .remove_entry(block_hash, peer_index);
+                    .mark_as_fetched(peer_index, block_hash);
                 {
                     log_read_lock_request!("VerificationThread:verify_tx::blockchain");
                     let blockchain = self.blockchain.read().await;

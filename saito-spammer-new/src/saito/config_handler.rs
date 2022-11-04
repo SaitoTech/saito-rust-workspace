@@ -41,6 +41,7 @@ impl SpammerConfigs {
                 channel_size: 0,
                 stat_timer_in_ms: 0,
                 thread_sleep_time_in_ms: 10,
+                block_fetch_batch_size: 0,
             },
             peers: vec![],
             spammer: Spammer {

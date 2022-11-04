@@ -1428,7 +1428,7 @@ impl Blockchain {
         blocks = mempool.blocks_queue.drain(..).collect();
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
 
-        info!("blocks to add : {:?}", blocks.len());
+        debug!("blocks to add : {:?}", blocks.len());
         while let Some(block) = blocks.pop_front() {
             self.add_block(
                 block,
@@ -1439,7 +1439,7 @@ impl Blockchain {
             )
             .await;
         }
-        info!(
+        debug!(
             "added blocks to blockchain. added back : {:?}",
             mempool.blocks_queue.len()
         );

@@ -132,7 +132,7 @@ async fn run_verification_thread(
         let mut work_done;
         let mut stat_timer = Instant::now();
         let time_keeper = TimeKeeper {};
-        let batch_size = 100;
+        let batch_size = 10000;
 
         event_processor.on_init().await;
         let mut queued_requests = vec![];
@@ -306,6 +306,7 @@ async fn run_routing_event_processor(
     thread_sleep_time_in_ms: u64,
     channel_size: usize,
     sender_to_stat: Sender<String>,
+    fetch_batch_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
         blockchain: context.blockchain.clone(),
@@ -329,7 +330,7 @@ async fn run_routing_event_processor(
         senders_to_verification: senders,
         last_verification_thread_index: 0,
         stat_sender: sender_to_stat.clone(),
-        blockchain_sync_state: BlockchainSyncState::new(),
+        blockchain_sync_state: BlockchainSyncState::new(fetch_batch_size),
     };
 
     {
@@ -552,6 +553,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let thread_sleep_time_in_ms;
     let stat_timer_in_ms;
     let verification_thread_count;
+    let fetch_batch_size;
 
     {
         log_read_lock_request!("configs");
@@ -561,6 +563,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         thread_sleep_time_in_ms = configs.get_server_configs().thread_sleep_time_in_ms;
         stat_timer_in_ms = configs.get_server_configs().stat_timer_in_ms;
         verification_thread_count = configs.get_server_configs().verification_threads;
+        fetch_batch_size = configs.get_server_configs().block_fetch_batch_size as usize;
+        assert_ne!(fetch_batch_size, 0);
     }
 
     let (event_sender_to_loop, event_receiver_in_loop) =
@@ -609,6 +613,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         thread_sleep_time_in_ms,
         channel_size,
         sender_to_stat.clone(),
+        fetch_batch_size,
     )
     .await;
 

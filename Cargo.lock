@@ -1644,6 +1644,7 @@ dependencies = [
  "base58",
  "blake3",
  "block-modes",
+ "byteorder",
  "criterion",
  "futures",
  "getrandom",
