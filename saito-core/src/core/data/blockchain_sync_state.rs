@@ -99,7 +99,11 @@ impl BlockchainSyncState {
     }
     pub fn mark_as_fetching(&mut self, entries: Vec<(u64, SaitoHash)>) {
         for (peer_index, hash) in entries.iter() {
-            let res = self.blocks_to_fetch.get_mut(peer_index).unwrap();
+            let res = self.blocks_to_fetch.get_mut(peer_index);
+            if res.is_none() {
+                continue;
+            }
+            let res = res.unwrap();
             for (block_hash, status, _) in res {
                 if hash.eq(block_hash) {
                     *status = BlockStatus::Fetching;
@@ -109,7 +113,11 @@ impl BlockchainSyncState {
         }
     }
     pub fn mark_as_fetched(&mut self, peer_index: u64, hash: SaitoHash) {
-        let res = self.blocks_to_fetch.get_mut(&peer_index).unwrap();
+        let res = self.blocks_to_fetch.get_mut(&peer_index);
+        if res.is_none() {
+            return;
+        }
+        let res = res.unwrap();
         for (block_hash, status, _) in res {
             if hash.eq(block_hash) {
                 *status = BlockStatus::Fetched;
