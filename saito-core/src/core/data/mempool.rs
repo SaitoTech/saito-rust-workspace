@@ -239,16 +239,10 @@ impl Mempool {
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
-            info!(
-                "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}",
-                previous_block.timestamp, current_timestamp, work_available, work_needed
-            );
             let time_elapsed = current_timestamp - previous_block.timestamp;
-            info!(
-                "can_bundle_block. work available: {:?} -- work needed: {:?} -- time elapsed: {:?} ",
-                work_available,
-                work_needed,
-                time_elapsed
+            debug!(
+                "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}, time_elapsed : {:?} can_bundle : {:?}",
+                previous_block.timestamp, current_timestamp, work_available, work_needed, time_elapsed, work_available >= work_needed
             );
             work_available >= work_needed
         } else {

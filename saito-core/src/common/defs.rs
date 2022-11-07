@@ -98,24 +98,24 @@ impl StatVariable {
             self.count_since_last_stat += amount;
         }
     }
-    pub async fn calculate_stats(&mut self, current_time_in_us: Timestamp) {
-        let time_elapsed_in_us = current_time_in_us - self.last_stat_at;
-        self.last_stat_at = current_time_in_us;
+    pub async fn calculate_stats(&mut self, current_time_in_ms: Timestamp) {
+        let time_elapsed_in_ms = current_time_in_ms - self.last_stat_at;
+        self.last_stat_at = current_time_in_ms;
         if self.bins.len() == self.bins.capacity() - 1 {
             self.bins.pop_front();
         }
         self.bins
-            .push_back((self.count_since_last_stat, time_elapsed_in_us));
+            .push_back((self.count_since_last_stat, time_elapsed_in_ms));
         self.count_since_last_stat = 0;
 
         let mut total = 0;
-        let mut total_time_in_us = 0;
+        let mut total_time_in_ms = 0;
         for (count, time) in self.bins.iter() {
             total += *count;
-            total_time_in_us += *time;
+            total_time_in_ms += *time;
         }
 
-        self.avg = (1_000_000.0 * total as f64) / total_time_in_us as f64;
+        self.avg = (1_000.0 * total as f64) / total_time_in_ms as f64;
         if self.avg > self.max_avg {
             self.max_avg = self.avg;
         }

@@ -193,20 +193,13 @@ impl TransactionGenerator {
 
         let mut transaction = Transaction::new();
 
-        let (mut input_slips, mut output_slips) =
-            wallet.generate_slips(total_nolans_requested_per_slip);
+        let (input_slips, output_slips) = wallet.generate_slips(total_nolans_requested_per_slip);
 
-        let input_len = input_slips.len();
-        let output_len = output_slips.len();
-
-        for _a in 0..input_len {
-            transaction.add_input(input_slips[0].clone());
-            input_slips.remove(0);
+        for slip in input_slips {
+            transaction.add_input(slip);
         }
-
-        for _b in 0..output_len {
-            transaction.add_output(output_slips[0].clone());
-            output_slips.remove(0);
+        for slip in output_slips {
+            transaction.add_output(slip);
         }
 
         for _c in 0..output_slips_per_input_slip {
@@ -224,7 +217,7 @@ impl TransactionGenerator {
             transaction.message = generate_random_bytes(remaining_bytes as u64);
         }
 
-        transaction.timestamp = self.time_keeper.get_timestamp();
+        transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
         transaction.generate(&self.public_key, 0, 0);
         transaction.sign(&self.private_key);
         transaction.add_hop(&wallet.private_key, &wallet.public_key, to_public_key);
@@ -320,7 +313,7 @@ impl TransactionGenerator {
                 .with_min_len(100)
                 .map(|mut transaction| {
                     transaction.message = vec![0; tx_size as usize]; //;generate_random_bytes(tx_size as u64);
-                    transaction.timestamp = time_keeper.get_timestamp();
+                    transaction.timestamp = time_keeper.get_timestamp_in_ms();
                     transaction.generate(&public_key, 0, 0);
                     transaction.sign(&self.private_key);
                     transaction.add_hop(&self.private_key, &self.public_key, &to_public_key);
