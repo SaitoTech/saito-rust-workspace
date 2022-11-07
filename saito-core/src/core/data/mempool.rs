@@ -240,7 +240,7 @@ impl Mempool {
             let work_available = self.get_routing_work_available();
             let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
             let time_elapsed = current_timestamp - previous_block.timestamp;
-            info!(
+            debug!(
                 "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}, time_elapsed : {:?} can_bundle : {:?}",
                 previous_block.timestamp, current_timestamp, work_available, work_needed, time_elapsed, work_available >= work_needed
             );
