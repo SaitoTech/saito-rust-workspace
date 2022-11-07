@@ -359,8 +359,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             if block.is_some() {
                 let block = block.unwrap();
                 info!(
-                    "adding bundled block : {:?} to mempool",
-                    hex::encode(block.hash)
+                    "adding bundled block : {:?} with id : {:?}to mempool",
+                    hex::encode(block.hash),
+                    block.id
                 );
                 trace!(
                     "mempool size after bundling : {:?}",
