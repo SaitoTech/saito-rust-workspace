@@ -96,9 +96,9 @@ pub fn hash(data: &[u8]) -> SaitoHash {
     // TODO: Blake3 has benchmarked 128 kb as the cutoff,
     // the benchmark should be redone for Saito's needs
     if data.len() > PARALLEL_HASH_BYTE_THRESHOLD {
-        hasher.update(data);
-    } else {
         hasher.update_rayon(data);
+    } else {
+        hasher.update(data);
     }
     hasher.finalize().into()
 }
