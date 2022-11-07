@@ -1,9 +1,10 @@
 use crate::common::defs::{Currency, Timestamp};
+use std::time::Duration;
 
 //
 // our target blocktime
 //
-pub const HEARTBEAT: u64 = 5_000;
+pub const HEARTBEAT: u64 = Duration::from_secs(5).as_millis() as u64;
 
 //
 // Burn Fee
@@ -31,17 +32,17 @@ impl BurnFee {
     ///
     pub fn return_routing_work_needed_to_produce_block_in_nolan(
         burn_fee_previous_block: Currency,
-        current_block_timestamp: u64,
-        previous_block_timestamp: u64,
+        current_block_timestamp_in_ms: u64,
+        previous_block_timestamp_in_ms: u64,
     ) -> Currency {
         //
         // impossible if times misordered
         //
-        if previous_block_timestamp >= current_block_timestamp {
+        if previous_block_timestamp_in_ms >= current_block_timestamp_in_ms {
             return 10_000_000_000_000_000_000;
         }
 
-        let elapsed_time = match current_block_timestamp - previous_block_timestamp {
+        let elapsed_time = match current_block_timestamp_in_ms - previous_block_timestamp_in_ms {
             0 => 1,
             diff => diff,
         };
@@ -69,19 +70,20 @@ impl BurnFee {
     ///
     pub fn return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
         burn_fee_previous_block: Currency,
-        current_block_timestamp: Timestamp,
-        previous_block_timestamp: Timestamp,
+        current_block_timestamp_in_ms: Timestamp,
+        previous_block_timestamp_in_ms: Timestamp,
     ) -> Currency {
         //
         // impossible if times misordered
         //
-        if previous_block_timestamp >= current_block_timestamp {
+        if previous_block_timestamp_in_ms >= current_block_timestamp_in_ms {
             return 10_000_000_000_000_000_000;
         }
-        let timestamp_difference = match current_block_timestamp - previous_block_timestamp {
-            0 => 1,
-            diff => diff,
-        };
+        let timestamp_difference =
+            match current_block_timestamp_in_ms - previous_block_timestamp_in_ms {
+                0 => 1,
+                diff => diff,
+            };
 
         // algorithm fails if burn fee last block is 0, so default to low value
         if burn_fee_previous_block == 0 {

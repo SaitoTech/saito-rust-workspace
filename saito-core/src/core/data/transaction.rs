@@ -561,6 +561,10 @@ impl Transaction {
         let last_hop = &self.path[self.path.len() - 1];
         if last_hop.to.ne(public_key) {
             self.total_work = 0;
+            warn!(
+                "tx : {:?} last hop is not current node",
+                hex::encode(self.signature)
+            );
             return;
         }
 
@@ -574,6 +578,10 @@ impl Transaction {
         for _i in 1..self.path.len() {
             if self.path[_i].to != self.path[_i - 1].from {
                 self.total_work = 0;
+                warn!(
+                    "tx : {:?} from and to not matching",
+                    hex::encode(self.signature)
+                );
                 return;
             }
 
@@ -583,10 +591,13 @@ impl Transaction {
         }
 
         self.total_work = routing_work_available_to_public_key;
-        debug!(
-            "total work calculated = {:?} for tx : {:?}",
+        trace!(
+            "total work : {:?} for tx : {:?}. total fees : {:?} total in : {:?} total_out : {:?}",
             self.total_work,
-            hex::encode(self.signature)
+            hex::encode(self.signature),
+            self.total_fees,
+            self.total_in,
+            self.total_out
         );
     }
 

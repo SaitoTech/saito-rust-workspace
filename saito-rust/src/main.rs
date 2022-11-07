@@ -109,7 +109,7 @@ where
                 if duration > Duration::from_millis(stat_timer_in_ms) {
                     stat_timer = current_instant;
                     event_processor
-                        .on_stat_interval(time_keeper.get_timestamp())
+                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
                         .await;
                 }
             }
@@ -177,7 +177,7 @@ async fn run_verification_thread(
                 if duration > Duration::from_millis(stat_timer_in_ms) {
                     stat_timer = current_instant;
                     event_processor
-                        .on_stat_interval(time_keeper.get_timestamp())
+                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
                         .await;
                 }
             }
@@ -487,7 +487,7 @@ fn run_loop_thread(
                 {
                     last_stat_on = Instant::now();
                     incoming_msgs
-                        .calculate_stats(TimeKeeper {}.get_timestamp())
+                        .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
                         .await;
                 }
             }

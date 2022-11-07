@@ -26,8 +26,8 @@ use crate::{
     log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
 };
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_micros() as u64;
-pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000_000).as_micros() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1).as_millis() as u64;
+pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000).as_millis() as u64;
 
 #[derive(Debug)]
 pub enum ConsensusEvent {
@@ -255,8 +255,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
         let mut work_done = false;
-        let timestamp = self.time_keeper.get_timestamp();
-        let duration_value = duration.as_micros() as u64;
+        let timestamp = self.time_keeper.get_timestamp_in_ms();
+        let duration_value = duration.as_millis() as u64;
 
         if self.generate_genesis_block {
             Self::generate_spammer_init_tx(

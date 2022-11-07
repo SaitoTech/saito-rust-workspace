@@ -306,6 +306,7 @@ impl Block {
                 previous_block_timestamp,
             );
 
+        assert!(current_timestamp > 0);
         block.id = previous_block_id + 1;
         block.previous_block_hash = previous_block_hash;
         block.burnfee = current_burnfee;

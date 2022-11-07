@@ -383,11 +383,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
-        let duration_value = duration.as_micros() as Timestamp;
+        let duration_value = duration.as_millis() as Timestamp;
 
         self.reconnection_timer = self.reconnection_timer + duration_value;
         // TODO : move the hard code value to a config
-        if self.reconnection_timer >= 10_000_000 {
+        if self.reconnection_timer >= 10_000 {
             self.network.connect_to_static_peers().await;
             self.reconnection_timer = 0;
         }

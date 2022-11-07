@@ -552,7 +552,7 @@ pub async fn run_network_controller(
                 {
                     last_stat_on = Instant::now();
                     outgoing_messages
-                        .calculate_stats(TimeKeeper {}.get_timestamp())
+                        .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
                         .await;
                     log_read_lock_request!("network controller");
                     let io_controller = network_controller.read().await;
