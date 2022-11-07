@@ -575,12 +575,14 @@ impl Transaction {
         // first hop gets ALL the routing work, so we start
         // halving from the 2nd hop in the routing path
         //
-        for _i in 1..self.path.len() {
-            if self.path[_i].to != self.path[_i - 1].from {
+        for i in 1..self.path.len() {
+            if self.path[i].from != self.path[i - 1].to {
                 self.total_work = 0;
                 warn!(
-                    "tx : {:?} from and to not matching",
-                    hex::encode(self.signature)
+                    "tx : {:?} from and to not matching. to : {:?} from : {:?}",
+                    hex::encode(self.signature),
+                    hex::encode(self.path[i - 1].to),
+                    hex::encode(self.path[i].from)
                 );
                 return;
             }
