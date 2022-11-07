@@ -15,7 +15,7 @@ use crate::core::data::blockring::BlockRing;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
-use crate::core::data::transaction::TransactionType;
+use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::{log_write_lock_receive, log_write_lock_request};
@@ -536,18 +536,26 @@ impl Blockchain {
         if block.creator == mempool.public_key {
             let transactions = &mut block.transactions;
             let prev_count = transactions.len();
-            // TODO : is there a way to not validate these again ?
-            transactions.retain(|tx| tx.validate(&self.utxoset));
+            let transactions: Vec<Transaction> = transactions
+                .par_drain(..)
+                .with_min_len(10)
+                .filter(|tx| {
+                    // TODO : what other types should be added back to the mempool
+                    if tx.transaction_type == TransactionType::Normal {
+                        // TODO : is there a way to not validate these again ?
+                        return tx.validate(&self.utxoset);
+                    }
+                    return false;
+                })
+                .collect();
+            // transactions.retain(|tx| tx.validate(&self.utxoset));
             info!(
                 "adding {:?} transactions back to mempool. dropped {:?} invalid transactions",
                 transactions.len(),
                 (prev_count - transactions.len())
             );
-            for tx in transactions.drain(..) {
-                // TODO : what other types should be added back to the mempool
-                if tx.transaction_type == TransactionType::Normal {
-                    mempool.transactions.insert(tx.signature, tx);
-                }
+            for tx in transactions {
+                mempool.transactions.insert(tx.signature, tx);
             }
             mempool.new_tx_added = true;
         }
