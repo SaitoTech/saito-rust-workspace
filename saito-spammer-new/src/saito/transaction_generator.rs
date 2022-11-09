@@ -277,8 +277,9 @@ impl TransactionGenerator {
                         assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
-                            let transaction =
+                            let mut transaction =
                                 Transaction::create(&mut wallet, public_key, payment, fee);
+                            transaction.generate_total_fees(0, 0);
                             if transaction.total_in == 0 || transaction.total_out == 0 {
                                 debug!("transaction not added since not enough funds. in : {:?} out : {:?}. current balance : {:?}, required : {:?}", transaction.total_in, transaction.total_out,wallet.get_available_balance(), required_balance);
                                 break;
