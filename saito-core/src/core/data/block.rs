@@ -1542,7 +1542,7 @@ impl Block {
                     previous_block.timestamp,
                 );
             if self.total_work < amount_of_routing_work_needed {
-                error!("Error 510293: block lacking adequate routing work from creator");
+                error!("Error 510293: block lacking adequate routing work from creator. actual : {:?} expected : {:?}",self.total_work, amount_of_routing_work_needed);
                 return false;
             }
 
