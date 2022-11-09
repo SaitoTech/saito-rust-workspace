@@ -402,7 +402,7 @@ impl Blockchain {
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
-                debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
+                info!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
                 // TODO : remove the sender by using a return value.
                 sender_to_miner
                     .send(MiningEvent::LongestChainBlockAdded {
@@ -412,7 +412,10 @@ impl Blockchain {
                     .await
                     .unwrap();
             } else {
-                debug!("new chain doesn't validate");
+                warn!(
+                    "new chain doesn't validate with hash : {:?}",
+                    hex::encode(block_hash)
+                );
                 self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = false;
                 self.add_block_failure(&block_hash, mempool).await;
             }
