@@ -145,14 +145,14 @@ impl Network {
     }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
-        log_read_lock_request!("network:handle_peer_disconnect:peers");
-        let peers = self.peers.read().await;
-        log_read_lock_receive!("network:handle_peer_disconnect:peers");
+        log_write_lock_request!("network:handle_peer_disconnect:peers");
+        let mut peers = self.peers.write().await;
+        log_write_lock_receive!("network:handle_peer_disconnect:peers");
         let result = peers.find_peer_by_index(peer_index);
 
         if result.is_some() {
             let peer = result.unwrap();
-
+            let public_key = peer.public_key;
             if peer.static_peer_config.is_some() {
                 // This means the connection has been initiated from this side, therefore we must
                 // try to re-establish the connection again
@@ -175,6 +175,11 @@ impl Network {
                 info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
                     peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
             }
+
+            if public_key.is_some() {
+                peers.address_to_peers.remove(&public_key.unwrap());
+            }
+            peers.index_to_peers.remove(&peer_index);
         } else {
             todo!("Handle the unknown peer disconnect");
         }
