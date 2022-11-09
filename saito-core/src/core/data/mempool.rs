@@ -238,7 +238,11 @@ impl Mempool {
 
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
-            let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
+            let work_needed = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
+                previous_block.burnfee,
+                current_timestamp,
+                previous_block.timestamp,
+            );
             let time_elapsed = current_timestamp - previous_block.timestamp;
 
             let result = work_available >= work_needed;
@@ -297,27 +301,6 @@ impl Mempool {
             return self.routing_work_in_mempool;
         }
         0
-    }
-
-    //
-    // Return work needed in Nolan
-    //
-    #[tracing::instrument(level = "info", skip_all)]
-    pub fn get_routing_work_needed(
-        &self,
-        previous_block: &Block,
-        current_timestamp: u64,
-    ) -> Currency {
-        let previous_block_timestamp = previous_block.timestamp;
-        let previous_block_burnfee = previous_block.burnfee;
-
-        let work_needed: Currency = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
-            previous_block_burnfee,
-            current_timestamp,
-            previous_block_timestamp,
-        );
-
-        work_needed
     }
 }
 
