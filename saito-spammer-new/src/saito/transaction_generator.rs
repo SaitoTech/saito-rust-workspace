@@ -279,6 +279,7 @@ impl TransactionGenerator {
                             let transaction =
                                 Transaction::create(&mut wallet, public_key, payment, fee);
                             if transaction.total_in == 0 || transaction.total_out == 0 {
+                                debug!("transaction not added since not enough funds. in : {:?} out : {:?}", transaction.total_in, transaction.total_out);
                                 break;
                             }
                             vec.push_back(transaction);
