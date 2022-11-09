@@ -278,6 +278,9 @@ impl TransactionGenerator {
                         for _ in 0..count {
                             let transaction =
                                 Transaction::create(&mut wallet, public_key, payment, fee);
+                            if transaction.total_in == 0 || transaction.total_out == 0 {
+                                break;
+                            }
                             vec.push_back(transaction);
                         }
                         sender.send(vec).await.unwrap();

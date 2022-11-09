@@ -49,9 +49,9 @@ pub struct Transaction {
     pub hash_for_signature: Option<SaitoHash>,
 
     /// total nolan in input slips
-    total_in: Currency,
+    pub total_in: Currency,
     /// total nolan in output slips
-    total_out: Currency,
+    pub total_out: Currency,
     /// total fees
     pub total_fees: Currency,
     /// total work to creator
