@@ -184,7 +184,7 @@ pub struct Block {
     /// total fees paid into block
     total_fees: Currency,
     /// total routing work in block, given creator
-    total_work: Currency,
+    pub total_work: Currency,
     /// Is Block on longest chain
     pub(crate) in_longest_chain: bool,
     // has golden ticket

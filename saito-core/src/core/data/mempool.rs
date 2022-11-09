@@ -151,13 +151,18 @@ impl Mempool {
         current_timestamp: u64,
         gt_tx: Option<Transaction>,
     ) -> Option<Block> {
-        if !self
+        let result = self
             .can_bundle_block(blockchain, current_timestamp, &gt_tx)
-            .await
-        {
+            .await;
+        if result.is_none() {
             return None;
         }
-        info!("bundling block with {:?} txs", self.transactions.len());
+        let mempool_work = result.unwrap();
+        info!(
+            "bundling block with {:?} txs with work : {:?}",
+            self.transactions.len(),
+            mempool_work
+        );
 
         let previous_block_hash: SaitoHash;
         {
@@ -175,6 +180,8 @@ impl Mempool {
         )
         .await;
         block.generate();
+        info!("block generated with work : {:?}", block.total_work);
+        assert_eq!(block.total_work, mempool_work);
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 
@@ -212,7 +219,7 @@ impl Mempool {
         blockchain: &Blockchain,
         current_timestamp: u64,
         gt_tx: &Option<Transaction>,
-    ) -> bool {
+    ) -> Option<Currency> {
         // if self.transactions.is_empty() {
         //     return false;
         // }
@@ -223,17 +230,17 @@ impl Mempool {
         if blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
             tokio::time::sleep(Duration::from_secs(1)).await;
-            return false;
+            return None;
         }
         if !self.blocks_queue.is_empty() {
-            return false;
+            return None;
         }
         if self.transactions.is_empty() || !self.new_tx_added {
-            return false;
+            return None;
         }
         if !blockchain.gt_requirement_met && gt_tx.is_none() {
             trace!("waiting till more golden tickets come in");
-            return false;
+            return None;
         }
 
         if let Some(previous_block) = blockchain.get_latest_block() {
@@ -257,9 +264,12 @@ impl Mempool {
                 previous_block.timestamp, current_timestamp, work_available, work_needed, time_elapsed, false
                 );
             }
-            return result;
+            if result {
+                return Some(work_available);
+            }
+            return None;
         } else {
-            true
+            Some(0)
         }
     }
 
@@ -392,11 +402,9 @@ mod tests {
         //     false
         // );
         let blockchain = blockchain_lock.read().await;
-        assert_eq!(
-            mempool
-                .can_bundle_block(&blockchain, ts + 120000, &None)
-                .await,
-            true
-        );
+        assert!(mempool
+            .can_bundle_block(&blockchain, ts + 120000, &None)
+            .await
+            .is_some());
     }
 }
