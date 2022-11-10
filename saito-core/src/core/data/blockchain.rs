@@ -809,7 +809,11 @@ impl Blockchain {
             return true;
         }
         if old_chain.len() > new_chain.len() {
-            warn!("WARN: old chain length is greater than new chain length");
+            warn!(
+                "WARN: old chain length : {:?} is greater than new chain length : {:?}",
+                old_chain.len(),
+                new_chain.len()
+            );
             return false;
         }
 
