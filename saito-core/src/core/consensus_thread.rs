@@ -336,10 +336,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             self.block_producing_timer = 0;
 
-            trace!(
-                "mempool size before bundling : {:?}",
-                mempool.transactions.len()
-            );
+            // trace!(
+            //     "mempool size before bundling : {:?}",
+            //     mempool.transactions.len()
+            // );
             let mut gt_result = None;
             let mut gt_propagated = false;
             {
