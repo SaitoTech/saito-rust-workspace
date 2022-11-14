@@ -555,8 +555,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::wallet");
             let stat = format!(
-                "--- stats ------ {} - total_slips : {:?} unspent_slips : {:?} current_balance : {:?}",
-                format!("{:width$}", "wallet::state", width = 30),
+                "{} - total_slips : {:?}, unspent_slips : {:?}, current_balance : {:?}",
+                format!("{:width$}", "wallet::state", width = 40),
                 wallet.slips.len(),
                 wallet.get_unspent_slip_count(),
                 wallet.get_available_balance()
@@ -568,8 +568,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let blockchain = self.blockchain.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::blockchain");
             let stat = format!(
-                "--- stats ------ {} - utxo_size : {:?} block_count : {:?} longest_chain_len : {:?}",
-                format!("{:width$}", "blockchain::state", width = 30),
+                "{} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?}",
+                format!("{:width$}", "blockchain::state", width = 40),
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
                 blockchain.get_latest_block_id()
@@ -581,8 +581,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let mempool = self.mempool.read().await;
             log_read_lock_receive!("ConsensusEventProcessor:on_stat_interval::mempool");
             let stat = format!(
-                "--- stats ------ {} - blocks_queue : {:?} transactions : {:?}",
-                format!("{:width$}", "mempool:state", width = 30),
+                "{} - blocks_queue : {:?}, transactions : {:?}",
+                format!("{:width$}", "mempool:state", width = 40),
                 mempool.blocks_queue.len(),
                 mempool.transactions.len(),
             );

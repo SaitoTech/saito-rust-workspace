@@ -558,8 +558,8 @@ pub async fn run_network_controller(
                     let io_controller = network_controller.read().await;
                     log_read_lock_receive!("network controller");
                     let stat = format!(
-                        "--- stats ------ {} - capacity : {:?} / {:?}",
-                        format!("{:width$}", "network::queue", width = 30),
+                        "{} - capacity : {:?} / {:?}",
+                        format!("{:width$}", "network::queue", width = 40),
                         io_controller.sender_to_saito_controller.capacity(),
                         io_controller.sender_to_saito_controller.max_capacity()
                     );
