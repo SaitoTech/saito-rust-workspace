@@ -6,6 +6,7 @@ use tracing::{debug, trace};
 
 use crate::common::defs::{BlockId, PeerIndex, SaitoHash};
 
+#[derive(Debug)]
 enum BlockStatus {
     Queued,
     Fetching,
@@ -53,6 +54,11 @@ impl BlockchainSyncState {
                 let (id, hash) = received_picture
                     .pop_front()
                     .expect("received picture should not be empty");
+                debug!(
+                    "adding new block hash : {:?} for peer : {:?} since nothing found",
+                    hex::encode(hash),
+                    peer_index
+                );
                 let mut deq = VecDeque::new();
                 deq.push_back((hash, BlockStatus::Queued, id));
                 self.blocks_to_fetch.insert(*peer_index, deq);
@@ -69,6 +75,12 @@ impl BlockchainSyncState {
 
                 let (_, _, block_id) = fetching_list.back().unwrap();
                 let (id, _) = received_picture.front().unwrap();
+                trace!(
+                    "for peer : {:?} last at fetching list : {:?}, first at received list : {:?}",
+                    peer_index,
+                    block_id,
+                    id
+                );
                 if *block_id != *id && *block_id + 1 != *id {
                     // if first entry in the received pic is not next in sequence (either has next block id or same block id for forks) we break
                     break;
@@ -83,7 +95,7 @@ impl BlockchainSyncState {
 
     pub fn request_blocks_from_waitlist(&mut self) -> HashMap<PeerIndex, Vec<SaitoHash>> {
         debug!("requesting blocks from waiting list");
-        let mut res: HashMap<u64, Vec<SaitoHash>> = Default::default();
+        let mut result: HashMap<u64, Vec<SaitoHash>> = Default::default();
 
         // for each peer check if we can fetch block
         for (peer_index, hashes) in self.blocks_to_fetch.iter_mut() {
@@ -94,25 +106,37 @@ impl BlockchainSyncState {
                     .get_mut(i)
                     .expect("entry should exist since we are checking the length");
                 if *block_id > self.block_ceiling {
+                    debug!(
+                        "block : {:?} - {:?} is above the ceiling : {:?}",
+                        block_id,
+                        hex::encode(hash),
+                        self.block_ceiling
+                    );
                     break;
                 }
-                if let BlockStatus::Fetching = status {
+                if let BlockStatus::Queued = status {
+                    debug!(
+                        "block : {:?} : {:?} to be fetched from peer : {:?}",
+                        block_id,
+                        hex::encode(*hash),
+                        peer_index
+                    );
+                    result.entry(*peer_index).or_default().push(*hash);
                 } else {
-                    debug!("fetching : {:?}", hex::encode(*hash));
-                    if res.contains_key(peer_index) {
-                        let vec = res.get_mut(peer_index).unwrap();
-                        vec.push(*hash);
-                    } else {
-                        let vec = vec![*hash];
-                        res.insert(*peer_index, vec);
-                    }
+                    debug!(
+                        "block {:?} - {:?} status = {:?}",
+                        block_id,
+                        hex::encode(hash),
+                        status
+                    );
                 }
             }
         }
 
-        res
+        result
     }
     pub fn mark_as_fetching(&mut self, entries: Vec<(PeerIndex, SaitoHash)>) {
+        debug!("marking as fetching : {:?}", entries.len());
         for (peer_index, hash) in entries.iter() {
             let res = self.blocks_to_fetch.get_mut(peer_index);
             if res.is_none() {
@@ -122,6 +146,7 @@ impl BlockchainSyncState {
             for (block_hash, status, _) in res {
                 if hash.eq(block_hash) {
                     *status = BlockStatus::Fetching;
+                    debug!("block : {:?} marked as fetching", hex::encode(block_hash));
                     break;
                 }
             }
@@ -130,31 +155,65 @@ impl BlockchainSyncState {
     pub fn mark_as_fetched(&mut self, peer_index: PeerIndex, hash: SaitoHash) {
         let res = self.blocks_to_fetch.get_mut(&peer_index);
         if res.is_none() {
+            debug!(
+                "block : {:?} for peer : {:?} not found to mark as fetched",
+                hex::encode(hash),
+                peer_index
+            );
             return;
         }
         let res = res.unwrap();
         for (block_hash, status, _) in res {
             if hash.eq(block_hash) {
                 *status = BlockStatus::Fetched;
+                debug!(
+                    "block : {:?} marked as fetched from peer : {:?}",
+                    hex::encode(block_hash),
+                    peer_index
+                );
                 break;
             }
         }
+        self.clean_fetched(peer_index);
+    }
+    fn clean_fetched(&mut self, peer_index: PeerIndex) {
+        debug!("cleaning fetched : {:?}", peer_index);
+        if let Some(res) = self.blocks_to_fetch.get_mut(&peer_index) {
+            while let Some((hash, status, id)) = res.front() {
+                if let BlockStatus::Fetched = status {
+                } else {
+                    break;
+                }
+                debug!(
+                    "removing hash : {:?} - {:?} from peer : {:?}",
+                    hex::encode(hash),
+                    id,
+                    peer_index
+                );
+                res.pop_front();
+            }
+        }
+        self.blocks_to_fetch.retain(|_, map| !map.is_empty());
     }
     pub fn add_entry(&mut self, block_hash: SaitoHash, block_id: BlockId, peer_index: PeerIndex) {
-        trace!(
+        debug!(
             "add entry : {:?} - {:?} from {:?}",
             hex::encode(block_hash),
             block_id,
             peer_index
         );
-        let result = self.received_block_picture.get_mut(&peer_index);
-        if let Some(deq) = result {
-            deq.push_back((block_id, block_hash));
-        } else {
-            let mut deq: VecDeque<(BlockId, SaitoHash)> = Default::default();
-            deq.push_back((block_id, block_hash));
-            self.received_block_picture.insert(peer_index, deq);
-        }
+        self.received_block_picture
+            .entry(peer_index)
+            .or_default()
+            .push_back((block_id, block_hash));
+        // let result = self.received_block_picture.get_mut(&peer_index);
+        // if let Some(deq) = result {
+        //     deq.push_back((block_id, block_hash));
+        // } else {
+        //     let mut deq: VecDeque<(BlockId, SaitoHash)> = Default::default();
+        //     deq.push_back((block_id, block_hash));
+        //     self.received_block_picture.insert(peer_index, deq);
+        // }
     }
     /// Removes entry when the hash is added to the blockchain. If so we can move the block ceiling up.
     ///
@@ -171,9 +230,12 @@ impl BlockchainSyncState {
     ///
     /// ```
     pub fn remove_entry(&mut self, block_hash: SaitoHash, peer_index: PeerIndex) {
-        let hashes = self.blocks_to_fetch.get_mut(&peer_index);
-        if hashes.is_some() {
-            let hashes = hashes.unwrap();
+        debug!(
+            "removing entry : {:?} from peer : {:?}",
+            hex::encode(block_hash),
+            peer_index
+        );
+        if let Some(hashes) = self.blocks_to_fetch.get_mut(&peer_index) {
             hashes.retain(|(hash, _, _)| !block_hash.eq(hash));
         }
         self.blocks_to_fetch.retain(|_, map| !map.is_empty());
@@ -219,9 +281,11 @@ impl BlockchainSyncState {
         stats.push(stat);
         stats
     }
-    pub fn set_latest_blockchain_id(&mut self, id: u64) {
-        // TODO : batch size should be larger than the fork length diff which can change the current fork. otherwise we won't fetch the blocks for new longest fork until current fork adds new blocks
-        self.block_ceiling = id + self.batch_size as u64;
+    pub fn set_latest_blockchain_id(&mut self, id: BlockId) {
+        debug!("setting latest blockchain id : {:?}", id);
+        // TODO : batch size should be larger than the fork length diff which can change the current fork.
+        // otherwise we won't fetch the blocks for new longest fork until current fork adds new blocks
+        self.block_ceiling = id + self.batch_size as BlockId;
     }
 }
 
