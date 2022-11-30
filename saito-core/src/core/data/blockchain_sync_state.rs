@@ -1,9 +1,10 @@
 use std::cmp::min;
+use std::collections::VecDeque;
 
 use ahash::HashMap;
-use tracing::debug;
+use tracing::{debug, trace};
 
-use crate::common::defs::SaitoHash;
+use crate::common::defs::{BlockId, PeerIndex, SaitoHash};
 
 enum BlockStatus {
     Queued,
@@ -12,10 +13,10 @@ enum BlockStatus {
 }
 
 pub struct BlockchainSyncState {
-    received_block_picture: HashMap<u64, HashMap<u64, SaitoHash>>,
-    blocks_to_fetch: HashMap<u64, Vec<(SaitoHash, BlockStatus, u64)>>,
+    received_block_picture: HashMap<PeerIndex, VecDeque<(BlockId, SaitoHash)>>,
+    blocks_to_fetch: HashMap<PeerIndex, VecDeque<(SaitoHash, BlockStatus, BlockId)>>,
     /// since we are maintaining this state in routing thread and adding to blockchain in other thread, we need to keep a ceiling value for allowed block ids
-    block_ceiling: u64,
+    block_ceiling: BlockId,
     batch_size: usize,
 }
 
@@ -24,49 +25,63 @@ impl BlockchainSyncState {
         BlockchainSyncState {
             received_block_picture: Default::default(),
             blocks_to_fetch: Default::default(),
-            block_ceiling: batch_size as u64,
+            block_ceiling: batch_size as BlockId,
             batch_size,
         }
     }
     pub(crate) fn build_peer_block_picture(&mut self) {
         debug!("building peer block picture");
-        for (peer_index, map) in self.received_block_picture.iter_mut() {
-            if map.is_empty() {
+        // for every block picture received from a peer, we sort and create a list of sequential hashes to fetch from peers
+        for (peer_index, received_picture) in self.received_block_picture.iter_mut() {
+            if received_picture.is_empty() {
                 continue;
             }
+
+            // need to sort before sequencing
+            received_picture
+                .make_contiguous()
+                .sort_by(|(id_a, hash_a), (id_b, hash_b)| {
+                    if id_a == id_b {
+                        return hash_a.cmp(hash_b);
+                    }
+                    id_a.cmp(id_b)
+                });
+
             let result = self.blocks_to_fetch.contains_key(peer_index);
             if !result {
-                // if we don't have an entry, we find the minimum block id for the peer
-                let mut min_id = u64::MAX;
-                for (id, _) in map.iter() {
-                    if min_id > *id {
-                        min_id = *id;
-                    }
-                }
-                let hash = map.remove(&min_id).unwrap();
-                let vec = vec![(hash, BlockStatus::Queued, min_id)];
-                self.blocks_to_fetch.insert(*peer_index, vec);
+                // if we don't have an entry, we find the minimum block id for the peer which is the first (since we sorted)
+                let (id, hash) = received_picture
+                    .pop_front()
+                    .expect("received picture should not be empty");
+                let mut deq = VecDeque::new();
+                deq.push_back((hash, BlockStatus::Queued, id));
+                self.blocks_to_fetch.insert(*peer_index, deq);
             }
             loop {
+                if received_picture.is_empty() {
+                    break;
+                }
                 let result = self.blocks_to_fetch.get_mut(peer_index);
                 if result.is_none() {
                     break;
                 }
-                let vec = result.unwrap();
-                let (_, _, block_id) = vec.last().unwrap();
-                let result = map.remove(&(*block_id + 1));
-                if result.is_none() {
+                let fetching_list = result.unwrap();
+
+                let (_, _, block_id) = fetching_list.back().unwrap();
+                let (id, _) = received_picture.front().unwrap();
+                if *block_id != *id && *block_id + 1 != *id {
+                    // if first entry in the received pic is not next in sequence (either has next block id or same block id for forks) we break
                     break;
                 }
-                let result = result.unwrap();
-                vec.push((result, BlockStatus::Queued, *block_id + 1));
+                let (id, hash) = received_picture.pop_front().unwrap();
+                fetching_list.push_back((hash, BlockStatus::Queued, id));
             }
         }
         self.received_block_picture.retain(|_, map| !map.is_empty());
         self.blocks_to_fetch.retain(|_, vec| !vec.is_empty());
     }
 
-    pub fn request_blocks_from_waitlist(&mut self) -> HashMap<u64, Vec<SaitoHash>> {
+    pub fn request_blocks_from_waitlist(&mut self) -> HashMap<PeerIndex, Vec<SaitoHash>> {
         debug!("requesting blocks from waiting list");
         let mut res: HashMap<u64, Vec<SaitoHash>> = Default::default();
 
@@ -85,10 +100,10 @@ impl BlockchainSyncState {
                 } else {
                     debug!("fetching : {:?}", hex::encode(*hash));
                     if res.contains_key(peer_index) {
-                        let vec = res.get_mut(&peer_index).unwrap();
+                        let vec = res.get_mut(peer_index).unwrap();
                         vec.push(*hash);
                     } else {
-                        let vec = vec![hash.clone()];
+                        let vec = vec![*hash];
                         res.insert(*peer_index, vec);
                     }
                 }
@@ -97,7 +112,7 @@ impl BlockchainSyncState {
 
         res
     }
-    pub fn mark_as_fetching(&mut self, entries: Vec<(u64, SaitoHash)>) {
+    pub fn mark_as_fetching(&mut self, entries: Vec<(PeerIndex, SaitoHash)>) {
         for (peer_index, hash) in entries.iter() {
             let res = self.blocks_to_fetch.get_mut(peer_index);
             if res.is_none() {
@@ -112,7 +127,7 @@ impl BlockchainSyncState {
             }
         }
     }
-    pub fn mark_as_fetched(&mut self, peer_index: u64, hash: SaitoHash) {
+    pub fn mark_as_fetched(&mut self, peer_index: PeerIndex, hash: SaitoHash) {
         let res = self.blocks_to_fetch.get_mut(&peer_index);
         if res.is_none() {
             return;
@@ -125,15 +140,20 @@ impl BlockchainSyncState {
             }
         }
     }
-    pub fn add_entry(&mut self, block_hash: SaitoHash, block_id: u64, peer_index: u64) {
+    pub fn add_entry(&mut self, block_hash: SaitoHash, block_id: BlockId, peer_index: PeerIndex) {
+        trace!(
+            "add entry : {:?} - {:?} from {:?}",
+            hex::encode(block_hash),
+            block_id,
+            peer_index
+        );
         let result = self.received_block_picture.get_mut(&peer_index);
-        if result.is_none() {
-            let mut map: HashMap<u64, SaitoHash> = Default::default();
-            map.insert(block_id, block_hash);
-            self.received_block_picture.insert(peer_index, map);
+        if let Some(deq) = result {
+            deq.push_back((block_id, block_hash));
         } else {
-            let map = result.unwrap();
-            map.insert(block_id, block_hash);
+            let mut deq: VecDeque<(BlockId, SaitoHash)> = Default::default();
+            deq.push_back((block_id, block_hash));
+            self.received_block_picture.insert(peer_index, deq);
         }
     }
     /// Removes entry when the hash is added to the blockchain. If so we can move the block ceiling up.
@@ -150,7 +170,7 @@ impl BlockchainSyncState {
     /// ```
     ///
     /// ```
-    pub fn remove_entry(&mut self, block_hash: SaitoHash, peer_index: u64) {
+    pub fn remove_entry(&mut self, block_hash: SaitoHash, peer_index: PeerIndex) {
         let hashes = self.blocks_to_fetch.get_mut(&peer_index);
         if hashes.is_some() {
             let hashes = hashes.unwrap();
@@ -163,28 +183,22 @@ impl BlockchainSyncState {
         for (peer_index, vec) in self.blocks_to_fetch.iter() {
             let res = self.received_block_picture.get(peer_index);
             let mut count = 0;
-            if res.is_some() {
-                count = res.unwrap().len();
+            if let Some(deq) = res {
+                count = deq.len();
             }
             let mut last_id = 0;
-            let last = vec.last();
-            if last.is_some() {
-                last_id = last.unwrap().2;
+            let last = vec.back();
+            if let Some((_, _, id)) = last {
+                last_id = *id;
             }
             let mut first_id = 0;
-            let first = vec.first();
+            let first = vec.front();
             if first.is_some() {
                 first_id = first.unwrap().2;
             }
             let fetching_count = vec
                 .iter()
-                .filter(|(_, status, _)| {
-                    if let BlockStatus::Fetching = status {
-                        true
-                    } else {
-                        false
-                    }
-                })
+                .filter(|(_, status, _)| matches!(status, BlockStatus::Fetching))
                 .count();
             let stat = format!(
                 "--- stats ------ {} - peer : {:?} first: {:?} fetching_count : {:?} ordered_till : {:?} waiting_to_order : {:?}",
@@ -213,6 +227,7 @@ impl BlockchainSyncState {
 
 #[cfg(test)]
 mod tests {
+    use crate::common::defs::BlockId;
     use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 
     #[test]
@@ -306,5 +321,58 @@ mod tests {
         assert_eq!(result.len(), 1);
         let vec = result.get_mut(&1).unwrap();
         assert_eq!(vec.len(), 3);
+    }
+
+    #[test]
+    fn multiple_forks_from_multiple_peers_test() {
+        let mut state = BlockchainSyncState::new(10);
+        for i in 0..state.batch_size + 50 {
+            state.add_entry([(i + 1) as u8; 32], (i + 1) as BlockId, 1);
+        }
+        for i in 4..state.batch_size + 50 {
+            state.add_entry([(i + 101) as u8; 32], (i + 1) as BlockId, 1);
+        }
+
+        state.build_peer_block_picture();
+        let mut result = state.request_blocks_from_waitlist();
+        assert_eq!(result.len(), 1);
+        let vec = result.get_mut(&1);
+        assert!(vec.is_some());
+        let vec = vec.unwrap();
+        assert_eq!(vec.len(), state.batch_size);
+        assert_eq!(state.batch_size, 10);
+        let mut fetching = vec![];
+        for i in 0..4 {
+            let entry = vec.get(i).unwrap();
+            assert_eq!(*entry, [(i + 1) as u8; 32]);
+            fetching.push((1, [(i + 1) as u8; 32]));
+        }
+        let mut value = 4;
+        for index in (4..10).step_by(2) {
+            value += 1;
+            let entry = vec.get(index).unwrap();
+            assert_eq!(*entry, [(value) as u8; 32]);
+            fetching.push((1, [(value) as u8; 32]));
+
+            let entry = vec.get(index + 1).unwrap();
+            assert_eq!(*entry, [(value + 100) as u8; 32]);
+            fetching.push((1, [(value + 100) as u8; 32]));
+        }
+        state.mark_as_fetching(fetching);
+        state.build_peer_block_picture();
+        let result = state.request_blocks_from_waitlist();
+        assert_eq!(result.len(), 0);
+
+        state.remove_entry([1; 32], 1);
+        state.remove_entry([5; 32], 1);
+        state.remove_entry([106; 32], 1);
+        state.build_peer_block_picture();
+        let mut result = state.request_blocks_from_waitlist();
+        assert_eq!(result.len(), 1);
+        let vec = result.get_mut(&1).unwrap();
+        assert_eq!(vec.len(), 3);
+        assert!(vec.contains(&[8; 32]));
+        assert!(vec.contains(&[108; 32]));
+        assert!(vec.contains(&[9; 32]));
     }
 }

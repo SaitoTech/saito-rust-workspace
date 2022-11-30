@@ -12,6 +12,8 @@ pub type SaitoHash = [u8; 32];
 // pub type SlipUuid = [u8; 17];
 pub type SaitoUTXOSetKey = [u8; 66];
 pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
+pub type PeerIndex = u64;
+pub type BlockId = u64;
 
 pub const BLOCK_FILE_EXTENSION: &str = ".sai";
 pub const STAT_BIN_COUNT: usize = 3;

@@ -161,6 +161,7 @@ impl RoutingThread {
             Message::GhostChainRequest() => {}
             Message::Result() => {}
             Message::Error() => {}
+            Message::ApplicationTransaction(_) => {}
         }
         trace!("incoming message processed");
     }
