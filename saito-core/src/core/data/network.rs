@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, trace, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::common::defs::{PeerIndex, SaitoHash, SaitoPublicKey};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
@@ -291,7 +291,7 @@ impl Network {
     pub async fn process_incoming_block_hash(
         &self,
         block_hash: SaitoHash,
-        peer_index: u64,
+        peer_index: PeerIndex,
         blockchain: Arc<RwLock<Blockchain>>,
     ) -> Option<()> {
         let block_exists;
@@ -319,7 +319,7 @@ impl Network {
             .fetch_block_from_peer(block_hash, peer_index, url)
             .await
             .unwrap();
-        return Some(());
+        Some(())
     }
 
     pub async fn initialize_static_peers(

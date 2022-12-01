@@ -175,7 +175,6 @@ impl ConsensusThread {
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;
-        let latest_block_id;
 
         {
             log_read_lock_request!("ConsensusEventProcessor:generate_tx::wallet");
@@ -192,7 +191,7 @@ impl ConsensusThread {
         let mut mempool = mempool_lock_clone.write().await;
         log_write_lock_receive!("ConsensusEventProcessor:generate_tx::mempool");
 
-        latest_block_id = blockchain.get_latest_block_id();
+        let latest_block_id = blockchain.get_latest_block_id();
 
         let spammer_public_key: SaitoPublicKey =
             hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
@@ -299,7 +298,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
         // generate test transactions
         if self.create_test_tx {
-            self.tx_producing_timer = self.tx_producing_timer + duration_value;
+            self.tx_producing_timer += duration_value;
             if self.tx_producing_timer >= SPAM_TX_PRODUCING_TIMER {
                 // TODO : Remove this transaction generation once testing is done
                 ConsensusThread::generate_tx(
@@ -346,8 +345,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let result: Option<&(Transaction, bool)> = mempool
                     .golden_tickets
                     .get(&blockchain.get_latest_block_hash());
-                if result.is_some() {
-                    let (tx, propagated) = result.unwrap();
+                if let Some((tx, propagated)) = result {
                     gt_result = Some(tx.clone());
                     gt_propagated = *propagated;
                 }
@@ -373,7 +371,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 // dropping the lock here since blockchain needs the write lock to add blocks
                 drop(mempool);
                 self.stats.blocks_created.increment();
-                blockchain
+                let updated = blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
                         &self.network,
@@ -381,6 +379,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         self.sender_to_miner.clone(),
                     )
                     .await;
+
+                if updated {
+                    self.sender_to_router
+                        .send(RoutingEvent::BlockchainUpdated)
+                        .await
+                        .unwrap();
+                }
 
                 debug!("blocks added to blockchain");
 
@@ -465,7 +470,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     mempool.add_block(block);
                 }
                 self.stats.blocks_fetched.increment();
-                blockchain
+                let updated = blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
                         &self.network,
@@ -473,6 +478,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         self.sender_to_miner.clone(),
                     )
                     .await;
+
+                if updated {
+                    self.sender_to_router
+                        .send(RoutingEvent::BlockchainUpdated)
+                        .await
+                        .unwrap();
+                }
 
                 Some(())
             }

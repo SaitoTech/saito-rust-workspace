@@ -282,10 +282,13 @@ impl BlockchainSyncState {
         stats
     }
     pub fn set_latest_blockchain_id(&mut self, id: BlockId) {
-        debug!("setting latest blockchain id : {:?}", id);
         // TODO : batch size should be larger than the fork length diff which can change the current fork.
         // otherwise we won't fetch the blocks for new longest fork until current fork adds new blocks
         self.block_ceiling = id + self.batch_size as BlockId;
+        debug!(
+            "setting latest blockchain id : {:?} and ceiling : {:?}",
+            id, self.block_ceiling
+        );
     }
 }
 

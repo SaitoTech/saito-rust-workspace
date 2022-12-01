@@ -23,7 +23,7 @@ use crate::{log_write_lock_receive, log_write_lock_request};
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 100_000;
 // prune blocks from index after N blocks
-pub const PRUNE_AFTER_BLOCKS: u64 = 10000;
+pub const PRUNE_AFTER_BLOCKS: u64 = 6;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
 pub const MAX_STAKER_RECURSION: u64 = 3;
 // max token supply - used in validating block #1
@@ -42,6 +42,13 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
     let bottom = packed as u32;
     let top = (packed >> 32) as u32;
     (top, bottom)
+}
+
+pub enum AddBlockResult {
+    BlockAdded,
+    BlockAlreadyExists,
+    FailedButRetry,
+    FailedNotValid,
 }
 
 #[derive(Debug)]
@@ -89,7 +96,7 @@ impl Blockchain {
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
         mempool: &mut Mempool,
-    ) {
+    ) -> AddBlockResult {
         // confirm hash first
         // block.generate_pre_hash();
         // block.generate_hash();
@@ -117,7 +124,7 @@ impl Blockchain {
                 "ERROR: block exists in blockchain {:?}",
                 &hex::encode(&block.hash)
             );
-            return;
+            return AddBlockResult::BlockAlreadyExists;
         }
 
         //
@@ -192,7 +199,7 @@ impl Blockchain {
                                     hex::encode(block.previous_block_hash));
                                 // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
                                 mempool.add_block(block);
-                                return;
+                                return AddBlockResult::FailedButRetry;
                             } else {
                                 trace!(
                                     "block : {:?} source connection id not set",
@@ -267,7 +274,7 @@ impl Blockchain {
                 "BLOCK IS ALREADY IN THE BLOCKCHAIN, WHY ARE WE ADDING IT????? {:?}",
                 block.hash
             );
-            return;
+            return AddBlockResult::BlockAlreadyExists;
         }
 
         //
@@ -291,10 +298,8 @@ impl Blockchain {
                     shared_ancestor_found = true;
                     trace!("shared ancestor found : {:?}", hex::encode(new_chain_hash));
                     break;
-                } else {
-                    if new_chain_hash == [0; 32] {
-                        break;
-                    }
+                } else if new_chain_hash == [0; 32] {
+                    break;
                 }
                 new_chain.push(new_chain_hash);
                 new_chain_hash = self
@@ -374,10 +379,8 @@ impl Blockchain {
 
         // at this point we should have a shared ancestor or not
         // find out whether this new block is claiming to require chain-validation
-        if !am_i_the_longest_chain {
-            if self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
-                am_i_the_longest_chain = true
-            }
+        if !am_i_the_longest_chain && self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
+            am_i_the_longest_chain = true
         }
 
         //
@@ -390,7 +393,7 @@ impl Blockchain {
         // with the BlockRing. We fail if the newly-preferred chain is not
         // viable.
         //
-        if am_i_the_longest_chain {
+        return if am_i_the_longest_chain {
             debug!("this is the longest chain");
             let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
 
@@ -411,6 +414,7 @@ impl Blockchain {
                     })
                     .await
                     .unwrap();
+                AddBlockResult::BlockAdded
             } else {
                 warn!(
                     "new chain doesn't validate with hash : {:?}",
@@ -418,12 +422,14 @@ impl Blockchain {
                 );
                 self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = false;
                 self.add_block_failure(&block_hash, mempool).await;
+                AddBlockResult::FailedButRetry
             }
         } else {
             debug!("this is not the longest chain");
             self.add_block_success(block_hash, network, storage, mempool)
                 .await;
-        }
+            AddBlockResult::BlockAdded
+        };
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -901,10 +907,9 @@ impl Blockchain {
             search_depth_index += 1;
 
             if let Some(block) = self.get_block_sync(&latest_block_hash) {
-                if i == 0 {
-                    if block.id < MIN_GOLDEN_TICKETS_DENOMINATOR {
-                        break;
-                    }
+                if i == 0 && block.id < MIN_GOLDEN_TICKETS_DENOMINATOR {
+                    golden_tickets_found = MIN_GOLDEN_TICKETS_DENOMINATOR;
+                    break;
                 }
 
                 // the latest block will not have has_golden_ticket set yet
@@ -923,21 +928,19 @@ impl Blockchain {
         if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
             && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
         {
-            let mut return_value = false;
+            let mut has_golden_ticket = false;
             if let Some(block) = self.get_block_sync(&new_chain[0]) {
-                for transaction in block.transactions.iter() {
-                    if transaction.transaction_type == TransactionType::GoldenTicket {
-                        return_value = true;
-                        break;
-                    }
-                }
+                has_golden_ticket = block.has_golden_ticket;
             }
-            if !return_value {
-                warn!("not enough golden tickets");
+            if !has_golden_ticket {
+                warn!(
+                    "not enough golden tickets : found = {:?} depth = {:?}",
+                    golden_tickets_found, search_depth_index
+                );
                 return false;
             }
         }
-        return true;
+        true
     }
 
     //
@@ -1434,7 +1437,7 @@ impl Blockchain {
         network: &Network,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
-    ) {
+    ) -> bool {
         debug!("adding blocks from mempool to blockchain");
         let mut blocks: VecDeque<Block>;
         log_write_lock_request!("blockchain:add_blocks_from_mempool::mempool");
@@ -1444,20 +1447,29 @@ impl Blockchain {
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
 
         debug!("blocks to add : {:?}", blocks.len());
+        let mut blockchain_updated = false;
         while let Some(block) = blocks.pop_front() {
-            self.add_block(
-                block,
-                network,
-                storage,
-                sender_to_miner.clone(),
-                &mut mempool,
-            )
-            .await;
+            let result = self
+                .add_block(
+                    block,
+                    network,
+                    storage,
+                    sender_to_miner.clone(),
+                    &mut mempool,
+                )
+                .await;
+            if !blockchain_updated {
+                if let AddBlockResult::BlockAdded = result {
+                    blockchain_updated = true;
+                }
+            }
         }
+
         debug!(
             "added blocks to blockchain. added back : {:?}",
             mempool.blocks_queue.len()
         );
+        blockchain_updated
     }
 }
 
