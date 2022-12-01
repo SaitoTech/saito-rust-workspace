@@ -189,7 +189,13 @@ impl Wallet {
         self.unspent_slips.insert(wallet_slip.utxokey);
         self.available_balance += slip.amount;
         let result = self.slips.insert(wallet_slip.utxokey, wallet_slip);
-        assert!(result.is_none());
+        if result.is_some() {
+            warn!(
+                "slip : {:?} with key : {:?} is replaced",
+                result.as_ref().unwrap(),
+                hex::encode(result.as_ref().unwrap().utxokey)
+            );
+        }
     }
 
     // #[tracing::instrument(level = "trace", skip_all)]

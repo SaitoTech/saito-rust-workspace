@@ -7,7 +7,9 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT};
+use crate::common::defs::{
+    PeerIndex, SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT,
+};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
@@ -24,7 +26,9 @@ use crate::core::verification_thread::VerifyRequest;
 use crate::{log_read_lock_receive, log_read_lock_request};
 
 #[derive(Debug)]
-pub enum RoutingEvent {}
+pub enum RoutingEvent {
+    BlockchainUpdated,
+}
 
 #[derive(Debug)]
 pub enum PeerState {
@@ -61,7 +65,7 @@ impl RoutingStats {
             total_incoming_messages: StatVariable::new(
                 "routing::incoming_msgs".to_string(),
                 STAT_BIN_COUNT,
-                sender.clone(),
+                sender,
             ),
         }
     }
@@ -161,6 +165,7 @@ impl RoutingThread {
             Message::GhostChainRequest() => {}
             Message::Result() => {}
             Message::Error() => {}
+            Message::ApplicationTransaction(_) => {}
         }
         trace!("incoming message processed");
     }
@@ -236,17 +241,22 @@ impl RoutingThread {
         self.blockchain_sync_state
             .add_entry(block_hash, block_id, peer_index);
 
-        self.blockchain_sync_state.build_peer_block_picture();
+        self.fetch_next_blocks().await;
+    }
+    async fn fetch_next_blocks(&mut self) {
         {
-            log_read_lock_request!("VerificationThread:verify_tx::blockchain");
+            log_read_lock_request!("RoutingThread:process_incoming_block_hash::blockchain");
             let blockchain = self.blockchain.read().await;
-            log_read_lock_receive!("VerificationThread:verify_tx::blockchain");
+            log_read_lock_receive!("RoutingThread:process_incoming_block_hash::blockchain");
             self.blockchain_sync_state
                 .set_latest_blockchain_id(blockchain.get_latest_block_id());
         }
+
+        self.blockchain_sync_state.build_peer_block_picture();
+
         let map = self.blockchain_sync_state.request_blocks_from_waitlist();
 
-        let mut fetched_blocks: Vec<(u64, SaitoHash)> = Default::default();
+        let mut fetched_blocks: Vec<(PeerIndex, SaitoHash)> = Default::default();
         for (peer_index, vec) in map {
             for hash in vec.iter() {
                 let result = self
@@ -263,7 +273,6 @@ impl RoutingThread {
         }
         self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
     }
-
     async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
         // waiting till we get an acceptable sender
         let sender_count = self.senders_to_verification.len();
@@ -350,30 +359,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
                 self.blockchain_sync_state
                     .mark_as_fetched(peer_index, block_hash);
-                {
-                    log_read_lock_request!("VerificationThread:verify_tx::blockchain");
-                    let blockchain = self.blockchain.read().await;
-                    log_read_lock_receive!("VerificationThread:verify_tx::blockchain");
-                    self.blockchain_sync_state
-                        .set_latest_blockchain_id(blockchain.get_latest_block_id());
-                }
-                let map = self.blockchain_sync_state.request_blocks_from_waitlist();
 
-                let mut fetched_blocks: Vec<(u64, SaitoHash)> = Default::default();
-                for (peer_index, vec) in map {
-                    for hash in vec.iter() {
-                        let result = self
-                            .network
-                            .process_incoming_block_hash(*hash, peer_index, self.blockchain.clone())
-                            .await;
-                        if result.is_some() {
-                            fetched_blocks.push((peer_index, *hash));
-                        } else {
-                            self.blockchain_sync_state.remove_entry(*hash, peer_index);
-                        }
-                    }
-                }
-                self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
+                self.fetch_next_blocks().await;
 
                 return Some(());
             }
@@ -385,7 +372,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
         let duration_value = duration.as_millis() as Timestamp;
 
-        self.reconnection_timer = self.reconnection_timer + duration_value;
+        self.reconnection_timer += duration_value;
         // TODO : move the hard code value to a config
         if self.reconnection_timer >= 10_000 {
             self.network.connect_to_static_peers().await;
@@ -395,7 +382,13 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         None
     }
 
-    async fn process_event(&mut self, _event: RoutingEvent) -> Option<()> {
+    async fn process_event(&mut self, event: RoutingEvent) -> Option<()> {
+        match event {
+            RoutingEvent::BlockchainUpdated => {
+                debug!("received blockchain update event");
+                self.fetch_next_blocks().await;
+            }
+        }
         None
     }
 
@@ -410,7 +403,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             log_read_lock_request!("RoutingThread:on_init::wallet");
             let wallet = self.wallet.read().await;
             log_read_lock_receive!("RoutingThread:on_init::wallet");
-            self.public_key = wallet.public_key.clone();
+            self.public_key = wallet.public_key;
         }
     }
     async fn on_stat_interval(&mut self, current_time: Timestamp) {

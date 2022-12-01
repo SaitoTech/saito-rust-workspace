@@ -5,7 +5,7 @@ use std::time::Duration;
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::common::keep_time::KeepTime;
@@ -242,9 +242,10 @@ impl TransactionGenerator {
             self.state = GeneratorState::Done;
             return true;
         }
-        debug!(
+        trace!(
             "unspent slips : {:?} tx count : {:?}",
-            unspent_slip_count, self.tx_count
+            unspent_slip_count,
+            self.tx_count
         );
         return false;
     }
@@ -276,12 +277,19 @@ impl TransactionGenerator {
                         assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
-                            let transaction =
+                            let mut transaction =
                                 Transaction::create(&mut wallet, public_key, payment, fee);
+                            transaction.generate_total_fees(0, 0);
+                            if transaction.total_in == 0 || transaction.total_out == 0 {
+                                debug!("transaction not added since not enough funds. in : {:?} out : {:?}. current balance : {:?}, required : {:?}", transaction.total_in, transaction.total_out,wallet.get_available_balance(), required_balance);
+                                break;
+                            }
                             vec.push_back(transaction);
                         }
-                        sender.send(vec).await.unwrap();
-                        work_done = true;
+                        if !vec.is_empty() {
+                            sender.send(vec).await.unwrap();
+                            work_done = true;
+                        }
                     }
                 }
                 if !work_done {

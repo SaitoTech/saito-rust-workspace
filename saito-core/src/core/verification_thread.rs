@@ -121,24 +121,6 @@ impl VerificationThread {
             .await
             .unwrap();
     }
-    // async fn on_init(&mut self) {
-    //     log_read_lock_request!("VerificationThread:on_init::wallet");
-    //     let wallet = self.wallet.read().await;
-    //     log_read_lock_receive!("VerificationThread:on_init::wallet");
-    //     self.public_key = wallet.public_key.clone();
-    // }
-    // async fn run(&mut self) {
-    //     let mut work_done = false;
-    //     let batch_count = 1000;
-    //     loop {
-    //         work_done = false;
-    //
-    //
-    //         if !work_done {
-    //             tokio::time::sleep(Duration::from_millis(10)).await;
-    //         }
-    //     }
-    // }
 }
 
 #[async_trait]

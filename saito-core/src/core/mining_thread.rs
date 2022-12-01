@@ -67,7 +67,6 @@ impl MiningThread {
 impl ProcessEvent<MiningEvent> for MiningThread {
     async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         unreachable!();
-        None
     }
 
     async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
@@ -80,7 +79,6 @@ impl ProcessEvent<MiningEvent> for MiningThread {
     }
 
     async fn process_event(&mut self, event: MiningEvent) -> Option<()> {
-        // debug!("event received : {:?}", event);
         return match event {
             MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
                 info!(

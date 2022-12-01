@@ -151,13 +151,18 @@ impl Mempool {
         current_timestamp: u64,
         gt_tx: Option<Transaction>,
     ) -> Option<Block> {
-        if !self
+        let result = self
             .can_bundle_block(blockchain, current_timestamp, &gt_tx)
-            .await
-        {
+            .await;
+        if result.is_none() {
             return None;
         }
-        info!("bundling block with {:?} txs", self.transactions.len());
+        let mempool_work = result.unwrap();
+        info!(
+            "bundling block with {:?} txs with work : {:?}",
+            self.transactions.len(),
+            mempool_work
+        );
 
         let previous_block_hash: SaitoHash;
         {
@@ -175,6 +180,8 @@ impl Mempool {
         )
         .await;
         block.generate();
+        info!("block generated with work : {:?}", block.total_work);
+        assert_eq!(block.total_work, mempool_work);
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 
@@ -212,7 +219,7 @@ impl Mempool {
         blockchain: &Blockchain,
         current_timestamp: u64,
         gt_tx: &Option<Transaction>,
-    ) -> bool {
+    ) -> Option<Currency> {
         // if self.transactions.is_empty() {
         //     return false;
         // }
@@ -223,30 +230,46 @@ impl Mempool {
         if blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
             tokio::time::sleep(Duration::from_secs(1)).await;
-            return false;
+            return None;
         }
         if !self.blocks_queue.is_empty() {
-            return false;
+            return None;
         }
         if self.transactions.is_empty() || !self.new_tx_added {
-            return false;
+            return None;
         }
         if !blockchain.gt_requirement_met && gt_tx.is_none() {
             trace!("waiting till more golden tickets come in");
-            return false;
+            return None;
         }
 
         if let Some(previous_block) = blockchain.get_latest_block() {
             let work_available = self.get_routing_work_available();
-            let work_needed = self.get_routing_work_needed(previous_block, current_timestamp);
-            let time_elapsed = current_timestamp - previous_block.timestamp;
-            debug!(
-                "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}, time_elapsed : {:?} can_bundle : {:?}",
-                previous_block.timestamp, current_timestamp, work_available, work_needed, time_elapsed, work_available >= work_needed
+            let work_needed = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
+                previous_block.burnfee,
+                current_timestamp,
+                previous_block.timestamp,
             );
-            work_available >= work_needed
+            let time_elapsed = current_timestamp - previous_block.timestamp;
+
+            let result = work_available >= work_needed;
+            if result {
+                info!(
+                "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}, time_elapsed : {:?} can_bundle : {:?}",
+                previous_block.timestamp, current_timestamp, work_available, work_needed, time_elapsed, true
+                );
+            } else {
+                debug!(
+                "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}, time_elapsed : {:?} can_bundle : {:?}",
+                previous_block.timestamp, current_timestamp, work_available, work_needed, time_elapsed, false
+                );
+            }
+            if result {
+                return Some(work_available);
+            }
+            return None;
         } else {
-            true
+            Some(0)
         }
     }
 
@@ -288,27 +311,6 @@ impl Mempool {
             return self.routing_work_in_mempool;
         }
         0
-    }
-
-    //
-    // Return work needed in Nolan
-    //
-    #[tracing::instrument(level = "info", skip_all)]
-    pub fn get_routing_work_needed(
-        &self,
-        previous_block: &Block,
-        current_timestamp: u64,
-    ) -> Currency {
-        let previous_block_timestamp = previous_block.timestamp;
-        let previous_block_burnfee = previous_block.burnfee;
-
-        let work_needed: Currency = BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
-            previous_block_burnfee,
-            current_timestamp,
-            previous_block_timestamp,
-        );
-
-        work_needed
     }
 }
 
@@ -400,11 +402,9 @@ mod tests {
         //     false
         // );
         let blockchain = blockchain_lock.read().await;
-        assert_eq!(
-            mempool
-                .can_bundle_block(&blockchain, ts + 120000, &None)
-                .await,
-            true
-        );
+        assert!(mempool
+            .can_bundle_block(&blockchain, ts + 120000, &None)
+            .await
+            .is_some());
     }
 }

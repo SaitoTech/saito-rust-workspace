@@ -184,7 +184,7 @@ pub struct Block {
     /// total fees paid into block
     total_fees: Currency,
     /// total routing work in block, given creator
-    total_work: Currency,
+    pub total_work: Currency,
     /// Is Block on longest chain
     pub(crate) in_longest_chain: bool,
     // has golden ticket
@@ -1542,7 +1542,7 @@ impl Block {
                     previous_block.timestamp,
                 );
             if self.total_work < amount_of_routing_work_needed {
-                error!("Error 510293: block lacking adequate routing work from creator");
+                error!("Error 510293: block lacking adequate routing work from creator. actual : {:?} expected : {:?}",self.total_work, amount_of_routing_work_needed);
                 return false;
             }
 

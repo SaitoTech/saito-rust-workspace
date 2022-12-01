@@ -13,7 +13,6 @@ use crate::core::data::transaction::Transaction;
 pub enum Message {
     HandshakeChallenge(HandshakeChallenge),
     HandshakeResponse(HandshakeResponse),
-    // HandshakeCompletion(HandshakeCompletion),
     ApplicationMessage(Vec<u8>),
     Block(Block),
     Transaction(Transaction),
@@ -26,6 +25,7 @@ pub enum Message {
     GhostChainRequest(),
     Result(),
     Error(),
+    ApplicationTransaction(Vec<u8>),
 }
 
 impl Message {
@@ -38,8 +38,8 @@ impl Message {
         buffer.append(&mut match self {
             Message::HandshakeChallenge(data) => data.serialize(),
             Message::HandshakeResponse(data) => data.serialize(),
-            // Message::HandshakeCompletion(data) => data.serialize(),
             Message::ApplicationMessage(data) => data.clone(),
+            Message::ApplicationTransaction(data) => data.clone(),
             Message::Block(data) => data.serialize_for_net(BlockType::Full),
             Message::Transaction(data) => data.serialize_for_net(),
             Message::BlockchainRequest(data) => data.serialize(),
@@ -67,49 +67,43 @@ impl Message {
         match message_type {
             1 => {
                 let result = HandshakeChallenge::deserialize(&buffer)?;
-                return Ok(Message::HandshakeChallenge(result));
+                Ok(Message::HandshakeChallenge(result))
             }
             2 => {
                 let result = HandshakeResponse::deserialize(&buffer)?;
-                return Ok(Message::HandshakeResponse(result));
+                Ok(Message::HandshakeResponse(result))
             }
-            // 3 => {
-            //     let result = HandshakeCompletion::deserialize(&buffer)?;
-            //     return Ok(Message::HandshakeCompletion(result));
-            // }
-            4 => {
-                return Ok(Message::ApplicationMessage(buffer));
-            }
+
+            4 => Ok(Message::ApplicationMessage(buffer)),
             5 => {
                 let block = Block::deserialize_from_net(&buffer);
-                return Ok(Message::Block(block));
+                Ok(Message::Block(block))
             }
             6 => {
                 let tx = Transaction::deserialize_from_net(&buffer);
-                return Ok(Message::Transaction(tx));
+                Ok(Message::Transaction(tx))
             }
             7 => {
                 let result = BlockchainRequest::deserialize(&buffer)?;
-                return Ok(Message::BlockchainRequest(result));
+                Ok(Message::BlockchainRequest(result))
             }
             8 => {
                 assert_eq!(buffer.len(), 40);
                 let block_hash = buffer[0..32].to_vec().try_into().unwrap();
                 let block_id = u64::from_be_bytes(buffer[32..40].to_vec().try_into().unwrap());
-                return Ok(Message::BlockHeaderHash(block_hash, block_id));
+                Ok(Message::BlockHeaderHash(block_hash, block_id))
             }
-            9 => {
-                return Ok(Message::Ping());
-            }
-            10 => return Ok(Message::SPVChain()),
-            11 => return Ok(Message::Services()),
-            12 => return Ok(Message::GhostChain()),
-            13 => return Ok(Message::GhostChainRequest()),
-            14 => return Ok(Message::Result()),
-            15 => return Ok(Message::Error()),
+            9 => Ok(Message::Ping()),
+            10 => Ok(Message::SPVChain()),
+            11 => Ok(Message::Services()),
+            12 => Ok(Message::GhostChain()),
+            13 => Ok(Message::GhostChainRequest()),
+            14 => Ok(Message::Result()),
+            15 => Ok(Message::Error()),
+            16 => Ok(Message::ApplicationTransaction(buffer)),
             _ => {
                 warn!("message type : {:?} not valid", message_type);
-                return Err(Error::from(ErrorKind::InvalidData));
+                Err(Error::from(ErrorKind::InvalidData))
             }
         }
     }
@@ -117,7 +111,6 @@ impl Message {
         match self {
             Message::HandshakeChallenge(_) => 1,
             Message::HandshakeResponse(_) => 2,
-            // Message::HandshakeCompletion(_) => 3,
             Message::ApplicationMessage(_) => 4,
             Message::Block(_) => 5,
             Message::Transaction(_) => 6,
@@ -130,6 +123,7 @@ impl Message {
             Message::GhostChainRequest() => 13,
             Message::Result() => 14,
             Message::Error() => 15,
+            Message::ApplicationTransaction(_) => 16,
         }
     }
 }
