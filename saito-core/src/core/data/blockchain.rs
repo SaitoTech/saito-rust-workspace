@@ -135,92 +135,59 @@ impl Blockchain {
         //
         // get missing block
         //
-        if self.blockring.get_latest_block_id() > 0 {
-            let mut earliest_block_id = 1;
-            if self.get_latest_block_id() > GENESIS_PERIOD {
-                earliest_block_id = self.get_latest_block_id() - GENESIS_PERIOD;
-            }
-            trace!("earliest_block_id {:?}", earliest_block_id);
-            let earliest_block_hash = self
-                .blockring
-                .get_longest_chain_block_hash_by_block_id(earliest_block_id);
-            trace!("earliest_block_hash {:?}", hex::encode(earliest_block_hash));
-
-            if earliest_block_hash != [0; 32] {
-                let earliest_block = self.get_mut_block(&earliest_block_hash).unwrap();
-
-                // trace!(
-                //     "block.timestamp - earliest_block.timestamp = {:?}",
-                //     block.timestamp - earliest_block.timestamp
-                // );
-                // fetch blocks recursively until all the missing blocks are found. will stop if the earliest block is newer than this block
-                if block.timestamp > earliest_block.timestamp {
-                    if self.get_block(&block.previous_block_hash).is_none() {
-                        trace!(
-                            "block id : {:?} earliest block id : {:?}",
-                            block.id,
-                            earliest_block_id
-                        );
-                        if block.id > earliest_block_id {
-                            if block.source_connection_id.is_some() {
-                                let block_hash = block.previous_block_hash;
-                                let block_in_mempool_queue;
-                                {
-                                    block_in_mempool_queue = mempool
-                                        .blocks_queue
-                                        .par_iter()
-                                        .any(|b| block_hash == b.hash);
-                                }
-                                if !block_in_mempool_queue {
-                                    let result = network
-                                        .fetch_missing_block(
-                                            block_hash,
-                                            block.source_connection_id.as_ref().unwrap(),
-                                        )
-                                        .await;
-                                    if result.is_err() {
-                                        warn!(
-                                            "couldn't fetch block : {:?}",
-                                            hex::encode(block.previous_block_hash)
-                                        );
-                                        todo!()
-                                    }
-                                } else {
-                                    debug!(
-                                        "previous block : {:?} is in the mempool. not fetching",
-                                        hex::encode(block_hash)
-                                    );
-                                }
-                                // log_write_lock_request!("mempool");
-                                // let mut mempool: RwLockWriteGuard<Mempool> = mempool.write().await;
-                                // log_write_lock_receive!("mempool");
-                                debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
-                                    hex::encode(block.hash),
-                                    hex::encode(block.previous_block_hash));
-                                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
-                                mempool.add_block(block);
-                                return AddBlockResult::FailedButRetry;
-                            } else {
-                                debug!(
-                                    "block : {:?} source connection id not set",
-                                    hex::encode(block.hash)
-                                );
-                            }
-                        }
-                    } else {
-                        debug!(
-                            "previous block : {:?} exists in blockchain",
+        if !self.blockring.is_empty() && self.get_block(&block.previous_block_hash).is_none() {
+            if block.previous_block_hash == [0; 32] {
+                trace!(
+                    "hash is empty for parent of block : {:?}",
+                    hex::encode(block.hash)
+                );
+            } else if block.source_connection_id.is_some() {
+                let block_hash = block.previous_block_hash;
+                let block_in_mempool_queue;
+                {
+                    block_in_mempool_queue = mempool
+                        .blocks_queue
+                        .par_iter()
+                        .any(|b| block_hash == b.hash);
+                }
+                if !block_in_mempool_queue {
+                    let result = network
+                        .fetch_missing_block(
+                            block_hash,
+                            block.source_connection_id.as_ref().unwrap(),
+                        )
+                        .await;
+                    if result.is_err() {
+                        warn!(
+                            "couldn't fetch block : {:?}",
                             hex::encode(block.previous_block_hash)
                         );
+                        todo!()
                     }
                 } else {
-                    debug!("aaaa");
+                    debug!(
+                        "previous block : {:?} is in the mempool. not fetching",
+                        hex::encode(block_hash)
+                    );
                 }
+
+                debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
+                                    hex::encode(block.hash),
+                                    hex::encode(block.previous_block_hash));
+                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
+                mempool.add_block(block);
+                return AddBlockResult::FailedButRetry;
             } else {
-                debug!("bbbb");
+                debug!(
+                    "block : {:?} source connection id not set",
+                    hex::encode(block.hash)
+                );
             }
         } else {
-            debug!("cccc");
+            debug!(
+                "previous block : {:?} exists in blockchain",
+                hex::encode(block.previous_block_hash)
+            );
         }
 
         //
