@@ -9,16 +9,14 @@ use lazy_static::lazy_static;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::InterfaceIO;
-
 use saito_core::core::data::configuration::PeerConfig;
 
 use crate::saito::io_context::IoContext;
-
 use crate::IoEvent;
 
 lazy_static! {
@@ -128,6 +126,10 @@ impl InterfaceIO for RustIOHandler {
         peer_index: u64,
         url: String,
     ) -> Result<(), Error> {
+        if block_hash == [0; 32] {
+            return Ok(());
+        }
+
         debug!("fetching block from peer : {:?}", url);
         let event = IoEvent::new(NetworkEvent::BlockFetchRequest {
             block_hash,
@@ -143,7 +145,6 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
         let filename = key.as_str();
