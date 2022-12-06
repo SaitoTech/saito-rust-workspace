@@ -320,7 +320,7 @@ impl Block {
             block.transactions.push(golden_ticket.unwrap());
         }
         block.transactions.reserve(transactions.len());
-        let iter = transactions.drain().map(|(_, tx)| tx).into_iter();
+        let iter = transactions.drain().map(|(_, tx)| tx);
 
         block.transactions.extend(iter);
 
@@ -656,7 +656,7 @@ impl Block {
         //
         // hash random number to pick routing node
         //
-        winner_pubkey = winning_tx.get_winning_routing_node(hash(&random_number.to_vec()));
+        winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
 
         winner_pubkey
     }
@@ -740,16 +740,16 @@ impl Block {
             // block when generating the FEE TX to check against the in-block
             // fee tx.
             //
-            if !self.created_hashmap_of_slips_spent_this_block {
-                if transaction.transaction_type != TransactionType::Fee {
-                    for input in transaction.inputs.iter() {
-                        self.slips_spent_this_block
-                            .entry(input.get_utxoset_key())
-                            .and_modify(|e| *e += 1)
-                            .or_insert(1);
-                    }
-                    self.created_hashmap_of_slips_spent_this_block = true;
+            if !self.created_hashmap_of_slips_spent_this_block
+                && transaction.transaction_type != TransactionType::Fee
+            {
+                for input in transaction.inputs.iter() {
+                    self.slips_spent_this_block
+                        .entry(input.get_utxoset_key())
+                        .and_modify(|e| *e += 1)
+                        .or_insert(1);
                 }
+                self.created_hashmap_of_slips_spent_this_block = true;
             }
 
             //
@@ -901,7 +901,7 @@ impl Block {
                                 //
                                 let rebroadcast_transaction =
                                     Transaction::create_rebroadcast_transaction(
-                                        &transaction,
+                                        transaction,
                                         output,
                                         rebroadcast_fee,
                                         staking_subsidy,
@@ -1003,7 +1003,7 @@ impl Block {
             let golden_ticket: GoldenTicket =
                 GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message);
             // generate input hash for router
-            let mut next_random_number = hash(&golden_ticket.random.to_vec());
+            let mut next_random_number = hash(golden_ticket.random.as_ref());
             let _miner_public_key = golden_ticket.public_key;
 
             //
@@ -1038,8 +1038,8 @@ impl Block {
                 //
                 // these two from find_winning_router - 3, 4
                 //
-                next_random_number = hash(&next_random_number.to_vec());
-                next_random_number = hash(&next_random_number.to_vec());
+                next_random_number = hash(next_random_number.as_ref());
+                next_random_number = hash(next_random_number.as_ref());
 
                 //
                 // loop backwards until MAX recursion OR golden ticket
@@ -1063,49 +1063,46 @@ impl Block {
                     //
                     if loop_index >= MAX_STAKER_RECURSION {
                         cont = 0;
-                    } else {
-                        if let Some(staking_block) = blockchain.blocks.get(&staking_block_hash) {
-                            staking_block_hash = staking_block.previous_block_hash;
-                            if !did_the_block_before_our_staking_block_have_a_golden_ticket {
-                                //
-                                // update with this block info in case of next loop
-                                //
-                                did_the_block_before_our_staking_block_have_a_golden_ticket =
-                                    staking_block.has_golden_ticket;
+                    } else if let Some(staking_block) = blockchain.blocks.get(&staking_block_hash) {
+                        staking_block_hash = staking_block.previous_block_hash;
+                        if !did_the_block_before_our_staking_block_have_a_golden_ticket {
+                            //
+                            // update with this block info in case of next loop
+                            //
+                            did_the_block_before_our_staking_block_have_a_golden_ticket =
+                                staking_block.has_golden_ticket;
 
-                                //
-                                // calculate staker and router payments
-                                //
-                                // the staker payout is contained in the slip of the winner. this is
-                                // because we calculate it afresh every time we reset the staking table
-                                // the payment for the router requires calculating the amount that will
-                                // be withheld for the staker treasury, which is what previous_staker_
-                                // payment is measuring.
-                                //
-                                let mut previous_staking_block_payout = staking_block.total_fees;
-                                if previous_staking_block_payout
-                                    > (staking_block.avg_income as f64 * 1.25) as Currency
-                                    && previous_staking_block_payout > 50
-                                {
-                                    previous_staking_block_payout =
-                                        (staking_block.avg_income as f64 * 1.24) as Currency;
-                                }
-
-                                let sp = previous_staking_block_payout / 2;
-                                let rp = previous_staking_block_payout - sp;
-
-                                let mut payout = BlockPayout::new();
-                                payout.router =
-                                    staking_block.find_winning_router(next_random_number);
-                                payout.router_payout = rp;
-                                payout.staking_treasury = sp as i64;
-
-                                // router consumes 2 hashes
-                                next_random_number = hash(next_random_number.as_slice());
-                                next_random_number = hash(next_random_number.as_slice());
-
-                                cv.block_payout.push(payout);
+                            //
+                            // calculate staker and router payments
+                            //
+                            // the staker payout is contained in the slip of the winner. this is
+                            // because we calculate it afresh every time we reset the staking table
+                            // the payment for the router requires calculating the amount that will
+                            // be withheld for the staker treasury, which is what previous_staker_
+                            // payment is measuring.
+                            //
+                            let mut previous_staking_block_payout = staking_block.total_fees;
+                            if previous_staking_block_payout
+                                > (staking_block.avg_income as f64 * 1.25) as Currency
+                                && previous_staking_block_payout > 50
+                            {
+                                previous_staking_block_payout =
+                                    (staking_block.avg_income as f64 * 1.24) as Currency;
                             }
+
+                            let sp = previous_staking_block_payout / 2;
+                            let rp = previous_staking_block_payout - sp;
+
+                            let mut payout = BlockPayout::new();
+                            payout.router = staking_block.find_winning_router(next_random_number);
+                            payout.router_payout = rp;
+                            payout.staking_treasury = sp as i64;
+
+                            // router consumes 2 hashes
+                            next_random_number = hash(next_random_number.as_slice());
+                            next_random_number = hash(next_random_number.as_slice());
+
+                            cv.block_payout.push(payout);
                         }
                     }
                 }
@@ -1419,7 +1416,7 @@ impl Block {
         // to validate it by checking the variables we can see in our block with what
         // they should be given this function.
         //
-        let cv = self.generate_consensus_values(&blockchain).await;
+        let cv = self.generate_consensus_values(blockchain).await;
 
         if cv.avg_income != self.avg_income {
             error!(
