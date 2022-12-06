@@ -106,7 +106,7 @@ impl RoutingThread {
     /// ```
     ///
     /// ```
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
         trace!(
             "processing incoming message type : {:?} from peer : {:?}",
@@ -225,7 +225,7 @@ impl RoutingThread {
                 .unwrap();
         }
     }
-    #[tracing::instrument(level = "info", skip_all)]
+    // #[tracing::instrument(level = "info", skip_all)]
     async fn process_incoming_block_hash(
         &mut self,
         block_hash: SaitoHash,
@@ -243,11 +243,12 @@ impl RoutingThread {
 
         self.fetch_next_blocks().await;
     }
+    // #[tracing::instrument(level = "info", skip_all)]
     async fn fetch_next_blocks(&mut self) {
         {
-            log_read_lock_request!("RoutingThread:process_incoming_block_hash::blockchain");
+            log_read_lock_request!("RoutingThread:fetch_next_blocks::blockchain");
             let blockchain = self.blockchain.read().await;
-            log_read_lock_receive!("RoutingThread:process_incoming_block_hash::blockchain");
+            log_read_lock_receive!("RoutingThread:fetch_next_blocks::blockchain");
             self.blockchain_sync_state
                 .set_latest_blockchain_id(blockchain.get_latest_block_id());
         }

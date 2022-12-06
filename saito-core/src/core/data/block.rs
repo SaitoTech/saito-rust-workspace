@@ -1213,7 +1213,7 @@ impl Block {
     // bytes array that can be hashed and then have the hash set.
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_hash(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = [
+        let vbytes: Vec<u8> = [
             self.previous_block_hash.as_slice(),
             self.pre_hash.as_slice(),
         ]
@@ -1578,7 +1578,7 @@ impl Block {
                 );
                 if !gt.validate(previous_block.difficulty) {
                     error!(
-                        "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}", 
+                        "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}",
                         hex::encode(previous_block.hash),
                         previous_block.difficulty,
                         hex::encode(gt.random),

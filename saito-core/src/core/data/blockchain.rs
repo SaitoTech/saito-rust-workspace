@@ -201,20 +201,26 @@ impl Blockchain {
                                 mempool.add_block(block);
                                 return AddBlockResult::FailedButRetry;
                             } else {
-                                trace!(
+                                debug!(
                                     "block : {:?} source connection id not set",
                                     hex::encode(block.hash)
                                 );
                             }
                         }
                     } else {
-                        trace!(
+                        debug!(
                             "previous block : {:?} exists in blockchain",
                             hex::encode(block.previous_block_hash)
                         );
                     }
+                } else {
+                    debug!("aaaa");
                 }
+            } else {
+                debug!("bbbb");
             }
+        } else {
+            debug!("cccc");
         }
 
         //
@@ -368,10 +374,10 @@ impl Blockchain {
                 // next block and we are getting blocks out-of-order because of
                 // connection or network issues.
 
-                info!("blocks received out-of-order issue. handling edge case...");
                 if previous_block_hash == self.get_latest_block_hash()
                     && previous_block_hash != [0; 32]
                 {
+                    info!("blocks received out-of-order issue. handling edge case...");
                     todo!("copy implementation from SLR. needed for lite client implementation")
                 }
             }
@@ -382,6 +388,18 @@ impl Blockchain {
         if !am_i_the_longest_chain && self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
             am_i_the_longest_chain = true
         }
+
+        //
+        // now update blockring so it is not empty
+        //
+        // we do this down here instead of automatically on
+        // adding a block, as we want to have the above check
+        // for handling the edge-case of blocks received in the
+        // wrong order. the longest_chain check also requires a
+        // first-block-received check that is conducted against
+        // the blockring.
+        //
+        self.blockring.empty = false;
 
         //
         // validate
@@ -516,6 +534,8 @@ impl Blockchain {
             let pruned_block_hash = self.blockring.get_longest_chain_block_hash_by_block_id(
                 self.get_latest_block_id() - GENESIS_PERIOD,
             );
+
+            assert_ne!(pruned_block_hash, [0; 32]);
 
             //
             // TODO
@@ -750,6 +770,12 @@ impl Blockchain {
         }
         info!("------------------------------------------------------");
         while current_id > 0 && current_id >= min_id {
+            let hash = self
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(current_id);
+            if hash == [0; 32] {
+                break;
+            }
             info!(
                 "{} - {:?}",
                 current_id,
@@ -875,7 +901,6 @@ impl Blockchain {
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
         //
-
         if !self.is_golden_ticket_count_valid(&new_chain) {
             self.gt_requirement_met = false;
             return false;

@@ -20,6 +20,7 @@ pub struct BlockRing {
     //
     pub ring: Vec<RingItem>,
     lc_pos: Option<usize>,
+    pub empty: bool,
 }
 
 impl BlockRing {
@@ -34,6 +35,7 @@ impl BlockRing {
         BlockRing {
             ring: init_ring,
             lc_pos: None,
+            empty: true,
         }
     }
 
@@ -91,7 +93,7 @@ impl BlockRing {
                     id,
                     insert_pos
                 );
-                return [0; 32];
+                [0; 32]
             }
         }
     }
@@ -104,11 +106,11 @@ impl BlockRing {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.lc_pos.is_none();
+        self.empty
     }
 
     #[tracing::instrument(level = "info", skip_all)]
