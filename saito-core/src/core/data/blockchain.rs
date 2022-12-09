@@ -1420,10 +1420,12 @@ impl Blockchain {
             // ask the block to remove its transactions
             //
             {
-                let pblock = self.get_mut_block(&hash).unwrap();
-                pblock
-                    .downgrade_block_to_block_type(BlockType::Pruned)
-                    .await;
+                let block = self.get_mut_block(&hash);
+                if let Some(block) = block {
+                    block.downgrade_block_to_block_type(BlockType::Pruned).await;
+                } else {
+                    warn!("block : {:?} not found to downgrade", hex::encode(hash));
+                }
             }
         }
     }
