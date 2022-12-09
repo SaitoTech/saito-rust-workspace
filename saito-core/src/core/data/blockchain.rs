@@ -1020,7 +1020,7 @@ impl Blockchain {
         assert_eq!(block.block_type, BlockType::Full);
 
         // trace!(" ... before block.validate:      {:?}", create_timestamp());
-        let does_block_validate = block.validate(&self, &self.utxoset).await;
+        let does_block_validate = block.validate(self, &self.utxoset).await;
 
         // trace!(
         //     " ... after block.validate:       {:?} {}",
@@ -1031,14 +1031,14 @@ impl Blockchain {
         if does_block_validate {
             // trace!(" ... before block ocr            {:?}", create_timestamp());
 
-            // utxoset update
-            block.on_chain_reorganization(&mut self.utxoset, true);
-
             // trace!(" ... before blockring ocr:       {:?}", create_timestamp());
 
             // blockring update
             self.blockring
                 .on_chain_reorganization(block.id, block.hash, true);
+
+            // utxoset update
+            block.on_chain_reorganization(&mut self.utxoset, true);
 
             //
             // TODO - wallet update should be optional, as core routing nodes
@@ -1117,7 +1117,7 @@ impl Blockchain {
                 // to unwind. Because of this, we start WINDING the old chain back
                 // which requires us to start at the END of the new chain vector.
                 //
-                if old_chain.len() > 0 {
+                if !old_chain.is_empty() {
                     info!("old chain len: {}", old_chain.len());
                     let res = self
                         .wind_chain(old_chain, new_chain, old_chain.len() - 1, true, storage)
@@ -1137,7 +1137,7 @@ impl Blockchain {
                 // will unwind in turn.
                 //
                 for i in current_wind_index + 1..new_chain.len() {
-                    chain_to_unwind.push(new_chain[i].clone());
+                    chain_to_unwind.push(new_chain[i]);
                 }
 
                 //
@@ -1181,29 +1181,33 @@ impl Blockchain {
         wind_failure: bool,
         storage: &Storage,
     ) -> bool {
-        let block = self
-            .blocks
-            .get_mut(&old_chain[current_unwind_index])
-            .unwrap();
-        block
-            .upgrade_block_to_block_type(BlockType::Full, storage)
-            .await;
-
-        // utxoset update
-        block.on_chain_reorganization(&mut self.utxoset, false);
-
-        // blockring update
-        self.blockring
-            .on_chain_reorganization(block.id, block.hash, false);
-
-        // wallet update
+        let block_id;
         {
-            log_write_lock_request!("blockchain:unwind_chain::wallet");
-            let mut wallet = self.wallet_lock.write().await;
-            log_write_lock_receive!("blockchain:unwind_chain::wallet");
-            wallet.on_chain_reorganization(&block, false);
-        }
+            let block = self
+                .blocks
+                .get_mut(&old_chain[current_unwind_index])
+                .unwrap();
+            block
+                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .await;
+            block_id = block.id;
 
+            // utxoset update
+            block.on_chain_reorganization(&mut self.utxoset, false);
+
+            // blockring update
+            self.blockring
+                .on_chain_reorganization(block.id, block.hash, false);
+
+            // wallet update
+            {
+                log_write_lock_request!("blockchain:unwind_chain::wallet");
+                let mut wallet = self.wallet_lock.write().await;
+                log_write_lock_receive!("blockchain:unwind_chain::wallet");
+                wallet.on_chain_reorganization(&block, false);
+            }
+        }
+        self.on_chain_reorganization(block_id, false, storage).await;
         if current_unwind_index == old_chain.len() - 1 {
             //
             // start winding new chain
