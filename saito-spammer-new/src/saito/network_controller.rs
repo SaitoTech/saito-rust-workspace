@@ -273,7 +273,7 @@ impl NetworkController {
             log_write_lock_receive!("sockets");
         }
 
-        debug!("sending new peer : {:?}", peer_index);
+        debug!("sending new peer : {:?} details to core", peer_index);
 
         sender_to_core
             .send(IoEvent {
@@ -451,6 +451,7 @@ pub async fn run_network_controller(
         loop {
             work_done = false;
 
+            // TODO : update to recv().await
             let result = receiver.try_recv();
             if result.is_ok() {
                 let event = result.unwrap();

@@ -72,6 +72,7 @@ where
         loop {
             work_done = false;
             if network_event_receiver.is_some() {
+                // TODO : update to recv().await
                 let result = network_event_receiver.as_mut().unwrap().try_recv();
                 if result.is_ok() {
                     let event = result.unwrap();
@@ -82,6 +83,7 @@ where
             }
 
             if event_receiver.is_some() {
+                // TODO : update to recv().await
                 let result = event_receiver.as_mut().unwrap().try_recv();
                 if result.is_ok() {
                     let event = result.unwrap();
@@ -142,6 +144,7 @@ async fn run_verification_thread(
             work_done = false;
 
             loop {
+                // TODO : update to recv().await
                 let result = event_receiver.try_recv();
                 if result.is_ok() {
                     let request = result.unwrap();
@@ -440,8 +443,8 @@ fn run_loop_thread(
         loop {
             work_done = false;
 
-            let result = receiver.try_recv();
-            if result.is_ok() {
+            let result = receiver.recv().await;
+            if result.is_some() {
                 let command = result.unwrap();
                 incoming_msgs.increment();
                 work_done = true;

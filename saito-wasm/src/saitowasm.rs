@@ -219,6 +219,7 @@ pub async fn process_timer_event(duration: u64) {
     let duration = Duration::new(0, 1_000_000 * duration as u32);
 
     // blockchain controller
+    // TODO : update to recv().await
     let result = saito.receiver_in_blockchain.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
@@ -230,6 +231,7 @@ pub async fn process_timer_event(duration: u64) {
         .process_timer_event(duration.clone())
         .await;
     // mempool controller
+    // TODO : update to recv().await
     let result = saito.receiver_in_mempool.try_recv();
     if result.is_ok() {
         let event = result.unwrap();

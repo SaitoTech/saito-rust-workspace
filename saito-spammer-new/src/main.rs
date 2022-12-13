@@ -70,6 +70,7 @@ where
 
         loop {
             if network_event_receiver.is_some() {
+                // TODO : update to recv().await
                 let result = network_event_receiver.as_mut().unwrap().try_recv();
                 if result.is_ok() {
                     let event = result.unwrap();
@@ -80,6 +81,7 @@ where
             }
 
             if event_receiver.is_some() {
+                // TODO : update to recv().await
                 let result = event_receiver.as_mut().unwrap().try_recv();
                 if result.is_ok() {
                     let event = result.unwrap();
@@ -358,8 +360,8 @@ fn run_loop_thread(
         loop {
             work_done = false;
 
-            let result = receiver.try_recv();
-            if result.is_ok() {
+            let result = receiver.recv().await;
+            if result.is_some() {
                 let command = result.unwrap();
                 work_done = true;
                 // TODO : remove hard coded values
@@ -400,7 +402,6 @@ fn run_loop_thread(
 
             if !work_done {
                 tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-            } else {
             }
         }
     });
