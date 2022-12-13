@@ -55,11 +55,9 @@ pub struct Transaction {
     /// total fees
     pub total_fees: Currency,
     /// total work to creator
-    pub total_work: Currency,
+    pub total_work_for_me: Currency,
     /// cumulative fees for this tx-in-block
     pub cumulative_fees: Currency,
-    /// cumulative work for this tx-in-block
-    pub cumulative_work: Currency,
 }
 
 impl Transaction {
@@ -78,9 +76,8 @@ impl Transaction {
             total_in: 0,
             total_out: 0,
             total_fees: 0,
-            total_work: 0,
+            total_work_for_me: 0,
             cumulative_fees: 0,
-            cumulative_work: 0,
         }
     }
 
@@ -479,13 +476,7 @@ impl Transaction {
         self.cumulative_fees = cumulative_fees + self.total_fees;
         self.cumulative_fees
     }
-    //
-    // calculate cumulative routing work in block
-    //
-    pub fn generate_cumulative_work(&mut self, cumulative_work: Currency) -> Currency {
-        self.cumulative_work = cumulative_work + self.cumulative_work;
-        self.cumulative_work
-    }
+
     //
     // calculate total fees in block
     //
@@ -551,7 +542,7 @@ impl Transaction {
         // the transaction itself.
         //
         if self.path.is_empty() {
-            self.total_work = 0;
+            self.total_work_for_me = 0;
             return;
         }
 
@@ -560,7 +551,7 @@ impl Transaction {
         //
         let last_hop = &self.path[self.path.len() - 1];
         if last_hop.to.ne(public_key) {
-            self.total_work = 0;
+            self.total_work_for_me = 0;
             warn!(
                 "tx : {:?} last hop is not current node",
                 hex::encode(self.signature)
@@ -576,8 +567,9 @@ impl Transaction {
         // halving from the 2nd hop in the routing path
         //
         for i in 1..self.path.len() {
+            // TODO : check if this check required here since txs already validated at this point
             if self.path[i].from != self.path[i - 1].to {
-                self.total_work = 0;
+                self.total_work_for_me = 0;
                 warn!(
                     "tx : {:?} from and to not matching. to : {:?} from : {:?}",
                     hex::encode(self.signature),
@@ -592,10 +584,10 @@ impl Transaction {
             routing_work_available_to_public_key -= half_of_routing_work;
         }
 
-        self.total_work = routing_work_available_to_public_key;
+        self.total_work_for_me = routing_work_available_to_public_key;
         trace!(
             "total work : {:?} for tx : {:?}. total fees : {:?} total in : {:?} total_out : {:?}",
-            self.total_work,
+            self.total_work_for_me,
             hex::encode(self.signature),
             self.total_fees,
             self.total_in,
@@ -991,21 +983,23 @@ impl Transaction {
                 return false;
             }
             // check path is continuous
-            if index > 0 {
-                if hop.from != self.path[index - 1].to {
-                    warn!(
-                        "from {:?}: {:?} not matching with previous to {:?}: {:?}. path length = {:?}",
-                        index,
+            if index > 0 && hop.from != self.path[index - 1].to {
+                warn!(
+                    "from {:?}: {:?} not matching with previous to {:?}: {:?}. path length = {:?}",
+                    index,
+                    hex::encode(hop.from),
+                    index - 1,
+                    hex::encode(self.path[index - 1].to),
+                    self.path.len()
+                );
+                for hop in self.path.iter() {
+                    info!(
+                        "hop : {:?} --> {:?}",
                         hex::encode(hop.from),
-                        index - 1,
-                        hex::encode(self.path[index - 1].to),
-                        self.path.len()
+                        hex::encode(hop.to)
                     );
-                    for hop in self.path.iter() {
-                        info!("hop : {:?} --> {:?}",hex::encode(hop.from),hex::encode(hop.to));
-                    }
-                    return false;
                 }
+                return false;
             }
             true
         })
@@ -1056,7 +1050,6 @@ mod tests {
         assert_eq!(tx.total_out, 0);
         assert_eq!(tx.total_fees, 0);
         assert_eq!(tx.cumulative_fees, 0);
-        assert_eq!(tx.cumulative_work, 0);
     }
 
     #[test]

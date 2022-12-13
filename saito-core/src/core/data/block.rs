@@ -313,7 +313,7 @@ impl Block {
         block.timestamp = current_timestamp;
         block.difficulty = previous_block_difficulty;
 
-        block.creator = public_key.clone();
+        block.creator = *public_key;
 
         if golden_ticket.is_some() {
             debug!("golden ticket found. adding to block.");
@@ -704,7 +704,7 @@ impl Block {
         // original figures.
         //
         let mut cumulative_fees = 0;
-        let mut cumulative_work = 0;
+        let mut total_work = 0;
 
         let mut has_golden_ticket = false;
         let mut has_fee_transaction = false;
@@ -727,7 +727,7 @@ impl Block {
             let transaction = &mut self.transactions[i];
 
             cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
-            cumulative_work = transaction.generate_cumulative_work(cumulative_work);
+            total_work += transaction.total_work_for_me;
 
             //
             // update slips_spent_this_block so that we have a record of
@@ -793,7 +793,7 @@ impl Block {
         // update block with total fees
         //
         self.total_fees = cumulative_fees;
-        self.total_work = cumulative_work;
+        self.total_work = total_work;
 
         // trace!(
         //     " ... block.pre_validation_done:  {:?}",
