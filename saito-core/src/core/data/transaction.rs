@@ -681,19 +681,19 @@ impl Transaction {
         longest_chain: bool,
         block_id: u64,
     ) {
-        let mut input_slip_value = true;
-        let mut output_slip_value = false;
+        let mut input_slip_spendable = true;
+        let mut output_slip_spendable = false;
 
         if longest_chain {
-            input_slip_value = false;
-            output_slip_value = true;
+            input_slip_spendable = false;
+            output_slip_spendable = true;
         }
 
         self.inputs.iter().for_each(|input| {
-            input.on_chain_reorganization(utxoset, longest_chain, input_slip_value)
+            input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
         });
         self.outputs.iter().for_each(|output| {
-            output.on_chain_reorganization(utxoset, longest_chain, output_slip_value)
+            output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
         });
     }
 

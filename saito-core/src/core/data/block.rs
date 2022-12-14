@@ -1190,10 +1190,11 @@ impl Block {
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
-    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
+    pub fn on_chain_reorganization(&mut self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
         for tx in &self.transactions {
             tx.on_chain_reorganization(utxoset, longest_chain, self.id);
         }
+        self.in_longest_chain = longest_chain;
         true
     }
 

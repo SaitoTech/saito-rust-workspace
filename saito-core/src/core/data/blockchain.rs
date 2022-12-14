@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::collections::VecDeque;
 use std::io::Error;
 use std::sync::Arc;
@@ -121,7 +122,7 @@ impl Blockchain {
         // sanity checks
         if self.blocks.contains_key(&block_hash) {
             error!(
-                "ERROR: block exists in blockchain {:?}",
+                "block already exists in blockchain {:?}. not adding",
                 &hex::encode(&block.hash)
             );
             return AddBlockResult::BlockAlreadyExists;
@@ -234,6 +235,7 @@ impl Blockchain {
                 "block : {:?} is already in blockring. therefore not adding",
                 hex::encode(block.hash)
             );
+            return AddBlockResult::BlockAlreadyExists;
         }
         //
         // blocks are stored in a hashmap indexed by the block_hash. we expect all
@@ -380,11 +382,13 @@ impl Blockchain {
         //
         return if am_i_the_longest_chain {
             debug!("this is the longest chain");
+
             let does_new_chain_validate = self
                 .validate(new_chain.as_slice(), old_chain.as_slice(), storage)
                 .await;
 
             if does_new_chain_validate {
+                self.gt_requirement_met = true;
                 self.add_block_success(block_hash, network, storage, mempool)
                     .await;
 
@@ -871,10 +875,10 @@ impl Blockchain {
         // it in wind_chain as we only need to check once for the entire chain
         //
         if !self.is_golden_ticket_count_valid(new_chain) {
+            // TODO : remove variable. cannot keep state between fork changes (edge case with similar heights)
             self.gt_requirement_met = false;
             return false;
         }
-        self.gt_requirement_met = true;
 
         if !old_chain.is_empty() {
             let res = self
@@ -1021,26 +1025,12 @@ impl Blockchain {
         let block = self.blocks.get(block_hash).unwrap();
         assert_eq!(block.block_type, BlockType::Full);
 
-        // trace!(" ... before block.validate:      {:?}", create_timestamp());
         let does_block_validate = block.validate(self, &self.utxoset).await;
 
-        // trace!(
-        //     " ... after block.validate:       {:?} {}",
-        //     create_timestamp(),
-        //     does_block_validate
-        // );
-
         if does_block_validate {
-            // trace!(" ... before block ocr            {:?}", create_timestamp());
-
-            // trace!(" ... before blockring ocr:       {:?}", create_timestamp());
-
             // blockring update
             self.blockring
                 .on_chain_reorganization(block.id, block.hash, true);
-
-            // utxoset update
-            block.on_chain_reorganization(&mut self.utxoset, true);
 
             //
             // TODO - wallet update should be optional, as core routing nodes
@@ -1054,12 +1044,18 @@ impl Blockchain {
                 log_write_lock_request!("blockchain:wind_chain::wallet");
                 let mut wallet = self.wallet_lock.write().await;
                 log_write_lock_receive!("blockchain:wind_chain::wallet");
-                wallet.on_chain_reorganization(&block, true);
+                wallet.on_chain_reorganization(block, true);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
-
             let block_id = block.id;
+            drop(block);
+            // utxoset update
+            {
+                let block = self.blocks.get_mut(block_hash).unwrap();
+                block.on_chain_reorganization(&mut self.utxoset, true);
+            }
+
             self.on_chain_reorganization(block_id, true, storage).await;
 
             //
