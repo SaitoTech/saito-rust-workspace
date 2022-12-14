@@ -60,9 +60,8 @@ pub struct Transaction {
     pub cumulative_fees: Currency,
 }
 
-impl Transaction {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+impl Default for Transaction {
+    fn default() -> Self {
         Self {
             timestamp: 0,
             inputs: vec![],
@@ -80,7 +79,9 @@ impl Transaction {
             cumulative_fees: 0,
         }
     }
+}
 
+impl Transaction {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn add_hop(
         &mut self,
@@ -168,7 +169,7 @@ impl Transaction {
         );
 
         if available_balance >= total_requested {
-            let mut transaction = Transaction::new();
+            let mut transaction = Transaction::default();
             let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
             let input_len = input_slips.len();
             let output_len = output_slips.len();
@@ -183,7 +184,7 @@ impl Transaction {
             }
 
             // add the payment
-            let mut output = Slip::new();
+            let mut output = Slip::default();
             output.public_key = to_public_key;
             output.amount = with_payment;
             transaction.add_output(output);
@@ -191,7 +192,7 @@ impl Transaction {
             transaction
         } else {
             if available_balance > with_payment {
-                let mut transaction = Transaction::new();
+                let mut transaction = Transaction::default();
                 let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
                 let input_len = input_slips.len();
                 let output_len = output_slips.len();
@@ -206,7 +207,7 @@ impl Transaction {
                 }
 
                 // add the payment
-                let mut output = Slip::new();
+                let mut output = Slip::default();
                 output.public_key = to_public_key;
                 output.amount = with_payment;
                 transaction.add_output(output);
@@ -215,7 +216,7 @@ impl Transaction {
             }
 
             if available_balance > with_fee {
-                let mut transaction = Transaction::new();
+                let mut transaction = Transaction::default();
                 let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
                 let input_len = input_slips.len();
                 let output_len = output_slips.len();
@@ -237,15 +238,15 @@ impl Transaction {
             // we just create a transaction that has no payment AND no
             // attached fee.
             //
-            let mut transaction = Transaction::new();
+            let mut transaction = Transaction::default();
 
-            let mut input1 = Slip::new();
+            let mut input1 = Slip::default();
             input1.public_key = to_public_key;
             input1.amount = 0;
             input1.block_id = 0;
             input1.tx_ordinal = 0;
 
-            let mut output1 = Slip::new();
+            let mut output1 = Slip::default();
             output1.public_key = wallet.public_key;
             output1.block_id = 0;
             output1.tx_ordinal = 0;
@@ -277,9 +278,9 @@ impl Transaction {
         with_amount: Currency,
     ) -> Transaction {
         debug!("generate vip transaction : amount = {:?}", with_amount);
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Vip;
-        let mut output = Slip::new();
+        let mut output = Slip::default();
         output.public_key = to_public_key;
         output.amount = with_amount;
         output.slip_type = SlipType::VipOutput;
@@ -309,7 +310,7 @@ impl Transaction {
         with_fee: Currency,
         with_staking_subsidy: Currency,
     ) -> Transaction {
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
         let mut output_payment = 0;
         if output_slip_to_rebroadcast.amount > with_fee {
             output_payment = output_slip_to_rebroadcast.amount - with_fee + with_staking_subsidy;
@@ -317,7 +318,7 @@ impl Transaction {
 
         transaction.transaction_type = TransactionType::ATR;
 
-        let mut output = Slip::new();
+        let mut output = Slip::default();
         output.public_key = output_slip_to_rebroadcast.public_key;
         output.amount = output_payment;
         output.slip_type = SlipType::ATR;
@@ -418,7 +419,7 @@ impl Transaction {
             path.push(hop);
         }
 
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
         transaction.timestamp = timestamp;
         transaction.inputs = inputs;
         transaction.outputs = outputs;
@@ -678,7 +679,7 @@ impl Transaction {
         &self,
         utxoset: &mut UtxoSet,
         longest_chain: bool,
-        _block_id: u64,
+        block_id: u64,
     ) {
         let mut input_slip_value = true;
         let mut output_slip_value = false;
@@ -715,8 +716,8 @@ impl Transaction {
     // #[tracing::instrument(level = "info", skip_all)]
     pub(crate) fn serialize_for_net_with_hop(&self, opt_hop: Option<Hop>) -> Vec<u8> {
         let mut path_len = self.path.len();
-        if !opt_hop.is_none() {
-            path_len = path_len + 1;
+        if opt_hop.is_some() {
+            path_len += 1;
         }
         let inputs = self
             .inputs
@@ -1038,7 +1039,7 @@ mod tests {
 
     #[test]
     fn transaction_new_test() {
-        let tx = Transaction::new();
+        let tx = Transaction::default();
         assert_eq!(tx.timestamp, 0);
         assert_eq!(tx.inputs, vec![]);
         assert_eq!(tx.outputs, vec![]);
@@ -1054,10 +1055,10 @@ mod tests {
 
     #[test]
     fn transaction_sign_test() {
-        let mut tx = Transaction::new();
+        let mut tx = Transaction::default();
         let wallet = Wallet::new();
 
-        tx.outputs = vec![Slip::new()];
+        tx.outputs = vec![Slip::default()];
         tx.sign(&wallet.private_key);
 
         assert_eq!(tx.outputs[0].slip_index, 0);
@@ -1067,7 +1068,7 @@ mod tests {
 
     #[test]
     fn serialize_for_signature_test() {
-        let tx = Transaction::new();
+        let tx = Transaction::default();
         assert_eq!(
             tx.serialize_for_signature(),
             vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
@@ -1076,15 +1077,15 @@ mod tests {
 
     #[test]
     fn serialize_for_signature_with_data_test() {
-        let mut tx = Transaction::new();
+        let mut tx = Transaction::default();
         tx.timestamp = 1637034582666;
         tx.transaction_type = TransactionType::ATR;
         tx.message = vec![
             123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
         ];
 
-        let mut input_slip = Slip::new();
-        input_slip.public_key = <[u8; 33]>::from_hex(
+        let mut input_slip = Slip::default();
+        input_slip.public_key = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
@@ -1094,8 +1095,8 @@ mod tests {
         input_slip.slip_index = 10;
         input_slip.slip_type = SlipType::ATR;
 
-        let mut output_slip = Slip::new();
-        output_slip.public_key = <[u8; 33]>::from_hex(
+        let mut output_slip = Slip::default();
+        output_slip.public_key = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
@@ -1124,15 +1125,15 @@ mod tests {
 
     #[test]
     fn tx_sign_with_data() {
-        let mut tx = Transaction::new();
+        let mut tx = Transaction::default();
         tx.timestamp = 1637034582666;
         tx.transaction_type = TransactionType::ATR;
         tx.message = vec![
             123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
         ];
 
-        let mut input_slip = Slip::new();
-        input_slip.public_key = <[u8; 33]>::from_hex(
+        let mut input_slip = Slip::default();
+        input_slip.public_key = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
@@ -1142,8 +1143,8 @@ mod tests {
         input_slip.slip_index = 10;
         input_slip.slip_type = SlipType::ATR;
 
-        let mut output_slip = Slip::new();
-        output_slip.public_key = <[u8; 33]>::from_hex(
+        let mut output_slip = Slip::default();
+        output_slip.public_key = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
@@ -1177,20 +1178,18 @@ mod tests {
 
     #[test]
     fn transaction_generate_cumulative_fees_test() {
-        let mut tx = Transaction::new();
+        let mut tx = Transaction::default();
         tx.generate_cumulative_fees(1_0000);
         assert_eq!(tx.cumulative_fees, 1_0000);
     }
 
     #[test]
     fn serialize_for_net_and_deserialize_from_net_test() {
-        let mock_input = Slip::new();
-        let mock_output = Slip::new();
-        let mut mock_hop = Hop::new();
-        mock_hop.from = [0; 33];
-        mock_hop.to = [0; 33];
-        mock_hop.sig = [0; 64];
-        let mut mock_tx = Transaction::new();
+        let mock_input = Slip::default();
+        let mock_output = Slip::default();
+        let mut mock_hop = Hop::default();
+
+        let mut mock_tx = Transaction::default();
         let mut mock_path: Vec<Hop> = vec![];
         mock_path.push(mock_hop);
         let ctimestamp = 0;

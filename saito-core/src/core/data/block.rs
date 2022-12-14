@@ -1112,12 +1112,12 @@ impl Block {
             // now create fee transaction using the block payout data
             //
             let mut slip_index = 0;
-            let mut transaction = Transaction::new();
+            let mut transaction = Transaction::default();
             transaction.transaction_type = TransactionType::Fee;
 
             for i in 0..cv.block_payout.len() {
                 if cv.block_payout[i].miner != [0; 33] {
-                    let mut output = Slip::new();
+                    let mut output = Slip::default();
                     output.public_key = cv.block_payout[i].miner;
                     output.amount = cv.block_payout[i].miner_payout;
                     output.slip_type = SlipType::MinerOutput;
@@ -1126,7 +1126,7 @@ impl Block {
                     slip_index += 1;
                 }
                 if cv.block_payout[i].router != [0; 33] {
-                    let mut output = Slip::new();
+                    let mut output = Slip::default();
                     output.public_key = cv.block_payout[i].router;
                     output.amount = cv.block_payout[i].router_payout;
                     output.slip_type = SlipType::RouterOutput;
@@ -1748,6 +1748,7 @@ impl Block {
 
 #[cfg(test)]
 mod tests {
+    use crate::common::defs::{SaitoHash, SaitoPublicKey};
     use ahash::AHashMap;
     use futures::future::join_all;
     use hex::FromHex;
@@ -1812,15 +1813,15 @@ mod tests {
 
         block.id = 10;
         block.timestamp = 1637034582666;
-        block.previous_block_hash = <[u8; 32]>::from_hex(
+        block.previous_block_hash = <SaitoHash>::from_hex(
             "bcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
         .unwrap();
-        block.merkle_root = <[u8; 32]>::from_hex(
+        block.merkle_root = <SaitoHash>::from_hex(
             "ccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
         .unwrap();
-        block.creator = <[u8; 33]>::from_hex(
+        block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
@@ -1833,13 +1834,13 @@ mod tests {
         let serialized_body = block.serialize_for_signature();
         assert_eq!(serialized_body.len(), 233);
 
-        block.creator = <[u8; 33]>::from_hex(
+        block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
 
         block.sign(
-            &<[u8; 32]>::from_hex(
+            &<SaitoHash>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
             .unwrap(),
@@ -1859,10 +1860,10 @@ mod tests {
 
     #[test]
     fn block_serialization_and_deserialization_test() {
-        let mock_input = Slip::new();
-        let mock_output = Slip::new();
+        let mock_input = Slip::default();
+        let mock_output = Slip::default();
 
-        let mut mock_tx = Transaction::new();
+        let mut mock_tx = Transaction::default();
         mock_tx.timestamp = 0;
         mock_tx.add_input(mock_input.clone());
         mock_tx.add_output(mock_output.clone());
@@ -1870,7 +1871,7 @@ mod tests {
         mock_tx.transaction_type = TransactionType::Normal;
         mock_tx.signature = [1; 64];
 
-        let mut mock_tx2 = Transaction::new();
+        let mut mock_tx2 = Transaction::default();
         mock_tx2.timestamp = 0;
         mock_tx2.add_input(mock_input);
         mock_tx2.add_output(mock_output);
@@ -1955,7 +1956,7 @@ mod tests {
         let transactions: Vec<Transaction> = (0..5)
             .into_iter()
             .map(|_| {
-                let mut transaction = Transaction::new();
+                let mut transaction = Transaction::default();
                 transaction.sign(&wallet.private_key);
                 transaction
             })
@@ -1976,7 +1977,7 @@ mod tests {
         let wallet_lock = t.wallet_lock.clone();
         let mut block = Block::new();
         let transactions = join_all((0..5).into_iter().map(|_| async {
-            let mut transaction = Transaction::new();
+            let mut transaction = Transaction::default();
             let wallet = wallet_lock.read().await;
             transaction.sign(&wallet.private_key);
             transaction

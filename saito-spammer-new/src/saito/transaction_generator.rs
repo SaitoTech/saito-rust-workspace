@@ -191,7 +191,7 @@ impl TransactionGenerator {
         let mut wallet = self.wallet.write().await;
         log_write_lock_receive!("wallet");
 
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         let (input_slips, output_slips) = wallet.generate_slips(total_nolans_requested_per_slip);
 
@@ -203,7 +203,7 @@ impl TransactionGenerator {
         }
 
         for _c in 0..output_slips_per_input_slip {
-            let mut output = Slip::new();
+            let mut output = Slip::default();
             output.public_key = self.public_key;
             output.amount = payment_amount;
             transaction.add_output(output);

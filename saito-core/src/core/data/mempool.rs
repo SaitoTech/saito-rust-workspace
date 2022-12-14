@@ -374,7 +374,7 @@ mod tests {
         assert_eq!(mempool.get_routing_work_available(), 0);
 
         for _i in 0..5 {
-            let mut tx = Transaction::new();
+            let mut tx = Transaction::default();
 
             {
                 let mut wallet = wallet_lock.write().await;

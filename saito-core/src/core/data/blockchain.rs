@@ -380,7 +380,9 @@ impl Blockchain {
         //
         return if am_i_the_longest_chain {
             debug!("this is the longest chain");
-            let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
+            let does_new_chain_validate = self
+                .validate(new_chain.as_slice(), old_chain.as_slice(), storage)
+                .await;
 
             if does_new_chain_validate {
                 self.add_block_success(block_hash, network, storage, mempool)
@@ -800,8 +802,8 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn is_new_chain_the_longest_chain(
         &self,
-        new_chain: &Vec<[u8; 32]>,
-        old_chain: &Vec<[u8; 32]>,
+        new_chain: &[SaitoHash],
+        old_chain: &[SaitoHash],
     ) -> bool {
         debug!("checking for longest chain");
         if self.blockring.is_empty() {
@@ -858,8 +860,8 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn validate(
         &mut self,
-        new_chain: Vec<[u8; 32]>,
-        old_chain: Vec<[u8; 32]>,
+        new_chain: &[SaitoHash],
+        old_chain: &[SaitoHash],
         storage: &Storage,
     ) -> bool {
         debug!("validating chains");
@@ -868,7 +870,7 @@ impl Blockchain {
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
         //
-        if !self.is_golden_ticket_count_valid(&new_chain) {
+        if !self.is_golden_ticket_count_valid(new_chain) {
             self.gt_requirement_met = false;
             return false;
         }
@@ -890,7 +892,7 @@ impl Blockchain {
         }
     }
 
-    pub fn is_golden_ticket_count_valid(&self, new_chain: &Vec<[u8; 32]>) -> bool {
+    pub fn is_golden_ticket_count_valid(&self, new_chain: &[SaitoHash]) -> bool {
         let mut golden_tickets_found = 0;
         let mut search_depth_index = 0;
         let mut latest_block_hash = new_chain[0];
@@ -956,8 +958,8 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn wind_chain(
         &mut self,
-        new_chain: &Vec<[u8; 32]>,
-        old_chain: &Vec<[u8; 32]>,
+        new_chain: &[SaitoHash],
+        old_chain: &[SaitoHash],
         current_wind_index: usize,
         wind_failure: bool,
         storage: &Storage,
@@ -1175,8 +1177,8 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn unwind_chain(
         &mut self,
-        new_chain: &Vec<[u8; 32]>,
-        old_chain: &Vec<[u8; 32]>,
+        new_chain: &[SaitoHash],
+        old_chain: &[SaitoHash],
         current_unwind_index: usize,
         wind_failure: bool,
         storage: &Storage,
