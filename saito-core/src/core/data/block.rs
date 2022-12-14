@@ -1191,6 +1191,11 @@ impl Block {
 
     #[tracing::instrument(level = "trace", skip_all)]
     pub fn on_chain_reorganization(&mut self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
+        debug!(
+            "block : on chain reorg : {:?} - {:?}",
+            self.id,
+            hex::encode(self.hash)
+        );
         for tx in &self.transactions {
             tx.on_chain_reorganization(utxoset, longest_chain, self.id);
         }

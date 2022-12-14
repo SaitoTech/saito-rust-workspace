@@ -880,19 +880,15 @@ impl Blockchain {
             return false;
         }
 
-        if !old_chain.is_empty() {
-            let res = self
-                .unwind_chain(&new_chain, &old_chain, 0, true, storage)
-                //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
-                .await;
-            res
+        if old_chain.is_empty() {
+            self.wind_chain(new_chain, old_chain, new_chain.len() - 1, false, storage)
+                .await
         } else if !new_chain.is_empty() {
-            let res = self
-                .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
-                .await;
-            res
+            self.unwind_chain(new_chain, old_chain, 0, true, storage)
+                .await
         } else {
-            true
+            warn!("lengths are inappropriate");
+            false
         }
     }
 
@@ -1394,6 +1390,7 @@ impl Blockchain {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn downgrade_blockchain_data(&mut self) {
+        trace!("downgrading blockchain data");
         //
         // downgrade blocks still on the chain
         //

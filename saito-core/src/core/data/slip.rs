@@ -116,6 +116,14 @@ impl Slip {
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.amount > 0 {
+            debug!(
+                "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?}",
+                hex::encode(self.utxoset_key),
+                spendable,
+                self.block_id,
+                self.tx_ordinal,
+                self.slip_index
+            );
             utxoset.insert(self.utxoset_key, spendable);
             // if utxoset.contains_key(&self.utxoset_key) {
             //     utxoset.insert(self.utxoset_key, spendable);
@@ -180,18 +188,23 @@ impl Slip {
                         true
                     } else {
                         warn!(
-                            "in utxoset but invalid: value is {} at {:?}",
+                            "in utxoset but invalid: value is {} at {:?}, block : {:?} tx : {:?} index : {:?}",
                             *value,
-                            hex::encode(self.utxoset_key)
+                            hex::encode(self.utxoset_key),
+                            self.block_id,
+                            self.tx_ordinal,
+                            self.slip_index
                         );
                         false
                     }
                 }
                 None => {
                     warn!(
-                        "not in utxoset so invalid. value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
+                        "not in utxoset so invalid. value is returned false: {:?} w/ type {:?} block : {:?} tx: {:?} index : {:?} and amount {:?}",
                         hex::encode(self.utxoset_key),
                         self.slip_type,
+                        self.block_id,
+                        self.tx_ordinal,
                         self.slip_index,
                         self.amount
                     );
