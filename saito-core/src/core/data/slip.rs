@@ -187,7 +187,8 @@ impl Slip {
                     if *value {
                         true
                     } else {
-                        warn!(
+                        // debug!() since method is used to check when cleaning up mempool
+                        debug!(
                             "in utxoset but invalid: value is {} at {:?}, block : {:?} tx : {:?} index : {:?}",
                             *value,
                             hex::encode(self.utxoset_key),
@@ -199,7 +200,8 @@ impl Slip {
                     }
                 }
                 None => {
-                    warn!(
+                    // debug!() since method is used to check when cleaning up mempool
+                    debug!(
                         "not in utxoset so invalid. value is returned false: {:?} w/ type {:?} block : {:?} tx: {:?} index : {:?} and amount {:?}",
                         hex::encode(self.utxoset_key),
                         self.slip_type,
