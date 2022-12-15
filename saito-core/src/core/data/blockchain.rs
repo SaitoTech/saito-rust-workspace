@@ -347,7 +347,27 @@ impl Blockchain {
                     && previous_block_hash != [0; 32]
                 {
                     info!("blocks received out-of-order issue. handling edge case...");
-                    todo!("copy implementation from SLR. needed for lite client implementation")
+
+                    let disconnected_block_id = self.get_latest_block_id();
+                    for i in block_id + 1..disconnected_block_id {
+                        let disconnected_block_hash =
+                            self.blockring.get_longest_chain_block_hash_by_block_id(i);
+                        if disconnected_block_hash != [0; 32] {
+                            self.blockring.on_chain_reorganization(
+                                i,
+                                disconnected_block_hash,
+                                false,
+                            );
+                            let disconnected_block = self.get_mut_block(&disconnected_block_hash);
+                            if let Some(disconnected_block) = disconnected_block {
+                                disconnected_block.in_longest_chain = false;
+                            }
+                        }
+                    }
+
+                    new_chain.clear();
+                    new_chain.push(block_hash);
+                    am_i_the_longest_chain = true;
                 }
             }
         }
