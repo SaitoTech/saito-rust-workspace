@@ -159,9 +159,8 @@ impl Network {
                 // TODO : Add a delay so that there won't be a runaway issue with connects and
                 // disconnects, check the best place to add (here or network_controller)
                 info!(
-                    "Static peer disconnected, reconnecting .., Peer ID = {}, Public Key = {:?}",
-                    peer.index,
-                    hex::encode(peer.public_key.as_ref().unwrap())
+                    "Static peer disconnected, reconnecting .., Peer ID = {}",
+                    peer.index
                 );
 
                 self.io_interface
