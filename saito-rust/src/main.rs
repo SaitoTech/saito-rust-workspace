@@ -145,8 +145,8 @@ async fn run_verification_thread(
 
             loop {
                 // TODO : update to recv().await
-                let result = event_receiver.try_recv();
-                if result.is_ok() {
+                let result = event_receiver.recv().await;
+                if result.is_some() {
                     let request = result.unwrap();
                     if let VerifyRequest::Block(..) = &request {
                         queued_requests.push(request);
