@@ -191,7 +191,7 @@ impl TransactionGenerator {
         let mut wallet = self.wallet.write().await;
         log_write_lock_receive!("wallet");
 
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         let (input_slips, output_slips) = wallet.generate_slips(total_nolans_requested_per_slip);
 
@@ -203,7 +203,7 @@ impl TransactionGenerator {
         }
 
         for _c in 0..output_slips_per_input_slip {
-            let mut output = Slip::new();
+            let mut output = Slip::default();
             output.public_key = self.public_key;
             output.amount = payment_amount;
             transaction.add_output(output);
@@ -280,7 +280,9 @@ impl TransactionGenerator {
                             let mut transaction =
                                 Transaction::create(&mut wallet, public_key, payment, fee);
                             transaction.generate_total_fees(0, 0);
-                            if transaction.total_in == 0 || transaction.total_out == 0 {
+                            if (transaction.total_in == 0 || transaction.total_out == 0)
+                                && (payment + fee != 0)
+                            {
                                 debug!("transaction not added since not enough funds. in : {:?} out : {:?}. current balance : {:?}, required : {:?}", transaction.total_in, transaction.total_out,wallet.get_available_balance(), required_balance);
                                 break;
                             }

@@ -240,7 +240,7 @@ impl Wallet {
             let slip = self.slips.get_mut(key).expect("slip should be here");
             nolan_in += slip.amount;
 
-            let mut input = Slip::new();
+            let mut input = Slip::default();
             input.public_key = my_public_key;
             input.amount = slip.amount;
             input.block_id = slip.block_id;
@@ -264,14 +264,14 @@ impl Wallet {
         }
 
         // add change address
-        let mut output = Slip::new();
+        let mut output = Slip::default();
         output.public_key = my_public_key;
         output.amount = nolan_out;
         outputs.push(output);
 
         // ensure not empty
         if inputs.is_empty() {
-            let mut input = Slip::new();
+            let mut input = Slip::default();
             input.public_key = my_public_key;
             input.amount = 0;
             input.block_id = 0;
@@ -279,7 +279,7 @@ impl Wallet {
             inputs.push(input);
         }
         if outputs.is_empty() {
-            let mut output = Slip::new();
+            let mut output = Slip::default();
             output.public_key = my_public_key;
             output.amount = 0;
             output.block_id = 0;
@@ -297,7 +297,7 @@ impl Wallet {
 
     pub async fn create_transaction_with_default_fees(&self) -> Transaction {
         // TODO : to be implemented
-        Transaction::new()
+        Transaction::default()
     }
     // #[tracing::instrument(level = "info", skip_all)]
     pub async fn create_golden_ticket_transaction(
@@ -305,19 +305,19 @@ impl Wallet {
         public_key: &SaitoPublicKey,
         private_key: &SaitoPrivateKey,
     ) -> Transaction {
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         // for now we'll use bincode to de/serialize
         transaction.transaction_type = TransactionType::GoldenTicket;
         transaction.message = golden_ticket.serialize_for_net();
 
-        let mut input1 = Slip::new();
+        let mut input1 = Slip::default();
         input1.public_key = public_key.clone();
         input1.amount = 0;
         input1.block_id = 0;
         input1.tx_ordinal = 0;
 
-        let mut output1 = Slip::new();
+        let mut output1 = Slip::default();
         output1.public_key = public_key.clone();
         output1.amount = 0;
         output1.block_id = 0;

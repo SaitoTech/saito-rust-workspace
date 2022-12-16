@@ -491,7 +491,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             ConsensusEvent::NewTransaction { transaction } => {
                 self.stats.received_tx.increment();
 
-                debug!(
+                trace!(
                     "tx received with sig: {:?} hash : {:?}",
                     hex::encode(transaction.signature),
                     hex::encode(hash(&transaction.serialize_for_net()))

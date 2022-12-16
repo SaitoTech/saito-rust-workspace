@@ -17,15 +17,17 @@ pub struct Hop {
     pub(crate) sig: SaitoSignature,
 }
 
-impl Hop {
-    pub fn new() -> Self {
+impl Default for Hop {
+    fn default() -> Self {
         Hop {
             from: [0; 33],
             to: [0; 33],
             sig: [0; 64],
         }
     }
+}
 
+impl Hop {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn generate(
         my_private_key: &SaitoPrivateKey,
@@ -33,7 +35,7 @@ impl Hop {
         to_public_key: &SaitoPublicKey,
         tx: &Transaction,
     ) -> Hop {
-        let mut hop = Hop::new();
+        let mut hop = Hop::default();
 
         // msg-to-sign is hash of transaction signature + next_peer.public_key
         let buffer: Vec<u8> = [tx.signature.as_slice(), to_public_key.as_slice()].concat();
@@ -50,7 +52,7 @@ impl Hop {
         let to: SaitoPublicKey = bytes[33..66].try_into().unwrap();
         let sig: SaitoSignature = bytes[66..130].try_into().unwrap();
 
-        let mut hop = Hop::new();
+        let mut hop = Hop::default();
         hop.from = from;
         hop.to = to;
         hop.sig = sig;
@@ -86,7 +88,7 @@ mod tests {
 
     #[test]
     fn hop_new_test() {
-        let hop = Hop::new();
+        let hop = Hop::default();
         assert_eq!(hop.from, [0; 33]);
         assert_eq!(hop.to, [0; 33]);
         assert_eq!(hop.sig, [0; 64]);
@@ -102,7 +104,7 @@ mod tests {
             sender_public_key = w.public_key;
         }
 
-        let tx = Transaction::new();
+        let tx = Transaction::default();
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
         let wallet = wallet.read().await;
@@ -120,7 +122,7 @@ mod tests {
     #[tokio::test]
     async fn serialize_and_deserialize_test() {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
-        let mut tx = Transaction::new();
+        let mut tx = Transaction::default();
         {
             let w = wallet.read().await;
             tx.sign(&w.private_key);

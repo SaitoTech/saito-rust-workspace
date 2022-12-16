@@ -37,8 +37,8 @@ pub struct Slip {
     pub is_utxoset_key_set: bool,
 }
 
-impl Slip {
-    pub fn new() -> Self {
+impl Default for Slip {
+    fn default() -> Self {
         Self {
             public_key: [0; 33],
             amount: 0,
@@ -51,7 +51,9 @@ impl Slip {
             is_utxoset_key_set: false,
         }
     }
+}
 
+impl Slip {
     //
     // runs when block is purged for good or staking slip deleted
     //
@@ -73,7 +75,7 @@ impl Slip {
         let tx_ordinal: u64 = u64::from_be_bytes(bytes[57..65].try_into().unwrap());
         let slip_index: u8 = bytes[65];
         let slip_type: SlipType = FromPrimitive::from_u8(bytes[66]).unwrap();
-        let mut slip = Slip::new();
+        let mut slip = Slip::default();
 
         slip.public_key = public_key;
         slip.amount = amount;
@@ -114,6 +116,14 @@ impl Slip {
     // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.amount > 0 {
+            debug!(
+                "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?}",
+                hex::encode(self.utxoset_key),
+                spendable,
+                self.block_id,
+                self.tx_ordinal,
+                self.slip_index
+            );
             utxoset.insert(self.utxoset_key, spendable);
             // if utxoset.contains_key(&self.utxoset_key) {
             //     utxoset.insert(self.utxoset_key, spendable);
@@ -174,23 +184,29 @@ impl Slip {
         if self.amount > 0 {
             match utxoset.get(&self.utxoset_key) {
                 Some(value) => {
-                    if *value == true {
+                    if *value {
                         true
                     } else {
+                        // debug!() since method is used to check when cleaning up mempool
                         debug!(
-                            "in utxoset but invalid: value is {} at {:?}",
+                            "in utxoset but invalid: value is {} at {:?}, block : {:?} tx : {:?} index : {:?}",
                             *value,
-                            hex::encode(self.utxoset_key)
+                            hex::encode(self.utxoset_key),
+                            self.block_id,
+                            self.tx_ordinal,
+                            self.slip_index
                         );
                         false
                     }
                 }
                 None => {
-                    debug!("not in utxoset so invalid");
+                    // debug!() since method is used to check when cleaning up mempool
                     debug!(
-                        "value is returned false: {:?} w/ type {:?}  ordinal {} and amount {}",
+                        "not in utxoset so invalid. value is returned false: {:?} w/ type {:?} block : {:?} tx: {:?} index : {:?} and amount {:?}",
                         hex::encode(self.utxoset_key),
                         self.slip_type,
+                        self.block_id,
+                        self.tx_ordinal,
                         self.slip_index,
                         self.amount
                     );
@@ -216,7 +232,7 @@ mod tests {
 
     #[test]
     fn slip_new_test() {
-        let mut slip = Slip::new();
+        let mut slip = Slip::default();
         assert_eq!(slip.public_key, [0; 33]);
         assert_eq!(slip.block_id, 0);
         assert_eq!(slip.tx_ordinal, 0);
@@ -239,7 +255,7 @@ mod tests {
 
     #[test]
     fn slip_serialize_for_signature_test() {
-        let slip = Slip::new();
+        let slip = Slip::default();
         assert_eq!(
             slip.serialize_input_for_signature(),
             vec![0; SLIP_SIZE - 16]
@@ -253,13 +269,13 @@ mod tests {
 
     #[test]
     fn slip_get_utxoset_key_test() {
-        let slip = Slip::new();
+        let slip = Slip::default();
         assert_eq!(slip.get_utxoset_key(), [0; 66]);
     }
 
     #[test]
     fn slip_serialization_for_net_test() {
-        let slip = Slip::new();
+        let slip = Slip::default();
         let serialized_slip = slip.serialize_for_net();
         assert_eq!(serialized_slip.len(), SLIP_SIZE);
         let deserilialized_slip = Slip::deserialize_from_net(&serialized_slip);
@@ -273,7 +289,7 @@ mod tests {
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let mut blockchain = blockchain_lock.write().await;
 
-        let mut slip = Slip::new();
+        let mut slip = Slip::default();
         slip.amount = 100_000;
         slip.block_id = 10;
         slip.tx_ordinal = 20;

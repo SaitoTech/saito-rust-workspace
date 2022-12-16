@@ -134,7 +134,11 @@ impl Mempool {
         // transaction.generate(&self.public_key, 0, 0);
 
         if !self.transactions.contains_key(&transaction.signature) {
-            self.routing_work_in_mempool += transaction.total_work;
+            self.routing_work_in_mempool += transaction.total_work_for_me;
+            debug!(
+                "routing work available in mempool : {:?} after adding work : {:?} from tx with fees : {:?}",
+                self.routing_work_in_mempool, transaction.total_work_for_me, transaction.total_fees
+            );
             if let TransactionType::GoldenTicket = transaction.transaction_type {
                 panic!("golden tickets should be in gt collection");
             } else {
@@ -151,13 +155,9 @@ impl Mempool {
         current_timestamp: u64,
         gt_tx: Option<Transaction>,
     ) -> Option<Block> {
-        let result = self
+        let mempool_work = self
             .can_bundle_block(blockchain, current_timestamp, &gt_tx)
-            .await;
-        if result.is_none() {
-            return None;
-        }
-        let mempool_work = result.unwrap();
+            .await?;
         info!(
             "bundling block with {:?} txs with work : {:?}",
             self.transactions.len(),
@@ -180,8 +180,11 @@ impl Mempool {
         )
         .await;
         block.generate();
-        info!("block generated with work : {:?}", block.total_work);
-        assert_eq!(block.total_work, mempool_work);
+        info!(
+            "block generated with work : {:?} and burnfee : {:?}",
+            block.total_work, block.burnfee
+        );
+        // assert_eq!(block.total_work, mempool_work);
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 
@@ -267,7 +270,7 @@ impl Mempool {
             if result {
                 return Some(work_available);
             }
-            return None;
+            None
         } else {
             Some(0)
         }
@@ -299,7 +302,7 @@ impl Mempool {
 
         // add routing work from remaining tx
         for (_, transaction) in &self.transactions {
-            self.routing_work_in_mempool += transaction.total_work;
+            self.routing_work_in_mempool += transaction.total_work_for_me;
         }
     }
 
@@ -307,10 +310,7 @@ impl Mempool {
     /// Calculates the work available in mempool to produce a block
     ///
     pub fn get_routing_work_available(&self) -> Currency {
-        if self.routing_work_in_mempool > 0 {
-            return self.routing_work_in_mempool;
-        }
-        0
+        self.routing_work_in_mempool
     }
 }
 
@@ -374,7 +374,7 @@ mod tests {
         assert_eq!(mempool.get_routing_work_available(), 0);
 
         for _i in 0..5 {
-            let mut tx = Transaction::new();
+            let mut tx = Transaction::default();
 
             {
                 let mut wallet = wallet_lock.write().await;

@@ -274,7 +274,7 @@ mod tests {
         let mut transactions = vec![];
 
         for i in 0..5 {
-            let mut transaction = Transaction::new();
+            let mut transaction = Transaction::default();
             transaction.timestamp = i;
             transaction.sign(&wallet.private_key);
             transactions.push(transaction);
@@ -315,7 +315,7 @@ mod tests {
         let mut transactions = vec![];
 
         for i in 0..5 {
-            let mut transaction = Transaction::new();
+            let mut transaction = Transaction::default();
             transaction.timestamp = i;
             transaction.sign(&wallet.private_key);
             transactions.push(transaction);

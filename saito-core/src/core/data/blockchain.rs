@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::collections::VecDeque;
 use std::io::Error;
 use std::sync::Arc;
@@ -121,7 +122,7 @@ impl Blockchain {
         // sanity checks
         if self.blocks.contains_key(&block_hash) {
             error!(
-                "ERROR: block exists in blockchain {:?}",
+                "block already exists in blockchain {:?}. not adding",
                 &hex::encode(&block.hash)
             );
             return AddBlockResult::BlockAlreadyExists;
@@ -234,6 +235,7 @@ impl Blockchain {
                 "block : {:?} is already in blockring. therefore not adding",
                 hex::encode(block.hash)
             );
+            return AddBlockResult::BlockAlreadyExists;
         }
         //
         // blocks are stored in a hashmap indexed by the block_hash. we expect all
@@ -345,7 +347,27 @@ impl Blockchain {
                     && previous_block_hash != [0; 32]
                 {
                     info!("blocks received out-of-order issue. handling edge case...");
-                    todo!("copy implementation from SLR. needed for lite client implementation")
+
+                    let disconnected_block_id = self.get_latest_block_id();
+                    for i in block_id + 1..disconnected_block_id {
+                        let disconnected_block_hash =
+                            self.blockring.get_longest_chain_block_hash_by_block_id(i);
+                        if disconnected_block_hash != [0; 32] {
+                            self.blockring.on_chain_reorganization(
+                                i,
+                                disconnected_block_hash,
+                                false,
+                            );
+                            let disconnected_block = self.get_mut_block(&disconnected_block_hash);
+                            if let Some(disconnected_block) = disconnected_block {
+                                disconnected_block.in_longest_chain = false;
+                            }
+                        }
+                    }
+
+                    new_chain.clear();
+                    new_chain.push(block_hash);
+                    am_i_the_longest_chain = true;
                 }
             }
         }
@@ -353,7 +375,7 @@ impl Blockchain {
         // at this point we should have a shared ancestor or not
         // find out whether this new block is claiming to require chain-validation
         if !am_i_the_longest_chain && self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
-            am_i_the_longest_chain = true
+            am_i_the_longest_chain = true;
         }
 
         //
@@ -380,13 +402,16 @@ impl Blockchain {
         //
         return if am_i_the_longest_chain {
             debug!("this is the longest chain");
-            let does_new_chain_validate = self.validate(new_chain, old_chain, storage).await;
+            self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
+
+            let does_new_chain_validate = self
+                .validate(new_chain.as_slice(), old_chain.as_slice(), storage)
+                .await;
 
             if does_new_chain_validate {
+                self.gt_requirement_met = true;
                 self.add_block_success(block_hash, network, storage, mempool)
                     .await;
-
-                self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
@@ -800,8 +825,8 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub fn is_new_chain_the_longest_chain(
         &self,
-        new_chain: &Vec<[u8; 32]>,
-        old_chain: &Vec<[u8; 32]>,
+        new_chain: &[SaitoHash],
+        old_chain: &[SaitoHash],
     ) -> bool {
         debug!("checking for longest chain");
         if self.blockring.is_empty() {
@@ -858,8 +883,8 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn validate(
         &mut self,
-        new_chain: Vec<[u8; 32]>,
-        old_chain: Vec<[u8; 32]>,
+        new_chain: &[SaitoHash],
+        old_chain: &[SaitoHash],
         storage: &Storage,
     ) -> bool {
         debug!("validating chains");
@@ -868,29 +893,25 @@ impl Blockchain {
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
         //
-        if !self.is_golden_ticket_count_valid(&new_chain) {
+        if !self.is_golden_ticket_count_valid(new_chain) {
+            // TODO : remove variable. cannot keep state between fork changes (edge case with similar heights)
             self.gt_requirement_met = false;
             return false;
         }
-        self.gt_requirement_met = true;
 
-        if !old_chain.is_empty() {
-            let res = self
-                .unwind_chain(&new_chain, &old_chain, 0, true, storage)
-                //.unwind_chain(&new_chain, &old_chain, old_chain.len() - 1, true)
-                .await;
-            res
+        if old_chain.is_empty() {
+            self.wind_chain(new_chain, old_chain, new_chain.len() - 1, false, storage)
+                .await
         } else if !new_chain.is_empty() {
-            let res = self
-                .wind_chain(&new_chain, &old_chain, new_chain.len() - 1, false, storage)
-                .await;
-            res
+            self.unwind_chain(new_chain, old_chain, 0, true, storage)
+                .await
         } else {
-            true
+            warn!("lengths are inappropriate");
+            false
         }
     }
 
-    pub fn is_golden_ticket_count_valid(&self, new_chain: &Vec<[u8; 32]>) -> bool {
+    pub fn is_golden_ticket_count_valid(&self, new_chain: &[SaitoHash]) -> bool {
         let mut golden_tickets_found = 0;
         let mut search_depth_index = 0;
         let mut latest_block_hash = new_chain[0];
@@ -956,8 +977,8 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn wind_chain(
         &mut self,
-        new_chain: &Vec<[u8; 32]>,
-        old_chain: &Vec<[u8; 32]>,
+        new_chain: &[SaitoHash],
+        old_chain: &[SaitoHash],
         current_wind_index: usize,
         wind_failure: bool,
         storage: &Storage,
@@ -1019,23 +1040,9 @@ impl Blockchain {
         let block = self.blocks.get(block_hash).unwrap();
         assert_eq!(block.block_type, BlockType::Full);
 
-        // trace!(" ... before block.validate:      {:?}", create_timestamp());
-        let does_block_validate = block.validate(&self, &self.utxoset).await;
-
-        // trace!(
-        //     " ... after block.validate:       {:?} {}",
-        //     create_timestamp(),
-        //     does_block_validate
-        // );
+        let does_block_validate = block.validate(self, &self.utxoset).await;
 
         if does_block_validate {
-            // trace!(" ... before block ocr            {:?}", create_timestamp());
-
-            // utxoset update
-            block.on_chain_reorganization(&mut self.utxoset, true);
-
-            // trace!(" ... before blockring ocr:       {:?}", create_timestamp());
-
             // blockring update
             self.blockring
                 .on_chain_reorganization(block.id, block.hash, true);
@@ -1052,12 +1059,18 @@ impl Blockchain {
                 log_write_lock_request!("blockchain:wind_chain::wallet");
                 let mut wallet = self.wallet_lock.write().await;
                 log_write_lock_receive!("blockchain:wind_chain::wallet");
-                wallet.on_chain_reorganization(&block, true);
+                wallet.on_chain_reorganization(block, true);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
-
             let block_id = block.id;
+            drop(block);
+            // utxoset update
+            {
+                let block = self.blocks.get_mut(block_hash).unwrap();
+                block.on_chain_reorganization(&mut self.utxoset, true);
+            }
+
             self.on_chain_reorganization(block_id, true, storage).await;
 
             //
@@ -1117,7 +1130,7 @@ impl Blockchain {
                 // to unwind. Because of this, we start WINDING the old chain back
                 // which requires us to start at the END of the new chain vector.
                 //
-                if old_chain.len() > 0 {
+                if !old_chain.is_empty() {
                     info!("old chain len: {}", old_chain.len());
                     let res = self
                         .wind_chain(old_chain, new_chain, old_chain.len() - 1, true, storage)
@@ -1137,7 +1150,7 @@ impl Blockchain {
                 // will unwind in turn.
                 //
                 for i in current_wind_index + 1..new_chain.len() {
-                    chain_to_unwind.push(new_chain[i].clone());
+                    chain_to_unwind.push(new_chain[i]);
                 }
 
                 //
@@ -1175,35 +1188,39 @@ impl Blockchain {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn unwind_chain(
         &mut self,
-        new_chain: &Vec<[u8; 32]>,
-        old_chain: &Vec<[u8; 32]>,
+        new_chain: &[SaitoHash],
+        old_chain: &[SaitoHash],
         current_unwind_index: usize,
         wind_failure: bool,
         storage: &Storage,
     ) -> bool {
-        let block = self
-            .blocks
-            .get_mut(&old_chain[current_unwind_index])
-            .unwrap();
-        block
-            .upgrade_block_to_block_type(BlockType::Full, storage)
-            .await;
-
-        // utxoset update
-        block.on_chain_reorganization(&mut self.utxoset, false);
-
-        // blockring update
-        self.blockring
-            .on_chain_reorganization(block.id, block.hash, false);
-
-        // wallet update
+        let block_id;
         {
-            log_write_lock_request!("blockchain:unwind_chain::wallet");
-            let mut wallet = self.wallet_lock.write().await;
-            log_write_lock_receive!("blockchain:unwind_chain::wallet");
-            wallet.on_chain_reorganization(&block, false);
-        }
+            let block = self
+                .blocks
+                .get_mut(&old_chain[current_unwind_index])
+                .unwrap();
+            block
+                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .await;
+            block_id = block.id;
 
+            // utxoset update
+            block.on_chain_reorganization(&mut self.utxoset, false);
+
+            // blockring update
+            self.blockring
+                .on_chain_reorganization(block.id, block.hash, false);
+
+            // wallet update
+            {
+                log_write_lock_request!("blockchain:unwind_chain::wallet");
+                let mut wallet = self.wallet_lock.write().await;
+                log_write_lock_receive!("blockchain:unwind_chain::wallet");
+                wallet.on_chain_reorganization(&block, false);
+            }
+        }
+        self.on_chain_reorganization(block_id, false, storage).await;
         if current_unwind_index == old_chain.len() - 1 {
             //
             // start winding new chain
@@ -1392,6 +1409,7 @@ impl Blockchain {
 
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn downgrade_blockchain_data(&mut self) {
+        trace!("downgrading blockchain data");
         //
         // downgrade blocks still on the chain
         //
@@ -1416,10 +1434,12 @@ impl Blockchain {
             // ask the block to remove its transactions
             //
             {
-                let pblock = self.get_mut_block(&hash).unwrap();
-                pblock
-                    .downgrade_block_to_block_type(BlockType::Pruned)
-                    .await;
+                let block = self.get_mut_block(&hash);
+                if let Some(block) = block {
+                    block.downgrade_block_to_block_type(BlockType::Pruned).await;
+                } else {
+                    warn!("block : {:?} not found to downgrade", hex::encode(hash));
+                }
             }
         }
     }

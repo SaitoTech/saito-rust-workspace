@@ -234,15 +234,12 @@ impl NetworkController {
         let response = result.unwrap();
         let result = response.bytes().await;
         if result.is_err() {
-            todo!()
+            warn!("failed getting byte buffer from fetching block : {:?}", url);
+            return;
         }
         let result = result.unwrap();
         let buffer = result.to_vec();
-        // let result = base64::decode(buffer);
-        // if result.is_err() {
-        //     todo!()
-        // }
-        // let buffer = result.unwrap();
+
         debug!(
             "block buffer received with size : {:?} for url : {:?}",
             buffer.len(),
@@ -351,6 +348,11 @@ impl NetworkController {
 
                     if result.is_binary() {
                         let buffer = result.into_bytes();
+                        trace!(
+                            "message buffer with size : {:?} received from peer : {:?}",
+                            buffer.len(),
+                            peer_index
+                        );
                         let message = IoEvent {
                             event_processor_id: 1,
                             event_id: 0,
@@ -358,7 +360,7 @@ impl NetworkController {
                         };
                         sender.send(message).await.expect("sending failed");
                     } else {
-                        todo!()
+                        todo!("handle these scenarios 1")
                     }
                 },
                 PeerReceiver::Tungstenite(mut receiver) => loop {
@@ -378,6 +380,11 @@ impl NetworkController {
                     let result = result.unwrap();
                     match result {
                         tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
+                            trace!(
+                                "message buffer with size : {:?} received from peer : {:?}",
+                                buffer.len(),
+                                peer_index
+                            );
                             let message = IoEvent {
                                 event_processor_id: 1,
                                 event_id: 0,
@@ -387,11 +394,12 @@ impl NetworkController {
                         }
                         _ => {
                             // Not handling these scenarios
-                            todo!()
+                            todo!("handle these scenarios 2")
                         }
                     }
                 },
             }
+            debug!("listening thread existed for peer : {:?}", peer_index);
         });
     }
 }
