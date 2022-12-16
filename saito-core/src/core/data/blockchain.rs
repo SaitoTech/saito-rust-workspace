@@ -375,7 +375,7 @@ impl Blockchain {
         // at this point we should have a shared ancestor or not
         // find out whether this new block is claiming to require chain-validation
         if !am_i_the_longest_chain && self.is_new_chain_the_longest_chain(&new_chain, &old_chain) {
-            am_i_the_longest_chain = true
+            am_i_the_longest_chain = true;
         }
 
         //
@@ -402,6 +402,7 @@ impl Blockchain {
         //
         return if am_i_the_longest_chain {
             debug!("this is the longest chain");
+            self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
             let does_new_chain_validate = self
                 .validate(new_chain.as_slice(), old_chain.as_slice(), storage)
@@ -411,8 +412,6 @@ impl Blockchain {
                 self.gt_requirement_met = true;
                 self.add_block_success(block_hash, network, storage, mempool)
                     .await;
-
-                self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
