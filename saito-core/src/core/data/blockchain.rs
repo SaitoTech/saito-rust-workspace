@@ -231,11 +231,11 @@ impl Blockchain {
         {
             self.blockring.add_block(&block);
         } else {
-            error!(
-                "block : {:?} is already in blockring. therefore not adding",
-                hex::encode(block.hash)
-            );
-            return AddBlockResult::BlockAlreadyExists;
+            // error!(
+            //     "block : {:?} is already in blockring. therefore not adding",
+            //     hex::encode(block.hash)
+            // );
+            // return AddBlockResult::BlockAlreadyExists;
         }
         //
         // blocks are stored in a hashmap indexed by the block_hash. we expect all
