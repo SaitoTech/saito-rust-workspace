@@ -241,7 +241,9 @@ impl Mempool {
         if self.transactions.is_empty() || !self.new_tx_added {
             return None;
         }
-        if !blockchain.gt_requirement_met && gt_tx.is_none() {
+        if !blockchain
+            .is_golden_ticket_count_valid(blockchain.get_latest_block_hash(), gt_tx.is_some())
+        {
             trace!("waiting till more golden tickets come in");
             return None;
         }
