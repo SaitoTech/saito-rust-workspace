@@ -4,7 +4,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::common::defs::{
+    push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data;
 use crate::core::data::configuration::Configuration;
@@ -12,7 +14,7 @@ use crate::core::data::crypto::{generate_random_bytes, sign, verify};
 use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
 use crate::core::data::wallet::Wallet;
-use crate::{log_read_lock_receive, log_read_lock_request};
+use crate::lock_for_read;
 
 #[derive(Debug, Clone)]
 pub struct Peer {
@@ -63,15 +65,12 @@ impl Peer {
         info!("handling handshake challenge : {:?}", self.index,);
         let block_fetch_url;
         {
-            log_read_lock_request!("configs");
-            let configs = configs.read().await;
-            log_read_lock_receive!("configs");
+            let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+
             block_fetch_url = configs.get_block_fetch_url();
         }
 
-        log_read_lock_request!("wallet");
-        let wallet = wallet.read().await;
-        log_read_lock_receive!("wallet");
+        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(challenge.challenge.as_slice(), &wallet.private_key),
@@ -122,15 +121,12 @@ impl Peer {
             todo!()
         }
 
-        log_read_lock_request!("wallet");
-        let wallet = wallet.read().await;
-        log_read_lock_receive!("wallet");
+        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
 
         let block_fetch_url;
         {
-            log_read_lock_request!("configs");
-            let configs = configs.read().await;
-            log_read_lock_receive!("configs");
+            let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+
             block_fetch_url = configs.get_block_fetch_url();
         }
         self.challenge_for_peer = None;

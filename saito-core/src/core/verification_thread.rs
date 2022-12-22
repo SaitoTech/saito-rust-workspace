@@ -9,7 +9,10 @@ use tokio::sync::RwLock;
 use tracing::debug;
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoPublicKey, StatVariable, Timestamp};
+use crate::common::defs::{
+    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET,
+};
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data::block::Block;
@@ -17,7 +20,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
-use crate::{log_read_lock_receive, log_read_lock_request};
+use crate::lock_for_read;
 
 #[derive(Debug)]
 pub enum VerifyRequest {
@@ -44,9 +47,8 @@ impl VerificationThread {
         {
             transaction.generate(&self.public_key, 0, 0);
 
-            log_read_lock_request!("VerificationThread:verify_tx::blockchain");
-            let blockchain = self.blockchain.read().await;
-            log_read_lock_receive!("VerificationThread:verify_tx::blockchain");
+            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+
             if !transaction.validate(&blockchain.utxoset) {
                 debug!(
                     "transaction : {:?} not valid",
@@ -70,9 +72,8 @@ impl VerificationThread {
         let prev_count = transactions.len();
         let txs: Vec<Transaction>;
         {
-            log_read_lock_request!("VerificationThread:verify_txs::blockchain");
-            let blockchain = self.blockchain.read().await;
-            log_read_lock_receive!("VerificationThread:verify_txs::blockchain");
+            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+
             txs = transactions
                 .par_drain(..)
                 .with_min_len(10)
@@ -104,9 +105,8 @@ impl VerificationThread {
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
         let mut block = Block::deserialize_from_net(&buffer);
-        log_read_lock_request!("RoutingEventProcessor:process_network_event::peers");
-        let peers = self.peers.read().await;
-        log_read_lock_receive!("RoutingEventProcessor:process_network_event::peers");
+        let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+
         let peer = peers.index_to_peers.get(&peer_index);
         if peer.is_some() {
             let peer = peer.unwrap();
@@ -150,9 +150,7 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
     }
 
     async fn on_init(&mut self) {
-        log_read_lock_request!("VerificationThread:on_init::wallet");
-        let wallet = self.wallet.read().await;
-        log_read_lock_receive!("VerificationThread:on_init::wallet");
+        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
         self.public_key = wallet.public_key.clone();
     }
 

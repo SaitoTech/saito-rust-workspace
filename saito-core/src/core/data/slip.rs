@@ -223,10 +223,12 @@ impl Slip {
 mod tests {
     use std::sync::Arc;
 
+    use crate::common::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
     use tokio::sync::RwLock;
 
     use crate::core::data::blockchain::Blockchain;
     use crate::core::data::wallet::Wallet;
+    use crate::{lock_for_read, lock_for_write};
 
     use super::*;
 
@@ -287,24 +289,22 @@ mod tests {
     async fn slip_addition_and_removal_from_utxoset() {
         let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let mut blockchain = blockchain_lock.write().await;
+        let (mut blockchain, _blockchain_) =
+            lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
         let mut slip = Slip::default();
         slip.amount = 100_000;
         slip.block_id = 10;
         slip.tx_ordinal = 20;
         {
-            let wallet = wallet_lock.read().await;
+            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
             slip.public_key = wallet.public_key;
         }
         slip.generate_utxoset_key();
 
         // add to utxoset
         slip.on_chain_reorganization(&mut blockchain.utxoset, true, true);
-        assert_eq!(
-            blockchain.utxoset.contains_key(&slip.get_utxoset_key()),
-            true
-        );
+        assert!(blockchain.utxoset.contains_key(&slip.get_utxoset_key()));
 
         // remove from utxoset
         // TODO: Repair this test

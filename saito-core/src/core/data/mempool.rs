@@ -322,9 +322,13 @@ mod tests {
 
     use tokio::sync::RwLock;
 
+    use crate::common::defs::{
+        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+    };
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::burnfee::HEARTBEAT;
     use crate::core::data::wallet::Wallet;
+    use crate::{lock_for_read, lock_for_write};
 
     use super::*;
 
@@ -362,7 +366,8 @@ mod tests {
         }
 
         {
-            let wallet = wallet_lock.read().await;
+            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
@@ -370,7 +375,9 @@ mod tests {
         let ts = create_timestamp();
         let _next_block_timestamp = ts + (HEARTBEAT * 2);
 
-        let mut mempool = mempool_lock.write().await;
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
+
         let _txs = Vec::<Transaction>::new();
 
         assert_eq!(mempool.get_routing_work_available(), 0);
@@ -379,7 +386,8 @@ mod tests {
             let mut tx = Transaction::default();
 
             {
-                let mut wallet = wallet_lock.write().await;
+                let (mut wallet, _wallet_) = lock_for_write!(wallet_lock, LOCK_ORDER_WALLET);
+
                 let (inputs, outputs) = wallet.generate_slips(720_000);
                 tx.inputs = inputs;
                 tx.outputs = outputs;
@@ -389,7 +397,7 @@ mod tests {
                 tx.generate(&public_key, 0, 0);
                 tx.sign(&private_key);
             }
-            let wallet = wallet_lock.read().await;
+            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
             tx.add_hop(&wallet.private_key, &wallet.public_key, &[1; 33]);
             tx.generate(&public_key, 0, 0);
             mempool.add_transaction(tx).await;
@@ -403,7 +411,7 @@ mod tests {
         //     mempool.can_bundle_block(blockchain_lock.clone(), ts).await,
         //     false
         // );
-        let blockchain = blockchain_lock.read().await;
+
         assert!(mempool
             .can_bundle_block(&blockchain, ts + 120000, &None)
             .await

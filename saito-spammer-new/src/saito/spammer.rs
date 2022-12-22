@@ -7,13 +7,14 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::Currency;
+use saito_core::common::defs::{push_lock, Currency, LOCK_ORDER_CONFIGS};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
+use saito_core::lock_for_read;
 
 use crate::saito::config_handler::SpammerConfigs;
 use crate::saito::transaction_generator::{GeneratorState, TransactionGenerator};
@@ -40,7 +41,7 @@ impl Spammer {
         let tx_payment;
         let tx_fee;
         {
-            let configs = configs.read().await;
+            let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
             tx_payment = configs.get_spammer_configs().tx_payment;
             tx_fee = configs.get_spammer_configs().tx_fee;
         }
@@ -70,10 +71,11 @@ impl Spammer {
         let stop_after;
 
         {
-            let config = self.configs.read().await;
-            timer_in_milli = config.get_spammer_configs().timer_in_milli;
-            burst_count = config.get_spammer_configs().burst_count;
-            stop_after = config.get_spammer_configs().stop_after;
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+
+            timer_in_milli = configs.get_spammer_configs().timer_in_milli;
+            burst_count = configs.get_spammer_configs().burst_count;
+            stop_after = configs.get_spammer_configs().stop_after;
         }
 
         let sender = self.sender_to_network.clone();

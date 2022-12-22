@@ -7,14 +7,14 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::common::command::NetworkEvent;
-use crate::common::defs::{SaitoHash, SaitoPublicKey, Timestamp};
+use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_WALLET};
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::data::crypto::{generate_random_bytes, hash};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::wallet::Wallet;
-use crate::{log_read_lock_receive, log_read_lock_request};
+use crate::lock_for_read;
 
 #[derive(Debug)]
 pub enum MiningEvent {
@@ -95,9 +95,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
     }
 
     async fn on_init(&mut self) {
-        log_read_lock_request!("wallet");
-        let wallet = self.wallet.read().await;
-        log_read_lock_receive!("wallet");
+        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
         self.public_key = wallet.public_key.clone();
         info!("node public key = {:?}", hex::encode(self.public_key));
     }

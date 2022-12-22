@@ -7,7 +7,10 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use tracing::{debug, info, trace};
 
-use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
+use saito_core::common::defs::{
+    push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::crypto::generate_random_bytes;
@@ -15,9 +18,7 @@ use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::slip::{Slip, SLIP_SIZE};
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::{
-    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
-};
+use saito_core::{lock_for_read, lock_for_write};
 
 use crate::saito::time_keeper::TimeKeeper;
 use crate::SpammerConfigs;
@@ -58,9 +59,10 @@ impl TransactionGenerator {
         let mut tx_size = 10;
         let tx_count;
         {
-            let config = configuration.read().await;
-            tx_size = config.get_spammer_configs().tx_size;
-            tx_count = config.get_spammer_configs().tx_count;
+            let (configs, _configs_) = lock_for_read!(configuration, LOCK_ORDER_CONFIGS);
+
+            tx_size = configs.get_spammer_configs().tx_size;
+            tx_count = configs.get_spammer_configs().tx_count;
         }
 
         let mut res = TransactionGenerator {
@@ -79,9 +81,7 @@ impl TransactionGenerator {
             peers,
         };
         {
-            log_read_lock_request!("wallet");
-            let wallet = wallet.read().await;
-            log_read_lock_receive!("wallet");
+            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
             res.public_key = wallet.public_key;
             res.private_key = wallet.private_key;
         }
@@ -112,9 +112,7 @@ impl TransactionGenerator {
         let available_balance;
 
         {
-            log_read_lock_request!("wallet");
-            let wallet = self.wallet.read().await;
-            log_read_lock_receive!("wallet");
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
             unspent_slip_count = wallet.get_unspent_slip_count();
             available_balance = wallet.get_available_balance();
@@ -133,9 +131,8 @@ impl TransactionGenerator {
             let mut to_public_key = [0; 33];
 
             {
-                log_read_lock_request!("peers");
-                let peers = self.peers.read().await;
-                log_read_lock_receive!("peers");
+                let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+
                 for peer in peers.index_to_peers.iter() {
                     to_public_key = peer.1.public_key.clone().unwrap();
                     break;
@@ -187,9 +184,7 @@ impl TransactionGenerator {
         let payment_amount =
             total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
 
-        log_write_lock_request!("wallet");
-        let mut wallet = self.wallet.write().await;
-        log_write_lock_receive!("wallet");
+        let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
 
         let mut transaction = Transaction::default();
 
@@ -228,9 +223,7 @@ impl TransactionGenerator {
     async fn check_blockchain_for_confirmation(&mut self) -> bool {
         let unspent_slip_count;
         {
-            log_read_lock_request!("wallet");
-            let wallet = self.wallet.read().await;
-            log_read_lock_receive!("wallet");
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
             unspent_slip_count = wallet.get_unspent_slip_count();
         }
 
@@ -267,12 +260,11 @@ impl TransactionGenerator {
             loop {
                 let mut work_done = false;
                 {
-                    log_write_lock_request!("create_test_transactions:blockchain");
-                    let mut blockchain = blockchain.write().await;
-                    log_write_lock_receive!("create_test_transactions:blockchain");
-                    log_write_lock_request!("create_test_transactions:wallet");
-                    let mut wallet = wallet.write().await;
-                    log_write_lock_receive!("create_test_transactions:wallet");
+                    let (mut blockchain, _blockchain_) =
+                        lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+                    let (mut wallet, _wallet_) = lock_for_write!(wallet, LOCK_ORDER_WALLET);
+
                     if wallet.get_available_balance() >= required_balance {
                         assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count as usize);
@@ -303,9 +295,8 @@ impl TransactionGenerator {
         let mut to_public_key = [0; 33];
 
         {
-            log_read_lock_request!("peers");
-            let peers = self.peers.read().await;
-            log_read_lock_receive!("peers");
+            let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+
             for peer in peers.index_to_peers.iter() {
                 to_public_key = peer.1.public_key.clone().unwrap();
                 break;

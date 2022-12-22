@@ -33,7 +33,8 @@ pub mod test {
     use tracing::{debug, info};
 
     use crate::common::defs::{
-        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
+        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
+        LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
@@ -47,10 +48,7 @@ pub mod test {
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_thread::MiningEvent;
-    use crate::{
-        log_read_lock_receive, log_read_lock_request, log_write_lock_receive,
-        log_write_lock_request,
-    };
+    use crate::{lock_for_read, lock_for_write};
 
     pub fn create_timestamp() -> u64 {
         SystemTime::now()
@@ -123,12 +121,10 @@ pub mod test {
         //
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
-            log_write_lock_request!("test_manager:add_block::blockchain");
-            let mut blockchain = self.blockchain_lock.write().await;
-            log_write_lock_receive!("test_manager:add_block::blockchain");
-            log_write_lock_request!("test_manager:add_block::mempool");
-            let mut mempool = self.mempool_lock.write().await;
-            log_write_lock_receive!("test_manager:add_block::mempool");
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
+
             blockchain
                 .add_block(
                     block,
@@ -145,9 +141,8 @@ pub mod test {
         // check that the blockchain connects properly
         //
         pub async fn check_blockchain(&self) {
-            log_read_lock_request!("check_blockchain:blockchain");
-            let blockchain = self.blockchain_lock.read().await;
-            log_read_lock_receive!("check_blockchain:blockchain");
+            let (blockchain, _blockchain_) =
+                lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             for i in 1..blockchain.blocks.len() {
                 let block_hash = blockchain
@@ -181,7 +176,9 @@ pub mod test {
         // chain and vice-versa.
         //
         pub async fn check_utxoset(&self) {
-            let blockchain = self.blockchain_lock.read().await;
+            let (blockchain, _blockchain_) =
+                lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
             let mut utxoset: UtxoSet = AHashMap::new();
             let latest_block_id = blockchain.get_latest_block_id();
 
@@ -289,7 +286,9 @@ pub mod test {
             let mut block_contains_fee_tx: bool;
             let mut block_fee_tx_index: usize = 0;
 
-            let blockchain = self.blockchain_lock.read().await;
+            let (blockchain, _blockchain_) =
+                lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
             let latest_block_id = blockchain.get_latest_block_id();
 
             for i in 1..=latest_block_id {
@@ -410,7 +409,8 @@ pub mod test {
             let public_key: SaitoPublicKey;
 
             {
-                let wallet = self.wallet_lock.read().await;
+                let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+
                 public_key = wallet.public_key;
                 private_key = wallet.private_key;
             }
@@ -418,9 +418,9 @@ pub mod test {
             for _i in 0..txs_number {
                 let mut transaction;
                 {
-                    log_write_lock_request!("test_manager:create_block::wallet");
-                    let mut wallet = self.wallet_lock.write().await;
-                    log_write_lock_receive!("test_manager:create_block::wallet");
+                    let (mut wallet, _wallet_) =
+                        lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
+
                     transaction = Transaction::create(&mut wallet, public_key, txs_amount, txs_fee);
                 }
 
@@ -430,7 +430,9 @@ pub mod test {
             }
 
             if include_valid_golden_ticket {
-                let blockchain = self.blockchain_lock.read().await;
+                let (blockchain, _blockchain_) =
+                    lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
                 let block = blockchain.get_block(&parent_hash).unwrap();
                 let golden_ticket: GoldenTicket = Self::create_golden_ticket(
                     self.wallet_lock.clone(),
@@ -440,7 +442,8 @@ pub mod test {
                 .await;
                 let mut gttx: Transaction;
                 {
-                    let wallet = self.wallet_lock.write().await;
+                    let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+
                     gttx = Wallet::create_golden_ticket_transaction(
                         golden_ticket,
                         &wallet.public_key,
@@ -452,13 +455,15 @@ pub mod test {
                 transactions.insert(gttx.signature, gttx);
             }
 
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             //
             // create block
             //
             let mut block = Block::create(
                 &mut transactions,
                 parent_hash,
-                self.blockchain_lock.clone().write().await.borrow_mut(),
+                blockchain.borrow_mut(),
                 timestamp,
                 &public_key,
                 &private_key,
@@ -478,9 +483,8 @@ pub mod test {
         ) -> GoldenTicket {
             let public_key;
             {
-                log_read_lock_request!("wallet");
-                let wallet = wallet.read().await;
-                log_read_lock_receive!("wallet");
+                let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+
                 public_key = wallet.public_key;
             }
             let mut random_bytes = hash(&generate_random_bytes(32));
@@ -530,7 +534,8 @@ pub mod test {
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
             {
-                let wallet = self.wallet_lock.read().await;
+                let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+
                 public_key = wallet.public_key;
                 private_key = wallet.private_key;
             }
