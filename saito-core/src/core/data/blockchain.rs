@@ -60,7 +60,6 @@ pub struct Blockchain {
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub genesis_block_id: u64,
     fork_id: SaitoHash,
-    pub gt_requirement_met: bool,
 }
 
 impl Blockchain {
@@ -73,7 +72,6 @@ impl Blockchain {
             wallet_lock,
             genesis_block_id: 0,
             fork_id: [0; 32],
-            gt_requirement_met: true,
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -116,8 +114,8 @@ impl Blockchain {
         // blockchain and our various indices.
         let block_hash = block.hash;
         let block_id = block.id;
-        let latest_block_hash = self.blockring.get_latest_block_hash();
-        let previous_block_hash = block.previous_block_hash;
+        let previous_block_hash = self.blockring.get_latest_block_hash();
+        // let previous_block_hash = block.previous_block_hash;
 
         // sanity checks
         if self.blocks.contains_key(&block_hash) {
@@ -259,7 +257,7 @@ impl Blockchain {
         let mut old_chain: Vec<[u8; 32]> = Vec::new();
         let mut shared_ancestor_found = false;
         let mut new_chain_hash = block_hash;
-        let mut old_chain_hash = latest_block_hash;
+        let mut old_chain_hash = previous_block_hash;
         let mut am_i_the_longest_chain = false;
 
         while !shared_ancestor_found {
@@ -291,10 +289,7 @@ impl Blockchain {
         if shared_ancestor_found {
             debug!("shared ancestor found");
 
-            loop {
-                if new_chain_hash == old_chain_hash {
-                    break;
-                }
+            while new_chain_hash != old_chain_hash {
                 if self.blocks.contains_key(&old_chain_hash) {
                     old_chain.push(old_chain_hash);
                     old_chain_hash = self
@@ -305,9 +300,6 @@ impl Blockchain {
                     if old_chain_hash == [0; 32] {
                         break;
                     }
-                    if new_chain_hash == old_chain_hash {
-                        break;
-                    }
                 } else {
                     break;
                 }
@@ -316,7 +308,7 @@ impl Blockchain {
             debug!(
                 "block without parent. block : {:?}, latest : {:?}",
                 hex::encode(block_hash),
-                hex::encode(latest_block_hash)
+                hex::encode(previous_block_hash)
             );
 
             //
@@ -343,8 +335,8 @@ impl Blockchain {
                 // next block and we are getting blocks out-of-order because of
                 // connection or network issues.
 
-                if previous_block_hash == self.get_latest_block_hash()
-                    && previous_block_hash != [0; 32]
+                if previous_block_hash != [0; 32]
+                    && previous_block_hash == self.get_latest_block_hash()
                 {
                     info!("blocks received out-of-order issue. handling edge case...");
 
@@ -409,7 +401,6 @@ impl Blockchain {
                 .await;
 
             if does_new_chain_validate {
-                self.gt_requirement_met = true;
                 self.add_block_success(block_hash, network, storage, mempool)
                     .await;
 
@@ -888,14 +879,20 @@ impl Blockchain {
         storage: &Storage,
     ) -> bool {
         debug!("validating chains");
+
+        let previous_block_hash;
+        let has_gt;
+        {
+            let block = self.blocks.get(new_chain[0].as_ref()).unwrap();
+            previous_block_hash = block.previous_block_hash;
+            has_gt = block.has_golden_ticket;
+        }
         //
         // ensure new chain has adequate mining support to be considered as
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
         //
-        if !self.is_golden_ticket_count_valid(new_chain) {
-            // TODO : remove variable. cannot keep state between fork changes (edge case with similar heights)
-            self.gt_requirement_met = false;
+        if !self.is_golden_ticket_count_valid(previous_block_hash, has_gt) {
             return false;
         }
 
@@ -911,10 +908,14 @@ impl Blockchain {
         }
     }
 
-    pub fn is_golden_ticket_count_valid(&self, new_chain: &[SaitoHash]) -> bool {
+    pub fn is_golden_ticket_count_valid(
+        &self,
+        previous_block_hash: SaitoHash,
+        current_block_has_golden_ticket: bool,
+    ) -> bool {
         let mut golden_tickets_found = 0;
         let mut search_depth_index = 0;
-        let mut latest_block_hash = new_chain[0];
+        let mut latest_block_hash = previous_block_hash;
 
         for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR {
             search_depth_index += 1;
@@ -940,18 +941,19 @@ impl Blockchain {
 
         if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
             && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
+            && current_block_has_golden_ticket
         {
-            let mut has_golden_ticket = false;
-            if let Some(block) = self.get_block_sync(&new_chain[0]) {
-                has_golden_ticket = block.has_golden_ticket;
-            }
-            if !has_golden_ticket {
-                warn!(
-                    "not enough golden tickets : found = {:?} depth = {:?}",
-                    golden_tickets_found, search_depth_index
-                );
-                return false;
-            }
+            golden_tickets_found += 1;
+        }
+
+        if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
+            && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
+        {
+            warn!(
+                "not enough golden tickets : found = {:?} depth = {:?}",
+                golden_tickets_found, search_depth_index
+            );
+            return false;
         }
         true
     }
