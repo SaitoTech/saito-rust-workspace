@@ -1492,6 +1492,9 @@ mod tests {
     use std::sync::Arc;
 
     use tokio::sync::RwLock;
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::Layer;
 
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
@@ -1748,6 +1751,11 @@ mod tests {
     // test we do not add blocks because of insufficient mining
     //
     async fn insufficient_golden_tickets_test() {
+        // let filter = tracing_subscriber::EnvFilter::from_default_env();
+        // let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+        //
+        // tracing_subscriber::registry().with(fmt_layer).init();
+
         let mut t = TestManager::new();
         let block1;
         let block1_id;
@@ -1925,15 +1933,24 @@ mod tests {
             assert_ne!(blockchain.get_latest_block_id(), block1_id);
             assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
             assert_ne!(blockchain.get_latest_block_id(), block2_id);
-            assert_ne!(blockchain.get_latest_block_hash(), block3_hash);
+            assert_ne!(
+                hex::encode(blockchain.get_latest_block_hash()),
+                hex::encode(block3_hash)
+            );
             assert_ne!(blockchain.get_latest_block_id(), block3_id);
-            assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
+            assert_ne!(
+                hex::encode(blockchain.get_latest_block_hash()),
+                hex::encode(block4_hash)
+            );
             assert_ne!(blockchain.get_latest_block_id(), block4_id);
-            assert_eq!(blockchain.get_latest_block_hash(), block5_hash);
-            assert_eq!(blockchain.get_latest_block_id(), block5_id);
-            assert_ne!(blockchain.get_latest_block_hash(), block6_hash);
-            assert_ne!(blockchain.get_latest_block_id(), block6_id);
-            assert_eq!(blockchain.get_latest_block_id(), 5);
+            assert_ne!(
+                hex::encode(blockchain.get_latest_block_hash()),
+                hex::encode(block5_hash)
+            );
+            assert_ne!(blockchain.get_latest_block_id(), block5_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block6_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block6_id);
+            assert_eq!(blockchain.get_latest_block_id(), 6);
         }
 
         //
@@ -1966,13 +1983,13 @@ mod tests {
             assert_ne!(blockchain.get_latest_block_id(), block3_id);
             assert_ne!(blockchain.get_latest_block_hash(), block4_hash);
             assert_ne!(blockchain.get_latest_block_id(), block4_id);
-            assert_eq!(blockchain.get_latest_block_hash(), block5_hash);
-            assert_eq!(blockchain.get_latest_block_id(), block5_id);
-            assert_ne!(blockchain.get_latest_block_hash(), block6_hash);
-            assert_ne!(blockchain.get_latest_block_id(), block6_id);
+            assert_ne!(blockchain.get_latest_block_hash(), block5_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block5_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block6_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block6_id);
             assert_ne!(blockchain.get_latest_block_hash(), block7_hash);
             assert_ne!(blockchain.get_latest_block_id(), block7_id);
-            assert_eq!(blockchain.get_latest_block_id(), 5);
+            assert_eq!(blockchain.get_latest_block_id(), 6);
         }
 
         t.check_blockchain().await;
