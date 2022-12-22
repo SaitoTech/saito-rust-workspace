@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::VecDeque;
 
 use ahash::AHashMap;
@@ -27,36 +28,111 @@ pub const STAT_BIN_COUNT: usize = 3;
 /// peers
 /// wallet
 /// TODO : add a macro to check the lock ordering as a feature flag
-#[macro_export]
-macro_rules! log_write_lock_request {
-    ($resource: expr) => {
+///
+
+pub const LOCK_ORDER_NETWORK_CONTROLLER: u8 = 1;
+pub const LOCK_ORDER_SOCKETS: u8 = 2;
+pub const LOCK_ORDER_CONFIGS: u8 = 3;
+pub const LOCK_ORDER_BLOCKCHAIN: u8 = 4;
+pub const LOCK_ORDER_MEMPOOL: u8 = 5;
+pub const LOCK_ORDER_PEERS: u8 = 6;
+pub const LOCK_ORDER_WALLET: u8 = 7;
+
+thread_local! {
+    pub static LOCK_ORDER: RefCell<VecDeque<u8>> = RefCell::new(VecDeque::default());
+}
+
+pub struct LockGuardWatcher {
+    order: u8,
+}
+
+impl Drop for LockGuardWatcher {
+    fn drop(&mut self) {
         #[cfg(feature = "locking-logs")]
-        println!("waiting for {:?} lock for writing", $resource);
-    };
+        LOCK_ORDER.with(|v| {
+            let mut v = v.borrow_mut();
+            let res = v.pop_back();
+            println!("releasing lock : {:?}", self.order);
+            assert!(
+                res.is_some(),
+                "no existing locks found for lock : {:?}",
+                self.order
+            );
+            let r = res.unwrap();
+            assert_eq!(
+                self.order, r,
+                "not the expected lock : {:?} vs actual : {:?}",
+                self.order, r
+            );
+        });
+    }
+}
+
+pub fn push_lock(order: u8) -> LockGuardWatcher {
+    #[cfg(feature = "locking-logs")]
+    LOCK_ORDER.with(|v| {
+        let mut v = v.borrow_mut();
+        let res = v.back();
+        if let Some(res) = res {
+            assert!(
+                *res < order,
+                "lock : {:?} cannot be locked after : {:?}",
+                order,
+                *res
+            );
+        }
+        // println!("locking : {:?}", order);
+        v.push_back(order);
+    });
+    LockGuardWatcher { order }
 }
 
 #[macro_export]
-macro_rules! log_write_lock_receive {
-    ($resource: expr) => {
+macro_rules! lock_for_write {
+    ($lock:expr, $order:expr) => {{
         #[cfg(feature = "locking-logs")]
-        println!("acquired {:?} lock for writing", $resource);
-    };
+        println!(
+            "waiting for lock : {:?} for writing - {:?}",
+            $order,
+            module_path!()
+        );
+
+        let l = $lock.write().await;
+        let watcher = push_lock($order);
+
+        #[cfg(feature = "locking-logs")]
+        println!(
+            "acquired lock : {:?} for writing - {:?}",
+            $order,
+            module_path!()
+        );
+
+        (l, watcher)
+    }};
 }
 
 #[macro_export]
-macro_rules! log_read_lock_request {
-    ($resource: expr) => {
+macro_rules! lock_for_read {
+    ($lock:expr, $order:expr) => {{
         #[cfg(feature = "locking-logs")]
-        println!("waiting for {:?} lock for reading", $resource);
-    };
-}
+        println!(
+            "waiting for lock : {:?} for reading - {:?}",
+            $order,
+            module_path!()
+        );
 
-#[macro_export]
-macro_rules! log_read_lock_receive {
-    ($resource: expr) => {
+        let l = $lock.write().await;
+        let watcher = push_lock($order);
+
         #[cfg(feature = "locking-logs")]
-        println!("acquired {:?} lock for reading", $resource);
-    };
+        println!(
+            "acquired lock : {:?} for reading - {:?}",
+            $order,
+            module_path!()
+        );
+
+        (l, watcher)
+    }};
 }
 
 #[derive(Clone, Debug)]

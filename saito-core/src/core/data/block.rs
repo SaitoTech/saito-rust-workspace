@@ -1754,17 +1754,18 @@ impl Block {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::defs::{SaitoHash, SaitoPublicKey};
     use ahash::AHashMap;
     use futures::future::join_all;
     use hex::FromHex;
 
+    use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_WALLET};
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::verify_hash;
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
+    use crate::lock_for_read;
 
     #[test]
     fn block_new_test() {
@@ -1984,7 +1985,8 @@ mod tests {
         let mut block = Block::new();
         let transactions = join_all((0..5).into_iter().map(|_| async {
             let mut transaction = Transaction::default();
-            let wallet = wallet_lock.read().await;
+            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+
             transaction.sign(&wallet.private_key);
             transaction
         }))

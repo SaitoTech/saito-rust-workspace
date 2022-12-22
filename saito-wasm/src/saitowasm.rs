@@ -13,7 +13,10 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
-use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoSignature};
+use saito_core::common::defs::{
+    push_lock, Currency, SaitoHash, SaitoPublicKey, SaitoSignature, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET,
+};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
@@ -28,6 +31,7 @@ use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
+use saito_core::lock_for_write;
 
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
@@ -93,11 +97,7 @@ pub fn new() -> SaitoWasm {
         wallet: wallet.clone(),
         configuration: configuration.clone(),
     };
-    // let generate_genesis_block:bool;
-    // {
-    //     let configs = context.configuration.read().await;
-    //     generate_genesis_block = configs.peers.is_empty();
-    // }
+
     let (sender_to_mempool, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
@@ -185,7 +185,7 @@ pub fn initialize_sync() -> Result<JsValue, JsValue> {
 #[wasm_bindgen]
 pub async fn create_transaction() -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.lock().await;
-    let wallet = saito.context.wallet.write().await;
+    let (mut wallet, _wallet_) = lock_for_write!(saito.context.wallet, LOCK_ORDER_WALLET);
     let transaction = wallet.create_transaction_with_default_fees().await;
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
     return Ok(wasm_transaction);

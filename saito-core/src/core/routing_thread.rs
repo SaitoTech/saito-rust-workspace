@@ -8,7 +8,8 @@ use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    PeerIndex, SaitoHash, SaitoPublicKey, StatVariable, Timestamp, STAT_BIN_COUNT,
+    push_lock, PeerIndex, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -23,7 +24,7 @@ use crate::core::data::network::Network;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::verification_thread::VerifyRequest;
-use crate::{log_read_lock_receive, log_read_lock_request};
+use crate::lock_for_read;
 
 #[derive(Debug)]
 pub enum RoutingEvent {
@@ -201,9 +202,7 @@ impl RoutingThread {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        log_read_lock_request!("routing_thread:process_incoming_blockchain_request:blockchain");
-        let blockchain = self.blockchain.read().await;
-        log_read_lock_receive!("routing_thread:process_incoming_blockchain_request:blockchain");
+        let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
@@ -246,9 +245,8 @@ impl RoutingThread {
     // #[tracing::instrument(level = "info", skip_all)]
     async fn fetch_next_blocks(&mut self) {
         {
-            log_read_lock_request!("RoutingThread:fetch_next_blocks::blockchain");
-            let blockchain = self.blockchain.read().await;
-            log_read_lock_receive!("RoutingThread:fetch_next_blocks::blockchain");
+            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+
             self.blockchain_sync_state
                 .set_latest_blockchain_id(blockchain.get_latest_block_id());
         }
@@ -401,9 +399,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             .await;
 
         {
-            log_read_lock_request!("RoutingThread:on_init::wallet");
-            let wallet = self.wallet.read().await;
-            log_read_lock_receive!("RoutingThread:on_init::wallet");
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
             self.public_key = wallet.public_key;
         }
     }

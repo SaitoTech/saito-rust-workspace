@@ -204,9 +204,6 @@ impl BlockRing {
 
 #[cfg(test)]
 mod tests {
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
-    use tracing_subscriber::Layer;
 
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::GENESIS_PERIOD;

@@ -5,7 +5,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, trace, warn};
 
-use crate::common::defs::{PeerIndex, SaitoHash, SaitoPublicKey};
+use crate::common::defs::{
+    push_lock, PeerIndex, SaitoHash, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
@@ -17,9 +20,7 @@ use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
-use crate::{
-    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
-};
+use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
 pub struct Network {
@@ -50,9 +51,7 @@ impl Network {
         // finding block sender to avoid resending the block to that node
 
         {
-            log_read_lock_request!("network:propagate_block:peers");
-            let peers = self.peers.read().await;
-            log_read_lock_receive!("network:propagate_block:peers");
+            let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
             for (index, peer) in peers.index_to_peers.iter() {
                 if peer.public_key.is_none() {
                     excluded_peers.push(*index);
@@ -86,12 +85,9 @@ impl Network {
 
         // TODO : return if tx is not valid
 
-        log_read_lock_request!("network:propagate_transaction:peers");
-        let peers = self.peers.read().await;
-        log_read_lock_receive!("network:propagate_transaction:peers");
-        log_read_lock_request!("network:propagate_transaction:wallet");
-        let wallet = self.wallet.read().await;
-        log_read_lock_receive!("network:propagate_transaction:wallet");
+        let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+
+        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
         for (index, peer) in peers.index_to_peers.iter() {
             if peer.public_key.is_none() {
                 continue;
@@ -126,9 +122,8 @@ impl Network {
         let peer_index;
         let url;
         {
-            log_read_lock_request!("network:fetch_missing_block:peers");
-            let peers = self.peers.read().await;
-            log_read_lock_receive!("network:fetch_missing_block:peers");
+            let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+
             let peer = peers.find_peer_by_address(public_key);
             if peer.is_none() {
                 debug!("a = {:?}", peers.address_to_peers.len());
@@ -145,9 +140,8 @@ impl Network {
     }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
-        log_write_lock_request!("network:handle_peer_disconnect:peers");
-        let mut peers = self.peers.write().await;
-        log_write_lock_receive!("network:handle_peer_disconnect:peers");
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+
         let result = peers.find_peer_by_index(peer_index);
 
         if result.is_some() {
@@ -186,9 +180,8 @@ impl Network {
     pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
-        log_write_lock_request!("network:handle_new_peer:peers");
-        let mut peers = self.peers.write().await;
-        log_write_lock_receive!("network:handle_new_peer:peers");
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+
         let mut peer = Peer::new(peer_index);
         peer.static_peer_config = peer_data;
 
@@ -214,9 +207,8 @@ impl Network {
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) {
-        log_write_lock_request!("network:handle_handshake_challenge:peers");
-        let mut peers = self.peers.write().await;
-        log_write_lock_receive!("network:handle_handshake_challenge:peers");
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             todo!()
@@ -235,9 +227,8 @@ impl Network {
         configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) {
         debug!("received handshake response");
-        log_write_lock_request!("network:handle_handshake_response:peers");
-        let mut peers = self.peers.write().await;
-        log_write_lock_receive!("network:handle_handshake_response:peers");
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             warn!("peer not found : {:?}", peer_index);
@@ -276,9 +267,8 @@ impl Network {
         // TODO : should this be moved inside peer ?
         let request;
         {
-            log_read_lock_request!("network:request_blockchain_from_peer:blockchain");
-            let blockchain = blockchain.read().await;
-            log_read_lock_receive!("network:request_blockchain_from_peer:blockchain");
+            let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+
             request = BlockchainRequest {
                 latest_block_id: blockchain.get_latest_block_id(),
                 latest_block_hash: blockchain.get_latest_block_hash(),
@@ -300,9 +290,8 @@ impl Network {
     ) -> Option<()> {
         let block_exists;
         {
-            log_read_lock_request!("network:process_incoming_block_hash:blockchain");
-            let blockchain = blockchain.read().await;
-            log_read_lock_receive!("network:process_incoming_block_hash:blockchain");
+            let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+
             block_exists = blockchain.is_block_indexed(block_hash);
         }
         if block_exists {
@@ -310,9 +299,8 @@ impl Network {
         }
         let url;
         {
-            log_read_lock_request!("network:process_incoming_block_hash:peers");
-            let peers = self.peers.read().await;
-            log_read_lock_receive!("network:process_incoming_block_hash:peers");
+            let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+
             let peer = peers
                 .index_to_peers
                 .get(&peer_index)
@@ -330,7 +318,8 @@ impl Network {
         &mut self,
         configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
     ) {
-        self.static_peer_configs = configs.read().await.get_peer_configs().clone();
+        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        self.static_peer_configs = configs.get_peer_configs().clone();
     }
 
     pub async fn connect_to_static_peers(&mut self) {

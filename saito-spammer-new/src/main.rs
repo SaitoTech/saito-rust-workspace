@@ -16,7 +16,10 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT};
+use saito_core::common::defs::{
+    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -33,7 +36,7 @@ use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::{log_read_lock_receive, log_read_lock_request};
+use saito_core::{lock_for_read, lock_for_write};
 
 use crate::saito::config_handler::{ConfigHandler, SpammerConfigs};
 use crate::saito::io_event::IoEvent;
@@ -174,7 +177,7 @@ async fn run_consensus_event_processor(
     }
     let generate_genesis_block: bool;
     {
-        let configs = context.configuration.read().await;
+        let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
 
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
         generate_genesis_block = configs.get_peer_configs().is_empty();
@@ -320,9 +323,8 @@ async fn run_routing_event_processor(
         blockchain_sync_state: BlockchainSyncState::new(fetch_batch_size),
     };
     {
-        log_read_lock_request!("configs");
-        let configs = configs.read().await;
-        log_read_lock_receive!("configs");
+        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+
         let peers = configs.get_peer_configs();
         for peer in peers {
             routing_event_processor.static_peers.push(StaticPeer {
@@ -478,9 +480,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fetch_batch_size: usize;
 
     {
-        log_read_lock_request!("configs");
-        let configs = configs.read().await;
-        log_read_lock_receive!("configs");
+        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+
         channel_size = configs.get_server_configs().channel_size as usize;
         thread_sleep_time_in_ms = configs.get_server_configs().thread_sleep_time_in_ms;
         stat_timer_in_ms = configs.get_server_configs().stat_timer_in_ms;
@@ -501,7 +502,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let context = Context::new(configs_clone.clone());
     {
-        let mut wallet = context.wallet.write().await;
+        let (mut wallet, _wallet_) = lock_for_write!(context.wallet, LOCK_ORDER_WALLET);
+
         wallet.public_key = public_key;
         wallet.private_key = private_key;
 

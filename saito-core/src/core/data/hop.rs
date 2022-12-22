@@ -80,9 +80,11 @@ mod tests {
 
     use tokio::sync::RwLock;
 
+    use crate::common::defs::{push_lock, LOCK_ORDER_WALLET};
     use crate::core::data::crypto::{generate_keys, verify};
     use crate::core::data::hop::Hop;
     use crate::core::data::wallet::Wallet;
+    use crate::lock_for_read;
 
     use super::*;
 
@@ -100,14 +102,15 @@ mod tests {
         let sender_public_key: SaitoPublicKey;
 
         {
-            let w = wallet.read().await;
-            sender_public_key = w.public_key;
+            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+
+            sender_public_key = wallet.public_key;
         }
 
         let tx = Transaction::default();
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let wallet = wallet.read().await;
+        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
         let hop = Hop::generate(
             &wallet.private_key,
             &wallet.public_key,
@@ -124,12 +127,12 @@ mod tests {
         let wallet = Arc::new(RwLock::new(Wallet::new()));
         let mut tx = Transaction::default();
         {
-            let w = wallet.read().await;
-            tx.sign(&w.private_key);
+            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+            tx.sign(&wallet.private_key);
         }
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let wallet = wallet.read().await;
+        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
         let hop = Hop::generate(
             &wallet.private_key,
             &wallet.public_key,

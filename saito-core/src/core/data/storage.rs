@@ -1,17 +1,14 @@
 use std::sync::Arc;
 
-use crate::common::defs::BLOCK_FILE_EXTENSION;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
 
+use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
-
 use crate::core::data::mempool::Mempool;
-
 use crate::core::data::slip::Slip;
-
-use crate::{log_write_lock_receive, log_write_lock_request};
+use crate::lock_for_write;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -105,9 +102,8 @@ impl Storage {
 
         let mut waiting_count = file_names.len();
         let handle = tokio::spawn(async move {
-            log_write_lock_request!("storage:load_blocks_from_disk:mempool");
-            let mut mempool = mempool.write().await;
-            log_write_lock_receive!("storage:load_blocks_from_disk:mempool");
+            let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+
             loop {
                 if waiting_count == 0 {
                     break;
@@ -243,12 +239,13 @@ impl Storage {
 
 #[cfg(test)]
 mod test {
+    use tracing::info;
+
     use crate::common::defs::SaitoHash;
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::MAX_TOKEN_SUPPLY;
     use crate::core::data::crypto::{hash, verify};
-    use tracing::info;
 
     #[ignore]
     #[tokio::test]
@@ -285,6 +282,7 @@ mod test {
 
         assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
     }
+
     // TODO : delete this test
     #[ignore]
     #[tokio::test]
@@ -297,7 +295,7 @@ mod test {
             "current dir = {:?}",
             std::env::current_dir().unwrap().to_str().unwrap()
         );
-        let filename =std::env::current_dir().unwrap().to_str().unwrap().to_string()+
+        let filename = std::env::current_dir().unwrap().to_str().unwrap().to_string() +
             "/data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai";
         let retrieved_block = t.storage.load_block_from_disk(filename).await;
         let mut block = retrieved_block.unwrap();

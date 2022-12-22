@@ -15,15 +15,16 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::{SaitoHash, StatVariable, STAT_BIN_COUNT};
+use saito_core::common::defs::{
+    push_lock, SaitoHash, StatVariable, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_NETWORK_CONTROLLER, STAT_BIN_COUNT,
+};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
 use saito_core::core::data::block::BlockType;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
-use saito_core::{
-    log_read_lock_receive, log_read_lock_request, log_write_lock_receive, log_write_lock_request,
-};
+use saito_core::lock_for_read;
 
 use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
@@ -91,9 +92,7 @@ impl NetworkController {
         buffer: Vec<u8>,
     ) {
         debug!("sending outgoing message : peer = {:?}", peer_index);
-        log_write_lock_request!("sockets");
         let mut sockets = sockets.lock().await;
-        log_write_lock_receive!("sockets");
         let socket = sockets.get_mut(&peer_index);
         if socket.is_none() {
             error!(
@@ -136,22 +135,22 @@ impl NetworkController {
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-            log_read_lock_request!("network controller");
-            let io_controller = io_controller.read().await;
-            log_read_lock_receive!("network controller");
-            let sender_to_controller = io_controller.sender_to_saito_controller.clone();
+            let (network_controller, _network_controller_) =
+                lock_for_read!(io_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+
+            let sender_to_controller = network_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
 
             let peer_index;
             {
-                let mut counter = io_controller.peer_counter.lock().await;
+                let mut counter = network_controller.peer_counter.lock().await;
                 peer_index = counter.get_next_index();
             }
 
             NetworkController::send_new_peer(
                 event_id,
                 peer_index,
-                io_controller.sockets.clone(),
+                network_controller.sockets.clone(),
                 PeerSender::Tungstenite(socket_sender),
                 PeerReceiver::Tungstenite(socket_receiver),
                 sender_to_controller,
@@ -173,9 +172,7 @@ impl NetworkController {
         exceptions: Vec<u64>,
     ) {
         trace!("sending message : {:?} to all", buffer[0]);
-        log_write_lock_request!("sockets");
         let mut sockets = sockets.lock().await;
-        log_write_lock_receive!("sockets");
         let mut peers_with_errors: Vec<u64> = Default::default();
 
         for entry in sockets.iter_mut() {
@@ -268,9 +265,7 @@ impl NetworkController {
         peer_data: Option<PeerConfig>,
     ) {
         {
-            log_write_lock_request!("sockets");
             sockets.lock().await.insert(peer_index, sender);
-            log_write_lock_receive!("sockets");
         }
 
         debug!("sending new peer : {:?} details to core", peer_index);
@@ -331,9 +326,7 @@ impl NetworkController {
                         // TODO : handle peer disconnections
                         warn!("failed receiving message [1] : {:?}", result.err().unwrap());
                         NetworkController::send_peer_disconnect(sender, peer_index).await;
-                        log_write_lock_request!("sockets");
                         sockets.lock().await.remove(&peer_index);
-                        log_write_lock_receive!("sockets");
                         break;
                     }
                     let result = result.unwrap();
@@ -359,9 +352,7 @@ impl NetworkController {
                     if result.is_err() {
                         warn!("failed receiving message [2] : {:?}", result.err().unwrap());
                         NetworkController::send_peer_disconnect(sender, peer_index).await;
-                        log_write_lock_request!("sockets");
                         sockets.lock().await.remove(&peer_index);
-                        log_write_lock_receive!("sockets");
                         break;
                     }
                     let result = result.unwrap();
@@ -412,9 +403,8 @@ pub async fn run_network_controller(
     let url;
     let port;
     {
-        log_read_lock_request!("configs");
-        let configs = configs.read().await;
-        log_read_lock_receive!("configs");
+        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+
         url = "localhost:".to_string() + configs.get_server_configs().port.to_string().as_str();
         port = configs.get_server_configs().port;
     }
@@ -460,9 +450,10 @@ pub async fn run_network_controller(
                 work_done = true;
                 match interface_event {
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
-                        log_write_lock_request!("network controller");
-                        let sockets = network_controller.read().await.sockets.clone();
-                        log_write_lock_receive!("network controller");
+                        let (network_controller, _network_controller_) =
+                            lock_for_read!(network_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+                        let sockets = network_controller.sockets.clone();
+
                         NetworkController::send_to_all(sockets, buffer, exceptions).await;
                         outgoing_messages.increment();
                     }
@@ -470,9 +461,10 @@ pub async fn run_network_controller(
                         peer_index: index,
                         buffer,
                     } => {
-                        log_write_lock_request!("network controller");
-                        let sockets = network_controller.read().await.sockets.clone();
-                        log_write_lock_receive!("network controller");
+                        let (network_controller, _network_controller_) =
+                            lock_for_read!(network_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+                        let sockets = network_controller.sockets.clone();
+
                         NetworkController::send_outgoing_message(sockets, index, buffer).await;
                         outgoing_messages.increment();
                     }
@@ -501,11 +493,11 @@ pub async fn run_network_controller(
                         let sender;
                         let current_queries;
                         {
-                            log_read_lock_request!("network controller");
-                            let io_controller = network_controller.read().await;
-                            log_read_lock_receive!("network controller");
-                            sender = io_controller.sender_to_saito_controller.clone();
-                            current_queries = io_controller.currently_queried_urls.clone();
+                            let (network_controller, _network_controller_) =
+                                lock_for_read!(network_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+
+                            sender = network_controller.sender_to_saito_controller.clone();
+                            current_queries = network_controller.currently_queried_urls.clone();
                         }
                         // starting new thread to stop io controller from getting blocked
                         tokio::spawn(async move {
@@ -579,20 +571,19 @@ fn run_websocket_server(
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
 
-                    log_read_lock_request!("network controller");
-                    let controller = clone.read().await;
-                    log_read_lock_receive!("network controller");
+                    let (network_controller, _network_controller_) =
+                        lock_for_read!(clone, LOCK_ORDER_NETWORK_CONTROLLER);
 
                     let peer_index;
                     {
-                        let mut counter = controller.peer_counter.lock().await;
+                        let mut counter = network_controller.peer_counter.lock().await;
                         peer_index = counter.get_next_index();
                     }
 
                     NetworkController::send_new_peer(
                         0,
                         peer_index,
-                        controller.sockets.clone(),
+                        network_controller.sockets.clone(),
                         PeerSender::Warp(sender),
                         PeerReceiver::Warp(receiver),
                         sender_to_io,
@@ -617,10 +608,10 @@ fn run_websocket_server(
                             todo!()
                         }
                         let block_hash: SaitoHash = block_hash.try_into().unwrap();
-                        log_read_lock_request!("run_websocket_server:blockchain");
                         // TODO : load disk from disk and serve rather than locking the blockchain
-                        let blockchain = blockchain.read().await;
-                        log_read_lock_receive!("run_websocket_server:blockchain");
+                        let (blockchain, _blockchain_) =
+                            lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+
                         let block = blockchain.get_block(&block_hash);
                         if block.is_none() {
                             warn!("block not found : {:?}", block_hash);
