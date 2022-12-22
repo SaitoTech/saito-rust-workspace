@@ -101,8 +101,8 @@ impl ProcessEvent<MiningEvent> for MiningThread {
     }
 
     async fn on_stat_interval(&mut self, _current_time: Timestamp) {
-        let stat = format!("--- stats ------ {} - total : {:?} current difficulty : {:?} miner_active : {:?} current target : {:?} ",
-                           format!("{:width$}", "mining::golden_tickets", width = 30),
+        let stat = format!("{} - total : {:?}, current difficulty : {:?}, miner_active : {:?}, current target : {:?} ",
+                           format!("{:width$}", "mining::golden_tickets", width = 40),
                            self.mined_golden_tickets,
                            self.difficulty,
                            self.miner_active,

@@ -534,8 +534,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
             let stat = format!(
-                "--- stats ------ {} - total_slips : {:?} unspent_slips : {:?} current_balance : {:?}",
-                format!("{:width$}", "wallet::state", width = 30),
+                "{} - total_slips : {:?}, unspent_slips : {:?}, current_balance : {:?}",
+                format!("{:width$}", "wallet::state", width = 40),
                 wallet.slips.len(),
                 wallet.get_unspent_slip_count(),
                 wallet.get_available_balance()
@@ -545,8 +545,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         {
             let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
             let stat = format!(
-                "--- stats ------ {} - utxo_size : {:?} block_count : {:?} longest_chain_len : {:?}",
-                format!("{:width$}", "blockchain::state", width = 30),
+                "{} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?}",
+                format!("{:width$}", "blockchain::state", width = 40),
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
                 blockchain.get_latest_block_id()
@@ -557,8 +557,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let (mempool, _mempool_) = lock_for_read!(self.mempool, LOCK_ORDER_MEMPOOL);
 
             let stat = format!(
-                "--- stats ------ {} - blocks_queue : {:?} transactions : {:?}",
-                format!("{:width$}", "mempool:state", width = 30),
+                "{} - blocks_queue : {:?}, transactions : {:?}",
+                format!("{:width$}", "mempool:state", width = 40),
                 mempool.blocks_queue.len(),
                 mempool.transactions.len(),
             );

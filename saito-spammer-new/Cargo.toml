@@ -9,7 +9,7 @@ edition = "2021"
 saito-core = { path = "../saito-core" }
 tokio = { version = "1.21.1", features = ["full", "tracing"] }
 tungstenite = { version = "0.17.3" }
-tokio-tungstenite = "0.17.2"
+tokio-tungstenite = { version = "0.17.2", features = ["native-tls"] }
 tracing = "0.1.36"
 pretty_env_logger = "0.4.0"
 async-trait = "0.1.57"

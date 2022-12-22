@@ -211,8 +211,8 @@ impl StatVariable {
     fn print(&self) -> String {
         format!(
             // target : "saito_stats",
-            "--- stats ------ {} - total : {:?} current_rate : {:.2} max_rate : {:.2} min_rate : {:.2}",
-            format!("{:width$}", self.name, width = 30),
+            "{} - total : {:?}, current_rate : {:.2}, max_rate : {:.2}, min_rate : {:.2}",
+            format!("{:width$}", self.name, width = 40),
             self.total,
             self.avg,
             self.max_avg,
