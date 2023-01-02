@@ -1058,7 +1058,7 @@ impl Blockchain {
             //
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
-                let (mut wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
                 wallet.on_chain_reorganization(block, true);
 
@@ -1215,7 +1215,7 @@ impl Blockchain {
 
             // wallet update
             {
-                let (mut wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
                 wallet.on_chain_reorganization(&block, false);
             }
@@ -1377,7 +1377,7 @@ impl Blockchain {
             // remove slips from wallet
             //
             {
-                let (mut wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
                 wallet.delete_block(pblock);
             }

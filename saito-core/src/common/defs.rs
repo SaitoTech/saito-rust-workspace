@@ -121,7 +121,7 @@ macro_rules! lock_for_read {
             module_path!()
         );
 
-        let l = $lock.write().await;
+        let l = $lock.read().await;
         let watcher = push_lock($order);
 
         #[cfg(feature = "locking-logs")]
