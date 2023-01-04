@@ -527,7 +527,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(99);
     }));
 
-    println!("Running saito");
+    info!("Running saito");
 
     let filter = tracing_subscriber::EnvFilter::from_default_env();
     let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
@@ -545,6 +545,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::registry().with(fmt_layer).init();
 
+    info!("load config");
+
     let configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
         Arc::new(RwLock::new(Box::new(
             ConfigHandler::load_configs("configs/config.json".to_string())
@@ -559,7 +561,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
-
+        
         channel_size = configs.get_server_configs().channel_size as usize;
         thread_sleep_time_in_ms = configs.get_server_configs().thread_sleep_time_in_ms;
         stat_timer_in_ms = configs.get_server_configs().stat_timer_in_ms;
@@ -567,13 +569,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         fetch_batch_size = configs.get_server_configs().block_fetch_batch_size as usize;
         assert_ne!(fetch_batch_size, 0);
     }
-
+    
+    info!("start channel");
     let (event_sender_to_loop, event_receiver_in_loop) =
-        tokio::sync::mpsc::channel::<IoEvent>(channel_size);
-
+    tokio::sync::mpsc::channel::<IoEvent>(channel_size);
+    
     let (sender_to_network_controller, receiver_in_network_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(channel_size);
-
+    tokio::sync::mpsc::channel::<IoEvent>(channel_size);
+    
     info!("running saito controllers");
 
     let context = Context::new(configs.clone());
@@ -589,6 +592,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::sync::mpsc::channel::<MiningEvent>(channel_size);
     let (sender_to_stat, receiver_for_stat) = tokio::sync::mpsc::channel::<String>(channel_size);
 
+    info!("run_verification_threads");    
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
         context.blockchain.clone(),
@@ -601,6 +605,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
+    info!("run_routing_event_processor");
     let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),
         configs.clone(),
@@ -618,6 +623,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
+    info!("run_consensus_event_processor");
     let (network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
         &context,
         peers.clone(),
@@ -632,6 +638,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
+    info!("run_mining_event_processor");
     let (network_event_sender_to_mining, miner_handle) = run_mining_event_processor(
         &context,
         &sender_to_consensus,
@@ -658,6 +665,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_stat.clone(),
     );
 
+    info!("run_network_controller");
     let network_handle = tokio::spawn(run_network_controller(
         receiver_in_network_controller,
         event_sender_to_loop.clone(),

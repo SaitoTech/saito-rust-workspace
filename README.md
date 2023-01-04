@@ -15,6 +15,12 @@ The Saito Rust directory contains the code needed to provide storage and network
 
 You should only need to modify these files if you are developing features that affect storage or network functionality in the Rust-only client.
 
+Run instructions:
+
+put a file in configs/config.json (see template).
+
+RUST_LOG=trace cargo run
+
 
 *** Saito-Wasm ***
 
