@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
@@ -104,9 +104,18 @@ impl VerificationThread {
         self.invalid_txs.increment_by(invalid_txs as u64);
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
-        let mut block = Block::deserialize_from_net(&buffer);
+        let buffer_len = buffer.len();
+        let result = Block::deserialize_from_net(buffer);
+        if result.is_err() {
+            warn!(
+                "failed verifying block buffer with length : {:?}",
+                buffer_len
+            );
+            return;
+        }
         let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
+        let mut block = result.unwrap();
         let peer = peers.index_to_peers.get(&peer_index);
         if peer.is_some() {
             let peer = peer.unwrap();

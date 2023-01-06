@@ -76,7 +76,7 @@ impl Message {
 
             4 => Ok(Message::ApplicationMessage(buffer)),
             5 => {
-                let block = Block::deserialize_from_net(&buffer);
+                let block = Block::deserialize_from_net(buffer)?;
                 Ok(Message::Block(block))
             }
             6 => {
