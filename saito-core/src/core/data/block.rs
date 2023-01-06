@@ -1923,10 +1923,11 @@ mod tests {
         block.transactions = vec![mock_tx, mock_tx2];
 
         let serialized_block = block.serialize_for_net(BlockType::Full);
-        let deserialized_block = Block::deserialize_from_net(&serialized_block);
+        let deserialized_block = Block::deserialize_from_net(serialized_block).unwrap();
 
         let serialized_block_header = block.serialize_for_net(BlockType::Header);
-        let deserialized_block_header = Block::deserialize_from_net(&serialized_block_header);
+        let deserialized_block_header =
+            Block::deserialize_from_net(serialized_block_header).unwrap();
 
         assert_eq!(
             block.serialize_for_net(BlockType::Full),
