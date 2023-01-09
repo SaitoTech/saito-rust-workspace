@@ -1,11 +1,12 @@
 use std::convert::TryInto;
+use std::io::{Error, ErrorKind};
 use std::ops::Rem;
 use std::{i128, mem};
 
 use ahash::AHashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
@@ -491,8 +492,14 @@ impl Block {
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
-    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Block {
-        // TODO : return Option<Block> to support invalid buffers
+    pub fn deserialize_from_net(bytes: Vec<u8>) -> Result<Block, Error> {
+        if bytes.len() < BLOCK_HEADER_SIZE {
+            warn!(
+                "block buffer is smaller than header length. length : {:?}",
+                bytes.len()
+            );
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
         let transactions_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let id: u64 = u64::from_be_bytes(bytes[4..12].try_into().unwrap());
         let timestamp: u64 = u64::from_be_bytes(bytes[12..20].try_into().unwrap());
@@ -517,6 +524,13 @@ impl Block {
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
         for _n in 0..transactions_len {
+            if bytes.len() < start_of_transaction_data + 16 {
+                warn!(
+                    "block buffer is invalid to read transaction metadata. length : {:?}",
+                    bytes.len()
+                );
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
             let inputs_len: u32 = u32::from_be_bytes(
                 bytes[start_of_transaction_data..start_of_transaction_data + 4]
                     .try_into()
@@ -542,6 +556,14 @@ impl Block {
                 + ((inputs_len + outputs_len) as usize * SLIP_SIZE)
                 + message_len
                 + path_len as usize * HOP_SIZE;
+
+            if bytes.len() < end_of_transaction_data {
+                warn!(
+                    "block buffer is invalid to read transaction data. length : {:?}",
+                    bytes.len()
+                );
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
             let transaction = Transaction::deserialize_from_net(
                 &bytes[start_of_transaction_data..end_of_transaction_data].to_vec(),
             );
@@ -571,7 +593,7 @@ impl Block {
             block.block_type = BlockType::Header;
         }
 
-        block
+        Ok(block)
     }
     //
     // downgrade block
@@ -1901,10 +1923,11 @@ mod tests {
         block.transactions = vec![mock_tx, mock_tx2];
 
         let serialized_block = block.serialize_for_net(BlockType::Full);
-        let deserialized_block = Block::deserialize_from_net(&serialized_block);
+        let deserialized_block = Block::deserialize_from_net(serialized_block).unwrap();
 
         let serialized_block_header = block.serialize_for_net(BlockType::Header);
-        let deserialized_block_header = Block::deserialize_from_net(&serialized_block_header);
+        let deserialized_block_header =
+            Block::deserialize_from_net(serialized_block_header).unwrap();
 
         assert_eq!(
             block.serialize_for_net(BlockType::Full),

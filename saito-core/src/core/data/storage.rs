@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
@@ -114,8 +114,18 @@ impl Storage {
                 if buffer.is_none() {
                     continue;
                 }
-                let buffer = buffer.unwrap();
-                let mut block = Block::deserialize_from_net(&buffer);
+                let buffer: Vec<u8> = buffer.unwrap();
+                let buffer_len = buffer.len();
+                let result = Block::deserialize_from_net(buffer);
+                if result.is_err() {
+                    // ideally this shouldn't happen since we only write blocks which are valid to disk
+                    warn!(
+                        "failed deserializing block with buffer length : {:?}",
+                        buffer_len
+                    );
+                    continue;
+                }
+                let mut block = result.unwrap();
                 block.generate();
                 info!("block : {:?} loaded from disk", hex::encode(block.hash));
                 mempool.add_block(block);
@@ -149,7 +159,7 @@ impl Storage {
             todo!()
         }
         let buffer = result.unwrap();
-        Ok(Block::deserialize_from_net(&buffer))
+        Block::deserialize_from_net(buffer)
     }
 
     #[tracing::instrument(level = "info", skip_all)]
