@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::io::Error;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Poll, Waker};
@@ -64,12 +65,12 @@ impl Future for NetworkResultFuture {
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    consensus_event_processor: RoutingThread,
-    routing_event_processor: ConsensusThread,
-    mining_event_processor: MiningThread,
-    receiver_in_blockchain: Receiver<RoutingEvent>,
-    receiver_in_mempool: Receiver<ConsensusEvent>,
-    receiver_in_miner: Receiver<MiningEvent>,
+    routing_thread: RoutingThread,
+    consensus_thread: ConsensusThread,
+    mining_thread: MiningThread,
+    receiver_for_router: Receiver<RoutingEvent>,
+    receiver_for_consensus: Receiver<ConsensusEvent>,
+    receiver_for_miner: Receiver<MiningEvent>,
     context: Context,
     wakers: HashMap<u64, Waker>,
     results: HashMap<u64, Result<Vec<u8>, Error>>,
@@ -77,6 +78,8 @@ pub struct SaitoWasm {
 
 lazy_static! {
     static ref SAITO: Mutex<SaitoWasm> = Mutex::new(new());
+    static ref CONFIGS: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
+        Arc::new(RwLock::new(Box::new(WasmConfiguration::new())));
 }
 
 // #[wasm_bindgen]
@@ -87,8 +90,7 @@ pub fn new() -> SaitoWasm {
     let public_key = wallet.public_key.clone();
     let private_key = wallet.private_key.clone();
     let wallet = Arc::new(RwLock::new(wallet));
-    let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
-        Arc::new(RwLock::new(Box::new(WasmConfiguration::new())));
+    let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> = CONFIGS.clone();
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
@@ -104,7 +106,7 @@ pub fn new() -> SaitoWasm {
     let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(100);
 
     SaitoWasm {
-        consensus_event_processor: RoutingThread {
+        routing_thread: RoutingThread {
             blockchain: context.blockchain.clone(),
             sender_to_consensus: sender_to_mempool.clone(),
             sender_to_miner: sender_to_miner.clone(),
@@ -125,7 +127,7 @@ pub fn new() -> SaitoWasm {
             stat_sender: sender_to_stat.clone(),
             blockchain_sync_state: BlockchainSyncState::new(10),
         },
-        routing_event_processor: ConsensusThread {
+        consensus_thread: ConsensusThread {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
@@ -147,7 +149,7 @@ pub fn new() -> SaitoWasm {
             txs_for_mempool: vec![],
             stat_sender: sender_to_stat.clone(),
         },
-        mining_event_processor: MiningThread {
+        mining_thread: MiningThread {
             wallet: context.wallet.clone(),
 
             sender_to_mempool: sender_to_mempool.clone(),
@@ -159,9 +161,9 @@ pub fn new() -> SaitoWasm {
             mined_golden_tickets: 0,
             stat_sender: sender_to_stat.clone(),
         },
-        receiver_in_blockchain,
-        receiver_in_mempool,
-        receiver_in_miner,
+        receiver_for_router: receiver_in_blockchain,
+        receiver_for_consensus: receiver_in_mempool,
+        receiver_for_miner: receiver_in_miner,
         context,
         wakers: Default::default(),
         results: Default::default(),
@@ -169,15 +171,21 @@ pub fn new() -> SaitoWasm {
 }
 
 #[wasm_bindgen]
-pub async fn initialize() -> Result<JsValue, JsValue> {
-    println!("initializing sakviti-wasm");
-
-    return Ok(JsValue::from("initialized"));
+pub async fn set_configs(config_string: js_sys::JsString) {
+    let mut configs = CONFIGS.write().await;
+    let config = WasmConfiguration::new();
+    let config: Box<dyn Configuration + Send + Sync> = Box::new(config);
+    let _ = std::mem::replace(&mut configs.deref(), &config);
 }
 
 #[wasm_bindgen]
-pub fn initialize_sync() -> Result<JsValue, JsValue> {
+pub async fn initialize() -> Result<JsValue, JsValue> {
     println!("initializing sakviti-wasm");
+
+    let mut saito = SAITO.lock().await;
+    saito.mining_thread.on_init().await;
+    saito.consensus_thread.on_init().await;
+    saito.routing_thread.on_init().await;
 
     return Ok(JsValue::from("initialized"));
 }
@@ -220,35 +228,33 @@ pub async fn process_timer_event(duration: u64) {
 
     // blockchain controller
     // TODO : update to recv().await
-    let result = saito.receiver_in_blockchain.try_recv();
+    let result = saito.receiver_for_router.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.consensus_event_processor.process_event(event).await;
+        let result = saito.routing_thread.process_event(event).await;
     }
 
     saito
-        .consensus_event_processor
+        .routing_thread
         .process_timer_event(duration.clone())
         .await;
     // mempool controller
     // TODO : update to recv().await
-    let result = saito.receiver_in_mempool.try_recv();
+    let result = saito.receiver_for_consensus.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.routing_event_processor.process_event(event).await;
+        let result = saito.consensus_thread.process_event(event).await;
     }
     saito
-        .routing_event_processor
+        .consensus_thread
         .process_timer_event(duration.clone())
         .await;
 
     // miner controller
-    let result = saito.receiver_in_miner.try_recv();
+    let result = saito.receiver_for_miner.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.mining_event_processor.process_event(event).await;
+        let result = saito.mining_thread.process_event(event).await;
     }
-    saito
-        .mining_event_processor
-        .process_timer_event(duration.clone());
+    saito.mining_thread.process_timer_event(duration.clone());
 }

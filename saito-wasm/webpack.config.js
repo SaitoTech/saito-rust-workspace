@@ -124,7 +124,7 @@ let nodeConfigs = merge(common, {
 let webConfigs = merge(common, {
     entry: [
         'babel-regenerator-runtime',
-        path.resolve(__dirname, "./index.web.js"),
+        path.resolve(__dirname, "./index.web.ts"),
     ],
     plugins: [
         new HtmlWebpackPlugin(),

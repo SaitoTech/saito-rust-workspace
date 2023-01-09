@@ -1,10 +1,15 @@
+use wasm_bindgen::prelude::wasm_bindgen;
+
 use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 
+// #[wasm_bindgen]
 pub struct WasmConfiguration {
     server: Server,
     peers: Vec<PeerConfig>,
+    lite: bool,
 }
 
+// #[wasm_bindgen]
 impl WasmConfiguration {
     pub fn new() -> WasmConfiguration {
         WasmConfiguration {
@@ -24,7 +29,11 @@ impl WasmConfiguration {
                 block_fetch_batch_size: 0,
             },
             peers: vec![],
+            lite: false,
         }
+    }
+    pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
+        todo!()
     }
 }
 
@@ -45,5 +54,8 @@ impl Configuration for WasmConfiguration {
             + ":"
             + endpoint.port.to_string().as_str()
             + "/block/"
+    }
+    fn is_lite(&self) -> bool {
+        self.lite
     }
 }

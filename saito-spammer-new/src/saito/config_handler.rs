@@ -79,6 +79,10 @@ impl Configuration for SpammerConfigs {
             + endpoint.port.to_string().as_str()
             + "/block/"
     }
+
+    fn is_lite(&self) -> bool {
+        false
+    }
 }
 
 pub struct ConfigHandler {}

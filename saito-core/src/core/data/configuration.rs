@@ -32,4 +32,5 @@ pub trait Configuration {
     fn get_server_configs(&self) -> &Server;
     fn get_peer_configs(&self) -> &Vec<PeerConfig>;
     fn get_block_fetch_url(&self) -> String;
+    fn is_lite(&self) -> bool;
 }
