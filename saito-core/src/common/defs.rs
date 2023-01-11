@@ -207,7 +207,6 @@ impl StatVariable {
             .expect("failed sending stat update");
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     fn print(&self) -> String {
         format!(
             // target : "saito_stats",

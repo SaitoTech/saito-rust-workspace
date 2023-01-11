@@ -86,7 +86,7 @@ let common = {
         topLevelAwait: true,
         syncWebAssembly: true,
         // lazyCompilation: false,
-        // outputModule: false,
+        // outputModule: true,
     },
     mode: "development",
     stats: {errorDetails: true}
@@ -103,6 +103,7 @@ let nodeConfigs = merge(common, {
             crateDirectory: __dirname,
             outDir: "./pkg/node",
             extraArgs: '--target nodejs',
+            pluginLogLevel: "info"
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
@@ -117,7 +118,7 @@ let nodeConfigs = merge(common, {
                 to: "./index.d.ts"
                 // }, {
                 //     from: "./pkg/node/snippets",
-                //     to: "./snippets"
+                //     to: "./snippets"rm -r
             }]
         })
     ],

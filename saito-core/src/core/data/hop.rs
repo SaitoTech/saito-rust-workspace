@@ -28,7 +28,6 @@ impl Default for Hop {
 }
 
 impl Hop {
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn generate(
         my_private_key: &SaitoPrivateKey,
         my_public_key: &SaitoPublicKey,

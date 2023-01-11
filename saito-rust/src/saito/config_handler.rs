@@ -2,9 +2,10 @@ use std::io::{Error, ErrorKind};
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
 use serde::Deserialize;
-use tracing::{debug, error};
+
+use log::{debug, error};
+use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
 
 #[derive(Deserialize, Debug)]
 pub struct NodeConfigurations {
@@ -63,9 +64,11 @@ impl ConfigHandler {
 
 #[cfg(test)]
 mod test {
-    use crate::ConfigHandler;
-    use saito_core::core::data::configuration::Configuration;
     use std::io::ErrorKind;
+
+    use saito_core::core::data::configuration::Configuration;
+
+    use crate::ConfigHandler;
 
     #[test]
     fn load_config_from_existing_file() {

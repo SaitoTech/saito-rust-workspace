@@ -1,7 +1,8 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, warn};
+
+use log::{debug, error, warn};
 
 use crate::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
@@ -57,7 +58,6 @@ impl Slip {
     //
     // runs when block is purged for good or staking slip deleted
     //
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn delete(&self, utxoset: &mut UtxoSet) -> bool {
         if self.get_utxoset_key() == [0; 66] {
             error!("ERROR 572034: asked to remove a slip without its utxoset_key properly set!");
@@ -67,7 +67,6 @@ impl Slip {
         true
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let amount: Currency = Currency::from_be_bytes(bytes[33..49].try_into().unwrap());
@@ -87,7 +86,6 @@ impl Slip {
         slip
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_utxoset_key(&mut self) {
         // if !self.is_utxoset_key_set {
         self.utxoset_key = self.get_utxoset_key();
@@ -99,7 +97,6 @@ impl Slip {
     // 32 bytes uuid
     // 8 bytes amount
     // 1 byte slip_index
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_utxoset_key(&self) -> SaitoUTXOSetKey {
         let res: Vec<u8> = vec![
             self.public_key.as_slice(),
@@ -113,7 +110,6 @@ impl Slip {
         res[0..66].try_into().unwrap()
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.amount > 0 {
             debug!(
@@ -138,7 +134,6 @@ impl Slip {
         }
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_net(&self) -> Vec<u8> {
         let vbytes: Vec<u8> = [
             self.public_key.as_slice(),
@@ -153,7 +148,6 @@ impl Slip {
         vbytes
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_input_for_signature(&self) -> Vec<u8> {
         [
             self.public_key.as_slice(),
@@ -166,7 +160,6 @@ impl Slip {
         .concat()
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_output_for_signature(&self) -> Vec<u8> {
         [
             self.public_key.as_slice(),
@@ -179,7 +172,6 @@ impl Slip {
         .concat()
     }
 
-    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         if self.amount > 0 {
             match utxoset.get(&self.utxoset_key) {
@@ -223,9 +215,9 @@ impl Slip {
 mod tests {
     use std::sync::Arc;
 
-    use crate::common::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
     use tokio::sync::RwLock;
 
+    use crate::common::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
     use crate::core::data::blockchain::Blockchain;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};

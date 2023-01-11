@@ -4,7 +4,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, info, trace};
+
+use log::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
@@ -107,7 +108,6 @@ impl RoutingThread {
     /// ```
     ///
     /// ```
-    // #[tracing::instrument(level = "info", skip_all)]
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
         trace!(
             "processing incoming message type : {:?} from peer : {:?}",
@@ -171,7 +171,6 @@ impl RoutingThread {
         trace!("incoming message processed");
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn handle_new_peer(
         &mut self,
         peer_data: Option<data::configuration::PeerConfig>,
@@ -181,13 +180,11 @@ impl RoutingThread {
         self.network.handle_new_peer(peer_data, peer_index).await;
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
         self.network.handle_peer_disconnect(peer_index).await;
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn process_incoming_blockchain_request(
         &self,
         request: BlockchainRequest,
@@ -224,7 +221,6 @@ impl RoutingThread {
                 .unwrap();
         }
     }
-    // #[tracing::instrument(level = "info", skip_all)]
     async fn process_incoming_block_hash(
         &mut self,
         block_hash: SaitoHash,
@@ -242,7 +238,6 @@ impl RoutingThread {
 
         self.fetch_next_blocks().await;
     }
-    // #[tracing::instrument(level = "info", skip_all)]
     async fn fetch_next_blocks(&mut self) {
         {
             let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);

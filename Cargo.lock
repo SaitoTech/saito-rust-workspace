@@ -1627,6 +1627,7 @@ dependencies = [
  "futures",
  "getrandom",
  "hex",
+ "log",
  "merkle",
  "num-derive",
  "num-traits",
@@ -1639,7 +1640,6 @@ dependencies = [
  "serde_with",
  "serial_test",
  "tokio",
- "tracing",
  "tracing-subscriber",
 ]
 
@@ -1657,6 +1657,7 @@ dependencies = [
  "futures",
  "hex",
  "lazy_static",
+ "log",
  "pretty_env_logger",
  "rand",
  "rayon",
@@ -1666,7 +1667,6 @@ dependencies = [
  "serial_test",
  "tokio",
  "tokio-tungstenite 0.18.0",
- "tracing",
  "tracing-subscriber",
  "tungstenite 0.18.0",
  "warp",
@@ -1686,6 +1686,7 @@ dependencies = [
  "futures",
  "hex",
  "lazy_static",
+ "log",
  "pretty_env_logger",
  "rand",
  "rayon",
@@ -1695,7 +1696,6 @@ dependencies = [
  "serial_test",
  "tokio",
  "tokio-tungstenite 0.18.0",
- "tracing",
  "tracing-flame",
  "tracing-subscriber",
  "tungstenite 0.18.0",
@@ -1710,10 +1710,12 @@ dependencies = [
  "hex",
  "js-sys",
  "lazy_static",
+ "log",
  "saito-core",
  "serde",
  "tokio",
  "wasm-bindgen",
+ "wasm-bindgen-console-logger",
  "wasm-bindgen-futures",
  "web-sys",
 ]
@@ -2505,6 +2507,16 @@ dependencies = [
  "quote",
  "syn",
  "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-console-logger"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7530a275e7faf7b5b83aabdf78244fb8d9a68a2ec4b26935a05ecc0c9b0185ed"
+dependencies = [
+ "log",
+ "wasm-bindgen",
 ]
 
 [[package]]

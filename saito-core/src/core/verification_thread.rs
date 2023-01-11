@@ -6,7 +6,8 @@ use async_trait::async_trait;
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, warn};
+
+use log::{debug, warn};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{

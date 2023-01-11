@@ -4,14 +4,14 @@ pub mod test {
     use std::io::Error;
     use std::path::Path;
 
-    use crate::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
     use async_trait::async_trait;
     use tokio::fs::File;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tracing::{debug, error, info};
 
+    use log::{debug, error, info};
+
+    use crate::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
     use crate::common::interface_io::InterfaceIO;
-
     use crate::core::data::configuration::PeerConfig;
 
     #[derive(Clone, Debug)]

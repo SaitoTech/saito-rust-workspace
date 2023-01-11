@@ -2,9 +2,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
+use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
-use tracing::info;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{push_lock, Currency, LOCK_ORDER_CONFIGS};

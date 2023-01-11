@@ -2,7 +2,8 @@ use std::cmp::min;
 use std::collections::VecDeque;
 
 use ahash::HashMap;
-use tracing::{debug, trace};
+
+use log::{debug, trace};
 
 use crate::common::defs::{BlockId, PeerIndex, SaitoHash};
 

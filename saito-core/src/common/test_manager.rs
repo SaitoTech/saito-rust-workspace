@@ -30,7 +30,8 @@ pub mod test {
     use ahash::AHashMap;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
-    use tracing::{debug, info};
+
+    use log::{debug, info};
 
     use crate::common::defs::{
         push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,

@@ -2,7 +2,8 @@ use std::io::Error;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+
+use log::{info, warn};
 
 use crate::common::defs::{
     push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,

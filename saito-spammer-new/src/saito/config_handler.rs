@@ -3,8 +3,8 @@ use std::io::{Error, ErrorKind};
 use figment::providers::{Format, Json};
 use figment::Figment;
 use serde::Deserialize;
-use tracing::{debug, error};
 
+use log::{debug, error};
 use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 
 #[derive(Deserialize, Debug, Clone)]

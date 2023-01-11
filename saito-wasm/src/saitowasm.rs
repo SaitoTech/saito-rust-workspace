@@ -33,6 +33,7 @@ use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
 use saito_core::lock_for_write;
+use wasm_bindgen_console_logger::DEFAULT_LOGGER;
 
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
@@ -40,6 +41,7 @@ use crate::wasm_slip::WasmSlip;
 use crate::wasm_task_runner::WasmTaskRunner;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
+use log::info;
 
 pub(crate) struct NetworkResultFuture {
     pub result: Option<Result<Vec<u8>, Error>>,
@@ -180,7 +182,10 @@ pub async fn set_configs(config_string: js_sys::JsString) {
 
 #[wasm_bindgen]
 pub async fn initialize() -> Result<JsValue, JsValue> {
-    println!("initializing sakviti-wasm");
+    log::set_logger(&DEFAULT_LOGGER).unwrap();
+    log::set_max_level(log::LevelFilter::Debug);
+
+    info!("initializing sakviti-wasm");
 
     let mut saito = SAITO.lock().await;
     saito.mining_thread.on_init().await;
