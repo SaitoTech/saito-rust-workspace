@@ -7,6 +7,9 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 let common = {
     devtool: false,
+    optimization: {
+        minimize: false,
+    },
     // entry: [
     //     path.resolve(__dirname, "./index.js"),
     // ],
@@ -73,7 +76,9 @@ let common = {
     resolve: {
         extensions: ['.ts', '.tsx', '.js', '.wasm', '...'],
         fallback: {
-            "buffer": require.resolve("buffer")
+            "buffer": require.resolve("buffer"),
+            "path": require.resolve("path-browserify"),
+            "fs": false
         }
     },
     experiments: {
@@ -84,6 +89,7 @@ let common = {
         // outputModule: false,
     },
     mode: "development",
+    stats: {errorDetails: true}
 };
 
 let nodeConfigs = merge(common, {
@@ -109,6 +115,9 @@ let nodeConfigs = merge(common, {
             }, {
                 from: "./pkg/node/index.d.ts",
                 to: "./index.d.ts"
+                // }, {
+                //     from: "./pkg/node/snippets",
+                //     to: "./snippets"
             }]
         })
     ],
@@ -141,7 +150,12 @@ let webConfigs = merge(common, {
             patterns: [{
                 from: "./pkg/node/index.d.ts",
                 to: "./index.d.ts"
-            }]
+            }
+                // , {
+                //     from: "./pkg/node/snippets",
+                //     to: "./snippets"
+                // }
+            ]
         })
     ],
     output: {

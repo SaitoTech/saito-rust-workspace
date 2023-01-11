@@ -9,12 +9,12 @@ crate-type = ["cdylib"]
 
 [dependencies]
 saito-core = { path = "../saito-core" }
-wasm-bindgen = { version = "0.2.80", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.4.30"
-serde = { version = "1.0.137", features = ["derive"] }
-web-sys = "0.3.57"
-async-trait = "0.1.56"
+wasm-bindgen = { version = "0.2.83", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.33"
+serde = { version = "1.0.152", features = ["derive"] }
+web-sys = "0.3.60"
+async-trait = "0.1.61"
 hex = "0.4.3"
-tokio = "1.18.2"
-js-sys = "0.3.57"
+tokio = "1.24.1"
+js-sys = "0.3.60"
 lazy_static = "1.4.0"

@@ -40,7 +40,7 @@ impl InterfaceIO for WasmIoHandler {
     //     todo!()
     // }
 
-    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
+    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
         todo!()
     }
 
@@ -51,6 +51,19 @@ impl InterfaceIO for WasmIoHandler {
     // ) -> Result<(), Error> {
     //     todo!()
     // }
+
+    async fn fetch_block_from_peer(
+        &self,
+        block_hash: SaitoHash,
+        peer_index: u64,
+        url: String,
+    ) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
+        todo!()
+    }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         todo!()
@@ -70,19 +83,6 @@ impl InterfaceIO for WasmIoHandler {
 
     fn get_block_dir(&self) -> String {
         "data/blocks/".to_string()
-    }
-
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
-        todo!()
-    }
-
-    async fn fetch_block_from_peer(
-        &self,
-        block_hash: SaitoHash,
-        peer_index: u64,
-        url: String,
-    ) -> Result<(), Error> {
-        todo!()
     }
 }
 impl Debug for WasmIoHandler {
