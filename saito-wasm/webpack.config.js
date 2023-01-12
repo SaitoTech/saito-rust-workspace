@@ -6,7 +6,7 @@ const {merge} = require("webpack-merge");
 const CopyPlugin = require("copy-webpack-plugin");
 
 let common = {
-    devtool: false,
+    devtool: "eval-source-map",
     optimization: {
         minimize: false,
     },
@@ -100,10 +100,10 @@ let nodeConfigs = merge(common, {
     plugins: [
         new HtmlWebpackPlugin(),
         new WasmPackPlugin({
-            crateDirectory: __dirname,
+            crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/node",
-            extraArgs: '--target nodejs',
-            pluginLogLevel: "info"
+            extraArgs: '--target bundler',
+            // pluginLogLevel: "info"
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
@@ -116,9 +116,9 @@ let nodeConfigs = merge(common, {
             }, {
                 from: "./pkg/node/index.d.ts",
                 to: "./index.d.ts"
-                // }, {
-                //     from: "./pkg/node/snippets",
-                //     to: "./snippets"rm -r
+            }, {
+                from: "./pkg/node/snippets",
+                to: "./snippets"
             }]
         })
     ],
@@ -126,7 +126,7 @@ let nodeConfigs = merge(common, {
         path: path.resolve(__dirname, "dist/server"),
         filename: "index.js",
         library: {
-            type: "commonjs2"
+            type: "commonjs-static"
         },
     },
     target: "node"
@@ -139,7 +139,7 @@ let webConfigs = merge(common, {
     plugins: [
         new HtmlWebpackPlugin(),
         new WasmPackPlugin({
-            crateDirectory: __dirname,
+            crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/web",
             extraArgs: '--target web',
         }),
@@ -149,7 +149,7 @@ let webConfigs = merge(common, {
         }),
         new CopyPlugin({
             patterns: [{
-                from: "./pkg/node/index.d.ts",
+                from: "./pkg/web/index.d.ts",
                 to: "./index.d.ts"
             }
                 // , {
