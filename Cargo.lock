@@ -315,6 +315,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_log"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "501a375961cef1a0d44767200e66e4a559283097e91d0730b1d75dfb2f8a1494"
+dependencies = [
+ "log",
+ "web-sys",
+]
+
+[[package]]
 name = "constant_time_eq"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1707,6 +1717,7 @@ name = "saito-wasm"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "console_log",
  "hex",
  "js-sys",
  "lazy_static",
@@ -1715,7 +1726,6 @@ dependencies = [
  "serde",
  "tokio",
  "wasm-bindgen",
- "wasm-bindgen-console-logger",
  "wasm-bindgen-futures",
  "web-sys",
 ]
@@ -2507,16 +2517,6 @@ dependencies = [
  "quote",
  "syn",
  "wasm-bindgen-shared",
-]
-
-[[package]]
-name = "wasm-bindgen-console-logger"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7530a275e7faf7b5b83aabdf78244fb8d9a68a2ec4b26935a05ecc0c9b0185ed"
-dependencies = [
- "log",
- "wasm-bindgen",
 ]
 
 [[package]]

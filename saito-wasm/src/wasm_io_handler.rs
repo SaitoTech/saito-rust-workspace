@@ -85,6 +85,7 @@ impl InterfaceIO for WasmIoHandler {
         "data/blocks/".to_string()
     }
 }
+
 impl Debug for WasmIoHandler {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RustIoHandler")
