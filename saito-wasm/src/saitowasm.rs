@@ -183,7 +183,7 @@ pub async fn set_configs(config_string: js_sys::JsString) {
 pub async fn initialize() -> Result<JsValue, JsValue> {
     console_log::init_with_level(Level::Debug);
 
-    info!("initializing sakviti-wasm");
+    info!("initializing saito-wasm");
 
     let mut saito = SAITO.lock().await;
     saito.mining_thread.on_init().await;
