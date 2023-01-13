@@ -10,14 +10,10 @@ let common = {
     optimization: {
         minimize: false,
     },
-
     experiments: {
         asyncWebAssembly: true,
         topLevelAwait: true,
         syncWebAssembly: true,
-        // futureDefaults: true,
-        // lazyCompilation: true,
-        // outputModule: true,
     },
     mode: "development",
     stats: {errorDetails: true}
@@ -54,24 +50,9 @@ let nodeConfigs = merge(common, {
                 loader: "ts-loader",
                 exclude: /(node_modules)/
             },
-            // {
-            //     test: /\.wasm$/,
-            //     type: "javascript/auto",
-            //     loader: "file-loader",
-            //     options: {
-            //         publicPath: "dist/"
-            //     }
-            // },
-            // {
-            //     test: /\.wasm$/,
-            //     type: "asset/inline",
-            // },
+
         ],
-        // parser: {
-        //     javascript: {
-        //         dynamicImportMode: 'eager'
-        //     }
-        // }
+
     },
     resolve: {
         extensions: ['.ts', '.tsx', '.js', ".mjs", '...'],
@@ -79,7 +60,6 @@ let nodeConfigs = merge(common, {
             "buffer": require.resolve("buffer"),
             "path": require.resolve("path-browserify"),
             "fs": false,
-            // "fetch": require.resolve("node-fetch")
         }
     },
     plugins: [
@@ -88,7 +68,6 @@ let nodeConfigs = merge(common, {
             crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/node",
             extraArgs: '--target bundler',
-            // pluginLogLevel: "info"
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
@@ -96,14 +75,8 @@ let nodeConfigs = merge(common, {
         }),
         new CopyPlugin({
             patterns: [{
-                //     from: "./pkg/node/index_bg.wasm",
-                //     to: "./index_bg.wasm",
-                // }, {
                 from: "./pkg/node/index.d.ts",
                 to: "./index.d.ts"
-                // }, {
-                //     from: "./pkg/node/snippets",
-                //     to: "./snippets"
             }]
         })
     ],
@@ -113,17 +86,9 @@ let nodeConfigs = merge(common, {
         library: {
             type: "commonjs2"
         },
-        // wasmLoading: 'node'
     },
     target: "node",
-    // experiments: {
-    //     asyncWebAssembly: true,
-    //     topLevelAwait: true,
-    //     syncWebAssembly: true,
-    //     // futureDefaults: true,
-    //     // lazyCompilation: true,
-    //     // outputModule: true,
-    // },
+
 });
 let webConfigs = merge(common, {
     entry: [
@@ -156,14 +121,6 @@ let webConfigs = merge(common, {
                 loader: "ts-loader",
                 exclude: /(node_modules)/
             },
-            // {
-            //     test: /\.wasm$/,
-            //     type: "javascript/auto",
-            //     loader: "file-loader",
-            //     options: {
-            //         publicPath: "dist/"
-            //     }
-            // },
             {
                 test: /\.wasm$/,
                 type: "asset/inline",
@@ -181,18 +138,10 @@ let webConfigs = merge(common, {
             "buffer": require.resolve("buffer"),
             "path": require.resolve("path-browserify"),
             "fs": false,
-            // "fetch": require.resolve("node-fetch")
         }
     },
     plugins: [
-        // new CopyPlugin({
-        //     patterns: [
-        //         {
-        //             from: "/js/msg_handler.js",
-        //             to: "/pkg/node/js/msg_handler.js"
-        //         }
-        //     ]
-        // }),
+
         new HtmlWebpackPlugin(),
         new WasmPackPlugin({
             crateDirectory: path.resolve(__dirname, '.'),
@@ -208,10 +157,6 @@ let webConfigs = merge(common, {
                 from: "./pkg/web/index.d.ts",
                 to: "./index.d.ts"
             }
-                // , {
-                //     from: "./pkg/node/snippets",
-                //     to: "./snippets"
-                // }
             ]
         })
     ],
