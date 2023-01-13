@@ -1773,7 +1773,7 @@ mod tests {
     use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_WALLET};
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::crypto::verify_hash;
+    use crate::core::data::crypto::{generate_keys, verify_hash};
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -1952,7 +1952,9 @@ mod tests {
 
     #[test]
     fn block_sign_and_verify_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+
+        let wallet = Wallet::new(keys.1, keys.0);
         let mut block = Block::new();
         block.creator = wallet.public_key;
         block.generate();
@@ -1971,7 +1973,8 @@ mod tests {
     #[test]
     fn block_merkle_root_test() {
         let mut block = Block::new();
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         let transactions: Vec<Transaction> = (0..5)
             .into_iter()

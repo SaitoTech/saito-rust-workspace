@@ -7,17 +7,22 @@ use std::sync::Arc;
 use std::task::{Poll, Waker};
 use std::time::Duration;
 
+use base58::ToBase58;
+use getrandom::getrandom;
 use js_sys::{Array, BigInt, Uint8Array};
 use lazy_static::lazy_static;
-use log::{info, Level};
+use log::{error, info, Level};
+use rand::RngCore;
+use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
+use web_sys::console::info;
 
 use saito_core::common::defs::{
-    push_lock, Currency, SaitoHash, SaitoPublicKey, SaitoSignature, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET,
+    push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -25,6 +30,7 @@ use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
+use saito_core::core::data::crypto::SECP256K1;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
@@ -87,7 +93,10 @@ lazy_static! {
 // impl SaitoWasm {}
 
 pub fn new() -> SaitoWasm {
-    let wallet = Wallet::new();
+    info!("creating new saito wasm instance");
+
+    let keys = generate_keys_wasm();
+    let wallet = Wallet::new(keys.1, keys.0);
     let public_key = wallet.public_key.clone();
     let private_key = wallet.private_key.clone();
     let wallet = Arc::new(RwLock::new(wallet));
@@ -186,8 +195,12 @@ pub async fn initialize() -> Result<JsValue, JsValue> {
     info!("initializing saito-wasm");
 
     let mut saito = SAITO.lock().await;
+    info!("111");
     saito.mining_thread.on_init().await;
+    info!("222");
+
     saito.consensus_thread.on_init().await;
+    info!("333");
     saito.routing_thread.on_init().await;
 
     return Ok(JsValue::from("initialized"));
@@ -260,4 +273,20 @@ pub async fn process_timer_event(duration: u64) {
         let result = saito.mining_thread.process_event(event).await;
     }
     saito.mining_thread.process_timer_event(duration.clone());
+}
+
+pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
+    let (mut secret_key, mut public_key) =
+        SECP256K1.generate_keypair(&mut rand::rngs::OsRng::default());
+    while public_key.serialize().to_base58().len() != 44 {
+        // sometimes secp256k1 address is too big to store in 44 base-58 digits
+        let keypair_tuple = SECP256K1.generate_keypair(&mut rand::rngs::OsRng::default());
+        secret_key = keypair_tuple.0;
+        public_key = keypair_tuple.1;
+    }
+    let mut secret_bytes = [0u8; 32];
+    for i in 0..32 {
+        secret_bytes[i] = secret_key[i];
+    }
+    (public_key.serialize(), secret_bytes)
 }

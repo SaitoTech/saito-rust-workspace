@@ -219,6 +219,7 @@ mod tests {
 
     use crate::common::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
     use crate::core::data::blockchain::Blockchain;
+    use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 
@@ -279,7 +280,8 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn slip_addition_and_removal_from_utxoset() {
-        let wallet_lock = Arc::new(RwLock::new(Wallet::new()));
+        let keys = generate_keys();
+        let wallet_lock = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let (mut blockchain, _blockchain_) =
             lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);

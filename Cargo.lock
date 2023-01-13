@@ -1717,12 +1717,16 @@ name = "saito-wasm"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base58",
  "console_log",
+ "getrandom",
  "hex",
  "js-sys",
  "lazy_static",
  "log",
+ "rand",
  "saito-core",
+ "secp256k1",
  "serde",
  "tokio",
  "wasm-bindgen",

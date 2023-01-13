@@ -40,7 +40,7 @@ pub mod test {
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
-    use crate::core::data::crypto::{generate_random_bytes, hash, verify_hash};
+    use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
@@ -72,7 +72,8 @@ pub mod test {
 
     impl TestManager {
         pub fn new() -> Self {
-            let wallet = Wallet::new();
+            let keys = generate_keys();
+            let wallet = Wallet::new(keys.1, keys.0);
             let public_key = wallet.public_key.clone();
             let private_key = wallet.private_key.clone();
             let peers = Arc::new(RwLock::new(PeerCollection::new()));
@@ -83,8 +84,8 @@ pub mod test {
 
             Self {
                 wallet_lock: wallet_lock.clone(),
-                blockchain_lock: blockchain_lock,
-                mempool_lock: mempool_lock,
+                blockchain_lock,
+                mempool_lock,
                 latest_block_hash: [0; 32],
                 network: Network::new(
                     Box::new(TestIOHandler::new()),

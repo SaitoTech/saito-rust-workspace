@@ -1479,12 +1479,15 @@ mod tests {
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
+    use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 
     #[tokio::test]
     async fn test_blockchain_init() {
-        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let keys = generate_keys();
+
+        let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let blockchain = Blockchain::new(wallet);
 
         assert_eq!(blockchain.fork_id, [0; 32]);
@@ -1493,7 +1496,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_block() {
-        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let keys = generate_keys();
+        let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let blockchain = Blockchain::new(wallet);
 
         assert_eq!(blockchain.fork_id, [0; 32]);

@@ -263,13 +263,15 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::data::crypto::generate_keys;
     use crate::core::data::merkle::MerkleTree;
     use crate::core::data::transaction::Transaction;
     use crate::core::data::wallet::Wallet;
 
     #[test]
     fn merkle_tree_generation_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         let mut transactions = vec![];
 
@@ -310,7 +312,8 @@ mod tests {
 
     #[test]
     fn merkle_tree_pruning_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         let mut transactions = vec![];
 

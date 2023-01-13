@@ -67,7 +67,7 @@ impl GoldenTicket {
 #[cfg(test)]
 mod tests {
     use crate::common::defs::SaitoHash;
-    use crate::core::data::crypto::{generate_random_bytes, hash};
+    use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
     use log::info;
@@ -101,7 +101,8 @@ mod tests {
 
     #[test]
     fn golden_ticket_extremes_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         let random = hash(&generate_random_bytes(32));
         let target = hash(&random.to_vec());

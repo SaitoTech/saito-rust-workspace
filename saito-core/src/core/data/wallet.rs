@@ -1,13 +1,11 @@
 use ahash::{AHashMap, AHashSet};
-use log::warn;
+use log::{info, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
 use crate::core::data::block::Block;
-use crate::core::data::crypto::{
-    decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
-};
+use crate::core::data::crypto::{decrypt_with_password, encrypt_with_password, hash, sign};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
@@ -51,8 +49,9 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new() -> Wallet {
-        let (public_key, private_key) = generate_keys();
+    pub fn new(private_key: SaitoPrivateKey, public_key: SaitoPublicKey) -> Wallet {
+        info!("generating new wallet...");
+        // let (public_key, private_key) = generate_keys();
 
         Wallet {
             public_key,
@@ -342,13 +341,15 @@ mod tests {
 
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::common::test_manager::test::TestManager;
+    use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
 
     use super::*;
 
     #[test]
     fn wallet_new_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
         assert_ne!(wallet.public_key, [0; 33]);
         assert_ne!(wallet.private_key, [0; 32]);
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
@@ -356,8 +357,10 @@ mod tests {
 
     #[test]
     fn wallet_serialize_and_deserialize_test() {
-        let wallet1 = Wallet::new();
-        let mut wallet2 = Wallet::new();
+        let keys = generate_keys();
+        let wallet1 = Wallet::new(keys.1, keys.0);
+        let keys = generate_keys();
+        let mut wallet2 = Wallet::new(keys.1, keys.0);
         let serialized = wallet1.serialize_for_disk();
         wallet2.deserialize_from_disk(&serialized);
         assert_eq!(wallet1, wallet2);
@@ -370,7 +373,8 @@ mod tests {
 
         let _t = TestManager::new();
 
-        let mut wallet = Wallet::new();
+        let keys = generate_keys();
+        let mut wallet = Wallet::new(keys.1, keys.0);
         let public_key1 = wallet.public_key.clone();
         let private_key1 = wallet.private_key.clone();
 
@@ -379,7 +383,8 @@ mod tests {
         };
         wallet.save(&mut storage).await;
 
-        wallet = Wallet::new();
+        let keys = generate_keys();
+        wallet = Wallet::new(keys.1, keys.0);
 
         assert_ne!(wallet.public_key, public_key1);
         assert_ne!(wallet.private_key, private_key1);

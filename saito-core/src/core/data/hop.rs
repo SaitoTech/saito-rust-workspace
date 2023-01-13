@@ -97,7 +97,8 @@ mod tests {
 
     #[tokio::test]
     async fn generate_test() {
-        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let keys = generate_keys();
+        let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let sender_public_key: SaitoPublicKey;
 
         {
@@ -123,7 +124,8 @@ mod tests {
 
     #[tokio::test]
     async fn serialize_and_deserialize_test() {
-        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let keys = generate_keys();
+        let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let mut tx = Transaction::default();
         {
             let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);

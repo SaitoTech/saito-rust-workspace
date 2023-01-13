@@ -1,6 +1,7 @@
 use std::io::Error;
 use std::sync::Arc;
 
+use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey};
 use tokio::sync::RwLock;
 
 use crate::common::run_task::RunTask;
@@ -18,10 +19,14 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>) -> Context {
-        let wallet = Wallet::new();
-        let public_key = wallet.public_key.clone();
-        let private_key = wallet.private_key.clone();
+    pub fn new(
+        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+        private_key: SaitoPrivateKey,
+        public_key: SaitoPublicKey,
+    ) -> Context {
+        let wallet = Wallet::new(private_key, public_key);
+        let public_key = wallet.public_key;
+        let private_key = wallet.private_key;
         let wallet = Arc::new(RwLock::new(wallet));
         Context {
             blockchain: Arc::new(RwLock::new(Blockchain::new(

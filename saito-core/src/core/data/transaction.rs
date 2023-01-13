@@ -1018,6 +1018,7 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::data::crypto::generate_keys;
     use hex::FromHex;
 
     use super::*;
@@ -1041,7 +1042,8 @@ mod tests {
     #[test]
     fn transaction_sign_test() {
         let mut tx = Transaction::default();
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         tx.outputs = vec![Slip::default()];
         tx.sign(&wallet.private_key);

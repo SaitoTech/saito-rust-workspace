@@ -27,6 +27,7 @@ use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
+use saito_core::core::data::crypto::generate_keys;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
@@ -500,7 +501,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("running saito controllers");
 
-    let context = Context::new(configs_clone.clone());
+    let keys = generate_keys();
+    let context = Context::new(configs_clone.clone(), keys.1, keys.0);
     {
         let (mut wallet, _wallet_) = lock_for_write!(context.wallet, LOCK_ORDER_WALLET);
 
