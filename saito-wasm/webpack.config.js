@@ -67,7 +67,7 @@ let nodeConfigs = merge(common, {
         new WasmPackPlugin({
             crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/node",
-            extraArgs: '--target bundler --release',
+            extraArgs: '--target bundler',
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],

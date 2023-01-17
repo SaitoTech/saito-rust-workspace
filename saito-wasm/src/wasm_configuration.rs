@@ -1,9 +1,16 @@
+use figment::providers::{Format, Json};
+use figment::Figment;
+use log::error;
 use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
+use serde::Deserialize;
+use std::io::{Error, ErrorKind};
 
 // #[wasm_bindgen]
+#[derive(Deserialize, Debug)]
 pub struct WasmConfiguration {
     server: Server,
     peers: Vec<PeerConfig>,
+    #[serde(skip)]
     lite: bool,
 }
 
@@ -31,7 +38,18 @@ impl WasmConfiguration {
         }
     }
     pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
-        todo!()
+        let configs = Figment::new()
+            .merge(Json::string(json))
+            .extract::<WasmConfiguration>();
+        if configs.is_err() {
+            error!(
+                "failed parsing json string to configs. {:?}",
+                configs.err().unwrap()
+            );
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
+        let configs = configs.unwrap();
+        Ok(configs)
     }
 }
 

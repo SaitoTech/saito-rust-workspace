@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use base58::ToBase58;
 use lazy_static::lazy_static;
-use log::{debug, info, trace, Level};
+use log::{debug, error, info, trace, Level};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -204,20 +204,31 @@ pub fn new() -> SaitoWasm {
 }
 
 #[wasm_bindgen]
-pub async fn set_configs(config_string: js_sys::JsString) {
+pub async fn set_configs(json: JsValue) {
     let mut configs = CONFIGS.write().await;
-    let config = WasmConfiguration::new();
+    let str = js_sys::JSON::stringify(&json).unwrap();
+    info!("setting configs : {:?}", str);
+    let config = WasmConfiguration::new_from_json(str.as_string().unwrap().as_str());
+
+    if config.is_err() {
+        error!("failed parsing configs");
+        return;
+    }
+    let config = config.unwrap();
+
     let config: Box<dyn Configuration + Send + Sync> = Box::new(config);
     let _ = std::mem::replace(&mut configs.deref(), &config);
 }
 
 #[wasm_bindgen]
-pub async fn initialize() -> Result<JsValue, JsValue> {
+pub async fn initialize(configs: JsValue) -> Result<JsValue, JsValue> {
     console_log::init_with_level(Level::Trace).unwrap();
 
     info!("initializing saito-wasm");
     trace!("trace test");
     debug!("debug test");
+
+    set_configs(configs).await;
 
     let mut saito = SAITO.lock().await;
     saito.mining_thread.on_init().await;
