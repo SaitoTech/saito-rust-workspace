@@ -8,22 +8,13 @@ use std::task::{Poll, Waker};
 use std::time::Duration;
 
 use base58::ToBase58;
-use getrandom::getrandom;
-use js_sys::{Array, BigInt, Uint8Array};
 use lazy_static::lazy_static;
-use log::{error, info, Level};
-use rand::RngCore;
-use secp256k1::SecretKey;
-use serde::{Deserialize, Serialize};
+use log::{info, Level};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
-use web_sys::console::info;
 
-use saito_core::common::defs::{
-    push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
-};
+use saito_core::common::defs::{push_lock, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_WALLET};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
@@ -35,7 +26,6 @@ use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
-use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
@@ -43,8 +33,6 @@ use saito_core::lock_for_write;
 
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
-use crate::wasm_slip::WasmSlip;
-use crate::wasm_task_runner::WasmTaskRunner;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
 

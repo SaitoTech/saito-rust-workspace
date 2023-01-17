@@ -1,8 +1,7 @@
+use log::{debug, error};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
-
-use log::{debug, error, warn};
 
 use crate::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 

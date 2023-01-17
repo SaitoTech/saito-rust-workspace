@@ -4,11 +4,10 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
+use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-
-use log::{debug, error, info, trace, warn};
 
 use crate::common::defs::{
     push_lock, Currency, SaitoHash, UtxoSet, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
@@ -21,7 +20,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
-use crate::{lock_for_read, lock_for_write};
+use crate::lock_for_write;
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 100_000;
@@ -1574,7 +1573,7 @@ mod tests {
         t.initialize(100, 1_000_000_000).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             block1 = blockchain.get_latest_block().unwrap();
             block1_id = block1.id;
@@ -1607,7 +1606,7 @@ mod tests {
         t.add_block(block2).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1638,7 +1637,7 @@ mod tests {
         t.add_block(block3).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1671,7 +1670,7 @@ mod tests {
         t.add_block(block4).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1706,7 +1705,7 @@ mod tests {
         t.add_block(block5).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1758,8 +1757,8 @@ mod tests {
         t.initialize(100, 1_000_000_000).await;
 
         {
-            let (mut blockchain, _blockchain_) =
-                lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             block1 = blockchain.get_latest_block().unwrap();
             block1_id = block1.id;
@@ -1792,7 +1791,7 @@ mod tests {
         t.add_block(block2).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1823,7 +1822,7 @@ mod tests {
         t.add_block(block3).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1856,7 +1855,7 @@ mod tests {
         t.add_block(block4).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1891,7 +1890,7 @@ mod tests {
         t.add_block(block5).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1928,7 +1927,7 @@ mod tests {
         t.add_block(block6).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1976,7 +1975,7 @@ mod tests {
         t.add_block(block7).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2019,7 +2018,7 @@ mod tests {
         t.initialize(100, 1_000_000_000).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             block1 = blockchain.get_latest_block().unwrap();
@@ -2053,7 +2052,7 @@ mod tests {
         t.add_block(block2).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2084,7 +2083,7 @@ mod tests {
         t.add_block(block3).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2117,7 +2116,7 @@ mod tests {
         t.add_block(block4).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2152,7 +2151,7 @@ mod tests {
         t.add_block(block5).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2189,7 +2188,7 @@ mod tests {
         t.add_block(block6).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2228,7 +2227,7 @@ mod tests {
         t.add_block(block7).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2496,7 +2495,7 @@ mod tests {
         t.initialize(100, 1_000_000_000).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             block1 = blockchain.get_latest_block().unwrap();

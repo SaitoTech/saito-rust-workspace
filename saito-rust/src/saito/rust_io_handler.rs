@@ -10,7 +10,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
-use log::{debug, trace, warn};
+use log::{debug, warn};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::InterfaceIO;

@@ -122,7 +122,7 @@ mod tests {
     fn test_handshake() {
         let crypto = secp256k1::Secp256k1::new();
 
-        let (_secret_key_1, public_key_1) =
+        let (_secret_key_1, _public_key_1) =
             crypto.generate_keypair(&mut secp256k1::rand::thread_rng());
         let (secret_key_2, public_key_2) =
             crypto.generate_keypair(&mut secp256k1::rand::thread_rng());

@@ -1,5 +1,3 @@
-use wasm_bindgen::prelude::wasm_bindgen;
-
 use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 
 // #[wasm_bindgen]
