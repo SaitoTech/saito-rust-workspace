@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use base58::ToBase58;
 use lazy_static::lazy_static;
-use log::{info, Level};
+use log::{debug, info, trace, Level};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -213,9 +213,11 @@ pub async fn set_configs(config_string: js_sys::JsString) {
 
 #[wasm_bindgen]
 pub async fn initialize() -> Result<JsValue, JsValue> {
-    console_log::init_with_level(Level::Debug);
+    console_log::init_with_level(Level::Trace).unwrap();
 
     info!("initializing saito-wasm");
+    trace!("trace test");
+    debug!("debug test");
 
     let mut saito = SAITO.lock().await;
     saito.mining_thread.on_init().await;
