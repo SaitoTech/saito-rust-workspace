@@ -268,12 +268,12 @@ pub fn get_public_key() -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub async fn process_timer_event(duration: u64) {
+pub async fn process_timer_event(duration_in_ms: u64) {
     // println!("processing timer event : {:?}", duration);
 
     let mut saito = SAITO.lock().await;
 
-    let duration = Duration::new(0, 1_000_000 * duration as u32);
+    let duration = Duration::from_millis(duration_in_ms);
 
     // blockchain controller
     // TODO : update to recv().await
@@ -282,11 +282,11 @@ pub async fn process_timer_event(duration: u64) {
         let event = result.unwrap();
         let result = saito.routing_thread.process_event(event).await;
     }
-
     saito
         .routing_thread
         .process_timer_event(duration.clone())
         .await;
+    info!("111");
     // mempool controller
     // TODO : update to recv().await
     let result = saito.receiver_for_consensus.try_recv();
@@ -294,18 +294,22 @@ pub async fn process_timer_event(duration: u64) {
         let event = result.unwrap();
         let result = saito.consensus_thread.process_event(event).await;
     }
+    info!("222");
     saito
         .consensus_thread
         .process_timer_event(duration.clone())
         .await;
 
+    info!("333");
     // miner controller
     let result = saito.receiver_for_miner.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
         let result = saito.mining_thread.process_event(event).await;
     }
+    info!("444");
     saito.mining_thread.process_timer_event(duration.clone());
+    info!("555");
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {

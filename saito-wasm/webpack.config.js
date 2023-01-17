@@ -6,7 +6,7 @@ const {merge} = require("webpack-merge");
 const CopyPlugin = require("copy-webpack-plugin");
 
 let common = {
-    devtool: false,
+    devtool: 'eval',
     optimization: {
         minimize: false,
     },
@@ -15,7 +15,7 @@ let common = {
         topLevelAwait: true,
         syncWebAssembly: true,
     },
-    mode: "production",
+    mode: "development",
     stats: {errorDetails: true}
 };
 
