@@ -226,7 +226,6 @@ impl Mempool {
 
         if blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
-            tokio::time::sleep(Duration::from_secs(1)).await;
             return None;
         }
         if !self.blocks_queue.is_empty() {

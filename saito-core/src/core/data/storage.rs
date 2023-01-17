@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
+use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
-
-use log::{debug, error, info, warn};
 
 use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
+use crate::common::run_task::RunTask;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
@@ -93,40 +93,9 @@ impl Storage {
         file_names.sort();
         debug!("block file names : {:?}", file_names);
 
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
-
         let mut waiting_count = file_names.len();
-        let handle = tokio::spawn(async move {
-            let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
 
-            loop {
-                if waiting_count == 0 {
-                    break;
-                }
-                waiting_count -= 1;
-                // TODO : if this fails we need to make sure `waiting_count` is reduced correctly. or should terminate the node
-                let buffer = receiver.recv().await;
-                if buffer.is_none() {
-                    continue;
-                }
-                let buffer: Vec<u8> = buffer.unwrap();
-                let buffer_len = buffer.len();
-                let result = Block::deserialize_from_net(buffer);
-                if result.is_err() {
-                    // ideally this shouldn't happen since we only write blocks which are valid to disk
-                    warn!(
-                        "failed deserializing block with buffer length : {:?}",
-                        buffer_len
-                    );
-                    continue;
-                }
-                let mut block = result.unwrap();
-                block.generate();
-                info!("block : {:?} loaded from disk", hex::encode(block.hash));
-                mempool.add_block(block);
-            }
-        });
-
+        trace!("loading files...");
         for file_name in file_names {
             info!("loading file : {:?}", file_name);
             let result = self
@@ -138,10 +107,23 @@ impl Storage {
             }
             info!("file : {:?} loaded", file_name);
             let buffer: Vec<u8> = result.unwrap();
-            sender.send(buffer).await.unwrap();
+            let buffer_len = buffer.len();
+            let result = Block::deserialize_from_net(buffer);
+            if result.is_err() {
+                // ideally this shouldn't happen since we only write blocks which are valid to disk
+                warn!(
+                    "failed deserializing block with buffer length : {:?}",
+                    buffer_len
+                );
+                continue;
+            }
+            let mut block = result.unwrap();
+            block.generate();
+            info!("block : {:?} loaded from disk", hex::encode(block.hash));
+            let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+            mempool.add_block(block);
         }
-
-        handle.await.unwrap();
+        trace!("block file loading finished");
 
         info!("loading blocks to mempool completed");
     }
