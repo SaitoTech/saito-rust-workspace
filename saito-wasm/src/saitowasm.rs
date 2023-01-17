@@ -14,7 +14,9 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
-use saito_core::common::defs::{push_lock, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_WALLET};
+use saito_core::common::defs::{
+    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+};
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
@@ -29,6 +31,7 @@ use saito_core::core::data::storage::Storage;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
+use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_write;
 
 use crate::wasm_configuration::WasmConfiguration;
@@ -63,9 +66,11 @@ pub struct SaitoWasm {
     routing_thread: RoutingThread,
     consensus_thread: ConsensusThread,
     mining_thread: MiningThread,
+    verification_thread: VerificationThread,
     receiver_for_router: Receiver<RoutingEvent>,
     receiver_for_consensus: Receiver<ConsensusEvent>,
     receiver_for_miner: Receiver<MiningEvent>,
+    receiver_for_verification: Receiver<VerifyRequest>,
     context: Context,
     wakers: HashMap<u64, Waker>,
     results: HashMap<u64, Result<Vec<u8>, Error>>,
@@ -98,20 +103,21 @@ pub fn new() -> SaitoWasm {
         configuration: configuration.clone(),
     };
 
-    let (sender_to_mempool, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
+    let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
     let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(100);
+    let (sender_to_verification, receiver_in_verification) = tokio::sync::mpsc::channel(100);
 
     SaitoWasm {
         routing_thread: RoutingThread {
             blockchain: context.blockchain.clone(),
-            sender_to_consensus: sender_to_mempool.clone(),
+            sender_to_consensus: sender_to_consensus.clone(),
             sender_to_miner: sender_to_miner.clone(),
             static_peers: vec![],
             configs: context.configuration.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
-            wallet,
+            wallet: wallet.clone(),
             network: Network::new(
                 Box::new(WasmIoHandler {}),
                 peers.clone(),
@@ -120,7 +126,7 @@ pub fn new() -> SaitoWasm {
             reconnection_timer: 0,
             stats: RoutingStats::new(sender_to_stat.clone()),
             public_key,
-            senders_to_verification: vec![],
+            senders_to_verification: vec![sender_to_verification.clone()],
             last_verification_thread_index: 0,
             stat_sender: sender_to_stat.clone(),
             blockchain_sync_state: BlockchainSyncState::new(10),
@@ -150,7 +156,7 @@ pub fn new() -> SaitoWasm {
         mining_thread: MiningThread {
             wallet: context.wallet.clone(),
 
-            sender_to_mempool: sender_to_mempool.clone(),
+            sender_to_mempool: sender_to_consensus.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
             miner_active: false,
             target: [0; 32],
@@ -159,9 +165,38 @@ pub fn new() -> SaitoWasm {
             mined_golden_tickets: 0,
             stat_sender: sender_to_stat.clone(),
         },
+        verification_thread: VerificationThread {
+            sender_to_consensus: sender_to_consensus.clone(),
+            blockchain: context.blockchain.clone(),
+            peers,
+            wallet,
+            public_key,
+            processed_txs: StatVariable::new(
+                "verification::processed_txs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            processed_blocks: StatVariable::new(
+                "verification::processed_blocks".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            processed_msgs: StatVariable::new(
+                "verification::processed_msgs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            invalid_txs: StatVariable::new(
+                "verification::invalid_txs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            stat_sender: sender_to_stat.clone(),
+        },
         receiver_for_router: receiver_in_blockchain,
         receiver_for_consensus: receiver_in_mempool,
         receiver_for_miner: receiver_in_miner,
+        receiver_for_verification: receiver_in_verification,
         context,
         wakers: Default::default(),
         results: Default::default(),
@@ -183,12 +218,9 @@ pub async fn initialize() -> Result<JsValue, JsValue> {
     info!("initializing saito-wasm");
 
     let mut saito = SAITO.lock().await;
-    info!("111");
     saito.mining_thread.on_init().await;
-    info!("222");
-
     saito.consensus_thread.on_init().await;
-    info!("333");
+    saito.verification_thread.on_init().await;
     saito.routing_thread.on_init().await;
 
     return Ok(JsValue::from("initialized"));

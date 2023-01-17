@@ -239,6 +239,8 @@ impl RoutingThread {
         self.fetch_next_blocks().await;
     }
     async fn fetch_next_blocks(&mut self) {
+        trace!("fetching next blocks");
+
         {
             let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
