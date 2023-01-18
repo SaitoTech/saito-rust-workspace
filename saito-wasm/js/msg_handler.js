@@ -8,6 +8,8 @@ export class MsgHandler {
     }
 
     static connect_to_peer(url) {
+        console.log("............... connect to peer ................");
+        console.log("shared_methods ", global.shared_methods);
         return global.shared_methods.connect_to_peer(url);
     }
 

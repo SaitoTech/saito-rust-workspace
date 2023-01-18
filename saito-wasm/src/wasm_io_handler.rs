@@ -3,6 +3,7 @@ use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
+use log::trace;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -49,6 +50,7 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
+        trace!("connect_to_peer : {:?}", peer.host);
         let mut protocol: String = String::from("ws");
         if peer.protocol == "https" {
             protocol = String::from("wss");

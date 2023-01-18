@@ -216,8 +216,9 @@ pub async fn set_configs(json: JsValue) {
     }
     let config = config.unwrap();
 
-    let config: Box<dyn Configuration + Send + Sync> = Box::new(config);
-    let _ = std::mem::replace(&mut configs.deref(), &config);
+    info!("config : {:?}", config);
+
+    configs.replace(&config);
 }
 
 #[wasm_bindgen]

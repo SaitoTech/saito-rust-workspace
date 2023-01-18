@@ -83,6 +83,12 @@ impl Configuration for SpammerConfigs {
     fn is_lite(&self) -> bool {
         false
     }
+
+    fn replace(&mut self, config: &dyn Configuration) {
+        self.server = config.get_server_configs().clone();
+        self.peers = config.get_peer_configs().clone();
+        self.lite = config.is_lite();
+    }
 }
 
 pub struct ConfigHandler {}

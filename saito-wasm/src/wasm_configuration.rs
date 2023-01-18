@@ -74,4 +74,10 @@ impl Configuration for WasmConfiguration {
     fn is_lite(&self) -> bool {
         self.lite
     }
+
+    fn replace(&mut self, config: &dyn Configuration) {
+        self.server = config.get_server_configs().clone();
+        self.peers = config.get_peer_configs().clone();
+        self.lite = config.is_lite();
+    }
 }

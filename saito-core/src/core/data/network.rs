@@ -2,9 +2,8 @@ use std::fmt::Debug;
 use std::io::Error;
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
-
 use log::{debug, info, trace, warn};
+use tokio::sync::RwLock;
 
 use crate::common::defs::{
     push_lock, PeerIndex, SaitoHash, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
@@ -321,10 +320,14 @@ impl Network {
     ) {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
         self.static_peer_configs = configs.get_peer_configs().clone();
+        trace!("static peers : {:?}", self.static_peer_configs);
     }
 
     pub async fn connect_to_static_peers(&mut self) {
-        trace!("connect to static peers",);
+        trace!(
+            "connect to static peers : count = {:?}",
+            self.static_peer_configs.len()
+        );
 
         for peer in &self.static_peer_configs {
             self.io_interface
