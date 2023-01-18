@@ -7,10 +7,8 @@ export class MsgHandler {
         return global.shared_methods.send_message_to_all(buffer, exceptions);
     }
 
-    static connect_to_peer(url) {
-        console.log("............... connect to peer ................");
-        console.log("shared_methods ", global.shared_methods);
-        return global.shared_methods.connect_to_peer(url);
+    static connect_to_peer(peer_data) {
+        return global.shared_methods.connect_to_peer(peer_data);
     }
 
     static write_value(key, value) {

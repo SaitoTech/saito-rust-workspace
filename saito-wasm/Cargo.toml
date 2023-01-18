@@ -25,3 +25,4 @@ rand = { version = "0.8.5", features = ["getrandom"] }
 secp256k1 = { version = "0.25.0", features = ["bitcoin_hashes", "global-context", "serde"] }
 base58 = "0.2.0"
 figment = { version = "0.10.8", features = ["json"] }
+serde_json = "1.0.91"

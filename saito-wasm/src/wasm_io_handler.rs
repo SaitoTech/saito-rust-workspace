@@ -2,8 +2,11 @@ use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
+use figment::providers::Json;
+use figment::Figment;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::trace;
+use serde::Serialize;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -51,18 +54,20 @@ impl InterfaceIO for WasmIoHandler {
 
     async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
         trace!("connect_to_peer : {:?}", peer.host);
-        let mut protocol: String = String::from("ws");
-        if peer.protocol == "https" {
-            protocol = String::from("wss");
-        }
-        let url = protocol
-            + "://"
-            + peer.host.as_str()
-            + ":"
-            + peer.port.to_string().as_str()
-            + "/wsopen";
+        // let mut protocol: String = String::from("ws");
+        // if peer.protocol == "https" {
+        //     protocol = String::from("wss");
+        // }
+        // let url = protocol
+        //     + "://"
+        //     + peer.host.as_str()
+        //     + ":"
+        //     + peer.port.to_string().as_str()
+        //     + "/wsopen";
 
-        MsgHandler::connect_to_peer(url);
+        let json_string = serde_json::to_string(&peer).unwrap();
+        let json = js_sys::JSON::parse(&json_string).unwrap();
+        MsgHandler::connect_to_peer(json);
 
         Ok(())
     }
@@ -180,7 +185,7 @@ extern "C" {
     pub fn send_message_to_all(buffer: js_sys::Uint8Array, exceptions: js_sys::Array);
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
-    pub fn connect_to_peer(url: String) -> Result<JsValue, js_sys::Error>;
+    pub fn connect_to_peer(peer_data: JsValue) -> Result<JsValue, js_sys::Error>;
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn write_value(key: String, value: Uint8Array);
 
