@@ -8,8 +8,11 @@ use std::task::{Poll, Waker};
 use std::time::Duration;
 
 use base58::ToBase58;
+use figment::providers::{Format, Json};
+use figment::Figment;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, Level};
+use saito_core::common::command::NetworkEvent;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -21,7 +24,7 @@ use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
-use saito_core::core::data::configuration::Configuration;
+use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::core::data::context::Context;
 use saito_core::core::data::crypto::SECP256K1;
 use saito_core::core::data::mempool::Mempool;
@@ -266,6 +269,62 @@ pub fn get_latest_block_hash() -> Result<JsValue, JsValue> {
 #[wasm_bindgen]
 pub fn get_public_key() -> Result<JsValue, JsValue> {
     Ok(JsValue::from("public_key"))
+}
+
+pub async fn process_new_peer(index: u64, peer_config: JsValue) {
+    let mut saito = SAITO.lock().await;
+
+    let mut peer_details = None;
+    if peer_config.is_truthy() {
+        let result = js_sys::JSON::stringify(&peer_config);
+        if result.is_err() {
+            error!("failed processing new peer. failed parsing json info");
+            error!("{:?}", result.err().unwrap());
+            return;
+        }
+        let json = result.unwrap();
+
+        let configs = Figment::new()
+            .merge(Json::string(json.as_string().unwrap().as_str()))
+            .extract::<PeerConfig>();
+        if configs.is_err() {
+            error!(
+                "failed parsing json string to configs. {:?}",
+                configs.err().unwrap()
+            );
+            return;
+        }
+        let configs = configs.unwrap();
+        peer_details = Some(configs);
+    }
+
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::PeerConnectionResult {
+            peer_details,
+            result: Ok(index),
+        })
+        .await;
+}
+
+pub async fn process_peer_disconnection(peer_index: u64) {
+    let mut saito = SAITO.lock().await;
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::PeerDisconnected { peer_index })
+        .await;
+}
+
+pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
+    let mut saito = SAITO.lock().await;
+
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::IncomingNetworkMessage {
+            peer_index,
+            buffer: buffer.to_vec(),
+        })
+        .await;
 }
 
 #[wasm_bindgen]

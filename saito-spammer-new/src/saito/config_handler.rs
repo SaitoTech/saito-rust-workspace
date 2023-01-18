@@ -23,6 +23,8 @@ pub struct SpammerConfigs {
     server: Server,
     peers: Vec<PeerConfig>,
     spammer: Spammer,
+    #[serde(skip)]
+    lite: bool,
 }
 
 impl SpammerConfigs {
@@ -53,6 +55,7 @@ impl SpammerConfigs {
                 tx_fee: 0,
                 stop_after: 0,
             },
+            lite: false,
         }
     }
 
