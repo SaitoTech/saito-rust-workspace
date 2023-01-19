@@ -12,11 +12,11 @@ use figment::providers::{Format, Json};
 use figment::Figment;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, Level};
-use saito_core::common::command::NetworkEvent;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
+use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
     push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
@@ -271,6 +271,7 @@ pub fn get_public_key() -> Result<JsValue, JsValue> {
     Ok(JsValue::from("public_key"))
 }
 
+#[wasm_bindgen]
 pub async fn process_new_peer(index: u64, peer_config: JsValue) {
     let mut saito = SAITO.lock().await;
 

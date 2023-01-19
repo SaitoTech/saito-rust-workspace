@@ -165,8 +165,10 @@ impl Network {
                 self.static_peer_configs
                     .push(peer.static_peer_config.as_ref().unwrap().clone());
             } else {
-                info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
+                if peer.public_key.is_some() {
+                    info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
                     peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
+                }
             }
 
             if public_key.is_some() {
