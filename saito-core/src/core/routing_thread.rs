@@ -2,10 +2,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-
-use log::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
@@ -270,6 +269,7 @@ impl RoutingThread {
         self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
     }
     async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
+        trace!("sending verification request to thread");
         // waiting till we get an acceptable sender
         let sender_count = self.senders_to_verification.len();
         let mut trials = 0;
@@ -284,11 +284,14 @@ impl RoutingThread {
 
             if sender.capacity() > 0 {
                 sender.send(request).await.unwrap();
+                trace!(
+                    "verification request sent to verification thread : {:?}",
+                    sender_index
+                );
                 return;
             }
             if trials == sender_count {
-                // if all the channels are full, we will sleep for a bit till some space is available
-                tokio::time::sleep(Duration::from_millis(10)).await;
+                // todo : if all the channels are full, we should wait here. cannot sleep to support wasm interface
                 trials = 0;
             }
         }

@@ -308,6 +308,7 @@ pub async fn process_new_peer(index: u64, peer_config: JsValue) {
         .await;
 }
 
+#[wasm_bindgen]
 pub async fn process_peer_disconnection(peer_index: u64) {
     let mut saito = SAITO.lock().await;
     saito
@@ -316,12 +317,30 @@ pub async fn process_peer_disconnection(peer_index: u64) {
         .await;
 }
 
+#[wasm_bindgen]
 pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
     let mut saito = SAITO.lock().await;
 
     saito
         .routing_thread
         .process_network_event(NetworkEvent::IncomingNetworkMessage {
+            peer_index,
+            buffer: buffer.to_vec(),
+        })
+        .await;
+}
+
+#[wasm_bindgen]
+pub async fn process_fetched_block(
+    buffer: js_sys::Uint8Array,
+    hash: js_sys::Uint8Array,
+    peer_index: u64,
+) {
+    let mut saito = SAITO.lock().await;
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::BlockFetched {
+            block_hash: hash.to_vec().try_into().unwrap(),
             peer_index,
             buffer: buffer.to_vec(),
         })
@@ -358,6 +377,16 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         .consensus_thread
         .process_timer_event(duration.clone())
         .await;
+
+    // verification thread
+    let result = saito.receiver_for_verification.try_recv();
+    if result.is_ok() {
+        let event = result.unwrap();
+        let result = saito.verification_thread.process_event(event).await;
+    }
+    saito
+        .verification_thread
+        .process_timer_event(duration.clone());
 
     // miner controller
     let result = saito.receiver_for_miner.try_recv();
