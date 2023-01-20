@@ -21,6 +21,7 @@ use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::iterate;
 
 pub const BLOCK_HEADER_SIZE: usize = 301;
 
@@ -1292,10 +1293,7 @@ impl Block {
         let mut tx_buf = vec![];
         if block_type != BlockType::Header {
             // block headers do not get tx data
-            tx_buf = self
-                .transactions
-                .par_iter()
-                .with_min_len(10)
+            tx_buf = iterate!(self.transactions, 10)
                 .map(|transaction| transaction.serialize_for_net())
                 .collect::<Vec<_>>()
                 .concat();
@@ -1738,11 +1736,7 @@ impl Block {
         // as to determine spendability.
         //
 
-        let transactions_valid = self
-            .transactions
-            .par_iter()
-            .with_min_len(100)
-            .all(|tx| tx.validate(utxoset));
+        let transactions_valid = iterate!(self.transactions, 100).all(|tx| tx.validate(utxoset));
 
         // let mut transactions_valid = true;
         // for tx in self.transactions.iter() {

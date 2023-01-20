@@ -20,7 +20,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
-use crate::lock_for_write;
+use crate::{iterate, lock_for_write};
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 100_000;
@@ -144,10 +144,8 @@ impl Blockchain {
                 let block_hash = block.previous_block_hash;
                 let block_in_mempool_queue;
                 {
-                    block_in_mempool_queue = mempool
-                        .blocks_queue
-                        .par_iter()
-                        .any(|b| block_hash == b.hash);
+                    block_in_mempool_queue =
+                        iterate!(mempool.blocks_queue, 100).any(|b| block_hash == b.hash);
                 }
                 if !block_in_mempool_queue {
                     let result = network

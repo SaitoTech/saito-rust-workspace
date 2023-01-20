@@ -13,6 +13,7 @@ use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::{Transaction, TransactionType};
+use crate::iterate;
 
 //
 // In addition to responding to global broadcast messages, the
@@ -60,11 +61,7 @@ impl Mempool {
     pub fn add_block(&mut self, block: Block) {
         debug!("mempool add block : {:?}", hex::encode(block.hash));
         let hash_to_insert = block.hash;
-        if !self
-            .blocks_queue
-            .par_iter()
-            .any(|block| block.hash == hash_to_insert)
-        {
+        if !iterate!(self.blocks_queue, 100).any(|block| block.hash == hash_to_insert) {
             self.blocks_queue.push_back(block);
         } else {
             debug!("block not added to mempool as it was already there");

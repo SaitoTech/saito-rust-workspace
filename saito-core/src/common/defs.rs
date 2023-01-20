@@ -135,6 +135,36 @@ macro_rules! lock_for_read {
     }};
 }
 
+#[macro_export]
+macro_rules! iterate {
+    ($collection:expr, $min:expr) => {{
+        #[cfg(feature = "with-rayon")]
+        {
+            $collection.par_iter().with_min_len($min)
+        }
+
+        #[cfg(not(feature = "with-rayon"))]
+        {
+            $collection.iter()
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! iterate_mut {
+    ($collection:expr) => {{
+        #[cfg(feature = "with-rayon")]
+        {
+            $collection.par_iter_mut()
+        }
+
+        #[cfg(not(feature = "with-rayon"))]
+        {
+            $collection.iter_mut()
+        }
+    }};
+}
+
 #[derive(Clone, Debug)]
 pub struct StatVariable {
     pub total: u64,

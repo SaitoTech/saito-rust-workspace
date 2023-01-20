@@ -6,6 +6,7 @@ use rayon::prelude::*;
 use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
 use crate::core::data::transaction::Transaction;
+use crate::{iterate, iterate_mut};
 
 #[derive(PartialEq)]
 pub enum TraverseMode {
@@ -112,9 +113,7 @@ impl MerkleTree {
             }
 
             // Compute the node hashes in parallel
-            nodes
-                .par_iter_mut()
-                .all(|node| MerkleTree::generate_hash(node));
+            iterate_mut!(nodes).all(|node| MerkleTree::generate_hash(node));
             // Collect the next set of leaves for the computation
             leaves.clear();
 

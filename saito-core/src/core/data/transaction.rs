@@ -13,6 +13,7 @@ use crate::core::data::crypto::{hash, sign, verify, verify_hash};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
+use crate::iterate;
 
 pub const TRANSACTION_SIZE: usize = 93;
 
@@ -950,10 +951,7 @@ impl Transaction {
         // if they claim to spend tokens. if the slip has no spendable
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
-        self.inputs
-            .par_iter()
-            .with_min_len(10)
-            .all(|input| input.validate(utxoset))
+        iterate!(self.inputs, 10).all(|input| input.validate(utxoset))
     }
 
     pub fn validate_routing_path(&self) -> bool {
@@ -1003,16 +1001,10 @@ impl Transaction {
         false
     }
     pub fn is_from(&self, public_key: &SaitoPublicKey) -> bool {
-        self.inputs
-            .par_iter()
-            .with_min_len(10)
-            .any(|input| input.public_key.eq(public_key))
+        iterate!(self.inputs, 10).any(|input| input.public_key.eq(public_key))
     }
     pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
-        self.outputs
-            .par_iter()
-            .with_min_len(10)
-            .any(|slip| slip.public_key.eq(public_key))
+        iterate!(self.outputs, 10).any(|slip| slip.public_key.eq(public_key))
     }
 }
 

@@ -39,6 +39,7 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 [features]
 locking-logs = []
 with-stats = []
+with-rayon=[]
 
 [[bench]]
 name = "benches"
