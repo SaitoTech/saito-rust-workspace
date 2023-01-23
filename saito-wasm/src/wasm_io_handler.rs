@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use figment::providers::Json;
 use figment::Figment;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
-use log::trace;
+use log::{info, trace};
 use serde::Serialize;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
@@ -123,16 +123,20 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
+        info!("111");
         let result = MsgHandler::load_block_file_list();
         if result.is_err() {
+            info!("aaaaa");
             return Err(Error::from(ErrorKind::Other));
         }
+        info!("222");
 
         let result = result.unwrap();
         let result = Array::try_from(result);
         if result.is_err() {
             return Err(Error::from(ErrorKind::Other));
         }
+        info!("333");
         let result = result.unwrap();
 
         let mut v = vec![];
@@ -141,6 +145,7 @@ impl InterfaceIO for WasmIoHandler {
             let res = js_sys::JsString::from(res).as_string().unwrap();
             v.push(res);
         }
+        info!("444");
 
         Ok(v)
     }

@@ -5,6 +5,7 @@ export default import("./pkg/web")
         console.log("saito default : ", saito.default);
         // @ts-ignore
         return saito.default(undefined).then(() => saito);
+        // return saito;
     })
     .catch(error => {
         console.error(error);

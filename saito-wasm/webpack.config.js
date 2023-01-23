@@ -59,7 +59,7 @@ let nodeConfigs = merge(common, {
         fallback: {
             "buffer": require.resolve("buffer"),
             "path": require.resolve("path-browserify"),
-            "fs": false,
+            // "fs": false,
         }
     },
     plugins: [
