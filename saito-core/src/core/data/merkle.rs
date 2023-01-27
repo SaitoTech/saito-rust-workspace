@@ -1,11 +1,12 @@
 use std::collections::LinkedList;
 
+use log::debug;
 use rayon::prelude::*;
-use tracing::debug;
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
 use crate::core::data::transaction::Transaction;
+use crate::{iterate, iterate_mut};
 
 #[derive(PartialEq)]
 pub enum TraverseMode {
@@ -112,9 +113,7 @@ impl MerkleTree {
             }
 
             // Compute the node hashes in parallel
-            nodes
-                .par_iter_mut()
-                .all(|node| MerkleTree::generate_hash(node));
+            iterate_mut!(nodes).all(|node| MerkleTree::generate_hash(node));
             // Collect the next set of leaves for the computation
             leaves.clear();
 
@@ -263,13 +262,15 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::data::crypto::generate_keys;
     use crate::core::data::merkle::MerkleTree;
     use crate::core::data::transaction::Transaction;
     use crate::core::data::wallet::Wallet;
 
     #[test]
     fn merkle_tree_generation_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         let mut transactions = vec![];
 
@@ -310,7 +311,8 @@ mod tests {
 
     #[test]
     fn merkle_tree_pruning_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         let mut transactions = vec![];
 

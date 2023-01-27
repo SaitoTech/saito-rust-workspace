@@ -2,14 +2,13 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
+use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
-use tracing::info;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{push_lock, Currency, LOCK_ORDER_CONFIGS};
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::msg::message::Message;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::transaction::Transaction;
@@ -117,7 +116,7 @@ impl Spammer {
             work_done = false;
             if !self.bootstrap_done {
                 self.tx_generator.on_new_block().await;
-                self.bootstrap_done = (self.tx_generator.get_state() == GeneratorState::Done);
+                self.bootstrap_done = self.tx_generator.get_state() == GeneratorState::Done;
                 work_done = true;
             }
 

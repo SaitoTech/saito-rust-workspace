@@ -10,11 +10,11 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
-use tracing::{debug, error, info, trace, warn};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
+use log::{debug, error, info, trace, warn};
 use saito_core::common::defs::{
     push_lock, SaitoHash, StatVariable, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
     LOCK_ORDER_NETWORK_CONTROLLER, STAT_BIN_COUNT,
@@ -39,7 +39,6 @@ pub struct NetworkController {
 }
 
 impl NetworkController {
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn send(connection: &mut PeerSender, peer_index: u64, buffer: Vec<u8>) -> bool {
         let mut send_failed = false;
 
@@ -85,7 +84,6 @@ impl NetworkController {
         return !send_failed;
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn send_outgoing_message(
         sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
         peer_index: u64,
@@ -109,7 +107,6 @@ impl NetworkController {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<NetworkController>>,
@@ -165,7 +162,6 @@ impl NetworkController {
             );
         }
     }
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn send_to_all(
         sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
         buffer: Vec<u8>,
@@ -193,7 +189,6 @@ impl NetworkController {
 
         trace!("message sent to all");
     }
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn fetch_block(
         block_hash: SaitoHash,
         peer_index: u64,
@@ -254,7 +249,6 @@ impl NetworkController {
         }
         debug!("block buffer sent to blockchain controller");
     }
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn send_new_peer(
         event_id: u64,
         peer_index: u64,
@@ -291,7 +285,6 @@ impl NetworkController {
         .await;
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn send_peer_disconnect(sender_to_core: Sender<IoEvent>, peer_index: u64) {
         debug!("sending peer disconnect : {:?}", peer_index);
 
@@ -305,7 +298,6 @@ impl NetworkController {
             .expect("sending failed");
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn receive_message_from_peer(
         receiver: PeerReceiver,
         sender: Sender<IoEvent>,

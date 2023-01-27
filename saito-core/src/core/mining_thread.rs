@@ -2,9 +2,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use log::info;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::info;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_WALLET};
@@ -35,7 +35,6 @@ pub struct MiningThread {
 }
 
 impl MiningThread {
-    #[tracing::instrument(level = "trace", skip_all)]
     async fn mine(&mut self) {
         assert!(self.miner_active);
         debug_assert_ne!(self.public_key, [0; 33]);

@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use async_recursion::async_recursion;
+use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, trace, warn};
 
 use crate::common::defs::{
     push_lock, Currency, SaitoHash, UtxoSet, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
@@ -20,7 +20,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
-use crate::{lock_for_read, lock_for_write};
+use crate::{iterate, lock_for_write};
 
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 100_000;
@@ -87,7 +87,6 @@ impl Blockchain {
         &self.fork_id
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     #[async_recursion]
     pub async fn add_block(
         &mut self,
@@ -145,10 +144,8 @@ impl Blockchain {
                 let block_hash = block.previous_block_hash;
                 let block_in_mempool_queue;
                 {
-                    block_in_mempool_queue = mempool
-                        .blocks_queue
-                        .par_iter()
-                        .any(|b| block_hash == b.hash);
+                    block_in_mempool_queue =
+                        iterate!(mempool.blocks_queue, 100).any(|b| block_hash == b.hash);
                 }
                 if !block_in_mempool_queue {
                     let result = network
@@ -434,7 +431,6 @@ impl Blockchain {
         };
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
@@ -539,7 +535,6 @@ impl Blockchain {
         info!("block {:?} added successfully", hex::encode(block_hash));
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
         info!("add block failed : {:?}", hex::encode(block_hash));
 
@@ -574,7 +569,6 @@ impl Blockchain {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_fork_id(&self, block_id: u64) -> SaitoHash {
         let mut fork_id = [0; 32];
         let mut current_block_id = block_id;
@@ -667,7 +661,6 @@ impl Blockchain {
         fork_id
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_last_shared_ancestor(
         &self,
         peer_latest_block_id: u64,
@@ -790,7 +783,6 @@ impl Blockchain {
         self.blocks.get(block_hash)
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
         //
 
@@ -814,7 +806,6 @@ impl Blockchain {
             .contains_block_hash_at_block_id(block_id, block_hash)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn is_new_chain_the_longest_chain(
         &self,
         new_chain: &[SaitoHash],
@@ -872,7 +863,6 @@ impl Blockchain {
     // winding requires starting from th END of the vector. the loops move
     // in opposite directions.
     //
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn validate(
         &mut self,
         new_chain: &[SaitoHash],
@@ -977,7 +967,6 @@ impl Blockchain {
     // being processed. we start winding with current_wind_index 4 not 0.
     //
     #[async_recursion]
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn wind_chain(
         &mut self,
         new_chain: &[SaitoHash],
@@ -1186,7 +1175,6 @@ impl Blockchain {
     // walking up the vector from there until we reach the end.
     //
     #[async_recursion]
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn unwind_chain(
         &mut self,
         new_chain: &[SaitoHash],
@@ -1267,7 +1255,6 @@ impl Blockchain {
     /// keeps any blockchain variables like fork_id or genesis_period
     /// tracking variables updated as the chain gets new blocks. also
     /// pre-loads any blocks needed to improve performance.
-    #[tracing::instrument(level = "info", skip_all)]
     async fn on_chain_reorganization(
         &mut self,
         block_id: u64,
@@ -1297,7 +1284,6 @@ impl Blockchain {
         self.downgrade_blockchain_data().await;
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn update_genesis_period(&mut self, storage: &Storage) {
         //
         // we need to make sure this is not a random block that is disconnected
@@ -1333,7 +1319,6 @@ impl Blockchain {
     //
     // deletes all blocks at a single block_id
     //
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn delete_blocks(&mut self, delete_block_id: u64, storage: &Storage) {
         trace!(
             "removing data including from disk at id {}",
@@ -1359,7 +1344,6 @@ impl Blockchain {
     //
     // deletes a single block
     //
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn delete_block(
         &mut self,
         delete_block_id: u64,
@@ -1406,7 +1390,6 @@ impl Blockchain {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn downgrade_blockchain_data(&mut self) {
         trace!("downgrading blockchain data");
         //
@@ -1493,12 +1476,15 @@ mod tests {
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
+    use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 
     #[tokio::test]
     async fn test_blockchain_init() {
-        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let keys = generate_keys();
+
+        let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let blockchain = Blockchain::new(wallet);
 
         assert_eq!(blockchain.fork_id, [0; 32]);
@@ -1507,7 +1493,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_block() {
-        let wallet = Arc::new(RwLock::new(Wallet::new()));
+        let keys = generate_keys();
+        let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let blockchain = Blockchain::new(wallet);
 
         assert_eq!(blockchain.fork_id, [0; 32]);
@@ -1584,7 +1571,7 @@ mod tests {
         t.initialize(100, 1_000_000_000).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             block1 = blockchain.get_latest_block().unwrap();
             block1_id = block1.id;
@@ -1617,7 +1604,7 @@ mod tests {
         t.add_block(block2).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1648,7 +1635,7 @@ mod tests {
         t.add_block(block3).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1681,7 +1668,7 @@ mod tests {
         t.add_block(block4).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1716,7 +1703,7 @@ mod tests {
         t.add_block(block5).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1768,8 +1755,8 @@ mod tests {
         t.initialize(100, 1_000_000_000).await;
 
         {
-            let (mut blockchain, _blockchain_) =
-                lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             block1 = blockchain.get_latest_block().unwrap();
             block1_id = block1.id;
@@ -1802,7 +1789,7 @@ mod tests {
         t.add_block(block2).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1833,7 +1820,7 @@ mod tests {
         t.add_block(block3).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1866,7 +1853,7 @@ mod tests {
         t.add_block(block4).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1901,7 +1888,7 @@ mod tests {
         t.add_block(block5).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1938,7 +1925,7 @@ mod tests {
         t.add_block(block6).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -1986,7 +1973,7 @@ mod tests {
         t.add_block(block7).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2029,7 +2016,7 @@ mod tests {
         t.initialize(100, 1_000_000_000).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             block1 = blockchain.get_latest_block().unwrap();
@@ -2063,7 +2050,7 @@ mod tests {
         t.add_block(block2).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2094,7 +2081,7 @@ mod tests {
         t.add_block(block3).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2127,7 +2114,7 @@ mod tests {
         t.add_block(block4).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2162,7 +2149,7 @@ mod tests {
         t.add_block(block5).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2199,7 +2186,7 @@ mod tests {
         t.add_block(block6).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2238,7 +2225,7 @@ mod tests {
         t.add_block(block7).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             assert_ne!(blockchain.get_latest_block_hash(), block1_hash);
@@ -2506,7 +2493,7 @@ mod tests {
         t.initialize(100, 1_000_000_000).await;
 
         {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             block1 = blockchain.get_latest_block().unwrap();

@@ -2,14 +2,17 @@ use std::io::{Error, ErrorKind};
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
 use serde::Deserialize;
-use tracing::{debug, error};
+
+use log::{debug, error};
+use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
 
 #[derive(Deserialize, Debug)]
 pub struct NodeConfigurations {
     server: Server,
     peers: Vec<PeerConfig>,
+    #[serde(skip)]
+    lite: bool,
 }
 
 impl NodeConfigurations {}
@@ -31,6 +34,16 @@ impl Configuration for NodeConfigurations {
             + ":"
             + endpoint.port.to_string().as_str()
             + "/block/"
+    }
+
+    fn is_lite(&self) -> bool {
+        false
+    }
+
+    fn replace(&mut self, config: &dyn Configuration) {
+        self.server = config.get_server_configs().clone();
+        self.peers = config.get_peer_configs().clone();
+        self.lite = config.is_lite();
     }
 }
 
@@ -59,9 +72,11 @@ impl ConfigHandler {
 
 #[cfg(test)]
 mod test {
-    use crate::ConfigHandler;
-    use saito_core::core::data::configuration::Configuration;
     use std::io::ErrorKind;
+
+    use saito_core::core::data::configuration::Configuration;
+
+    use crate::ConfigHandler;
 
     #[test]
     fn load_config_from_existing_file() {

@@ -6,25 +6,24 @@ const {merge} = require("webpack-merge");
 const CopyPlugin = require("copy-webpack-plugin");
 
 let common = {
-    devtool: false,
-    // entry: [
-    //     path.resolve(__dirname, "./index.js"),
-    // ],
-    output: {
-        path: path.resolve(__dirname, "dist"),
-        filename: "index.js",
+    devtool: 'eval',
+    optimization: {
+        minimize: false,
     },
-    // plugins: [
-    //     new HtmlWebpackPlugin(),
-    //     new WasmPackPlugin({
-    //         crateDirectory: __dirname,
-    //         extraArgs: '--target web',
-    //     }),
-    //     new webpack.ProvidePlugin({
-    //         TextDecoder: ['text-encoding', 'TextDecoder'],
-    //         TextEncoder: ['text-encoding', 'TextEncoder']
-    //     })
-    // ],
+    experiments: {
+        asyncWebAssembly: true,
+        topLevelAwait: true,
+        syncWebAssembly: true,
+    },
+    mode: "development",
+    stats: {errorDetails: true}
+};
+
+let nodeConfigs = merge(common, {
+    entry: [
+        'babel-regenerator-runtime',
+        path.resolve(__dirname, "./index.node.ts"),
+    ],
     module: {
         rules: [
             {
@@ -51,52 +50,24 @@ let common = {
                 loader: "ts-loader",
                 exclude: /(node_modules)/
             },
-            // {
-            //     test: /\.wasm$/,
-            //     type: "javascript/auto",
-            //     loader: "file-loader",
-            //     options: {
-            //         publicPath: "dist/"
-            //     }
-            // },
-            {
-                test: /\.wasm$/,
-                type: "asset/inline",
-            },
+
         ],
-        parser: {
-            javascript: {
-                dynamicImportMode: 'eager'
-            }
-        }
+
     },
     resolve: {
-        extensions: ['.ts', '.tsx', '.js', '.wasm', '...'],
+        extensions: ['.ts', '.tsx', '.js', ".mjs", '...'],
         fallback: {
-            "buffer": require.resolve("buffer")
+            "buffer": require.resolve("buffer"),
+            "path": require.resolve("path-browserify"),
+            // "fs": false,
         }
     },
-    experiments: {
-        asyncWebAssembly: true,
-        topLevelAwait: true,
-        syncWebAssembly: true,
-        // lazyCompilation: false,
-        // outputModule: false,
-    },
-    mode: "development",
-};
-
-let nodeConfigs = merge(common, {
-    entry: [
-        'babel-regenerator-runtime',
-        path.resolve(__dirname, "./index.node.ts"),
-    ],
     plugins: [
         new HtmlWebpackPlugin(),
         new WasmPackPlugin({
-            crateDirectory: __dirname,
+            crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/node",
-            extraArgs: '--target nodejs',
+            extraArgs: '--target bundler',
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
@@ -104,9 +75,6 @@ let nodeConfigs = merge(common, {
         }),
         new CopyPlugin({
             patterns: [{
-                from: "./pkg/node/index_bg.wasm",
-                to: "./index_bg.wasm",
-            }, {
                 from: "./pkg/node/index.d.ts",
                 to: "./index.d.ts"
             }]
@@ -119,17 +87,64 @@ let nodeConfigs = merge(common, {
             type: "commonjs2"
         },
     },
-    target: "node"
+    target: "node",
+
 });
 let webConfigs = merge(common, {
     entry: [
         'babel-regenerator-runtime',
-        path.resolve(__dirname, "./index.web.js"),
+        path.resolve(__dirname, "./index.web.ts"),
     ],
+    module: {
+        rules: [
+            {
+                test: /\.js$/,
+                use: [
+                    "source-map-loader",
+                    {
+                        loader: "babel-loader",
+                        options: {
+                            presets: ["@babel/preset-env"],
+                            sourceMaps: true
+                        }
+                    }
+                ],
+                exclude: /(node_modules)/
+            },
+            {
+                test: /\.mjs$/,
+                include: /node_modules/,
+                type: "javascript/auto"
+            },
+            {
+                test: /\.tsx?$/,
+                loader: "ts-loader",
+                exclude: /(node_modules)/
+            },
+            {
+                test: /\.wasm$/,
+                type: "asset/inline",
+            },
+        ],
+        parser: {
+            javascript: {
+                dynamicImportMode: 'eager'
+            }
+        }
+    },
+    resolve: {
+        extensions: ['.ts', '.tsx', '.js', '.wasm', ".mjs", '...'],
+        fallback: {
+            "buffer": require.resolve("buffer"),
+            "path": require.resolve("path-browserify"),
+            "fs": false,
+        }
+    },
     plugins: [
+
         new HtmlWebpackPlugin(),
         new WasmPackPlugin({
-            crateDirectory: __dirname,
+            crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/web",
             extraArgs: '--target web',
         }),
@@ -139,9 +154,10 @@ let webConfigs = merge(common, {
         }),
         new CopyPlugin({
             patterns: [{
-                from: "./pkg/node/index.d.ts",
+                from: "./pkg/web/index.d.ts",
                 to: "./index.d.ts"
-            }]
+            }
+            ]
         })
     ],
     output: {

@@ -3,7 +3,8 @@ use num_traits::FromPrimitive;
 use primitive_types::U256;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, trace, warn};
+
+use log::{debug, error, info, trace, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
@@ -12,6 +13,7 @@ use crate::core::data::crypto::{hash, sign, verify, verify_hash};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
+use crate::iterate;
 
 pub const TRANSACTION_SIZE: usize = 93;
 
@@ -82,7 +84,6 @@ impl Default for Transaction {
 }
 
 impl Transaction {
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn add_hop(
         &mut self,
         my_private_key: &SaitoPrivateKey,
@@ -146,7 +147,6 @@ impl Transaction {
     /// ```
     ///
     /// ```
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn create(
         wallet: &mut Wallet,
         to_public_key: SaitoPublicKey,
@@ -380,7 +380,6 @@ impl Transaction {
     /// [output][output][output]...
     /// [message]
     /// [hop][hop][hop]...
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Transaction {
         let inputs_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let outputs_len: u32 = u32::from_be_bytes(bytes[4..8].try_into().unwrap());
@@ -450,7 +449,6 @@ impl Transaction {
     //
     // generates all non-cumulative
     //
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
         //
         // nolan_in, nolan_out, total fees
@@ -481,7 +479,6 @@ impl Transaction {
     //
     // calculate total fees in block
     //
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
         // TODO - remove for uuid work
         // generate tx signature hash
@@ -534,7 +531,6 @@ impl Transaction {
     //
     // calculate cumulative routing work in block
     //
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_total_work(&mut self, public_key: &SaitoPublicKey) {
         //
         // if there is no routing path, then the transaction contains
@@ -599,12 +595,10 @@ impl Transaction {
     //
     // generate hash used for signing the tx
     //
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn generate_hash_for_signature(&mut self) {
         self.hash_for_signature = Some(hash(&self.serialize_for_signature()));
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn get_winning_routing_node(&self, random_hash: SaitoHash) -> SaitoPublicKey {
         //
         // if there are no routing paths, we return the sender of
@@ -674,7 +668,6 @@ impl Transaction {
     }
 
     /// Runs when the chain is re-organized
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn on_chain_reorganization(
         &self,
         utxoset: &mut UtxoSet,
@@ -708,12 +701,10 @@ impl Transaction {
     /// [output][output][output]...
     /// [message]
     /// [hop][hop][hop]...
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_net(&self) -> Vec<u8> {
         self.serialize_for_net_with_hop(None)
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub(crate) fn serialize_for_net_with_hop(&self, opt_hop: Option<Hop>) -> Vec<u8> {
         let mut path_len = self.path.len();
         if opt_hop.is_some() {
@@ -760,7 +751,6 @@ impl Transaction {
         buffer
     }
 
-    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
         // fastest known way that isn't bincode ??
 
@@ -789,7 +779,6 @@ impl Transaction {
         .concat()
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn sign(&mut self, private_key: &SaitoPrivateKey) {
         // we set slip ordinals when signing
         for (i, output) in self.outputs.iter_mut().enumerate() {
@@ -802,7 +791,6 @@ impl Transaction {
         self.signature = sign(&buffer, private_key);
     }
 
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         // trace!(
         //     "validating transaction : {:?}",
@@ -963,13 +951,9 @@ impl Transaction {
         // if they claim to spend tokens. if the slip has no spendable
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
-        self.inputs
-            .par_iter()
-            .with_min_len(10)
-            .all(|input| input.validate(utxoset))
+        iterate!(self.inputs, 10).all(|input| input.validate(utxoset))
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn validate_routing_path(&self) -> bool {
         self.path.iter().enumerate().all(|(index, hop)| {
             let bytes: Vec<u8> = [self.signature.as_slice(), hop.to.as_slice()].concat();
@@ -1005,7 +989,6 @@ impl Transaction {
             true
         })
     }
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn is_in_path(&self, public_key: &SaitoPublicKey) -> bool {
         if self.is_from(public_key) {
             return true;
@@ -1018,21 +1001,16 @@ impl Transaction {
         false
     }
     pub fn is_from(&self, public_key: &SaitoPublicKey) -> bool {
-        self.inputs
-            .par_iter()
-            .with_min_len(10)
-            .any(|input| input.public_key.eq(public_key))
+        iterate!(self.inputs, 10).any(|input| input.public_key.eq(public_key))
     }
     pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
-        self.outputs
-            .par_iter()
-            .with_min_len(10)
-            .any(|slip| slip.public_key.eq(public_key))
+        iterate!(self.outputs, 10).any(|slip| slip.public_key.eq(public_key))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::core::data::crypto::generate_keys;
     use hex::FromHex;
 
     use super::*;
@@ -1056,7 +1034,8 @@ mod tests {
     #[test]
     fn transaction_sign_test() {
         let mut tx = Transaction::default();
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         tx.outputs = vec![Slip::default()];
         tx.sign(&wallet.private_key);

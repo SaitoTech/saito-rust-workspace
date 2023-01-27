@@ -3,6 +3,7 @@ use base58::ToBase58;
 use blake3::Hasher;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
+use log::info;
 pub use merkle::MerkleTree;
 use rand::{thread_rng, Rng};
 use secp256k1::ecdsa;
@@ -14,7 +15,6 @@ type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
 pub const PARALLEL_HASH_BYTE_THRESHOLD: usize = 128_000;
 
-#[tracing::instrument(level = "trace", skip_all)]
 pub fn encrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
     let hash = hash(password.as_bytes());
     let mut key: [u8; 16] = [0; 16];
@@ -28,7 +28,6 @@ pub fn encrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
     return encrypt_msg;
 }
 
-#[tracing::instrument(level = "trace", skip_all)]
 pub fn decrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
     let hash = hash(password.as_bytes());
     let mut key: [u8; 16] = [0; 16];
@@ -69,7 +68,6 @@ pub fn generate_keypair_from_private_key(slice: &[u8]) -> (SaitoPublicKey, Saito
     (public_key.serialize(), secret_bytes)
 }
 
-#[tracing::instrument(level = "trace", skip_all)]
 pub fn sign_blob<'a, 'b>(
     vbytes: &'a mut Vec<u8>,
     private_key: &'b SaitoPrivateKey,
@@ -89,7 +87,6 @@ pub fn generate_random_bytes(len: u64) -> Vec<u8> {
     (0..len).map(|_| rng.gen::<u8>()).collect()
 }
 
-#[tracing::instrument(level = "trace", skip_all)]
 pub fn hash(data: &[u8]) -> SaitoHash {
     let mut hasher = Hasher::new();
     // Hashing in parallel can be faster if large enough
@@ -103,7 +100,6 @@ pub fn hash(data: &[u8]) -> SaitoHash {
     hasher.finalize().into()
 }
 
-#[tracing::instrument(level = "trace", skip_all)]
 pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignature {
     let hash = hash(message_bytes);
     let msg = Message::from_slice(&hash).unwrap();
@@ -112,13 +108,11 @@ pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignatu
     sig.serialize_compact()
 }
 
-#[tracing::instrument(level = "trace", skip_all)]
 pub fn verify(msg: &[u8], sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let hash = hash(msg);
     verify_hash(&hash, sig, public_key)
 }
 
-#[tracing::instrument(level = "trace", skip_all)]
 pub fn verify_hash(hash: &SaitoHash, sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let m = Message::from_slice(hash);
     let p = PublicKey::from_slice(public_key);

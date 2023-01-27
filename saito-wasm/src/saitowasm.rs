@@ -1,42 +1,44 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::io::Error;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Poll, Waker};
 use std::time::Duration;
 
-use js_sys::{Array, BigInt, Uint8Array};
+use base58::ToBase58;
+use figment::providers::{Format, Json};
+use figment::Figment;
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use log::{debug, error, info, trace, Level};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
+use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, Currency, SaitoHash, SaitoPublicKey, SaitoSignature, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET,
+    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
-use saito_core::core::data::configuration::Configuration;
+use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::core::data::context::Context;
+use saito_core::core::data::crypto::SECP256K1;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
-use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
+use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_write;
 
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
-use crate::wasm_slip::WasmSlip;
-use crate::wasm_task_runner::WasmTaskRunner;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
 
@@ -64,12 +66,14 @@ impl Future for NetworkResultFuture {
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    consensus_event_processor: RoutingThread,
-    routing_event_processor: ConsensusThread,
-    mining_event_processor: MiningThread,
-    receiver_in_blockchain: Receiver<RoutingEvent>,
-    receiver_in_mempool: Receiver<ConsensusEvent>,
-    receiver_in_miner: Receiver<MiningEvent>,
+    routing_thread: RoutingThread,
+    consensus_thread: ConsensusThread,
+    mining_thread: MiningThread,
+    verification_thread: VerificationThread,
+    receiver_for_router: Receiver<RoutingEvent>,
+    receiver_for_consensus: Receiver<ConsensusEvent>,
+    receiver_for_miner: Receiver<MiningEvent>,
+    receiver_for_verification: Receiver<VerifyRequest>,
     context: Context,
     wakers: HashMap<u64, Waker>,
     results: HashMap<u64, Result<Vec<u8>, Error>>,
@@ -77,18 +81,22 @@ pub struct SaitoWasm {
 
 lazy_static! {
     static ref SAITO: Mutex<SaitoWasm> = Mutex::new(new());
+    static ref CONFIGS: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
+        Arc::new(RwLock::new(Box::new(WasmConfiguration::new())));
 }
 
 // #[wasm_bindgen]
 // impl SaitoWasm {}
 
 pub fn new() -> SaitoWasm {
-    let wallet = Wallet::new();
+    info!("creating new saito wasm instance");
+
+    let keys = generate_keys_wasm();
+    let wallet = Wallet::new(keys.1, keys.0);
     let public_key = wallet.public_key.clone();
     let private_key = wallet.private_key.clone();
     let wallet = Arc::new(RwLock::new(wallet));
-    let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
-        Arc::new(RwLock::new(Box::new(WasmConfiguration::new())));
+    let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> = CONFIGS.clone();
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
@@ -98,20 +106,21 @@ pub fn new() -> SaitoWasm {
         configuration: configuration.clone(),
     };
 
-    let (sender_to_mempool, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
+    let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
     let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(100);
+    let (sender_to_verification, receiver_in_verification) = tokio::sync::mpsc::channel(100);
 
     SaitoWasm {
-        consensus_event_processor: RoutingThread {
+        routing_thread: RoutingThread {
             blockchain: context.blockchain.clone(),
-            sender_to_consensus: sender_to_mempool.clone(),
+            sender_to_consensus: sender_to_consensus.clone(),
             sender_to_miner: sender_to_miner.clone(),
             static_peers: vec![],
             configs: context.configuration.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
-            wallet,
+            wallet: wallet.clone(),
             network: Network::new(
                 Box::new(WasmIoHandler {}),
                 peers.clone(),
@@ -120,12 +129,12 @@ pub fn new() -> SaitoWasm {
             reconnection_timer: 0,
             stats: RoutingStats::new(sender_to_stat.clone()),
             public_key,
-            senders_to_verification: vec![],
+            senders_to_verification: vec![sender_to_verification.clone()],
             last_verification_thread_index: 0,
             stat_sender: sender_to_stat.clone(),
             blockchain_sync_state: BlockchainSyncState::new(10),
         },
-        routing_event_processor: ConsensusThread {
+        consensus_thread: ConsensusThread {
             mempool: context.mempool.clone(),
             blockchain: context.blockchain.clone(),
             wallet: context.wallet.clone(),
@@ -147,10 +156,10 @@ pub fn new() -> SaitoWasm {
             txs_for_mempool: vec![],
             stat_sender: sender_to_stat.clone(),
         },
-        mining_event_processor: MiningThread {
+        mining_thread: MiningThread {
             wallet: context.wallet.clone(),
 
-            sender_to_mempool: sender_to_mempool.clone(),
+            sender_to_mempool: sender_to_consensus.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
             miner_active: false,
             target: [0; 32],
@@ -159,9 +168,38 @@ pub fn new() -> SaitoWasm {
             mined_golden_tickets: 0,
             stat_sender: sender_to_stat.clone(),
         },
-        receiver_in_blockchain,
-        receiver_in_mempool,
-        receiver_in_miner,
+        verification_thread: VerificationThread {
+            sender_to_consensus: sender_to_consensus.clone(),
+            blockchain: context.blockchain.clone(),
+            peers,
+            wallet,
+            public_key,
+            processed_txs: StatVariable::new(
+                "verification::processed_txs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            processed_blocks: StatVariable::new(
+                "verification::processed_blocks".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            processed_msgs: StatVariable::new(
+                "verification::processed_msgs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            invalid_txs: StatVariable::new(
+                "verification::invalid_txs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            stat_sender: sender_to_stat.clone(),
+        },
+        receiver_for_router: receiver_in_blockchain,
+        receiver_for_consensus: receiver_in_mempool,
+        receiver_for_miner: receiver_in_miner,
+        receiver_for_verification: receiver_in_verification,
         context,
         wakers: Default::default(),
         results: Default::default(),
@@ -169,15 +207,38 @@ pub fn new() -> SaitoWasm {
 }
 
 #[wasm_bindgen]
-pub async fn initialize() -> Result<JsValue, JsValue> {
-    println!("initializing sakviti-wasm");
+pub async fn set_configs(json: JsValue) {
+    let mut configs = CONFIGS.write().await;
+    let str = js_sys::JSON::stringify(&json).unwrap();
+    info!("setting configs : {:?}", str);
+    let config = WasmConfiguration::new_from_json(str.as_string().unwrap().as_str());
 
-    return Ok(JsValue::from("initialized"));
+    if config.is_err() {
+        error!("failed parsing configs");
+        return;
+    }
+    let config = config.unwrap();
+
+    info!("config : {:?}", config);
+
+    configs.replace(&config);
 }
 
 #[wasm_bindgen]
-pub fn initialize_sync() -> Result<JsValue, JsValue> {
-    println!("initializing sakviti-wasm");
+pub async fn initialize(configs: JsValue) -> Result<JsValue, JsValue> {
+    console_log::init_with_level(Level::Trace).unwrap();
+
+    info!("initializing saito-wasm");
+    trace!("trace test");
+    debug!("debug test");
+
+    set_configs(configs).await;
+
+    let mut saito = SAITO.lock().await;
+    saito.mining_thread.on_init().await;
+    saito.consensus_thread.on_init().await;
+    saito.verification_thread.on_init().await;
+    saito.routing_thread.on_init().await;
 
     return Ok(JsValue::from("initialized"));
 }
@@ -211,44 +272,143 @@ pub fn get_public_key() -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub async fn process_timer_event(duration: u64) {
+pub async fn process_new_peer(index: u64, peer_config: JsValue) {
+    let mut saito = SAITO.lock().await;
+
+    let mut peer_details = None;
+    if peer_config.is_truthy() {
+        let result = js_sys::JSON::stringify(&peer_config);
+        if result.is_err() {
+            error!("failed processing new peer. failed parsing json info");
+            error!("{:?}", result.err().unwrap());
+            return;
+        }
+        let json = result.unwrap();
+
+        let configs = Figment::new()
+            .merge(Json::string(json.as_string().unwrap().as_str()))
+            .extract::<PeerConfig>();
+        if configs.is_err() {
+            error!(
+                "failed parsing json string to configs. {:?}",
+                configs.err().unwrap()
+            );
+            return;
+        }
+        let configs = configs.unwrap();
+        peer_details = Some(configs);
+    }
+
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::PeerConnectionResult {
+            peer_details,
+            result: Ok(index),
+        })
+        .await;
+}
+
+#[wasm_bindgen]
+pub async fn process_peer_disconnection(peer_index: u64) {
+    let mut saito = SAITO.lock().await;
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::PeerDisconnected { peer_index })
+        .await;
+}
+
+#[wasm_bindgen]
+pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
+    let mut saito = SAITO.lock().await;
+
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::IncomingNetworkMessage {
+            peer_index,
+            buffer: buffer.to_vec(),
+        })
+        .await;
+}
+
+#[wasm_bindgen]
+pub async fn process_fetched_block(
+    buffer: js_sys::Uint8Array,
+    hash: js_sys::Uint8Array,
+    peer_index: u64,
+) {
+    let mut saito = SAITO.lock().await;
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::BlockFetched {
+            block_hash: hash.to_vec().try_into().unwrap(),
+            peer_index,
+            buffer: buffer.to_vec(),
+        })
+        .await;
+}
+
+#[wasm_bindgen]
+pub async fn process_timer_event(duration_in_ms: u64) {
     // println!("processing timer event : {:?}", duration);
 
     let mut saito = SAITO.lock().await;
 
-    let duration = Duration::new(0, 1_000_000 * duration as u32);
+    let duration = Duration::from_millis(duration_in_ms);
 
     // blockchain controller
     // TODO : update to recv().await
-    let result = saito.receiver_in_blockchain.try_recv();
+    let result = saito.receiver_for_router.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.consensus_event_processor.process_event(event).await;
+        let result = saito.routing_thread.process_event(event).await;
     }
-
     saito
-        .consensus_event_processor
+        .routing_thread
         .process_timer_event(duration.clone())
         .await;
     // mempool controller
     // TODO : update to recv().await
-    let result = saito.receiver_in_mempool.try_recv();
+    let result = saito.receiver_for_consensus.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.routing_event_processor.process_event(event).await;
+        let result = saito.consensus_thread.process_event(event).await;
     }
     saito
-        .routing_event_processor
+        .consensus_thread
         .process_timer_event(duration.clone())
         .await;
 
-    // miner controller
-    let result = saito.receiver_in_miner.try_recv();
+    // verification thread
+    let result = saito.receiver_for_verification.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.mining_event_processor.process_event(event).await;
+        let result = saito.verification_thread.process_event(event).await;
     }
     saito
-        .mining_event_processor
+        .verification_thread
         .process_timer_event(duration.clone());
+
+    // miner controller
+    let result = saito.receiver_for_miner.try_recv();
+    if result.is_ok() {
+        let event = result.unwrap();
+        let result = saito.mining_thread.process_event(event).await;
+    }
+    saito.mining_thread.process_timer_event(duration.clone());
+}
+
+pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
+    let (mut secret_key, mut public_key) =
+        SECP256K1.generate_keypair(&mut rand::rngs::OsRng::default());
+    while public_key.serialize().to_base58().len() != 44 {
+        // sometimes secp256k1 address is too big to store in 44 base-58 digits
+        let keypair_tuple = SECP256K1.generate_keypair(&mut rand::rngs::OsRng::default());
+        secret_key = keypair_tuple.0;
+        public_key = keypair_tuple.1;
+    }
+    let mut secret_bytes = [0u8; 32];
+    for i in 0..32 {
+        secret_bytes[i] = secret_key[i];
+    }
+    (public_key.serialize(), secret_bytes)
 }

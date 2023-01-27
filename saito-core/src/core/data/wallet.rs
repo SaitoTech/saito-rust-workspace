@@ -1,13 +1,11 @@
 use ahash::{AHashMap, AHashSet};
-use tracing::warn;
+use log::{info, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
 use crate::core::data::block::Block;
-use crate::core::data::crypto::{
-    decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
-};
+use crate::core::data::crypto::{decrypt_with_password, encrypt_with_password, hash, sign};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
@@ -51,8 +49,9 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new() -> Wallet {
-        let (public_key, private_key) = generate_keys();
+    pub fn new(private_key: SaitoPrivateKey, public_key: SaitoPublicKey) -> Wallet {
+        info!("generating new wallet...");
+        // let (public_key, private_key) = generate_keys();
 
         Wallet {
             public_key,
@@ -65,7 +64,6 @@ impl Wallet {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn load(&mut self, storage: &mut Storage) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
@@ -83,7 +81,6 @@ impl Wallet {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn load_wallet(
         &mut self,
         wallet_path: &str,
@@ -95,7 +92,6 @@ impl Wallet {
         self.load(storage).await;
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn save(&mut self, storage: &mut Storage) {
         let mut filename = String::from("data/wallets/");
         filename.push_str(&self.filename);
@@ -109,7 +105,6 @@ impl Wallet {
 
     /// [private_key - 32 bytes]
     /// [public_key - 33 bytes]
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn serialize_for_disk(&self) -> Vec<u8> {
         let mut vbytes: Vec<u8> = vec![];
 
@@ -121,13 +116,11 @@ impl Wallet {
 
     /// [private_key - 32 bytes
     /// [public_key - 33 bytes]
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
         self.private_key = bytes[0..32].try_into().unwrap();
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
@@ -161,7 +154,6 @@ impl Wallet {
     //
     // removes all slips in block when pruned / deleted
     //
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_block(&mut self, block: &Block) {
         for tx in block.transactions.iter() {
             for input in tx.inputs.iter() {
@@ -175,7 +167,6 @@ impl Wallet {
         }
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn add_slip(&mut self, block: &Block, tx_index: u64, slip: &Slip, lc: bool) {
         let mut wallet_slip = WalletSlip::new();
 
@@ -198,7 +189,6 @@ impl Wallet {
         }
     }
 
-    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn delete_slip(&mut self, slip: &Slip) {
         let result = self.slips.remove(&slip.utxoset_key);
         let in_unspent_list = self.unspent_slips.remove(&slip.utxoset_key);
@@ -210,12 +200,10 @@ impl Wallet {
         }
     }
 
-    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn get_available_balance(&self) -> Currency {
         self.available_balance
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn get_unspent_slip_count(&self) -> u64 {
         self.unspent_slips.len() as u64
     }
@@ -223,7 +211,6 @@ impl Wallet {
     // the nolan_requested is omitted from the slips created - only the change
     // address is provided as an output. so make sure that any function calling
     // this manually creates the output for its desired payment
-    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn generate_slips(&mut self, nolan_requested: Currency) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = Vec::new();
         let mut outputs: Vec<Slip> = Vec::new();
@@ -290,7 +277,6 @@ impl Wallet {
         (inputs, outputs)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn sign(&self, message_bytes: &[u8]) -> SaitoSignature {
         sign(message_bytes, &self.private_key)
     }
@@ -299,7 +285,6 @@ impl Wallet {
         // TODO : to be implemented
         Transaction::default()
     }
-    // #[tracing::instrument(level = "info", skip_all)]
     pub async fn create_golden_ticket_transaction(
         golden_ticket: GoldenTicket,
         public_key: &SaitoPublicKey,
@@ -352,17 +337,19 @@ impl WalletSlip {
 
 #[cfg(test)]
 mod tests {
-    use tracing::info;
+    use log::info;
 
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::common::test_manager::test::TestManager;
+    use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
 
     use super::*;
 
     #[test]
     fn wallet_new_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
         assert_ne!(wallet.public_key, [0; 33]);
         assert_ne!(wallet.private_key, [0; 32]);
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
@@ -370,8 +357,10 @@ mod tests {
 
     #[test]
     fn wallet_serialize_and_deserialize_test() {
-        let wallet1 = Wallet::new();
-        let mut wallet2 = Wallet::new();
+        let keys = generate_keys();
+        let wallet1 = Wallet::new(keys.1, keys.0);
+        let keys = generate_keys();
+        let mut wallet2 = Wallet::new(keys.1, keys.0);
         let serialized = wallet1.serialize_for_disk();
         wallet2.deserialize_from_disk(&serialized);
         assert_eq!(wallet1, wallet2);
@@ -384,7 +373,8 @@ mod tests {
 
         let _t = TestManager::new();
 
-        let mut wallet = Wallet::new();
+        let keys = generate_keys();
+        let mut wallet = Wallet::new(keys.1, keys.0);
         let public_key1 = wallet.public_key.clone();
         let private_key1 = wallet.private_key.clone();
 
@@ -393,7 +383,8 @@ mod tests {
         };
         wallet.save(&mut storage).await;
 
-        wallet = Wallet::new();
+        let keys = generate_keys();
+        wallet = Wallet::new(keys.1, keys.0);
 
         assert_ne!(wallet.public_key, public_key1);
         assert_ne!(wallet.private_key, private_key1);

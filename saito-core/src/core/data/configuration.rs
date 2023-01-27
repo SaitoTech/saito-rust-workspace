@@ -1,6 +1,7 @@
 use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct PeerConfig {
     pub host: String,
     pub port: u16,
@@ -32,4 +33,6 @@ pub trait Configuration {
     fn get_server_configs(&self) -> &Server;
     fn get_peer_configs(&self) -> &Vec<PeerConfig>;
     fn get_block_fetch_url(&self) -> String;
+    fn is_lite(&self) -> bool;
+    fn replace(&mut self, config: &dyn Configuration);
 }

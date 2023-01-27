@@ -6,7 +6,8 @@ use std::{i128, mem};
 use ahash::AHashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, trace, warn};
+
+use log::{debug, error, info, trace, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
@@ -20,6 +21,7 @@ use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::iterate;
 
 pub const BLOCK_HEADER_SIZE: usize = 301;
 
@@ -826,14 +828,12 @@ impl Block {
         true
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
     pub fn generate_hash(&mut self) -> SaitoHash {
         let hash_for_hash = hash(&self.serialize_for_hash());
         self.hash = hash_for_hash;
         hash_for_hash
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
     pub fn generate_merkle_root(&self) -> SaitoHash {
         debug!("generating the merkle root 1");
 
@@ -854,7 +854,6 @@ impl Block {
     }
 
     // generate dynamic consensus values
-    #[tracing::instrument(level = "trace", skip_all)]
     pub async fn generate_consensus_values(&self, blockchain: &Blockchain) -> ConsensusValues {
         debug!("generate consensus values");
         let mut cv = ConsensusValues::new();
@@ -1205,13 +1204,11 @@ impl Block {
 
         cv
     }
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn generate_pre_hash(&mut self) {
         let hash_for_signature = hash(&self.serialize_for_signature());
         self.pre_hash = hash_for_signature;
     }
 
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn on_chain_reorganization(&mut self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
         debug!(
             "block : on chain reorg : {:?} - {:?}",
@@ -1228,7 +1225,6 @@ impl Block {
     // we may want to separate the signing of the block from the setting of the necessary hash
     // we do this together out of convenience only
 
-    #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
     pub fn sign(&mut self, private_key: &SaitoPrivateKey) {
         // we set final data
         self.signature = sign(&self.serialize_for_signature(), private_key);
@@ -1236,7 +1232,6 @@ impl Block {
 
     // serialize the pre_hash and the signature_for_source into a
     // bytes array that can be hashed and then have the hash set.
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_hash(&self) -> Vec<u8> {
         let vbytes: Vec<u8> = [
             self.previous_block_hash.as_slice(),
@@ -1250,7 +1245,6 @@ impl Block {
     // this will manually calculate the merkle_root if necessary
     // but it is advised that the merkle_root be already calculated
     // to avoid speed issues.
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_signature(&self) -> Vec<u8> {
         [
             self.id.to_be_bytes().as_slice(),
@@ -1287,7 +1281,6 @@ impl Block {
     /// [avg_atr_income - 8 bytes - u64]
     /// [avg_atr_variance - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
-    #[tracing::instrument(level = "trace", skip_all)]
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
         let mut buffer: Vec<u8> = vec![];
 
@@ -1300,10 +1293,7 @@ impl Block {
         let mut tx_buf = vec![];
         if block_type != BlockType::Header {
             // block headers do not get tx data
-            tx_buf = self
-                .transactions
-                .par_iter()
-                .with_min_len(10)
+            tx_buf = iterate!(self.transactions, 10)
                 .map(|transaction| transaction.serialize_for_net())
                 .collect::<Vec<_>>()
                 .concat();
@@ -1331,7 +1321,6 @@ impl Block {
         buffer
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(id = hex::encode(self.hash)))]
     pub async fn update_block_to_block_type(
         &mut self,
         block_type: BlockType,
@@ -1357,7 +1346,6 @@ impl Block {
     // data that is necessary for blocks of that type if possible. if this is
     // not possible, return false. if it is possible, return true once upgraded.
     //
-    #[tracing::instrument(level = "trace", skip_all)]
     pub async fn upgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
@@ -1748,11 +1736,7 @@ impl Block {
         // as to determine spendability.
         //
 
-        let transactions_valid = self
-            .transactions
-            .par_iter()
-            .with_min_len(100)
-            .all(|tx| tx.validate(utxoset));
+        let transactions_valid = iterate!(self.transactions, 100).all(|tx| tx.validate(utxoset));
 
         // let mut transactions_valid = true;
         // for tx in self.transactions.iter() {
@@ -1783,7 +1767,7 @@ mod tests {
     use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_WALLET};
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::crypto::verify_hash;
+    use crate::core::data::crypto::{generate_keys, verify_hash};
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -1962,7 +1946,9 @@ mod tests {
 
     #[test]
     fn block_sign_and_verify_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+
+        let wallet = Wallet::new(keys.1, keys.0);
         let mut block = Block::new();
         block.creator = wallet.public_key;
         block.generate();
@@ -1981,7 +1967,8 @@ mod tests {
     #[test]
     fn block_merkle_root_test() {
         let mut block = Block::new();
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         let transactions: Vec<Transaction> = (0..5)
             .into_iter()

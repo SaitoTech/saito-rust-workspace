@@ -9,16 +9,14 @@ use lazy_static::lazy_static;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
-use tracing::{debug, warn};
 
+use log::{debug, warn};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::InterfaceIO;
-
 use saito_core::core::data::configuration::PeerConfig;
 
 use crate::saito::io_context::IoContext;
-
 use crate::IoEvent;
 
 lazy_static! {
@@ -143,7 +141,6 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
         let filename = key.as_str();
@@ -166,7 +163,6 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         let result = File::open(key).await;
         if result.is_err() {
@@ -182,7 +178,6 @@ impl InterfaceIO for RustIOHandler {
         Ok(encoded)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
         debug!(
             "loading blocks from dir : {:?}",

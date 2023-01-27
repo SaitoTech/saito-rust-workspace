@@ -3,8 +3,8 @@ use std::io::{Error, ErrorKind};
 use figment::providers::{Format, Json};
 use figment::Figment;
 use serde::Deserialize;
-use tracing::{debug, error};
 
+use log::{debug, error};
 use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 
 #[derive(Deserialize, Debug, Clone)]
@@ -23,6 +23,8 @@ pub struct SpammerConfigs {
     server: Server,
     peers: Vec<PeerConfig>,
     spammer: Spammer,
+    #[serde(skip)]
+    lite: bool,
 }
 
 impl SpammerConfigs {
@@ -53,6 +55,7 @@ impl SpammerConfigs {
                 tx_fee: 0,
                 stop_after: 0,
             },
+            lite: false,
         }
     }
 
@@ -78,6 +81,16 @@ impl Configuration for SpammerConfigs {
             + ":"
             + endpoint.port.to_string().as_str()
             + "/block/"
+    }
+
+    fn is_lite(&self) -> bool {
+        false
+    }
+
+    fn replace(&mut self, config: &dyn Configuration) {
+        self.server = config.get_server_configs().clone();
+        self.peers = config.get_peer_configs().clone();
+        self.lite = config.is_lite();
     }
 }
 

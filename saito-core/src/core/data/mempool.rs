@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use ahash::AHashMap;
 use rayon::prelude::*;
-use tracing::{debug, info, trace, warn};
+
+use log::{debug, info, trace, warn};
 
 use crate::common::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::data::block::Block;
@@ -12,6 +13,7 @@ use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::{Transaction, TransactionType};
+use crate::iterate;
 
 //
 // In addition to responding to global broadcast messages, the
@@ -56,21 +58,15 @@ impl Mempool {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn add_block(&mut self, block: Block) {
         debug!("mempool add block : {:?}", hex::encode(block.hash));
         let hash_to_insert = block.hash;
-        if !self
-            .blocks_queue
-            .par_iter()
-            .any(|block| block.hash == hash_to_insert)
-        {
+        if !iterate!(self.blocks_queue, 100).any(|block| block.hash == hash_to_insert) {
             self.blocks_queue.push_back(block);
         } else {
             debug!("block not added to mempool as it was already there");
         }
     }
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_golden_ticket(&mut self, golden_ticket: Transaction) {
         let gt = GoldenTicket::deserialize_from_net(&golden_ticket.message);
         info!(
@@ -92,7 +88,6 @@ impl Mempool {
 
         info!("golden ticket added to mempool");
     }
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_transaction_if_validates(
         &mut self,
         mut transaction: Transaction,
@@ -113,7 +108,6 @@ impl Mempool {
             );
         }
     }
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn add_transaction(&mut self, transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
@@ -148,7 +142,6 @@ impl Mempool {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn bundle_block(
         &mut self,
         blockchain: &mut Blockchain,
@@ -191,7 +184,6 @@ impl Mempool {
         Some(block)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn bundle_genesis_block(
         &mut self,
         blockchain: &mut Blockchain,
@@ -216,7 +208,6 @@ impl Mempool {
         block
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn can_bundle_block(
         &self,
         blockchain: &Blockchain,
@@ -232,7 +223,6 @@ impl Mempool {
 
         if blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
-            tokio::time::sleep(Duration::from_secs(1)).await;
             return None;
         }
         if !self.blocks_queue.is_empty() {
@@ -278,7 +268,6 @@ impl Mempool {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_block(&mut self, block_hash: &SaitoHash) {
         debug!(
             "deleting block from mempool : {:?}",
@@ -289,7 +278,6 @@ impl Mempool {
         // self.blocks_queue.retain(|block| !block.hash.eq(block_hash));
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         for transaction in transactions {
             if let TransactionType::GoldenTicket = transaction.transaction_type {

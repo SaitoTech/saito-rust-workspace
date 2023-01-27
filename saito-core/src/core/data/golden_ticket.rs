@@ -51,14 +51,12 @@ impl GoldenTicket {
         vbytes
     }
 
-    // #[tracing::instrument(level = "trace", skip_all)]
     pub fn validate(&self, difficulty: u64) -> bool {
         let solution_hash = hash(&self.serialize_for_net());
 
         return GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty);
     }
 
-    // #[tracing::instrument(level = "info", skip_all)]
     pub fn validate_hashing_difficulty(solution_hash: &SaitoHash, difficulty: u64) -> bool {
         let solution = primitive_types::U256::from_big_endian(solution_hash);
 
@@ -69,10 +67,10 @@ impl GoldenTicket {
 #[cfg(test)]
 mod tests {
     use crate::common::defs::SaitoHash;
-    use crate::core::data::crypto::{generate_random_bytes, hash};
+    use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
-    use tracing::info;
+    use log::info;
 
     #[test]
     fn golden_ticket_validate_hashing_difficulty() {
@@ -103,7 +101,8 @@ mod tests {
 
     #[test]
     fn golden_ticket_extremes_test() {
-        let wallet = Wallet::new();
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
         let random = hash(&generate_random_bytes(32));
         let target = hash(&random.to_vec());

@@ -2,9 +2,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-use tracing::{debug, info, trace};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
@@ -107,7 +107,6 @@ impl RoutingThread {
     /// ```
     ///
     /// ```
-    // #[tracing::instrument(level = "info", skip_all)]
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
         trace!(
             "processing incoming message type : {:?} from peer : {:?}",
@@ -171,7 +170,6 @@ impl RoutingThread {
         trace!("incoming message processed");
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn handle_new_peer(
         &mut self,
         peer_data: Option<data::configuration::PeerConfig>,
@@ -181,13 +179,11 @@ impl RoutingThread {
         self.network.handle_new_peer(peer_data, peer_index).await;
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
         self.network.handle_peer_disconnect(peer_index).await;
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     pub async fn process_incoming_blockchain_request(
         &self,
         request: BlockchainRequest,
@@ -224,7 +220,6 @@ impl RoutingThread {
                 .unwrap();
         }
     }
-    // #[tracing::instrument(level = "info", skip_all)]
     async fn process_incoming_block_hash(
         &mut self,
         block_hash: SaitoHash,
@@ -242,8 +237,9 @@ impl RoutingThread {
 
         self.fetch_next_blocks().await;
     }
-    // #[tracing::instrument(level = "info", skip_all)]
     async fn fetch_next_blocks(&mut self) {
+        trace!("fetching next blocks");
+
         {
             let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
@@ -273,6 +269,7 @@ impl RoutingThread {
         self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
     }
     async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
+        trace!("sending verification request to thread");
         // waiting till we get an acceptable sender
         let sender_count = self.senders_to_verification.len();
         let mut trials = 0;
@@ -287,11 +284,14 @@ impl RoutingThread {
 
             if sender.capacity() > 0 {
                 sender.send(request).await.unwrap();
+                trace!(
+                    "verification request sent to verification thread : {:?}",
+                    sender_index
+                );
                 return;
             }
             if trials == sender_count {
-                // if all the channels are full, we will sleep for a bit till some space is available
-                tokio::time::sleep(Duration::from_millis(10)).await;
+                // todo : if all the channels are full, we should wait here. cannot sleep to support wasm interface
                 trials = 0;
             }
         }
