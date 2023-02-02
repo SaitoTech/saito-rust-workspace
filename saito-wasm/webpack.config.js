@@ -6,16 +6,16 @@ const {merge} = require("webpack-merge");
 const CopyPlugin = require("copy-webpack-plugin");
 
 let common = {
-    devtool: 'eval',
+    devtool: false,//'eval',
     optimization: {
-        minimize: false,
+        minimize: true,
     },
     experiments: {
         asyncWebAssembly: true,
         topLevelAwait: true,
         syncWebAssembly: true,
     },
-    mode: "development",
+    mode: "production",
     stats: {errorDetails: true}
 };
 
@@ -67,7 +67,7 @@ let nodeConfigs = merge(common, {
         new WasmPackPlugin({
             crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/node",
-            extraArgs: '--target bundler',
+            extraArgs: '--target bundler --release',
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
@@ -146,7 +146,7 @@ let webConfigs = merge(common, {
         new WasmPackPlugin({
             crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/web",
-            extraArgs: '--target web',
+            extraArgs: '--target web --release',
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
