@@ -1,9 +1,11 @@
+use std::io::{Error, ErrorKind};
+
 use figment::providers::{Format, Json};
 use figment::Figment;
-use log::error;
-use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
+use log::{error, info};
 use serde::Deserialize;
-use std::io::{Error, ErrorKind};
+
+use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
 
 // #[wasm_bindgen]
 #[derive(Deserialize, Debug)]
@@ -38,6 +40,7 @@ impl WasmConfiguration {
         }
     }
     pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
+        info!("new from json : {:?}", json);
         let configs = Figment::new()
             .merge(Json::string(json))
             .extract::<WasmConfiguration>();

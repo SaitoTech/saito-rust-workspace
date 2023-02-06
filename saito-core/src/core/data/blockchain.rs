@@ -67,7 +67,7 @@ impl Blockchain {
     #[allow(clippy::new_without_default)]
     pub fn new(wallet_lock: Arc<RwLock<Wallet>>) -> Self {
         Blockchain {
-            utxoset: AHashMap::with_capacity(10_000_000),
+            utxoset: AHashMap::with_capacity(10),
             blockring: BlockRing::new(),
             blocks: AHashMap::new(),
             wallet_lock,

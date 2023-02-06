@@ -10,6 +10,7 @@ use std::time::Duration;
 use base58::ToBase58;
 use figment::providers::{Format, Json};
 use figment::Figment;
+use js_sys::JsString;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, Level};
 use tokio::sync::mpsc::Receiver;
@@ -207,32 +208,177 @@ pub fn new() -> SaitoWasm {
 }
 
 #[wasm_bindgen]
-pub async fn set_configs(json: JsValue) {
-    let mut configs = CONFIGS.write().await;
-    let str = js_sys::JSON::stringify(&json).unwrap();
-    info!("setting configs : {:?}", str);
-    let config = WasmConfiguration::new_from_json(str.as_string().unwrap().as_str());
+pub async fn test_run(test: JsString) -> Result<JsValue, JsValue> {
+    console_log::init_with_level(Level::Debug).unwrap();
+    // let mut v = vec![];
+    // for i in 0..1000_000 {
+    //     let array = js_sys::Uint8Array::new_with_length(1024);
+    //     info!("i : {:?}", i);
+    //     v.push(array);
+    // }
+    info!("initializing saito-wasm");
+    trace!("trace test");
+    debug!("debug test"); // 258MB
 
-    if config.is_err() {
-        error!("failed parsing configs");
-        return;
-    }
-    let config = config.unwrap();
+    // let mut configs = CONFIGS.write().await;
+    //
+    // let mut saito = SAITO.lock().await;
 
-    info!("config : {:?}", config);
+    let keys = generate_keys_wasm(); //259MB - 162MB
+    let wallet = Wallet::new(keys.1, keys.0); // 654MB - 614MB
+    let public_key = wallet.public_key.clone();
+    let private_key = wallet.private_key.clone();
+    let wallet = Arc::new(RwLock::new(wallet)); // 654MB
+    let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> = CONFIGS.clone();
 
-    configs.replace(&config);
+    let peers = Arc::new(RwLock::new(PeerCollection::new()));
+    let context = Context {
+        blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
+        mempool: Arc::new(RwLock::new(Mempool::new(public_key, private_key))),
+        wallet: wallet.clone(),
+        configuration: configuration.clone(),
+    };
+
+    let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
+    let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
+    let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
+    let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(100);
+    let (sender_to_verification, receiver_in_verification) = tokio::sync::mpsc::channel(100);
+
+    let wasm = SaitoWasm {
+        routing_thread: RoutingThread {
+            blockchain: context.blockchain.clone(),
+            sender_to_consensus: sender_to_consensus.clone(),
+            sender_to_miner: sender_to_miner.clone(),
+            static_peers: vec![],
+            configs: context.configuration.clone(),
+            time_keeper: Box::new(WasmTimeKeeper {}),
+            wallet: wallet.clone(),
+            network: Network::new(
+                Box::new(WasmIoHandler {}),
+                peers.clone(),
+                context.wallet.clone(),
+            ),
+            reconnection_timer: 0,
+            stats: RoutingStats::new(sender_to_stat.clone()),
+            public_key,
+            senders_to_verification: vec![sender_to_verification.clone()],
+            last_verification_thread_index: 0,
+            stat_sender: sender_to_stat.clone(),
+            blockchain_sync_state: BlockchainSyncState::new(10),
+        },
+        consensus_thread: ConsensusThread {
+            mempool: context.mempool.clone(),
+            blockchain: context.blockchain.clone(),
+            wallet: context.wallet.clone(),
+            generate_genesis_block: false,
+            sender_to_router: sender_to_blockchain.clone(),
+            sender_to_miner: sender_to_miner.clone(),
+            // sender_global: (),
+            block_producing_timer: 0,
+            tx_producing_timer: 0,
+            create_test_tx: false,
+            time_keeper: Box::new(WasmTimeKeeper {}),
+            network: Network::new(
+                Box::new(WasmIoHandler {}),
+                peers.clone(),
+                context.wallet.clone(),
+            ),
+            storage: Storage::new(Box::new(WasmIoHandler {})),
+            stats: ConsensusStats::new(sender_to_stat.clone()),
+            txs_for_mempool: vec![],
+            stat_sender: sender_to_stat.clone(),
+        },
+        mining_thread: MiningThread {
+            wallet: context.wallet.clone(),
+
+            sender_to_mempool: sender_to_consensus.clone(),
+            time_keeper: Box::new(WasmTimeKeeper {}),
+            miner_active: false,
+            target: [0; 32],
+            difficulty: 0,
+            public_key: [0; 33],
+            mined_golden_tickets: 0,
+            stat_sender: sender_to_stat.clone(),
+        },
+        verification_thread: VerificationThread {
+            sender_to_consensus: sender_to_consensus.clone(),
+            blockchain: context.blockchain.clone(),
+            peers,
+            wallet,
+            public_key,
+            processed_txs: StatVariable::new(
+                "verification::processed_txs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            processed_blocks: StatVariable::new(
+                "verification::processed_blocks".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            processed_msgs: StatVariable::new(
+                "verification::processed_msgs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            invalid_txs: StatVariable::new(
+                "verification::invalid_txs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            ),
+            stat_sender: sender_to_stat.clone(),
+        },
+        receiver_for_router: receiver_in_blockchain,
+        receiver_for_consensus: receiver_in_mempool,
+        receiver_for_miner: receiver_in_miner,
+        receiver_for_verification: receiver_in_verification,
+        context,
+        wakers: Default::default(),
+        results: Default::default(),
+    };
+
+    return Ok(JsValue::from("zzzzzz"));
 }
 
 #[wasm_bindgen]
-pub async fn initialize(configs: JsValue) -> Result<JsValue, JsValue> {
-    console_log::init_with_level(Level::Trace).unwrap();
+pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
+    console_log::init_with_level(Level::Debug).unwrap();
 
     info!("initializing saito-wasm");
     trace!("trace test");
     debug!("debug test");
+    // return Ok(JsValue::from("sss"));
+    {
+        info!("setting configs...");
+        let mut configs = CONFIGS.write().await;
+        info!("config lock acquired");
+        // let str = js_sys::JSON::stringify(&json);
+        // info!("setting configs : {:?}", str.as_string().unwrap());
 
-    set_configs(configs).await;
+        let str: Result<String, _> = json.try_into();
+        if str.is_err() {
+            info!(
+                "cannot parse json configs string : {:?}",
+                str.err().unwrap()
+            );
+            return Ok(JsValue::from("initialized"));
+        }
+        info!("wwwwwwwwwwwww");
+        // let str: JsString = str.unwrap();
+        let config = WasmConfiguration::new_from_json(str.expect("couldn't get string").as_str());
+
+        if config.is_err() {
+            info!("failed parsing configs");
+            return Ok(JsValue::from("initialized"));
+        }
+        let config = config.unwrap();
+
+        info!("config : {:?}", config);
+
+        configs.replace(&config);
+        // drop(json);
+    }
 
     let mut saito = SAITO.lock().await;
     saito.mining_thread.on_init().await;
@@ -283,6 +429,7 @@ pub async fn process_new_peer(index: u64, peer_config: JsValue) {
             error!("{:?}", result.err().unwrap());
             return;
         }
+        drop(peer_config);
         let json = result.unwrap();
 
         let configs = Figment::new()
@@ -328,6 +475,7 @@ pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index
             buffer: buffer.to_vec(),
         })
         .await;
+    drop(buffer);
 }
 
 #[wasm_bindgen]
@@ -345,12 +493,12 @@ pub async fn process_fetched_block(
             buffer: buffer.to_vec(),
         })
         .await;
+    drop(buffer);
+    drop(hash);
 }
 
 #[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
-    // println!("processing timer event : {:?}", duration);
-
     let mut saito = SAITO.lock().await;
 
     let duration = Duration::from_millis(duration_in_ms);

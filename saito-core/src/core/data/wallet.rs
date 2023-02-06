@@ -56,8 +56,8 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            slips: AHashMap::with_capacity(1_000_000),
-            unspent_slips: AHashSet::with_capacity(1_000_000),
+            slips: AHashMap::with_capacity(10),
+            unspent_slips: AHashSet::with_capacity(10),
             filename: "default".to_string(),
             filepass: "password".to_string(),
             available_balance: 0,
@@ -219,7 +219,7 @@ impl Wallet {
         let my_public_key = self.public_key;
 
         // grab inputs
-        let mut keys_to_remove = Vec::with_capacity(1000);
+        let mut keys_to_remove = Vec::with_capacity(10);
         for key in &self.unspent_slips {
             if nolan_in >= nolan_requested {
                 break;
