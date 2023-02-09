@@ -226,10 +226,9 @@ impl Storage {
 mod test {
     use log::{info, trace};
 
-    use crate::common::defs::SaitoHash;
+    use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::block::Block;
-    use crate::core::data::blockchain::MAX_TOKEN_SUPPLY;
     use crate::core::data::crypto::{hash, verify};
 
     #[ignore]

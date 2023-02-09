@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::future::Future;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -10,16 +11,17 @@ use std::time::Duration;
 use base58::ToBase58;
 use figment::providers::{Format, Json};
 use figment::Figment;
-use js_sys::JsString;
+use js_sys::{BigInt, JsString, Uint8Array};
 use lazy_static::lazy_static;
-use log::{debug, error, info, trace, Level};
+use log::{debug, error, info, trace, warn, Level};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, StatVariable,
+    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -28,6 +30,7 @@ use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::core::data::context::Context;
 use saito_core::core::data::crypto::SECP256K1;
+use saito_core::core::data::crypto::{hash as hash_fn, sign};
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
@@ -38,6 +41,7 @@ use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_write;
 
+use crate::wasm_block::WasmBlock;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_time_keeper::WasmTimeKeeper;
@@ -390,11 +394,31 @@ pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub async fn create_transaction() -> Result<WasmTransaction, JsValue> {
+pub async fn create_transaction(
+    public_key: JsString,
+    amount: u64,
+    fee: u64,
+    force_merge: bool,
+) -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.lock().await;
     let (mut wallet, _wallet_) = lock_for_write!(saito.context.wallet, LOCK_ORDER_WALLET);
-    let transaction = wallet.create_transaction_with_default_fees().await;
-    let wasm_transaction = WasmTransaction::from_transaction(transaction);
+    let key = string_to_key(public_key);
+    if key.is_err() {
+        error!("failed parsing public key : {:?}", key.err().unwrap());
+        todo!()
+    }
+    let transaction = wallet
+        .create_transaction(&key.unwrap(), amount, fee, force_merge)
+        .await;
+
+    if transaction.is_err() {
+        error!(
+            "couldn't create transaction : {:?}",
+            transaction.err().unwrap()
+        );
+        todo!()
+    }
+    let wasm_transaction = WasmTransaction::from_transaction(transaction.unwrap());
     return Ok(wasm_transaction);
 }
 
@@ -412,9 +436,27 @@ pub fn get_latest_block_hash() -> Result<JsValue, JsValue> {
     Ok(JsValue::from("latestblockhash"))
 }
 
-#[wasm_bindgen]
-pub fn get_public_key() -> Result<JsValue, JsValue> {
-    Ok(JsValue::from("public_key"))
+pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
+    let block_hash = string_to_key(block_hash);
+    if block_hash.is_err() {
+        error!("block hash string is invalid");
+        todo!()
+    }
+
+    let block_hash = block_hash.unwrap();
+
+    let mut saito = SAITO.lock().await;
+    let blockchain = saito.routing_thread.blockchain.read().await;
+
+    let result = blockchain.get_block(&block_hash);
+
+    if result.is_none() {
+        warn!("block {:?} not found", hex::encode(block_hash));
+        todo!()
+    }
+    let block = result.cloned().unwrap();
+
+    Ok(WasmBlock::from_block(block))
 }
 
 #[wasm_bindgen]
@@ -545,6 +587,53 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     saito.mining_thread.process_timer_event(duration.clone());
 }
 
+#[wasm_bindgen]
+pub fn hash(buffer: Uint8Array) -> JsString {
+    let buffer: Vec<u8> = buffer.to_vec();
+    let hash = hash_fn(&buffer);
+    let str = hex::encode(hash);
+    let str: js_sys::JsString = str.into();
+    str
+}
+
+#[wasm_bindgen]
+pub fn sign_buffer(buffer: Uint8Array, private_key: JsString) -> JsString {
+    let buffer = buffer.to_vec();
+    let key = string_to_key(private_key);
+    if key.is_err() {
+        error!("key couldn't be parsed : {:?}", key.err().unwrap());
+        todo!()
+    }
+    let key: SaitoPrivateKey = key.unwrap();
+
+    let result = sign(&buffer, &key);
+
+    let signature = hex::encode(result);
+    signature.into()
+}
+
+#[wasm_bindgen]
+pub async fn get_public_key() -> JsString {
+    let saito = SAITO.lock().await;
+    let wallet = saito.context.wallet.read().await;
+    let key = hex::encode(wallet.public_key);
+    JsString::from(key)
+}
+
+#[wasm_bindgen]
+pub fn get_pending_txs() -> js_sys::Array {
+    let array = js_sys::Array::new_with_length(1024);
+
+    array
+}
+
+#[wasm_bindgen]
+pub async fn get_balance(ticker: JsString) -> Currency {
+    let saito = SAITO.lock().await;
+    let wallet = saito.context.wallet.read().await;
+    wallet.get_available_balance()
+}
+
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
     let (mut secret_key, mut public_key) =
         SECP256K1.generate_keypair(&mut rand::rngs::OsRng::default());
@@ -559,4 +648,28 @@ pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
         secret_bytes[i] = secret_key[i];
     }
     (public_key.serialize(), secret_bytes)
+}
+
+pub fn string_to_key<T: TryFrom<Vec<u8>>>(key: JsString) -> Result<T, std::io::Error>
+where
+    <T as TryFrom<Vec<u8>>>::Error: std::fmt::Debug,
+{
+    let str = key.as_string();
+    if str.is_none() {
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+    let str = str.unwrap();
+    let key = hex::decode(str);
+    if key.is_err() {
+        error!("{:?}", key.err().unwrap());
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+    let key = key.unwrap();
+    let key = key.try_into();
+    if key.is_err() {
+        // error!("{:?}", key.err().unwrap());
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+    let key = key.unwrap();
+    Ok(key)
 }

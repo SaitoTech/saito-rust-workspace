@@ -10,7 +10,9 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, Currency, SaitoHash, UtxoSet, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+    push_lock, Currency, SaitoHash, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+    MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
+    PRUNE_AFTER_BLOCKS,
 };
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
@@ -21,19 +23,6 @@ use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::{iterate, lock_for_write};
-
-// length of 1 genesis period
-pub const GENESIS_PERIOD: u64 = 100_000;
-// prune blocks from index after N blocks
-pub const PRUNE_AFTER_BLOCKS: u64 = 6;
-// max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
-pub const MAX_STAKER_RECURSION: u64 = 3;
-// max token supply - used in validating block #1
-pub const MAX_TOKEN_SUPPLY: Currency = 10_000_000_000_000_000_000_000_000_000;
-// minimum golden tickets required ( NUMBER_OF_TICKETS / number of preceding blocks )
-pub const MIN_GOLDEN_TICKETS_NUMERATOR: u64 = 2;
-// minimum golden tickets required ( number of tickets / NUMBER_OF_PRECEDING_BLOCKS )
-pub const MIN_GOLDEN_TICKETS_DENOMINATOR: u64 = 6;
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
     ((top as u64) << 32) + (bottom as u64)

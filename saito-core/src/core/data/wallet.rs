@@ -3,6 +3,7 @@ use log::{info, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    NOLAN_PER_SAITO,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{decrypt_with_password, encrypt_with_password, hash, sign};
@@ -281,9 +282,17 @@ impl Wallet {
         sign(message_bytes, &self.private_key)
     }
 
-    pub async fn create_transaction_with_default_fees(&self) -> Transaction {
-        // TODO : to be implemented
-        Transaction::default()
+    pub async fn create_transaction(
+        &self,
+        public_key: &SaitoPublicKey,
+        amount: Currency,
+        fee: Currency,
+        force_merge: bool,
+    ) -> Result<Transaction, std::io::Error> {
+        let amount = amount * NOLAN_PER_SAITO;
+        let fee = fee * NOLAN_PER_SAITO;
+
+        todo!()
     }
     pub async fn create_golden_ticket_transaction(
         golden_ticket: GoldenTicket,
@@ -324,7 +333,7 @@ impl WalletSlip {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         WalletSlip {
-            utxokey: [0; 66],
+            utxokey: [0; 58],
             amount: 0,
             block_id: 0,
             tx_ordinal: 0,

@@ -4,17 +4,32 @@ use std::collections::VecDeque;
 use ahash::AHashMap;
 use tokio::sync::mpsc::Sender;
 
-pub type Currency = u128;
+pub type Currency = u64;
 pub type Timestamp = u64;
 pub type SaitoSignature = [u8; 64];
 pub type SaitoPublicKey = [u8; 33];
 pub type SaitoPrivateKey = [u8; 32];
 pub type SaitoHash = [u8; 32];
 // pub type SlipUuid = [u8; 17];
-pub type SaitoUTXOSetKey = [u8; 66];
+pub type SaitoUTXOSetKey = [u8; 58];
 pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 pub type PeerIndex = u64;
 pub type BlockId = u64;
+
+pub const NOLAN_PER_SAITO: Currency = 100_000_000;
+
+// length of 1 genesis period
+pub const GENESIS_PERIOD: u64 = 100_000;
+// prune blocks from index after N blocks
+pub const PRUNE_AFTER_BLOCKS: u64 = 6;
+// max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
+pub const MAX_STAKER_RECURSION: u64 = 3;
+// max token supply - used in validating block #1
+pub const MAX_TOKEN_SUPPLY: Currency = 1_000_000_000_000_000_000;
+// minimum golden tickets required ( NUMBER_OF_TICKETS / number of preceding blocks )
+pub const MIN_GOLDEN_TICKETS_NUMERATOR: u64 = 2;
+// minimum golden tickets required ( number of tickets / NUMBER_OF_PRECEDING_BLOCKS )
+pub const MIN_GOLDEN_TICKETS_DENOMINATOR: u64 = 6;
 
 pub const BLOCK_FILE_EXTENSION: &str = ".sai";
 pub const STAT_BIN_COUNT: usize = 3;

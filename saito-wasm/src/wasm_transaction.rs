@@ -1,4 +1,4 @@
-use js_sys::Array;
+use js_sys::{Array, Uint8Array};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use saito_core::common::defs::{Currency, SaitoSignature};
@@ -8,33 +8,45 @@ use crate::wasm_slip::WasmSlip;
 
 #[wasm_bindgen]
 pub struct WasmTransaction {
-    pub(crate) from: Vec<WasmSlip>,
-    pub(crate) to: Vec<WasmSlip>,
-    pub(crate) fees_total: Currency,
-    pub timestamp: u64,
-    pub(crate) signature: SaitoSignature,
+    tx: Transaction,
 }
 
 #[wasm_bindgen]
 impl WasmTransaction {
     pub fn new() -> WasmTransaction {
         WasmTransaction {
-            from: vec![],
-            to: vec![],
-            fees_total: 0,
-            timestamp: 0,
-            signature: [0; 64],
+            tx: Transaction::default(),
         }
+    }
+    pub fn get_signature(&self) -> js_sys::Uint8Array {
+        let buffer = Uint8Array::new_with_length(64);
+        buffer.copy_from(self.tx.signature.as_slice());
+
+        buffer
     }
     pub fn add_to_slip(&mut self, slip: WasmSlip) {}
     pub fn add_from_slip(&mut self, slip: WasmSlip) {}
     pub fn get_to_slips(&self) -> Array {
         todo!()
     }
+
     pub fn get_from_slips(&self) -> Array {
         todo!()
     }
-    pub(crate) fn from_transaction(transaction: Transaction) -> WasmTransaction {
-        todo!()
+
+    pub fn get_data(&self) -> js_sys::Uint8Array {
+        let buffer = js_sys::Uint8Array::new_with_length(self.tx.message.len() as u32);
+        buffer.copy_from(self.tx.message.as_slice());
+
+        buffer
+    }
+    pub fn sign(&mut self) {}
+
+    pub fn sign_and_encrypt(&mut self) {}
+}
+
+impl WasmTransaction {
+    pub fn from_transaction(transaction: Transaction) -> WasmTransaction {
+        WasmTransaction { tx: transaction }
     }
 }

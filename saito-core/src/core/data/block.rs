@@ -4,15 +4,15 @@ use std::ops::Rem;
 use std::{i128, mem};
 
 use ahash::AHashMap;
+use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use log::{debug, error, info, trace, warn};
-
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, UtxoSet,
+    GENESIS_PERIOD, MAX_STAKER_RECURSION,
 };
-use crate::core::data::blockchain::{Blockchain, GENESIS_PERIOD, MAX_STAKER_RECURSION};
+use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
 use crate::core::data::crypto::{hash, sign, verify_hash};
 use crate::core::data::golden_ticket::GoldenTicket;
@@ -23,7 +23,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 301;
+pub const BLOCK_HEADER_SIZE: usize = 245;
 
 //
 // object used when generating and validation transactions, containing the
@@ -510,18 +510,18 @@ impl Block {
         let merkle_root: SaitoHash = bytes[85..117].try_into().unwrap();
         let signature: SaitoSignature = bytes[117..181].try_into().unwrap();
 
-        let treasury: Currency = Currency::from_be_bytes(bytes[181..197].try_into().unwrap());
+        let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
         let staking_treasury: Currency =
-            Currency::from_be_bytes(bytes[197..213].try_into().unwrap());
+            Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
 
-        let burnfee: Currency = Currency::from_be_bytes(bytes[213..229].try_into().unwrap());
-        let difficulty: u64 = u64::from_be_bytes(bytes[229..237].try_into().unwrap());
+        let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
+        let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
 
-        let avg_income: Currency = Currency::from_be_bytes(bytes[237..253].try_into().unwrap());
-        let avg_variance: Currency = Currency::from_be_bytes(bytes[253..269].try_into().unwrap());
-        let avg_atr_income: Currency = Currency::from_be_bytes(bytes[269..285].try_into().unwrap());
+        let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
+        let avg_variance: Currency = Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
+        let avg_atr_income: Currency = Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
         let avg_atr_variance: Currency =
-            Currency::from_be_bytes(bytes[285..301].try_into().unwrap());
+            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -649,7 +649,7 @@ impl Block {
 
         let z = primitive_types::U256::from_big_endian(&y.to_be_bytes());
         let zy = x.rem(z);
-        let winning_nolan = zy.low_u128();
+        let winning_nolan: Currency = zy.low_u64();
         // we may need function-timelock object if we need to recreate
         // an ATR transaction to pick the winning routing node.
         let winning_tx_placeholder: Transaction;
@@ -861,8 +861,7 @@ impl Block {
         //
         // calculate total fees
         //
-        let mut index: usize = 0;
-        for transaction in &self.transactions {
+        for (index, transaction) in self.transactions.iter().enumerate() {
             if !transaction.is_fee_transaction() {
                 cv.total_fees += transaction.total_fees;
             } else {
@@ -877,7 +876,6 @@ impl Block {
                 cv.it_num += 1;
                 cv.it_index = Some(index);
             }
-            index += 1;
         }
 
         //
@@ -1845,7 +1843,7 @@ mod tests {
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 233);
+        assert_eq!(serialized_body.len(), 177);
 
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
@@ -1863,10 +1861,10 @@ mod tests {
         assert_eq!(
             block.signature,
             [
-                59, 78, 162, 0, 116, 90, 145, 136, 114, 203, 136, 133, 159, 36, 59, 185, 105, 151,
-                154, 67, 47, 227, 172, 196, 54, 205, 145, 179, 198, 189, 221, 198, 96, 136, 38, 5,
-                177, 115, 81, 221, 120, 197, 77, 250, 185, 154, 18, 248, 8, 50, 49, 217, 179, 172,
-                237, 103, 34, 75, 46, 130, 108, 190, 5, 193
+                181, 196, 195, 189, 82, 225, 56, 124, 169, 36, 245, 199, 95, 50, 182, 135, 95, 153,
+                228, 2, 162, 21, 248, 254, 42, 1, 106, 1, 25, 208, 145, 191, 21, 187, 69, 52, 225,
+                214, 86, 94, 116, 168, 14, 58, 70, 186, 16, 164, 215, 211, 153, 107, 226, 236, 231,
+                190, 0, 62, 12, 122, 68, 24, 2, 109
             ]
         )
     }
