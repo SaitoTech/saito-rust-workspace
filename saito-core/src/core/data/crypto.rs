@@ -110,10 +110,10 @@ pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignatu
 
 pub fn verify(msg: &[u8], sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let hash = hash(msg);
-    verify_hash(&hash, sig, public_key)
+    verify_signature(&hash, sig, public_key)
 }
 
-pub fn verify_hash(hash: &SaitoHash, sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
+pub fn verify_signature(hash: &SaitoHash, sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
     let m = Message::from_slice(hash);
     let p = PublicKey::from_slice(public_key);
     let s = ecdsa::Signature::from_compact(sig);

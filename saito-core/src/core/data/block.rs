@@ -14,7 +14,7 @@ use crate::common::defs::{
 };
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
-use crate::core::data::crypto::{hash, sign, verify_hash};
+use crate::core::data::crypto::{hash, sign, verify_signature};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
 use crate::core::data::merkle::MerkleTree;
@@ -1412,7 +1412,7 @@ impl Block {
         // );
 
         // verify signed by creator
-        if !verify_hash(&self.pre_hash, &self.signature, &self.creator) {
+        if !verify_signature(&self.pre_hash, &self.signature, &self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
@@ -1765,7 +1765,7 @@ mod tests {
     use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_WALLET};
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::crypto::{generate_keys, verify_hash};
+    use crate::core::data::crypto::{generate_keys, verify_signature};
     use crate::core::data::slip::Slip;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -1955,7 +1955,7 @@ mod tests {
 
         assert_eq!(block.creator, wallet.public_key);
         assert_eq!(
-            verify_hash(&block.pre_hash, &block.signature, &block.creator),
+            verify_signature(&block.pre_hash, &block.signature, &block.creator),
             true
         );
         assert_ne!(block.hash, [0; 32]);

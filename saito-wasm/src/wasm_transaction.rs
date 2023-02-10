@@ -1,9 +1,11 @@
-use js_sys::{Array, Uint8Array};
+use js_sys::{Array, JsString, Uint8Array};
+use log::error;
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use saito_core::common::defs::{Currency, SaitoSignature};
+use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoSignature};
 use saito_core::core::data::transaction::Transaction;
 
+use crate::saitowasm::{string_to_key, SAITO};
 use crate::wasm_slip::WasmSlip;
 
 #[wasm_bindgen]
@@ -40,9 +42,19 @@ impl WasmTransaction {
 
         buffer
     }
-    pub fn sign(&mut self) {}
+    pub async fn sign(&mut self) {
+        let saito = SAITO.lock().await;
+        let wallet = saito.context.wallet.read().await;
 
-    pub fn sign_and_encrypt(&mut self) {}
+        self.tx.sign(&wallet.private_key);
+    }
+
+    pub async fn sign_and_encrypt(&mut self) {
+        let saito = SAITO.lock().await;
+        let wallet = saito.context.wallet.read().await;
+
+        self.tx.sign_and_encrypt(&wallet.private_key);
+    }
 }
 
 impl WasmTransaction {

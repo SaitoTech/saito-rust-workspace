@@ -11,7 +11,7 @@ use std::time::Duration;
 use base58::ToBase58;
 use figment::providers::{Format, Json};
 use figment::Figment;
-use js_sys::{BigInt, JsString, Uint8Array};
+use js_sys::{Array, BigInt, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn, Level};
 use tokio::sync::mpsc::Receiver;
@@ -44,6 +44,7 @@ use saito_core::lock_for_write;
 use crate::wasm_block::WasmBlock;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
+use crate::wasm_peer::WasmPeer;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
 
@@ -79,13 +80,13 @@ pub struct SaitoWasm {
     receiver_for_consensus: Receiver<ConsensusEvent>,
     receiver_for_miner: Receiver<MiningEvent>,
     receiver_for_verification: Receiver<VerifyRequest>,
-    context: Context,
+    pub(crate) context: Context,
     wakers: HashMap<u64, Waker>,
     results: HashMap<u64, Result<Vec<u8>, Error>>,
 }
 
 lazy_static! {
-    static ref SAITO: Mutex<SaitoWasm> = Mutex::new(new());
+    pub static ref SAITO: Mutex<SaitoWasm> = Mutex::new(new());
     static ref CONFIGS: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
         Arc::new(RwLock::new(Box::new(WasmConfiguration::new())));
 }
@@ -610,6 +611,37 @@ pub fn sign_buffer(buffer: Uint8Array, private_key: JsString) -> JsString {
 
     let signature = hex::encode(result);
     signature.into()
+}
+
+#[wasm_bindgen]
+pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsString) -> bool {
+    let sig = string_to_key(signature);
+    if sig.is_err() {
+        error!("signature is invalid");
+        todo!()
+    }
+    let sig = sig.unwrap();
+    let key = string_to_key(public_key);
+    if key.is_err() {
+        error!("key is invalid");
+        todo!()
+    }
+    let key = key.unwrap();
+    let buffer = buffer.to_vec();
+    let h = saito_core::core::data::crypto::hash(&buffer);
+    saito_core::core::data::crypto::verify_signature(&h, &sig, &key)
+}
+
+#[wasm_bindgen]
+pub async fn get_peers() -> Array {
+    let saito = SAITO.lock().await;
+    let peers = saito.routing_thread.network.peers.read().await;
+    let array = Array::new_with_length(peers.index_to_peers.len() as u32);
+    for (i, (peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
+        let peer = peer.clone();
+        array.set(i as u32, JsValue::from(WasmPeer::new(peer)));
+    }
+    array
 }
 
 #[wasm_bindgen]

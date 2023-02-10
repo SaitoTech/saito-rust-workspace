@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
 };
-use crate::core::data::crypto::{hash, sign, verify, verify_hash};
+use crate::core::data::crypto::{hash, sign, verify, verify_signature};
 use crate::core::data::hop::{Hop, HOP_SIZE};
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
@@ -789,6 +789,9 @@ impl Transaction {
         self.hash_for_signature = Some(hash_for_signature);
         self.signature = sign(&buffer, private_key);
     }
+    pub fn sign_and_encrypt(&mut self, private_key: &SaitoPrivateKey) {
+        todo!()
+    }
 
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         // trace!(
@@ -844,7 +847,7 @@ impl Transaction {
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
                 let public_key: SaitoPublicKey = self.inputs[0].public_key;
-                if !verify_hash(hash_for_signature, &sig, &public_key) {
+                if !verify_signature(hash_for_signature, &sig, &public_key) {
                     error!(
                         "tx verification failed : hash = {:?}, sig = {:?}, pub_key = {:?}",
                         hex::encode(hash_for_signature),
@@ -1212,7 +1215,7 @@ mod tests {
                    , tx.serialize_for_signature());
         let result = verify(tx.serialize_for_signature().as_slice(), &sig, &public_key);
         assert!(result);
-        let result = verify_hash(tx.hash_for_signature.as_ref().unwrap(), &sig, &public_key);
+        let result = verify_signature(tx.hash_for_signature.as_ref().unwrap(), &sig, &public_key);
         assert!(result);
     }
 }
