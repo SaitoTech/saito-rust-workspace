@@ -10,15 +10,15 @@ pub const SLIP_SIZE: usize = 59;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq, FromPrimitive)]
 pub enum SlipType {
-    Normal,
-    ATR,
-    VipInput,
-    VipOutput,
-    MinerInput,
-    MinerOutput,
-    RouterInput,
-    RouterOutput,
-    Other,
+    Normal = 0,
+    ATR = 1,
+    VipInput = 2,
+    VipOutput = 3,
+    MinerInput = 4,
+    MinerOutput = 5,
+    RouterInput = 6,
+    RouterOutput = 7,
+    Other = 8,
 }
 
 #[serde_with::serde_as]

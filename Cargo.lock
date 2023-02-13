@@ -1726,6 +1726,8 @@ dependencies = [
  "js-sys",
  "lazy_static",
  "log",
+ "num-derive",
+ "num-traits",
  "rand",
  "saito-core",
  "secp256k1",

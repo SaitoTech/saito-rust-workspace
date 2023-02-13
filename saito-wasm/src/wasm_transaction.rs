@@ -3,7 +3,7 @@ use log::error;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoSignature};
-use saito_core::core::data::transaction::Transaction;
+use saito_core::core::data::transaction::{Transaction, TransactionType};
 
 use crate::saitowasm::{string_to_key, SAITO};
 use crate::wasm_slip::WasmSlip;
@@ -54,6 +54,9 @@ impl WasmTransaction {
         let wallet = saito.context.wallet.read().await;
 
         self.tx.sign_and_encrypt(&wallet.private_key);
+    }
+    pub fn get_type(&self) -> u8 {
+        self.tx.transaction_type as u8
     }
 }
 
