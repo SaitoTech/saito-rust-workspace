@@ -68,7 +68,7 @@ impl Mempool {
         }
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: Transaction) {
-        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.message);
+        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.data);
         info!(
             "adding golden ticket : {:?} target : {:?} public_key : {:?}",
             hex::encode(hash(&golden_ticket.serialize_for_net())),
@@ -281,7 +281,7 @@ impl Mempool {
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         for transaction in transactions {
             if let TransactionType::GoldenTicket = transaction.transaction_type {
-                let gt = GoldenTicket::deserialize_from_net(&transaction.message);
+                let gt = GoldenTicket::deserialize_from_net(&transaction.data);
                 self.golden_tickets.remove(&gt.target);
             } else {
                 self.transactions.remove(&transaction.signature);
@@ -377,8 +377,8 @@ mod tests {
                 let (mut wallet, _wallet_) = lock_for_write!(wallet_lock, LOCK_ORDER_WALLET);
 
                 let (inputs, outputs) = wallet.generate_slips(720_000);
-                tx.inputs = inputs;
-                tx.outputs = outputs;
+                tx.from = inputs;
+                tx.to = outputs;
                 // _i prevents sig from being identical during test
                 // and thus from being auto-rejected from mempool
                 tx.timestamp = ts + 120000 + _i;

@@ -5,6 +5,8 @@ use std::{i128, mem};
 
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -150,12 +152,12 @@ impl BlockPayout {
 /// Header - the header of the block without transaction data
 /// Full - the full block including transactions and signatures
 ///
-#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone, FromPrimitive)]
 pub enum BlockType {
-    Ghost,
-    Header,
-    Pruned,
-    Full,
+    Ghost = 0,
+    Header = 1,
+    Pruned = 2,
+    Full = 3,
 }
 
 #[serde_with::serde_as]
@@ -163,25 +165,25 @@ pub enum BlockType {
 pub struct Block {
     /// Consensus Level Variables
     pub id: u64,
-    pub(crate) timestamp: u64,
-    pub(crate) previous_block_hash: [u8; 32],
+    pub timestamp: u64,
+    pub previous_block_hash: [u8; 32],
     #[serde_as(as = "[_; 33]")]
-    pub(crate) creator: [u8; 33],
-    pub(crate) merkle_root: [u8; 32],
+    pub creator: [u8; 33],
+    pub merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
     pub signature: [u8; 64],
-    pub(crate) treasury: Currency,
-    pub(crate) burnfee: Currency,
-    pub(crate) difficulty: u64,
-    pub(crate) staking_treasury: Currency,
-    avg_income: Currency,
-    avg_variance: Currency,
-    avg_atr_income: Currency,
-    avg_atr_variance: Currency,
+    pub treasury: Currency,
+    pub burnfee: Currency,
+    pub difficulty: u64,
+    pub staking_treasury: Currency,
+    pub avg_income: Currency,
+    pub avg_variance: Currency,
+    pub avg_atr_income: Currency,
+    pub avg_atr_variance: Currency,
     /// Transactions
     pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
-    pub(crate) pre_hash: SaitoHash,
+    pub pre_hash: SaitoHash,
     /// Self-Calculated / Validated
     pub hash: SaitoHash,
     /// total fees paid into block
@@ -189,7 +191,7 @@ pub struct Block {
     /// total routing work in block, given creator
     pub total_work: Currency,
     /// Is Block on longest chain
-    pub(crate) in_longest_chain: bool,
+    pub in_longest_chain: bool,
     // has golden ticket
     pub has_golden_ticket: bool,
     // has issuance transaction
@@ -197,27 +199,27 @@ pub struct Block {
     // issuance transaction index
     pub issuance_transaction_index: u64,
     // has fee transaction
-    has_fee_transaction: bool,
+    pub has_fee_transaction: bool,
     // golden ticket index
-    golden_ticket_index: u64,
+    pub golden_ticket_index: u64,
     // fee transaction index
-    fee_transaction_index: u64,
+    pub fee_transaction_index: u64,
     // number of rebroadcast slips
-    total_rebroadcast_slips: u64,
+    pub total_rebroadcast_slips: u64,
     // number of rebroadcast txs
-    total_rebroadcast_nolan: Currency,
+    pub total_rebroadcast_nolan: Currency,
     // all ATR txs hashed together
-    rebroadcast_hash: [u8; 32],
+    pub rebroadcast_hash: [u8; 32],
     // the state of the block w/ pruning etc
-    pub(crate) block_type: BlockType,
+    pub block_type: BlockType,
     // vector of staker slips spent this block - used to prevent withdrawals and payouts same block
     #[serde(skip)]
     pub slips_spent_this_block: AHashMap<SaitoUTXOSetKey, u64>,
     #[serde(skip)]
-    created_hashmap_of_slips_spent_this_block: bool,
+    pub created_hashmap_of_slips_spent_this_block: bool,
     // the peer's connection ID who sent us this block
     #[serde(skip)]
-    pub(crate) source_connection_id: Option<SaitoPublicKey>,
+    pub source_connection_id: Option<SaitoPublicKey>,
 }
 
 impl Block {
@@ -347,7 +349,7 @@ impl Block {
         //
         if !block.created_hashmap_of_slips_spent_this_block {
             for transaction in &block.transactions {
-                for input in transaction.inputs.iter() {
+                for input in transaction.from.iter() {
                     block
                         .slips_spent_this_block
                         .entry(input.get_utxoset_key())
@@ -407,7 +409,7 @@ impl Block {
         //
         for transaction in &block.transactions {
             if transaction.transaction_type != TransactionType::Fee {
-                for input in transaction.inputs.iter() {
+                for input in transaction.from.iter() {
                     block
                         .slips_spent_this_block
                         .entry(input.get_utxoset_key())
@@ -672,7 +674,7 @@ impl Block {
         // if winner is atr, we take inside TX
         //
         if winning_tx.transaction_type == TransactionType::ATR {
-            let tmptx = winning_tx.message.to_vec();
+            let tmptx = winning_tx.data.to_vec();
             winning_tx_placeholder = Transaction::deserialize_from_net(&tmptx);
             winning_tx = &winning_tx_placeholder;
         }
@@ -767,7 +769,7 @@ impl Block {
             if !self.created_hashmap_of_slips_spent_this_block
                 && transaction.transaction_type != TransactionType::Fee
             {
-                for input in transaction.inputs.iter() {
+                for input in transaction.from.iter() {
                     self.slips_spent_this_block
                         .entry(input.get_utxoset_key())
                         .and_modify(|e| *e += 1)
@@ -798,7 +800,7 @@ impl Block {
                     vbytes.extend(&transaction.serialize_for_signature());
                     self.rebroadcast_hash = hash(&vbytes);
 
-                    for input in transaction.inputs.iter() {
+                    for input in transaction.from.iter() {
                         self.total_rebroadcast_slips += 1;
                         self.total_rebroadcast_nolan += input.amount;
                     }
@@ -896,7 +898,7 @@ impl Block {
                 // identify all unspent transactions
                 //
                 for transaction in &pruned_block.transactions {
-                    for output in transaction.outputs.iter() {
+                    for output in transaction.to.iter() {
                         //
                         // these need to be calculated dynamically based on the
                         // value of the UTXO and the byte-size of the transaction
@@ -1020,7 +1022,7 @@ impl Block {
         //
         if let Some(gt_index) = cv.gt_index {
             let golden_ticket: GoldenTicket =
-                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message);
+                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
             // generate input hash for router
             let mut next_random_number = hash(golden_ticket.random.as_ref());
             let _miner_public_key = golden_ticket.public_key;
@@ -1141,7 +1143,7 @@ impl Block {
                     output.amount = cv.block_payout[i].miner_payout;
                     output.slip_type = SlipType::MinerOutput;
                     output.slip_index = slip_index;
-                    transaction.add_output(output.clone());
+                    transaction.add_to_slip(output.clone());
                     slip_index += 1;
                 }
                 if cv.block_payout[i].router != [0; 33] {
@@ -1150,7 +1152,7 @@ impl Block {
                     output.amount = cv.block_payout[i].router_payout;
                     output.slip_type = SlipType::RouterOutput;
                     output.slip_index = slip_index;
-                    transaction.add_output(output.clone());
+                    transaction.add_to_slip(output.clone());
                     slip_index += 1;
                 }
             }
@@ -1575,7 +1577,7 @@ impl Block {
             //
             if let Some(gt_index) = cv.gt_index {
                 let golden_ticket: GoldenTicket =
-                    GoldenTicket::deserialize_from_net(&self.transactions[gt_index].message);
+                    GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
                 //
                 // we already have a golden ticket, but create a new one pulling the
                 // target hash from our previous block to ensure that this ticket is
@@ -1876,17 +1878,17 @@ mod tests {
 
         let mut mock_tx = Transaction::default();
         mock_tx.timestamp = 0;
-        mock_tx.add_input(mock_input.clone());
-        mock_tx.add_output(mock_output.clone());
-        mock_tx.message = vec![104, 101, 108, 111];
+        mock_tx.add_from_slip(mock_input.clone());
+        mock_tx.add_to_slip(mock_output.clone());
+        mock_tx.data = vec![104, 101, 108, 111];
         mock_tx.transaction_type = TransactionType::Normal;
         mock_tx.signature = [1; 64];
 
         let mut mock_tx2 = Transaction::default();
         mock_tx2.timestamp = 0;
-        mock_tx2.add_input(mock_input);
-        mock_tx2.add_output(mock_output);
-        mock_tx2.message = vec![];
+        mock_tx2.add_from_slip(mock_input);
+        mock_tx2.add_to_slip(mock_output);
+        mock_tx2.data = vec![];
         mock_tx2.transaction_type = TransactionType::Normal;
         mock_tx2.signature = [2; 64];
 

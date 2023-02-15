@@ -318,11 +318,11 @@ pub mod test {
                         block_contains_fee_tx = true;
                         block_fee_tx_index = t as usize;
                     } else {
-                        for z in 0..block.transactions[t].inputs.len() {
-                            block_inputs += block.transactions[t].inputs[z].amount;
+                        for z in 0..block.transactions[t].from.len() {
+                            block_inputs += block.transactions[t].from[z].amount;
                         }
-                        for z in 0..block.transactions[t].outputs.len() {
-                            block_outputs += block.transactions[t].outputs[z].amount;
+                        for z in 0..block.transactions[t].to.len() {
+                            block_outputs += block.transactions[t].to[z].amount;
                         }
                     }
 
@@ -356,7 +356,7 @@ pub mod test {
                             //
                             let mut total_fees_paid: Currency = 0;
                             let fee_transaction = &block.transactions[block_fee_tx_index];
-                            for output in fee_transaction.outputs.iter() {
+                            for output in fee_transaction.to.iter() {
                                 total_fees_paid += output.amount;
                             }
 

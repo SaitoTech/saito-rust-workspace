@@ -36,12 +36,12 @@ pub enum TransactionType {
 pub struct Transaction {
     // the bulk of the consensus transaction data
     pub timestamp: u64,
-    pub inputs: Vec<Slip>,
-    pub outputs: Vec<Slip>,
+    pub from: Vec<Slip>,
+    pub to: Vec<Slip>,
     // #[serde(with = "serde_bytes")] TODO : check this for performance
-    pub message: Vec<u8>,
+    pub data: Vec<u8>,
     pub transaction_type: TransactionType,
-    pub(crate) replaces_txs: u32,
+    pub txs_replacements: u32,
     #[serde_as(as = "[_; 64]")]
     pub signature: SaitoSignature,
     path: Vec<Hop>,
@@ -65,11 +65,11 @@ impl Default for Transaction {
     fn default() -> Self {
         Self {
             timestamp: 0,
-            inputs: vec![],
-            outputs: vec![],
-            message: vec![],
+            from: vec![],
+            to: vec![],
+            data: vec![],
             transaction_type: TransactionType::Normal,
-            replaces_txs: 1,
+            txs_replacements: 1,
             signature: [0; 64],
             hash_for_signature: None,
             path: vec![],
@@ -107,8 +107,8 @@ impl Transaction {
     /// ```
     ///
     /// ```
-    pub fn add_input(&mut self, input_slip: Slip) {
-        self.inputs.push(input_slip);
+    pub fn add_from_slip(&mut self, input_slip: Slip) {
+        self.from.push(input_slip);
     }
 
     /// add output slip
@@ -124,8 +124,8 @@ impl Transaction {
     /// ```
     ///
     /// ```
-    pub fn add_output(&mut self, output_slip: Slip) {
-        self.outputs.push(output_slip);
+    pub fn add_to_slip(&mut self, output_slip: Slip) {
+        self.to.push(output_slip);
     }
 
     /// this function exists largely for testing. It attempts to attach the requested fee
@@ -174,11 +174,11 @@ impl Transaction {
             let output_len = output_slips.len();
 
             for _i in 0..input_len {
-                transaction.add_input(input_slips[0].clone());
+                transaction.add_from_slip(input_slips[0].clone());
                 input_slips.remove(0);
             }
             for _i in 0..output_len {
-                transaction.add_output(output_slips[0].clone());
+                transaction.add_to_slip(output_slips[0].clone());
                 output_slips.remove(0);
             }
 
@@ -186,7 +186,7 @@ impl Transaction {
             let mut output = Slip::default();
             output.public_key = to_public_key;
             output.amount = with_payment;
-            transaction.add_output(output);
+            transaction.add_to_slip(output);
 
             transaction
         } else {
@@ -197,11 +197,11 @@ impl Transaction {
                 let output_len = output_slips.len();
 
                 for _i in 0..input_len {
-                    transaction.add_input(input_slips[0].clone());
+                    transaction.add_from_slip(input_slips[0].clone());
                     input_slips.remove(0);
                 }
                 for _i in 0..output_len {
-                    transaction.add_output(output_slips[0].clone());
+                    transaction.add_to_slip(output_slips[0].clone());
                     output_slips.remove(0);
                 }
 
@@ -209,7 +209,7 @@ impl Transaction {
                 let mut output = Slip::default();
                 output.public_key = to_public_key;
                 output.amount = with_payment;
-                transaction.add_output(output);
+                transaction.add_to_slip(output);
 
                 return transaction;
             }
@@ -221,11 +221,11 @@ impl Transaction {
                 let output_len = output_slips.len();
 
                 for _i in 0..input_len {
-                    transaction.add_input(input_slips[0].clone());
+                    transaction.add_from_slip(input_slips[0].clone());
                     input_slips.remove(0);
                 }
                 for _i in 0..output_len {
-                    transaction.add_output(output_slips[0].clone());
+                    transaction.add_to_slip(output_slips[0].clone());
                     output_slips.remove(0);
                 }
 
@@ -250,8 +250,8 @@ impl Transaction {
             output1.block_id = 0;
             output1.tx_ordinal = 0;
 
-            transaction.add_input(input1);
-            transaction.add_output(output1);
+            transaction.add_from_slip(input1);
+            transaction.add_to_slip(output1);
 
             transaction
         }
@@ -283,7 +283,7 @@ impl Transaction {
         output.public_key = to_public_key;
         output.amount = with_amount;
         output.slip_type = SlipType::VipOutput;
-        transaction.add_output(output);
+        transaction.add_to_slip(output);
         transaction
     }
 
@@ -336,12 +336,12 @@ impl Transaction {
         // by definition already in the previous TX message space.
         //
         if output_slip_to_rebroadcast.slip_type == SlipType::ATR {
-            transaction.message = transaction_to_rebroadcast.message.to_vec();
+            transaction.data = transaction_to_rebroadcast.data.to_vec();
         } else {
-            transaction.message = transaction_to_rebroadcast.serialize_for_net().to_vec();
+            transaction.data = transaction_to_rebroadcast.serialize_for_net().to_vec();
         }
 
-        transaction.add_output(output);
+        transaction.add_to_slip(output);
 
         //
         // signature is the ORIGINAL signature. this transaction
@@ -357,10 +357,10 @@ impl Transaction {
     // removes utxoset entries when block is deleted
     //
     pub async fn delete(&self, utxoset: &mut UtxoSet) -> bool {
-        self.inputs.iter().for_each(|input| {
+        self.from.iter().for_each(|input| {
             input.delete(utxoset);
         });
-        self.outputs.iter().for_each(|output| {
+        self.to.iter().for_each(|output| {
             output.delete(utxoset);
         });
 
@@ -419,10 +419,10 @@ impl Transaction {
 
         let mut transaction = Transaction::default();
         transaction.timestamp = timestamp;
-        transaction.inputs = inputs;
-        transaction.outputs = outputs;
-        transaction.message = message;
-        transaction.replaces_txs = replaces_txs;
+        transaction.from = inputs;
+        transaction.to = outputs;
+        transaction.data = message;
+        transaction.txs_replacements = replaces_txs;
         transaction.transaction_type = transaction_type;
         transaction.signature = signature;
         transaction.path = path;
@@ -490,7 +490,7 @@ impl Transaction {
         // calculate nolan in / out, fees
         // generate utxoset key for every slip
         let nolan_in = self
-            .inputs
+            .from
             .iter_mut()
             .map(|slip| {
                 slip.generate_utxoset_key();
@@ -499,7 +499,7 @@ impl Transaction {
             .sum::<Currency>();
 
         let nolan_out = self
-            .outputs
+            .to
             .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
@@ -606,8 +606,8 @@ impl Transaction {
         // can make you money.
         //
         if self.path.is_empty() {
-            if !self.inputs.is_empty() {
-                return self.inputs[0].public_key;
+            if !self.from.is_empty() {
+                return self.from[0].public_key;
             } else {
                 return [0; 33];
             }
@@ -681,10 +681,10 @@ impl Transaction {
             output_slip_spendable = true;
         }
 
-        self.inputs.iter().for_each(|input| {
+        self.from.iter().for_each(|input| {
             input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
         });
-        self.outputs.iter().for_each(|output| {
+        self.to.iter().for_each(|output| {
             output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
         });
     }
@@ -710,13 +710,13 @@ impl Transaction {
             path_len += 1;
         }
         let inputs = self
-            .inputs
+            .from
             .iter()
             .map(|slip| slip.serialize_for_net())
             .collect::<Vec<_>>()
             .concat();
         let outputs = self
-            .outputs
+            .to
             .iter()
             .map(|slip| slip.serialize_for_net())
             .collect::<Vec<_>>()
@@ -729,17 +729,17 @@ impl Transaction {
             .concat();
 
         let mut buffer: Vec<u8> = [
-            (self.inputs.len() as u32).to_be_bytes().as_slice(),
-            (self.outputs.len() as u32).to_be_bytes().as_slice(),
-            (self.message.len() as u32).to_be_bytes().as_slice(),
+            (self.from.len() as u32).to_be_bytes().as_slice(),
+            (self.to.len() as u32).to_be_bytes().as_slice(),
+            (self.data.len() as u32).to_be_bytes().as_slice(),
             (path_len as u32).to_be_bytes().as_slice(),
             &self.signature.as_slice(),
             self.timestamp.to_be_bytes().as_slice(),
-            self.replaces_txs.to_be_bytes().as_slice(),
+            self.txs_replacements.to_be_bytes().as_slice(),
             (self.transaction_type as u8).to_be_bytes().as_slice(),
             inputs.as_slice(),
             outputs.as_slice(),
-            self.message.as_slice(),
+            self.data.as_slice(),
             hops.as_slice(),
         ]
         .concat();
@@ -754,14 +754,14 @@ impl Transaction {
         // fastest known way that isn't bincode ??
 
         let inputs = self
-            .inputs
+            .from
             .iter()
             .map(|slip| slip.serialize_input_for_signature())
             .collect::<Vec<_>>()
             .concat();
 
         let outputs = self
-            .outputs
+            .to
             .iter()
             .map(|slip| slip.serialize_output_for_signature())
             .collect::<Vec<_>>()
@@ -771,16 +771,16 @@ impl Transaction {
             self.timestamp.to_be_bytes().as_slice(),
             inputs.as_slice(),
             outputs.as_slice(),
-            (self.replaces_txs as u32).to_be_bytes().as_slice(),
+            (self.txs_replacements as u32).to_be_bytes().as_slice(),
             (self.transaction_type as u32).to_be_bytes().as_slice(),
-            self.message.as_slice(),
+            self.data.as_slice(),
         ]
         .concat()
     }
 
     pub fn sign(&mut self, private_key: &SaitoPrivateKey) {
         // we set slip ordinals when signing
-        for (i, output) in self.outputs.iter_mut().enumerate() {
+        for (i, output) in self.to.iter_mut().enumerate() {
             output.slip_index = i as u8;
         }
 
@@ -836,7 +836,7 @@ impl Transaction {
             //
             // validate sender exists
             //
-            if self.inputs.is_empty() {
+            if self.from.is_empty() {
                 error!("ERROR 582039: less than 1 input in transaction");
                 return false;
             }
@@ -846,7 +846,7 @@ impl Transaction {
             //
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
-                let public_key: SaitoPublicKey = self.inputs[0].public_key;
+                let public_key: SaitoPublicKey = self.from[0].public_key;
                 if !verify_signature(hash_for_signature, &sig, &public_key) {
                     error!(
                         "tx verification failed : hash = {:?}, sig = {:?}, pub_key = {:?}",
@@ -936,7 +936,7 @@ impl Transaction {
         //
         // all transactions must have outputs
         //
-        if self.outputs.is_empty() {
+        if self.to.is_empty() {
             error!("ERROR 582039: less than 1 output in transaction");
             return false;
         }
@@ -953,7 +953,7 @@ impl Transaction {
         // if they claim to spend tokens. if the slip has no spendable
         // tokens it will pass this check, which is conducted inside
         // the slip-level validation logic.
-        iterate!(self.inputs, 10).all(|input| input.validate(utxoset))
+        iterate!(self.from, 10).all(|input| input.validate(utxoset))
     }
 
     pub fn validate_routing_path(&self) -> bool {
@@ -1003,10 +1003,10 @@ impl Transaction {
         false
     }
     pub fn is_from(&self, public_key: &SaitoPublicKey) -> bool {
-        iterate!(self.inputs, 10).any(|input| input.public_key.eq(public_key))
+        iterate!(self.from, 10).any(|input| input.public_key.eq(public_key))
     }
     pub fn is_to(&self, public_key: &SaitoPublicKey) -> bool {
-        iterate!(self.outputs, 10).any(|slip| slip.public_key.eq(public_key))
+        iterate!(self.to, 10).any(|slip| slip.public_key.eq(public_key))
     }
 }
 
@@ -1022,9 +1022,9 @@ mod tests {
     fn transaction_new_test() {
         let tx = Transaction::default();
         assert_eq!(tx.timestamp, 0);
-        assert_eq!(tx.inputs, vec![]);
-        assert_eq!(tx.outputs, vec![]);
-        assert_eq!(tx.message, vec![]);
+        assert_eq!(tx.from, vec![]);
+        assert_eq!(tx.to, vec![]);
+        assert_eq!(tx.data, vec![]);
         assert_eq!(tx.transaction_type, TransactionType::Normal);
         assert_eq!(tx.signature, [0; 64]);
         assert_eq!(tx.hash_for_signature, None);
@@ -1040,10 +1040,10 @@ mod tests {
         let keys = generate_keys();
         let wallet = Wallet::new(keys.1, keys.0);
 
-        tx.outputs = vec![Slip::default()];
+        tx.to = vec![Slip::default()];
         tx.sign(&wallet.private_key);
 
-        assert_eq!(tx.outputs[0].slip_index, 0);
+        assert_eq!(tx.to[0].slip_index, 0);
         assert_ne!(tx.signature, [0; 64]);
         assert_ne!(tx.hash_for_signature, Some([0; 32]));
     }
@@ -1062,7 +1062,7 @@ mod tests {
         let mut tx = Transaction::default();
         tx.timestamp = 1637034582666;
         tx.transaction_type = TransactionType::ATR;
-        tx.message = vec![
+        tx.data = vec![
             123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
         ];
 
@@ -1088,8 +1088,8 @@ mod tests {
         output_slip.slip_index = 23;
         output_slip.slip_type = SlipType::Normal;
 
-        tx.inputs.push(input_slip);
-        tx.outputs.push(output_slip);
+        tx.from.push(input_slip);
+        tx.to.push(output_slip);
 
         // assert_eq!(
         //     tx.serialize_for_signature(),
@@ -1110,7 +1110,7 @@ mod tests {
         let mut tx = Transaction::default();
         tx.timestamp = 1637034582666;
         tx.transaction_type = TransactionType::ATR;
-        tx.message = vec![
+        tx.data = vec![
             123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
         ];
 
@@ -1136,8 +1136,8 @@ mod tests {
         output_slip.slip_index = 23;
         output_slip.slip_type = SlipType::Normal;
 
-        tx.inputs.push(input_slip);
-        tx.outputs.push(output_slip);
+        tx.from.push(input_slip);
+        tx.to.push(output_slip);
 
         tx.sign(
             &<[u8; 32]>::from_hex(
@@ -1177,9 +1177,9 @@ mod tests {
         let ctimestamp = 0;
 
         mock_tx.timestamp = ctimestamp;
-        mock_tx.add_input(mock_input);
-        mock_tx.add_output(mock_output);
-        mock_tx.message = vec![104, 101, 108, 108, 111];
+        mock_tx.add_from_slip(mock_input);
+        mock_tx.add_to_slip(mock_output);
+        mock_tx.data = vec![104, 101, 108, 108, 111];
         mock_tx.transaction_type = TransactionType::Normal;
         mock_tx.signature = [1; 64];
         mock_tx.path = mock_path;
@@ -1203,7 +1203,7 @@ mod tests {
         assert_eq!(tx.transaction_type, TransactionType::ATR);
 
         assert_eq!(hex::encode(tx.signature), "dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec");
-        let public_key: SaitoPublicKey = tx.inputs[0].public_key;
+        let public_key: SaitoPublicKey = tx.from[0].public_key;
         assert_eq!(
             hex::encode(public_key),
             "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"

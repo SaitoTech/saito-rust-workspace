@@ -206,7 +206,7 @@ impl ConsensusThread {
             let mut transaction;
             transaction = Transaction::create(&mut wallet, public_key, 5000, 5000);
             // TODO : generate a message buffer which can be converted back into JSON
-            transaction.message = (0..bytes_per_tx)
+            transaction.data = (0..bytes_per_tx)
                 .into_iter()
                 .map(|_| rand::random::<u8>())
                 .collect();

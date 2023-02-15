@@ -141,7 +141,6 @@ let webConfigs = merge(common, {
         }
     },
     plugins: [
-        // new HtmlWebpackPlugin(),
         new WasmPackPlugin({
             crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/web",
@@ -168,5 +167,5 @@ let webConfigs = merge(common, {
     },
     target: "web",
 });
-
+ 
 module.exports = [nodeConfigs, webConfigs];
