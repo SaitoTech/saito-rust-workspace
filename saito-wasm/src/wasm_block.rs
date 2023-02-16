@@ -69,6 +69,10 @@ impl WasmBlock {
     pub fn set_type(&mut self, t: u8) {
         self.block.block_type = BlockType::from_u8(t).unwrap();
     }
+    #[wasm_bindgen(getter = hash)]
+    pub fn get_hash(&self) -> JsString {
+        hex::encode(self.block.hash).into()
+    }
 }
 
 impl WasmBlock {
