@@ -1,4 +1,4 @@
-use js_sys::{Array, JsString};
+use js_sys::{Array, JsString, Uint8Array};
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
@@ -72,6 +72,14 @@ impl WasmBlock {
     #[wasm_bindgen(getter = hash)]
     pub fn get_hash(&self) -> JsString {
         hex::encode(self.block.hash).into()
+    }
+
+    #[wasm_bindgen]
+    pub fn serialize(&self) -> Uint8Array {
+        let buffer = self.block.serialize_for_net(BlockType::Full);
+        let buf = Uint8Array::new_with_length(buffer.len() as u32);
+        buf.copy_from(buffer.as_slice());
+        buf
     }
 }
 
