@@ -60,7 +60,7 @@ pub fn generate_keys() -> (SaitoPublicKey, SaitoPrivateKey) {
 /// Create and return a keypair with  the given hex u8 array as the private key
 pub fn generate_keypair_from_private_key(slice: &[u8]) -> (SaitoPublicKey, SaitoPrivateKey) {
     let secret_key = SecretKey::from_slice(slice).unwrap();
-    let public_key = PublicKey::from_secret_key(&SECP256K1, &secret_key);
+    let public_key = PublicKey::from_secret_key(SECP256K1, &secret_key);
     let mut secret_bytes = [0u8; 32];
     for i in 0..32 {
         secret_bytes[i] = secret_key[i];
@@ -113,7 +113,11 @@ pub fn verify(msg: &[u8], sig: &SaitoSignature, public_key: &SaitoPublicKey) -> 
     verify_signature(&hash, sig, public_key)
 }
 
-pub fn verify_signature(hash: &SaitoHash, sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
+pub fn verify_signature(
+    hash: &SaitoHash,
+    sig: &SaitoSignature,
+    public_key: &SaitoPublicKey,
+) -> bool {
     let m = Message::from_slice(hash);
     let p = PublicKey::from_slice(public_key);
     let s = ecdsa::Signature::from_compact(sig);

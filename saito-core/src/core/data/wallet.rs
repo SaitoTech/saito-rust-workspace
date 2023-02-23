@@ -47,6 +47,7 @@ pub struct Wallet {
     pub filename: String,
     pub filepass: String,
     available_balance: Currency,
+    pub pending_txs: AHashMap<SaitoHash, Transaction>,
 }
 
 impl Wallet {
@@ -62,6 +63,7 @@ impl Wallet {
             filename: "default".to_string(),
             filepass: "password".to_string(),
             available_balance: 0,
+            pending_txs: Default::default(),
         }
     }
 
@@ -326,6 +328,12 @@ impl Wallet {
         transaction.sign(private_key);
 
         transaction
+    }
+    pub fn add_to_pending(&mut self, tx: Transaction) {
+        assert_eq!(tx.from.get(0).unwrap().public_key, self.public_key);
+        assert_ne!(tx.transaction_type, TransactionType::GoldenTicket);
+        assert!(tx.hash_for_signature.is_some());
+        self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
     }
 }
 

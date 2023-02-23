@@ -29,7 +29,7 @@ use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::core::data::context::Context;
-use saito_core::core::data::crypto::SECP256K1;
+use saito_core::core::data::crypto::{generate_keypair_from_private_key, SECP256K1};
 use saito_core::core::data::crypto::{hash as hash_fn, sign};
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
@@ -644,6 +644,17 @@ pub async fn get_peers() -> Array {
     array
 }
 
+pub async fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
+    let saito = SAITO.lock().await;
+    let peers = saito.routing_thread.network.peers.read().await;
+    let peer = peers.find_peer_by_index(peer_index);
+    if peer.is_none() {
+        todo!()
+    }
+
+    Ok(WasmPeer::new(peer.cloned().unwrap()))
+}
+
 #[wasm_bindgen]
 pub async fn get_public_key() -> JsString {
     let saito = SAITO.lock().await;
@@ -664,6 +675,27 @@ pub async fn get_balance(ticker: JsString) -> Currency {
     let saito = SAITO.lock().await;
     let wallet = saito.context.wallet.read().await;
     wallet.get_available_balance()
+}
+
+#[wasm_bindgen]
+pub fn generate_private_key() -> JsString {
+    let (_, private_key) = generate_keys_wasm();
+    hex::encode(private_key).into()
+}
+
+#[wasm_bindgen]
+pub async fn generate_public_key(private_key: JsString) -> JsString {
+    let private_key: SaitoPrivateKey = string_to_key(private_key).unwrap();
+    let (public_key, _) = generate_keypair_from_private_key(&private_key);
+    hex::encode(public_key).into()
+}
+#[wasm_bindgen]
+pub async fn propagate_transaction(tx: WasmTransaction) {
+    let mut saito = SAITO.lock().await;
+    saito
+        .consensus_thread
+        .process_event(ConsensusEvent::NewTransaction { transaction: tx.tx })
+        .await;
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {

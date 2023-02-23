@@ -13,7 +13,7 @@ use crate::wasm_slip::WasmSlip;
 
 #[wasm_bindgen]
 pub struct WasmTransaction {
-    tx: Transaction,
+    pub(crate) tx: Transaction,
 }
 
 #[wasm_bindgen]

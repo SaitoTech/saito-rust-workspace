@@ -18,7 +18,7 @@ use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::transaction::Transaction;
+use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{lock_for_read, lock_for_write};
 
@@ -86,8 +86,23 @@ impl Network {
         // TODO : return if tx is not valid
 
         let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+        let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
 
-        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+        let public_key = wallet.public_key;
+
+        if transaction
+            .from
+            .get(0)
+            .expect("from slip should exist")
+            .public_key
+            == public_key
+        {
+            if let TransactionType::GoldenTicket = transaction.transaction_type {
+            } else {
+                wallet.add_to_pending(transaction.clone());
+            }
+        }
+
         for (index, peer) in peers.index_to_peers.iter() {
             if peer.public_key.is_none() {
                 continue;

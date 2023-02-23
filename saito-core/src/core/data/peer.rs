@@ -1,9 +1,8 @@
 use std::io::Error;
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
-
 use log::{info, warn};
+use tokio::sync::RwLock;
 
 use crate::common::defs::{
     push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
@@ -25,6 +24,7 @@ pub struct Peer {
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
     pub static_peer_config: Option<data::configuration::PeerConfig>,
     pub challenge_for_peer: Option<SaitoHash>,
+    pub key_list: Vec<SaitoPublicKey>,
 }
 
 impl Peer {
@@ -35,6 +35,7 @@ impl Peer {
             block_fetch_url: "".to_string(),
             static_peer_config: None,
             challenge_for_peer: None,
+            key_list: vec![],
         }
     }
     pub async fn initiate_handshake(

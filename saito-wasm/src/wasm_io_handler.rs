@@ -10,7 +10,7 @@ use serde::Serialize;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::SaitoHash;
+use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::configuration::PeerConfig;
 
@@ -162,6 +162,24 @@ impl InterfaceIO for WasmIoHandler {
     fn get_block_dir(&self) -> String {
         "data/blocks/".to_string()
     }
+
+    async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        let buf = Uint8Array::new_with_length(buffer.len() as u32);
+        buf.copy_from(buffer.as_slice());
+        MsgHandler::process_api_call(buf, msg_index, peer_index);
+    }
+
+    async fn process_api_result(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        let buf = Uint8Array::new_with_length(buffer.len() as u32);
+        buf.copy_from(buffer.as_slice());
+        MsgHandler::process_api_result(buf, msg_index, peer_index);
+    }
+
+    async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        let buf = Uint8Array::new_with_length(buffer.len() as u32);
+        buf.copy_from(buffer.as_slice());
+        MsgHandler::process_api_error(buf, msg_index, peer_index);
+    }
 }
 
 impl Debug for WasmIoHandler {
@@ -206,4 +224,13 @@ extern "C" {
         peer_index: BigInt,
         url: String,
     ) -> Result<JsValue, js_sys::Error>;
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn process_api_call(buffer: Uint8Array, msg_index: u32, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn process_api_result(buffer: Uint8Array, msg_index: u32, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn process_api_error(buffer: Uint8Array, msg_index: u32, peer_index: u64);
 }

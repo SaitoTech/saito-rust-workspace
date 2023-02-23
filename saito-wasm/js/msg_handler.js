@@ -38,4 +38,17 @@ export class MsgHandler {
     static fetch_block_from_peer(hash, peer_index, url) {
         return global.shared_methods.fetch_block_from_peer(hash, peer_index, url);
     }
+
+    static process_api_call(buffer, msgIndex, peerIndex) {
+        return global.shared_methods.process_api_call(buffer, msgIndex, peerIndex);
+    }
+
+
+    static process_api_result(buffer, msgIndex, peerIndex) {
+        return global.shared_methods.process_api_result(buffer, msgIndex, peerIndex);
+    }
+
+    static process_api_error(buffer, msgIndex, peerIndex) {
+        return global.shared_methods.process_api_error(buffer, msgIndex, peerIndex);
+    }
 }

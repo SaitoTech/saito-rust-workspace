@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info, trace};
+use log::{debug, error, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -138,8 +138,12 @@ impl RoutingThread {
                     )
                     .await;
             }
-            Message::ApplicationMessage(_) => {
-                debug!("received buffer");
+            Message::ApplicationMessage(api_message) => {
+                self.network.io_interface.process_api_call(
+                    api_message.data,
+                    api_message.msg_index,
+                    peer_index,
+                );
             }
             Message::Block(_) => {
                 unreachable!("received block");
@@ -163,9 +167,20 @@ impl RoutingThread {
             Message::Services() => {}
             Message::GhostChain() => {}
             Message::GhostChainRequest() => {}
-            Message::Result() => {}
-            Message::Error() => {}
-            Message::ApplicationTransaction(_) => {}
+            Message::Result(api_message) => {
+                self.network.io_interface.process_api_result(
+                    api_message.data,
+                    api_message.msg_index,
+                    peer_index,
+                );
+            }
+            Message::Error(api_message) => {
+                self.network.io_interface.process_api_error(
+                    api_message.data,
+                    api_message.msg_index,
+                    peer_index,
+                );
+            }
         }
         trace!("incoming message processed");
     }
