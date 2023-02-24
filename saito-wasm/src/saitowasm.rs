@@ -20,8 +20,8 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, StatVariable,
-    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, Currency, PeerIndex, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    StatVariable, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -32,6 +32,8 @@ use saito_core::core::data::context::Context;
 use saito_core::core::data::crypto::{generate_keypair_from_private_key, SECP256K1};
 use saito_core::core::data::crypto::{hash as hash_fn, sign};
 use saito_core::core::data::mempool::Mempool;
+use saito_core::core::data::msg::api_message::ApiMessage;
+use saito_core::core::data::msg::message::Message;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
@@ -689,6 +691,7 @@ pub async fn generate_public_key(private_key: JsString) -> JsString {
     let (public_key, _) = generate_keypair_from_private_key(&private_key);
     hex::encode(public_key).into()
 }
+
 #[wasm_bindgen]
 pub async fn propagate_transaction(tx: WasmTransaction) {
     let mut saito = SAITO.lock().await;
@@ -696,6 +699,72 @@ pub async fn propagate_transaction(tx: WasmTransaction) {
         .consensus_thread
         .process_event(ConsensusEvent::NewTransaction { transaction: tx.tx })
         .await;
+}
+
+#[wasm_bindgen]
+pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
+    let mut saito = SAITO.lock().await;
+    let api_message = ApiMessage {
+        msg_index,
+        data: buffer.to_vec(),
+    };
+    let message = Message::ApplicationMessage(api_message);
+    let buffer = message.serialize();
+    if peer_index == 0 {
+        saito
+            .routing_thread
+            .network
+            .io_interface
+            .send_message_to_all(buffer, vec![])
+            .await
+            .unwrap();
+    } else {
+        saito
+            .routing_thread
+            .network
+            .io_interface
+            .send_message(peer_index, buffer)
+            .await
+            .unwrap();
+    }
+}
+
+#[wasm_bindgen]
+pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
+    let mut saito = SAITO.lock().await;
+    let api_message = ApiMessage {
+        msg_index,
+        data: buffer.to_vec(),
+    };
+    let message = Message::Result(api_message);
+    let buffer = message.serialize();
+
+    saito
+        .routing_thread
+        .network
+        .io_interface
+        .send_message(peer_index, buffer)
+        .await
+        .unwrap();
+}
+
+#[wasm_bindgen]
+pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
+    let mut saito = SAITO.lock().await;
+    let api_message = ApiMessage {
+        msg_index,
+        data: buffer.to_vec(),
+    };
+    let message = Message::Error(api_message);
+    let buffer = message.serialize();
+
+    saito
+        .routing_thread
+        .network
+        .io_interface
+        .send_message(peer_index, buffer)
+        .await
+        .unwrap();
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {

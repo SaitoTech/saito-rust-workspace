@@ -169,10 +169,10 @@ impl InterfaceIO for WasmIoHandler {
         MsgHandler::process_api_call(buf, msg_index, peer_index);
     }
 
-    async fn process_api_result(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+    async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
         let buf = Uint8Array::new_with_length(buffer.len() as u32);
         buf.copy_from(buffer.as_slice());
-        MsgHandler::process_api_result(buf, msg_index, peer_index);
+        MsgHandler::process_api_success(buf, msg_index, peer_index);
     }
 
     async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
@@ -229,7 +229,7 @@ extern "C" {
     pub fn process_api_call(buffer: Uint8Array, msg_index: u32, peer_index: u64);
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn process_api_result(buffer: Uint8Array, msg_index: u32, peer_index: u64);
+    pub fn process_api_success(buffer: Uint8Array, msg_index: u32, peer_index: u64);
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn process_api_error(buffer: Uint8Array, msg_index: u32, peer_index: u64);

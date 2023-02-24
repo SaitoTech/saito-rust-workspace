@@ -236,7 +236,7 @@ impl InterfaceIO for RustIOHandler {
         todo!()
     }
 
-    async fn process_api_result(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+    async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
         todo!()
     }
 

@@ -109,7 +109,7 @@ pub trait InterfaceIO: Debug {
     fn get_block_dir(&self) -> String;
 
     async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
-    async fn process_api_result(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
+    async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
     async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
 }
 

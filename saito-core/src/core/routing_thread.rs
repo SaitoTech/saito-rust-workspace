@@ -18,6 +18,7 @@ use crate::core::data;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
+use crate::core::data::msg::api_message::ApiMessage;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
@@ -138,13 +139,7 @@ impl RoutingThread {
                     )
                     .await;
             }
-            Message::ApplicationMessage(api_message) => {
-                self.network.io_interface.process_api_call(
-                    api_message.data,
-                    api_message.msg_index,
-                    peer_index,
-                );
-            }
+
             Message::Block(_) => {
                 unreachable!("received block");
             }
@@ -167,19 +162,23 @@ impl RoutingThread {
             Message::Services() => {}
             Message::GhostChain() => {}
             Message::GhostChainRequest() => {}
+            Message::ApplicationMessage(api_message) => {
+                self.network
+                    .io_interface
+                    .process_api_call(api_message.data, api_message.msg_index, peer_index)
+                    .await;
+            }
             Message::Result(api_message) => {
-                self.network.io_interface.process_api_result(
-                    api_message.data,
-                    api_message.msg_index,
-                    peer_index,
-                );
+                self.network
+                    .io_interface
+                    .process_api_success(api_message.data, api_message.msg_index, peer_index)
+                    .await;
             }
             Message::Error(api_message) => {
-                self.network.io_interface.process_api_error(
-                    api_message.data,
-                    api_message.msg_index,
-                    peer_index,
-                );
+                self.network
+                    .io_interface
+                    .process_api_error(api_message.data, api_message.msg_index, peer_index)
+                    .await;
             }
         }
         trace!("incoming message processed");

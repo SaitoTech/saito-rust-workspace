@@ -14,7 +14,6 @@ use crate::core::data::transaction::Transaction;
 pub enum Message {
     HandshakeChallenge(HandshakeChallenge),
     HandshakeResponse(HandshakeResponse),
-    ApplicationMessage(ApiMessage),
     Block(Block),
     Transaction(Transaction),
     BlockchainRequest(BlockchainRequest),
@@ -24,6 +23,7 @@ pub enum Message {
     Services(),
     GhostChain(),
     GhostChainRequest(),
+    ApplicationMessage(ApiMessage),
     Result(ApiMessage),
     Error(ApiMessage),
     // ApplicationTransaction(ApiMessage),
@@ -71,34 +71,33 @@ impl Message {
                 let result = HandshakeResponse::deserialize(&buffer)?;
                 Ok(Message::HandshakeResponse(result))
             }
-
             3 => {
-                let result = ApiMessage::deserialize(&buffer);
-                Ok(Message::ApplicationMessage(result))
-            }
-            4 => {
                 let block = Block::deserialize_from_net(buffer)?;
                 Ok(Message::Block(block))
             }
-            5 => {
+            4 => {
                 let tx = Transaction::deserialize_from_net(&buffer);
                 Ok(Message::Transaction(tx))
             }
-            6 => {
+            5 => {
                 let result = BlockchainRequest::deserialize(&buffer)?;
                 Ok(Message::BlockchainRequest(result))
             }
-            7 => {
+            6 => {
                 assert_eq!(buffer.len(), 40);
                 let block_hash = buffer[0..32].to_vec().try_into().unwrap();
                 let block_id = u64::from_be_bytes(buffer[32..40].to_vec().try_into().unwrap());
                 Ok(Message::BlockHeaderHash(block_hash, block_id))
             }
-            8 => Ok(Message::Ping()),
-            9 => Ok(Message::SPVChain()),
-            10 => Ok(Message::Services()),
-            11 => Ok(Message::GhostChain()),
-            12 => Ok(Message::GhostChainRequest()),
+            7 => Ok(Message::Ping()),
+            8 => Ok(Message::SPVChain()),
+            9 => Ok(Message::Services()),
+            10 => Ok(Message::GhostChain()),
+            11 => Ok(Message::GhostChainRequest()),
+            12 => {
+                let result = ApiMessage::deserialize(&buffer);
+                Ok(Message::ApplicationMessage(result))
+            }
             13 => {
                 let result = ApiMessage::deserialize(&buffer);
                 Ok(Message::Result(result))
@@ -118,16 +117,16 @@ impl Message {
         match self {
             Message::HandshakeChallenge(_) => 1,
             Message::HandshakeResponse(_) => 2,
-            Message::ApplicationMessage(_) => 3,
-            Message::Block(_) => 4,
-            Message::Transaction(_) => 5,
-            Message::BlockchainRequest(_) => 6,
-            Message::BlockHeaderHash(_, _) => 7,
-            Message::Ping() => 8,
-            Message::SPVChain() => 9,
-            Message::Services() => 10,
-            Message::GhostChain() => 11,
-            Message::GhostChainRequest() => 12,
+            Message::Block(_) => 3,
+            Message::Transaction(_) => 4,
+            Message::BlockchainRequest(_) => 5,
+            Message::BlockHeaderHash(_, _) => 6,
+            Message::Ping() => 7,
+            Message::SPVChain() => 8,
+            Message::Services() => 9,
+            Message::GhostChain() => 10,
+            Message::GhostChainRequest() => 11,
+            Message::ApplicationMessage(_) => 12,
             Message::Result(_) => 13,
             Message::Error(_) => 14,
             // Message::ApplicationTransaction(_) => 16,

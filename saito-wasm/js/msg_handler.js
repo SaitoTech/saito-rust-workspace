@@ -44,8 +44,8 @@ export class MsgHandler {
     }
 
 
-    static process_api_result(buffer, msgIndex, peerIndex) {
-        return global.shared_methods.process_api_result(buffer, msgIndex, peerIndex);
+    static process_api_success(buffer, msgIndex, peerIndex) {
+        return global.shared_methods.process_api_success(buffer, msgIndex, peerIndex);
     }
 
     static process_api_error(buffer, msgIndex, peerIndex) {
