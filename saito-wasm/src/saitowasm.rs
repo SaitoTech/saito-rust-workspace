@@ -424,19 +424,23 @@ pub async fn create_transaction(
     let wasm_transaction = WasmTransaction::from_transaction(transaction.unwrap());
     return Ok(wasm_transaction);
 }
+//
+// #[wasm_bindgen]
+// pub async fn send_transaction(transaction: WasmTransaction) -> Result<JsValue, JsValue> {
+//     // todo : convert transaction
+//
+//     let saito = SAITO.lock().await;
+//     // saito.blockchain_controller.
+//     Ok(JsValue::from("test"))
+// }
 
 #[wasm_bindgen]
-pub async fn send_transaction(transaction: WasmTransaction) -> Result<JsValue, JsValue> {
-    // todo : convert transaction
-
+pub async fn get_latest_block_hash() -> JsString {
     let saito = SAITO.lock().await;
-    // saito.blockchain_controller.
-    Ok(JsValue::from("test"))
-}
+    let blockchain = saito.context.blockchain.read().await;
+    let hash = blockchain.get_latest_block_hash();
 
-#[wasm_bindgen]
-pub fn get_latest_block_hash() -> Result<JsValue, JsValue> {
-    Ok(JsValue::from("latestblockhash"))
+    hex::encode(hash).into()
 }
 
 pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
@@ -668,8 +672,8 @@ pub async fn get_public_key() -> JsString {
 #[wasm_bindgen]
 pub fn get_pending_txs() -> js_sys::Array {
     let array = js_sys::Array::new_with_length(1024);
-
-    array
+    todo!()
+    // array
 }
 
 #[wasm_bindgen]
