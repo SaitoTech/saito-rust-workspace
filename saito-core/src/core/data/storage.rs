@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
-use crate::common::run_task::RunTask;
+
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
@@ -92,8 +92,6 @@ impl Storage {
         let mut file_names = file_names.unwrap();
         file_names.sort();
         debug!("block file names : {:?}", file_names);
-
-        let mut waiting_count = file_names.len();
 
         trace!("loading files...");
         for file_name in file_names {

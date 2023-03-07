@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use log::info;
+use log::{debug, error, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -14,7 +15,6 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
-use log::{debug, error, trace};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
     push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS,
@@ -136,6 +136,7 @@ async fn run_mining_event_processor(
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
     sender_to_stat: Sender<String>,
+    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
 ) -> JoinHandle<()> {
     let mining_event_processor = MiningThread {
         wallet: context.wallet.clone(),
@@ -147,6 +148,8 @@ async fn run_mining_event_processor(
         public_key: [0; 33],
         mined_golden_tickets: 0,
         stat_sender: sender_to_stat.clone(),
+        configs,
+        enabled: false,
     };
     debug!("running miner thread");
     let miner_handle = run_thread(
@@ -199,6 +202,7 @@ async fn run_consensus_event_processor(
             )),
             peers.clone(),
             context.wallet.clone(),
+            context.configuration.clone(),
         ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
@@ -210,6 +214,7 @@ async fn run_consensus_event_processor(
         stats: ConsensusStats::new(sender_to_stat.clone()),
         txs_for_mempool: vec![],
         stat_sender: sender_to_stat.clone(),
+        configs: context.configuration.clone(),
     };
 
     debug!("running mempool thread");
@@ -286,7 +291,7 @@ async fn run_verification_threads(
 
 async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
-    configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     context: &Context,
     peers: Arc<RwLock<PeerCollection>>,
     sender_to_mempool: &Sender<ConsensusEvent>,
@@ -314,6 +319,7 @@ async fn run_routing_event_processor(
             )),
             peers.clone(),
             context.wallet.clone(),
+            context.configuration.clone(),
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
@@ -472,7 +478,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = ConfigHandler::load_configs("configs/config.json".to_string())
         .expect("loading configs failed");
-    let configs: Arc<RwLock<Box<SpammerConfigs>>> = Arc::new(RwLock::new(Box::new(config.clone())));
+    let configs: Arc<RwLock<SpammerConfigs>> = Arc::new(RwLock::new(config.clone()));
 
     let channel_size;
     let thread_sleep_time_in_ms;
@@ -490,8 +496,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         fetch_batch_size = configs.get_server_configs().block_fetch_batch_size as usize;
     }
 
-    let configs_clone: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
-        Arc::new(RwLock::new(Box::new(config.clone())));
+    let configs_clone: Arc<RwLock<dyn Configuration + Send + Sync>> =
+        Arc::new(RwLock::new(config.clone()));
 
     let (event_sender_to_loop, event_receiver_in_loop) =
         tokio::sync::mpsc::channel::<IoEvent>(channel_size);
@@ -575,6 +581,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
         sender_to_stat.clone(),
+        configs.clone(),
     )
     .await;
 

@@ -6,6 +6,7 @@ use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::msg::api_message::ApiMessage;
 use crate::core::data::msg::block_request::BlockchainRequest;
+use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;
@@ -21,8 +22,8 @@ pub enum Message {
     Ping(),
     SPVChain(),
     Services(),
-    GhostChain(),
-    GhostChainRequest(),
+    GhostChain(GhostChainSync),
+    GhostChainRequest(u64, SaitoHash, SaitoHash),
     ApplicationMessage(ApiMessage),
     Result(ApiMessage),
     Error(ApiMessage),
@@ -45,6 +46,13 @@ impl Message {
             Message::BlockHeaderHash(block_hash, block_id) => {
                 [block_hash.as_slice(), block_id.to_be_bytes().as_slice()].concat()
             }
+            Message::GhostChain(chain) => chain.serialize(),
+            Message::GhostChainRequest(block_id, block_hash, fork_id) => [
+                block_id.to_be_bytes().as_slice(),
+                block_hash.as_slice(),
+                fork_id.as_slice(),
+            ]
+            .concat(),
             Message::Ping() => {
                 vec![]
             }
@@ -92,8 +100,13 @@ impl Message {
             7 => Ok(Message::Ping()),
             8 => Ok(Message::SPVChain()),
             9 => Ok(Message::Services()),
-            10 => Ok(Message::GhostChain()),
-            11 => Ok(Message::GhostChainRequest()),
+            10 => Ok(Message::GhostChain(GhostChainSync::deserialize(buffer))),
+            11 => {
+                let block_id = u64::from_be_bytes(buffer[0..8].try_into().unwrap());
+                let block_hash = buffer[8..40].to_vec().try_into().unwrap();
+                let fork_id = buffer[40..72].to_vec().try_into().unwrap();
+                return Ok(Message::GhostChainRequest(block_id, block_hash, fork_id));
+            }
             12 => {
                 let result = ApiMessage::deserialize(&buffer);
                 Ok(Message::ApplicationMessage(result))
@@ -124,8 +137,8 @@ impl Message {
             Message::Ping() => 7,
             Message::SPVChain() => 8,
             Message::Services() => 9,
-            Message::GhostChain() => 10,
-            Message::GhostChainRequest() => 11,
+            Message::GhostChain(_) => 10,
+            Message::GhostChainRequest(..) => 11,
             Message::ApplicationMessage(_) => 12,
             Message::Result(_) => 13,
             Message::Error(_) => 14,

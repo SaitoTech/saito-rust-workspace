@@ -6,7 +6,6 @@ use std::{i128, mem};
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
-use num_traits::FromPrimitive;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +15,7 @@ use crate::common::defs::{
 };
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
+use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::{hash, sign, verify_signature};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::hop::HOP_SIZE;
@@ -220,6 +220,8 @@ pub struct Block {
     // the peer's connection ID who sent us this block
     #[serde(skip)]
     pub source_connection_id: Option<SaitoPublicKey>,
+    #[serde(skip)]
+    pub transaction_map: AHashMap<SaitoPublicKey, bool>,
 }
 
 impl Block {
@@ -262,6 +264,7 @@ impl Block {
             slips_spent_this_block: AHashMap::new(),
             created_hashmap_of_slips_spent_this_block: false,
             source_connection_id: None,
+            transaction_map: Default::default(),
         }
     }
 
@@ -280,6 +283,7 @@ impl Block {
         public_key: &SaitoPublicKey,
         private_key: &SaitoPrivateKey,
         golden_ticket: Option<Transaction>,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> Block {
         debug!(
             "Block::create : previous block hash : {:?}",
@@ -453,7 +457,8 @@ impl Block {
         //
         // generate merkle root
         //
-        let block_merkle_root = block.generate_merkle_root();
+        let block_merkle_root =
+            block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
         block.merkle_root = block_merkle_root;
 
         block.avg_income = cv.avg_income;
@@ -723,6 +728,8 @@ impl Block {
             .enumerate()
             .all(|(index, tx)| tx.generate(creator_public_key, index as u64, self.id));
 
+        self.generate_transaction_hashmap();
+
         // trace!(" ... block.prevalid - pst hash:  {:?}", create_timestamp());
 
         //
@@ -836,8 +843,12 @@ impl Block {
         hash_for_hash
     }
 
-    pub fn generate_merkle_root(&self) -> SaitoHash {
+    pub fn generate_merkle_root(&self, is_browser: bool, is_spv: bool) -> SaitoHash {
         debug!("generating the merkle root 1");
+
+        if self.transactions.is_empty() && (is_browser || is_spv) {
+            return self.merkle_root;
+        }
 
         let merkle_root_hash;
         if let Some(tree) = MerkleTree::generate(&self.transactions) {
@@ -1395,8 +1406,81 @@ impl Block {
         false
     }
 
-    pub async fn validate(&self, blockchain: &Blockchain, utxoset: &UtxoSet) -> bool {
+    pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
+        let mut pruned_txs = vec![];
+        for tx in self.transactions.iter() {
+            if tx
+                .from
+                .iter()
+                .any(|slip| keylist.contains(&slip.public_key))
+                || tx.to.iter().any(|slip| keylist.contains(&slip.public_key))
+                || tx.is_golden_ticket()
+            {
+                pruned_txs.push(tx.clone());
+            } else {
+                let spv = Transaction {
+                    timestamp: tx.timestamp,
+                    from: vec![],
+                    to: vec![],
+                    data: vec![],
+                    transaction_type: TransactionType::SPV,
+                    txs_replacements: 1,
+                    signature: [
+                        tx.hash_for_signature.as_ref().unwrap().as_slice(),
+                        [0; 32].as_slice(),
+                    ]
+                    .concat()
+                    .try_into()
+                    .unwrap(),
+                    path: vec![],
+                    hash_for_signature: tx.hash_for_signature.clone(),
+                    total_in: 0,
+                    total_out: 0,
+                    total_fees: 0,
+                    total_work_for_me: 0,
+                    cumulative_fees: 0,
+                };
+
+                pruned_txs.push(spv);
+            }
+        }
+
+        // TODO : prune transactions here
+
+        let mut block = Block::new();
+        block.id = self.id;
+        block.timestamp = self.timestamp;
+        block.previous_block_hash = self.previous_block_hash;
+        block.merkle_root = self.merkle_root;
+        block.creator = self.creator;
+        block.burnfee = self.burnfee;
+        block.difficulty = self.difficulty;
+        block.treasury = self.treasury;
+        block.staking_treasury = self.staking_treasury;
+        block.signature = self.signature;
+        block.avg_income = self.avg_income;
+        block.avg_variance = self.avg_variance;
+        block.avg_atr_income = self.avg_atr_income;
+        block.avg_atr_variance = self.avg_atr_variance;
+
+        block.transactions = pruned_txs;
+
+        block
+    }
+
+    pub async fn validate(
+        &self,
+        blockchain: &Blockchain,
+        utxoset: &UtxoSet,
+        configs: &(dyn Configuration + Send + Sync),
+    ) -> bool {
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
+
+        if let BlockType::Ghost = self.block_type {
+            // block validates since it's a ghost block
+            return true;
+        }
+
         //
         // no transactions? no thank you
         //
@@ -1643,7 +1727,10 @@ impl Block {
         //
         // validate merkle root
         //
-        if self.merkle_root == [0; 32] && self.merkle_root != self.generate_merkle_root() {
+        if self.merkle_root == [0; 32]
+            && self.merkle_root
+                != self.generate_merkle_root(configs.is_browser(), configs.is_spv_mode())
+        {
             error!("merkle root is unset or is invalid false 1");
             return false;
         }
@@ -1755,6 +1842,28 @@ impl Block {
         }
 
         transactions_valid
+    }
+    pub fn generate_transaction_hashmap(&mut self) {
+        if !self.transaction_map.is_empty() {
+            return;
+        }
+        for tx in self.transactions.iter() {
+            for slip in tx.from.iter() {
+                // TODO : use a hashset instead ??
+                self.transaction_map.insert(slip.public_key, true);
+            }
+            for slip in tx.to.iter() {
+                self.transaction_map.insert(slip.public_key, true);
+            }
+        }
+    }
+    pub fn has_keylist_transactions(&self, keylist: Vec<SaitoPublicKey>) -> bool {
+        for key in keylist {
+            if self.transaction_map.contains_key(&key) {
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -1980,7 +2089,7 @@ mod tests {
             .collect();
 
         block.transactions = transactions;
-        block.merkle_root = block.generate_merkle_root();
+        block.merkle_root = block.generate_merkle_root(false, false);
 
         assert_eq!(block.merkle_root.len(), 32);
         assert_ne!(block.merkle_root, [0; 32]);

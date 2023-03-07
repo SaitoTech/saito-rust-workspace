@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::io::Error;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use ahash::AHashMap;
@@ -16,6 +18,7 @@ use crate::common::defs::{
 };
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
+use crate::core::data::configuration::Configuration;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
 use crate::core::data::storage::Storage;
@@ -49,7 +52,19 @@ pub struct Blockchain {
     pub blocks: AHashMap<SaitoHash, Block>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub genesis_block_id: u64,
-    fork_id: SaitoHash,
+    pub fork_id: SaitoHash,
+    pub last_block_hash: SaitoHash,
+    pub last_block_id: u64,
+    pub last_timestamp: u64,
+    pub last_burnfee: Currency,
+
+    genesis_timestamp: u64,
+    genesis_block_hash: SaitoHash,
+    lowest_acceptable_timestamp: u64,
+    lowest_acceptable_block_hash: SaitoHash,
+    lowest_acceptable_block_id: u64,
+
+    last_callback_block_id: u64,
 }
 
 impl Blockchain {
@@ -62,6 +77,16 @@ impl Blockchain {
             wallet_lock,
             genesis_block_id: 0,
             fork_id: [0; 32],
+            last_block_hash: [0; 32],
+            last_block_id: 0,
+            last_timestamp: 0,
+            last_burnfee: 0,
+            genesis_timestamp: 0,
+            genesis_block_hash: [0; 32],
+            lowest_acceptable_timestamp: 0,
+            lowest_acceptable_block_hash: [0; 32],
+            lowest_acceptable_block_id: 0,
+            last_callback_block_id: 0,
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -84,6 +109,7 @@ impl Blockchain {
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
         mempool: &mut Mempool,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> AddBlockResult {
         // confirm hash first
         // block.generate_pre_hash();
@@ -384,7 +410,12 @@ impl Blockchain {
             self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
             let does_new_chain_validate = self
-                .validate(new_chain.as_slice(), old_chain.as_slice(), storage)
+                .validate(
+                    new_chain.as_slice(),
+                    old_chain.as_slice(),
+                    storage,
+                    configs.deref(),
+                )
                 .await;
 
             if does_new_chain_validate {
@@ -857,6 +888,7 @@ impl Blockchain {
         new_chain: &[SaitoHash],
         old_chain: &[SaitoHash],
         storage: &Storage,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         debug!("validating chains");
 
@@ -872,15 +904,27 @@ impl Blockchain {
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
         //
-        if !self.is_golden_ticket_count_valid(previous_block_hash, has_gt) {
+        if !self.is_golden_ticket_count_valid(
+            previous_block_hash,
+            has_gt,
+            configs.is_browser(),
+            configs.is_spv_mode(),
+        ) {
             return false;
         }
 
         if old_chain.is_empty() {
-            self.wind_chain(new_chain, old_chain, new_chain.len() - 1, false, storage)
-                .await
+            self.wind_chain(
+                new_chain,
+                old_chain,
+                new_chain.len() - 1,
+                false,
+                storage,
+                configs.deref(),
+            )
+            .await
         } else if !new_chain.is_empty() {
-            self.unwind_chain(new_chain, old_chain, 0, true, storage)
+            self.unwind_chain(new_chain, old_chain, 0, true, storage, configs)
                 .await
         } else {
             warn!("lengths are inappropriate");
@@ -892,6 +936,8 @@ impl Blockchain {
         &self,
         previous_block_hash: SaitoHash,
         current_block_has_golden_ticket: bool,
+        is_browser: bool,
+        is_spv: bool,
     ) -> bool {
         let mut golden_tickets_found = 0;
         let mut search_depth_index = 0;
@@ -933,7 +979,10 @@ impl Blockchain {
                 "not enough golden tickets : found = {:?} depth = {:?}",
                 golden_tickets_found, search_depth_index
             );
-            return false;
+            // TODO : browsers might want to implement this check somehow
+            if !is_browser && !is_spv {
+                return false;
+            }
         }
         true
     }
@@ -963,6 +1012,7 @@ impl Blockchain {
         current_wind_index: usize,
         wind_failure: bool,
         storage: &Storage,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
@@ -1021,7 +1071,7 @@ impl Blockchain {
         let block = self.blocks.get(block_hash).unwrap();
         assert_eq!(block.block_type, BlockType::Full);
 
-        let does_block_validate = block.validate(self, &self.utxoset).await;
+        let does_block_validate = block.validate(self, &self.utxoset, configs).await;
 
         if does_block_validate {
             // blockring update
@@ -1070,7 +1120,14 @@ impl Blockchain {
             }
 
             let res = self
-                .wind_chain(new_chain, old_chain, current_wind_index - 1, false, storage)
+                .wind_chain(
+                    new_chain,
+                    old_chain,
+                    current_wind_index - 1,
+                    false,
+                    storage,
+                    configs,
+                )
                 .await;
             res
         } else {
@@ -1112,7 +1169,14 @@ impl Blockchain {
                 if !old_chain.is_empty() {
                     info!("old chain len: {}", old_chain.len());
                     let res = self
-                        .wind_chain(old_chain, new_chain, old_chain.len() - 1, true, storage)
+                        .wind_chain(
+                            old_chain,
+                            new_chain,
+                            old_chain.len() - 1,
+                            true,
+                            storage,
+                            configs,
+                        )
                         .await;
                     res
                 } else {
@@ -1140,7 +1204,7 @@ impl Blockchain {
                 // unwinding starts from the BEGINNING of the vector
                 //
                 let res = self
-                    .unwind_chain(old_chain, &chain_to_unwind, 0, true, storage)
+                    .unwind_chain(old_chain, &chain_to_unwind, 0, true, storage, configs)
                     .await;
                 res
             }
@@ -1171,6 +1235,7 @@ impl Blockchain {
         current_unwind_index: usize,
         wind_failure: bool,
         storage: &Storage,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         let block_id;
         {
@@ -1218,6 +1283,7 @@ impl Blockchain {
                     new_chain.len() - 1,
                     wind_failure,
                     storage,
+                    configs,
                 )
                 .await;
             res
@@ -1235,6 +1301,7 @@ impl Blockchain {
                     current_unwind_index + 1,
                     wind_failure,
                     storage,
+                    configs,
                 )
                 .await;
             res
@@ -1420,6 +1487,7 @@ impl Blockchain {
         network: &Network,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         debug!("adding blocks from mempool to blockchain");
         let mut blocks: VecDeque<Block>;
@@ -1438,6 +1506,7 @@ impl Blockchain {
                     storage,
                     sender_to_miner.clone(),
                     &mut mempool,
+                    configs.deref(),
                 )
                 .await;
             if !blockchain_updated {
@@ -1453,15 +1522,47 @@ impl Blockchain {
         );
         blockchain_updated
     }
+    pub fn add_ghost_block(
+        &mut self,
+        id: u64,
+        previous_block_hash: SaitoHash,
+        ts: u64,
+        prehash: SaitoHash,
+        gt: bool,
+        hash: SaitoHash,
+    ) {
+        let mut block = Block::new();
+        block.id = id;
+        block.previous_block_hash = previous_block_hash;
+        block.timestamp = ts;
+        block.has_golden_ticket = gt;
+        block.pre_hash = prehash;
+        block.hash = hash;
+        block.block_type = BlockType::Ghost;
+
+        if self.is_block_indexed(hash) {
+            warn!("block :{:?} exists in blockchain", hex::encode(hash));
+            return;
+        }
+        if !self.blockring.contains_block_hash_at_block_id(id, hash) {
+            self.blockring.add_block(&block);
+        }
+        if !self.is_block_indexed(hash) {
+            self.blocks.insert(hash, block);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Deref;
     use std::sync::Arc;
 
     use tokio::sync::RwLock;
 
-    use crate::common::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
+    use crate::common::defs::{
+        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+    };
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
@@ -2513,6 +2614,7 @@ mod tests {
             .load_blocks_from_disk(t2.mempool_lock.clone())
             .await;
         {
+            let (configs, _configs_) = lock_for_read!(t2.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain2, _blockchain2_) =
                 lock_for_write!(t2.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
@@ -2522,6 +2624,7 @@ mod tests {
                     &t2.network,
                     &mut t2.storage,
                     t2.sender_to_miner.clone(),
+                    configs.deref(),
                 )
                 .await;
         }

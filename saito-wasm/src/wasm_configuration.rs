@@ -13,7 +13,9 @@ pub struct WasmConfiguration {
     server: Server,
     peers: Vec<PeerConfig>,
     #[serde(skip)]
-    lite: bool,
+    spv_mode: bool,
+    #[serde(skip)]
+    browser_mode: bool,
 }
 
 // #[wasm_bindgen]
@@ -36,7 +38,8 @@ impl WasmConfiguration {
                 block_fetch_batch_size: 0,
             },
             peers: vec![],
-            lite: false,
+            spv_mode: true,
+            browser_mode: true,
         }
     }
     pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
@@ -74,13 +77,17 @@ impl Configuration for WasmConfiguration {
             + endpoint.port.to_string().as_str()
             + "/block/"
     }
-    fn is_lite(&self) -> bool {
-        self.lite
+    fn is_spv_mode(&self) -> bool {
+        self.spv_mode
+    }
+
+    fn is_browser(&self) -> bool {
+        self.browser_mode
     }
 
     fn replace(&mut self, config: &dyn Configuration) {
         self.server = config.get_server_configs().clone();
         self.peers = config.get_peer_configs().clone();
-        self.lite = config.is_lite();
+        self.spv_mode = config.is_spv_mode();
     }
 }

@@ -15,7 +15,7 @@ pub struct HandshakeChallenge {
 pub struct HandshakeResponse {
     pub public_key: SaitoPublicKey,
     pub signature: SaitoSignature,
-    pub is_lite: u64,
+    pub is_lite: bool,
     pub block_fetch_url: String,
     pub challenge: SaitoHash,
 }
@@ -55,7 +55,7 @@ impl Serialize<Self> for HandshakeResponse {
             self.public_key.to_vec(),
             self.signature.to_vec(),
             self.challenge.to_vec(),
-            self.is_lite.to_be_bytes().to_vec(),
+            (self.is_lite as u8).to_be_bytes().to_vec(),
             (self.block_fetch_url.len() as u32).to_be_bytes().to_vec(),
             self.block_fetch_url.as_bytes().to_vec(),
         ]
@@ -74,15 +74,15 @@ impl Serialize<Self> for HandshakeResponse {
             public_key: buffer[0..33].to_vec().try_into().unwrap(),
             signature: buffer[33..97].to_vec().try_into().unwrap(),
             challenge: buffer[97..129].to_vec().try_into().unwrap(),
-            is_lite: u64::from_be_bytes(buffer[129..137].try_into().unwrap()),
+            is_lite: buffer[129] != 0,
             block_fetch_url: "".to_string(),
         };
 
-        let url_length = u32::from_be_bytes(buffer[137..141].try_into().unwrap());
+        let url_length = u32::from_be_bytes(buffer[130..134].try_into().unwrap());
 
         if url_length > 0 {
             let result =
-                String::from_utf8(buffer[141..141 as usize + url_length as usize].to_vec());
+                String::from_utf8(buffer[134..134 as usize + url_length as usize].to_vec());
             if result.is_err() {
                 warn!(
                     "failed decoding block fetch url. {:?}",
@@ -142,7 +142,7 @@ mod tests {
             public_key: public_key_2.serialize(),
             signature: signature.serialize_compact(),
             challenge: rand::random(),
-            is_lite: 0,
+            is_lite: false,
             block_fetch_url: "http://url/test2".to_string(),
         };
         let buffer = response.serialize();

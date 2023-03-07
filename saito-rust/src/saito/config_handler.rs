@@ -33,17 +33,20 @@ impl Configuration for NodeConfigurations {
             + endpoint.host.as_str()
             + ":"
             + endpoint.port.to_string().as_str()
-            + "/block/"
     }
 
-    fn is_lite(&self) -> bool {
+    fn is_spv_mode(&self) -> bool {
+        false
+    }
+
+    fn is_browser(&self) -> bool {
         false
     }
 
     fn replace(&mut self, config: &dyn Configuration) {
         self.server = config.get_server_configs().clone();
         self.peers = config.get_peer_configs().clone();
-        self.lite = config.is_lite();
+        self.lite = config.is_spv_mode();
     }
 }
 

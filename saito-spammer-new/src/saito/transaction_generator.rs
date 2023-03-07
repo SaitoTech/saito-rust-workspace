@@ -51,7 +51,7 @@ impl TransactionGenerator {
         wallet: Arc<RwLock<Wallet>>,
         peers: Arc<RwLock<PeerCollection>>,
         blockchain: Arc<RwLock<Blockchain>>,
-        configuration: Arc<RwLock<Box<SpammerConfigs>>>,
+        configuration: Arc<RwLock<SpammerConfigs>>,
         sender: Sender<VecDeque<Transaction>>,
         tx_payment: Currency,
         tx_fee: Currency,

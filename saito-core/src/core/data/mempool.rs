@@ -1,15 +1,14 @@
 use std::collections::VecDeque;
-use std::time::Duration;
 
 use ahash::AHashMap;
-use rayon::prelude::*;
-
 use log::{debug, info, trace, warn};
+use rayon::prelude::*;
 
 use crate::common::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
+use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::{Transaction, TransactionType};
@@ -147,9 +146,10 @@ impl Mempool {
         blockchain: &mut Blockchain,
         current_timestamp: u64,
         gt_tx: Option<Transaction>,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> Option<Block> {
         let mempool_work = self
-            .can_bundle_block(blockchain, current_timestamp, &gt_tx)
+            .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
             .await?;
         info!(
             "bundling block with {:?} txs with work : {:?}",
@@ -170,6 +170,7 @@ impl Mempool {
             &self.public_key,
             &self.private_key,
             gt_tx,
+            configs,
         )
         .await;
         block.generate();
@@ -188,6 +189,7 @@ impl Mempool {
         &mut self,
         blockchain: &mut Blockchain,
         current_timestamp: u64,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> Block {
         debug!("bundling genesis block...");
 
@@ -199,6 +201,7 @@ impl Mempool {
             &self.public_key,
             &self.private_key,
             None,
+            configs,
         )
         .await;
         block.generate();
@@ -213,6 +216,7 @@ impl Mempool {
         blockchain: &Blockchain,
         current_timestamp: u64,
         gt_tx: &Option<Transaction>,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> Option<Currency> {
         // if self.transactions.is_empty() {
         //     return false;
@@ -231,9 +235,12 @@ impl Mempool {
         if self.transactions.is_empty() || !self.new_tx_added {
             return None;
         }
-        if !blockchain
-            .is_golden_ticket_count_valid(blockchain.get_latest_block_hash(), gt_tx.is_some())
-        {
+        if !blockchain.is_golden_ticket_count_valid(
+            blockchain.get_latest_block_hash(),
+            gt_tx.is_some(),
+            configs.is_browser(),
+            configs.is_spv_mode(),
+        ) {
             trace!("waiting till more golden tickets come in");
             return None;
         }
@@ -306,12 +313,13 @@ impl Mempool {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Deref;
     use std::sync::Arc;
 
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
-        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::burnfee::HEARTBEAT;
@@ -342,9 +350,9 @@ mod tests {
         let blockchain_lock: Arc<RwLock<Blockchain>>;
         let public_key: SaitoPublicKey;
         let private_key: SaitoPrivateKey;
+        let mut t = TestManager::new();
 
         {
-            let mut t = TestManager::new();
             t.initialize(100, 720_000).await;
             t.wait_for_mining_event().await;
 
@@ -363,6 +371,7 @@ mod tests {
         let ts = create_timestamp();
         let _next_block_timestamp = ts + (HEARTBEAT * 2);
 
+        let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
         let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
         let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
 
@@ -401,7 +410,7 @@ mod tests {
         // );
 
         assert!(mempool
-            .can_bundle_block(&blockchain, ts + 120000, &None)
+            .can_bundle_block(&blockchain, ts + 120000, &None, configs.deref())
             .await
             .is_some());
     }

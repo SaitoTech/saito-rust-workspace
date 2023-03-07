@@ -24,22 +24,24 @@ pub mod test {
     //
     //
     use std::borrow::BorrowMut;
+    use std::fmt::{Debug, Formatter};
+    use std::ops::Deref;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
+    use log::{debug, info};
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
-    use log::{debug, info};
-
     use crate::common::defs::{
         push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
-        LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
+    use crate::core::data::configuration::{Configuration, PeerConfig, Server};
     use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
@@ -68,6 +70,7 @@ pub mod test {
         pub peers: Arc<RwLock<PeerCollection>>,
         pub sender_to_miner: Sender<MiningEvent>,
         pub receiver_in_miner: Receiver<MiningEvent>,
+        pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     }
 
     impl TestManager {
@@ -81,6 +84,7 @@ pub mod test {
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(public_key, private_key)));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
+            let configs = Arc::new(RwLock::new(TestConfiguration {}));
 
             Self {
                 wallet_lock: wallet_lock.clone(),
@@ -91,11 +95,13 @@ pub mod test {
                     Box::new(TestIOHandler::new()),
                     peers.clone(),
                     wallet_lock.clone(),
+                    configs.clone(),
                 ),
                 peers: peers.clone(),
                 storage: Storage::new(Box::new(TestIOHandler::new())),
                 sender_to_miner: sender_to_miner.clone(),
                 receiver_in_miner,
+                configs,
             }
         }
 
@@ -123,6 +129,7 @@ pub mod test {
         //
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
@@ -134,6 +141,7 @@ pub mod test {
                     &mut self.storage,
                     self.sender_to_miner.clone(),
                     &mut mempool,
+                    configs.deref(),
                 )
                 .await;
             debug!("block added to test manager blockchain");
@@ -457,6 +465,7 @@ pub mod test {
                 transactions.insert(gttx.signature, gttx);
             }
 
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             //
@@ -470,6 +479,7 @@ pub mod test {
                 &public_key,
                 &private_key,
                 None,
+                configs.deref(),
             )
             .await;
             block.generate();
@@ -557,19 +567,55 @@ pub mod test {
                 block.add_transaction(tx);
             }
 
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             // we have added VIP, so need to regenerate the merkle-root
-            block.merkle_root = block.generate_merkle_root();
+            block.merkle_root =
+                block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+            drop(configs);
             block.generate();
             block.sign(&private_key);
 
             assert!(verify_signature(
                 &block.pre_hash,
                 &block.signature,
-                &block.creator
+                &block.creator,
             ));
 
             // and add first block to blockchain
             self.add_block(block).await;
+        }
+    }
+    struct TestConfiguration {}
+
+    impl Debug for TestConfiguration {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            todo!()
+        }
+    }
+
+    impl Configuration for TestConfiguration {
+        fn get_server_configs(&self) -> &Server {
+            todo!()
+        }
+
+        fn get_peer_configs(&self) -> &Vec<PeerConfig> {
+            todo!()
+        }
+
+        fn get_block_fetch_url(&self) -> String {
+            todo!()
+        }
+
+        fn is_spv_mode(&self) -> bool {
+            todo!()
+        }
+
+        fn is_browser(&self) -> bool {
+            todo!()
+        }
+
+        fn replace(&mut self, config: &dyn Configuration) {
+            todo!()
         }
     }
 }

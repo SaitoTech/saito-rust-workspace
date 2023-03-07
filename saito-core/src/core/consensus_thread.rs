@@ -1,4 +1,4 @@
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -9,13 +9,14 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_MEMPOOL,
-    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
+use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
@@ -89,6 +90,7 @@ pub struct ConsensusThread {
     pub stats: ConsensusStats,
     pub txs_for_mempool: Vec<Transaction>,
     pub stat_sender: Sender<String>,
+    pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
 }
 
 impl ConsensusThread {
@@ -245,6 +247,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             .await;
 
             {
+                let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
@@ -253,7 +256,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
                     {
                         block = mempool
-                            .bundle_genesis_block(&mut blockchain, timestamp)
+                            .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
                             .await;
                     }
 
@@ -264,6 +267,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                             &mut self.storage,
                             self.sender_to_miner.clone(),
                             &mut mempool,
+                            configs.deref(),
                         )
                         .await;
                 }
@@ -293,6 +297,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         // generate blocks
         self.block_producing_timer += duration_value;
         if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
+            let (configs, _configs_) = lock_for_read!(self.network.configs, LOCK_ORDER_CONFIGS);
+
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
             let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
@@ -325,9 +331,17 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 }
             }
 
-            let block = mempool
-                .bundle_block(blockchain.deref_mut(), timestamp, gt_result.clone())
-                .await;
+            let mut block = None;
+            if !configs.is_browser() && !configs.is_spv_mode() {
+                block = mempool
+                    .bundle_block(
+                        blockchain.deref_mut(),
+                        timestamp,
+                        gt_result.clone(),
+                        configs.deref(),
+                    )
+                    .await;
+            }
             if block.is_some() {
                 let block = block.unwrap();
                 info!(
@@ -351,6 +365,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         &self.network,
                         &mut self.storage,
                         self.sender_to_miner.clone(),
+                        configs.deref(),
                     )
                     .await;
 
@@ -421,6 +436,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 Some(())
             }
             ConsensusEvent::BlockFetched { block, .. } => {
+                let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
@@ -446,6 +462,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         &self.network,
                         &mut self.storage,
                         self.sender_to_miner.clone(),
+                        configs.deref(),
                     )
                     .await;
 
@@ -506,6 +523,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             .load_blocks_from_disk(self.mempool.clone())
             .await;
 
+        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let (mut blockchain, _blockchain_) =
             lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
         blockchain
@@ -514,6 +532,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 &self.network,
                 &mut self.storage,
                 self.sender_to_miner.clone(),
+                configs.deref(),
             )
             .await;
     }

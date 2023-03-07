@@ -22,7 +22,7 @@ use crate::IoEvent;
 pub struct Spammer {
     sender_to_network: Sender<IoEvent>,
     peers: Arc<RwLock<PeerCollection>>,
-    configs: Arc<RwLock<Box<SpammerConfigs>>>,
+    configs: Arc<RwLock<SpammerConfigs>>,
     bootstrap_done: bool,
     sent_tx_count: u64,
     tx_generator: TransactionGenerator,
@@ -35,7 +35,7 @@ impl Spammer {
         blockchain: Arc<RwLock<Blockchain>>,
         sender_to_network: Sender<IoEvent>,
         sender: Sender<VecDeque<Transaction>>,
-        configs: Arc<RwLock<Box<SpammerConfigs>>>,
+        configs: Arc<RwLock<SpammerConfigs>>,
     ) -> Spammer {
         let tx_payment;
         let tx_fee;
@@ -132,7 +132,7 @@ pub async fn run_spammer(
     peers: Arc<RwLock<PeerCollection>>,
     blockchain: Arc<RwLock<Blockchain>>,
     sender_to_network: Sender<IoEvent>,
-    configs: Arc<RwLock<Box<SpammerConfigs>>>,
+    configs: Arc<RwLock<SpammerConfigs>>,
 ) {
     info!("starting the spammer");
     let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(10);

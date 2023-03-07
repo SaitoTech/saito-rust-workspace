@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
+use log::{debug, error, info, trace, warn};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
@@ -19,15 +20,17 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use log::{debug, error, info, trace, warn};
 use saito_core::common::defs::{
-    push_lock, SaitoHash, StatVariable, BLOCK_FILE_EXTENSION, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_NETWORK_CONTROLLER, STAT_BIN_COUNT,
+    push_lock, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use saito_core::common::keep_time::KeepTime;
 use saito_core::core::data;
+use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, PeerConfig};
+use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::lock_for_read;
 
 use crate::saito::rust_io_handler::BLOCKS_DIR_PATH;
@@ -406,9 +409,10 @@ impl PeerCounter {
 pub async fn run_network_controller(
     mut receiver: Receiver<IoEvent>,
     sender: Sender<IoEvent>,
-    configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     blockchain: Arc<RwLock<Blockchain>>,
     sender_to_stat: Sender<String>,
+    peers: Arc<RwLock<PeerCollection>>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -416,6 +420,7 @@ pub async fn run_network_controller(
     let host;
     let url;
     let port;
+    let public_key;
     {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
 
@@ -424,10 +429,13 @@ pub async fn run_network_controller(
             + configs.get_server_configs().port.to_string().as_str();
         port = configs.get_server_configs().port;
         host = configs.get_server_configs().host.clone();
+
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let (wallet, _wallet_) = lock_for_read!(blockchain.wallet_lock, LOCK_ORDER_WALLET);
+        public_key = wallet.public_key;
     }
 
     info!("starting server on : {:?}", url);
-    let peer_counter_clone = peer_index_counter.clone();
     let sender_clone = sender.clone();
 
     let network_controller = Arc::new(RwLock::new(NetworkController {
@@ -440,12 +448,12 @@ pub async fn run_network_controller(
     let network_controller_clone = network_controller.clone();
 
     let server_handle = run_websocket_server(
-        peer_counter_clone,
         sender_clone.clone(),
         network_controller_clone.clone(),
         port,
         host,
-        blockchain.clone(),
+        public_key,
+        peers,
     );
 
     let mut work_done = false;
@@ -584,25 +592,24 @@ pub enum PeerReceiver {
 }
 
 fn run_websocket_server(
-    peer_counter: Arc<Mutex<PeerCounter>>,
     sender_clone: Sender<IoEvent>,
     io_controller: Arc<RwLock<NetworkController>>,
     port: u16,
     host: String,
-    blockchain: Arc<RwLock<Blockchain>>,
+    public_key: SaitoPublicKey,
+    peers: Arc<RwLock<PeerCollection>>,
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
     tokio::spawn(async move {
         info!("starting websocket server");
         let io_controller = io_controller.clone();
         let sender_to_io = sender_clone.clone();
-        let peer_counter = peer_counter.clone();
+        let public_key = public_key.clone();
         let ws_route = warp::path("wsopen")
             .and(warp::ws())
             .map(move |ws: warp::ws::Ws| {
                 debug!("incoming connection received");
                 let clone = io_controller.clone();
-                let _peer_counter = peer_counter.clone();
                 let sender_to_io = sender_to_io.clone();
                 let ws = ws.max_message_size(10_000_000_000);
                 let ws = ws.max_frame_size(10_000_000_000);
@@ -681,7 +688,106 @@ fn run_websocket_server(
             debug!("served block with : {:?} length", buffer_len);
             return result;
         });
-        let routes = http_route.or(ws_route);
+        let lite_route = warp::path!("lite-block" / String / String)
+            .and(warp::any().map(move || peers.clone()))
+            .and_then(
+            move |block_hash: String, key1: String,peers:Arc<RwLock<PeerCollection>>| async move {
+                debug!("serving block : {:?}", block_hash);
+
+                if key1.len() != 64 {
+                    warn!("key : {:?} is not valid", key1);
+                    return Err(warp::reject::reject());
+                }
+                let key;
+                if key1.is_empty() {
+                    key = public_key.clone();
+                } else {
+                    let result = hex::decode(key1.as_str());
+                    if result.is_err() {
+                        warn!("key : {:?} couldn't be decoded", key1);
+                        return Err(warp::reject::reject());
+                    }
+                    let result = result.unwrap();
+                    if result.len() != 33 {
+                        warn!("key length : {:?} is not for public key", result.len());
+                        return Err(warp::reject::reject());
+                    }
+                    key = result.try_into().unwrap();
+                }
+                let mut keylist;
+                {
+                    let (peers, _peers_) = lock_for_read!(peers, LOCK_ORDER_PEERS);
+                    let peer = peers.find_peer_by_address(&key);
+                    if peer.is_none() {
+                        keylist = vec![key];
+                    } else {
+                        keylist = peer.as_ref().unwrap().key_list.clone();
+                        keylist.push(key);
+                    }
+                }
+
+                // let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+                let mut buffer: Vec<u8> = Default::default();
+                let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
+                if result.is_err() {
+                    debug!("no blocks found");
+                    return Err(warp::reject::not_found());
+                }
+                let paths: Vec<_> = result
+                    .unwrap()
+                    .map(|r| r.unwrap())
+                    .filter(|r| {
+                        let filename = r.file_name().into_string().unwrap();
+                        if !filename.contains(BLOCK_FILE_EXTENSION) {
+                            return false;
+                        }
+                        if !filename.contains(block_hash.as_str()) {
+                            return false;
+                        }
+                        debug!("selected file : {:?}", filename);
+                        return true;
+                    })
+                    .collect();
+
+                if paths.is_empty() {
+                    return Err(warp::reject::not_found());
+                }
+                let path = paths.first().unwrap();
+                let file_path = BLOCKS_DIR_PATH.to_string()
+                    + "/"
+                    + path.file_name().into_string().unwrap().as_str();
+                let result = File::open(file_path.as_str()).await;
+                if result.is_err() {
+                    error!("failed opening file : {:?}", result.err().unwrap());
+                    todo!()
+                }
+                let mut file = result.unwrap();
+
+                let result = file.read_to_end(&mut buffer).await;
+                if result.is_err() {
+                    error!("failed reading file : {:?}", result.err().unwrap());
+                    todo!()
+                }
+                drop(file);
+
+                let block = Block::deserialize_from_net(buffer);
+                if block.is_err() {
+                    error!("failed parsing buffer into a block");
+                    todo!()
+                }
+                let block = block.unwrap();
+                let block = block.generate_lite_block(keylist);
+                let buffer = block.serialize_for_net(BlockType::Full);
+                let buffer_len = buffer.len();
+                let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
+                debug!("served block with : {:?} length", buffer_len);
+                return result;
+                // }
+                // .await
+            },
+        );
+        let routes = http_route.or(ws_route).or(lite_route);
         // let (_, server) =
         //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
         //         // tokio::signal::ctrl_c().await.ok();

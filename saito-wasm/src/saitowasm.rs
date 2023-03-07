@@ -89,8 +89,8 @@ pub struct SaitoWasm {
 
 lazy_static! {
     pub static ref SAITO: Mutex<SaitoWasm> = Mutex::new(new());
-    static ref CONFIGS: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
-        Arc::new(RwLock::new(Box::new(WasmConfiguration::new())));
+    static ref CONFIGS: Arc<RwLock<dyn Configuration + Send + Sync>> =
+        Arc::new(RwLock::new(WasmConfiguration::new()));
 }
 
 // #[wasm_bindgen]
@@ -104,7 +104,7 @@ pub fn new() -> SaitoWasm {
     let public_key = wallet.public_key.clone();
     let private_key = wallet.private_key.clone();
     let wallet = Arc::new(RwLock::new(wallet));
-    let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> = CONFIGS.clone();
+    let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
@@ -133,6 +133,7 @@ pub fn new() -> SaitoWasm {
                 Box::new(WasmIoHandler {}),
                 peers.clone(),
                 context.wallet.clone(),
+                context.configuration.clone(),
             ),
             reconnection_timer: 0,
             stats: RoutingStats::new(sender_to_stat.clone()),
@@ -158,11 +159,13 @@ pub fn new() -> SaitoWasm {
                 Box::new(WasmIoHandler {}),
                 peers.clone(),
                 context.wallet.clone(),
+                configuration.clone(),
             ),
             storage: Storage::new(Box::new(WasmIoHandler {})),
             stats: ConsensusStats::new(sender_to_stat.clone()),
             txs_for_mempool: vec![],
             stat_sender: sender_to_stat.clone(),
+            configs: configuration.clone(),
         },
         mining_thread: MiningThread {
             wallet: context.wallet.clone(),
@@ -175,6 +178,8 @@ pub fn new() -> SaitoWasm {
             public_key: [0; 33],
             mined_golden_tickets: 0,
             stat_sender: sender_to_stat.clone(),
+            configs: configuration,
+            enabled: true,
         },
         verification_thread: VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
@@ -236,7 +241,7 @@ pub async fn test_run(test: JsString) -> Result<JsValue, JsValue> {
     let public_key = wallet.public_key.clone();
     let private_key = wallet.private_key.clone();
     let wallet = Arc::new(RwLock::new(wallet)); // 654MB
-    let configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> = CONFIGS.clone();
+    let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
@@ -265,6 +270,7 @@ pub async fn test_run(test: JsString) -> Result<JsValue, JsValue> {
                 Box::new(WasmIoHandler {}),
                 peers.clone(),
                 context.wallet.clone(),
+                configuration.clone(),
             ),
             reconnection_timer: 0,
             stats: RoutingStats::new(sender_to_stat.clone()),
@@ -290,11 +296,13 @@ pub async fn test_run(test: JsString) -> Result<JsValue, JsValue> {
                 Box::new(WasmIoHandler {}),
                 peers.clone(),
                 context.wallet.clone(),
+                configuration.clone(),
             ),
             storage: Storage::new(Box::new(WasmIoHandler {})),
             stats: ConsensusStats::new(sender_to_stat.clone()),
             txs_for_mempool: vec![],
             stat_sender: sender_to_stat.clone(),
+            configs: configuration.clone(),
         },
         mining_thread: MiningThread {
             wallet: context.wallet.clone(),
@@ -307,6 +315,8 @@ pub async fn test_run(test: JsString) -> Result<JsValue, JsValue> {
             public_key: [0; 33],
             mined_golden_tickets: 0,
             stat_sender: sender_to_stat.clone(),
+            configs: configuration.clone(),
+            enabled: false,
         },
         verification_thread: VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),

@@ -383,7 +383,7 @@ impl PeerCounter {
 pub async fn run_network_controller(
     mut receiver: Receiver<IoEvent>,
     sender: Sender<IoEvent>,
-    configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     blockchain: Arc<RwLock<Blockchain>>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,

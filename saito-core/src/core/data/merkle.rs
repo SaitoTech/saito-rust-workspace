@@ -6,7 +6,7 @@ use rayon::prelude::*;
 use crate::common::defs::SaitoHash;
 use crate::core::data::crypto::hash;
 use crate::core::data::transaction::Transaction;
-use crate::{iterate, iterate_mut};
+use crate::iterate_mut;
 
 #[derive(PartialEq)]
 pub enum TraverseMode {

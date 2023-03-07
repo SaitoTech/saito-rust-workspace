@@ -44,7 +44,7 @@ pub struct Transaction {
     pub txs_replacements: u32,
     #[serde_as(as = "[_; 64]")]
     pub signature: SaitoSignature,
-    path: Vec<Hop>,
+    pub(crate) path: Vec<Hop>,
 
     // hash used for merkle_root (does not include signature)
     pub hash_for_signature: Option<SaitoHash>,
@@ -595,7 +595,11 @@ impl Transaction {
     // generate hash used for signing the tx
     //
     pub fn generate_hash_for_signature(&mut self) {
-        self.hash_for_signature = Some(hash(&self.serialize_for_signature()));
+        if let TransactionType::SPV = self.transaction_type {
+            self.hash_for_signature = Some(self.signature[0..32].to_vec().try_into().unwrap());
+        } else {
+            self.hash_for_signature = Some(hash(&self.serialize_for_signature()));
+        }
     }
 
     pub fn get_winning_routing_node(&self, random_hash: SaitoHash) -> SaitoPublicKey {
