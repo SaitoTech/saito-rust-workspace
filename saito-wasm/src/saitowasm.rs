@@ -220,145 +220,6 @@ pub fn new() -> SaitoWasm {
 }
 
 #[wasm_bindgen]
-pub async fn test_run(test: JsString) -> Result<JsValue, JsValue> {
-    console_log::init_with_level(Level::Debug).unwrap();
-    // let mut v = vec![];
-    // for i in 0..1000_000 {
-    //     let array = js_sys::Uint8Array::new_with_length(1024);
-    //     info!("i : {:?}", i);
-    //     v.push(array);
-    // }
-    info!("initializing saito-wasm");
-    trace!("trace test");
-    debug!("debug test"); // 258MB
-
-    // let mut configs = CONFIGS.write().await;
-    //
-    // let mut saito = SAITO.lock().await;
-
-    let keys = generate_keys_wasm(); //259MB - 162MB
-    let wallet = Wallet::new(keys.1, keys.0); // 654MB - 614MB
-    let public_key = wallet.public_key.clone();
-    let private_key = wallet.private_key.clone();
-    let wallet = Arc::new(RwLock::new(wallet)); // 654MB
-    let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
-
-    let peers = Arc::new(RwLock::new(PeerCollection::new()));
-    let context = Context {
-        blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
-        mempool: Arc::new(RwLock::new(Mempool::new(public_key, private_key))),
-        wallet: wallet.clone(),
-        configuration: configuration.clone(),
-    };
-
-    let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
-    let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
-    let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
-    let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(100);
-    let (sender_to_verification, receiver_in_verification) = tokio::sync::mpsc::channel(100);
-
-    let wasm = SaitoWasm {
-        routing_thread: RoutingThread {
-            blockchain: context.blockchain.clone(),
-            sender_to_consensus: sender_to_consensus.clone(),
-            sender_to_miner: sender_to_miner.clone(),
-            static_peers: vec![],
-            configs: context.configuration.clone(),
-            time_keeper: Box::new(WasmTimeKeeper {}),
-            wallet: wallet.clone(),
-            network: Network::new(
-                Box::new(WasmIoHandler {}),
-                peers.clone(),
-                context.wallet.clone(),
-                configuration.clone(),
-            ),
-            reconnection_timer: 0,
-            stats: RoutingStats::new(sender_to_stat.clone()),
-            public_key,
-            senders_to_verification: vec![sender_to_verification.clone()],
-            last_verification_thread_index: 0,
-            stat_sender: sender_to_stat.clone(),
-            blockchain_sync_state: BlockchainSyncState::new(10),
-        },
-        consensus_thread: ConsensusThread {
-            mempool: context.mempool.clone(),
-            blockchain: context.blockchain.clone(),
-            wallet: context.wallet.clone(),
-            generate_genesis_block: false,
-            sender_to_router: sender_to_blockchain.clone(),
-            sender_to_miner: sender_to_miner.clone(),
-            // sender_global: (),
-            block_producing_timer: 0,
-            tx_producing_timer: 0,
-            create_test_tx: false,
-            time_keeper: Box::new(WasmTimeKeeper {}),
-            network: Network::new(
-                Box::new(WasmIoHandler {}),
-                peers.clone(),
-                context.wallet.clone(),
-                configuration.clone(),
-            ),
-            storage: Storage::new(Box::new(WasmIoHandler {})),
-            stats: ConsensusStats::new(sender_to_stat.clone()),
-            txs_for_mempool: vec![],
-            stat_sender: sender_to_stat.clone(),
-            configs: configuration.clone(),
-        },
-        mining_thread: MiningThread {
-            wallet: context.wallet.clone(),
-
-            sender_to_mempool: sender_to_consensus.clone(),
-            time_keeper: Box::new(WasmTimeKeeper {}),
-            miner_active: false,
-            target: [0; 32],
-            difficulty: 0,
-            public_key: [0; 33],
-            mined_golden_tickets: 0,
-            stat_sender: sender_to_stat.clone(),
-            configs: configuration.clone(),
-            enabled: false,
-        },
-        verification_thread: VerificationThread {
-            sender_to_consensus: sender_to_consensus.clone(),
-            blockchain: context.blockchain.clone(),
-            peers,
-            wallet,
-            public_key,
-            processed_txs: StatVariable::new(
-                "verification::processed_txs".to_string(),
-                STAT_BIN_COUNT,
-                sender_to_stat.clone(),
-            ),
-            processed_blocks: StatVariable::new(
-                "verification::processed_blocks".to_string(),
-                STAT_BIN_COUNT,
-                sender_to_stat.clone(),
-            ),
-            processed_msgs: StatVariable::new(
-                "verification::processed_msgs".to_string(),
-                STAT_BIN_COUNT,
-                sender_to_stat.clone(),
-            ),
-            invalid_txs: StatVariable::new(
-                "verification::invalid_txs".to_string(),
-                STAT_BIN_COUNT,
-                sender_to_stat.clone(),
-            ),
-            stat_sender: sender_to_stat.clone(),
-        },
-        receiver_for_router: receiver_in_blockchain,
-        receiver_for_consensus: receiver_in_mempool,
-        receiver_for_miner: receiver_in_miner,
-        receiver_for_verification: receiver_in_verification,
-        context,
-        wakers: Default::default(),
-        results: Default::default(),
-    };
-
-    return Ok(JsValue::from("zzzzzz"));
-}
-
-#[wasm_bindgen]
 pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
     console_log::init_with_level(Level::Debug).unwrap();
 
@@ -407,22 +268,21 @@ pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub async fn create_transaction(
+pub fn create_transaction(
     public_key: JsString,
     amount: u64,
     fee: u64,
     force_merge: bool,
 ) -> Result<WasmTransaction, JsValue> {
-    let saito = SAITO.lock().await;
-    let (mut wallet, _wallet_) = lock_for_write!(saito.context.wallet, LOCK_ORDER_WALLET);
+    let saito = SAITO.blocking_lock();
+    let wallet = saito.context.wallet.blocking_write();
+    // let (mut wallet, _wallet_) = lock_for_write!(saito.context.wallet, LOCK_ORDER_WALLET);
     let key = string_to_key(public_key);
     if key.is_err() {
         error!("failed parsing public key : {:?}", key.err().unwrap());
         todo!()
     }
-    let transaction = wallet
-        .create_transaction(&key.unwrap(), amount, fee, force_merge)
-        .await;
+    let transaction = wallet.create_transaction(&key.unwrap(), amount, fee, force_merge);
 
     if transaction.is_err() {
         error!(
@@ -445,15 +305,15 @@ pub async fn create_transaction(
 // }
 
 #[wasm_bindgen]
-pub async fn get_latest_block_hash() -> JsString {
-    let saito = SAITO.lock().await;
-    let blockchain = saito.context.blockchain.read().await;
+pub fn get_latest_block_hash() -> JsString {
+    let saito = SAITO.blocking_lock();
+    let blockchain = saito.context.blockchain.blocking_read();
     let hash = blockchain.get_latest_block_hash();
 
     hex::encode(hash).into()
 }
 
-pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
+pub fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
     let block_hash = string_to_key(block_hash);
     if block_hash.is_err() {
         error!("block hash string is invalid");
@@ -462,8 +322,8 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
 
     let block_hash = block_hash.unwrap();
 
-    let mut saito = SAITO.lock().await;
-    let blockchain = saito.routing_thread.blockchain.read().await;
+    let mut saito = SAITO.blocking_lock();
+    let blockchain = saito.routing_thread.blockchain.blocking_read();
 
     let result = blockchain.get_block(&block_hash);
 
@@ -648,10 +508,22 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
     saito_core::core::data::crypto::verify_signature(&h, &sig, &key)
 }
 
+// #[wasm_bindgen]
+// pub async fn get_peers() -> Array {
+//     let saito = SAITO.lock().await;
+//     let peers = saito.routing_thread.network.peers.read().await;
+//     let array = Array::new_with_length(peers.index_to_peers.len() as u32);
+//     for (i, (peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
+//         let peer = peer.clone();
+//         array.set(i as u32, JsValue::from(WasmPeer::new(peer)));
+//     }
+//     array
+// }
+
 #[wasm_bindgen]
-pub async fn get_peers() -> Array {
-    let saito = SAITO.lock().await;
-    let peers = saito.routing_thread.network.peers.read().await;
+pub fn get_peers() -> Array {
+    let saito = SAITO.blocking_lock();
+    let peers = saito.routing_thread.network.peers.blocking_read();
     let array = Array::new_with_length(peers.index_to_peers.len() as u32);
     for (i, (peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
         let peer = peer.clone();
@@ -660,9 +532,9 @@ pub async fn get_peers() -> Array {
     array
 }
 
-pub async fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
-    let saito = SAITO.lock().await;
-    let peers = saito.routing_thread.network.peers.read().await;
+pub fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
+    let saito = SAITO.blocking_lock();
+    let peers = saito.routing_thread.network.peers.blocking_read();
     let peer = peers.find_peer_by_index(peer_index);
     if peer.is_none() {
         todo!()
@@ -672,10 +544,18 @@ pub async fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
 }
 
 #[wasm_bindgen]
-pub async fn get_public_key() -> JsString {
-    let saito = SAITO.lock().await;
-    let wallet = saito.context.wallet.read().await;
+pub fn get_public_key() -> JsString {
+    let saito = SAITO.blocking_lock();
+    let wallet = saito.context.wallet.blocking_read();
     let key = hex::encode(wallet.public_key);
+    JsString::from(key)
+}
+
+#[wasm_bindgen]
+pub fn get_private_key() -> JsString {
+    let saito = SAITO.blocking_lock();
+    let wallet = saito.context.wallet.blocking_read();
+    let key = hex::encode(wallet.private_key);
     JsString::from(key)
 }
 
@@ -687,9 +567,9 @@ pub fn get_pending_txs() -> js_sys::Array {
 }
 
 #[wasm_bindgen]
-pub async fn get_balance(ticker: JsString) -> Currency {
-    let saito = SAITO.lock().await;
-    let wallet = saito.context.wallet.read().await;
+pub fn get_balance(ticker: JsString) -> Currency {
+    let saito = SAITO.blocking_lock();
+    let wallet = saito.context.wallet.blocking_read();
     wallet.get_available_balance()
 }
 
@@ -700,7 +580,7 @@ pub fn generate_private_key() -> JsString {
 }
 
 #[wasm_bindgen]
-pub async fn generate_public_key(private_key: JsString) -> JsString {
+pub fn generate_public_key(private_key: JsString) -> JsString {
     let private_key: SaitoPrivateKey = string_to_key(private_key).unwrap();
     let (public_key, _) = generate_keypair_from_private_key(&private_key);
     hex::encode(public_key).into()

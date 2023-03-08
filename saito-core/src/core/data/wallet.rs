@@ -284,7 +284,7 @@ impl Wallet {
         sign(message_bytes, &self.private_key)
     }
 
-    pub async fn create_transaction(
+    pub fn create_transaction(
         &self,
         public_key: &SaitoPublicKey,
         amount: Currency,

@@ -100,16 +100,16 @@ impl WasmTransaction {
         self.tx.timestamp = timestamp;
     }
 
-    pub async fn sign(&mut self) {
-        let saito = SAITO.lock().await;
-        let wallet = saito.context.wallet.read().await;
+    pub fn sign(&mut self) {
+        let saito = SAITO.blocking_lock();
+        let wallet = saito.context.wallet.blocking_read();
 
         self.tx.sign(&wallet.private_key);
     }
 
-    pub async fn sign_and_encrypt(&mut self) {
-        let saito = SAITO.lock().await;
-        let wallet = saito.context.wallet.read().await;
+    pub fn sign_and_encrypt(&mut self) {
+        let saito = SAITO.blocking_lock();
+        let wallet = saito.context.wallet.blocking_read();
 
         self.tx.sign_and_encrypt(&wallet.private_key);
     }
@@ -122,7 +122,7 @@ impl WasmTransaction {
         self.tx.transaction_type =
             TransactionType::from_u8(t).expect("invalid value for transaction type");
     }
-    #[wasm_bindgen(getter=total_fees)]
+    #[wasm_bindgen(getter = total_fees)]
     pub fn total_fees(&self) -> Currency {
         self.tx.total_fees
     }
