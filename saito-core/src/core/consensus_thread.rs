@@ -81,8 +81,8 @@ pub struct ConsensusThread {
     pub generate_genesis_block: bool,
     pub sender_to_router: Sender<RoutingEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
-    pub block_producing_timer: Timestamp,
-    pub tx_producing_timer: Timestamp,
+    pub block_producing_timer: u64,
+    pub tx_producing_timer: u64,
     pub create_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub network: Network,
@@ -206,7 +206,7 @@ impl ConsensusThread {
 
         for _i in 0..txs_to_generate {
             let mut transaction;
-            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000);
+            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000, false);
             // TODO : generate a message buffer which can be converted back into JSON
             transaction.data = (0..bytes_per_tx)
                 .into_iter()

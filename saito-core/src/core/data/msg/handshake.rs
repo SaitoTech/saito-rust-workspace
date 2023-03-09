@@ -146,7 +146,7 @@ mod tests {
             block_fetch_url: "http://url/test2".to_string(),
         };
         let buffer = response.serialize();
-        assert_eq!(buffer.len(), 157);
+        assert_eq!(buffer.len(), 150);
         let response2 = HandshakeResponse::deserialize(&buffer).expect("deserialization failed");
         assert_eq!(response.challenge, response2.challenge);
         assert_eq!(response.public_key, response2.public_key);

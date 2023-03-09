@@ -1,4 +1,5 @@
 use js_sys::{Array, JsString};
+use saito_core::common::defs::PeerIndex;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -28,10 +29,16 @@ impl WasmPeer {
     pub fn get_peer_index(&self) -> u64 {
         self.peer.index
     }
+    #[wasm_bindgen(constructor)]
+    pub fn new(peer_index: PeerIndex) -> WasmPeer {
+        WasmPeer {
+            peer: Peer::new(peer_index),
+        }
+    }
 }
 
 impl WasmPeer {
-    pub fn new(peer: Peer) -> WasmPeer {
+    pub fn new_from_peer(peer: Peer) -> WasmPeer {
         WasmPeer { peer }
     }
 }

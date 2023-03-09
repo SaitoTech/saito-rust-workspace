@@ -4,7 +4,9 @@ use ahash::AHashMap;
 use log::{debug, info, trace, warn};
 use rayon::prelude::*;
 
-use crate::common::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
+use crate::common::defs::{
+    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
@@ -144,7 +146,7 @@ impl Mempool {
     pub async fn bundle_block(
         &mut self,
         blockchain: &mut Blockchain,
-        current_timestamp: u64,
+        current_timestamp: Timestamp,
         gt_tx: Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),
     ) -> Option<Block> {
@@ -188,7 +190,7 @@ impl Mempool {
     pub async fn bundle_genesis_block(
         &mut self,
         blockchain: &mut Blockchain,
-        current_timestamp: u64,
+        current_timestamp: Timestamp,
         configs: &(dyn Configuration + Send + Sync),
     ) -> Block {
         debug!("bundling genesis block...");
@@ -214,7 +216,7 @@ impl Mempool {
     pub async fn can_bundle_block(
         &self,
         blockchain: &Blockchain,
-        current_timestamp: u64,
+        current_timestamp: Timestamp,
         gt_tx: &Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),
     ) -> Option<Currency> {

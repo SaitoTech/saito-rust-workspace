@@ -6,7 +6,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{
-    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
+    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp, UtxoSet,
 };
 use crate::core::data::crypto::{hash, sign, verify, verify_signature};
 use crate::core::data::hop::{Hop, HOP_SIZE};
@@ -14,7 +14,7 @@ use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
 use crate::iterate;
 
-pub const TRANSACTION_SIZE: usize = 93;
+pub const TRANSACTION_SIZE: usize = 89;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone, FromPrimitive)]
 pub enum TransactionType {
@@ -35,7 +35,7 @@ pub enum TransactionType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Transaction {
     // the bulk of the consensus transaction data
-    pub timestamp: u64,
+    pub timestamp: Timestamp,
     pub from: Vec<Slip>,
     pub to: Vec<Slip>,
     // #[serde(with = "serde_bytes")] TODO : check this for performance
@@ -151,6 +151,7 @@ impl Transaction {
         to_public_key: SaitoPublicKey,
         with_payment: Currency,
         with_fee: Currency,
+        force_merge: bool,
     ) -> Transaction {
         trace!(
             "generating transaction : payment = {:?}, fee = {:?}",
@@ -385,9 +386,9 @@ impl Transaction {
         let message_len: usize = u32::from_be_bytes(bytes[8..12].try_into().unwrap()) as usize;
         let path_len: usize = u32::from_be_bytes(bytes[12..16].try_into().unwrap()) as usize;
         let signature: SaitoSignature = bytes[16..80].try_into().unwrap();
-        let timestamp: u64 = u64::from_be_bytes(bytes[80..88].try_into().unwrap());
-        let replaces_txs = u32::from_be_bytes(bytes[88..92].try_into().unwrap());
-        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[92]).unwrap();
+        let timestamp: u32 = u32::from_be_bytes(bytes[80..84].try_into().unwrap());
+        let replaces_txs = u32::from_be_bytes(bytes[84..88].try_into().unwrap());
+        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[88]).unwrap();
         let start_of_inputs = TRANSACTION_SIZE;
         let start_of_outputs = start_of_inputs + inputs_len as usize * SLIP_SIZE;
         let start_of_message = start_of_outputs + outputs_len as usize * SLIP_SIZE;
@@ -1057,14 +1058,14 @@ mod tests {
         let tx = Transaction::default();
         assert_eq!(
             tx.serialize_for_signature(),
-            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
         );
     }
 
     #[test]
     fn serialize_for_signature_with_data_test() {
         let mut tx = Transaction::default();
-        tx.timestamp = 1637034582666;
+        tx.timestamp = 1637034582;
         tx.transaction_type = TransactionType::ATR;
         tx.data = vec![
             123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
@@ -1112,7 +1113,7 @@ mod tests {
     #[test]
     fn tx_sign_with_data() {
         let mut tx = Transaction::default();
-        tx.timestamp = 1637034582666;
+        tx.timestamp = 1637034582;
         tx.transaction_type = TransactionType::ATR;
         tx.data = vec![
             123, 34, 116, 101, 115, 116, 34, 58, 34, 116, 101, 115, 116, 34, 125,
@@ -1203,7 +1204,7 @@ mod tests {
 
         let mut tx = Transaction::deserialize_from_net(&buffer);
 
-        assert_eq!(tx.timestamp, 1637034582666);
+        assert_eq!(tx.timestamp, 1637034582);
         assert_eq!(tx.transaction_type, TransactionType::ATR);
 
         assert_eq!(hex::encode(tx.signature), "dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec");

@@ -12,9 +12,9 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, Currency, SaitoHash, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
-    MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
-    PRUNE_AFTER_BLOCKS,
+    push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
+    LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
+    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
@@ -1526,7 +1526,7 @@ impl Blockchain {
         &mut self,
         id: u64,
         previous_block_hash: SaitoHash,
-        ts: u64,
+        ts: Timestamp,
         prehash: SaitoHash,
         gt: bool,
         hash: SaitoHash,

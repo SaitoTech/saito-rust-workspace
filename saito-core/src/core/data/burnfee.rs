@@ -1,10 +1,11 @@
-use crate::common::defs::{Currency, Timestamp};
 use std::time::Duration;
+
+use crate::common::defs::{Currency, Timestamp};
 
 //
 // our target blocktime
 //
-pub const HEARTBEAT: u64 = Duration::from_secs(5).as_millis() as u64;
+pub const HEARTBEAT: Timestamp = Duration::from_secs(5).as_millis() as Timestamp;
 
 //
 // Burn Fee
@@ -32,8 +33,8 @@ impl BurnFee {
     ///
     pub fn return_routing_work_needed_to_produce_block_in_nolan(
         burn_fee_previous_block: Currency,
-        current_block_timestamp_in_ms: u64,
-        previous_block_timestamp_in_ms: u64,
+        current_block_timestamp_in_ms: Timestamp,
+        previous_block_timestamp_in_ms: Timestamp,
     ) -> Currency {
         //
         // impossible if times misordered
@@ -143,17 +144,18 @@ mod tests {
             (100_000_000.0 * (10 as f64).sqrt()).round() as Currency
         );
     }
+
     #[test]
     fn burnfee_slr_match() {
         let burn_fee_previous_block = 50000000;
-        let current_block_timestamp: u64 = 1658821423410;
-        let previous_block_timestamp: u64 = 1658821412997;
+        let current_block_timestamp: Timestamp = 1658821423;
+        let previous_block_timestamp: Timestamp = 1658821412;
 
         let burnfee = BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
             burn_fee_previous_block,
             current_block_timestamp,
             previous_block_timestamp,
         );
-        assert_eq!(burnfee, 34647115);
+        assert_eq!(burnfee, 1066003582);
     }
 }

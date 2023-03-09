@@ -1,5 +1,6 @@
 use js_sys::{Array, JsString, Uint8Array};
 use num_traits::FromPrimitive;
+use saito_core::common::defs::Timestamp;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -15,6 +16,12 @@ pub struct WasmBlock {
 
 #[wasm_bindgen]
 impl WasmBlock {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> WasmBlock {
+        WasmBlock {
+            block: Block::new(),
+        }
+    }
     #[wasm_bindgen(getter = transactions)]
     pub fn get_transactions(&self) -> Array {
         let mut txs: Vec<WasmTransaction> = self
@@ -38,11 +45,11 @@ impl WasmBlock {
         self.block.id = id;
     }
     #[wasm_bindgen(getter = timestamp)]
-    pub fn get_timestamp(&self) -> u64 {
+    pub fn get_timestamp(&self) -> Timestamp {
         self.block.timestamp
     }
     #[wasm_bindgen(setter = timestamp)]
-    pub fn set_timestamp(&mut self, timestamp: u64) {
+    pub fn set_timestamp(&mut self, timestamp: Timestamp) {
         self.block.timestamp = timestamp;
     }
     #[wasm_bindgen(getter = previous_block_hash)]

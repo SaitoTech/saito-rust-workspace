@@ -37,6 +37,7 @@ use saito_core::core::data::msg::message::Message;
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
+use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
@@ -275,23 +276,16 @@ pub fn create_transaction(
     force_merge: bool,
 ) -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.blocking_lock();
-    let wallet = saito.context.wallet.blocking_write();
+    let mut wallet = saito.context.wallet.blocking_write();
     // let (mut wallet, _wallet_) = lock_for_write!(saito.context.wallet, LOCK_ORDER_WALLET);
     let key = string_to_key(public_key);
     if key.is_err() {
         error!("failed parsing public key : {:?}", key.err().unwrap());
         todo!()
     }
-    let transaction = wallet.create_transaction(&key.unwrap(), amount, fee, force_merge);
+    let transaction = Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge);
 
-    if transaction.is_err() {
-        error!(
-            "couldn't create transaction : {:?}",
-            transaction.err().unwrap()
-        );
-        todo!()
-    }
-    let wasm_transaction = WasmTransaction::from_transaction(transaction.unwrap());
+    let wasm_transaction = WasmTransaction::from_transaction(transaction);
     return Ok(wasm_transaction);
 }
 //
@@ -527,7 +521,7 @@ pub fn get_peers() -> Array {
     let array = Array::new_with_length(peers.index_to_peers.len() as u32);
     for (i, (peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
         let peer = peer.clone();
-        array.set(i as u32, JsValue::from(WasmPeer::new(peer)));
+        array.set(i as u32, JsValue::from(WasmPeer::new_from_peer(peer)));
     }
     array
 }
@@ -540,7 +534,7 @@ pub fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
         todo!()
     }
 
-    Ok(WasmPeer::new(peer.cloned().unwrap()))
+    Ok(WasmPeer::new_from_peer(peer.cloned().unwrap()))
 }
 
 #[wasm_bindgen]

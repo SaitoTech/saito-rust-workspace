@@ -5,7 +5,7 @@ use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoSignature};
+use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoSignature, Timestamp};
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 
 use crate::saitowasm::{string_to_key, SAITO};
@@ -18,6 +18,7 @@ pub struct WasmTransaction {
 
 #[wasm_bindgen]
 impl WasmTransaction {
+    #[wasm_bindgen(constructor)]
     pub fn new() -> WasmTransaction {
         WasmTransaction {
             tx: Transaction::default(),
@@ -50,7 +51,7 @@ impl WasmTransaction {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn output_slips(&self) -> Array {
+    pub fn to(&self) -> Array {
         let mut slips: Vec<WasmSlip> = self
             .tx
             .to
@@ -65,7 +66,7 @@ impl WasmTransaction {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn input_slips(&self) -> Array {
+    pub fn from(&self) -> Array {
         let mut slips: Vec<WasmSlip> = self
             .tx
             .from
@@ -92,11 +93,11 @@ impl WasmTransaction {
     }
 
     #[wasm_bindgen(getter = timestamp)]
-    pub fn get_timestamp(&self) -> u64 {
+    pub fn get_timestamp(&self) -> Timestamp {
         self.tx.timestamp
     }
     #[wasm_bindgen(setter = timestamp)]
-    pub fn set_timestamp(&mut self, timestamp: u64) {
+    pub fn set_timestamp(&mut self, timestamp: Timestamp) {
         self.tx.timestamp = timestamp;
     }
 

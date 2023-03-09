@@ -35,8 +35,8 @@ pub mod test {
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
-        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
-        LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+        UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
@@ -53,11 +53,11 @@ pub mod test {
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
 
-    pub fn create_timestamp() -> u64 {
+    pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis() as u64
+            .as_millis() as Timestamp
     }
 
     pub struct TestManager {
@@ -408,7 +408,7 @@ pub mod test {
         pub async fn create_block(
             &mut self,
             parent_hash: SaitoHash,
-            timestamp: u64,
+            timestamp: Timestamp,
             txs_number: usize,
             txs_amount: Currency,
             txs_fee: Currency,
@@ -431,7 +431,8 @@ pub mod test {
                     let (mut wallet, _wallet_) =
                         lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
-                    transaction = Transaction::create(&mut wallet, public_key, txs_amount, txs_fee);
+                    transaction =
+                        Transaction::create(&mut wallet, public_key, txs_amount, txs_fee, false);
                 }
 
                 transaction.sign(&private_key);
@@ -526,7 +527,7 @@ pub mod test {
             &mut self,
             vip_transactions: u64,
             vip_amount: Currency,
-            timestamp: u64,
+            timestamp: Timestamp,
         ) {
             //
             // initialize timestamp
@@ -567,11 +568,12 @@ pub mod test {
                 block.add_transaction(tx);
             }
 
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            // we have added VIP, so need to regenerate the merkle-root
-            block.merkle_root =
-                block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
-            drop(configs);
+            {
+                let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+                // we have added VIP, so need to regenerate the merkle-root
+                block.merkle_root =
+                    block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+            }
             block.generate();
             block.sign(&private_key);
 
@@ -585,6 +587,7 @@ pub mod test {
             self.add_block(block).await;
         }
     }
+
     struct TestConfiguration {}
 
     impl Debug for TestConfiguration {
@@ -607,11 +610,11 @@ pub mod test {
         }
 
         fn is_spv_mode(&self) -> bool {
-            todo!()
+            false
         }
 
         fn is_browser(&self) -> bool {
-            todo!()
+            false
         }
 
         fn replace(&mut self, config: &dyn Configuration) {

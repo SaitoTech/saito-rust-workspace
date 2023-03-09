@@ -284,18 +284,6 @@ impl Wallet {
         sign(message_bytes, &self.private_key)
     }
 
-    pub fn create_transaction(
-        &self,
-        public_key: &SaitoPublicKey,
-        amount: Currency,
-        fee: Currency,
-        force_merge: bool,
-    ) -> Result<Transaction, std::io::Error> {
-        let amount = amount * NOLAN_PER_SAITO;
-        let fee = fee * NOLAN_PER_SAITO;
-
-        todo!()
-    }
     pub async fn create_golden_ticket_transaction(
         golden_ticket: GoldenTicket,
         public_key: &SaitoPublicKey,
