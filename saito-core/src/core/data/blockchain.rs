@@ -410,16 +410,11 @@ impl Blockchain {
             self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
             let does_new_chain_validate = self
-                .validate(
-                    new_chain.as_slice(),
-                    old_chain.as_slice(),
-                    storage,
-                    configs.deref(),
-                )
+                .validate(new_chain.as_slice(), old_chain.as_slice(), storage, configs)
                 .await;
 
             if does_new_chain_validate {
-                self.add_block_success(block_hash, network, storage, mempool)
+                self.add_block_success(block_hash, network, storage, mempool, configs)
                     .await;
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
@@ -445,7 +440,7 @@ impl Blockchain {
             }
         } else {
             debug!("this is not the longest chain");
-            self.add_block_success(block_hash, network, storage, mempool)
+            self.add_block_success(block_hash, network, storage, mempool, configs)
                 .await;
             AddBlockResult::BlockAdded
         };
@@ -457,6 +452,7 @@ impl Blockchain {
         network: &Network,
         storage: &mut Storage,
         mempool: &mut Mempool,
+        configs: &(dyn Configuration + Send + Sync),
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -481,7 +477,7 @@ impl Blockchain {
                     block.block_type
                 );
             }
-            network.propagate_block(block).await;
+            network.propagate_block(block, configs).await;
         }
 
         //

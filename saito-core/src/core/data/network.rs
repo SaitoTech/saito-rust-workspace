@@ -47,10 +47,14 @@ impl Network {
             configs,
         }
     }
-    pub async fn propagate_block(&self, block: &Block) {
+    pub async fn propagate_block(
+        &self,
+        block: &Block,
+        configs: &(dyn Configuration + Send + Sync),
+    ) {
         debug!("propagating block : {:?}", hex::encode(&block.hash));
         {
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            // let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             if configs.is_browser() {
                 return;
             }
