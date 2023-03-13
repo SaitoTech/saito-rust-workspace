@@ -581,11 +581,13 @@ pub fn generate_public_key(private_key: JsString) -> JsString {
 }
 
 #[wasm_bindgen]
-pub async fn propagate_transaction(tx: WasmTransaction) {
+pub async fn propagate_transaction(tx: &WasmTransaction) {
     let mut saito = SAITO.lock().await;
     saito
         .consensus_thread
-        .process_event(ConsensusEvent::NewTransaction { transaction: tx.tx })
+        .process_event(ConsensusEvent::NewTransaction {
+            transaction: tx.tx.clone(),
+        })
         .await;
 }
 

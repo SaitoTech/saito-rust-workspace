@@ -12,6 +12,7 @@ use crate::saitowasm::{string_to_key, SAITO};
 use crate::wasm_slip::WasmSlip;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct WasmTransaction {
     pub(crate) tx: Transaction,
 }

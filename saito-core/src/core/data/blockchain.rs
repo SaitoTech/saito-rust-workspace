@@ -118,7 +118,7 @@ impl Blockchain {
 
         debug!(
             "add_block {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
-            &hex::encode(&block.hash),
+            hex::encode(block.hash),
             block.id,
             self.get_latest_block_id(),
             block.transactions.len()
