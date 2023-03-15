@@ -91,15 +91,16 @@ impl Network {
     }
 
     pub async fn propagate_transaction(&self, transaction: &Transaction) {
-        trace!(
-            "propagating transaction : {:?}",
-            hex::encode(transaction.signature)
-        );
-
         // TODO : return if tx is not valid
 
         let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
         let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+
+        trace!(
+            "propagating transaction : {:?} peers : {:?}",
+            hex::encode(transaction.signature),
+            peers.index_to_peers.len()
+        );
 
         let public_key = wallet.public_key;
 

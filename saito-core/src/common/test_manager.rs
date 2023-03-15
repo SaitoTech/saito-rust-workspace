@@ -597,7 +597,7 @@ pub mod test {
     }
 
     impl Configuration for TestConfiguration {
-        fn get_server_configs(&self) -> &Server {
+        fn get_server_configs(&self) -> Option<&Server> {
             todo!()
         }
 

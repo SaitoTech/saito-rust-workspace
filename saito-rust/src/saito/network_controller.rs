@@ -424,11 +424,16 @@ pub async fn run_network_controller(
     {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
 
-        url = configs.get_server_configs().host.clone()
+        url = configs.get_server_configs().unwrap().host.clone()
             + ":"
-            + configs.get_server_configs().port.to_string().as_str();
-        port = configs.get_server_configs().port;
-        host = configs.get_server_configs().host.clone();
+            + configs
+                .get_server_configs()
+                .unwrap()
+                .port
+                .to_string()
+                .as_str();
+        port = configs.get_server_configs().unwrap().port;
+        host = configs.get_server_configs().unwrap().host.clone();
 
         let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
         let (wallet, _wallet_) = lock_for_read!(blockchain.wallet_lock, LOCK_ORDER_WALLET);
@@ -549,7 +554,7 @@ pub async fn run_network_controller(
                 let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
 
                 if Instant::now().duration_since(last_stat_on)
-                    > Duration::from_millis(configs.get_server_configs().stat_timer_in_ms)
+                    > Duration::from_millis(configs.get_server_configs().unwrap().stat_timer_in_ms)
                 {
                     last_stat_on = Instant::now();
                     outgoing_messages
@@ -572,7 +577,10 @@ pub async fn run_network_controller(
                 let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
 
                 tokio::time::sleep(Duration::from_millis(
-                    configs.get_server_configs().thread_sleep_time_in_ms,
+                    configs
+                        .get_server_configs()
+                        .unwrap()
+                        .thread_sleep_time_in_ms,
                 ))
                 .await;
             }

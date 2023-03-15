@@ -10,7 +10,7 @@ use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig,
 // #[wasm_bindgen]
 #[derive(Deserialize, Debug)]
 pub struct WasmConfiguration {
-    server: Server,
+    server: Option<Server>,
     peers: Vec<PeerConfig>,
     #[serde(skip)]
     spv_mode: bool,
@@ -22,7 +22,7 @@ pub struct WasmConfiguration {
 impl WasmConfiguration {
     pub fn new() -> WasmConfiguration {
         WasmConfiguration {
-            server: Server {
+            server: Option::Some(Server {
                 host: "127.0.0.1".to_string(),
                 port: 12100,
                 protocol: "http".to_string(),
@@ -36,7 +36,7 @@ impl WasmConfiguration {
                 stat_timer_in_ms: 10000,
                 thread_sleep_time_in_ms: 10,
                 block_fetch_batch_size: 0,
-            },
+            }),
             peers: vec![],
             spv_mode: true,
             browser_mode: true,
@@ -60,8 +60,8 @@ impl WasmConfiguration {
 }
 
 impl Configuration for WasmConfiguration {
-    fn get_server_configs(&self) -> &Server {
-        return &self.server;
+    fn get_server_configs(&self) -> Option<&Server> {
+        return self.server.as_ref();
     }
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
@@ -69,7 +69,7 @@ impl Configuration for WasmConfiguration {
     }
 
     fn get_block_fetch_url(&self) -> String {
-        let endpoint = &self.get_server_configs().endpoint;
+        let endpoint = &self.get_server_configs().unwrap().endpoint;
         endpoint.protocol.to_string()
             + "://"
             + endpoint.host.as_str()
@@ -86,7 +86,7 @@ impl Configuration for WasmConfiguration {
     }
 
     fn replace(&mut self, config: &dyn Configuration) {
-        self.server = config.get_server_configs().clone();
+        self.server = config.get_server_configs().cloned();
         self.peers = config.get_peer_configs().clone();
         self.spv_mode = config.is_spv_mode();
     }

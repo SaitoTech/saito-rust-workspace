@@ -222,7 +222,7 @@ pub fn new() -> SaitoWasm {
 
 #[wasm_bindgen]
 pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
-    console_log::init_with_level(Level::Debug).unwrap();
+    console_log::init_with_level(Level::Trace).unwrap();
 
     info!("initializing saito-wasm");
     trace!("trace test");
@@ -526,6 +526,7 @@ pub fn get_peers() -> Array {
     array
 }
 
+#[wasm_bindgen]
 pub fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
     let saito = SAITO.blocking_lock();
     let peers = saito.routing_thread.network.peers.blocking_read();

@@ -128,6 +128,17 @@ impl WasmTransaction {
     pub fn total_fees(&self) -> Currency {
         self.tx.total_fees
     }
+    pub fn serialize(&self) -> Uint8Array {
+        let buffer = self.tx.serialize_for_net();
+        let res = Uint8Array::new_with_length(buffer.len() as u32);
+        res.copy_from(buffer.as_slice());
+        return res;
+    }
+    pub fn deserialize(buffer: Uint8Array) -> Result<WasmTransaction, JsValue> {
+        let tx = Transaction::deserialize_from_net(&buffer.to_vec());
+        let tx = WasmTransaction::from_transaction(tx);
+        Ok(tx)
+    }
 }
 
 impl WasmTransaction {

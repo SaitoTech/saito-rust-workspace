@@ -565,11 +565,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
 
-        channel_size = configs.get_server_configs().channel_size as usize;
-        thread_sleep_time_in_ms = configs.get_server_configs().thread_sleep_time_in_ms;
-        stat_timer_in_ms = configs.get_server_configs().stat_timer_in_ms;
-        verification_thread_count = configs.get_server_configs().verification_threads;
-        fetch_batch_size = configs.get_server_configs().block_fetch_batch_size as usize;
+        channel_size = configs.get_server_configs().unwrap().channel_size as usize;
+        thread_sleep_time_in_ms = configs
+            .get_server_configs()
+            .unwrap()
+            .thread_sleep_time_in_ms;
+        stat_timer_in_ms = configs.get_server_configs().unwrap().stat_timer_in_ms;
+        verification_thread_count = configs.get_server_configs().unwrap().verification_threads;
+        fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
         assert_ne!(fetch_batch_size, 0);
     }
 

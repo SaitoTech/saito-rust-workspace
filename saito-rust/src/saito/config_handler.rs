@@ -18,8 +18,8 @@ pub struct NodeConfigurations {
 impl NodeConfigurations {}
 
 impl Configuration for NodeConfigurations {
-    fn get_server_configs(&self) -> &Server {
-        return &self.server;
+    fn get_server_configs(&self) -> Option<&Server> {
+        return Some(&self.server);
     }
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
@@ -27,7 +27,7 @@ impl Configuration for NodeConfigurations {
     }
 
     fn get_block_fetch_url(&self) -> String {
-        let endpoint = &self.get_server_configs().endpoint;
+        let endpoint = &self.get_server_configs().unwrap().endpoint;
         endpoint.protocol.to_string()
             + "://"
             + endpoint.host.as_str()
@@ -44,7 +44,7 @@ impl Configuration for NodeConfigurations {
     }
 
     fn replace(&mut self, config: &dyn Configuration) {
-        self.server = config.get_server_configs().clone();
+        self.server = config.get_server_configs().cloned().unwrap();
         self.peers = config.get_peer_configs().clone();
         self.lite = config.is_spv_mode();
     }
@@ -87,16 +87,22 @@ mod test {
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_ok());
         let configs = result.unwrap();
-        assert_eq!(configs.get_server_configs().host, String::from("localhost"));
-        assert_eq!(configs.get_server_configs().port, 12101);
-        assert_eq!(configs.get_server_configs().protocol, String::from("http"));
         assert_eq!(
-            configs.get_server_configs().endpoint.host,
+            configs.get_server_configs().unwrap().host,
             String::from("localhost")
         );
-        assert_eq!(configs.get_server_configs().endpoint.port, 12101);
+        assert_eq!(configs.get_server_configs().unwrap().port, 12101);
         assert_eq!(
-            configs.get_server_configs().endpoint.protocol,
+            configs.get_server_configs().unwrap().protocol,
+            String::from("http")
+        );
+        assert_eq!(
+            configs.get_server_configs().unwrap().endpoint.host,
+            String::from("localhost")
+        );
+        assert_eq!(configs.get_server_configs().unwrap().endpoint.port, 12101);
+        assert_eq!(
+            configs.get_server_configs().unwrap().endpoint.protocol,
             String::from("http")
         );
     }
