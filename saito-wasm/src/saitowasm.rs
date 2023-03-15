@@ -14,6 +14,7 @@ use figment::Figment;
 use js_sys::{Array, BigInt, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn, Level};
+use tokio::runtime::Runtime;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -378,17 +379,21 @@ pub async fn process_peer_disconnection(peer_index: u64) {
 }
 
 #[wasm_bindgen]
-pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
-    let mut saito = SAITO.lock().await;
+pub fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
+    info!("111111");
+    tokio::runtime::Handle::current().block_on(async {
+        let mut saito = SAITO.lock().await;
+        info!("222222");
+        saito
+            .routing_thread
+            .process_network_event(NetworkEvent::IncomingNetworkMessage {
+                peer_index,
+                buffer: buffer.to_vec(),
+            })
+            .await;
+    });
 
-    saito
-        .routing_thread
-        .process_network_event(NetworkEvent::IncomingNetworkMessage {
-            peer_index,
-            buffer: buffer.to_vec(),
-        })
-        .await;
-    drop(buffer);
+    info!("333333");
 }
 
 #[wasm_bindgen]
@@ -406,8 +411,6 @@ pub async fn process_fetched_block(
             buffer: buffer.to_vec(),
         })
         .await;
-    drop(buffer);
-    drop(hash);
 }
 
 #[wasm_bindgen]
