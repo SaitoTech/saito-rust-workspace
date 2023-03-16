@@ -102,16 +102,16 @@ impl WasmTransaction {
         self.tx.timestamp = timestamp;
     }
 
-    pub fn sign(&mut self) {
-        let saito = SAITO.blocking_lock();
-        let wallet = saito.context.wallet.blocking_read();
+    pub async fn sign(&mut self) {
+        let saito = SAITO.lock().await;
+        let wallet = saito.context.wallet.read().await;
 
         self.tx.sign(&wallet.private_key);
     }
 
-    pub fn sign_and_encrypt(&mut self) {
-        let saito = SAITO.blocking_lock();
-        let wallet = saito.context.wallet.blocking_read();
+    pub async fn sign_and_encrypt(&mut self) {
+        let saito = SAITO.lock().await;
+        let wallet = saito.context.wallet.read().await;
 
         self.tx.sign_and_encrypt(&wallet.private_key);
     }

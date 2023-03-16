@@ -483,6 +483,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 return Some(());
             }
         }
+        debug!("network event processed");
         None
     }
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {

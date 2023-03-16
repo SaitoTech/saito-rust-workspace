@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 saito-core = { path = "../saito-core" }
-tokio = { version = "1.24.1", features = ["full", "tracing"] }
+tokio = { version = "1.24.2", features = ["full", "tracing"] }
 tungstenite = { version = "0.18.0" }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 pretty_env_logger = "0.4.0"
@@ -21,8 +21,8 @@ ahash = "0.8.2"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 hex = "0.4.3"
 warp = "0.3.3"
-reqwest = "0.11.13"
-base64 = "0.20.0"
+reqwest = "0.11.14"
+base64 = "0.21.0"
 ctrlc = { version = "3.2.4", features = ["termination"] }
 tracing-flame = "0.2.0"
 serde = { version = "1.0.152", features = ["derive"] }
@@ -37,7 +37,7 @@ criterion = "0.4.0"
 panic = "unwind"
 
 [features]
-default = ["with-stats","saito-core/with-rayon"]
+default = ["with-stats", "saito-core/with-rayon"]
 locking-logs = ["saito-core/locking-logs"]
 with-stats = ["saito-core/with-stats"]
 
