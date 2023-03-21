@@ -406,7 +406,7 @@ pub async fn process_fetched_block(
 
 #[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
-    info!("process_timer_event");
+    // trace!("process_timer_event");
     let mut saito = SAITO.lock().await;
 
     let duration = Duration::from_millis(duration_in_ms);
