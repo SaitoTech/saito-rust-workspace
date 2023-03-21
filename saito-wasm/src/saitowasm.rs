@@ -511,7 +511,6 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
 
 #[wasm_bindgen]
 pub async fn get_peers() -> Array {
-    info!("get_peers");
     let saito = SAITO.lock().await;
     let peers = saito.routing_thread.network.peers.read().await;
     let array = Array::new_with_length(peers.index_to_peers.len() as u32);
@@ -524,7 +523,6 @@ pub async fn get_peers() -> Array {
 
 #[wasm_bindgen]
 pub async fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
-    info!("get_peer");
     let saito = SAITO.lock().await;
     let peers = saito.routing_thread.network.peers.read().await;
     let peer = peers.find_peer_by_index(peer_index);
@@ -537,7 +535,6 @@ pub async fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
 
 #[wasm_bindgen]
 pub async fn get_public_key() -> JsString {
-    info!("get_public_key");
     let saito = SAITO.lock().await;
     let wallet = saito.context.wallet.read().await;
     let key = hex::encode(wallet.public_key);

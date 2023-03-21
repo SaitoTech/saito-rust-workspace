@@ -1,8 +1,9 @@
 use js_sys::{Array, JsString};
-use saito_core::common::defs::PeerIndex;
+use log::warn;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
+use saito_core::common::defs::PeerIndex;
 use saito_core::core::data::peer::Peer;
 
 #[wasm_bindgen]
@@ -14,6 +15,9 @@ pub struct WasmPeer {
 impl WasmPeer {
     #[wasm_bindgen(getter = public_key)]
     pub fn get_public_key(&self) -> JsString {
+        if self.peer.public_key.is_none() {
+            warn!("peer : {:?} public key is not set", self.peer.index);
+        }
         hex::encode(self.peer.public_key.unwrap()).into()
     }
     #[wasm_bindgen(getter = key_list)]

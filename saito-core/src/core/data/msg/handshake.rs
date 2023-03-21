@@ -45,7 +45,7 @@ impl Serialize<Self> for HandshakeChallenge {
         let mut challenge = HandshakeChallenge { challenge: [0; 32] };
         challenge.challenge = buffer[0..32].to_vec().try_into().unwrap();
 
-        return Ok(challenge);
+        Ok(challenge)
     }
 }
 
@@ -62,9 +62,9 @@ impl Serialize<Self> for HandshakeResponse {
         .concat()
     }
     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
-        if buffer.len() < 141 {
+        if buffer.len() < 134 {
             warn!(
-                "Deserializing Handshake Response, buffer size is :{:?}",
+                "Deserializing failed for handshake response, buffer size is :{:?}",
                 buffer.len()
             );
             return Err(Error::from(ErrorKind::InvalidData));
@@ -81,8 +81,7 @@ impl Serialize<Self> for HandshakeResponse {
         let url_length = u32::from_be_bytes(buffer[130..134].try_into().unwrap());
 
         if url_length > 0 {
-            let result =
-                String::from_utf8(buffer[134..134 as usize + url_length as usize].to_vec());
+            let result = String::from_utf8(buffer[134..(134 + url_length) as usize].to_vec());
             if result.is_err() {
                 warn!(
                     "failed decoding block fetch url. {:?}",
