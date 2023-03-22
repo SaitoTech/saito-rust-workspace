@@ -375,14 +375,16 @@ pub async fn process_peer_disconnection(peer_index: u64) {
 
 #[wasm_bindgen]
 pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
-    info!("process_msg_buffer_from_peer : {:?}", peer_index);
     let mut saito = SAITO.lock().await;
+    let buffer = buffer.to_vec();
+    info!(
+        "process_msg_buffer_from_peer : {:?} length = {:?}",
+        peer_index,
+        buffer.len()
+    );
     saito
         .routing_thread
-        .process_network_event(NetworkEvent::IncomingNetworkMessage {
-            peer_index,
-            buffer: buffer.to_vec(),
-        })
+        .process_network_event(NetworkEvent::IncomingNetworkMessage { peer_index, buffer })
         .await;
 }
 

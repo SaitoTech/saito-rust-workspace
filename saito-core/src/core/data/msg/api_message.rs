@@ -14,7 +14,7 @@ impl ApiMessage {
     }
     pub fn deserialize(buffer: &Vec<u8>) -> Self {
         let index = u32::from_be_bytes(buffer[0..4].try_into().unwrap());
-        let data = buffer[..5].to_vec();
+        let data = buffer[4..].to_vec();
         ApiMessage {
             msg_index: index,
             data,

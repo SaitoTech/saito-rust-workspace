@@ -170,6 +170,10 @@ impl RoutingThread {
                     .await;
             }
             Message::ApplicationMessage(api_message) => {
+                debug!(
+                    "processing application msg with buffer size : {:?}",
+                    api_message.data.len()
+                );
                 self.network
                     .io_interface
                     .process_api_call(api_message.data, api_message.msg_index, peer_index)
@@ -430,7 +434,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 unreachable!()
             }
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                trace!("incoming message received from peer : {:?}", peer_index);
+                trace!(
+                    "incoming message received from peer : {:?} buffer_len : {:?}",
+                    peer_index,
+                    buffer.len()
+                );
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
                     //todo!()
