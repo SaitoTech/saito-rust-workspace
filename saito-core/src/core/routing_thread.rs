@@ -146,7 +146,10 @@ impl RoutingThread {
                 unreachable!("received block");
             }
             Message::Transaction(transaction) => {
-                trace!("received transaction");
+                trace!(
+                    "received transaction : {:?}",
+                    hex::encode(transaction.signature)
+                );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;

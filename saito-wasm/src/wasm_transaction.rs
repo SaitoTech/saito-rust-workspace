@@ -5,7 +5,9 @@ use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoSignature, Timestamp};
+use saito_core::common::defs::{
+    Currency, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+};
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 
 use crate::saitowasm::{string_to_key, SAITO};
@@ -79,6 +81,15 @@ impl WasmTransaction {
             array.set(i as u32, JsValue::from(slip));
         }
         array
+    }
+
+    pub fn is_from(&self, key: JsString) -> bool {
+        let key: SaitoPublicKey = string_to_key(key).unwrap();
+        return self.tx.is_from(&key);
+    }
+    pub fn is_to(&self, key: JsString) -> bool {
+        let key: SaitoPublicKey = string_to_key(key).unwrap();
+        return self.tx.is_to(&key);
     }
 
     #[wasm_bindgen(getter = data)]
