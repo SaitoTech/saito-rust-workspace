@@ -1,5 +1,5 @@
 use js_sys::{Array, JsString};
-use log::warn;
+use log::{info, warn};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -7,6 +7,7 @@ use saito_core::common::defs::PeerIndex;
 use saito_core::core::data::peer::Peer;
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct WasmPeer {
     peer: Peer,
 }

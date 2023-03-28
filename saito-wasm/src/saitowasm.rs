@@ -525,7 +525,6 @@ pub async fn get_peers() -> Array {
 
 #[wasm_bindgen]
 pub async fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
-    info!("get_peer : {:?}", peer_index);
     let saito = SAITO.lock().await;
     let peers = saito.routing_thread.network.peers.read().await;
     let peer = peers.find_peer_by_index(peer_index);
@@ -533,8 +532,8 @@ pub async fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
         warn!("peer not found");
         todo!()
     }
-    info!("peer found : {:?}", peer.as_ref().unwrap());
-    Ok(WasmPeer::new_from_peer(peer.cloned().unwrap()))
+    let peer = peer.cloned().unwrap();
+    Ok(WasmPeer::new_from_peer(peer))
 }
 
 #[wasm_bindgen]
