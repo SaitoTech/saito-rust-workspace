@@ -25,6 +25,7 @@ pub struct Peer {
     pub static_peer_config: Option<data::configuration::PeerConfig>,
     pub challenge_for_peer: Option<SaitoHash>,
     pub key_list: Vec<SaitoPublicKey>,
+    pub services: Vec<String>,
 }
 
 impl Peer {
@@ -36,6 +37,7 @@ impl Peer {
             static_peer_config: None,
             challenge_for_peer: None,
             key_list: vec![],
+            services: vec![],
         }
     }
     pub async fn initiate_handshake(
@@ -191,6 +193,9 @@ impl Peer {
 
         // TODO : generate the url with proper / escapes,etc...
         self.block_fetch_url.to_string() + str + hex::encode(block_hash).as_str()
+    }
+    pub fn has_service(&self, service: String) -> bool {
+        self.services.contains(&service)
     }
 }
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -164,7 +164,9 @@ impl RoutingThread {
             }
             Message::Ping() => {}
             Message::SPVChain() => {}
-            Message::Services() => {}
+            Message::Services(services) => {
+                self.process_peer_services(services, peer_index).await;
+            }
             Message::GhostChain(chain) => {
                 self.process_ghost_chain(chain, peer_index).await;
             }
@@ -420,6 +422,16 @@ impl RoutingThread {
                 );
             }
             previous_block_hash = block_hash;
+        }
+    }
+    async fn process_peer_services(&mut self, services: Vec<String>, peer_index: u64) {
+        let (mut peers, _peers_) = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_some() {
+            let peer = peer.unwrap();
+            peer.services = services;
+        } else {
+            warn!("peer {:?} not found to update services", peer_index);
         }
     }
 }

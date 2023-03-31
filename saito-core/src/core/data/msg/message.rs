@@ -21,7 +21,7 @@ pub enum Message {
     BlockHeaderHash(SaitoHash, u64),
     Ping(),
     SPVChain(),
-    Services(),
+    Services(Vec<String>),
     GhostChain(GhostChainSync),
     GhostChainRequest(u64, SaitoHash, SaitoHash),
     ApplicationMessage(ApiMessage),
@@ -55,6 +55,10 @@ impl Message {
             .concat(),
             Message::Ping() => {
                 vec![]
+            }
+            Message::Services(services) => {
+                let str = services.join(";");
+                str.as_bytes().to_vec()
             }
             _ => {
                 todo!()
@@ -103,7 +107,15 @@ impl Message {
             }
             7 => Ok(Message::Ping()),
             8 => Ok(Message::SPVChain()),
-            9 => Ok(Message::Services()),
+            9 => {
+                let str = String::from_utf8(buffer).unwrap();
+                let mut services = vec![];
+                for str in str.split(";") {
+                    services.push(str.to_string());
+                }
+                // let services = str.split(";").collect::<Vec<String>>();
+                Ok(Message::Services(services))
+            }
             10 => Ok(Message::GhostChain(GhostChainSync::deserialize(buffer))),
             11 => {
                 let block_id = u64::from_be_bytes(buffer[0..8].try_into().unwrap());
@@ -140,7 +152,7 @@ impl Message {
             Message::BlockHeaderHash(_, _) => 6,
             Message::Ping() => 7,
             Message::SPVChain() => 8,
-            Message::Services() => 9,
+            Message::Services(_) => 9,
             Message::GhostChain(_) => 10,
             Message::GhostChainRequest(..) => 11,
             Message::ApplicationMessage(_) => 12,

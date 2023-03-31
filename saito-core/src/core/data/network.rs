@@ -402,4 +402,21 @@ impl Network {
         }
         trace!("connected to peers");
     }
+    pub async fn propagate_services(&self, peer_index: PeerIndex, services: Vec<String>) {
+        let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+        let buffer = Message::Services(services).serialize();
+        if peer_index == 0 {
+            for (i, _) in peers.index_to_peers.iter() {
+                self.io_interface
+                    .send_message(*i, buffer.clone())
+                    .await
+                    .unwrap();
+            }
+        } else {
+            self.io_interface
+                .send_message(peer_index, buffer)
+                .await
+                .unwrap();
+        }
+    }
 }

@@ -40,6 +40,34 @@ impl WasmPeer {
             peer: Peer::new(peer_index),
         }
     }
+    #[wasm_bindgen(getter = sync_type)]
+    pub fn get_sync_type(&self) -> JsString {
+        if self.peer.block_fetch_url.is_empty() {
+            return "lite".into();
+        }
+        return "full".into();
+    }
+    #[wasm_bindgen(getter = services)]
+    pub fn get_services(&self) -> JsValue {
+        let arr = js_sys::Array::new_with_length(self.peer.services.len() as u32);
+        for (i, service) in self.peer.services.iter().enumerate() {
+            arr.set(i as u32, JsValue::from(JsString::from(service.as_str())));
+        }
+        JsValue::from(arr)
+    }
+    #[wasm_bindgen(setter = services)]
+    pub fn set_services(&mut self, services: JsValue) {
+        let services = js_sys::Array::from(&services);
+        let mut ser = vec![];
+        for i in 0..services.length() {
+            let str = JsString::from(services.at(i as i32));
+            ser.push(str.into());
+        }
+        self.peer.services = ser;
+    }
+    pub fn has_service(&self, service: JsString) -> bool {
+        return self.peer.has_service(service.into());
+    }
 }
 
 impl WasmPeer {

@@ -96,23 +96,20 @@ impl Mempool {
     ) {
         trace!(
             "add transaction if validates : {:?}",
-            hex::encode(transaction.hash_for_signature.unwrap())
+            hex::encode(transaction.signature)
         );
         transaction.generate(&self.public_key, 0, 0);
         // validate
         if transaction.validate(&blockchain.utxoset) {
             self.add_transaction(transaction).await;
         } else {
-            debug!(
-                "transaction not valid : {:?}",
-                transaction.hash_for_signature.unwrap()
-            );
+            debug!("transaction not valid : {:?}", transaction.signature);
         }
     }
     pub async fn add_transaction(&mut self, transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
-            hex::encode(transaction.hash_for_signature.unwrap()),
+            hex::encode(transaction.signature),
             transaction.transaction_type
         );
 
