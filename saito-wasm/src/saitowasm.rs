@@ -116,11 +116,11 @@ pub fn new() -> SaitoWasm {
         configuration: configuration.clone(),
     };
 
-    let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(100);
-    let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(100);
-    let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(100);
-    let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(100);
-    let (sender_to_verification, receiver_in_verification) = tokio::sync::mpsc::channel(100);
+    let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(10);
+    let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(10);
+    let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
+    let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(10);
+    let (sender_to_verification, receiver_in_verification) = tokio::sync::mpsc::channel(10);
 
     SaitoWasm {
         routing_thread: RoutingThread {

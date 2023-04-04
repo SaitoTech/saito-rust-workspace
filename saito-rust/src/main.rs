@@ -139,7 +139,7 @@ async fn run_verification_thread(
 
         event_processor.on_init().await;
         let mut queued_requests = vec![];
-        let mut requests = VecDeque::with_capacity(batch_size);
+        let mut requests = VecDeque::new();
 
         loop {
             work_done = false;
@@ -282,7 +282,7 @@ async fn run_consensus_event_processor(
             CONSENSUS_EVENT_PROCESSOR_ID,
         ))),
         stats: ConsensusStats::new(sender_to_stat.clone()),
-        txs_for_mempool: Vec::with_capacity(channel_size),
+        txs_for_mempool: Vec::new(),
         stat_sender: sender_to_stat.clone(),
         configs: context.configuration.clone(),
     };

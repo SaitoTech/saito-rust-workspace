@@ -23,7 +23,7 @@ impl StatThread {
 
         StatThread {
             file,
-            stat_queue: VecDeque::with_capacity(100),
+            stat_queue: VecDeque::new(),
         }
     }
 }
