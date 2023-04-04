@@ -1,8 +1,8 @@
-use js_sys::{JsString, Uint8Array};
+use js_sys::{JsString};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use num_traits::FromPrimitive;
-use saito_core::common::defs::{Currency, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey};
+use saito_core::common::defs::{Currency, SaitoUTXOSetKey};
 use saito_core::core::data::slip::{Slip, SlipType};
 
 use crate::saitowasm::string_to_key;

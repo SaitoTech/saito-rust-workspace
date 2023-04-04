@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -19,7 +19,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
-use crate::core::data::msg::api_message::ApiMessage;
+
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;

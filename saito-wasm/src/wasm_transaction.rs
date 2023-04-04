@@ -1,12 +1,12 @@
 use js_sys::{Array, JsString, Uint8Array};
-use log::error;
-use num_derive::FromPrimitive;
+
+
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{
-    Currency, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+    Currency, SaitoPublicKey, Timestamp,
 };
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 

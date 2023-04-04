@@ -30,11 +30,11 @@ impl StatThread {
 
 #[async_trait]
 impl ProcessEvent<String> for StatThread {
-    async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
+    async fn process_network_event(&mut self, _event: NetworkEvent) -> Option<()> {
         None
     }
 
-    async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
+    async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
         let mut work_done = false;
 
         for stat in self.stat_queue.drain(..) {
@@ -56,5 +56,5 @@ impl ProcessEvent<String> for StatThread {
 
     async fn on_init(&mut self) {}
 
-    async fn on_stat_interval(&mut self, current_time: Timestamp) {}
+    async fn on_stat_interval(&mut self, _current_time: Timestamp) {}
 }

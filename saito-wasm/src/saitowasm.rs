@@ -1,28 +1,28 @@
 use std::collections::HashMap;
-use std::fmt::Debug;
-use std::future::Future;
+
+
 use std::io::{Error, ErrorKind};
-use std::ops::Deref;
-use std::pin::Pin;
+
+
 use std::sync::Arc;
-use std::task::{Poll, Waker};
+use std::task::{Waker};
 use std::time::Duration;
 
 use base58::ToBase58;
 use figment::providers::{Format, Json};
 use figment::Figment;
-use js_sys::{Array, BigInt, JsString, Uint8Array};
+use js_sys::{Array, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn, Level};
-use tokio::runtime::Runtime;
+
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, Currency, PeerIndex, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    StatVariable, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    Currency, PeerIndex, SaitoPrivateKey, SaitoPublicKey,
+    StatVariable, STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -43,7 +43,7 @@ use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::lock_for_write;
+
 
 use crate::wasm_block::WasmBlock;
 use crate::wasm_configuration::WasmConfiguration;
@@ -119,7 +119,7 @@ pub fn new() -> SaitoWasm {
     let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(10);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(10);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
-    let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(10);
+    let (sender_to_stat, _receiver_in_stats) = tokio::sync::mpsc::channel(10);
     let (sender_to_verification, receiver_in_verification) = tokio::sync::mpsc::channel(10);
 
     SaitoWasm {
@@ -310,7 +310,7 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
 
     let block_hash = block_hash.unwrap();
 
-    let mut saito = SAITO.lock().await;
+    let saito = SAITO.lock().await;
     let blockchain = saito.routing_thread.blockchain.read().await;
 
     let result = blockchain.get_block(&block_hash);
@@ -418,7 +418,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     let result = saito.receiver_for_router.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.routing_thread.process_event(event).await;
+        let _result = saito.routing_thread.process_event(event).await;
     }
     saito
         .routing_thread
@@ -429,7 +429,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     let result = saito.receiver_for_consensus.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.consensus_thread.process_event(event).await;
+        let _result = saito.consensus_thread.process_event(event).await;
     }
     saito
         .consensus_thread
@@ -440,7 +440,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     let result = saito.receiver_for_verification.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.verification_thread.process_event(event).await;
+        let _result = saito.verification_thread.process_event(event).await;
     }
     saito
         .verification_thread
@@ -450,7 +450,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     let result = saito.receiver_for_miner.try_recv();
     if result.is_ok() {
         let event = result.unwrap();
-        let result = saito.mining_thread.process_event(event).await;
+        let _result = saito.mining_thread.process_event(event).await;
     }
     saito.mining_thread.process_timer_event(duration.clone());
 }
@@ -516,7 +516,7 @@ pub async fn get_peers() -> Array {
     let saito = SAITO.lock().await;
     let peers = saito.routing_thread.network.peers.read().await;
     let array = Array::new_with_length(peers.index_to_peers.len() as u32);
-    for (i, (peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
+    for (i, (_peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
         let peer = peer.clone();
         array.set(i as u32, JsValue::from(WasmPeer::new_from_peer(peer)));
     }
@@ -555,13 +555,13 @@ pub async fn get_private_key() -> JsString {
 
 #[wasm_bindgen]
 pub fn get_pending_txs() -> js_sys::Array {
-    let array = js_sys::Array::new_with_length(1024);
+    let _array = js_sys::Array::new_with_length(1024);
     todo!()
     // array
 }
 
 #[wasm_bindgen]
-pub async fn get_balance(ticker: JsString) -> Currency {
+pub async fn get_balance(_ticker: JsString) -> Currency {
     info!("get_balance");
     let saito = SAITO.lock().await;
     let wallet = saito.context.wallet.read().await;
@@ -599,7 +599,7 @@ pub async fn propagate_transaction(tx: &WasmTransaction) {
 #[wasm_bindgen]
 pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
     info!("send_api_call : {:?}", peer_index);
-    let mut saito = SAITO.lock().await;
+    let saito = SAITO.lock().await;
     let api_message = ApiMessage {
         msg_index,
         data: buffer.to_vec(),
@@ -628,7 +628,7 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
 #[wasm_bindgen]
 pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
     info!("send_api_success : {:?}", peer_index);
-    let mut saito = SAITO.lock().await;
+    let saito = SAITO.lock().await;
     let api_message = ApiMessage {
         msg_index,
         data: buffer.to_vec(),
@@ -648,7 +648,7 @@ pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: Pe
 #[wasm_bindgen]
 pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
     info!("send_api_error : {:?}", peer_index);
-    let mut saito = SAITO.lock().await;
+    let saito = SAITO.lock().await;
     let api_message = ApiMessage {
         msg_index,
         data: buffer.to_vec(),
@@ -668,7 +668,7 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
 #[wasm_bindgen]
 pub async fn propagate_services(peer_index: PeerIndex, services: JsValue) {
     info!("propagating services : {:?} - {:?}", peer_index, services);
-    let mut saito = SAITO.lock().await;
+    let saito = SAITO.lock().await;
     let arr = js_sys::Array::from(&services);
     let mut services = vec![];
     for i in 0..arr.length() {

@@ -260,7 +260,7 @@ impl TransactionGenerator {
             loop {
                 let mut work_done = false;
                 {
-                    let (mut blockchain, _blockchain_) =
+                    let (blockchain, _blockchain_) =
                         lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
                     let (mut wallet, _wallet_) = lock_for_write!(wallet, LOCK_ORDER_WALLET);

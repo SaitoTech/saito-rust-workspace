@@ -286,7 +286,7 @@ async fn run_consensus_event_processor(
         stat_sender: sender_to_stat.clone(),
         configs: context.configuration.clone(),
     };
-    let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
+    let (interface_sender_to_blockchain, _interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
     debug!("running mempool thread");
     let blockchain_handle = run_thread(
@@ -627,7 +627,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
+    let (_network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
         &context,
         peers.clone(),
         receiver_for_consensus,
@@ -641,7 +641,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (network_event_sender_to_mining, miner_handle) = run_mining_event_processor(
+    let (_network_event_sender_to_mining, miner_handle) = run_mining_event_processor(
         &context,
         &sender_to_consensus,
         receiver_for_miner,

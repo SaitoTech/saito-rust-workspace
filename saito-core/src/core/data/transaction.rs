@@ -151,7 +151,7 @@ impl Transaction {
         to_public_key: SaitoPublicKey,
         with_payment: Currency,
         with_fee: Currency,
-        force_merge: bool,
+        _force_merge: bool,
     ) -> Transaction {
         trace!(
             "generating transaction : payment = {:?}, fee = {:?}",
@@ -677,7 +677,7 @@ impl Transaction {
         &self,
         utxoset: &mut UtxoSet,
         longest_chain: bool,
-        block_id: u64,
+        _block_id: u64,
     ) {
         let mut input_slip_spendable = true;
         let mut output_slip_spendable = false;
@@ -795,7 +795,7 @@ impl Transaction {
         self.hash_for_signature = Some(hash_for_signature);
         self.signature = sign(&buffer, private_key);
     }
-    pub fn sign_and_encrypt(&mut self, private_key: &SaitoPrivateKey) {
+    pub fn sign_and_encrypt(&mut self, _private_key: &SaitoPrivateKey) {
         todo!()
     }
 
@@ -1175,7 +1175,7 @@ mod tests {
     fn serialize_for_net_and_deserialize_from_net_test() {
         let mock_input = Slip::default();
         let mock_output = Slip::default();
-        let mut mock_hop = Hop::default();
+        let mock_hop = Hop::default();
 
         let mut mock_tx = Transaction::default();
         let mut mock_path: Vec<Hop> = vec![];

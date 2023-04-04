@@ -3,7 +3,6 @@ use log::{info, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
-    NOLAN_PER_SAITO,
 };
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{decrypt_with_password, encrypt_with_password, hash, sign};

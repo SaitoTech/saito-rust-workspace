@@ -591,7 +591,7 @@ pub mod test {
     struct TestConfiguration {}
 
     impl Debug for TestConfiguration {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
             todo!()
         }
     }
@@ -617,7 +617,7 @@ pub mod test {
             false
         }
 
-        fn replace(&mut self, config: &dyn Configuration) {
+        fn replace(&mut self, _config: &dyn Configuration) {
             todo!()
         }
     }
