@@ -1,11 +1,5 @@
-use std::collections::HashMap;
-
-
 use std::io::{Error, ErrorKind};
-
-
 use std::sync::Arc;
-use std::task::{Waker};
 use std::time::Duration;
 
 use base58::ToBase58;
@@ -14,15 +8,13 @@ use figment::Figment;
 use js_sys::{Array, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn, Level};
-
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    Currency, PeerIndex, SaitoPrivateKey, SaitoPublicKey,
-    StatVariable, STAT_BIN_COUNT,
+    Currency, PeerIndex, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -43,7 +35,6 @@ use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-
 
 use crate::wasm_block::WasmBlock;
 use crate::wasm_configuration::WasmConfiguration;
@@ -85,8 +76,6 @@ pub struct SaitoWasm {
     receiver_for_miner: Receiver<MiningEvent>,
     receiver_for_verification: Receiver<VerifyRequest>,
     pub(crate) context: Context,
-    wakers: HashMap<u64, Waker>,
-    results: HashMap<u64, Result<Vec<u8>, Error>>,
 }
 
 lazy_static! {
@@ -216,8 +205,6 @@ pub fn new() -> SaitoWasm {
         receiver_for_miner: receiver_in_miner,
         receiver_for_verification: receiver_in_verification,
         context,
-        wakers: Default::default(),
-        results: Default::default(),
     }
 }
 
@@ -244,7 +231,6 @@ pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
             );
             return Ok(JsValue::from("initialized"));
         }
-        info!("wwwwwwwwwwwww");
         // let str: JsString = str.unwrap();
         let config = WasmConfiguration::new_from_json(str.expect("couldn't get string").as_str());
 
@@ -254,7 +240,7 @@ pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
         }
         let config = config.unwrap();
 
-        info!("config : {:?}", config);
+        // info!("config : {:?}", config);
 
         configs.replace(&config);
     }
@@ -444,7 +430,8 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     }
     saito
         .verification_thread
-        .process_timer_event(duration.clone());
+        .process_timer_event(duration.clone())
+        .await;
 
     // miner controller
     let result = saito.receiver_for_miner.try_recv();
@@ -452,7 +439,10 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         let event = result.unwrap();
         let _result = saito.mining_thread.process_event(event).await;
     }
-    saito.mining_thread.process_timer_event(duration.clone());
+    saito
+        .mining_thread
+        .process_timer_event(duration.clone())
+        .await;
 }
 
 #[wasm_bindgen]
@@ -554,10 +544,15 @@ pub async fn get_private_key() -> JsString {
 }
 
 #[wasm_bindgen]
-pub fn get_pending_txs() -> js_sys::Array {
-    let _array = js_sys::Array::new_with_length(1024);
-    todo!()
-    // array
+pub async fn get_pending_txs() -> js_sys::Array {
+    let saito = SAITO.lock().await;
+    let wallet = saito.context.wallet.read().await;
+    let array = js_sys::Array::new_with_length(wallet.pending_txs.len() as u32);
+    for (i, tx) in wallet.pending_txs.values().enumerate() {
+        let t = WasmTransaction::from_transaction(tx.clone());
+        array.set(i as u32, JsValue::from(t));
+    }
+    array
 }
 
 #[wasm_bindgen]

@@ -43,7 +43,7 @@ impl WasmConfiguration {
         }
     }
     pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
-        info!("new from json : {:?}", json);
+        // info!("new from json : {:?}", json);
         let configs = Figment::new()
             .merge(Json::string(json))
             .extract::<WasmConfiguration>();
