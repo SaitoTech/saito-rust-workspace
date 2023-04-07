@@ -1,9 +1,11 @@
 export class MsgHandler {
     static send_message(peer_index, buffer) {
+        console.debug("MsgHandler::send_message : " + peer_index);
         return global.shared_methods.send_message(peer_index, buffer);
     }
 
     static send_message_to_all(buffer, exceptions) {
+        console.debug("MsgHandler::send_message_to_all");
         return global.shared_methods.send_message_to_all(buffer, exceptions);
     }
 
@@ -37,5 +39,18 @@ export class MsgHandler {
 
     static fetch_block_from_peer(hash, peer_index, url) {
         return global.shared_methods.fetch_block_from_peer(hash, peer_index, url);
+    }
+
+    static process_api_call(buffer, msgIndex, peerIndex) {
+        return global.shared_methods.process_api_call(buffer, msgIndex, peerIndex);
+    }
+
+
+    static process_api_success(buffer, msgIndex, peerIndex) {
+        return global.shared_methods.process_api_success(buffer, msgIndex, peerIndex);
+    }
+
+    static process_api_error(buffer, msgIndex, peerIndex) {
+        return global.shared_methods.process_api_error(buffer, msgIndex, peerIndex);
     }
 }

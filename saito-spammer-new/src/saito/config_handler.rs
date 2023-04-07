@@ -65,8 +65,8 @@ impl SpammerConfigs {
 }
 
 impl Configuration for SpammerConfigs {
-    fn get_server_configs(&self) -> &Server {
-        return &self.server;
+    fn get_server_configs(&self) -> Option<&Server> {
+        return Some(&self.server);
     }
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
@@ -74,7 +74,7 @@ impl Configuration for SpammerConfigs {
     }
 
     fn get_block_fetch_url(&self) -> String {
-        let endpoint = &self.get_server_configs().endpoint;
+        let endpoint = &self.get_server_configs().unwrap().endpoint;
         endpoint.protocol.to_string()
             + "://"
             + endpoint.host.as_str()
@@ -83,14 +83,18 @@ impl Configuration for SpammerConfigs {
             + "/block/"
     }
 
-    fn is_lite(&self) -> bool {
+    fn is_spv_mode(&self) -> bool {
+        false
+    }
+
+    fn is_browser(&self) -> bool {
         false
     }
 
     fn replace(&mut self, config: &dyn Configuration) {
-        self.server = config.get_server_configs().clone();
+        self.server = config.get_server_configs().cloned().unwrap();
         self.peers = config.get_peer_configs().clone();
-        self.lite = config.is_lite();
+        self.lite = config.is_spv_mode();
     }
 }
 

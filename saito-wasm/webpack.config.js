@@ -16,7 +16,7 @@ let common = {
         syncWebAssembly: true,
     },
     mode: "development",
-    stats: {errorDetails: true}
+    // stats: {errorDetails: true}
 };
 
 let nodeConfigs = merge(common, {
@@ -63,11 +63,11 @@ let nodeConfigs = merge(common, {
         }
     },
     plugins: [
-        new HtmlWebpackPlugin(),
+        // new HtmlWebpackPlugin(),
         new WasmPackPlugin({
             crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/node",
-            extraArgs: '--target bundler',
+            extraArgs: '--target bundler'// --release',
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
@@ -141,12 +141,10 @@ let webConfigs = merge(common, {
         }
     },
     plugins: [
-
-        new HtmlWebpackPlugin(),
         new WasmPackPlugin({
             crateDirectory: path.resolve(__dirname, '.'),
             outDir: "./pkg/web",
-            extraArgs: '--target web',
+            extraArgs: '--target web'// --release',
         }),
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
@@ -169,5 +167,5 @@ let webConfigs = merge(common, {
     },
     target: "web",
 });
-
+ 
 module.exports = [nodeConfigs, webConfigs];

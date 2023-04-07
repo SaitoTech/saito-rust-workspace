@@ -15,12 +15,12 @@ pub struct Context {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub mempool: Arc<RwLock<Mempool>>,
     pub wallet: Arc<RwLock<Wallet>>,
-    pub configuration: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+    pub configuration: Arc<RwLock<dyn Configuration + Send + Sync>>,
 }
 
 impl Context {
     pub fn new(
-        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
         private_key: SaitoPrivateKey,
         public_key: SaitoPublicKey,
     ) -> Context {

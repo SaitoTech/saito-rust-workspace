@@ -10,7 +10,7 @@ pub mod test {
 
     use log::{debug, error, info};
 
-    use crate::common::defs::{SaitoHash, BLOCK_FILE_EXTENSION};
+    use crate::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
     use crate::common::interface_io::InterfaceIO;
     use crate::core::data::configuration::PeerConfig;
 
@@ -148,6 +148,33 @@ pub mod test {
 
         fn get_block_dir(&self) -> String {
             "./data/blocks/".to_string()
+        }
+
+        async fn process_api_call(
+            &self,
+            _buffer: Vec<u8>,
+            _msg_index: u32,
+            _peer_index: PeerIndex,
+        ) {
+            todo!()
+        }
+
+        async fn process_api_success(
+            &self,
+            _buffer: Vec<u8>,
+            _msg_index: u32,
+            _peer_index: PeerIndex,
+        ) {
+            todo!()
+        }
+
+        async fn process_api_error(
+            &self,
+            _buffer: Vec<u8>,
+            _msg_index: u32,
+            _peer_index: PeerIndex,
+        ) {
+            todo!()
         }
     }
 }

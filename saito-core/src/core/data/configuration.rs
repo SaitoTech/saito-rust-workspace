@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -29,10 +31,11 @@ pub struct Server {
     pub block_fetch_batch_size: u64,
 }
 
-pub trait Configuration {
-    fn get_server_configs(&self) -> &Server;
+pub trait Configuration: Debug {
+    fn get_server_configs(&self) -> Option<&Server>;
     fn get_peer_configs(&self) -> &Vec<PeerConfig>;
     fn get_block_fetch_url(&self) -> String;
-    fn is_lite(&self) -> bool;
+    fn is_spv_mode(&self) -> bool;
+    fn is_browser(&self) -> bool;
     fn replace(&mut self, config: &dyn Configuration);
 }

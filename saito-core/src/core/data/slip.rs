@@ -6,19 +6,19 @@ use serde::{Deserialize, Serialize};
 use crate::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
 /// The size of a serialized slip in bytes.
-pub const SLIP_SIZE: usize = 67;
+pub const SLIP_SIZE: usize = 59;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq, FromPrimitive)]
 pub enum SlipType {
-    Normal,
-    ATR,
-    VipInput,
-    VipOutput,
-    MinerInput,
-    MinerOutput,
-    RouterInput,
-    RouterOutput,
-    Other,
+    Normal = 0,
+    ATR = 1,
+    VipInput = 2,
+    VipOutput = 3,
+    MinerInput = 4,
+    MinerOutput = 5,
+    RouterInput = 6,
+    RouterOutput = 7,
+    Other = 8,
 }
 
 #[serde_with::serde_as]
@@ -31,7 +31,7 @@ pub struct Slip {
     pub block_id: u64,
     pub tx_ordinal: u64,
     pub slip_type: SlipType,
-    #[serde_as(as = "[_; 66]")]
+    #[serde_as(as = "[_; 58]")]
     pub utxoset_key: SaitoUTXOSetKey,
     // TODO : Check if this can be removed with Option<>
     pub is_utxoset_key_set: bool,
@@ -47,7 +47,7 @@ impl Default for Slip {
             tx_ordinal: 0,
             slip_type: SlipType::Normal,
             // uuid: [0; 32],
-            utxoset_key: [0; 66],
+            utxoset_key: [0; 58],
             is_utxoset_key_set: false,
         }
     }
@@ -58,7 +58,7 @@ impl Slip {
     // runs when block is purged for good or staking slip deleted
     //
     pub fn delete(&self, utxoset: &mut UtxoSet) -> bool {
-        if self.get_utxoset_key() == [0; 66] {
+        if self.get_utxoset_key() == [0; 58] {
             error!("ERROR 572034: asked to remove a slip without its utxoset_key properly set!");
             false;
         }
@@ -68,11 +68,11 @@ impl Slip {
 
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
-        let amount: Currency = Currency::from_be_bytes(bytes[33..49].try_into().unwrap());
-        let block_id: u64 = u64::from_be_bytes(bytes[49..57].try_into().unwrap());
-        let tx_ordinal: u64 = u64::from_be_bytes(bytes[57..65].try_into().unwrap());
-        let slip_index: u8 = bytes[65];
-        let slip_type: SlipType = FromPrimitive::from_u8(bytes[66]).unwrap();
+        let amount: Currency = Currency::from_be_bytes(bytes[33..41].try_into().unwrap());
+        let block_id: u64 = u64::from_be_bytes(bytes[41..49].try_into().unwrap());
+        let tx_ordinal: u64 = u64::from_be_bytes(bytes[49..57].try_into().unwrap());
+        let slip_index: u8 = bytes[57];
+        let slip_type: SlipType = FromPrimitive::from_u8(bytes[58]).unwrap();
         let mut slip = Slip::default();
 
         slip.public_key = public_key;
@@ -106,7 +106,7 @@ impl Slip {
         ]
         .concat();
 
-        res[0..66].try_into().unwrap()
+        res[0..58].try_into().unwrap()
     }
 
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
@@ -264,7 +264,7 @@ mod tests {
     #[test]
     fn slip_get_utxoset_key_test() {
         let slip = Slip::default();
-        assert_eq!(slip.get_utxoset_key(), [0; 66]);
+        assert_eq!(slip.get_utxoset_key(), [0; 58]);
     }
 
     #[test]

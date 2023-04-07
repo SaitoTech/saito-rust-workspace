@@ -2,14 +2,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
     push_lock, PeerIndex, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -18,13 +18,16 @@ use crate::core::data;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
+use crate::core::data::crypto::hash;
+
 use crate::core::data::msg::block_request::BlockchainRequest;
+use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::verification_thread::VerifyRequest;
-use crate::lock_for_read;
+use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
 pub enum RoutingEvent {
@@ -79,7 +82,7 @@ pub struct RoutingThread {
     pub sender_to_miner: Sender<MiningEvent>,
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
-    pub configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+    pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub network: Network,
@@ -138,14 +141,15 @@ impl RoutingThread {
                     )
                     .await;
             }
-            Message::ApplicationMessage(_) => {
-                debug!("received buffer");
-            }
+
             Message::Block(_) => {
                 unreachable!("received block");
             }
             Message::Transaction(transaction) => {
-                trace!("received transaction");
+                trace!(
+                    "received transaction : {:?}",
+                    hex::encode(transaction.signature)
+                );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;
@@ -160,16 +164,102 @@ impl RoutingThread {
             }
             Message::Ping() => {}
             Message::SPVChain() => {}
-            Message::Services() => {}
-            Message::GhostChain() => {}
-            Message::GhostChainRequest() => {}
-            Message::Result() => {}
-            Message::Error() => {}
-            Message::ApplicationTransaction(_) => {}
+            Message::Services(services) => {
+                self.process_peer_services(services, peer_index).await;
+            }
+            Message::GhostChain(chain) => {
+                self.process_ghost_chain(chain, peer_index).await;
+            }
+            Message::GhostChainRequest(block_id, block_hash, fork_id) => {
+                self.process_ghost_chain_request(block_id, block_hash, fork_id, peer_index)
+                    .await;
+            }
+            Message::ApplicationMessage(api_message) => {
+                debug!(
+                    "processing application msg with buffer size : {:?}",
+                    api_message.data.len()
+                );
+                self.network
+                    .io_interface
+                    .process_api_call(api_message.data, api_message.msg_index, peer_index)
+                    .await;
+            }
+            Message::Result(api_message) => {
+                self.network
+                    .io_interface
+                    .process_api_success(api_message.data, api_message.msg_index, peer_index)
+                    .await;
+            }
+            Message::Error(api_message) => {
+                self.network
+                    .io_interface
+                    .process_api_error(api_message.data, api_message.msg_index, peer_index)
+                    .await;
+            }
         }
         trace!("incoming message processed");
     }
+    async fn process_ghost_chain_request(
+        &self,
+        block_id: u64,
+        block_hash: SaitoHash,
+        fork_id: SaitoHash,
+        peer_index: u64,
+    ) {
+        let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let peer_public_key;
+        {
+            let (peers, _peers_) = lock_for_read!(self.network.peers, LOCK_ORDER_PEERS);
+            peer_public_key = peers
+                .find_peer_by_index(peer_index)
+                .unwrap()
+                .public_key
+                .unwrap();
+        }
 
+        let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
+
+        if last_shared_ancestor == 0 && blockchain.get_latest_block_id() > 10 {
+            last_shared_ancestor = blockchain.get_latest_block_id() - 10;
+        }
+        let mut ghost = GhostChainSync {
+            start: blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(last_shared_ancestor),
+            prehashes: vec![],
+            previous_block_hashes: vec![],
+            block_ids: vec![],
+            block_ts: vec![],
+            txs: vec![],
+            gts: vec![],
+        };
+        for i in (last_shared_ancestor + 1)..=blockchain.blockring.get_latest_block_id() {
+            let hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(i);
+            if hash != [0; 32] {
+                let block = blockchain.get_block(&block_hash);
+                if block.is_some() {
+                    let block = block.unwrap();
+                    ghost.gts.push(block.has_golden_ticket);
+                    ghost.block_ts.push(block.timestamp);
+                    ghost.prehashes.push(block.pre_hash);
+                    ghost.previous_block_hashes.push(block.previous_block_hash);
+                    ghost.block_ids.push(block.id);
+                    ghost
+                        .txs
+                        .push(block.has_keylist_transactions(vec![peer_public_key]));
+                }
+            }
+        }
+
+        let buffer = Message::GhostChain(ghost).serialize();
+        self.network
+            .io_interface
+            .send_message(peer_index, buffer)
+            .await
+            .unwrap();
+    }
     async fn handle_new_peer(
         &mut self,
         peer_data: Option<data::configuration::PeerConfig>,
@@ -296,6 +386,54 @@ impl RoutingThread {
             }
         }
     }
+    async fn process_ghost_chain(&self, chain: GhostChainSync, peer_index: u64) {
+        let mut previous_block_hash = chain.start;
+        let peer_key;
+        {
+            let (peers, _peers_) = lock_for_read!(self.network.peers, LOCK_ORDER_PEERS);
+            peer_key = peers
+                .find_peer_by_index(peer_index)
+                .unwrap()
+                .public_key
+                .unwrap();
+        }
+        for i in 0..chain.prehashes.len() {
+            let buf = [
+                previous_block_hash.as_slice(),
+                chain.prehashes[i].as_slice(),
+            ]
+            .concat();
+            let block_hash = hash(&buf);
+            if chain.txs[i] {
+                self.network
+                    .fetch_missing_block(block_hash, &peer_key)
+                    .await
+                    .unwrap();
+            } else {
+                let (mut blockchain, _blockchain_) =
+                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                blockchain.add_ghost_block(
+                    chain.block_ids[i],
+                    chain.previous_block_hashes[i],
+                    chain.block_ts[i],
+                    chain.prehashes[i],
+                    chain.gts[i],
+                    block_hash,
+                );
+            }
+            previous_block_hash = block_hash;
+        }
+    }
+    async fn process_peer_services(&mut self, services: Vec<String>, peer_index: u64) {
+        let (mut peers, _peers_) = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_some() {
+            let peer = peer.unwrap();
+            peer.services = services;
+        } else {
+            warn!("peer {:?} not found to update services", peer_index);
+        }
+    }
 }
 
 #[async_trait]
@@ -311,7 +449,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 unreachable!()
             }
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                trace!("incoming message received from peer : {:?}", peer_index);
+                trace!(
+                    "incoming message received from peer : {:?} buffer_len : {:?}",
+                    peer_index,
+                    buffer.len()
+                );
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
                     //todo!()
@@ -364,6 +506,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 return Some(());
             }
         }
+        debug!("network event processed");
         None
     }
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {

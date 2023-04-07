@@ -18,7 +18,7 @@ use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::transaction::Transaction;
+use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{lock_for_read, lock_for_write};
 
@@ -29,6 +29,7 @@ pub struct Network {
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
     static_peer_configs: Vec<PeerConfig>,
     pub wallet: Arc<RwLock<Wallet>>,
+    pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
 }
 
 impl Network {
@@ -36,16 +37,28 @@ impl Network {
         io_handler: Box<dyn InterfaceIO + Send + Sync>,
         peers: Arc<RwLock<PeerCollection>>,
         wallet: Arc<RwLock<Wallet>>,
+        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Network {
         Network {
             peers,
             io_interface: io_handler,
             static_peer_configs: Default::default(),
             wallet,
+            configs,
         }
     }
-    pub async fn propagate_block(&self, block: &Block) {
+    pub async fn propagate_block(
+        &self,
+        block: &Block,
+        configs: &(dyn Configuration + Send + Sync),
+    ) {
         debug!("propagating block : {:?}", hex::encode(&block.hash));
+        {
+            // let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            if configs.is_browser() {
+                return;
+            }
+        }
 
         let mut excluded_peers = vec![];
         // finding block sender to avoid resending the block to that node
@@ -78,16 +91,32 @@ impl Network {
     }
 
     pub async fn propagate_transaction(&self, transaction: &Transaction) {
-        trace!(
-            "propagating transaction : {:?}",
-            hex::encode(transaction.signature)
-        );
-
         // TODO : return if tx is not valid
 
         let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+        let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
 
-        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+        trace!(
+            "propagating transaction : {:?} peers : {:?}",
+            hex::encode(transaction.signature),
+            peers.index_to_peers.len()
+        );
+
+        let public_key = wallet.public_key;
+
+        if transaction
+            .from
+            .get(0)
+            .expect("from slip should exist")
+            .public_key
+            == public_key
+        {
+            if let TransactionType::GoldenTicket = transaction.transaction_type {
+            } else {
+                wallet.add_to_pending(transaction.clone());
+            }
+        }
+
         for (index, peer) in peers.index_to_peers.iter() {
             if peer.public_key.is_none() {
                 continue;
@@ -122,6 +151,7 @@ impl Network {
         let peer_index;
         let url;
         {
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
             let peer = peers.find_peer_by_address(public_key);
@@ -130,7 +160,7 @@ impl Network {
                 todo!()
             }
             let peer = peer.unwrap();
-            url = peer.get_block_fetch_url(block_hash);
+            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
             peer_index = peer.index;
         }
 
@@ -207,7 +237,7 @@ impl Network {
         peer_index: u64,
         challenge: HandshakeChallenge,
         wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
         let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
@@ -226,7 +256,7 @@ impl Network {
         response: HandshakeResponse,
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
-        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
         debug!("received handshake response");
         let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
@@ -267,22 +297,54 @@ impl Network {
         info!("requesting blockchain from peer : {:?}", peer_index);
 
         // TODO : should this be moved inside peer ?
-        let request;
-        {
-            let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
-            request = BlockchainRequest {
-                latest_block_id: blockchain.get_latest_block_id(),
-                latest_block_hash: blockchain.get_latest_block_hash(),
-                fork_id: blockchain.get_fork_id().clone(),
-            };
+        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        if configs.is_spv_mode() {
+            let request;
+            {
+                let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+                if blockchain.last_block_id > blockchain.get_latest_block_id() {
+                    request = BlockchainRequest {
+                        latest_block_id: blockchain.last_block_id,
+                        latest_block_hash: blockchain.last_block_hash,
+                        fork_id: blockchain.get_fork_id().clone(),
+                    };
+                } else {
+                    request = BlockchainRequest {
+                        latest_block_id: blockchain.get_latest_block_id(),
+                        latest_block_hash: blockchain.get_latest_block_hash(),
+                        fork_id: blockchain.get_fork_id().clone(),
+                    };
+                }
+            }
+            let buffer = Message::GhostChainRequest(
+                request.latest_block_id,
+                request.latest_block_hash,
+                request.fork_id,
+            )
+            .serialize();
+            self.io_interface
+                .send_message(peer_index, buffer)
+                .await
+                .unwrap();
+        } else {
+            let request;
+            {
+                let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+                request = BlockchainRequest {
+                    latest_block_id: blockchain.get_latest_block_id(),
+                    latest_block_hash: blockchain.get_latest_block_hash(),
+                    fork_id: blockchain.get_fork_id().clone(),
+                };
+            }
+            let buffer = Message::BlockchainRequest(request).serialize();
+            self.io_interface
+                .send_message(peer_index, buffer)
+                .await
+                .unwrap();
         }
-
-        let buffer = Message::BlockchainRequest(request).serialize();
-        self.io_interface
-            .send_message(peer_index, buffer)
-            .await
-            .unwrap();
     }
     pub async fn process_incoming_block_hash(
         &self,
@@ -290,6 +352,7 @@ impl Network {
         peer_index: PeerIndex,
         blockchain: Arc<RwLock<Blockchain>>,
     ) -> Option<()> {
+        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let block_exists;
         {
             let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
@@ -307,7 +370,7 @@ impl Network {
                 .index_to_peers
                 .get(&peer_index)
                 .expect("peer not found");
-            url = peer.get_block_fetch_url(block_hash);
+            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
         }
         self.io_interface
             .fetch_block_from_peer(block_hash, peer_index, url)
@@ -318,7 +381,7 @@ impl Network {
 
     pub async fn initialize_static_peers(
         &mut self,
-        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
         self.static_peer_configs = configs.get_peer_configs().clone();
@@ -338,5 +401,22 @@ impl Network {
                 .unwrap();
         }
         trace!("connected to peers");
+    }
+    pub async fn propagate_services(&self, peer_index: PeerIndex, services: Vec<String>) {
+        let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+        let buffer = Message::Services(services).serialize();
+        if peer_index == 0 {
+            for (i, _) in peers.index_to_peers.iter() {
+                self.io_interface
+                    .send_message(*i, buffer.clone())
+                    .await
+                    .unwrap();
+            }
+        } else {
+            self.io_interface
+                .send_message(peer_index, buffer)
+                .await
+                .unwrap();
+        }
     }
 }

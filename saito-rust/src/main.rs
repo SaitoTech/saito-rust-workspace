@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use log::info;
+use log::{debug, error, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -15,7 +16,6 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
-use log::{debug, error, trace};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{push_lock, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT};
 use saito_core::common::keep_time::KeepTime;
@@ -139,7 +139,7 @@ async fn run_verification_thread(
 
         event_processor.on_init().await;
         let mut queued_requests = vec![];
-        let mut requests = VecDeque::with_capacity(batch_size);
+        let mut requests = VecDeque::new();
 
         loop {
             work_done = false;
@@ -212,6 +212,8 @@ async fn run_mining_event_processor(
         public_key: [0; 33],
         mined_golden_tickets: 0,
         stat_sender: sender_to_stat.clone(),
+        configs: context.configuration.clone(),
+        enabled: true,
     };
 
     let (interface_sender_to_miner, interface_receiver_for_miner) =
@@ -270,6 +272,7 @@ async fn run_consensus_event_processor(
             )),
             peers.clone(),
             context.wallet.clone(),
+            context.configuration.clone(),
         ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
@@ -279,10 +282,11 @@ async fn run_consensus_event_processor(
             CONSENSUS_EVENT_PROCESSOR_ID,
         ))),
         stats: ConsensusStats::new(sender_to_stat.clone()),
-        txs_for_mempool: Vec::with_capacity(channel_size),
+        txs_for_mempool: Vec::new(),
         stat_sender: sender_to_stat.clone(),
+        configs: context.configuration.clone(),
     };
-    let (interface_sender_to_blockchain, interface_receiver_for_mempool) =
+    let (interface_sender_to_blockchain, _interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
     debug!("running mempool thread");
     let blockchain_handle = run_thread(
@@ -299,7 +303,7 @@ async fn run_consensus_event_processor(
 
 async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
-    configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     context: &Context,
     peers: Arc<RwLock<PeerCollection>>,
     sender_to_mempool: &Sender<ConsensusEvent>,
@@ -327,6 +331,7 @@ async fn run_routing_event_processor(
             )),
             peers.clone(),
             context.wallet.clone(),
+            configs.clone(),
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
@@ -546,11 +551,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::registry().with(fmt_layer).init();
 
-    let configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>> =
-        Arc::new(RwLock::new(Box::new(
-            ConfigHandler::load_configs("configs/config.json".to_string())
-                .expect("loading configs failed"),
-        )));
+    let configs: Arc<RwLock<dyn Configuration + Send + Sync>> = Arc::new(RwLock::new(
+        ConfigHandler::load_configs("configs/config.json".to_string())
+            .expect("loading configs failed"),
+    ));
 
     let channel_size;
     let thread_sleep_time_in_ms;
@@ -561,11 +565,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
 
-        channel_size = configs.get_server_configs().channel_size as usize;
-        thread_sleep_time_in_ms = configs.get_server_configs().thread_sleep_time_in_ms;
-        stat_timer_in_ms = configs.get_server_configs().stat_timer_in_ms;
-        verification_thread_count = configs.get_server_configs().verification_threads;
-        fetch_batch_size = configs.get_server_configs().block_fetch_batch_size as usize;
+        channel_size = configs.get_server_configs().unwrap().channel_size as usize;
+        thread_sleep_time_in_ms = configs
+            .get_server_configs()
+            .unwrap()
+            .thread_sleep_time_in_ms;
+        stat_timer_in_ms = configs.get_server_configs().unwrap().stat_timer_in_ms;
+        verification_thread_count = configs.get_server_configs().unwrap().verification_threads;
+        fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
         assert_ne!(fetch_batch_size, 0);
     }
 
@@ -620,7 +627,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
+    let (_network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
         &context,
         peers.clone(),
         receiver_for_consensus,
@@ -634,7 +641,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (network_event_sender_to_mining, miner_handle) = run_mining_event_processor(
+    let (_network_event_sender_to_mining, miner_handle) = run_mining_event_processor(
         &context,
         &sender_to_consensus,
         receiver_for_miner,
@@ -666,6 +673,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         configs.clone(),
         context.blockchain.clone(),
         sender_to_stat.clone(),
+        peers.clone(),
     ));
 
     let _result = tokio::join!(

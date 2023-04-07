@@ -24,23 +24,25 @@ pub mod test {
     //
     //
     use std::borrow::BorrowMut;
+    use std::fmt::{Debug, Formatter};
+    use std::ops::Deref;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
+    use log::{debug, info};
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
-    use log::{debug, info};
-
     use crate::common::defs::{
-        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, UtxoSet,
-        LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+        UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
-    use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_hash};
+    use crate::core::data::configuration::{Configuration, PeerConfig, Server};
+    use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
@@ -51,11 +53,11 @@ pub mod test {
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
 
-    pub fn create_timestamp() -> u64 {
+    pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis() as u64
+            .as_millis() as Timestamp
     }
 
     pub struct TestManager {
@@ -68,6 +70,7 @@ pub mod test {
         pub peers: Arc<RwLock<PeerCollection>>,
         pub sender_to_miner: Sender<MiningEvent>,
         pub receiver_in_miner: Receiver<MiningEvent>,
+        pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     }
 
     impl TestManager {
@@ -80,7 +83,8 @@ pub mod test {
             let wallet_lock = Arc::new(RwLock::new(wallet));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(public_key, private_key)));
-            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
+            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
+            let configs = Arc::new(RwLock::new(TestConfiguration {}));
 
             Self {
                 wallet_lock: wallet_lock.clone(),
@@ -91,11 +95,13 @@ pub mod test {
                     Box::new(TestIOHandler::new()),
                     peers.clone(),
                     wallet_lock.clone(),
+                    configs.clone(),
                 ),
                 peers: peers.clone(),
                 storage: Storage::new(Box::new(TestIOHandler::new())),
                 sender_to_miner: sender_to_miner.clone(),
                 receiver_in_miner,
+                configs,
             }
         }
 
@@ -123,6 +129,7 @@ pub mod test {
         //
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
@@ -134,6 +141,7 @@ pub mod test {
                     &mut self.storage,
                     self.sender_to_miner.clone(),
                     &mut mempool,
+                    configs.deref(),
                 )
                 .await;
             debug!("block added to test manager blockchain");
@@ -318,11 +326,11 @@ pub mod test {
                         block_contains_fee_tx = true;
                         block_fee_tx_index = t as usize;
                     } else {
-                        for z in 0..block.transactions[t].inputs.len() {
-                            block_inputs += block.transactions[t].inputs[z].amount;
+                        for z in 0..block.transactions[t].from.len() {
+                            block_inputs += block.transactions[t].from[z].amount;
                         }
-                        for z in 0..block.transactions[t].outputs.len() {
-                            block_outputs += block.transactions[t].outputs[z].amount;
+                        for z in 0..block.transactions[t].to.len() {
+                            block_outputs += block.transactions[t].to[z].amount;
                         }
                     }
 
@@ -356,7 +364,7 @@ pub mod test {
                             //
                             let mut total_fees_paid: Currency = 0;
                             let fee_transaction = &block.transactions[block_fee_tx_index];
-                            for output in fee_transaction.outputs.iter() {
+                            for output in fee_transaction.to.iter() {
                                 total_fees_paid += output.amount;
                             }
 
@@ -400,7 +408,7 @@ pub mod test {
         pub async fn create_block(
             &mut self,
             parent_hash: SaitoHash,
-            timestamp: u64,
+            timestamp: Timestamp,
             txs_number: usize,
             txs_amount: Currency,
             txs_fee: Currency,
@@ -423,7 +431,8 @@ pub mod test {
                     let (mut wallet, _wallet_) =
                         lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
-                    transaction = Transaction::create(&mut wallet, public_key, txs_amount, txs_fee);
+                    transaction =
+                        Transaction::create(&mut wallet, public_key, txs_amount, txs_fee, false);
                 }
 
                 transaction.sign(&private_key);
@@ -457,6 +466,7 @@ pub mod test {
                 transactions.insert(gttx.signature, gttx);
             }
 
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             //
@@ -470,6 +480,7 @@ pub mod test {
                 &public_key,
                 &private_key,
                 None,
+                configs.deref(),
             )
             .await;
             block.generate();
@@ -516,7 +527,7 @@ pub mod test {
             &mut self,
             vip_transactions: u64,
             vip_amount: Currency,
-            timestamp: u64,
+            timestamp: Timestamp,
         ) {
             //
             // initialize timestamp
@@ -557,19 +568,57 @@ pub mod test {
                 block.add_transaction(tx);
             }
 
-            // we have added VIP, so need to regenerate the merkle-root
-            block.merkle_root = block.generate_merkle_root();
+            {
+                let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+                // we have added VIP, so need to regenerate the merkle-root
+                block.merkle_root =
+                    block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+            }
             block.generate();
             block.sign(&private_key);
 
-            assert!(verify_hash(
+            assert!(verify_signature(
                 &block.pre_hash,
                 &block.signature,
-                &block.creator
+                &block.creator,
             ));
 
             // and add first block to blockchain
             self.add_block(block).await;
+        }
+    }
+
+    struct TestConfiguration {}
+
+    impl Debug for TestConfiguration {
+        fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
+            todo!()
+        }
+    }
+
+    impl Configuration for TestConfiguration {
+        fn get_server_configs(&self) -> Option<&Server> {
+            todo!()
+        }
+
+        fn get_peer_configs(&self) -> &Vec<PeerConfig> {
+            todo!()
+        }
+
+        fn get_block_fetch_url(&self) -> String {
+            todo!()
+        }
+
+        fn is_spv_mode(&self) -> bool {
+            false
+        }
+
+        fn is_browser(&self) -> bool {
+            false
+        }
+
+        fn replace(&mut self, _config: &dyn Configuration) {
+            todo!()
         }
     }
 }

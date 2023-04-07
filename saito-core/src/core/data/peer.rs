@@ -1,9 +1,8 @@
 use std::io::Error;
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
-
 use log::{info, warn};
+use tokio::sync::RwLock;
 
 use crate::common::defs::{
     push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
@@ -25,6 +24,8 @@ pub struct Peer {
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
     pub static_peer_config: Option<data::configuration::PeerConfig>,
     pub challenge_for_peer: Option<SaitoHash>,
+    pub key_list: Vec<SaitoPublicKey>,
+    pub services: Vec<String>,
 }
 
 impl Peer {
@@ -35,6 +36,8 @@ impl Peer {
             block_fetch_url: "".to_string(),
             static_peer_config: None,
             challenge_for_peer: None,
+            key_list: vec![],
+            services: vec![],
         }
     }
     pub async fn initiate_handshake(
@@ -61,14 +64,20 @@ impl Peer {
         challenge: HandshakeChallenge,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
         info!("handling handshake challenge : {:?}", self.index,);
         let block_fetch_url;
+        let is_lite;
         {
             let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
 
-            block_fetch_url = configs.get_block_fetch_url();
+            is_lite = configs.is_browser();
+            if is_lite {
+                block_fetch_url = "".to_string();
+            } else {
+                block_fetch_url = configs.get_block_fetch_url();
+            }
         }
 
         let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
@@ -76,7 +85,7 @@ impl Peer {
             public_key: wallet.public_key,
             signature: sign(challenge.challenge.as_slice(), &wallet.private_key),
             challenge: generate_random_bytes(32).try_into().unwrap(),
-            is_lite: 0,
+            is_lite,
             block_fetch_url,
         };
 
@@ -94,7 +103,7 @@ impl Peer {
         response: HandshakeResponse,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
         wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<Box<dyn Configuration + Send + Sync>>>,
+        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
         info!(
             "handling handshake response :{:?} with address : {:?}",
@@ -125,10 +134,16 @@ impl Peer {
         let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
 
         let block_fetch_url;
+        let is_lite;
         {
             let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
 
-            block_fetch_url = configs.get_block_fetch_url();
+            is_lite = configs.is_browser();
+            if is_lite {
+                block_fetch_url = "".to_string();
+            } else {
+                block_fetch_url = configs.get_block_fetch_url();
+            }
         }
         self.challenge_for_peer = None;
         self.public_key = Some(response.public_key);
@@ -142,7 +157,7 @@ impl Peer {
             let response = HandshakeResponse {
                 public_key: wallet.public_key.clone(),
                 signature: sign(&response.challenge, &wallet.private_key),
-                is_lite: 0,
+                is_lite,
                 block_fetch_url: block_fetch_url.to_string(),
                 challenge: generate_random_bytes(32).try_into().unwrap(),
             };
@@ -173,9 +188,14 @@ impl Peer {
     /// ```
     ///
     /// ```
-    pub fn get_block_fetch_url(&self, block_hash: SaitoHash) -> String {
+    pub fn get_block_fetch_url(&self, block_hash: SaitoHash, lite: bool) -> String {
+        let str = if lite { "/block/" } else { "/lite-block/" };
+
         // TODO : generate the url with proper / escapes,etc...
-        self.block_fetch_url.to_string() + hex::encode(block_hash).as_str()
+        self.block_fetch_url.to_string() + str + hex::encode(block_hash).as_str()
+    }
+    pub fn has_service(&self, service: String) -> bool {
+        self.services.contains(&service)
     }
 }
 

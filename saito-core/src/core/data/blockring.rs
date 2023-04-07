@@ -1,8 +1,7 @@
 use log::trace;
 
-use crate::common::defs::SaitoHash;
+use crate::common::defs::{SaitoHash, GENESIS_PERIOD};
 use crate::core::data::block::Block;
-use crate::core::data::blockchain::GENESIS_PERIOD;
 use crate::core::data::ringitem::RingItem;
 
 pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
@@ -195,9 +194,8 @@ impl BlockRing {
 
 #[cfg(test)]
 mod tests {
-
+    use crate::common::defs::GENESIS_PERIOD;
     use crate::core::data::block::Block;
-    use crate::core::data::blockchain::GENESIS_PERIOD;
     use crate::core::data::blockring::BlockRing;
 
     pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;

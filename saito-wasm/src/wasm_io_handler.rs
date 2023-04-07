@@ -2,15 +2,14 @@ use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
-use figment::providers::Json;
-use figment::Figment;
+
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{info, trace};
-use serde::Serialize;
+
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::SaitoHash;
+use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::InterfaceIO;
 use saito_core::core::data::configuration::PeerConfig;
 
@@ -19,13 +18,16 @@ pub struct WasmIoHandler {}
 #[async_trait]
 impl InterfaceIO for WasmIoHandler {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
+        info!("WasmIoHandler::send_message : {:?}", peer_index);
+
         let array = js_sys::Uint8Array::new_with_length(buffer.len() as u32);
         array.copy_from(buffer.as_slice());
 
         // let async_fn =
-        MsgHandler::send_message(js_sys::BigInt::from(peer_index), array);
+        MsgHandler::send_message(js_sys::BigInt::from(peer_index), &array);
         // let promise = js_sys::Promise::resolve(async_fn);
         // let result = wasm_bindgen_futures::JsFuture::from(async_fn).await;
+        drop(array);
 
         Ok(())
     }
@@ -47,23 +49,16 @@ impl InterfaceIO for WasmIoHandler {
             arr2.set(i as u32, int);
         }
 
-        MsgHandler::send_message_to_all(array, arr2);
+        MsgHandler::send_message_to_all(&array, &arr2);
+
+        drop(array);
+        drop(arr2);
 
         Ok(())
     }
 
     async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
         trace!("connect_to_peer : {:?}", peer.host);
-        // let mut protocol: String = String::from("ws");
-        // if peer.protocol == "https" {
-        //     protocol = String::from("wss");
-        // }
-        // let url = protocol
-        //     + "://"
-        //     + peer.host.as_str()
-        //     + ":"
-        //     + peer.port.to_string().as_str()
-        //     + "/wsopen";
 
         let json_string = serde_json::to_string(&peer).unwrap();
         let json = js_sys::JSON::parse(&json_string).unwrap();
@@ -97,7 +92,9 @@ impl InterfaceIO for WasmIoHandler {
     ) -> Result<(), Error> {
         let hash = js_sys::Uint8Array::new_with_length(32);
         hash.copy_from(block_hash.as_slice());
-        MsgHandler::fetch_block_from_peer(hash, BigInt::from(peer_index), url);
+        MsgHandler::fetch_block_from_peer(&hash, BigInt::from(peer_index), url);
+
+        drop(hash);
 
         Ok(())
     }
@@ -106,7 +103,8 @@ impl InterfaceIO for WasmIoHandler {
         let array = js_sys::Uint8Array::new_with_length(value.len() as u32);
         array.copy_from(value.as_slice());
 
-        MsgHandler::write_value(key, array);
+        MsgHandler::write_value(key, &array);
+        drop(array);
 
         Ok(())
     }
@@ -118,8 +116,9 @@ impl InterfaceIO for WasmIoHandler {
         }
 
         let result = result.unwrap();
-
-        Ok(result.to_vec())
+        let v = result.to_vec();
+        drop(result);
+        Ok(v)
     }
 
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
@@ -164,6 +163,24 @@ impl InterfaceIO for WasmIoHandler {
     fn get_block_dir(&self) -> String {
         "data/blocks/".to_string()
     }
+
+    async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        let buf = Uint8Array::new_with_length(buffer.len() as u32);
+        buf.copy_from(buffer.as_slice());
+        MsgHandler::process_api_call(buf, msg_index, peer_index);
+    }
+
+    async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        let buf = Uint8Array::new_with_length(buffer.len() as u32);
+        buf.copy_from(buffer.as_slice());
+        MsgHandler::process_api_success(buf, msg_index, peer_index);
+    }
+
+    async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        let buf = Uint8Array::new_with_length(buffer.len() as u32);
+        buf.copy_from(buffer.as_slice());
+        MsgHandler::process_api_error(buf, msg_index, peer_index);
+    }
 }
 
 impl Debug for WasmIoHandler {
@@ -179,15 +196,15 @@ extern "C" {
     type MsgHandler;
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn send_message(peer_index: js_sys::BigInt, buffer: js_sys::Uint8Array);
+    pub fn send_message(peer_index: BigInt, buffer: &Uint8Array);
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn send_message_to_all(buffer: js_sys::Uint8Array, exceptions: js_sys::Array);
+    pub fn send_message_to_all(buffer: &Uint8Array, exceptions: &Array);
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn connect_to_peer(peer_data: JsValue) -> Result<JsValue, js_sys::Error>;
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn write_value(key: String, value: Uint8Array);
+    pub fn write_value(key: String, value: &Uint8Array);
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn read_value(key: String) -> Result<Uint8Array, js_sys::Error>;
@@ -204,8 +221,17 @@ extern "C" {
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn fetch_block_from_peer(
-        hash: Uint8Array,
+        hash: &Uint8Array,
         peer_index: BigInt,
         url: String,
     ) -> Result<JsValue, js_sys::Error>;
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn process_api_call(buffer: Uint8Array, msg_index: u32, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn process_api_success(buffer: Uint8Array, msg_index: u32, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn process_api_error(buffer: Uint8Array, msg_index: u32, peer_index: u64);
 }

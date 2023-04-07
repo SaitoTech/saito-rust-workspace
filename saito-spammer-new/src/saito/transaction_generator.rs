@@ -51,7 +51,7 @@ impl TransactionGenerator {
         wallet: Arc<RwLock<Wallet>>,
         peers: Arc<RwLock<PeerCollection>>,
         blockchain: Arc<RwLock<Blockchain>>,
-        configuration: Arc<RwLock<Box<SpammerConfigs>>>,
+        configuration: Arc<RwLock<SpammerConfigs>>,
         sender: Sender<VecDeque<Transaction>>,
         tx_payment: Currency,
         tx_fee: Currency,
@@ -191,17 +191,17 @@ impl TransactionGenerator {
         let (input_slips, output_slips) = wallet.generate_slips(total_nolans_requested_per_slip);
 
         for slip in input_slips {
-            transaction.add_input(slip);
+            transaction.add_from_slip(slip);
         }
         for slip in output_slips {
-            transaction.add_output(slip);
+            transaction.add_to_slip(slip);
         }
 
         for _c in 0..output_slips_per_input_slip {
             let mut output = Slip::default();
             output.public_key = self.public_key;
             output.amount = payment_amount;
-            transaction.add_output(output);
+            transaction.add_to_slip(output);
             *total_output_slips_created += 1;
         }
 
@@ -209,7 +209,7 @@ impl TransactionGenerator {
             self.tx_size as i64 - (*total_output_slips_created + 1) as i64 * SLIP_SIZE as i64;
 
         if remaining_bytes > 0 {
-            transaction.message = generate_random_bytes(remaining_bytes as u64);
+            transaction.data = generate_random_bytes(remaining_bytes as u64);
         }
 
         transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
@@ -260,7 +260,7 @@ impl TransactionGenerator {
             loop {
                 let mut work_done = false;
                 {
-                    let (mut blockchain, _blockchain_) =
+                    let (blockchain, _blockchain_) =
                         lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
                     let (mut wallet, _wallet_) = lock_for_write!(wallet, LOCK_ORDER_WALLET);
@@ -270,7 +270,7 @@ impl TransactionGenerator {
                         let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
                             let mut transaction =
-                                Transaction::create(&mut wallet, public_key, payment, fee);
+                                Transaction::create(&mut wallet, public_key, payment, fee, false);
                             transaction.generate_total_fees(0, 0);
                             if (transaction.total_in == 0 || transaction.total_out == 0)
                                 && (payment + fee != 0)
@@ -313,7 +313,7 @@ impl TransactionGenerator {
                 .par_drain(..)
                 .with_min_len(100)
                 .map(|mut transaction| {
-                    transaction.message = vec![0; tx_size as usize]; //;generate_random_bytes(tx_size as u64);
+                    transaction.data = vec![0; tx_size as usize]; //;generate_random_bytes(tx_size as u64);
                     transaction.timestamp = time_keeper.get_timestamp_in_ms();
                     transaction.generate(&public_key, 0, 0);
                     transaction.sign(&self.private_key);

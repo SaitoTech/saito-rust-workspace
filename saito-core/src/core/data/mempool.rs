@@ -1,15 +1,16 @@
 use std::collections::VecDeque;
-use std::time::Duration;
 
 use ahash::AHashMap;
+use log::{debug, info, trace, warn};
 use rayon::prelude::*;
 
-use log::{debug, info, trace, warn};
-
-use crate::common::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
+use crate::common::defs::{
+    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
+use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::transaction::{Transaction, TransactionType};
@@ -68,7 +69,7 @@ impl Mempool {
         }
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: Transaction) {
-        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.message);
+        let gt = GoldenTicket::deserialize_from_net(&golden_ticket.data);
         info!(
             "adding golden ticket : {:?} target : {:?} public_key : {:?}",
             hex::encode(hash(&golden_ticket.serialize_for_net())),
@@ -95,23 +96,20 @@ impl Mempool {
     ) {
         trace!(
             "add transaction if validates : {:?}",
-            hex::encode(transaction.hash_for_signature.unwrap())
+            hex::encode(transaction.signature)
         );
         transaction.generate(&self.public_key, 0, 0);
         // validate
         if transaction.validate(&blockchain.utxoset) {
             self.add_transaction(transaction).await;
         } else {
-            debug!(
-                "transaction not valid : {:?}",
-                transaction.hash_for_signature.unwrap()
-            );
+            debug!("transaction not valid : {:?}", transaction.signature);
         }
     }
     pub async fn add_transaction(&mut self, transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
-            hex::encode(transaction.hash_for_signature.unwrap()),
+            hex::encode(transaction.signature),
             transaction.transaction_type
         );
 
@@ -145,11 +143,12 @@ impl Mempool {
     pub async fn bundle_block(
         &mut self,
         blockchain: &mut Blockchain,
-        current_timestamp: u64,
+        current_timestamp: Timestamp,
         gt_tx: Option<Transaction>,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> Option<Block> {
         let mempool_work = self
-            .can_bundle_block(blockchain, current_timestamp, &gt_tx)
+            .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
             .await?;
         info!(
             "bundling block with {:?} txs with work : {:?}",
@@ -170,6 +169,7 @@ impl Mempool {
             &self.public_key,
             &self.private_key,
             gt_tx,
+            configs,
         )
         .await;
         block.generate();
@@ -187,7 +187,8 @@ impl Mempool {
     pub async fn bundle_genesis_block(
         &mut self,
         blockchain: &mut Blockchain,
-        current_timestamp: u64,
+        current_timestamp: Timestamp,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> Block {
         debug!("bundling genesis block...");
 
@@ -199,6 +200,7 @@ impl Mempool {
             &self.public_key,
             &self.private_key,
             None,
+            configs,
         )
         .await;
         block.generate();
@@ -211,8 +213,9 @@ impl Mempool {
     pub async fn can_bundle_block(
         &self,
         blockchain: &Blockchain,
-        current_timestamp: u64,
+        current_timestamp: Timestamp,
         gt_tx: &Option<Transaction>,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> Option<Currency> {
         // if self.transactions.is_empty() {
         //     return false;
@@ -231,9 +234,12 @@ impl Mempool {
         if self.transactions.is_empty() || !self.new_tx_added {
             return None;
         }
-        if !blockchain
-            .is_golden_ticket_count_valid(blockchain.get_latest_block_hash(), gt_tx.is_some())
-        {
+        if !blockchain.is_golden_ticket_count_valid(
+            blockchain.get_latest_block_hash(),
+            gt_tx.is_some(),
+            configs.is_browser(),
+            configs.is_spv_mode(),
+        ) {
             trace!("waiting till more golden tickets come in");
             return None;
         }
@@ -281,7 +287,7 @@ impl Mempool {
     pub fn delete_transactions(&mut self, transactions: &Vec<Transaction>) {
         for transaction in transactions {
             if let TransactionType::GoldenTicket = transaction.transaction_type {
-                let gt = GoldenTicket::deserialize_from_net(&transaction.message);
+                let gt = GoldenTicket::deserialize_from_net(&transaction.data);
                 self.golden_tickets.remove(&gt.target);
             } else {
                 self.transactions.remove(&transaction.signature);
@@ -306,12 +312,13 @@ impl Mempool {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Deref;
     use std::sync::Arc;
 
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
-        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::burnfee::HEARTBEAT;
@@ -342,9 +349,9 @@ mod tests {
         let blockchain_lock: Arc<RwLock<Blockchain>>;
         let public_key: SaitoPublicKey;
         let private_key: SaitoPrivateKey;
+        let mut t = TestManager::new();
 
         {
-            let mut t = TestManager::new();
             t.initialize(100, 720_000).await;
             t.wait_for_mining_event().await;
 
@@ -363,6 +370,7 @@ mod tests {
         let ts = create_timestamp();
         let _next_block_timestamp = ts + (HEARTBEAT * 2);
 
+        let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
         let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
         let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
 
@@ -377,8 +385,8 @@ mod tests {
                 let (mut wallet, _wallet_) = lock_for_write!(wallet_lock, LOCK_ORDER_WALLET);
 
                 let (inputs, outputs) = wallet.generate_slips(720_000);
-                tx.inputs = inputs;
-                tx.outputs = outputs;
+                tx.from = inputs;
+                tx.to = outputs;
                 // _i prevents sig from being identical during test
                 // and thus from being auto-rejected from mempool
                 tx.timestamp = ts + 120000 + _i;
@@ -401,7 +409,7 @@ mod tests {
         // );
 
         assert!(mempool
-            .can_bundle_block(&blockchain, ts + 120000, &None)
+            .can_bundle_block(&blockchain, ts + 120000, &None, configs.deref())
             .await
             .is_some());
     }

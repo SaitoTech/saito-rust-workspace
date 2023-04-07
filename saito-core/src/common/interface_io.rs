@@ -3,7 +3,7 @@ use std::io::Error;
 
 use async_trait::async_trait;
 
-use crate::common::defs::SaitoHash;
+use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::core::data;
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
@@ -107,6 +107,10 @@ pub trait InterfaceIO: Debug {
     async fn remove_value(&self, key: String) -> Result<(), Error>;
     /// Retrieve the prefix for all the keys for blocks
     fn get_block_dir(&self) -> String;
+
+    async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
+    async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
+    async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
 }
 
 // impl Debug for dyn InterfaceIO {

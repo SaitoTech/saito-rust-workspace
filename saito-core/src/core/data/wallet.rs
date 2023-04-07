@@ -46,6 +46,7 @@ pub struct Wallet {
     pub filename: String,
     pub filepass: String,
     available_balance: Currency,
+    pub pending_txs: AHashMap<SaitoHash, Transaction>,
 }
 
 impl Wallet {
@@ -56,11 +57,12 @@ impl Wallet {
         Wallet {
             public_key,
             private_key,
-            slips: AHashMap::with_capacity(1_000_000),
-            unspent_slips: AHashSet::with_capacity(1_000_000),
+            slips: AHashMap::new(),
+            unspent_slips: AHashSet::new(),
             filename: "default".to_string(),
             filepass: "password".to_string(),
             available_balance: 0,
+            pending_txs: Default::default(),
         }
     }
 
@@ -124,12 +126,12 @@ impl Wallet {
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
-                for input in tx.inputs.iter() {
+                for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         self.delete_slip(input);
                     }
                 }
-                for output in tx.outputs.iter() {
+                for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
                         self.add_slip(block, index as u64, output, true);
                     }
@@ -137,12 +139,12 @@ impl Wallet {
             }
         } else {
             for (index, tx) in block.transactions.iter().enumerate() {
-                for input in tx.inputs.iter() {
+                for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         self.add_slip(block, index as u64, input, true);
                     }
                 }
-                for output in tx.outputs.iter() {
+                for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
                         self.delete_slip(output);
                     }
@@ -156,10 +158,10 @@ impl Wallet {
     //
     pub fn delete_block(&mut self, block: &Block) {
         for tx in block.transactions.iter() {
-            for input in tx.inputs.iter() {
+            for input in tx.from.iter() {
                 self.delete_slip(input);
             }
-            for output in tx.outputs.iter() {
+            for output in tx.to.iter() {
                 if output.amount > 0 {
                     self.delete_slip(output);
                 }
@@ -219,7 +221,7 @@ impl Wallet {
         let my_public_key = self.public_key;
 
         // grab inputs
-        let mut keys_to_remove = Vec::with_capacity(1000);
+        let mut keys_to_remove = Vec::new();
         for key in &self.unspent_slips {
             if nolan_in >= nolan_requested {
                 break;
@@ -281,10 +283,6 @@ impl Wallet {
         sign(message_bytes, &self.private_key)
     }
 
-    pub async fn create_transaction_with_default_fees(&self) -> Transaction {
-        // TODO : to be implemented
-        Transaction::default()
-    }
     pub async fn create_golden_ticket_transaction(
         golden_ticket: GoldenTicket,
         public_key: &SaitoPublicKey,
@@ -294,7 +292,7 @@ impl Wallet {
 
         // for now we'll use bincode to de/serialize
         transaction.transaction_type = TransactionType::GoldenTicket;
-        transaction.message = golden_ticket.serialize_for_net();
+        transaction.data = golden_ticket.serialize_for_net();
 
         let mut input1 = Slip::default();
         input1.public_key = public_key.clone();
@@ -308,8 +306,8 @@ impl Wallet {
         output1.block_id = 0;
         output1.tx_ordinal = 0;
 
-        transaction.add_input(input1);
-        transaction.add_output(output1);
+        transaction.add_from_slip(input1);
+        transaction.add_to_slip(output1);
 
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.hash_for_signature = Some(hash_for_signature);
@@ -318,13 +316,19 @@ impl Wallet {
 
         transaction
     }
+    pub fn add_to_pending(&mut self, tx: Transaction) {
+        assert_eq!(tx.from.get(0).unwrap().public_key, self.public_key);
+        assert_ne!(tx.transaction_type, TransactionType::GoldenTicket);
+        assert!(tx.hash_for_signature.is_some());
+        self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
+    }
 }
 
 impl WalletSlip {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         WalletSlip {
-            utxokey: [0; 66],
+            utxokey: [0; 58],
             amount: 0,
             block_id: 0,
             tx_ordinal: 0,
