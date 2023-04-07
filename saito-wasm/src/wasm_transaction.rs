@@ -1,13 +1,10 @@
 use js_sys::{Array, JsString, Uint8Array};
 
-
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{
-    Currency, SaitoPublicKey, Timestamp,
-};
+use saito_core::common::defs::{Currency, SaitoPublicKey, Timestamp};
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 
 use crate::saitowasm::{string_to_key, SAITO};

@@ -1,4 +1,4 @@
-use js_sys::{JsString};
+use js_sys::JsString;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use num_traits::FromPrimitive;

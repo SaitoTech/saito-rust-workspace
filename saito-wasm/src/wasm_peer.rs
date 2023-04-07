@@ -1,5 +1,5 @@
 use js_sys::{Array, JsString};
-use log::{warn};
+use log::warn;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 

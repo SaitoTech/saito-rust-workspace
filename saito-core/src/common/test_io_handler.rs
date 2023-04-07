@@ -150,7 +150,12 @@ pub mod test {
             "./data/blocks/".to_string()
         }
 
-        async fn process_api_call(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
+        async fn process_api_call(
+            &self,
+            _buffer: Vec<u8>,
+            _msg_index: u32,
+            _peer_index: PeerIndex,
+        ) {
             todo!()
         }
 
@@ -163,7 +168,12 @@ pub mod test {
             todo!()
         }
 
-        async fn process_api_error(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
+        async fn process_api_error(
+            &self,
+            _buffer: Vec<u8>,
+            _msg_index: u32,
+            _peer_index: PeerIndex,
+        ) {
             todo!()
         }
     }
