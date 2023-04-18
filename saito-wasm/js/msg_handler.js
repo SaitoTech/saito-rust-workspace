@@ -53,4 +53,8 @@ export class MsgHandler {
     static process_api_error(buffer, msgIndex, peerIndex) {
         return global.shared_methods.process_api_error(buffer, msgIndex, peerIndex);
     }
+
+    static send_interface_event(event, peerIndex) {
+        return global.shared_methods.send_interface_event(event, peerIndex);
+    }
 }

@@ -11,7 +11,7 @@ pub mod test {
     use log::{debug, error, info};
 
     use crate::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
-    use crate::common::interface_io::InterfaceIO;
+    use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
     use crate::core::data::configuration::PeerConfig;
 
     #[derive(Clone, Debug)]
@@ -174,6 +174,10 @@ pub mod test {
             _msg_index: u32,
             _peer_index: PeerIndex,
         ) {
+            todo!()
+        }
+
+        fn send_interface_event(&self, event: InterfaceEvent) {
             todo!()
         }
     }

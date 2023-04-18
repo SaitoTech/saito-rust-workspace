@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{PeerIndex, SaitoHash};
-use saito_core::common::interface_io::InterfaceIO;
+use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::data::configuration::PeerConfig;
 
 pub struct WasmIoHandler {}
@@ -181,6 +181,20 @@ impl InterfaceIO for WasmIoHandler {
         buf.copy_from(buffer.as_slice());
         MsgHandler::process_api_error(buf, msg_index, peer_index);
     }
+
+    fn send_interface_event(&self, event: InterfaceEvent) {
+        match event {
+            InterfaceEvent::PeerHandshakeComplete(index) => {
+                MsgHandler::send_interface_event("handshake_complete".to_string(), index);
+            }
+            InterfaceEvent::PeerConnectionDropped(index) => {
+                MsgHandler::send_interface_event("peer_disconnect".to_string(), index);
+            }
+            InterfaceEvent::PeerConnected(index) => {
+                MsgHandler::send_interface_event("peer_connect".to_string(), index);
+            }
+        }
+    }
 }
 
 impl Debug for WasmIoHandler {
@@ -234,4 +248,7 @@ extern "C" {
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn process_api_error(buffer: Uint8Array, msg_index: u32, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn send_interface_event(event: String, peer_index: u64);
 }

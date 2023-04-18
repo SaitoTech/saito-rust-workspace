@@ -6,6 +6,12 @@ use async_trait::async_trait;
 use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::core::data;
 
+pub enum InterfaceEvent {
+    PeerHandshakeComplete(PeerIndex),
+    PeerConnectionDropped(PeerIndex),
+    PeerConnected(PeerIndex),
+}
+
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
 #[async_trait]
 pub trait InterfaceIO: Debug {
@@ -111,6 +117,8 @@ pub trait InterfaceIO: Debug {
     async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
     async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
     async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
+
+    fn send_interface_event(&self, event: InterfaceEvent);
 }
 
 // impl Debug for dyn InterfaceIO {

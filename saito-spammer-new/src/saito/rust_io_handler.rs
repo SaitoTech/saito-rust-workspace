@@ -13,7 +13,7 @@ use tokio::sync::mpsc::Sender;
 use log::{debug, warn};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
-use saito_core::common::interface_io::InterfaceIO;
+use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::data::configuration::PeerConfig;
 
 use crate::saito::io_context::IoContext;
@@ -237,6 +237,10 @@ impl InterfaceIO for RustIOHandler {
     }
 
     async fn process_api_error(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
+        todo!()
+    }
+
+    fn send_interface_event(&self, event: InterfaceEvent) {
         todo!()
     }
 }
