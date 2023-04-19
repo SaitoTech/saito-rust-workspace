@@ -93,6 +93,7 @@ pub struct RoutingThread {
     pub last_verification_thread_index: usize,
     pub stat_sender: Sender<String>,
     pub blockchain_sync_state: BlockchainSyncState,
+    pub initial_connection: bool
 }
 
 impl RoutingThread {
@@ -516,10 +517,16 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
         self.reconnection_timer += duration_value;
         // TODO : move the hard code value to a config
-        if self.reconnection_timer >= 10_000 {
+        if !self.initial_connection {
             self.network.connect_to_static_peers().await;
             self.reconnection_timer = 0;
+        }else if self.initial_connection {
+            if self.reconnection_timer >= 10_000 {
+                self.network.connect_to_static_peers().await;
+                self.reconnection_timer = 0;
+            }
         }
+
 
         None
     }
