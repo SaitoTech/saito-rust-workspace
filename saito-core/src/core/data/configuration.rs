@@ -9,6 +9,8 @@ pub struct PeerConfig {
     pub port: u16,
     pub protocol: String,
     pub synctype: String,
+    #[serde(skip)]
+    pub is_main: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]

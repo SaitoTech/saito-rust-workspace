@@ -48,7 +48,7 @@ pub mod test {
         }
 
         async fn disconnect_from_peer(&mut self, _peer_index: u64) -> Result<(), Error> {
-            todo!()
+            todo!("")
         }
 
         async fn fetch_block_from_peer(

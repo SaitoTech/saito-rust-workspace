@@ -198,6 +198,12 @@ impl Peer {
     pub fn has_service(&self, service: String) -> bool {
         self.services.contains(&service)
     }
+    pub fn is_main_peer(&self) -> bool {
+        if self.static_peer_config.is_none() {
+            return false;
+        }
+        self.static_peer_config.as_ref().unwrap().is_main
+    }
 }
 
 #[cfg(test)]

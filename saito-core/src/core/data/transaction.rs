@@ -381,6 +381,10 @@ impl Transaction {
     /// [message]
     /// [hop][hop][hop]...
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Transaction {
+        trace!(
+            "deserializing tx from buffer with length : {:?}",
+            bytes.len()
+        );
         // TODO : change return type to Result<Transaction>
         let inputs_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let outputs_len: u32 = u32::from_be_bytes(bytes[4..8].try_into().unwrap());

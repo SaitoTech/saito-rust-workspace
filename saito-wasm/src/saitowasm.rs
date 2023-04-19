@@ -631,6 +631,7 @@ pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: Pe
     let message = Message::Result(api_message);
     let buffer = message.serialize();
 
+    info!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
         .network
@@ -651,6 +652,7 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
     let message = Message::Error(api_message);
     let buffer = message.serialize();
 
+    info!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
         .network

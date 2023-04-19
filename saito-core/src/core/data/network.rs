@@ -392,6 +392,9 @@ impl Network {
     ) {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
         self.static_peer_configs = configs.get_peer_configs().clone();
+        if !self.static_peer_configs.is_empty() {
+            self.static_peer_configs.get_mut(0).unwrap().is_main = true;
+        }
         trace!("static peers : {:?}", self.static_peer_configs);
     }
 
