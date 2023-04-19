@@ -528,7 +528,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             if self.reconnection_timer >= reconnection_wait_time {
                 self.network.connect_to_static_peers().await;
                 self.reconnection_timer = 0;
-                debug!("reconnecting")
+                debug!("reconnecting");
             }
         }
 
