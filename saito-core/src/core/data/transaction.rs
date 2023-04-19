@@ -381,7 +381,7 @@ impl Transaction {
     /// [message]
     /// [hop][hop][hop]...
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Transaction {
-        trace!(
+        debug!(
             "deserializing tx from buffer with length : {:?}",
             bytes.len()
         );

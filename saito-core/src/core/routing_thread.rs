@@ -514,12 +514,14 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
         let duration_value = duration.as_millis() as Timestamp;
-
         self.reconnection_timer += duration_value;
         // TODO : move the hard code value to a config
+
+
         if !self.initial_connection {
             self.network.connect_to_static_peers().await;
             self.reconnection_timer = 0;
+            self.initial_connection = true;
         }else if self.initial_connection {
             if self.reconnection_timer >= 10_000 {
                 self.network.connect_to_static_peers().await;

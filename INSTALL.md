@@ -27,6 +27,8 @@ git clone git@github.com:SaitoTech/saito-rust-workspace.git
 1. Navigate into the directory: `cd saito-rust-workspace/`
 2. Run `cp configs/saito.config.template.json configs/saito.config.json` and do the necessary changes in saito.config.json.
 3. run `RUST_LOG=debug GEN_TX=1 cargo run`
+
+
 #### Environment Variables
 
 - RUST_LOG - `error,warn,info,debug,trace` Log level of the node
