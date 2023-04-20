@@ -31,7 +31,7 @@ pub struct Server {
     pub stat_timer_in_ms: u64,
     pub thread_sleep_time_in_ms: u64,
     pub block_fetch_batch_size: u64,
-    pub reconnection_wait_time:u32
+    pub reconnection_wait_time: u32,
 }
 
 pub trait Configuration: Debug {
