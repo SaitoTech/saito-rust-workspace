@@ -94,6 +94,7 @@ pub struct RoutingThread {
     pub stat_sender: Sender<String>,
     pub blockchain_sync_state: BlockchainSyncState,
     pub initial_connection: bool,
+    pub reconnection_wait_time: Timestamp,
 }
 
 impl RoutingThread {
@@ -514,15 +515,13 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         // trace!("processing timer event : {:?}", duration.as_micros());
 
         let duration_value: Timestamp = duration.as_millis() as Timestamp;
-        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-        let reconnection_wait_time = configs.get_server_configs().unwrap().reconnection_wait_time;
 
         if !self.initial_connection {
             self.network.connect_to_static_peers().await;
             self.initial_connection = true;
         } else if self.initial_connection {
             self.reconnection_timer += duration_value;
-            if self.reconnection_timer >= reconnection_wait_time {
+            if self.reconnection_timer >= self.reconnection_wait_time {
                 self.network.connect_to_static_peers().await;
                 self.reconnection_timer = 0;
                 debug!("reconnecting")

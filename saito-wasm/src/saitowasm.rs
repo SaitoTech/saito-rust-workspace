@@ -134,6 +134,7 @@ pub fn new() -> SaitoWasm {
             stat_sender: sender_to_stat.clone(),
             blockchain_sync_state: BlockchainSyncState::new(10),
             initial_connection: false,
+            reconnection_wait_time: 10_000,
         },
         consensus_thread: ConsensusThread {
             mempool: context.mempool.clone(),

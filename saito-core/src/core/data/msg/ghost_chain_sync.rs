@@ -70,17 +70,17 @@ impl GhostChainSync {
                 buf[i * 8..(i + 1) * 8].try_into().unwrap(),
             ));
         }
-        let buf = buffer[(count * 72)..(count * 76)].to_vec();
+        let buf = buffer[(count * 72)..(count * 80)].to_vec();
         for i in 0..count {
-            block_ts.push(u32::from_be_bytes(
-                buf[i * 4..(i + 1) * 4].try_into().unwrap(),
+            block_ts.push(Timestamp::from_be_bytes(
+                buf[i * 8..(i + 1) * 8].try_into().unwrap(),
             ));
         }
-        let buf = buffer[(count * 76)..(count * 77)].to_vec();
+        let buf = buffer[(count * 80)..(count * 81)].to_vec();
         for i in 0..count {
             txs.push(buf[i] != 0);
         }
-        let buf = buffer[(count * 77)..(count * 78)].to_vec();
+        let buf = buffer[(count * 81)..(count * 82)].to_vec();
         for i in 0..count {
             gts.push(buf[i] != 0);
         }

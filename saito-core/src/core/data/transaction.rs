@@ -16,7 +16,7 @@ use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
 use crate::iterate;
 
-pub const TRANSACTION_SIZE: usize = 89;
+pub const TRANSACTION_SIZE: usize = 93;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone, FromPrimitive)]
 pub enum TransactionType {
@@ -395,9 +395,9 @@ impl Transaction {
         let message_len: usize = u32::from_be_bytes(bytes[8..12].try_into().unwrap()) as usize;
         let path_len: usize = u32::from_be_bytes(bytes[12..16].try_into().unwrap()) as usize;
         let signature: SaitoSignature = bytes[16..80].try_into().unwrap();
-        let timestamp: u32 = u32::from_be_bytes(bytes[80..84].try_into().unwrap());
-        let replaces_txs = u32::from_be_bytes(bytes[84..88].try_into().unwrap());
-        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[88]).unwrap();
+        let timestamp: Timestamp = Timestamp::from_be_bytes(bytes[80..88].try_into().unwrap());
+        let replaces_txs = u32::from_be_bytes(bytes[88..92].try_into().unwrap());
+        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[92]).unwrap();
         let start_of_inputs = TRANSACTION_SIZE;
         let start_of_outputs = start_of_inputs + inputs_len as usize * SLIP_SIZE;
         let start_of_message = start_of_outputs + outputs_len as usize * SLIP_SIZE;
@@ -1067,7 +1067,7 @@ mod tests {
         let tx = Transaction::default();
         assert_eq!(
             tx.serialize_for_signature(),
-            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
         );
     }
 

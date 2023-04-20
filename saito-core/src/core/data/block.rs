@@ -25,7 +25,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 241;
+pub const BLOCK_HEADER_SIZE: usize = 245;
 
 //
 // object used when generating and validation transactions, containing the
@@ -511,24 +511,24 @@ impl Block {
         }
         let transactions_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let id: u64 = u64::from_be_bytes(bytes[4..12].try_into().unwrap());
-        let timestamp: Timestamp = Timestamp::from_be_bytes(bytes[12..16].try_into().unwrap());
-        let previous_block_hash: SaitoHash = bytes[16..48].try_into().unwrap();
-        let creator: SaitoPublicKey = bytes[48..81].try_into().unwrap();
-        let merkle_root: SaitoHash = bytes[81..113].try_into().unwrap();
-        let signature: SaitoSignature = bytes[113..177].try_into().unwrap();
+        let timestamp: Timestamp = Timestamp::from_be_bytes(bytes[12..20].try_into().unwrap());
+        let previous_block_hash: SaitoHash = bytes[20..52].try_into().unwrap();
+        let creator: SaitoPublicKey = bytes[52..85].try_into().unwrap();
+        let merkle_root: SaitoHash = bytes[85..117].try_into().unwrap();
+        let signature: SaitoSignature = bytes[117..181].try_into().unwrap();
 
-        let treasury: Currency = Currency::from_be_bytes(bytes[177..185].try_into().unwrap());
+        let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
         let staking_treasury: Currency =
-            Currency::from_be_bytes(bytes[185..193].try_into().unwrap());
+            Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
 
-        let burnfee: Currency = Currency::from_be_bytes(bytes[193..201].try_into().unwrap());
-        let difficulty: u64 = u64::from_be_bytes(bytes[201..209].try_into().unwrap());
+        let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
+        let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
 
-        let avg_income: Currency = Currency::from_be_bytes(bytes[209..217].try_into().unwrap());
-        let avg_variance: Currency = Currency::from_be_bytes(bytes[217..225].try_into().unwrap());
-        let avg_atr_income: Currency = Currency::from_be_bytes(bytes[225..233].try_into().unwrap());
+        let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
+        let avg_variance: Currency = Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
+        let avg_atr_income: Currency = Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
         let avg_atr_variance: Currency =
-            Currency::from_be_bytes(bytes[233..241].try_into().unwrap());
+            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -1955,7 +1955,7 @@ mod tests {
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 173);
+        assert_eq!(serialized_body.len(), 177);
 
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",

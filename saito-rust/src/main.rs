@@ -341,10 +341,13 @@ async fn run_routing_event_processor(
         stat_sender: sender_to_stat.clone(),
         blockchain_sync_state: BlockchainSyncState::new(fetch_batch_size),
         initial_connection: false,
+        reconnection_wait_time: 0,
     };
 
     {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        routing_event_processor.reconnection_wait_time =
+            configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
         for peer in peers {
             routing_event_processor.static_peers.push(StaticPeer {
