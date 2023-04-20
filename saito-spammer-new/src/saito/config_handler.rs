@@ -42,6 +42,7 @@ impl SpammerConfigs {
                 verification_threads: 4,
                 channel_size: 0,
                 stat_timer_in_ms: 0,
+                reconnection_wait_time: 10000,
                 thread_sleep_time_in_ms: 10,
                 block_fetch_batch_size: 0,
             },
