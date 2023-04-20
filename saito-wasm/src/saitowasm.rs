@@ -270,8 +270,7 @@ pub async fn create_transaction(
         error!("failed parsing public key : {:?}", key.err().unwrap());
         todo!()
     }
-    let transaction = Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge);
-
+    let mut transaction = Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge);
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
     return Ok(wasm_transaction);
 }
@@ -460,7 +459,7 @@ pub fn sign_buffer(buffer: Uint8Array, private_key: JsString) -> JsString {
     let key = string_to_key(private_key);
     if key.is_err() {
         error!("key couldn't be parsed : {:?}", key.err().unwrap());
-        todo!()
+        return "".into();
     }
     let key: SaitoPrivateKey = key.unwrap();
 
@@ -475,31 +474,19 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
     let sig = string_to_key(signature);
     if sig.is_err() {
         error!("signature is invalid");
-        todo!()
+        return false;
     }
     let sig = sig.unwrap();
     let key = string_to_key(public_key);
     if key.is_err() {
         error!("key is invalid");
-        todo!()
+        return false;
     }
     let key = key.unwrap();
     let buffer = buffer.to_vec();
     let h = saito_core::core::data::crypto::hash(&buffer);
     saito_core::core::data::crypto::verify_signature(&h, &sig, &key)
 }
-
-// #[wasm_bindgen]
-// pub async fn get_peers() -> Array {
-//     let saito = SAITO.lock().await;
-//     let peers = saito.routing_thread.network.peers.read().await;
-//     let array = Array::new_with_length(peers.index_to_peers.len() as u32);
-//     for (i, (peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
-//         let peer = peer.clone();
-//         array.set(i as u32, JsValue::from(WasmPeer::new(peer)));
-//     }
-//     array
-// }
 
 #[wasm_bindgen]
 pub async fn get_peers() -> Array {
@@ -514,16 +501,18 @@ pub async fn get_peers() -> Array {
 }
 
 #[wasm_bindgen]
-pub async fn get_peer(peer_index: u64) -> Result<WasmPeer, JsValue> {
+pub async fn get_peer(peer_index: u64) -> Option<WasmPeer> {
     let saito = SAITO.lock().await;
     let peers = saito.routing_thread.network.peers.read().await;
     let peer = peers.find_peer_by_index(peer_index);
     if peer.is_none() {
         warn!("peer not found");
-        todo!()
+        // return Err(JsValue::from("peer not found"));
+        return None;
+        // return Ok(JsValue::NULL);
     }
     let peer = peer.cloned().unwrap();
-    Ok(WasmPeer::new_from_peer(peer))
+    Some(WasmPeer::new_from_peer(peer))
 }
 
 #[wasm_bindgen]
@@ -631,6 +620,9 @@ pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: Pe
     let message = Message::Result(api_message);
     let buffer = message.serialize();
 
+    // let mut tx = Transaction::default();
+    // tx.data = buffer;
+    // let buffer = Message::Transaction(tx).serialize();
     info!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
@@ -651,6 +643,10 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
     };
     let message = Message::Error(api_message);
     let buffer = message.serialize();
+
+    // let mut tx = Transaction::default();
+    // tx.data = buffer;
+    // let buffer = Message::Transaction(tx).serialize();
 
     info!("buffer size = {:?}", buffer.len());
     saito

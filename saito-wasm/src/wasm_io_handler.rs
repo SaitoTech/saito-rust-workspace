@@ -2,16 +2,15 @@ use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
-
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{info, trace};
-
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::transaction::Transaction;
 
 pub struct WasmIoHandler {}
 
@@ -171,12 +170,17 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        // let tx = Transaction::deserialize_from_net(&buffer);
+        // let buffer = tx.data;
         let buf = Uint8Array::new_with_length(buffer.len() as u32);
         buf.copy_from(buffer.as_slice());
         MsgHandler::process_api_success(buf, msg_index, peer_index);
     }
 
     async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        // let tx = Transaction::deserialize_from_net(&buffer);
+        // let buffer = tx.data;
+
         let buf = Uint8Array::new_with_length(buffer.len() as u32);
         buf.copy_from(buffer.as_slice());
         MsgHandler::process_api_error(buf, msg_index, peer_index);

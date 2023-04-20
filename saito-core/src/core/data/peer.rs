@@ -171,8 +171,8 @@ impl Peer {
                 "handshake completed for peer : {:?}",
                 hex::encode(self.public_key.as_ref().unwrap())
             );
-            io_handler.send_interface_event(InterfaceEvent::PeerHandshakeComplete(self.index));
         }
+        io_handler.send_interface_event(InterfaceEvent::PeerHandshakeComplete(self.index));
 
         Ok(())
     }

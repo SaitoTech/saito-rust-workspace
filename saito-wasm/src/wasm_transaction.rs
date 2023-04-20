@@ -1,4 +1,5 @@
 use js_sys::{Array, JsString, Uint8Array};
+use std::io::{Error, ErrorKind};
 
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -161,7 +162,10 @@ impl WasmTransaction {
     }
     pub fn deserialize(buffer: Uint8Array) -> Result<WasmTransaction, JsValue> {
         let tx = Transaction::deserialize_from_net(&buffer.to_vec());
-        let tx = WasmTransaction::from_transaction(tx);
+        if tx.is_err() {
+            return Err(JsValue::from("transaction deserialization failed"));
+        }
+        let tx = WasmTransaction::from_transaction(tx.unwrap());
         Ok(tx)
     }
 }

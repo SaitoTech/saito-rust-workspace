@@ -230,12 +230,15 @@ impl Network {
                 "removing static peer config : {:?}",
                 peer.static_peer_config.as_ref().unwrap()
             );
+            let data = peer.static_peer_config.as_ref().unwrap();
+
             self.static_peer_configs
-                .retain(|config| config != peer.static_peer_config.as_ref().unwrap());
+                .retain(|config| config.host != data.host || config.port != data.port);
         }
 
         info!("new peer added : {:?}", peer_index);
         peers.index_to_peers.insert(peer_index, peer);
+        info!("current peer count = {:?}", peers.index_to_peers.len());
         self.io_interface
             .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
     }

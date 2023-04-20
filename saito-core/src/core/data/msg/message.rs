@@ -95,7 +95,7 @@ impl Message {
                 Ok(Message::Block(block))
             }
             4 => {
-                let tx = Transaction::deserialize_from_net(&buffer);
+                let tx = Transaction::deserialize_from_net(&buffer)?;
                 Ok(Message::Transaction(tx))
             }
             5 => {

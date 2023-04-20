@@ -1,3 +1,5 @@
+use std::io::{Error, ErrorKind};
+
 use log::{debug, error};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -66,7 +68,10 @@ impl Slip {
         true
     }
 
-    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Slip {
+    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Result<Slip, Error> {
+        if bytes.len() != SLIP_SIZE {
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
         let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let amount: Currency = Currency::from_be_bytes(bytes[33..41].try_into().unwrap());
         let block_id: u64 = u64::from_be_bytes(bytes[41..49].try_into().unwrap());
@@ -82,7 +87,7 @@ impl Slip {
         slip.slip_index = slip_index;
         slip.slip_type = slip_type;
 
-        slip
+        Ok(slip)
     }
 
     pub fn generate_utxoset_key(&mut self) {
@@ -272,7 +277,7 @@ mod tests {
         let slip = Slip::default();
         let serialized_slip = slip.serialize_for_net();
         assert_eq!(serialized_slip.len(), SLIP_SIZE);
-        let deserilialized_slip = Slip::deserialize_from_net(&serialized_slip);
+        let deserilialized_slip = Slip::deserialize_from_net(&serialized_slip).unwrap();
         assert_eq!(slip, deserilialized_slip);
     }
 

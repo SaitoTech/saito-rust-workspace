@@ -575,7 +575,7 @@ impl Block {
             }
             let transaction = Transaction::deserialize_from_net(
                 &bytes[start_of_transaction_data..end_of_transaction_data].to_vec(),
-            );
+            )?;
             transactions.push(transaction);
             start_of_transaction_data = end_of_transaction_data;
         }
@@ -680,7 +680,8 @@ impl Block {
         //
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.data.to_vec();
-            winning_tx_placeholder = Transaction::deserialize_from_net(&tmptx);
+            winning_tx_placeholder =
+                Transaction::deserialize_from_net(&tmptx).expect("buffer to be valid");
             winning_tx = &winning_tx_placeholder;
         }
 
