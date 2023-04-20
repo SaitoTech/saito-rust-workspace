@@ -316,8 +316,6 @@ async fn run_routing_event_processor(
     sender_to_stat: Sender<String>,
     fetch_batch_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-
-    
     let mut routing_event_processor = RoutingThread {
         blockchain: context.blockchain.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
@@ -342,7 +340,7 @@ async fn run_routing_event_processor(
         last_verification_thread_index: 0,
         stat_sender: sender_to_stat.clone(),
         blockchain_sync_state: BlockchainSyncState::new(fetch_batch_size),
-        initial_connection: false
+        initial_connection: false,
     };
 
     {
