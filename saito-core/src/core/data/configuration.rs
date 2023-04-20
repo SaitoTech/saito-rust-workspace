@@ -31,10 +31,12 @@ pub struct Server {
     pub stat_timer_in_ms: u64,
     pub thread_sleep_time_in_ms: u64,
     pub block_fetch_batch_size: u64,
+    pub reconnection_wait_time:u32
 }
 
 pub trait Configuration: Debug {
     fn get_server_configs(&self) -> Option<&Server>;
+
     fn get_peer_configs(&self) -> &Vec<PeerConfig>;
     fn get_block_fetch_url(&self) -> String;
     fn is_spv_mode(&self) -> bool;
