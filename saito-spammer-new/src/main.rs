@@ -328,6 +328,7 @@ async fn run_routing_event_processor(
         last_verification_thread_index: 0,
         stat_sender: sender_to_stat.clone(),
         blockchain_sync_state: BlockchainSyncState::new(fetch_batch_size),
+        initial_connection: false
     };
     {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
