@@ -247,19 +247,19 @@ impl InterfaceIO for RustIOHandler {
         todo!()
     }
 
-    async fn save_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error>{
+    async fn save_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error> {
         todo!()
     }
 
-    async fn load_wallet(&self, wallet: Arc<RwLock<Wallet>>)-> Result<(), Error> {
+    async fn load_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error> {
         todo!()
     }
 
-    async fn save_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>)-> Result<(), Error> {
+    async fn save_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error> {
         todo!()
     }
 
-    async fn load_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>)-> Result<(), Error> {
+    async fn load_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error> {
         todo!()
     }
 }

@@ -13,7 +13,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{BLOCK_FILE_EXTENSION, PeerIndex, SaitoHash};
+use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::PeerConfig;

@@ -55,7 +55,7 @@ pub trait InterfaceIO: Debug {
     ///
     /// ```
     async fn connect_to_peer(&mut self, peer: data::configuration::PeerConfig)
-                             -> Result<(), Error>;
+        -> Result<(), Error>;
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error>;
 
     /// Fetches a block with given hash from a specific peer

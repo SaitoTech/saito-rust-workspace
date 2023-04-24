@@ -24,9 +24,7 @@ impl Context {
         wallet: Arc<RwLock<Wallet>>,
     ) -> Context {
         Context {
-            blockchain: Arc::new(RwLock::new(Blockchain::new(
-                wallet.clone(),
-            ))),
+            blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
             mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
             wallet,
             configuration: configs,
