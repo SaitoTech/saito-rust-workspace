@@ -1,16 +1,24 @@
 use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{info, trace};
+use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
+use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::PeerConfig;
 use saito_core::core::data::transaction::Transaction;
+use saito_core::core::data::wallet::Wallet;
+
+use crate::wasm_block::WasmBlock;
+use crate::wasm_blockchain::WasmBlockchain;
+use crate::wasm_wallet::WasmWallet;
 
 pub struct WasmIoHandler {}
 
@@ -199,6 +207,34 @@ impl InterfaceIO for WasmIoHandler {
             }
         }
     }
+
+    async fn save_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error> {
+        let wallet = WasmWallet { wallet };
+        MsgHandler::save_wallet(wallet);
+        // TODO : return error state
+        Ok(())
+    }
+
+    async fn load_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error> {
+        let wallet = WasmWallet { wallet };
+        // TODO : return error state
+        MsgHandler::load_wallet(wallet);
+        Ok(())
+    }
+
+    async fn save_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error> {
+        let blockchain = WasmBlockchain { blockchain };
+        MsgHandler::save_blockchain(blockchain);
+        // TODO : return error state
+        Ok(())
+    }
+
+    async fn load_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error> {
+        let blockchain = WasmBlockchain { blockchain };
+        MsgHandler::load_blockchain(blockchain);
+        // TODO : return error state
+        Ok(())
+    }
 }
 
 impl Debug for WasmIoHandler {
@@ -255,4 +291,14 @@ extern "C" {
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn send_interface_event(event: String, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn save_wallet(wallet: WasmWallet);
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn load_wallet(wallet: WasmWallet);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn save_blockchain(blockchain: WasmBlockchain);
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn load_blockchain(blockchain: WasmBlockchain);
 }

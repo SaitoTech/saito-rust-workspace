@@ -37,11 +37,13 @@ use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 
 use crate::wasm_block::WasmBlock;
+use crate::wasm_blockchain::WasmBlockchain;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_peer::WasmPeer;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
+use crate::wasm_wallet::WasmWallet;
 
 // pub(crate) struct NetworkResultFuture {
 //     pub result: Option<Result<Vec<u8>, Error>>,
@@ -76,6 +78,8 @@ pub struct SaitoWasm {
     receiver_for_miner: Receiver<MiningEvent>,
     receiver_for_verification: Receiver<VerifyRequest>,
     pub(crate) context: Context,
+    wallet: WasmWallet,
+    blockchain: WasmBlockchain,
 }
 
 lazy_static! {
@@ -91,16 +95,18 @@ pub fn new() -> SaitoWasm {
     info!("creating new saito wasm instance");
 
     let keys = generate_keys_wasm();
-    let wallet = Wallet::new(keys.1, keys.0);
-    let public_key = wallet.public_key.clone();
-    let private_key = wallet.private_key.clone();
-    let wallet = Arc::new(RwLock::new(wallet));
+    let mut wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    {
+        Wallet::load(wallet.clone(), Box::new(WasmIoHandler {}));
+    }
+    // let public_key = wallet.public_key.clone();
+    // let private_key = wallet.private_key.clone();
     let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
         blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
-        mempool: Arc::new(RwLock::new(Mempool::new(public_key, private_key))),
+        mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet: wallet.clone(),
         configuration: configuration.clone(),
     };
@@ -128,7 +134,6 @@ pub fn new() -> SaitoWasm {
             ),
             reconnection_timer: 0,
             stats: RoutingStats::new(sender_to_stat.clone()),
-            public_key,
             senders_to_verification: vec![sender_to_verification.clone()],
             last_verification_thread_index: 0,
             stat_sender: sender_to_stat.clone(),
@@ -179,7 +184,6 @@ pub fn new() -> SaitoWasm {
             blockchain: context.blockchain.clone(),
             peers,
             wallet,
-            public_key,
             processed_txs: StatVariable::new(
                 "verification::processed_txs".to_string(),
                 STAT_BIN_COUNT,
@@ -206,6 +210,10 @@ pub fn new() -> SaitoWasm {
         receiver_for_consensus: receiver_in_mempool,
         receiver_for_miner: receiver_in_miner,
         receiver_for_verification: receiver_in_verification,
+        wallet: WasmWallet::new_from(context.wallet.clone()),
+        blockchain: WasmBlockchain {
+            blockchain: context.blockchain.clone(),
+        },
         context,
     }
 }
@@ -517,42 +525,42 @@ pub async fn get_peer(peer_index: u64) -> Option<WasmPeer> {
     Some(WasmPeer::new_from_peer(peer))
 }
 
-#[wasm_bindgen]
-pub async fn get_public_key() -> JsString {
-    let saito = SAITO.lock().await;
-    let wallet = saito.context.wallet.read().await;
-    let key = hex::encode(wallet.public_key);
-    JsString::from(key)
-}
+// #[wasm_bindgen]
+// pub async fn get_public_key() -> JsString {
+//     let saito = SAITO.lock().await;
+//     let wallet = saito.context.wallet.read().await;
+//     let key = hex::encode(wallet.public_key);
+//     JsString::from(key)
+// }
+//
+// #[wasm_bindgen]
+// pub async fn get_private_key() -> JsString {
+//     info!("get_private_key");
+//     let saito = SAITO.lock().await;
+//     let wallet = saito.context.wallet.read().await;
+//     let key = hex::encode(wallet.private_key);
+//     JsString::from(key)
+// }
 
-#[wasm_bindgen]
-pub async fn get_private_key() -> JsString {
-    info!("get_private_key");
-    let saito = SAITO.lock().await;
-    let wallet = saito.context.wallet.read().await;
-    let key = hex::encode(wallet.private_key);
-    JsString::from(key)
-}
+// #[wasm_bindgen]
+// pub async fn get_pending_txs() -> js_sys::Array {
+//     let saito = SAITO.lock().await;
+//     let wallet = saito.context.wallet.read().await;
+//     let array = js_sys::Array::new_with_length(wallet.pending_txs.len() as u32);
+//     for (i, tx) in wallet.pending_txs.values().enumerate() {
+//         let t = WasmTransaction::from_transaction(tx.clone());
+//         array.set(i as u32, JsValue::from(t));
+//     }
+//     array
+// }
 
-#[wasm_bindgen]
-pub async fn get_pending_txs() -> js_sys::Array {
-    let saito = SAITO.lock().await;
-    let wallet = saito.context.wallet.read().await;
-    let array = js_sys::Array::new_with_length(wallet.pending_txs.len() as u32);
-    for (i, tx) in wallet.pending_txs.values().enumerate() {
-        let t = WasmTransaction::from_transaction(tx.clone());
-        array.set(i as u32, JsValue::from(t));
-    }
-    array
-}
-
-#[wasm_bindgen]
-pub async fn get_balance(_ticker: JsString) -> Currency {
-    info!("get_balance");
-    let saito = SAITO.lock().await;
-    let wallet = saito.context.wallet.read().await;
-    wallet.get_available_balance()
-}
+// #[wasm_bindgen]
+// pub async fn get_balance(_ticker: JsString) -> Currency {
+//     info!("get_balance");
+//     let saito = SAITO.lock().await;
+//     let wallet = saito.context.wallet.read().await;
+//     wallet.get_available_balance()
+// }
 
 #[wasm_bindgen]
 pub fn generate_private_key() -> JsString {
@@ -676,6 +684,49 @@ pub async fn propagate_services(peer_index: PeerIndex, services: JsValue) {
         .propagate_services(peer_index, services)
         .await;
 }
+
+#[wasm_bindgen]
+pub async fn get_wallet() -> WasmWallet {
+    let saito = SAITO.lock().await;
+    return saito.wallet.clone();
+}
+#[wasm_bindgen]
+pub async fn get_blockchain() -> WasmBlockchain {
+    let saito = SAITO.lock().await;
+    return saito.blockchain.clone();
+}
+
+//
+// #[wasm_bindgen]
+// pub async fn load_wallet() {
+//     info!("loading wallet...");
+//     let saito = SAITO.lock().await;
+//     let mut wallet = saito.context.wallet.write().await;
+//     wallet
+//         .load(&mut Storage::new(Box::new(WasmIoHandler {})))
+//         .await;
+//     info!("loaded public key = {:?}", hex::encode(wallet.public_key));
+// }
+//
+// #[wasm_bindgen]
+// pub async fn save_wallet() {
+//     info!("saving wallet...");
+//     let saito = SAITO.lock().await;
+//     let mut wallet = saito.context.wallet.write().await;
+//     wallet
+//         .save(&mut Storage::new(Box::new(WasmIoHandler {})))
+//         .await;
+// }
+//
+// #[wasm_bindgen]
+// pub async fn reset_wallet() {
+//     info!("resetting wallet...");
+//     let saito = SAITO.lock().await;
+//     let mut wallet = saito.context.wallet.write().await;
+//     wallet
+//         .reset(&mut Storage::new(Box::new(WasmIoHandler {})))
+//         .await;
+// }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
     let (mut secret_key, mut public_key) =

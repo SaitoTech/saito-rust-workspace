@@ -335,7 +335,6 @@ async fn run_routing_event_processor(
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
-        public_key: [0; 33],
         senders_to_verification: senders,
         last_verification_thread_index: 0,
         stat_sender: sender_to_stat.clone(),
@@ -395,7 +394,6 @@ async fn run_verification_threads(
             blockchain: blockchain.clone(),
             peers: peers.clone(),
             wallet: wallet.clone(),
-            public_key: [0; 33],
             processed_txs: StatVariable::new(
                 format!("verification_{:?}::processed_txs", i),
                 STAT_BIN_COUNT,
@@ -588,7 +586,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("running saito controllers");
 
     let keys = generate_keys();
-    let context = Context::new(configs.clone(), keys.1, keys.0);
+    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    {
+        Wallet::load(
+            wallet.clone(),
+            Box::new(RustIOHandler::new(
+                sender_to_network_controller.clone(),
+                ROUTING_EVENT_PROCESSOR_ID,
+            )),
+        )
+        .await;
+    }
+    let context = Context::new(configs.clone(), wallet);
+
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =

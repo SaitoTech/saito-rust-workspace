@@ -82,7 +82,7 @@ pub mod test {
             let peers = Arc::new(RwLock::new(PeerCollection::new()));
             let wallet_lock = Arc::new(RwLock::new(wallet));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-            let mempool_lock = Arc::new(RwLock::new(Mempool::new(public_key, private_key)));
+            let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
             let configs = Arc::new(RwLock::new(TestConfiguration {}));
 

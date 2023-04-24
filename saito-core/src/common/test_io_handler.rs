@@ -3,16 +3,20 @@ pub mod test {
     use std::fs;
     use std::io::Error;
     use std::path::Path;
+    use std::sync::Arc;
 
     use async_trait::async_trait;
     use tokio::fs::File;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use log::{debug, error, info};
+    use tokio::sync::RwLock;
 
     use crate::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
     use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
+    use crate::core::data::blockchain::Blockchain;
     use crate::core::data::configuration::PeerConfig;
+    use crate::core::data::wallet::Wallet;
 
     #[derive(Clone, Debug)]
     pub struct TestIOHandler {}
@@ -178,6 +182,22 @@ pub mod test {
         }
 
         fn send_interface_event(&self, event: InterfaceEvent) {
+            todo!()
+        }
+
+        async fn save_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error>{
+            todo!()
+        }
+
+        async fn load_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error>{
+            todo!()
+        }
+
+        async fn save_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>)-> Result<(), Error> {
+            todo!()
+        }
+
+        async fn load_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>)-> Result<(), Error> {
             todo!()
         }
     }

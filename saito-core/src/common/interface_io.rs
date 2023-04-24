@@ -1,10 +1,14 @@
 use std::fmt::Debug;
 use std::io::Error;
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use tokio::sync::RwLock;
 
 use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::core::data;
+use crate::core::data::blockchain::Blockchain;
+use crate::core::data::wallet::Wallet;
 
 pub enum InterfaceEvent {
     PeerHandshakeComplete(PeerIndex),
@@ -51,7 +55,7 @@ pub trait InterfaceIO: Debug {
     ///
     /// ```
     async fn connect_to_peer(&mut self, peer: data::configuration::PeerConfig)
-        -> Result<(), Error>;
+                             -> Result<(), Error>;
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error>;
 
     /// Fetches a block with given hash from a specific peer
@@ -119,6 +123,12 @@ pub trait InterfaceIO: Debug {
     async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
 
     fn send_interface_event(&self, event: InterfaceEvent);
+
+    async fn save_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error>;
+    async fn load_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error>;
+
+    async fn save_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error>;
+    async fn load_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error>;
 }
 
 // impl Debug for dyn InterfaceIO {

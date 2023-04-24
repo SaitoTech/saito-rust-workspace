@@ -19,7 +19,6 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
-
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;
@@ -88,7 +87,6 @@ pub struct RoutingThread {
     pub network: Network,
     pub reconnection_timer: Timestamp,
     pub stats: RoutingStats,
-    pub public_key: SaitoPublicKey,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
     pub last_verification_thread_index: usize,
     pub stat_sender: Sender<String>,
@@ -547,11 +545,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         self.network
             .initialize_static_peers(self.configs.clone())
             .await;
-
-        {
-            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
-            self.public_key = wallet.public_key;
-        }
     }
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
         self.stats

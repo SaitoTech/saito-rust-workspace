@@ -251,7 +251,6 @@ async fn run_verification_threads(
             blockchain: blockchain.clone(),
             peers: peers.clone(),
             wallet: wallet.clone(),
-            public_key: [0; 33],
             processed_txs: StatVariable::new(
                 format!("verification_{:?}::processed_txs", i),
                 STAT_BIN_COUNT,
@@ -323,7 +322,6 @@ async fn run_routing_event_processor(
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
-        public_key: [0; 33],
         senders_to_verification: senders,
         last_verification_thread_index: 0,
         stat_sender: sender_to_stat.clone(),
@@ -514,17 +512,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("running saito controllers");
 
     let keys = generate_keys();
-    let context = Context::new(configs_clone.clone(), keys.1, keys.0);
+    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
     {
-        let (mut wallet, _wallet_) = lock_for_write!(context.wallet, LOCK_ORDER_WALLET);
-
-        wallet.public_key = public_key;
-        wallet.private_key = private_key;
-
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
-        let mut storage = Storage::new(Box::new(RustIOHandler::new(sender, 1)));
-        wallet.load(&mut storage).await;
+        Wallet::load(wallet.clone(), Box::new(RustIOHandler::new(sender, 1))).await;
     }
+    let context = Context::new(configs_clone.clone(), wallet);
+
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =
