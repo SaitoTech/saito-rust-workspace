@@ -1,11 +1,11 @@
 use js_sys::JsString;
-use log::info;
+use log::{error, info};
 use std::cell::RefCell;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::Currency;
+use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::data::storage::Storage;
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -40,9 +40,47 @@ impl WasmWallet {
         let wallet = self.wallet.read().await;
         JsString::from(hex::encode(wallet.public_key))
     }
+    pub async fn set_public_key(&mut self, key: JsString) {
+        let str: String = key.into();
+        if str.len() != 66 {
+            error!(
+                "invalid length : {:?} for public key string. expected 66",
+                str.len()
+            );
+            return;
+        }
+        let key = hex::decode(str);
+        if key.is_err() {
+            error!("{:?}", key.err().unwrap());
+            return;
+        }
+        let key = key.unwrap();
+        let key: SaitoPublicKey = key.try_into().unwrap();
+        let mut wallet = self.wallet.write().await;
+        wallet.public_key = key;
+    }
     pub async fn get_private_key(&self) -> JsString {
         let wallet = self.wallet.read().await;
         JsString::from(hex::encode(wallet.private_key))
+    }
+    pub async fn set_private_key(&mut self, key: JsString) {
+        let str: String = key.into();
+        if str.len() != 64 {
+            error!(
+                "invalid length : {:?} for public key string. expected 64",
+                str.len()
+            );
+            return;
+        }
+        let key = hex::decode(str);
+        if key.is_err() {
+            error!("{:?}", key.err().unwrap());
+            return;
+        }
+        let key = key.unwrap();
+        let key: SaitoPrivateKey = key.try_into().unwrap();
+        let mut wallet = self.wallet.write().await;
+        wallet.private_key = key;
     }
     pub async fn get_balance(&self) -> Currency {
         let wallet = self.wallet.read().await;
