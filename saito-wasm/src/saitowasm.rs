@@ -86,6 +86,7 @@ lazy_static! {
     pub static ref SAITO: Mutex<SaitoWasm> = Mutex::new(new());
     static ref CONFIGS: Arc<RwLock<dyn Configuration + Send + Sync>> =
         Arc::new(RwLock::new(WasmConfiguration::new()));
+    static ref PRIVATE_KEY: Mutex<String> = Mutex::new("".to_string());
 }
 
 // #[wasm_bindgen]
@@ -94,11 +95,19 @@ lazy_static! {
 pub fn new() -> SaitoWasm {
     info!("creating new saito wasm instance");
 
-    let keys = generate_keys_wasm();
-    let mut wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
-    {
-        Wallet::load(wallet.clone(), Box::new(WasmIoHandler {}));
-    }
+    // let keys = generate_keys_wasm();
+    // let private_key;
+    // let public_key;
+    // {
+    //     let key = PRIVATE_KEY.lock().await;
+    //     private_key = key;
+    //
+    // }
+    // let keys = generate_public_key()
+    let mut wallet = Arc::new(RwLock::new(Wallet::new([0; 32], [0; 33])));
+    // {
+    //     Wallet::load(Box::new(WasmIoHandler {})).await;
+    // }
     // let public_key = wallet.public_key.clone();
     // let private_key = wallet.private_key.clone();
     let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
@@ -219,7 +228,7 @@ pub fn new() -> SaitoWasm {
 }
 
 #[wasm_bindgen]
-pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
+pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue, JsValue> {
     console_log::init_with_level(Level::Trace).unwrap();
 
     info!("initializing saito-wasm");
@@ -256,6 +265,15 @@ pub async fn initialize(json: JsString) -> Result<JsValue, JsValue> {
     }
 
     let mut saito = SAITO.lock().await;
+    let private_key: SaitoPrivateKey = string_to_key(private_key).unwrap();
+    {
+        let mut wallet = saito.context.wallet.write().await;
+        if private_key != [0; 32] {
+            let keys = generate_keypair_from_private_key(private_key.as_slice());
+            wallet.private_key = keys.1;
+            wallet.public_key = keys.0;
+        }
+    }
     saito.mining_thread.on_init().await;
     saito.consensus_thread.on_init().await;
     saito.verification_thread.on_init().await;
@@ -695,6 +713,12 @@ pub async fn get_blockchain() -> WasmBlockchain {
     let saito = SAITO.lock().await;
     return saito.blockchain.clone();
 }
+
+// #[wasm_bindgen]
+// pub async fn set_initial_private_key(key: JsString) {
+//     let mut key = PRIVATE_KEY.lock().await;
+//     key = key.into();
+// }
 
 //
 // #[wasm_bindgen]

@@ -588,13 +588,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let keys = generate_keys();
     let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
     {
-        Wallet::load(
-            wallet.clone(),
-            Box::new(RustIOHandler::new(
-                sender_to_network_controller.clone(),
-                ROUTING_EVENT_PROCESSOR_ID,
-            )),
-        )
+        Wallet::load(Box::new(RustIOHandler::new(
+            sender_to_network_controller.clone(),
+            ROUTING_EVENT_PROCESSOR_ID,
+        )))
         .await;
     }
     let context = Context::new(configs.clone(), wallet);

@@ -515,7 +515,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
     {
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
-        Wallet::load(wallet.clone(), Box::new(RustIOHandler::new(sender, 1))).await;
+        Wallet::load(Box::new(RustIOHandler::new(sender, 1))).await;
     }
     let context = Context::new(configs_clone.clone(), wallet);
 

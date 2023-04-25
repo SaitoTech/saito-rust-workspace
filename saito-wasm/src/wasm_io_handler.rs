@@ -208,30 +208,26 @@ impl InterfaceIO for WasmIoHandler {
         }
     }
 
-    async fn save_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error> {
-        let wallet = WasmWallet { wallet };
-        MsgHandler::save_wallet(wallet);
+    async fn save_wallet(&self) -> Result<(), Error> {
+        MsgHandler::save_wallet();
         // TODO : return error state
         Ok(())
     }
 
-    async fn load_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error> {
-        let wallet = WasmWallet { wallet };
-        // TODO : return error state
-        MsgHandler::load_wallet(wallet);
-        Ok(())
-    }
-
-    async fn save_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error> {
-        let blockchain = WasmBlockchain { blockchain };
-        MsgHandler::save_blockchain(blockchain);
+    async fn load_wallet(&self) -> Result<(), Error> {
+        MsgHandler::load_wallet();
         // TODO : return error state
         Ok(())
     }
 
-    async fn load_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error> {
-        let blockchain = WasmBlockchain { blockchain };
-        MsgHandler::load_blockchain(blockchain);
+    async fn save_blockchain(&self) -> Result<(), Error> {
+        MsgHandler::save_blockchain();
+        // TODO : return error state
+        Ok(())
+    }
+
+    async fn load_blockchain(&self) -> Result<(), Error> {
+        MsgHandler::load_blockchain();
         // TODO : return error state
         Ok(())
     }
@@ -293,12 +289,12 @@ extern "C" {
     pub fn send_interface_event(event: String, peer_index: u64);
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn save_wallet(wallet: WasmWallet);
+    pub fn save_wallet();
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn load_wallet(wallet: WasmWallet);
+    pub fn load_wallet();
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn save_blockchain(blockchain: WasmBlockchain);
+    pub fn save_blockchain();
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn load_blockchain(blockchain: WasmBlockchain);
+    pub fn load_blockchain();
 }

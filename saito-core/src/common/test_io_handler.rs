@@ -185,19 +185,19 @@ pub mod test {
             todo!()
         }
 
-        async fn save_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error> {
+        async fn save_wallet(&self) -> Result<(), Error> {
             todo!()
         }
 
-        async fn load_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error> {
+        async fn load_wallet(&self) -> Result<(), Error> {
             todo!()
         }
 
-        async fn save_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error> {
+        async fn save_blockchain(&self) -> Result<(), Error> {
             todo!()
         }
 
-        async fn load_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error> {
+        async fn load_blockchain(&self) -> Result<(), Error> {
             todo!()
         }
     }

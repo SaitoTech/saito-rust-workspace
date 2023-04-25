@@ -22,7 +22,7 @@ pub struct WasmWallet {
 #[wasm_bindgen]
 impl WasmWallet {
     pub async fn save(&self) {
-        Wallet::save(self.wallet.clone(), Box::new(WasmIoHandler {})).await;
+        Wallet::save(Box::new(WasmIoHandler {})).await;
     }
     pub async fn reset(&mut self) {
         self.wallet
@@ -32,7 +32,7 @@ impl WasmWallet {
             .await;
     }
     pub async fn load(&mut self) {
-        Wallet::load(self.wallet.clone(), Box::new(WasmIoHandler {})).await;
+        Wallet::load(Box::new(WasmIoHandler {})).await;
         // info!("loaded public key = {:?}", hex::encode(wallet.public_key));
     }
 

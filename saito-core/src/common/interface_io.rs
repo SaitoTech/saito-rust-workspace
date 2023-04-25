@@ -124,11 +124,11 @@ pub trait InterfaceIO: Debug {
 
     fn send_interface_event(&self, event: InterfaceEvent);
 
-    async fn save_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error>;
-    async fn load_wallet(&self, wallet: Arc<RwLock<Wallet>>) -> Result<(), Error>;
+    async fn save_wallet(&self) -> Result<(), Error>;
+    async fn load_wallet(&self) -> Result<(), Error>;
 
-    async fn save_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error>;
-    async fn load_blockchain(&self, blockchain: Arc<RwLock<Blockchain>>) -> Result<(), Error>;
+    async fn save_blockchain(&self) -> Result<(), Error>;
+    async fn load_blockchain(&self) -> Result<(), Error>;
 }
 
 // impl Debug for dyn InterfaceIO {

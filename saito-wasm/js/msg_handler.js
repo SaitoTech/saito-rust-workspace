@@ -58,19 +58,19 @@ export class MsgHandler {
         return global.shared_methods.send_interface_event(event, peerIndex);
     }
 
-    static save_wallet(wallet) {
-        return global.shared_methods.save_wallet(wallet);
+    static save_wallet() {
+        return global.shared_methods.save_wallet();
     }
 
-    static load_wallet(wallet) {
-        return global.shared_methods.load_wallet(wallet);
+    static load_wallet() {
+        return global.shared_methods.load_wallet();
     }
 
-    static save_blockchain(blockchain) {
-        return global.shared_methods.save_blockchain(blockchain);
+    static save_blockchain() {
+        return global.shared_methods.save_blockchain();
     }
 
-    static load_blockchain(blockchain) {
-        return global.shared_methods.load_blockchain(blockchain);
+    static load_blockchain() {
+        return global.shared_methods.load_blockchain();
     }
 }

@@ -72,58 +72,25 @@ impl Wallet {
         }
     }
 
-    pub async fn load(wallet: Arc<RwLock<Wallet>>, io: Box<dyn InterfaceIO + Send + Sync>) {
+    pub async fn load(io: Box<dyn InterfaceIO + Send + Sync>) {
         info!("loading wallet...");
-        let result = io.load_wallet(wallet.clone()).await;
+        let result = io.load_wallet().await;
         if result.is_err() {
             warn!("loading wallet failed. saving new wallet");
             // TODO : check error code
-            io.save_wallet(wallet).await.unwrap();
+            io.save_wallet().await.unwrap();
         } else {
             info!("wallet loaded");
         }
-        // storage.io_interface.load_wallet()
-        // let mut filename = String::from("data/wallets/");
-        // filename.push_str(&self.filename);
-        //
-        // if storage.file_exists(&filename).await {
-        //     let password = self.filepass.clone();
-        //     let encoded = storage.read(&filename).await.unwrap();
-        //     let decrypted_encoded = decrypt_with_password(encoded.as_ref(), &password);
-        //     self.deserialize_from_disk(&decrypted_encoded);
-        // } else {
-        //     //
-        //     // new wallet, save to disk
-        //     //
-        //     self.save(storage).await;
-        // }
     }
-
-    // pub async fn load_wallet(
-    //     &mut self,
-    //     wallet_path: &str,
-    //     password: Option<&str>,
-    //     storage: &mut Storage,
-    // ) {
-    //     self.filename = wallet_path.to_string();
-    //     self.filepass = password.unwrap().to_string();
-    //     self.load(storage).await;
-    // }
-
-    pub async fn save(wallet: Arc<RwLock<Wallet>>, io: Box<dyn InterfaceIO + Send + Sync>) {
-        let result = io.load_wallet(wallet.clone()).await;
-
-        // let mut filename = String::from("data/wallets/");
-        // filename.push_str(&self.filename);
-        //
-        // let password = self.filepass.clone();
-        // let byte_array: Vec<u8> = self.serialize_for_disk();
-        // let encrypted_wallet = encrypt_with_password(byte_array.as_ref(), &password);
-        //
-        // storage.write(encrypted_wallet, &filename).await;
+    pub async fn save(io: Box<dyn InterfaceIO + Send + Sync>) {
+        info!("saving wallet");
+        let result = io.save_wallet().await;
+        info!("wallet saved");
     }
 
     pub async fn reset(&mut self, storage: &mut Storage) {
+        info!("resetting wallet");
         let keys = generate_keys();
         self.public_key = keys.0;
         self.private_key = keys.1;
