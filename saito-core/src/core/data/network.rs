@@ -402,18 +402,19 @@ impl Network {
     }
 
     pub async fn connect_to_static_peers(&mut self) {
-        trace!(
-            "connect to static peers : count = {:?}",
-            self.static_peer_configs.len()
-        );
+        // trace!(
+        //     "connect to static peers : count = {:?}",
+        //     self.static_peer_configs.len()
+        // );
 
         for peer in &self.static_peer_configs {
+            trace!("connecting to peer : {:?}", peer);
             self.io_interface
                 .connect_to_peer(peer.clone())
                 .await
                 .unwrap();
         }
-        trace!("connected to peers");
+        // trace!("connected to peers");
     }
     pub async fn propagate_services(&self, peer_index: PeerIndex, services: Vec<String>) {
         let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
