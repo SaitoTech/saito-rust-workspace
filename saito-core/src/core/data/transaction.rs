@@ -1,3 +1,5 @@
+use std::io::{Error, ErrorKind};
+
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -14,7 +16,7 @@ use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
 use crate::iterate;
 
-pub const TRANSACTION_SIZE: usize = 89;
+pub const TRANSACTION_SIZE: usize = 93;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Clone, FromPrimitive)]
 pub enum TransactionType {
@@ -380,16 +382,22 @@ impl Transaction {
     /// [output][output][output]...
     /// [message]
     /// [hop][hop][hop]...
-    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Transaction {
-        // TODO : change return type to Result<Transaction>
+    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Result<Transaction, Error> {
+        trace!(
+            "deserializing tx from buffer with length : {:?}",
+            bytes.len()
+        );
+        if bytes.len() < TRANSACTION_SIZE {
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
         let inputs_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
         let outputs_len: u32 = u32::from_be_bytes(bytes[4..8].try_into().unwrap());
         let message_len: usize = u32::from_be_bytes(bytes[8..12].try_into().unwrap()) as usize;
         let path_len: usize = u32::from_be_bytes(bytes[12..16].try_into().unwrap()) as usize;
         let signature: SaitoSignature = bytes[16..80].try_into().unwrap();
-        let timestamp: u32 = u32::from_be_bytes(bytes[80..84].try_into().unwrap());
-        let replaces_txs = u32::from_be_bytes(bytes[84..88].try_into().unwrap());
-        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[88]).unwrap();
+        let timestamp: Timestamp = Timestamp::from_be_bytes(bytes[80..88].try_into().unwrap());
+        let replaces_txs = u32::from_be_bytes(bytes[88..92].try_into().unwrap());
+        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[92]).unwrap();
         let start_of_inputs = TRANSACTION_SIZE;
         let start_of_outputs = start_of_inputs + inputs_len as usize * SLIP_SIZE;
         let start_of_message = start_of_outputs + outputs_len as usize * SLIP_SIZE;
@@ -398,14 +406,14 @@ impl Transaction {
         for n in 0..inputs_len {
             let start_of_data: usize = start_of_inputs as usize + n as usize * SLIP_SIZE;
             let end_of_data: usize = start_of_data + SLIP_SIZE;
-            let input = Slip::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec());
+            let input = Slip::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             inputs.push(input);
         }
         let mut outputs: Vec<Slip> = vec![];
         for n in 0..outputs_len {
             let start_of_data: usize = start_of_outputs as usize + n as usize * SLIP_SIZE;
             let end_of_data: usize = start_of_data + SLIP_SIZE;
-            let output = Slip::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec());
+            let output = Slip::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             outputs.push(output);
         }
         let message = bytes[start_of_message..start_of_message + message_len]
@@ -415,7 +423,7 @@ impl Transaction {
         for n in 0..path_len {
             let start_of_data: usize = start_of_path as usize + n as usize * HOP_SIZE;
             let end_of_data: usize = start_of_data + HOP_SIZE;
-            let hop = Hop::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec());
+            let hop = Hop::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             path.push(hop);
         }
 
@@ -428,7 +436,7 @@ impl Transaction {
         transaction.transaction_type = transaction_type;
         transaction.signature = signature;
         transaction.path = path;
-        transaction
+        Ok(transaction)
     }
 
     pub fn is_fee_transaction(&self) -> bool {
@@ -1059,7 +1067,7 @@ mod tests {
         let tx = Transaction::default();
         assert_eq!(
             tx.serialize_for_signature(),
-            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
+            vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
         );
     }
 
@@ -1192,7 +1200,7 @@ mod tests {
 
         let serialized_tx = mock_tx.serialize_for_net();
 
-        let deserialized_tx = Transaction::deserialize_from_net(&serialized_tx);
+        let deserialized_tx = Transaction::deserialize_from_net(&serialized_tx).unwrap();
         assert_eq!(mock_tx, deserialized_tx);
     }
 
@@ -1203,7 +1211,7 @@ mod tests {
         let tx_buffer_txt = "00000001000000010000000300000000dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec0000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b00000000000001590000616263";
         let buffer = hex::decode(tx_buffer_txt).unwrap();
 
-        let mut tx = Transaction::deserialize_from_net(&buffer);
+        let mut tx = Transaction::deserialize_from_net(&buffer).unwrap();
 
         assert_eq!(tx.timestamp, 1637034582);
         assert_eq!(tx.transaction_type, TransactionType::ATR);

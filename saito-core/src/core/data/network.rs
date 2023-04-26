@@ -9,7 +9,7 @@ use crate::common::defs::{
     push_lock, PeerIndex, SaitoHash, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
     LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
 };
-use crate::common::interface_io::InterfaceIO;
+use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
@@ -170,6 +170,11 @@ impl Network {
     }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
+
+        // calling here before removing the peer from collections
+        self.io_interface
+            .send_interface_event(InterfaceEvent::PeerConnectionDropped(peer_index));
+
         let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let result = peers.find_peer_by_index(peer_index);
@@ -225,12 +230,17 @@ impl Network {
                 "removing static peer config : {:?}",
                 peer.static_peer_config.as_ref().unwrap()
             );
+            let data = peer.static_peer_config.as_ref().unwrap();
+
             self.static_peer_configs
-                .retain(|config| config != peer.static_peer_config.as_ref().unwrap());
+                .retain(|config| config.host != data.host || config.port != data.port);
         }
 
         info!("new peer added : {:?}", peer_index);
         peers.index_to_peers.insert(peer_index, peer);
+        info!("current peer count = {:?}", peers.index_to_peers.len());
+        self.io_interface
+            .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
     }
     pub async fn handle_handshake_challenge(
         &self,
@@ -385,6 +395,9 @@ impl Network {
     ) {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
         self.static_peer_configs = configs.get_peer_configs().clone();
+        if !self.static_peer_configs.is_empty() {
+            self.static_peer_configs.get_mut(0).unwrap().is_main = true;
+        }
         trace!("static peers : {:?}", self.static_peer_configs);
     }
 

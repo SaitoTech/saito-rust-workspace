@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{trace, warn};
+use log::{error, trace, warn};
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};
@@ -60,12 +60,15 @@ impl Message {
                 let str = services.join(";");
                 str.as_bytes().to_vec()
             }
+            Message::Result(data) => data.serialize(),
+            Message::Error(data) => data.serialize(),
             _ => {
+                error!("unhandled type : {:?}", message_type);
                 todo!()
             }
         });
 
-        return buffer;
+        buffer
     }
     pub fn deserialize(buffer: Vec<u8>) -> Result<Message, Error> {
         let message_type: u8 = u8::from_be_bytes(buffer[0..1].try_into().unwrap());
@@ -92,7 +95,7 @@ impl Message {
                 Ok(Message::Block(block))
             }
             4 => {
-                let tx = Transaction::deserialize_from_net(&buffer);
+                let tx = Transaction::deserialize_from_net(&buffer)?;
                 Ok(Message::Transaction(tx))
             }
             5 => {

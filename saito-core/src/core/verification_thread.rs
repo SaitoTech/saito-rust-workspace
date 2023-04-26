@@ -3,11 +3,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use log::{debug, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
-
-use log::{debug, warn};
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
@@ -35,7 +34,6 @@ pub struct VerificationThread {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub peers: Arc<RwLock<PeerCollection>>,
     pub wallet: Arc<RwLock<Wallet>>,
-    pub public_key: SaitoPublicKey,
     pub processed_txs: StatVariable,
     pub processed_blocks: StatVariable,
     pub processed_msgs: StatVariable,
@@ -45,8 +43,13 @@ pub struct VerificationThread {
 
 impl VerificationThread {
     pub async fn verify_tx(&mut self, mut transaction: Transaction) {
+        let public_key;
         {
-            transaction.generate(&self.public_key, 0, 0);
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            public_key = wallet.public_key;
+        }
+        {
+            transaction.generate(&public_key, 0, 0);
 
             let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
@@ -75,12 +78,17 @@ impl VerificationThread {
         {
             let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
+            let public_key;
+            {
+                let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                public_key = wallet.public_key;
+            }
             txs = transactions
                 .par_drain(..)
                 .with_min_len(10)
                 // .with_max_len(1000)
                 .filter_map(|mut transaction| {
-                    transaction.generate(&self.public_key, 0, 0);
+                    transaction.generate(&public_key, 0, 0);
 
                     if !transaction.validate(&blockchain.utxoset) {
                         debug!(
@@ -159,10 +167,7 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
         Some(())
     }
 
-    async fn on_init(&mut self) {
-        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
-        self.public_key = wallet.public_key.clone();
-    }
+    async fn on_init(&mut self) {}
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
         self.processed_msgs.calculate_stats(current_time).await;

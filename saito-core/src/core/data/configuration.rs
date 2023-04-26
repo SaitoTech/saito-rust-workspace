@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use crate::common::defs::Timestamp;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -9,6 +10,8 @@ pub struct PeerConfig {
     pub port: u16,
     pub protocol: String,
     pub synctype: String,
+    #[serde(skip)]
+    pub is_main: bool,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -29,10 +32,12 @@ pub struct Server {
     pub stat_timer_in_ms: u64,
     pub thread_sleep_time_in_ms: u64,
     pub block_fetch_batch_size: u64,
+    pub reconnection_wait_time: Timestamp,
 }
 
 pub trait Configuration: Debug {
     fn get_server_configs(&self) -> Option<&Server>;
+
     fn get_peer_configs(&self) -> &Vec<PeerConfig>;
     fn get_block_fetch_url(&self) -> String;
     fn is_spv_mode(&self) -> bool;

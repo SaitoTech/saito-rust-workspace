@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::fs;
 use std::io::Error;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
@@ -13,8 +13,11 @@ use tokio::sync::mpsc::Sender;
 use log::{debug, warn};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
-use saito_core::common::interface_io::InterfaceIO;
+use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
+use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::wallet::Wallet;
+use tokio::sync::RwLock;
 
 use crate::saito::io_context::IoContext;
 use crate::IoEvent;
@@ -237,6 +240,26 @@ impl InterfaceIO for RustIOHandler {
     }
 
     async fn process_api_error(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
+        todo!()
+    }
+
+    fn send_interface_event(&self, event: InterfaceEvent) {
+        todo!()
+    }
+
+    async fn save_wallet(&self) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn load_wallet(&self) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn save_blockchain(&self) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn load_blockchain(&self) -> Result<(), Error> {
         todo!()
     }
 }

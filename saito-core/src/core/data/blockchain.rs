@@ -25,7 +25,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
-use crate::{iterate, lock_for_write};
+use crate::{iterate, lock_for_read, lock_for_write};
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
     ((top as u64) << 32) + (bottom as u64)
@@ -556,8 +556,12 @@ impl Blockchain {
 
         mempool.delete_block(block_hash);
         let mut block = self.blocks.remove(block_hash).unwrap();
-
-        if block.creator == mempool.public_key {
+        let public_key;
+        {
+            let (wallet, _wallet_) = lock_for_read!(mempool.wallet, LOCK_ORDER_WALLET);
+            public_key = wallet.public_key;
+        }
+        if block.creator == public_key {
             let transactions = &mut block.transactions;
             let prev_count = transactions.len();
             let transactions: Vec<Transaction> = transactions
@@ -1546,6 +1550,13 @@ impl Blockchain {
         if !self.is_block_indexed(hash) {
             self.blocks.insert(hash, block);
         }
+    }
+    pub async fn reset(&mut self) {
+        todo!()
+    }
+
+    pub async fn save(&self) {
+        todo!()
     }
 }
 

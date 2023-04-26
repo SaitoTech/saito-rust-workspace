@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use crate::common::defs::{
     push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
 };
-use crate::common::interface_io::InterfaceIO;
+use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
@@ -155,7 +155,7 @@ impl Peer {
             // we only need to send a response for response is in above stage 3 (meaning the challenger).
 
             let response = HandshakeResponse {
-                public_key: wallet.public_key.clone(),
+                public_key: wallet.public_key,
                 signature: sign(&response.challenge, &wallet.private_key),
                 is_lite,
                 block_fetch_url: block_fetch_url.to_string(),
@@ -172,6 +172,7 @@ impl Peer {
                 hex::encode(self.public_key.as_ref().unwrap())
             );
         }
+        io_handler.send_interface_event(InterfaceEvent::PeerHandshakeComplete(self.index));
 
         Ok(())
     }
@@ -196,6 +197,12 @@ impl Peer {
     }
     pub fn has_service(&self, service: String) -> bool {
         self.services.contains(&service)
+    }
+    pub fn is_main_peer(&self) -> bool {
+        if self.static_peer_config.is_none() {
+            return false;
+        }
+        self.static_peer_config.as_ref().unwrap().is_main
     }
 }
 

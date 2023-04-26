@@ -1,17 +1,24 @@
 use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
+use std::sync::Arc;
 
 use async_trait::async_trait;
-
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{info, trace};
-
+use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{PeerIndex, SaitoHash};
-use saito_core::common::interface_io::InterfaceIO;
+use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
+use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::transaction::Transaction;
+use saito_core::core::data::wallet::Wallet;
+
+use crate::wasm_block::WasmBlock;
+use crate::wasm_blockchain::WasmBlockchain;
+use crate::wasm_wallet::WasmWallet;
 
 pub struct WasmIoHandler {}
 
@@ -171,15 +178,58 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        // let tx = Transaction::deserialize_from_net(&buffer);
+        // let buffer = tx.data;
         let buf = Uint8Array::new_with_length(buffer.len() as u32);
         buf.copy_from(buffer.as_slice());
         MsgHandler::process_api_success(buf, msg_index, peer_index);
     }
 
     async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
+        // let tx = Transaction::deserialize_from_net(&buffer);
+        // let buffer = tx.data;
+
         let buf = Uint8Array::new_with_length(buffer.len() as u32);
         buf.copy_from(buffer.as_slice());
         MsgHandler::process_api_error(buf, msg_index, peer_index);
+    }
+
+    fn send_interface_event(&self, event: InterfaceEvent) {
+        match event {
+            InterfaceEvent::PeerHandshakeComplete(index) => {
+                MsgHandler::send_interface_event("handshake_complete".to_string(), index);
+            }
+            InterfaceEvent::PeerConnectionDropped(index) => {
+                MsgHandler::send_interface_event("peer_disconnect".to_string(), index);
+            }
+            InterfaceEvent::PeerConnected(index) => {
+                MsgHandler::send_interface_event("peer_connect".to_string(), index);
+            }
+        }
+    }
+
+    async fn save_wallet(&self) -> Result<(), Error> {
+        MsgHandler::save_wallet();
+        // TODO : return error state
+        Ok(())
+    }
+
+    async fn load_wallet(&self) -> Result<(), Error> {
+        MsgHandler::load_wallet();
+        // TODO : return error state
+        Ok(())
+    }
+
+    async fn save_blockchain(&self) -> Result<(), Error> {
+        MsgHandler::save_blockchain();
+        // TODO : return error state
+        Ok(())
+    }
+
+    async fn load_blockchain(&self) -> Result<(), Error> {
+        MsgHandler::load_blockchain();
+        // TODO : return error state
+        Ok(())
     }
 }
 
@@ -234,4 +284,17 @@ extern "C" {
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn process_api_error(buffer: Uint8Array, msg_index: u32, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn send_interface_event(event: String, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn save_wallet();
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn load_wallet();
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn save_blockchain();
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn load_blockchain();
 }

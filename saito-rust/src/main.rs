@@ -335,16 +335,18 @@ async fn run_routing_event_processor(
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
-        public_key: [0; 33],
         senders_to_verification: senders,
         last_verification_thread_index: 0,
         stat_sender: sender_to_stat.clone(),
         blockchain_sync_state: BlockchainSyncState::new(fetch_batch_size),
+        initial_connection: false,
+        reconnection_wait_time: 0,
     };
 
     {
         let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
-
+        routing_event_processor.reconnection_wait_time =
+            configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
         for peer in peers {
             routing_event_processor.static_peers.push(StaticPeer {
@@ -392,7 +394,6 @@ async fn run_verification_threads(
             blockchain: blockchain.clone(),
             peers: peers.clone(),
             wallet: wallet.clone(),
-            public_key: [0; 33],
             processed_txs: StatVariable::new(
                 format!("verification_{:?}::processed_txs", i),
                 STAT_BIN_COUNT,
@@ -585,7 +586,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("running saito controllers");
 
     let keys = generate_keys();
-    let context = Context::new(configs.clone(), keys.1, keys.0);
+    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    {
+        Wallet::load(Box::new(RustIOHandler::new(
+            sender_to_network_controller.clone(),
+            ROUTING_EVENT_PROCESSOR_ID,
+        )))
+        .await;
+    }
+    let context = Context::new(configs.clone(), wallet);
+
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =

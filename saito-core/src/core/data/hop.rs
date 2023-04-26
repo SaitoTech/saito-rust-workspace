@@ -1,3 +1,5 @@
+use std::io::{Error, ErrorKind};
+
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
@@ -46,7 +48,10 @@ impl Hop {
         hop
     }
 
-    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Hop {
+    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Result<Hop, Error> {
+        if bytes.len() != HOP_SIZE {
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
         let from: SaitoPublicKey = bytes[..33].try_into().unwrap();
         let to: SaitoPublicKey = bytes[33..66].try_into().unwrap();
         let sig: SaitoSignature = bytes[66..130].try_into().unwrap();
@@ -56,7 +61,7 @@ impl Hop {
         hop.to = to;
         hop.sig = sig;
 
-        hop
+        Ok(hop)
     }
 
     pub fn serialize_for_net(&self) -> Vec<u8> {
@@ -141,7 +146,7 @@ mod tests {
             &tx,
         );
 
-        let hop2 = Hop::deserialize_from_net(&hop.serialize_for_net());
+        let hop2 = Hop::deserialize_from_net(&hop.serialize_for_net()).unwrap();
 
         assert_eq!(hop.from, hop2.from);
         assert_eq!(hop.to, hop2.to);
