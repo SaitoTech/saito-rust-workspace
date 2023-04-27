@@ -30,7 +30,7 @@ jobs:
         command: test
         args: --release
 
-  publish_to_npm:
+ publish_to_npm:
     needs: build_and_test
     runs-on: ubuntu-latest
 
@@ -43,8 +43,10 @@ jobs:
       with:
         node-version: 14
         cache: npm
+      working-directory: ./saito-wasm
 
     - name: Publish package
       run: npm publish
       env:
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      working-directory: ./saito-wasm
