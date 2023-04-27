@@ -1,6 +1,6 @@
-name: Publish Saito Wasm
+name: Publish-Saito-Wasm
 
-on:push
+on: push
 
 
 jobs:
