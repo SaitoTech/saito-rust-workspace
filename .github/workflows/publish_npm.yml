@@ -2,7 +2,7 @@ name: Publish-Saito-Wasm
 
 on:
   push:
-    branches: [ prod ]
+    branches: [ prod, develop ] # remove develop after testing the script
 
 jobs:
   build_and_test:
@@ -45,7 +45,7 @@ jobs:
           node-version: 16
           cache: npm
           working-directory: ./saito-wasm
-          
+
       - name: Install npm packages
         run: npm install
         working-directory: ./saito-wasm
