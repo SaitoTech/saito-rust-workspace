@@ -51,6 +51,10 @@ jobs:
         run: npm ci
         working-directory: saito-wasm
 
+      - name: Wasm Build
+        run: npm run build
+        working-directory: saito-wasm
+
       - name: Publish package
         run: npm publish
         env:
