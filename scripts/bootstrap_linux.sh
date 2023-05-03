@@ -3,7 +3,7 @@
 # Script to setup the basic requirements for running a saito rust node
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y || exit
 sudo apt update
-sudo apt install build-essential libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3 || exit
+sudo apt install build-essential libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3 | sh -s -- -y || exit
 bash
 cargo install flamegraph
 cargo install wasm-pack
