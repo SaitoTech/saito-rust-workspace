@@ -1,57 +1,46 @@
-use serde::Deserialize;
+use std::fmt::Debug;
 
-#[derive(Deserialize, Debug, Clone, Eq, PartialEq)]
+use crate::common::defs::Timestamp;
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct PeerConfig {
     pub host: String,
     pub port: u16,
     pub protocol: String,
     pub synctype: String,
+    #[serde(skip)]
+    pub is_main: bool,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Endpoint {
     pub host: String,
     pub port: u16,
     pub protocol: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Server {
     pub host: String,
     pub port: u16,
     pub protocol: String,
     pub endpoint: Endpoint,
+    pub verification_threads: u16,
+    pub channel_size: u64,
+    pub stat_timer_in_ms: u64,
+    pub thread_sleep_time_in_ms: u64,
+    pub block_fetch_batch_size: u64,
+    pub reconnection_wait_time: Timestamp,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct Configuration {
-    pub server: Server,
-    pub peers: Vec<PeerConfig>,
-}
+pub trait Configuration: Debug {
+    fn get_server_configs(&self) -> Option<&Server>;
 
-impl Configuration {
-    pub fn new() -> Configuration {
-        Configuration {
-            server: Server {
-                host: "127.0.0.1".to_string(),
-                port: 12100,
-                protocol: "http".to_string(),
-                endpoint: Endpoint {
-                    host: "127.0.0.1".to_string(),
-                    port: 12101,
-                    protocol: "http".to_string(),
-                },
-            },
-            peers: vec![],
-        }
-    }
-    pub fn get_block_fetch_url(&self) -> String {
-        let endpoint = &self.server.endpoint;
-        endpoint.protocol.to_string()
-            + "://"
-            + endpoint.host.as_str()
-            + ":"
-            + endpoint.port.to_string().as_str()
-            + "/block/"
-    }
+    fn get_peer_configs(&self) -> &Vec<PeerConfig>;
+    fn get_block_fetch_url(&self) -> String;
+    fn is_spv_mode(&self) -> bool;
+    fn is_browser(&self) -> bool;
+    fn replace(&mut self, config: &dyn Configuration);
 }

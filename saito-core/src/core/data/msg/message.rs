@@ -1,13 +1,13 @@
 use std::io::{Error, ErrorKind};
 
-use log::{info, warn};
+use log::{error, trace, warn};
 
 use crate::common::defs::SaitoHash;
 use crate::core::data::block::{Block, BlockType};
+use crate::core::data::msg::api_message::ApiMessage;
 use crate::core::data::msg::block_request::BlockchainRequest;
-use crate::core::data::msg::handshake::{
-    HandshakeChallenge, HandshakeCompletion, HandshakeResponse,
-};
+use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
+use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;
 
@@ -15,70 +15,133 @@ use crate::core::data::transaction::Transaction;
 pub enum Message {
     HandshakeChallenge(HandshakeChallenge),
     HandshakeResponse(HandshakeResponse),
-    HandshakeCompletion(HandshakeCompletion),
-    ApplicationMessage(Vec<u8>),
     Block(Block),
     Transaction(Transaction),
     BlockchainRequest(BlockchainRequest),
-    BlockHeaderHash(SaitoHash),
+    BlockHeaderHash(SaitoHash, u64),
+    Ping(),
+    SPVChain(),
+    Services(Vec<String>),
+    GhostChain(GhostChainSync),
+    GhostChainRequest(u64, SaitoHash, SaitoHash),
+    ApplicationMessage(ApiMessage),
+    Result(ApiMessage),
+    Error(ApiMessage),
+    // ApplicationTransaction(ApiMessage),
 }
 
 impl Message {
     pub fn serialize(&self) -> Vec<u8> {
         let message_type: u8 = self.get_type_value();
-        let internal_buffer = match self {
+        let mut buffer: Vec<u8> = vec![];
+        buffer.extend(&message_type.to_be_bytes());
+        buffer.append(&mut match self {
             Message::HandshakeChallenge(data) => data.serialize(),
             Message::HandshakeResponse(data) => data.serialize(),
-            Message::HandshakeCompletion(data) => data.serialize(),
-            Message::ApplicationMessage(data) => data.clone(),
+            Message::ApplicationMessage(data) => data.serialize(),
+            // Message::ApplicationTransaction(data) => data.clone(),
             Message::Block(data) => data.serialize_for_net(BlockType::Full),
             Message::Transaction(data) => data.serialize_for_net(),
             Message::BlockchainRequest(data) => data.serialize(),
-            Message::BlockHeaderHash(data) => data.to_vec(),
-        };
-        [vec![message_type], internal_buffer].concat()
+            Message::BlockHeaderHash(block_hash, block_id) => {
+                [block_hash.as_slice(), block_id.to_be_bytes().as_slice()].concat()
+            }
+            Message::GhostChain(chain) => chain.serialize(),
+            Message::GhostChainRequest(block_id, block_hash, fork_id) => [
+                block_id.to_be_bytes().as_slice(),
+                block_hash.as_slice(),
+                fork_id.as_slice(),
+            ]
+            .concat(),
+            Message::Ping() => {
+                vec![]
+            }
+            Message::Services(services) => {
+                let str = services.join(";");
+                str.as_bytes().to_vec()
+            }
+            Message::Result(data) => data.serialize(),
+            Message::Error(data) => data.serialize(),
+            _ => {
+                error!("unhandled type : {:?}", message_type);
+                todo!()
+            }
+        });
+
+        buffer
     }
     pub fn deserialize(buffer: Vec<u8>) -> Result<Message, Error> {
-        let message_type = buffer[0];
+        let message_type: u8 = u8::from_be_bytes(buffer[0..1].try_into().unwrap());
         let buffer = buffer[1..].to_vec();
 
-        info!("buffer size = {:?}", buffer.len());
+        trace!(
+            "deserializing buffer size = {:?} of type = {:?}",
+            buffer.len(),
+            message_type
+        );
 
         // TODO : remove hardcoded values into an enum
         match message_type {
             1 => {
                 let result = HandshakeChallenge::deserialize(&buffer)?;
-                return Ok(Message::HandshakeChallenge(result));
+                Ok(Message::HandshakeChallenge(result))
             }
             2 => {
                 let result = HandshakeResponse::deserialize(&buffer)?;
-                return Ok(Message::HandshakeResponse(result));
+                Ok(Message::HandshakeResponse(result))
             }
             3 => {
-                let result = HandshakeCompletion::deserialize(&buffer)?;
-                return Ok(Message::HandshakeCompletion(result));
+                let block = Block::deserialize_from_net(buffer)?;
+                Ok(Message::Block(block))
             }
             4 => {
-                todo!()
+                let tx = Transaction::deserialize_from_net(&buffer)?;
+                Ok(Message::Transaction(tx))
             }
             5 => {
-                todo!()
+                let result = BlockchainRequest::deserialize(&buffer)?;
+                Ok(Message::BlockchainRequest(result))
             }
             6 => {
-                todo!()
+                assert_eq!(buffer.len(), 40);
+                let block_hash = buffer[0..32].to_vec().try_into().unwrap();
+                let block_id = u64::from_be_bytes(buffer[32..40].to_vec().try_into().unwrap());
+                Ok(Message::BlockHeaderHash(block_hash, block_id))
             }
-            7 => {
-                let result = BlockchainRequest::deserialize(&buffer)?;
-                return Ok(Message::BlockchainRequest(result));
+            7 => Ok(Message::Ping()),
+            8 => Ok(Message::SPVChain()),
+            9 => {
+                let str = String::from_utf8(buffer).unwrap();
+                let mut services = vec![];
+                for str in str.split(";") {
+                    services.push(str.to_string());
+                }
+                // let services = str.split(";").collect::<Vec<String>>();
+                Ok(Message::Services(services))
             }
-            8 => {
-                assert_eq!(buffer.len(), 32);
-                let result = buffer[0..32].to_vec().try_into().unwrap();
-                return Ok(Message::BlockHeaderHash(result));
+            10 => Ok(Message::GhostChain(GhostChainSync::deserialize(buffer))),
+            11 => {
+                let block_id = u64::from_be_bytes(buffer[0..8].try_into().unwrap());
+                let block_hash = buffer[8..40].to_vec().try_into().unwrap();
+                let fork_id = buffer[40..72].to_vec().try_into().unwrap();
+                return Ok(Message::GhostChainRequest(block_id, block_hash, fork_id));
             }
+            12 => {
+                let result = ApiMessage::deserialize(&buffer);
+                Ok(Message::ApplicationMessage(result))
+            }
+            13 => {
+                let result = ApiMessage::deserialize(&buffer);
+                Ok(Message::Result(result))
+            }
+            14 => {
+                let result = ApiMessage::deserialize(&buffer);
+                Ok(Message::Error(result))
+            }
+            // 16 => Ok(Message::ApplicationTransaction(buffer)),
             _ => {
                 warn!("message type : {:?} not valid", message_type);
-                return Err(Error::from(ErrorKind::InvalidData));
+                Err(Error::from(ErrorKind::InvalidData))
             }
         }
     }
@@ -86,12 +149,19 @@ impl Message {
         match self {
             Message::HandshakeChallenge(_) => 1,
             Message::HandshakeResponse(_) => 2,
-            Message::HandshakeCompletion(_) => 3,
-            Message::ApplicationMessage(_) => 4,
-            Message::Block(_) => 5,
-            Message::Transaction(_) => 6,
-            Message::BlockchainRequest(_) => 7,
-            Message::BlockHeaderHash(_) => 8,
+            Message::Block(_) => 3,
+            Message::Transaction(_) => 4,
+            Message::BlockchainRequest(_) => 5,
+            Message::BlockHeaderHash(_, _) => 6,
+            Message::Ping() => 7,
+            Message::SPVChain() => 8,
+            Message::Services(_) => 9,
+            Message::GhostChain(_) => 10,
+            Message::GhostChainRequest(..) => 11,
+            Message::ApplicationMessage(_) => 12,
+            Message::Result(_) => 13,
+            Message::Error(_) => 14,
+            // Message::ApplicationTransaction(_) => 16,
         }
     }
 }

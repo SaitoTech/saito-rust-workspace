@@ -1,13 +1,24 @@
+use std::fmt::Debug;
 use std::io::Error;
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use tokio::sync::RwLock;
 
-use crate::common::defs::SaitoHash;
+use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::core::data;
+use crate::core::data::blockchain::Blockchain;
+use crate::core::data::wallet::Wallet;
+
+pub enum InterfaceEvent {
+    PeerHandshakeComplete(PeerIndex),
+    PeerConnectionDropped(PeerIndex),
+    PeerConnected(PeerIndex),
+}
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
 #[async_trait]
-pub trait InterfaceIO {
+pub trait InterfaceIO: Debug {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error>;
 
     /// Sends the given message buffer to all the peers except the ones specified
@@ -106,4 +117,23 @@ pub trait InterfaceIO {
     async fn remove_value(&self, key: String) -> Result<(), Error>;
     /// Retrieve the prefix for all the keys for blocks
     fn get_block_dir(&self) -> String;
+
+    async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
+    async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
+    async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
+
+    fn send_interface_event(&self, event: InterfaceEvent);
+
+    async fn save_wallet(&self) -> Result<(), Error>;
+    async fn load_wallet(&self) -> Result<(), Error>;
+
+    async fn save_blockchain(&self) -> Result<(), Error>;
+    async fn load_blockchain(&self) -> Result<(), Error>;
 }
+
+// impl Debug for dyn InterfaceIO {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         f.debug_struct("IoInterface").finish()
+//     }
+// }
+//

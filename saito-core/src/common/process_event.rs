@@ -3,6 +3,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 
 use crate::common::command::NetworkEvent;
+use crate::common::defs::Timestamp;
 
 /// Event Processing trait for the controllers. Handles both events from actions and timer
 #[async_trait]
@@ -53,4 +54,6 @@ where
     /// ```
     async fn process_event(&mut self, event: T) -> Option<()>;
     async fn on_init(&mut self);
+
+    async fn on_stat_interval(&mut self, current_time: Timestamp);
 }

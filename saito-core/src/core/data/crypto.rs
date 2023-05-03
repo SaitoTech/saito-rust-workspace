@@ -4,7 +4,9 @@ use blake3::Hasher;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
 pub use merkle::MerkleTree;
-pub use secp256k1::{Message, PublicKey, SecretKey, Signature, SECP256K1};
+use rand::{thread_rng, Rng};
+use secp256k1::ecdsa;
+pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
 
 use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 
@@ -12,28 +14,28 @@ type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
 pub const PARALLEL_HASH_BYTE_THRESHOLD: usize = 128_000;
 
-pub fn encrypt_with_password(msg: Vec<u8>, password: &str) -> Vec<u8> {
-    let hash = hash(&password.as_bytes().to_vec());
+pub fn encrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
+    let hash = hash(password.as_bytes());
     let mut key: [u8; 16] = [0; 16];
     let mut iv: [u8; 16] = [0; 16];
     key.clone_from_slice(&hash[0..16]);
     iv.clone_from_slice(&hash[16..32]);
 
     let cipher = Aes128Cbc::new_from_slices(&key, &iv).unwrap();
-    let encrypt_msg = cipher.encrypt_vec(&msg);
+    let encrypt_msg = cipher.encrypt_vec(msg);
 
     return encrypt_msg;
 }
 
-pub fn decrypt_with_password(msg: Vec<u8>, password: &str) -> Vec<u8> {
-    let hash = hash(&password.as_bytes().to_vec());
+pub fn decrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
+    let hash = hash(password.as_bytes());
     let mut key: [u8; 16] = [0; 16];
     let mut iv: [u8; 16] = [0; 16];
     key.clone_from_slice(&hash[0..16]);
     iv.clone_from_slice(&hash[16..32]);
 
     let cipher = Aes128Cbc::new_from_slices(&key, &iv).unwrap();
-    let decrypt_msg = cipher.decrypt_vec(&msg).unwrap();
+    let decrypt_msg = cipher.decrypt_vec(msg).unwrap();
 
     return decrypt_msg;
 }
@@ -55,9 +57,9 @@ pub fn generate_keys() -> (SaitoPublicKey, SaitoPrivateKey) {
 }
 
 /// Create and return a keypair with  the given hex u8 array as the private key
-pub fn generate_keypair_from_privatekey(slice: &[u8]) -> (SaitoPublicKey, SaitoPrivateKey) {
+pub fn generate_keypair_from_private_key(slice: &[u8]) -> (SaitoPublicKey, SaitoPrivateKey) {
     let secret_key = SecretKey::from_slice(slice).unwrap();
-    let public_key = PublicKey::from_secret_key(&SECP256K1, &secret_key);
+    let public_key = PublicKey::from_secret_key(SECP256K1, &secret_key);
     let mut secret_bytes = [0u8; 32];
     for i in 0..32 {
         secret_bytes[i] = secret_key[i];
@@ -65,8 +67,11 @@ pub fn generate_keypair_from_privatekey(slice: &[u8]) -> (SaitoPublicKey, SaitoP
     (public_key.serialize(), secret_bytes)
 }
 
-pub fn sign_blob(vbytes: &mut Vec<u8>, privatekey: SaitoPrivateKey) -> &mut Vec<u8> {
-    let sig = sign(&hash(vbytes.as_ref()), privatekey);
+pub fn sign_blob<'a, 'b>(
+    vbytes: &'a mut Vec<u8>,
+    private_key: &'b SaitoPrivateKey,
+) -> &'a mut Vec<u8> {
+    let sig = sign(&hash(vbytes.as_ref()), private_key);
     vbytes.extend(&sig);
     vbytes
 }
@@ -76,49 +81,61 @@ pub fn generate_random_bytes(len: u64) -> Vec<u8> {
         let x: Vec<u8> = vec![];
         return x;
     }
-    (0..len).map(|_| rand::random::<u8>()).collect()
+    let mut rng = thread_rng();
+
+    (0..len).map(|_| rng.gen::<u8>()).collect()
 }
 
-pub fn hash(data: &Vec<u8>) -> SaitoHash {
+pub fn hash(data: &[u8]) -> SaitoHash {
     let mut hasher = Hasher::new();
     // Hashing in parallel can be faster if large enough
     // TODO: Blake3 has benchmarked 128 kb as the cutoff,
     // the benchmark should be redone for Saito's needs
     if data.len() > PARALLEL_HASH_BYTE_THRESHOLD {
-        hasher.update(data);
-    } else {
         hasher.update_rayon(data);
+    } else {
+        hasher.update(data);
     }
     hasher.finalize().into()
 }
 
-pub fn sign(message_bytes: &[u8], privatekey: SaitoPrivateKey) -> SaitoSignature {
-    let msg = Message::from_slice(message_bytes).unwrap();
-    let secret = SecretKey::from_slice(&privatekey).unwrap();
-    let sig = SECP256K1.sign(&msg, &secret);
+pub fn sign(message_bytes: &[u8], private_key: &SaitoPrivateKey) -> SaitoSignature {
+    let hash = hash(message_bytes);
+    let msg = Message::from_slice(&hash).unwrap();
+    let secret = SecretKey::from_slice(private_key).unwrap();
+    let sig = SECP256K1.sign_ecdsa(&msg, &secret);
     sig.serialize_compact()
 }
 
-pub fn verify(msg: &[u8], sig: SaitoSignature, publickey: SaitoPublicKey) -> bool {
-    let m = Message::from_slice(msg);
-    let p = PublicKey::from_slice(&publickey);
-    let s = Signature::from_compact(&sig);
+pub fn verify(msg: &[u8], sig: &SaitoSignature, public_key: &SaitoPublicKey) -> bool {
+    let hash = hash(msg);
+    verify_signature(&hash, sig, public_key)
+}
+
+pub fn verify_signature(
+    hash: &SaitoHash,
+    sig: &SaitoSignature,
+    public_key: &SaitoPublicKey,
+) -> bool {
+    let m = Message::from_slice(hash);
+    let p = PublicKey::from_slice(public_key);
+    let s = ecdsa::Signature::from_compact(sig);
     if m.is_err() || p.is_err() || s.is_err() {
         false
     } else {
         SECP256K1
-            .verify(&m.unwrap(), &s.unwrap(), &p.unwrap())
+            .verify_ecdsa(&m.unwrap(), &s.unwrap(), &p.unwrap())
             .is_ok()
     }
 }
 
 #[cfg(test)]
-
 mod tests {
+    use std::str;
+
+    use hex::FromHex;
 
     use super::*;
-    use hex::FromHex;
-    use std::str;
 
     #[test]
     //
@@ -126,42 +143,49 @@ mod tests {
     //
     fn symmetrical_encryption_test() {
         let text = "This is our unencrypted text";
-        let e = encrypt_with_password(text.as_bytes().to_vec(), "asdf");
-        let d = decrypt_with_password(e, "asdf");
+        let e = encrypt_with_password(text.as_bytes(), "asdf");
+        let d = decrypt_with_password(e.as_slice(), "asdf");
         let dtext = str::from_utf8(&d).unwrap();
         assert_eq!(text, dtext);
     }
 
     #[test]
-    fn keypair_restoration_from_privatekey_test() {
-        let (publickey, privatekey) = generate_keys();
-        let (publickey2, privatekey2) = generate_keypair_from_privatekey(&privatekey);
-        assert_eq!(publickey, publickey2);
-        assert_eq!(privatekey, privatekey2);
+    fn keypair_restoration_from_private_key_test() {
+        let (public_key, private_key) = generate_keys();
+        let (public_key2, private_key2) = generate_keypair_from_private_key(&private_key);
+        assert_eq!(public_key, public_key2);
+        assert_eq!(private_key, private_key2);
     }
 
     #[test]
     fn sign_message_test() {
         let msg = <[u8; 32]>::from_hex(
-            "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        )
-        .unwrap();
-        let private_key: SaitoPrivateKey = <[u8; 32]>::from_hex(
-            "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
+            "5a16ffa08e5fc440772ee962c1d730041f12c7008a6e5c704d13dfd3d1906e0d",
         )
         .unwrap();
 
-        let result = sign(&msg, private_key);
-        assert_eq!(result.len(), 64);
+        let hex = hash(msg.as_slice());
+
+        let hex_str = hex::encode(hex);
         assert_eq!(
-            result,
-            [
-                202, 118, 37, 146, 48, 117, 177, 10, 18, 74, 214, 201, 245, 79, 145, 68, 124, 181,
-                129, 43, 91, 128, 75, 189, 34, 121, 244, 108, 214, 106, 46, 155, 54, 226, 157, 1,
-                230, 58, 151, 82, 11, 177, 41, 250, 204, 74, 32, 21, 109, 128, 177, 114, 15, 171,
-                9, 150, 237, 116, 236, 2, 146, 210, 39, 69
-            ]
+            hex_str,
+            "f8b1f22222bdbd2e0bce06707a51f5fffa0753b11483c330e3bfddaf5bacabd6"
         );
+
+        let private_key: SaitoPrivateKey = <[u8; 32]>::from_hex(
+            "4a16ffa08e5fc440772ee962c1d730041f12c7008a6e5c704d13dfd3d1905e0d",
+        )
+        .unwrap();
+
+        let (public, _) = generate_keypair_from_private_key(&private_key);
+
+        let signature = sign(&msg, &private_key);
+        assert_eq!(signature.len(), 64);
+        let hex_str = hex::encode(signature);
+        assert_eq!(hex_str, "11c0e19856726c42c8ac3ec8e469057f5f8a882f7206377525db00899835b03f6ec3010d19534a5703dd9b1004b4f0e31d19582cdd5aec794541d0d0f339db7c");
+
+        let result = verify(&msg, &signature, &public);
+        assert!(result);
     }
 
     #[test]
@@ -171,12 +195,12 @@ mod tests {
         )
         .unwrap();
 
-        let (publickey, privatekey) = generate_keys();
-        let (publickey2, privatekey2) = generate_keys();
+        let (public_key, private_key) = generate_keys();
+        let (public_key2, private_key2) = generate_keys();
 
-        assert_eq!(verify(&msg, sign(&msg, privatekey), publickey), true);
-        assert_eq!(verify(&msg, sign(&msg, privatekey2), publickey2), true);
-        assert_eq!(verify(&msg, sign(&msg, privatekey), publickey2), false);
-        assert_eq!(verify(&msg, sign(&msg, privatekey2), publickey), false);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key), &public_key), true);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key2), &public_key2), true);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key), &public_key2), false);
+        assert_eq!(verify(&msg, &sign(&msg, &private_key2), &public_key), false);
     }
 }
