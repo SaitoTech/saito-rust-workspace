@@ -25,6 +25,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+          target: "wasm32-unknown-unknown"
           override: true
 
       - name: Build
@@ -46,6 +47,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: npm
           cache-dependency-path: saito-wasm/package-lock.json
+
+      - name: Bootstrapping
+        run: bash ./scripts/bootstrap_for_ci.sh
+        shell: bash
 
       - name: Install npm packages
         run: npm ci
