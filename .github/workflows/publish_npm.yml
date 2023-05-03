@@ -3,6 +3,8 @@ name: Publish-Saito-Wasm
 on:
   push:
     branches: [ prod, develop ] # remove develop after testing the script
+  pull_request:
+    branches: [ develop ]
 #  workflow_run:
 #    workflows: [ "Build Rust" ]
 #    types: [ completed ]
@@ -14,6 +16,12 @@ jobs:
     #    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: npm
+
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -35,12 +43,6 @@ jobs:
         with:
           command: test
           args: --release
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: 16
-          cache: npm
 
       - name: Install npm packages
         run: npm install
