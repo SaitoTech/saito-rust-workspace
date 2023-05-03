@@ -41,17 +41,17 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v2
+        working-directory: saito-wasm
         with:
           node-version: 16
           cache: npm
-          working-directory: ./saito-wasm
-
+          
       - name: Install npm packages
         run: npm install
-        working-directory: ./saito-wasm
+        working-directory: saito-wasm
 
       - name: Publish package
         run: npm publish
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        working-directory: ./saito-wasm
+        working-directory: saito-wasm
