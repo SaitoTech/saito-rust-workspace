@@ -47,6 +47,10 @@ jobs:
           cache: npm
           cache-dependency-path: saito-wasm/package-lock.json
 
+      - name: Bootstrapping
+        run: bash ./scripts/bootstrap_for_ci.sh
+        shell: bash
+
       - name: Install npm packages
         run: npm ci
         working-directory: saito-wasm
