@@ -16,11 +16,6 @@ jobs:
     #    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16
-          cache: npm
 
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -43,6 +38,13 @@ jobs:
         with:
           command: test
           args: --release
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: npm
+          cache-dependency-path: saito-wasm/package-lock.json
 
       - name: Install npm packages
         run: npm install
