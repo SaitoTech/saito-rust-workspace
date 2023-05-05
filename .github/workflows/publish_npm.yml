@@ -13,7 +13,6 @@ on:
 jobs:
   build_and_publish:
     runs-on: ubuntu-latest
-    #    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
 
@@ -28,22 +27,22 @@ jobs:
           cache: npm
           cache-dependency-path: saito-wasm/package-lock.json
 
-      - name: Get latest published version
+      - name: get latest version
         run: |
-          npm show saito-wasm version >> "$LATEST_SAITO_VERSION"
-          npm pkg get version >> "$PACKAGE_SAITO_VERSION"
+          echo latest_version=$(npm show saito-wasm version) >> $GITHUB_ENV
+          echo current_version=$(npm pkg get version) >> $GITHUB_ENV
         working-directory: saito-wasm
 
-      - name: Check versions
-        if: $LATEST_SAITO_VERSION == $PACKAGE_SAITO_VERSION
+      - name: version check
+        if: ${{ env.latest_version == env.current_version }}
         run: |
           echo "same version is already published"
-          echo "current version : $PACKAGE_SAITO_VERSION"
-          echo "published version : $LATEST_SAITO_VERSION"
+          echo "current version : ${{ env.current_version }}"
+          echo "published version : ${{ env.latest_version }}"
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
-        if: $LATEST_SAITO_VERSION != $PACKAGE_SAITO_VERSION
+        if: ${{ env.latest_version != env.current_version }}
         with:
           profile: minimal
           toolchain: stable
@@ -52,35 +51,35 @@ jobs:
 
       - name: Build
         uses: actions-rs/cargo@v1
-        if: $LATEST_SAITO_VERSION != $PACKAGE_SAITO_VERSION
+        if: ${{ env.latest_version != env.current_version }}
         with:
           command: build
           args: --release
 
       - name: Run tests
         uses: actions-rs/cargo@v1
-        if: $LATEST_SAITO_VERSION != $PACKAGE_SAITO_VERSION
+        if: ${{ env.latest_version != env.current_version }}
         with:
           command: test
           args: --release
 
       - name: Bootstrapping
-        if: $LATEST_SAITO_VERSION != $PACKAGE_SAITO_VERSION
+        if: ${{ env.latest_version != env.current_version }}
         run: bash ./scripts/bootstrap_for_ci.sh
         shell: bash
 
       - name: Install npm packages
-        if: $LATEST_SAITO_VERSION != $PACKAGE_SAITO_VERSION
+        if: ${{ env.latest_version != env.current_version }}
         run: npm ci
         working-directory: saito-wasm
 
       - name: Wasm Build
-        if: $LATEST_SAITO_VERSION != $PACKAGE_SAITO_VERSION
+        if: ${{ env.latest_version != env.current_version }}
         run: npm run build
         working-directory: saito-wasm
 
       - name: Publish package
-        if: $LATEST_SAITO_VERSION != $PACKAGE_SAITO_VERSION
+        if: ${{ env.latest_version != env.current_version }}
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
