@@ -1,4 +1,4 @@
-name: Publish-Saito-Wasm
+name: publish
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
 
       - name: Get latest published version
         run: |
-          npm show saito-js version >> "$LATEST_SAITO_VERSION"
+          npm show saito-wasm version >> "$LATEST_SAITO_VERSION"
           npm pkg get version >> "$PACKAGE_SAITO_VERSION"
         working-directory: saito-wasm
 
