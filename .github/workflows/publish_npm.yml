@@ -2,9 +2,9 @@ name: publish
 
 on:
   push:
-    branches: [ prod, develop ] # remove develop after testing the script
-  pull_request:
-    branches: [ develop ]
+    branches: [ prod ]
+#  pull_request:
+#    branches: [ develop ]
 #  workflow_run:
 #    workflows: [ "Build Rust" ]
 #    types: [ completed ]
