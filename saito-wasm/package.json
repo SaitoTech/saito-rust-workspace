@@ -5,7 +5,7 @@
   "scripts": {
     "test": "./node_modules/.bin/jest",
     "start": "ts-node-dev index.ts",
-    "build prod": "webpack --config webpack.prod.config.js",
+    "build-prod": "webpack --config webpack.prod.config.js",
     "build": "webpack",
     "serve": "webpack-dev-server"
   },
