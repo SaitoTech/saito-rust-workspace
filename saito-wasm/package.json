@@ -1,12 +1,12 @@
 {
   "name": "saito-wasm",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "js wrappings around saito-core using wasm",
   "scripts": {
     "test": "./node_modules/.bin/jest",
     "start": "ts-node-dev index.ts",
-    "build-prod": "webpack --config webpack.prod.config.js",
-    "build": "webpack",
+    "build": "webpack --config webpack.prod.config.js",
+    "build-dev": "webpack",
     "serve": "webpack-dev-server"
   },
   "author": "",
