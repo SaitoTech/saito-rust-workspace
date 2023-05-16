@@ -1,3 +1,8 @@
+// extern crate wee_alloc;
+//
+// #[global_allocator]
+// static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use std::time::Duration;
@@ -708,12 +713,28 @@ pub async fn get_wallet() -> WasmWallet {
     let saito = SAITO.lock().await;
     return saito.wallet.clone();
 }
+
 #[wasm_bindgen]
 pub async fn get_blockchain() -> WasmBlockchain {
     let saito = SAITO.lock().await;
     return saito.blockchain.clone();
 }
 
+#[wasm_bindgen]
+pub fn test_buffer_in(buffer: js_sys::Uint8Array) {
+    let buffer = buffer.to_vec();
+}
+
+#[wasm_bindgen]
+pub fn test_buffer_out() -> js_sys::Uint8Array {
+    let buffer = js_sys::Uint8Array::new_with_length(1000);
+    buffer
+}
+
+// #[wasm_bindgen]
+// pub fn print_wasm_memory_usage(){
+//     info!("WASM memory usage : {:?}",wasm.memory);
+// }
 // #[wasm_bindgen]
 // pub async fn set_initial_private_key(key: JsString) {
 //     let mut key = PRIVATE_KEY.lock().await;
