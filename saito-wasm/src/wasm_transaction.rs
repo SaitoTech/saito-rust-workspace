@@ -35,11 +35,11 @@ impl WasmTransaction {
     }
 
     pub fn add_to_slip(&mut self, slip: WasmSlip) {
-        self.tx.add_to_slip(slip.slip);
+        self.tx.add_to_slip(slip.slip.clone());
     }
 
     pub fn add_from_slip(&mut self, slip: WasmSlip) {
-        self.tx.add_from_slip(slip.slip);
+        self.tx.add_from_slip(slip.slip.clone());
     }
 
     #[wasm_bindgen(getter = txs_replacements)]
@@ -80,23 +80,6 @@ impl WasmTransaction {
         }
         array
     }
-    // #[wasm_bindgen(setter = to)]
-    // pub fn set_to(&mut self, array: Array) {
-    //     self.tx.to.clear();
-    //     for i in 0..array.length() as i32 {
-    //         let slip: WasmSlip = array.at(i).try_into().unwrap();
-    //         self.add_to_slip(slip);
-    //     }
-    // }
-    //
-    // #[wasm_bindgen(setter = from)]
-    // pub fn set_from(&mut self, array: Array) {
-    //     self.tx.from.clear();
-    //     for i in 0..array.length() as i32 {
-    //         let slip: WasmSlip = array.at(i).try_into().unwrap();
-    //         self.add_from_slip(slip);
-    //     }
-    // }
 
     pub fn is_from(&self, key: JsString) -> bool {
         let key: SaitoPublicKey = string_to_key(key).unwrap();

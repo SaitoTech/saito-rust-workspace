@@ -1,11 +1,9 @@
 use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{info, trace};
-use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 

@@ -17,7 +17,7 @@ base58 = "0.2.0"
 aes = "0.7.5"
 block-modes = "0.8.1"
 merkle = "1.11.0"
-serde = { version = "1.0.152", features = ["derive"] }
+serde = { version = "1.0.163", features = ["derive"] }
 serde_with = "2.2.0"
 hex = "0.4.3"
 ahash = "0.8.3"
@@ -25,7 +25,7 @@ num-derive = "0.3.3"
 num-traits = "0.2.15"
 async-recursion = "1.0.2"
 rayon = "1.6.1"
-async-trait = "0.1.63"
+async-trait = "0.1.68"
 primitive-types = "0.12.1"
 futures = { version = "0.3.25" }
 log = "0.4.17"

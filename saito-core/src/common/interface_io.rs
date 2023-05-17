@@ -1,14 +1,10 @@
 use std::fmt::Debug;
 use std::io::Error;
-use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::sync::RwLock;
 
 use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::core::data;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::wallet::Wallet;
 
 pub enum InterfaceEvent {
     PeerHandshakeComplete(PeerIndex),

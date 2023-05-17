@@ -1,17 +1,12 @@
-use std::sync::Arc;
-
 use ahash::{AHashMap, AHashSet};
 use log::{info, warn};
-use tokio::sync::RwLock;
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::Block;
-use crate::core::data::crypto::{
-    decrypt_with_password, encrypt_with_password, generate_keys, hash, sign,
-};
+use crate::core::data::crypto::{generate_keys, hash, sign};
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
@@ -85,11 +80,11 @@ impl Wallet {
     }
     pub async fn save(io: Box<dyn InterfaceIO + Send + Sync>) {
         info!("saving wallet");
-        let result = io.save_wallet().await;
+        io.save_wallet().await.unwrap();
         info!("wallet saved");
     }
 
-    pub async fn reset(&mut self, storage: &mut Storage) {
+    pub async fn reset(&mut self, _storage: &mut Storage) {
         info!("resetting wallet");
         let keys = generate_keys();
         self.public_key = keys.0;
@@ -338,8 +333,6 @@ impl WalletSlip {
 mod tests {
     use log::info;
 
-    use crate::common::test_io_handler::test::TestIOHandler;
-    use crate::common::test_manager::test::TestManager;
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
 
