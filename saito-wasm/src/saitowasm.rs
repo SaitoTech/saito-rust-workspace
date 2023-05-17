@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    Currency, PeerIndex, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+    PeerIndex, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -109,7 +109,7 @@ pub fn new() -> SaitoWasm {
     //
     // }
     // let keys = generate_public_key()
-    let mut wallet = Arc::new(RwLock::new(Wallet::new([0; 32], [0; 33])));
+    let wallet = Arc::new(RwLock::new(Wallet::new([0; 32], [0; 33])));
     // {
     //     Wallet::load(Box::new(WasmIoHandler {})).await;
     // }
@@ -303,7 +303,7 @@ pub async fn create_transaction(
         error!("failed parsing public key : {:?}", key.err().unwrap());
         todo!()
     }
-    let mut transaction = Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge);
+    let transaction = Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge);
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
     return Ok(wasm_transaction);
 }
@@ -722,7 +722,7 @@ pub async fn get_blockchain() -> WasmBlockchain {
 
 #[wasm_bindgen]
 pub fn test_buffer_in(buffer: js_sys::Uint8Array) {
-    let buffer = buffer.to_vec();
+    let _buffer = buffer.to_vec();
 }
 
 #[wasm_bindgen]

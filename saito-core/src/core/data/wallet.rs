@@ -331,7 +331,6 @@ impl WalletSlip {
 
 #[cfg(test)]
 mod tests {
-    use log::info;
 
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;

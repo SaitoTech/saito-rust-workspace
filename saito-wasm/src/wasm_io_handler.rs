@@ -9,14 +9,8 @@ use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::PeerConfig;
-use saito_core::core::data::transaction::Transaction;
-use saito_core::core::data::wallet::Wallet;
 
-use crate::wasm_block::WasmBlock;
-use crate::wasm_blockchain::WasmBlockchain;
-use crate::wasm_wallet::WasmWallet;
+use saito_core::core::data::configuration::PeerConfig;
 
 pub struct WasmIoHandler {}
 
