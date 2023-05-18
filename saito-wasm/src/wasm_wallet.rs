@@ -1,6 +1,6 @@
 use js_sys::JsString;
-use log::{error, info};
-use std::cell::RefCell;
+use log::error;
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use wasm_bindgen::JsValue;

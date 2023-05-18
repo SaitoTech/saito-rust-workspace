@@ -7,8 +7,7 @@ use rayon::prelude::*;
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
-    LOCK_ORDER_WALLET,
+    push_lock, Currency, SaitoHash, SaitoSignature, Timestamp, LOCK_ORDER_WALLET,
 };
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
@@ -337,7 +336,8 @@ mod tests {
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
-        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        push_lock, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::burnfee::HEARTBEAT;

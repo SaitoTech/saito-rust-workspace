@@ -150,6 +150,12 @@ let webConfigs = merge(common, {
             TextDecoder: ['text-encoding', 'TextDecoder'],
             TextEncoder: ['text-encoding', 'TextEncoder']
         }),
+        new webpack.ProvidePlugin({
+            Buffer: ["buffer", "Buffer"]
+        }),
+        new webpack.ProvidePlugin({
+            process: "process/browser"
+        }),
         new CopyPlugin({
             patterns: [{
                 from: "./pkg/web/index.d.ts",
@@ -167,5 +173,5 @@ let webConfigs = merge(common, {
     },
     target: "web",
 });
- 
+
 module.exports = [nodeConfigs, webConfigs];
