@@ -1,12 +1,12 @@
 {
   "name": "saito-wasm",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "js wrappings around saito-core using wasm",
   "scripts": {
     "test": "./node_modules/.bin/jest",
     "start": "ts-node-dev index.ts",
-    "build prod": "webpack --config webpack.prod.config.js",
-    "build": "webpack",
+    "build-prod": "cross-env WASM_BINDGEN_WEAKREF=1 webpack --config webpack.prod.config.js",
+    "build": "cross-env WASM_BINDGEN_WEAKREF=1 webpack",
     "serve": "webpack-dev-server"
   },
   "author": "",
@@ -23,6 +23,7 @@
     "html-webpack-plugin": "^5.5.0",
     "jest": "^29.3.1",
     "path-browserify": "^1.0.1",
+    "process": "0.11.10",
     "source-map-loader": "^4.0.1",
     "text-encoding": "^0.7.0",
     "ts-loader": "^9.4.2",
@@ -35,6 +36,7 @@
     "node-fetch": "^3.3.0"
   },
   "dependencies": {
-    "node-fetch": "^3.3.0"
+    "node-fetch": "^3.3.0",
+    "cross-env": "^7.0.3"
   }
 }

@@ -6,7 +6,7 @@ const {merge} = require("webpack-merge");
 const CopyPlugin = require("copy-webpack-plugin");
 
 let common = {
-    devtool: 'source-map',
+    devtool: false,//'source-map',
     optimization: {
         minimize: true,
     },
@@ -149,6 +149,12 @@ let webConfigs = merge(common, {
         new webpack.ProvidePlugin({
             TextDecoder: ['text-encoding', 'TextDecoder'],
             TextEncoder: ['text-encoding', 'TextEncoder']
+        }),
+        new webpack.ProvidePlugin({
+            Buffer: ["buffer", "Buffer"]
+        }),
+        new webpack.ProvidePlugin({
+            process: "process/browser"
         }),
         new CopyPlugin({
             patterns: [{
