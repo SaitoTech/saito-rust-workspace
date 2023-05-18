@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
-use log::{debug, error, trace};
+use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
+use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::network::Network;
+use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
-use crate::core::mining_event_processor::MiningEvent;
+use crate::lock_for_write;
 
+#[derive(Debug)]
 pub struct Storage {
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
@@ -50,20 +51,19 @@ impl Storage {
     }
 
     pub async fn file_exists(&self, filename: &str) -> bool {
-        return self
-            .io_interface
+        self.io_interface
             .is_existing_file(filename.to_string())
-            .await;
+            .await
     }
 
     pub fn generate_block_filename(&self, block: &Block) -> String {
-        let timestamp = block.get_timestamp();
-        let block_hash = block.get_hash();
+        let timestamp = block.timestamp;
+        let block_hash = block.hash;
         self.io_interface.get_block_dir().to_string()
             + timestamp.to_string().as_str()
             + "-"
             + hex::encode(block_hash).as_str()
-            + ".block"
+            + BLOCK_FILE_EXTENSION
     }
     pub async fn write_block_to_disk(&mut self, block: &Block) -> String {
         let buffer = block.serialize_for_net(BlockType::Full);
@@ -79,25 +79,21 @@ impl Storage {
         filename
     }
 
-    pub async fn load_blocks_from_disk(
-        &mut self,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
-        network: &Network,
-        sender_to_miner: tokio::sync::mpsc::Sender<MiningEvent>,
-    ) {
-        debug!("loading blocks from disk");
+    pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
+        info!("loading blocks from disk");
         let file_names = self.io_interface.load_block_file_list().await;
-        trace!("waiting for the blockchain write lock");
-        let mut blockchain = blockchain_lock.write().await;
-        trace!("acquired the blockchain write lock");
 
         if file_names.is_err() {
             error!("{:?}", file_names.err().unwrap());
             return;
         }
-        let file_names = file_names.unwrap();
+        let mut file_names = file_names.unwrap();
+        file_names.sort();
         debug!("block file names : {:?}", file_names);
+
+        trace!("loading files...");
         for file_name in file_names {
+            info!("loading file : {:?}", file_name);
             let result = self
                 .io_interface
                 .read_value(self.io_interface.get_block_dir() + file_name.as_str())
@@ -105,13 +101,27 @@ impl Storage {
             if result.is_err() {
                 todo!()
             }
-            let buffer = result.unwrap();
-            let mut block = Block::deserialize_for_net(&buffer);
-            block.generate_metadata();
-            blockchain
-                .add_block(block, network, self, sender_to_miner.clone())
-                .await;
+            info!("file : {:?} loaded", file_name);
+            let buffer: Vec<u8> = result.unwrap();
+            let buffer_len = buffer.len();
+            let result = Block::deserialize_from_net(buffer);
+            if result.is_err() {
+                // ideally this shouldn't happen since we only write blocks which are valid to disk
+                warn!(
+                    "failed deserializing block with buffer length : {:?}",
+                    buffer_len
+                );
+                continue;
+            }
+            let mut block = result.unwrap();
+            block.generate();
+            info!("block : {:?} loaded from disk", hex::encode(block.hash));
+            let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+            mempool.add_block(block);
         }
+        trace!("block file loading finished");
+
+        info!("loading blocks to mempool completed");
     }
 
     pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
@@ -121,7 +131,7 @@ impl Storage {
             todo!()
         }
         let buffer = result.unwrap();
-        Ok(Block::deserialize_for_net(&buffer))
+        Block::deserialize_from_net(buffer)
     }
 
     pub async fn delete_block_from_disk(&self, filename: String) -> bool {
@@ -192,7 +202,7 @@ impl Storage {
     //     }
     //
     //     let mut slip = Slip::new();
-    //     slip.set_publickey(add);
+    //     slip.set_public_key(add);
     //     slip.set_amount(amt);
     //     if typ.eq("VipOutput") {
     //         slip.set_slip_type(SlipType::VipOutput);
@@ -206,4 +216,136 @@ impl Storage {
     //
     //     return slip;
     // }
+}
+
+#[cfg(test)]
+mod test {
+    use log::{info, trace};
+
+    use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
+    use crate::common::test_manager::test::{create_timestamp, TestManager};
+    use crate::core::data::block::Block;
+    use crate::core::data::crypto::{hash, verify};
+
+    #[ignore]
+    #[tokio::test]
+    async fn read_issuance_file_test() {
+        let mut t = TestManager::new();
+        t.initialize(100, 100_000_000).await;
+
+        let slips = t.storage.return_token_supply_slips_from_disk();
+        let mut total_issuance = 0;
+
+        for i in 0..slips.len() {
+            total_issuance += slips[i].amount;
+        }
+
+        assert_eq!(total_issuance, MAX_TOKEN_SUPPLY);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn write_read_block_to_file_test() {
+        let mut t = TestManager::new();
+        t.initialize(100, 100_000_000).await;
+
+        let current_timestamp = create_timestamp();
+
+        let mut block = Block::new();
+        block.timestamp = current_timestamp;
+
+        let filename = t.storage.write_block_to_disk(&mut block).await;
+        trace!("block written to file : {}", filename);
+        let retrieved_block = t.storage.load_block_from_disk(filename).await;
+        let mut actual_retrieved_block = retrieved_block.unwrap();
+        actual_retrieved_block.generate();
+
+        assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
+    }
+
+    // TODO : delete this test
+    #[ignore]
+    #[tokio::test]
+    async fn block_load_test_slr() {
+        // pretty_env_logger::init();
+
+        let t = TestManager::new();
+
+        info!(
+            "current dir = {:?}",
+            std::env::current_dir().unwrap().to_str().unwrap()
+        );
+        let filename = std::env::current_dir().unwrap().to_str().unwrap().to_string() +
+            "/data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai";
+        let retrieved_block = t.storage.load_block_from_disk(filename).await;
+        let mut block = retrieved_block.unwrap();
+        block.generate();
+
+        info!(
+            "prehash = {:?},  prev : {:?}",
+            hex::encode(block.pre_hash),
+            hex::encode(block.previous_block_hash),
+        );
+        // assert_eq!(
+        //     "11bc1529b4bcdbfbdbd6582b9033e4156681e5b8777fcc5bcc0d69eb7238d133",
+        //     hex::encode(block.pre_hash)
+        // );
+        // assert_eq!(
+        //     "bcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
+        //     hex::encode(block.previous_block_hash)
+        // );
+        assert_eq!(
+            hex::encode(block.hash),
+            "f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda"
+        );
+        assert_ne!(block.timestamp, 0);
+
+        let hex = hash(&block.pre_hash.to_vec());
+        info!(
+            "prehash = {:?}, hex = {:?}, signature : {:?}, creator = {:?}",
+            hex::encode(block.pre_hash),
+            hex::encode(hex),
+            hex::encode(block.signature),
+            hex::encode(block.creator)
+        );
+        // assert_eq!("000000000000000a0000017d26dd628abcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bdcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bccccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000000000000000000000000000000002faf08000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        //     hex::encode(block.serialize_for_signature()));
+        let result = verify(
+            &block.serialize_for_signature(),
+            &block.signature,
+            &block.creator,
+        );
+        assert!(result);
+
+        let filename = t.storage.generate_block_filename(&block);
+        assert_eq!(
+            filename,
+            "./data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai"
+        );
+        // assert_eq!(retrieved_block.timestamp, 1637034582666);
+    }
+
+    #[test]
+    fn hashing_test() {
+        // pretty_env_logger::init();
+        let h1: SaitoHash =
+            hex::decode("fa761296cdca6b5c0e587e8bdc75f86223072780533a8edeb90fa51aea597128")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let h2: SaitoHash =
+            hex::decode("8f1717d0f4a244f805436633897d48952c30cb35b3941e5d36cb371c68289d25")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let mut h3: Vec<u8> = vec![];
+        h3.extend(&h1);
+        h3.extend(&h2);
+
+        let hash = hash(&h3);
+        assert_eq!(
+            hex::encode(hash),
+            "de0cdde5db8fd4489f2038aca5224c18983f6676aebcb2561f5089e12ea2eedf"
+        );
+    }
 }

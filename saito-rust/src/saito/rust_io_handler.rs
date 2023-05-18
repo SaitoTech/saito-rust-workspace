@@ -1,7 +1,8 @@
+use std::fmt::{Debug, Formatter};
 use std::fs;
 use std::io::Error;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
@@ -9,19 +10,20 @@ use log::{debug, warn};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
+use tokio::sync::RwLock;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::SaitoHash;
-use saito_core::common::interface_io::InterfaceIO;
-
+use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
+use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
+use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::wallet::Wallet;
 
-use crate::saito::io_context::IoContext;
-
+// use crate::saito::io_context::IoContext;
 use crate::IoEvent;
 
 lazy_static! {
-    pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
+    // pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
     pub static ref BLOCKS_DIR_PATH: String = configure_storage();
 }
 pub fn configure_storage() -> String {
@@ -32,12 +34,11 @@ pub fn configure_storage() -> String {
     }
 }
 
-pub enum FutureState {
-    DataSent(Vec<u8>),
-    PeerConnectionResult(Result<u64, Error>),
-}
+// pub enum FutureState {
+//     DataSent(Vec<u8>),
+//     PeerConnectionResult(Result<u64, Error>),
+// }
 
-#[derive(Clone, Debug)]
 pub struct RustIOHandler {
     sender: Sender<IoEvent>,
     handler_id: u8,
@@ -48,26 +49,34 @@ impl RustIOHandler {
         RustIOHandler { sender, handler_id }
     }
 
-    // TODO : delete this if not required
-    pub fn set_event_response(event_id: u64, response: FutureState) {
-        // debug!("setting event response for : {:?}", event_id,);
-        if event_id == 0 {
-            return;
-        }
-        let waker;
-        {
-            let mut context = SHARED_CONTEXT.lock().unwrap();
-            context.future_states.insert(event_id, response);
-            waker = context.future_wakers.remove(&event_id);
-        }
-        if waker.is_some() {
-            // debug!("waking future on event: {:?}", event_id,);
-            let waker = waker.unwrap();
-            waker.wake();
-            // debug!("waker invoked on event: {:?}", event_id);
-        } else {
-            warn!("waker not found for event: {:?}", event_id);
-        }
+    // // TODO : delete this if not required
+    // pub fn set_event_response(event_id: u64, response: FutureState) {
+    //     // debug!("setting event response for : {:?}", event_id,);
+    //     if event_id == 0 {
+    //         return;
+    //     }
+    //     let waker;
+    //     {
+    //         let mut context = SHARED_CONTEXT.lock().unwrap();
+    //         context.future_states.insert(event_id, response);
+    //         waker = context.future_wakers.remove(&event_id);
+    //     }
+    //     if waker.is_some() {
+    //         // debug!("waking future on event: {:?}", event_id,);
+    //         let waker = waker.unwrap();
+    //         waker.wake();
+    //         // debug!("waker invoked on event: {:?}", event_id);
+    //     } else {
+    //         warn!("waker not found for event: {:?}", event_id);
+    //     }
+    // }
+}
+
+impl Debug for RustIOHandler {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RustIoHandler")
+            .field("handler_id", &self.handler_id)
+            .finish()
     }
 }
 
@@ -120,6 +129,10 @@ impl InterfaceIO for RustIOHandler {
         peer_index: u64,
         url: String,
     ) -> Result<(), Error> {
+        if block_hash == [0; 32] {
+            return Ok(());
+        }
+
         debug!("fetching block from peer : {:?}", url);
         let event = IoEvent::new(NetworkEvent::BlockFetchRequest {
             block_hash,
@@ -185,7 +198,12 @@ impl InterfaceIO for RustIOHandler {
         let mut paths: Vec<_> = result
             .unwrap()
             .map(|r| r.unwrap())
-            .filter(|r| r.file_name().into_string().unwrap().contains(".block"))
+            .filter(|r| {
+                r.file_name()
+                    .into_string()
+                    .unwrap()
+                    .contains(BLOCK_FILE_EXTENSION)
+            })
             .collect();
         paths.sort_by(|a, b| {
             let a_metadata = fs::metadata(a.path()).unwrap();
@@ -216,6 +234,38 @@ impl InterfaceIO for RustIOHandler {
     fn get_block_dir(&self) -> String {
         BLOCKS_DIR_PATH.to_string()
     }
+
+    async fn process_api_call(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
+        todo!()
+    }
+
+    async fn process_api_success(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
+        todo!()
+    }
+
+    async fn process_api_error(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
+        todo!()
+    }
+
+    fn send_interface_event(&self, event: InterfaceEvent) {
+        todo!()
+    }
+
+    async fn save_wallet(&self) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn load_wallet(&self) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn save_blockchain(&self) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn load_blockchain(&self) -> Result<(), Error> {
+        todo!()
+    }
 }
 
 #[cfg(test)]
@@ -243,7 +293,7 @@ mod tests {
     async fn file_exists_success() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
         let io_handler = RustIOHandler::new(sender, 0);
-        let path = String::from("src/test/test_data/config_handler_tests.json");
+        let path = String::from("src/test/data/config_handler_tests.json");
 
         let result = io_handler.is_existing_file(path).await;
         assert!(result);

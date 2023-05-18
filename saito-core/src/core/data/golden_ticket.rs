@@ -1,7 +1,5 @@
 use std::convert::TryInto;
 
-use bigint::uint::U256;
-use log::trace;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey};
@@ -10,189 +8,169 @@ use crate::core::data::crypto::hash;
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GoldenTicket {
-    target: SaitoHash,
-    random: SaitoHash,
+    pub target: SaitoHash,
+    pub(crate) random: SaitoHash,
     #[serde_as(as = "[_; 33]")]
-    publickey: SaitoPublicKey,
+    pub(crate) public_key: SaitoPublicKey,
 }
 
 impl GoldenTicket {
     #[allow(clippy::new_without_default)]
 
-    pub fn new(target: SaitoHash, random: SaitoHash, publickey: SaitoPublicKey) -> Self {
+    pub fn new(target: SaitoHash, random: SaitoHash, public_key: SaitoPublicKey) -> Self {
         return Self {
             target,
             random,
-            publickey,
+            public_key,
         };
     }
 
-    pub fn deserialize(bytes: Vec<u8>) -> GoldenTicket {
-        let target: SaitoHash = bytes[0..32].try_into().unwrap();
-        let random: SaitoHash = bytes[32..64].try_into().unwrap();
-        let publickey: SaitoPublicKey = bytes[64..97].try_into().unwrap();
-        GoldenTicket::new(target, random, publickey)
-    }
-
-    pub fn generate(
+    pub fn create(
         previous_block_hash: SaitoHash,
         random_bytes: SaitoHash,
-        publickey: SaitoPublicKey,
-    ) -> SaitoHash {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&previous_block_hash);
-        vbytes.extend(&random_bytes);
-        vbytes.extend(&publickey);
-        hash(&vbytes)
+        public_key: SaitoPublicKey,
+    ) -> GoldenTicket {
+        GoldenTicket::new(previous_block_hash, random_bytes, public_key)
     }
 
-    pub fn get_target(&self) -> SaitoHash {
-        self.target
+    pub fn deserialize_from_net(bytes: &Vec<u8>) -> GoldenTicket {
+        assert_eq!(bytes.len(), 97);
+        let target: SaitoHash = bytes[0..32].try_into().unwrap();
+        let random: SaitoHash = bytes[32..64].try_into().unwrap();
+        let public_key: SaitoPublicKey = bytes[64..97].try_into().unwrap();
+        GoldenTicket::new(target, random, public_key)
     }
 
-    pub fn get_random(&self) -> SaitoHash {
-        self.random
-    }
-
-    pub fn get_publickey(&self) -> SaitoPublicKey {
-        self.publickey
-    }
-
-    pub fn serialize(&self) -> Vec<u8> {
-        let mut vbytes: Vec<u8> = vec![];
-        vbytes.extend(&self.target);
-        vbytes.extend(&self.random);
-        vbytes.extend(&self.publickey);
+    pub fn serialize_for_net(&self) -> Vec<u8> {
+        let vbytes: Vec<u8> = [
+            self.target.as_slice(),
+            self.random.as_slice(),
+            self.public_key.as_slice(),
+        ]
+        .concat();
         vbytes
     }
 
-    //
-    // TODO - switch to full binary difficulty algorithm
-    //
-    // this algorithm is quite old but maintained in this form for compatibility with
-    // javascript clients in the short-term. we should update this to have it handle
-    // comparisons in binary.
-    //
-    pub fn validate(solution: SaitoHash, difficulty: u64) -> bool {
-        let leading_zeroes_required: u64 = difficulty / 16;
-        let final_digit: u8 = 15 - ((difficulty % 16) as u8);
+    pub fn validate(&self, difficulty: u64) -> bool {
+        let solution_hash = hash(&self.serialize_for_net());
 
-        let mut target_string = String::from("");
+        return GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty);
+    }
 
-        //
-        // decidely ungainly
-        //
-        for i in 0..64 {
-            if (i as u64) < leading_zeroes_required {
-                target_string.push('0');
-            } else {
-                if (i as u64) == leading_zeroes_required {
-                    if final_digit == 0 {
-                        target_string.push('0');
-                    }
-                    if final_digit == 1 {
-                        target_string.push('1');
-                    }
-                    if final_digit == 2 {
-                        target_string.push('2');
-                    }
-                    if final_digit == 3 {
-                        target_string.push('3');
-                    }
-                    if final_digit == 4 {
-                        target_string.push('4');
-                    }
-                    if final_digit == 5 {
-                        target_string.push('5');
-                    }
-                    if final_digit == 6 {
-                        target_string.push('6');
-                    }
-                    if final_digit == 7 {
-                        target_string.push('7');
-                    }
-                    if final_digit == 8 {
-                        target_string.push('8');
-                    }
-                    if final_digit == 9 {
-                        target_string.push('9');
-                    }
-                    if final_digit == 10 {
-                        target_string.push('A');
-                    }
-                    if final_digit == 11 {
-                        target_string.push('B');
-                    }
-                    if final_digit == 12 {
-                        target_string.push('C');
-                    }
-                    if final_digit == 13 {
-                        target_string.push('D');
-                    }
-                    if final_digit == 14 {
-                        target_string.push('E');
-                    }
-                    if final_digit == 15 {
-                        target_string.push('F');
-                    }
-                } else {
-                    target_string.push('F');
-                }
-            }
-        }
+    pub fn validate_hashing_difficulty(solution_hash: &SaitoHash, difficulty: u64) -> bool {
+        let solution = primitive_types::U256::from_big_endian(solution_hash);
 
-        let target_hash = hex::decode(target_string).expect("error generating target bytes array");
-
-        let sol = U256::from_big_endian(&solution);
-        let tgt = U256::from_big_endian(&target_hash);
-
-        if sol <= tgt {
-            return true;
-        }
-
-        trace!(
-            "GT : solution : {:?} target : {:?}",
-            hex::encode(solution),
-            hex::encode(target_hash)
-        );
-        return false;
+        solution.leading_zeros() >= difficulty as u32
     }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use crate::core::data::crypto::{generate_random_bytes, hash};
+    use crate::common::defs::SaitoHash;
+    use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
+    use log::info;
 
     #[test]
-    fn golden_ticket_extremes_test() {
-        let wallet = Wallet::new();
+    fn golden_ticket_validate_hashing_difficulty() {
+        let hash: SaitoHash = [0u8; 32];
+        let mut hash2: SaitoHash = [255u8; 32];
 
-        let random = hash(&generate_random_bytes(32));
-        let target = hash(&random.to_vec());
-        let publickey = wallet.get_publickey();
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash, 0));
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash, 10));
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash, 256));
+        assert_eq!(
+            GoldenTicket::validate_hashing_difficulty(&hash, 1000000),
+            false
+        );
 
-        let solution = GoldenTicket::generate(target, random, publickey);
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash2, 0));
+        assert_eq!(GoldenTicket::validate_hashing_difficulty(&hash2, 10), false);
+        assert_eq!(
+            GoldenTicket::validate_hashing_difficulty(&hash2, 256),
+            false
+        );
 
-        assert_eq!(GoldenTicket::validate(solution, 0), true);
-        assert_eq!(GoldenTicket::validate(solution, 256), false);
+        hash2[0] = 15u8;
+
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash2, 3));
+        assert!(GoldenTicket::validate_hashing_difficulty(&hash2, 4));
+        assert_eq!(GoldenTicket::validate_hashing_difficulty(&hash2, 5), false);
     }
 
     #[test]
-    fn golden_ticket_difficulty_test() {
+    fn golden_ticket_extremes_test() {
+        let keys = generate_keys();
+        let wallet = Wallet::new(keys.1, keys.0);
 
-        // GIVEN - a known hash
-        // WHEN - tested against exactly the appropriate difficulty
-        // THEN - valid solution
+        let random = hash(&generate_random_bytes(32));
+        let target = hash(&random.to_vec());
+        let public_key = wallet.public_key;
 
-        // GIVEN - a known hash
-        // WHEN - tested against one difficulty easier
-        // THEN - valid solution
+        let gt = GoldenTicket::create(target, random, public_key);
 
-        // GIVEN - a known hash
-        // WHEN - tested against one difficulty easier
-        // THEN - invalid solution
+        assert_eq!(gt.validate(0), true);
+        assert_eq!(gt.validate(256), false);
+    }
+    #[test]
+    fn gt_against_slr() {
+        let buffer = hex::decode("844702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235e03bf1a4714cfc7ae33d3f6e860c23191ddea07bcb1bfa6c85bc124151ad8d4ce03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610").unwrap();
+        assert_eq!(buffer.len(), 97);
+
+        let result = GoldenTicket::deserialize_from_net(&buffer);
+        assert_eq!(
+            hex::encode(result.target),
+            "844702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235e"
+        );
+        assert_eq!(
+            hex::encode(result.random),
+            "03bf1a4714cfc7ae33d3f6e860c23191ddea07bcb1bfa6c85bc124151ad8d4ce"
+        );
+        assert_eq!(
+            hex::encode(result.public_key),
+            "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
+        );
+
+        assert!(result.validate(0));
+    }
+
+    #[test]
+    fn gt_against_slr_2() {
+        pretty_env_logger::init();
+
+        assert_eq!(primitive_types::U256::one().leading_zeros(), 255);
+        assert_eq!(primitive_types::U256::zero().leading_zeros(), 256);
+        let sol = hex::decode("4523d0eb05233434b42de74a99049decb6c4347da2e7cde9fb49330e905da1e2")
+            .unwrap();
+        info!("sss = {:?}", sol);
+        assert_eq!(
+            primitive_types::U256::from_big_endian(sol.as_ref()).leading_zeros(),
+            1
+        );
+
+        let gt = GoldenTicket {
+            target: hex::decode("6bc717fdd325b39383923e21c00aedf04efbc2d8ae6ba092e86b984ba45daf5f")
+                .unwrap()
+                .to_vec()
+                .try_into()
+                .unwrap(),
+            random: hex::decode("e41eed52c0d1b261654bd7bc7c15996276714e79bf837e129b022f9c04a97e49")
+                .unwrap()
+                .to_vec()
+                .try_into()
+                .unwrap(),
+            public_key: hex::decode(
+                "02262b7491f6599ed3f4f60315d9345e9ef02767973663b9764b52842306da461c",
+            )
+            .unwrap()
+            .to_vec()
+            .try_into()
+            .unwrap(),
+        };
+
+        let result = gt.validate(1);
+
+        assert!(result);
     }
 }

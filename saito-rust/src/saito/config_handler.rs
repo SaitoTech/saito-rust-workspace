@@ -2,14 +2,58 @@ use std::io::{Error, ErrorKind};
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use log::{debug, error};
+use serde::Deserialize;
 
-use saito_core::core::data::configuration::Configuration;
+use log::{debug, error};
+use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
+
+#[derive(Deserialize, Debug)]
+pub struct NodeConfigurations {
+    server: Server,
+    peers: Vec<PeerConfig>,
+    #[serde(skip)]
+    lite: bool,
+}
+
+impl NodeConfigurations {}
+
+impl Configuration for NodeConfigurations {
+    fn get_server_configs(&self) -> Option<&Server> {
+        return Some(&self.server);
+    }
+
+    fn get_peer_configs(&self) -> &Vec<PeerConfig> {
+        return &self.peers;
+    }
+
+    fn get_block_fetch_url(&self) -> String {
+        let endpoint = &self.get_server_configs().unwrap().endpoint;
+        endpoint.protocol.to_string()
+            + "://"
+            + endpoint.host.as_str()
+            + ":"
+            + endpoint.port.to_string().as_str()
+    }
+
+    fn is_spv_mode(&self) -> bool {
+        false
+    }
+
+    fn is_browser(&self) -> bool {
+        false
+    }
+
+    fn replace(&mut self, config: &dyn Configuration) {
+        self.server = config.get_server_configs().cloned().unwrap();
+        self.peers = config.get_peer_configs().clone();
+        self.lite = config.is_spv_mode();
+    }
+}
 
 pub struct ConfigHandler {}
 
 impl ConfigHandler {
-    pub fn load_configs(config_file_path: String) -> Result<Configuration, Error> {
+    pub fn load_configs(config_file_path: String) -> Result<NodeConfigurations, Error> {
         debug!(
             "loading configurations from path : {:?} current_dir = {:?}",
             config_file_path,
@@ -18,7 +62,7 @@ impl ConfigHandler {
         // TODO : add prompt with user friendly format
         let configs = Figment::new()
             .merge(Json::file(config_file_path))
-            .extract::<Configuration>();
+            .extract::<NodeConfigurations>();
 
         if configs.is_err() {
             error!("{:?}", configs.err().unwrap());
@@ -29,28 +73,43 @@ impl ConfigHandler {
     }
 }
 
+#[cfg(test)]
 mod test {
-    use crate::ConfigHandler;
     use std::io::ErrorKind;
+
+    use saito_core::core::data::configuration::Configuration;
+
+    use crate::ConfigHandler;
 
     #[test]
     fn load_config_from_existing_file() {
-        let path = String::from("saito-rust/src/test/test_data/config_handler_tests.json");
+        let path = String::from("saito-rust/src/test/data/config_handler_tests.json");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_ok());
         let configs = result.unwrap();
-        assert_eq!(configs.server.host, String::from("localhost"));
-        assert_eq!(configs.server.port, 12101);
-        assert_eq!(configs.server.protocol, String::from("http"));
-        assert_eq!(configs.server.endpoint.host, String::from("localhost"));
-        assert_eq!(configs.server.endpoint.port, 12101);
-        assert_eq!(configs.server.endpoint.protocol, String::from("http"));
+        assert_eq!(
+            configs.get_server_configs().unwrap().host,
+            String::from("localhost")
+        );
+        assert_eq!(configs.get_server_configs().unwrap().port, 12101);
+        assert_eq!(
+            configs.get_server_configs().unwrap().protocol,
+            String::from("http")
+        );
+        assert_eq!(
+            configs.get_server_configs().unwrap().endpoint.host,
+            String::from("localhost")
+        );
+        assert_eq!(configs.get_server_configs().unwrap().endpoint.port, 12101);
+        assert_eq!(
+            configs.get_server_configs().unwrap().endpoint.protocol,
+            String::from("http")
+        );
     }
 
     #[test]
     fn load_config_from_bad_file_format() {
-        let path =
-            String::from("saito-rust/src/test/test_data/config_handler_tests_bad_format.xml");
+        let path = String::from("saito-rust/src/test/data/config_handler_tests_bad_format.xml");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_err());
         assert_eq!(result.err().unwrap().kind(), ErrorKind::InvalidInput);
