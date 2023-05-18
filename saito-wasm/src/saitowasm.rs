@@ -731,6 +731,12 @@ pub fn test_buffer_out() -> js_sys::Uint8Array {
     buffer
 }
 
+#[wasm_bindgen]
+pub async fn test_buffer_out_async() -> js_sys::Uint8Array {
+    let buffer = js_sys::Uint8Array::new_with_length(1000);
+    buffer
+}
+
 // #[wasm_bindgen]
 // pub fn print_wasm_memory_usage(){
 //     info!("WASM memory usage : {:?}",wasm.memory);

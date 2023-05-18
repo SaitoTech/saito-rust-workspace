@@ -6,7 +6,7 @@ const {merge} = require("webpack-merge");
 const CopyPlugin = require("copy-webpack-plugin");
 
 let common = {
-    devtool: 'source-map',
+    devtool: false,//'source-map',
     optimization: {
         minimize: true,
     },
