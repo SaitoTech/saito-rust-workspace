@@ -73,4 +73,8 @@ export class MsgHandler {
     static load_blockchain() {
         return global.shared_methods.load_blockchain();
     }
+
+    static get_my_services() {
+        return global.shared_methods.get_my_services();
+    }
 }

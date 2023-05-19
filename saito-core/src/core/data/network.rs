@@ -18,6 +18,7 @@ use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
+use crate::core::data::peer_service::PeerService;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{lock_for_read, lock_for_write};
@@ -416,7 +417,7 @@ impl Network {
         }
         // trace!("connected to peers");
     }
-    pub async fn propagate_services(&self, peer_index: PeerIndex, services: Vec<String>) {
+    pub async fn propagate_services(&self, peer_index: PeerIndex, services: Vec<PeerService>) {
         let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
         let buffer = Message::Services(services).serialize();
         if peer_index == 0 {

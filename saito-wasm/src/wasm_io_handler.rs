@@ -3,14 +3,16 @@ use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
-use log::{info, trace};
+use log::{error, info, trace};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::peer_service::PeerService;
+
+use crate::wasm_peer_service::WasmPeerService;
 
 pub struct WasmIoHandler {}
 
@@ -223,6 +225,17 @@ impl InterfaceIO for WasmIoHandler {
         // TODO : return error state
         Ok(())
     }
+
+    fn get_my_services(&self) -> Vec<PeerService> {
+        let services = MsgHandler::get_my_services();
+        let services = serde_wasm_bindgen::from_value(services);
+        if services.is_err() {
+            error!("{:?}", services.err().unwrap());
+            return vec![];
+        }
+        let mut services: Vec<WasmPeerService> = services.unwrap();
+        services.drain(..).map(|s| s.service).collect()
+    }
 }
 
 impl Debug for WasmIoHandler {
@@ -289,4 +302,7 @@ extern "C" {
     pub fn save_blockchain();
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn load_blockchain();
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn get_my_services() -> JsValue;
 }

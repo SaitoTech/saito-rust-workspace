@@ -23,6 +23,7 @@ use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
+use crate::core::data::peer_service::PeerService;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::verification_thread::VerifyRequest;
@@ -424,7 +425,7 @@ impl RoutingThread {
             previous_block_hash = block_hash;
         }
     }
-    async fn process_peer_services(&mut self, services: Vec<String>, peer_index: u64) {
+    async fn process_peer_services(&mut self, services: Vec<PeerService>, peer_index: u64) {
         let (mut peers, _peers_) = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_some() {

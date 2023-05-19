@@ -4,6 +4,7 @@ mod wasm_blockchain;
 mod wasm_configuration;
 mod wasm_io_handler;
 mod wasm_peer;
+mod wasm_peer_service;
 mod wasm_slip;
 mod wasm_task_runner;
 mod wasm_time_keeper;
