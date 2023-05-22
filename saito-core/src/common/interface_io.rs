@@ -5,6 +5,7 @@ use async_trait::async_trait;
 
 use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::core::data;
+use crate::core::data::peer_service::PeerService;
 
 pub enum InterfaceEvent {
     PeerHandshakeComplete(PeerIndex),
@@ -125,6 +126,8 @@ pub trait InterfaceIO: Debug {
 
     async fn save_blockchain(&self) -> Result<(), Error>;
     async fn load_blockchain(&self) -> Result<(), Error>;
+
+    fn get_my_services(&self) -> Vec<PeerService>;
 }
 
 // impl Debug for dyn InterfaceIO {

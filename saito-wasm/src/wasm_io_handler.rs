@@ -3,14 +3,16 @@ use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
-use log::{info, trace};
+use log::{debug, error, info, trace};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::peer_service::PeerService;
+
+use crate::wasm_peer_service::{WasmPeerService, WasmPeerServiceList};
 
 pub struct WasmIoHandler {}
 
@@ -223,6 +225,37 @@ impl InterfaceIO for WasmIoHandler {
         // TODO : return error state
         Ok(())
     }
+
+    fn get_my_services(&self) -> Vec<PeerService> {
+        // let mut services = vec![];
+        let mut result: WasmPeerServiceList = MsgHandler::get_my_services();
+        // for i in 0..result.length() {
+        //     // let service: WasmPeerService = result.at(i as i32) as WasmPeerService;
+        //     let service = serde_wasm_bindgen::from_value(result.at(i as i32));
+        //     if service.is_err() {
+        //         error!("failed deserializing service. {:?}", service.err().unwrap());
+        //         return vec![];
+        //     }
+        //     services.push(service.unwrap());
+        // }
+        // debug!("services 1 : {:?}", services);
+        // let services = JsValue::from(services);
+        // debug!("services 2 : {:?}", services);
+        // let services = serde_wasm_bindgen::from_value(services);
+        // if services.is_err() {
+        //     error!(
+        //         "failed deserializing services. {:?}",
+        //         services.err().unwrap()
+        //     );
+        //     return vec![];
+        // }
+        // let mut services: Vec<WasmPeerService> = services.unwrap();
+        result
+            .services
+            .drain(..)
+            .map(|s: WasmPeerService| s.service)
+            .collect()
+    }
 }
 
 impl Debug for WasmIoHandler {
@@ -289,4 +322,7 @@ extern "C" {
     pub fn save_blockchain();
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn load_blockchain();
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn get_my_services() -> WasmPeerServiceList;
 }
