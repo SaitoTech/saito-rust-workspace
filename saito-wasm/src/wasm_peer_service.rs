@@ -4,6 +4,11 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 #[wasm_bindgen]
+pub struct WasmPeerServiceList {
+    pub(crate) services: Vec<WasmPeerService>,
+}
+
+#[wasm_bindgen]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct WasmPeerService {
     pub(crate) service: PeerService,
@@ -46,5 +51,16 @@ impl WasmPeerService {
     #[wasm_bindgen(getter=domain)]
     pub fn get_domain(&self) -> JsString {
         self.service.domain.clone().into()
+    }
+}
+
+#[wasm_bindgen]
+impl WasmPeerServiceList {
+    pub fn push(&mut self, service: WasmPeerService) {
+        self.services.push(service);
+    }
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> WasmPeerServiceList {
+        WasmPeerServiceList { services: vec![] }
     }
 }

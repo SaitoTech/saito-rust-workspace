@@ -29,6 +29,9 @@ impl Into<String> for PeerService {
 
 impl PeerService {
     pub fn serialize_services(services: &Vec<PeerService>) -> Vec<u8> {
+        if services.is_empty() {
+            return vec![];
+        }
         let str: String = services
             .iter()
             .map(|service| {
@@ -40,6 +43,9 @@ impl PeerService {
         str.as_bytes().to_vec()
     }
     pub fn deserialize_services(buffer: Vec<u8>) -> Result<Vec<PeerService>, Error> {
+        if buffer.is_empty() {
+            return Ok(vec![]);
+        }
         let str = String::from_utf8(buffer);
         if str.is_err() {
             warn!("failed parsing services. {:?}", str.err().unwrap());

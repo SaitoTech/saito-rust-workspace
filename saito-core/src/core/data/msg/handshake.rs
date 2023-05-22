@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::warn;
+use log::{info, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
 use crate::core::data::peer_service::PeerService;
@@ -81,9 +81,9 @@ impl Serialize<Self> for HandshakeResponse {
             block_fetch_url: "".to_string(),
             services: vec![],
         };
-
         let url_length = u32::from_be_bytes(buffer[130..134].try_into().unwrap());
 
+        // if we detect a block fetch url, we will retrieve it
         if url_length > 0 {
             let result = String::from_utf8(buffer[134..(134 + url_length) as usize].to_vec());
             if result.is_err() {
@@ -96,9 +96,13 @@ impl Serialize<Self> for HandshakeResponse {
 
             response.block_fetch_url = result.unwrap();
         }
-        let service_buffer = buffer[(134 + url_length) as usize..].to_vec();
-        let services = PeerService::deserialize_services(service_buffer)?;
-        response.services = services;
+        // if we detect services, we deserialize that too
+        if buffer.len() > (134 + url_length) as usize {
+            let service_buffer = buffer[(134 + url_length) as usize..].to_vec();
+
+            let services = PeerService::deserialize_services(service_buffer)?;
+            response.services = services;
+        }
 
         Ok(response)
     }

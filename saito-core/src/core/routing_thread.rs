@@ -425,6 +425,8 @@ impl RoutingThread {
             previous_block_hash = block_hash;
         }
     }
+
+    // TODO : remove if not required
     async fn process_peer_services(&mut self, services: Vec<PeerService>, peer_index: u64) {
         let (mut peers, _peers_) = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
         let peer = peers.index_to_peers.get_mut(&peer_index);
