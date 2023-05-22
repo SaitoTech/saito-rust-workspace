@@ -77,8 +77,8 @@ pub mod test {
         pub fn new() -> Self {
             let keys = generate_keys();
             let wallet = Wallet::new(keys.1, keys.0);
-            let public_key = wallet.public_key.clone();
-            let private_key = wallet.private_key.clone();
+            let _public_key = wallet.public_key.clone();
+            let _private_key = wallet.private_key.clone();
             let peers = Arc::new(RwLock::new(PeerCollection::new()));
             let wallet_lock = Arc::new(RwLock::new(wallet));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));

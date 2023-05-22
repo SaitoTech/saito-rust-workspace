@@ -16,6 +16,7 @@ use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::peer_service::PeerService;
 use saito_core::core::data::wallet::Wallet;
 use tokio::sync::RwLock;
 
@@ -261,5 +262,9 @@ impl InterfaceIO for RustIOHandler {
 
     async fn load_blockchain(&self) -> Result<(), Error> {
         todo!()
+    }
+
+    fn get_my_services(&self) -> Vec<PeerService> {
+        vec![]
     }
 }

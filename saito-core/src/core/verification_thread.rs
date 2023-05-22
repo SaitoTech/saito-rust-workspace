@@ -10,8 +10,7 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET,
+    push_lock, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
 };
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;

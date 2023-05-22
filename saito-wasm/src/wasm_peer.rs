@@ -3,6 +3,7 @@ use log::warn;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
+use crate::wasm_peer_service::WasmPeerService;
 use saito_core::common::defs::PeerIndex;
 use saito_core::core::data::peer::Peer;
 
@@ -51,19 +52,26 @@ impl WasmPeer {
     pub fn get_services(&self) -> JsValue {
         let arr = js_sys::Array::new_with_length(self.peer.services.len() as u32);
         for (i, service) in self.peer.services.iter().enumerate() {
-            arr.set(i as u32, JsValue::from(JsString::from(service.as_str())));
+            arr.set(
+                i as u32,
+                JsValue::from(WasmPeerService {
+                    service: service.clone(),
+                }),
+            );
         }
         JsValue::from(arr)
     }
     #[wasm_bindgen(setter = services)]
     pub fn set_services(&mut self, services: JsValue) {
-        let services = js_sys::Array::from(&services);
-        let mut ser = vec![];
-        for i in 0..services.length() {
-            let str = JsString::from(services.at(i as i32));
-            ser.push(str.into());
-        }
-        self.peer.services = ser;
+        let mut services: Vec<WasmPeerService> = serde_wasm_bindgen::from_value(services).unwrap();
+        let services = services.drain(..).map(|s| s.service).collect();
+
+        // let mut ser = vec![];
+        // for i in 0..services.length() {
+        //     let str = WasmPeerService::from(services.at(i as i32));
+        //     ser.push(str.service);
+        // }
+        self.peer.services = services;
     }
     pub fn has_service(&self, service: JsString) -> bool {
         return self.peer.has_service(service.into());

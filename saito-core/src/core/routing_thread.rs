@@ -8,8 +8,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, PeerIndex, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, PeerIndex, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_PEERS, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -23,6 +23,7 @@ use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
+use crate::core::data::peer_service::PeerService;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::verification_thread::VerifyRequest;
@@ -424,7 +425,9 @@ impl RoutingThread {
             previous_block_hash = block_hash;
         }
     }
-    async fn process_peer_services(&mut self, services: Vec<String>, peer_index: u64) {
+
+    // TODO : remove if not required
+    async fn process_peer_services(&mut self, services: Vec<PeerService>, peer_index: u64) {
         let (mut peers, _peers_) = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_some() {

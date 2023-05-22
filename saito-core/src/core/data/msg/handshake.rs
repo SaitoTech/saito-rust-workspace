@@ -1,8 +1,9 @@
 use std::io::{Error, ErrorKind};
 
-use log::warn;
+use log::{info, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
+use crate::core::data::peer_service::PeerService;
 use crate::core::data::serialize::Serialize;
 
 #[derive(Debug)]
@@ -18,6 +19,7 @@ pub struct HandshakeResponse {
     pub is_lite: bool,
     pub block_fetch_url: String,
     pub challenge: SaitoHash,
+    pub services: Vec<PeerService>,
 }
 
 // #[derive(Debug)]
@@ -58,6 +60,7 @@ impl Serialize<Self> for HandshakeResponse {
             (self.is_lite as u8).to_be_bytes().to_vec(),
             (self.block_fetch_url.len() as u32).to_be_bytes().to_vec(),
             self.block_fetch_url.as_bytes().to_vec(),
+            PeerService::serialize_services(&self.services),
         ]
         .concat()
     }
@@ -76,10 +79,11 @@ impl Serialize<Self> for HandshakeResponse {
             challenge: buffer[97..129].to_vec().try_into().unwrap(),
             is_lite: buffer[129] != 0,
             block_fetch_url: "".to_string(),
+            services: vec![],
         };
-
         let url_length = u32::from_be_bytes(buffer[130..134].try_into().unwrap());
 
+        // if we detect a block fetch url, we will retrieve it
         if url_length > 0 {
             let result = String::from_utf8(buffer[134..(134 + url_length) as usize].to_vec());
             if result.is_err() {
@@ -92,25 +96,17 @@ impl Serialize<Self> for HandshakeResponse {
 
             response.block_fetch_url = result.unwrap();
         }
+        // if we detect services, we deserialize that too
+        if buffer.len() > (134 + url_length) as usize {
+            let service_buffer = buffer[(134 + url_length) as usize..].to_vec();
+
+            let services = PeerService::deserialize_services(service_buffer)?;
+            response.services = services;
+        }
 
         Ok(response)
     }
 }
-//
-// impl Serialize<Self> for HandshakeCompletion {
-//     fn serialize(&self) -> Vec<u8> {
-//         self.signature.to_vec()
-//     }
-//     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
-//         if buffer.len() != 64 {
-//             warn!("buffer size is :{:?}", buffer.len());
-//             return Err(Error::from(ErrorKind::InvalidData));
-//         }
-//         Ok(HandshakeCompletion {
-//             signature: buffer[0..64].try_into().unwrap(),
-//         })
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
@@ -143,6 +139,7 @@ mod tests {
             challenge: rand::random(),
             is_lite: false,
             block_fetch_url: "http://url/test2".to_string(),
+            services: vec![],
         };
         let buffer = response.serialize();
         assert_eq!(buffer.len(), 150);

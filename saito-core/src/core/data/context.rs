@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey};
 use crate::common::run_task::RunTask;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;

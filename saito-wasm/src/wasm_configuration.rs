@@ -2,7 +2,7 @@ use std::io::{Error, ErrorKind};
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use log::{error, info};
+use log::error;
 use serde::Deserialize;
 
 use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};

@@ -3,20 +3,18 @@ pub mod test {
     use std::fs;
     use std::io::Error;
     use std::path::Path;
-    use std::sync::Arc;
 
     use async_trait::async_trait;
     use tokio::fs::File;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use log::{debug, error, info};
-    use tokio::sync::RwLock;
 
     use crate::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
     use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
-    use crate::core::data::blockchain::Blockchain;
+
     use crate::core::data::configuration::PeerConfig;
-    use crate::core::data::wallet::Wallet;
+    use crate::core::data::peer_service::PeerService;
 
     #[derive(Clone, Debug)]
     pub struct TestIOHandler {}
@@ -181,7 +179,7 @@ pub mod test {
             todo!()
         }
 
-        fn send_interface_event(&self, event: InterfaceEvent) {
+        fn send_interface_event(&self, _event: InterfaceEvent) {
             todo!()
         }
 
@@ -198,6 +196,10 @@ pub mod test {
         }
 
         async fn load_blockchain(&self) -> Result<(), Error> {
+            todo!()
+        }
+
+        fn get_my_services(&self) -> Vec<PeerService> {
             todo!()
         }
     }

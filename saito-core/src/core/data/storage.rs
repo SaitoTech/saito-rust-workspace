@@ -5,7 +5,6 @@ use tokio::sync::RwLock;
 
 use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
-
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
@@ -52,10 +51,9 @@ impl Storage {
     }
 
     pub async fn file_exists(&self, filename: &str) -> bool {
-        return self
-            .io_interface
+        self.io_interface
             .is_existing_file(filename.to_string())
-            .await;
+            .await
     }
 
     pub fn generate_block_filename(&self, block: &Block) -> String {
