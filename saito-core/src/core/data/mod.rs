@@ -14,6 +14,7 @@ pub mod msg;
 pub mod network;
 pub mod peer;
 pub mod peer_collection;
+pub mod peer_service;
 pub mod ringitem;
 pub mod serialize;
 pub mod slip;

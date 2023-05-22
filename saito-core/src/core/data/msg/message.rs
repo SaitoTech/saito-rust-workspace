@@ -8,6 +8,7 @@ use crate::core::data::msg::api_message::ApiMessage;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
+use crate::core::data::peer_service::PeerService;
 use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;
 
@@ -21,7 +22,7 @@ pub enum Message {
     BlockHeaderHash(SaitoHash, u64),
     Ping(),
     SPVChain(),
-    Services(Vec<String>),
+    Services(Vec<PeerService>),
     GhostChain(GhostChainSync),
     GhostChainRequest(u64, SaitoHash, SaitoHash),
     ApplicationMessage(ApiMessage),
@@ -56,10 +57,7 @@ impl Message {
             Message::Ping() => {
                 vec![]
             }
-            Message::Services(services) => {
-                let str = services.join(";");
-                str.as_bytes().to_vec()
-            }
+            Message::Services(services) => PeerService::serialize_services(services),
             Message::Result(data) => data.serialize(),
             Message::Error(data) => data.serialize(),
             _ => {
@@ -111,12 +109,7 @@ impl Message {
             7 => Ok(Message::Ping()),
             8 => Ok(Message::SPVChain()),
             9 => {
-                let str = String::from_utf8(buffer).unwrap();
-                let mut services = vec![];
-                for str in str.split(";") {
-                    services.push(str.to_string());
-                }
-                // let services = str.split(";").collect::<Vec<String>>();
+                let services = PeerService::deserialize_services(buffer).unwrap();
                 Ok(Message::Services(services))
             }
             10 => Ok(Message::GhostChain(GhostChainSync::deserialize(buffer))),

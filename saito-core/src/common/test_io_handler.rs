@@ -14,6 +14,7 @@ pub mod test {
     use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 
     use crate::core::data::configuration::PeerConfig;
+    use crate::core::data::peer_service::PeerService;
 
     #[derive(Clone, Debug)]
     pub struct TestIOHandler {}
@@ -195,6 +196,10 @@ pub mod test {
         }
 
         async fn load_blockchain(&self) -> Result<(), Error> {
+            todo!()
+        }
+
+        fn get_my_services(&self) -> Vec<PeerService> {
             todo!()
         }
     }

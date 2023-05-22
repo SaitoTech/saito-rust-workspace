@@ -46,6 +46,7 @@ use crate::wasm_blockchain::WasmBlockchain;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_peer::WasmPeer;
+use crate::wasm_peer_service::WasmPeerService;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
 use crate::wasm_wallet::WasmWallet;
@@ -691,22 +692,24 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
         .unwrap();
 }
 
-#[wasm_bindgen]
-pub async fn propagate_services(peer_index: PeerIndex, services: JsValue) {
-    info!("propagating services : {:?} - {:?}", peer_index, services);
-    let saito = SAITO.lock().await;
-    let arr = js_sys::Array::from(&services);
-    let mut services = vec![];
-    for i in 0..arr.length() {
-        let service: String = JsString::from(arr.at(i as i32)).into();
-        services.push(service);
-    }
-    saito
-        .routing_thread
-        .network
-        .propagate_services(peer_index, services)
-        .await;
-}
+// #[wasm_bindgen]
+// pub async fn propagate_services(peer_index: PeerIndex, services: JsValue) {
+//     info!("propagating services : {:?} - {:?}", peer_index, services);
+//     let arr = js_sys::Array::from(&services);
+//     let mut services: Vec<WasmPeerService> = serde_wasm_bindgen::from_value(services).unwrap();
+//     // for i in 0..arr.length() {
+//     //     let service = WasmPeerService::from(arr.at(i as i32));
+//     //     let service = service.service;
+//     //     services.push(service);
+//     // }
+//     let services = services.drain(..).map(|s| s.service).collect();
+//     let saito = SAITO.lock().await;
+//     saito
+//         .routing_thread
+//         .network
+//         .propagate_services(peer_index, services)
+//         .await;
+// }
 
 #[wasm_bindgen]
 pub async fn get_wallet() -> WasmWallet {
