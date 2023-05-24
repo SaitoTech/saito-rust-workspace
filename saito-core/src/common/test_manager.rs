@@ -432,7 +432,8 @@ pub mod test {
                         lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
                     transaction =
-                        Transaction::create(&mut wallet, public_key, txs_amount, txs_fee, false);
+                        Transaction::create(&mut wallet, public_key, txs_amount, txs_fee, false)
+                            .unwrap();
                 }
 
                 transaction.sign(&private_key);

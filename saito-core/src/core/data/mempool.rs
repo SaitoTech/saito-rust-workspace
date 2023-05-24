@@ -238,7 +238,7 @@ impl Mempool {
         // if self.transactions.is_empty() {
         //     return false;
         // }
-        // trace!("can bundle block : timestamp = {:?}", current_timestamp);
+        trace!("can bundle block : timestamp = {:?}", current_timestamp);
 
         // TODO : add checks [downloading_active,etc...] from SLR code here
 

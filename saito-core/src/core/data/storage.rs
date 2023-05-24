@@ -114,6 +114,7 @@ impl Storage {
                 continue;
             }
             let mut block = result.unwrap();
+            block.force_loaded = true;
             block.generate();
             info!("block : {:?} loaded from disk", hex::encode(block.hash));
             let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);

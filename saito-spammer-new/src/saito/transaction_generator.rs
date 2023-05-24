@@ -270,7 +270,8 @@ impl TransactionGenerator {
                         let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
                             let mut transaction =
-                                Transaction::create(&mut wallet, public_key, payment, fee, false);
+                                Transaction::create(&mut wallet, public_key, payment, fee, false)
+                                    .unwrap();
                             transaction.generate_total_fees(0, 0);
                             if (transaction.total_in == 0 || transaction.total_out == 0)
                                 && (payment + fee != 0)

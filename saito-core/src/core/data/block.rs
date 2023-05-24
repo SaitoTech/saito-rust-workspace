@@ -222,6 +222,8 @@ pub struct Block {
     pub source_connection_id: Option<SaitoPublicKey>,
     #[serde(skip)]
     pub transaction_map: AHashMap<SaitoPublicKey, bool>,
+    #[serde(skip)]
+    pub force_loaded: bool,
 }
 
 impl Block {
@@ -265,6 +267,7 @@ impl Block {
             created_hashmap_of_slips_spent_this_block: false,
             source_connection_id: None,
             transaction_map: Default::default(),
+            force_loaded: false,
         }
     }
 

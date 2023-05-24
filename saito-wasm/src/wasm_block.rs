@@ -1,9 +1,9 @@
 use js_sys::{Array, JsString, Uint8Array};
 use num_traits::FromPrimitive;
-use saito_core::common::defs::Timestamp;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
+use saito_core::common::defs::Timestamp;
 use saito_core::core::data::block::{Block, BlockType};
 
 use crate::saitowasm::string_to_key;
@@ -79,6 +79,16 @@ impl WasmBlock {
     #[wasm_bindgen(getter = hash)]
     pub fn get_hash(&self) -> JsString {
         hex::encode(self.block.hash).into()
+    }
+
+    #[wasm_bindgen(getter = in_longest_chain)]
+    pub fn in_longest_chain(&self) -> bool {
+        self.block.in_longest_chain
+    }
+
+    #[wasm_bindgen(getter = force_loaded)]
+    pub fn force_loaded(&self) -> bool {
+        self.block.force_loaded
     }
 
     #[wasm_bindgen]

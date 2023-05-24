@@ -240,13 +240,10 @@ pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue
     info!("initializing saito-wasm");
     trace!("trace test");
     debug!("debug test");
-    // return Ok(JsValue::from("sss"));
     {
         info!("setting configs...");
         let mut configs = CONFIGS.write().await;
         info!("config lock acquired");
-        // let str = js_sys::JSON::stringify(&json);
-        // info!("setting configs : {:?}", str.as_string().unwrap());
 
         let str: Result<String, _> = json.try_into();
         if str.is_err() {
@@ -265,7 +262,7 @@ pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue
         }
         let config = config.unwrap();
 
-        // info!("config : {:?}", config);
+        info!("config : {:?}", config);
 
         configs.replace(&config);
     }
@@ -304,7 +301,8 @@ pub async fn create_transaction(
         error!("failed parsing public key : {:?}", key.err().unwrap());
         todo!()
     }
-    let transaction = Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge);
+    let transaction =
+        Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge).unwrap();
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
     return Ok(wasm_transaction);
 }
@@ -427,7 +425,7 @@ pub async fn process_fetched_block(
 
 #[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
-    // trace!("process_timer_event");
+    // trace!("process_timer_event. duration : {:?}", duration_in_ms);
     let mut saito = SAITO.lock().await;
 
     let duration = Duration::from_millis(duration_in_ms);

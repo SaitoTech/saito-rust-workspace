@@ -152,9 +152,9 @@ impl Transaction {
         wallet: &mut Wallet,
         to_public_key: SaitoPublicKey,
         with_payment: Currency,
-        with_fee: Currency,
+        mut with_fee: Currency,
         _force_merge: bool,
-    ) -> Transaction {
+    ) -> Result<Transaction, Error> {
         trace!(
             "generating transaction : payment = {:?}, fee = {:?}",
             with_payment,
@@ -162,6 +162,11 @@ impl Transaction {
         );
 
         let available_balance = wallet.get_available_balance();
+
+        if with_fee > available_balance {
+            with_fee = 0;
+        }
+
         let total_requested = with_payment + with_fee;
         trace!(
             "in generate transaction. available: {} and payment: {} and fee: {}",
@@ -169,9 +174,21 @@ impl Transaction {
             with_payment,
             with_fee
         );
+        if available_balance < total_requested {
+            warn!(
+                "not enough funds to create transaction. required : {:?} available : {:?}",
+                total_requested, available_balance
+            );
+            return Err(Error::from(ErrorKind::NotFound));
+        }
 
-        if available_balance >= total_requested {
-            let mut transaction = Transaction::default();
+        let mut transaction = Transaction::default();
+        if total_requested == 0 {
+            let mut slip = Slip::default();
+            slip.amount = 0;
+            slip.public_key = wallet.public_key;
+            transaction.add_from_slip(slip);
+        } else {
             let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
             let input_len = input_slips.len();
             let output_len = output_slips.len();
@@ -184,80 +201,85 @@ impl Transaction {
                 transaction.add_to_slip(output_slips[0].clone());
                 output_slips.remove(0);
             }
-
-            // add the payment
-            let mut output = Slip::default();
-            output.public_key = to_public_key;
-            output.amount = with_payment;
-            transaction.add_to_slip(output);
-
-            transaction
-        } else {
-            if available_balance > with_payment {
-                let mut transaction = Transaction::default();
-                let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
-                let input_len = input_slips.len();
-                let output_len = output_slips.len();
-
-                for _i in 0..input_len {
-                    transaction.add_from_slip(input_slips[0].clone());
-                    input_slips.remove(0);
-                }
-                for _i in 0..output_len {
-                    transaction.add_to_slip(output_slips[0].clone());
-                    output_slips.remove(0);
-                }
-
-                // add the payment
-                let mut output = Slip::default();
-                output.public_key = to_public_key;
-                output.amount = with_payment;
-                transaction.add_to_slip(output);
-
-                return transaction;
-            }
-
-            if available_balance > with_fee {
-                let mut transaction = Transaction::default();
-                let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
-                let input_len = input_slips.len();
-                let output_len = output_slips.len();
-
-                for _i in 0..input_len {
-                    transaction.add_from_slip(input_slips[0].clone());
-                    input_slips.remove(0);
-                }
-                for _i in 0..output_len {
-                    transaction.add_to_slip(output_slips[0].clone());
-                    output_slips.remove(0);
-                }
-
-                return transaction;
-            }
-
-            //
-            // we have neither enough for the payment OR the fee, so
-            // we just create a transaction that has no payment AND no
-            // attached fee.
-            //
-            let mut transaction = Transaction::default();
-
-            let mut input1 = Slip::default();
-            input1.public_key = to_public_key;
-            input1.amount = 0;
-            input1.block_id = 0;
-            input1.tx_ordinal = 0;
-
-            let mut output1 = Slip::default();
-            output1.public_key = wallet.public_key;
-            output1.block_id = 0;
-            output1.tx_ordinal = 0;
-
-            transaction.add_from_slip(input1);
-            transaction.add_to_slip(output1);
-
-            transaction
         }
+        let mut output = Slip::default();
+        output.public_key = to_public_key;
+        output.amount = with_payment;
+        transaction.add_to_slip(output);
+
+        Ok(transaction)
+        //
+        // if available_balance >= total_requested {
+        //
+        //
+        //     // add the payment
+        //
+        // } else {
+        //     if available_balance > with_payment {
+        //         let mut transaction = Transaction::default();
+        //         let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
+        //         let input_len = input_slips.len();
+        //         let output_len = output_slips.len();
+        //
+        //         for _i in 0..input_len {
+        //             transaction.add_from_slip(input_slips[0].clone());
+        //             input_slips.remove(0);
+        //         }
+        //         for _i in 0..output_len {
+        //             transaction.add_to_slip(output_slips[0].clone());
+        //             output_slips.remove(0);
+        //         }
+        //
+        //         // add the payment
+        //         let mut output = Slip::default();
+        //         output.public_key = to_public_key;
+        //         output.amount = with_payment;
+        //         transaction.add_to_slip(output);
+        //
+        //         return Ok(transaction);
+        //     }
+        //
+        //     if available_balance > with_fee {
+        //         let mut transaction = Transaction::default();
+        //         let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
+        //         let input_len = input_slips.len();
+        //         let output_len = output_slips.len();
+        //
+        //         for _i in 0..input_len {
+        //             transaction.add_from_slip(input_slips[0].clone());
+        //             input_slips.remove(0);
+        //         }
+        //         for _i in 0..output_len {
+        //             transaction.add_to_slip(output_slips[0].clone());
+        //             output_slips.remove(0);
+        //         }
+        //
+        //         return Ok(transaction);
+        //     }
+        //
+        // //
+        // // we have neither enough for the payment OR the fee, so
+        // // we just create a transaction that has no payment AND no
+        // // attached fee.
+        // //
+        // let mut transaction = Transaction::default();
+        //
+        // let mut input1 = Slip::default();
+        // input1.public_key = to_public_key;
+        // input1.amount = 0;
+        // input1.block_id = 0;
+        // input1.tx_ordinal = 0;
+        //
+        // let mut output1 = Slip::default();
+        // output1.public_key = wallet.public_key;
+        // output1.block_id = 0;
+        // output1.tx_ordinal = 0;
+        //
+        // transaction.add_from_slip(input1);
+        // transaction.add_to_slip(output1);
+        //
+        // transaction
+        // }
     }
 
     ///
