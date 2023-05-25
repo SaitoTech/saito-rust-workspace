@@ -317,6 +317,7 @@ pub async fn get_latest_block_hash() -> JsString {
     hex::encode(hash).into()
 }
 
+#[wasm_bindgen]
 pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
     debug!("get_block");
     let block_hash = string_to_key(block_hash);

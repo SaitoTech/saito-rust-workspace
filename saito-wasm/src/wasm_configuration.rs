@@ -68,6 +68,9 @@ impl Configuration for WasmConfiguration {
     }
 
     fn get_block_fetch_url(&self) -> String {
+        if self.get_server_configs().is_none() {
+            return "".to_string();
+        }
         let endpoint = &self.get_server_configs().unwrap().endpoint;
         endpoint.protocol.to_string()
             + "://"

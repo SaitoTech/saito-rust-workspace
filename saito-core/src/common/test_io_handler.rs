@@ -179,9 +179,7 @@ pub mod test {
             todo!()
         }
 
-        fn send_interface_event(&self, _event: InterfaceEvent) {
-            todo!()
-        }
+        fn send_interface_event(&self, _event: InterfaceEvent) {}
 
         async fn save_wallet(&self) -> Result<(), Error> {
             todo!()
