@@ -11,6 +11,7 @@ use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::data::configuration::PeerConfig;
 use saito_core::core::data::peer_service::PeerService;
+use saito_core::core::data::wallet::Wallet;
 
 use crate::wasm_peer_service::{WasmPeerService, WasmPeerServiceList};
 
@@ -100,7 +101,7 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
+    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
         let array = js_sys::Uint8Array::new_with_length(value.len() as u32);
         array.copy_from(value.as_slice());
 
@@ -205,13 +206,13 @@ impl InterfaceIO for WasmIoHandler {
         }
     }
 
-    async fn save_wallet(&self) -> Result<(), Error> {
+    async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
         MsgHandler::save_wallet();
         // TODO : return error state
         Ok(())
     }
 
-    async fn load_wallet(&self) -> Result<(), Error> {
+    async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
         MsgHandler::load_wallet();
         // TODO : return error state
         Ok(())

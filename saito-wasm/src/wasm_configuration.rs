@@ -77,7 +77,6 @@ impl Configuration for WasmConfiguration {
             + endpoint.host.as_str()
             + ":"
             + endpoint.port.to_string().as_str()
-            + "/block/"
     }
     fn is_spv_mode(&self) -> bool {
         self.spv_mode

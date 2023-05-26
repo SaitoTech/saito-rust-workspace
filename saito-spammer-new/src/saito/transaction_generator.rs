@@ -19,8 +19,8 @@ use saito_core::core::data::slip::{Slip, SLIP_SIZE};
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::{lock_for_read, lock_for_write};
+use saito_rust::saito::time_keeper::TimeKeeper;
 
-use crate::saito::time_keeper::TimeKeeper;
 use crate::SpammerConfigs;
 
 #[derive(Clone, PartialEq)]

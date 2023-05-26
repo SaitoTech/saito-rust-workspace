@@ -15,6 +15,7 @@ pub mod test {
 
     use crate::core::data::configuration::PeerConfig;
     use crate::core::data::peer_service::PeerService;
+    use crate::core::data::wallet::Wallet;
 
     #[derive(Clone, Debug)]
     pub struct TestIOHandler {}
@@ -62,7 +63,7 @@ pub mod test {
             todo!()
         }
 
-        async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
+        async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
             debug!("writing value to disk : {:?}", key);
             let filename = key.as_str();
             let path = Path::new(filename);
@@ -181,11 +182,11 @@ pub mod test {
 
         fn send_interface_event(&self, _event: InterfaceEvent) {}
 
-        async fn save_wallet(&self) -> Result<(), Error> {
+        async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
             todo!()
         }
 
-        async fn load_wallet(&self) -> Result<(), Error> {
+        async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
             todo!()
         }
 

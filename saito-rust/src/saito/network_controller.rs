@@ -8,6 +8,7 @@ use std::time::Duration;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, trace, warn};
+use saito_core::common::command::NetworkEvent;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
@@ -20,6 +21,7 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
+use crate::saito::io_event::IoEvent;
 use saito_core::common::defs::{
     push_lock, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
     LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
@@ -34,7 +36,8 @@ use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::lock_for_read;
 
 use crate::saito::rust_io_handler::BLOCKS_DIR_PATH;
-use crate::{IoEvent, NetworkEvent, TimeKeeper};
+use crate::saito::time_keeper::TimeKeeper;
+// use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
@@ -49,7 +52,12 @@ pub struct NetworkController {
 impl NetworkController {
     pub async fn send(connection: &mut PeerSender, peer_index: u64, buffer: Vec<u8>) -> bool {
         let mut send_failed = false;
-
+        trace!(
+            "sending buffer with size : {:?} to peer : {:?}",
+            buffer.len(),
+            peer_index
+        );
+        // TODO : can be better optimized if we buffer the messages and flush once per timer event
         match connection {
             PeerSender::Warp(sender) => {
                 if let Err(error) = sender.send(warp::ws::Message::binary(buffer)).await {

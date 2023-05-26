@@ -7,10 +7,11 @@ edition = "2021"
 
 [dependencies]
 saito-core = { path = "../saito-core" }
+saito-rust = { path = "../saito-rust" }
 tokio = { version = "1.24.2", features = ["full", "tracing"] }
-tungstenite = { version = "0.18.0" }
-tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
-pretty_env_logger = "0.4.0"
+tungstenite = { version = "0.19.0" }
+tokio-tungstenite = { version = "0.19.0", features = ["native-tls"] }
+pretty_env_logger = "0.5.0"
 async-trait = "0.1.68"
 lazy_static = "1.4.0"
 figment = { version = "0.10.8", features = ["json"] }
@@ -37,7 +38,7 @@ criterion = "0.4.0"
 panic = "unwind"
 
 [features]
-default = ["with-stats", "saito-core/with-rayon"]
+default = ["with-stats", "saito-core/with-rayon", "saito-rust/default"]
 locking-logs = ["saito-core/locking-logs"]
 with-stats = ["saito-core/with-stats"]
 

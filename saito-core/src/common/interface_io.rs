@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::core::data;
 use crate::core::data::peer_service::PeerService;
+use crate::core::data::wallet::Wallet;
 
 pub enum InterfaceEvent {
     PeerHandshakeComplete(PeerIndex),
@@ -92,7 +93,7 @@ pub trait InterfaceIO: Debug {
     /// ```
     ///
     /// ```
-    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error>;
+    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error>;
     /// Reads a value with the given key from a persistent storage
     ///
     /// # Arguments
@@ -122,8 +123,8 @@ pub trait InterfaceIO: Debug {
 
     fn send_interface_event(&self, event: InterfaceEvent);
 
-    async fn save_wallet(&self) -> Result<(), Error>;
-    async fn load_wallet(&self) -> Result<(), Error>;
+    async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error>;
+    async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error>;
 
     async fn save_blockchain(&self) -> Result<(), Error>;
     async fn load_blockchain(&self) -> Result<(), Error>;
