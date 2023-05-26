@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use clap::{App, Arg};
 use log::info;
 use log::{debug, error, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -511,6 +512,19 @@ fn run_loop_thread(
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let matches = App::new("Saito")
+        .arg(
+            Arg::with_name("config")
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file")
+                .takes_value(true),
+        )
+        .get_matches();
+
+    // config.json as default
+    let config = matches.value_of("config").unwrap_or("configs/config.json");
+
     ctrlc::set_handler(move || {
         info!("shutting down the node");
         process::exit(0);
@@ -552,9 +566,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::registry().with(fmt_layer).init();
 
+    info!("Using config file: {}", config.to_string());
+
     let configs: Arc<RwLock<dyn Configuration + Send + Sync>> = Arc::new(RwLock::new(
-        ConfigHandler::load_configs("configs/config.json".to_string())
-            .expect("loading configs failed"),
+        ConfigHandler::load_configs(config.to_string()).expect("loading configs failed"),
     ));
 
     let channel_size;

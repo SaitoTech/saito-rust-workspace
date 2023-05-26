@@ -26,6 +26,7 @@ base64 = "0.21.0"
 ctrlc = { version = "3.2.4", features = ["termination"] }
 serde = { version = "1.0.163", features = ["derive"] }
 log = "0.4.17"
+clap = "3"
 
 [dev-dependencies]
 serial_test = "0.10.0"
