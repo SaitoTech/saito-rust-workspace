@@ -247,9 +247,7 @@ impl RoutingThread {
                     ghost.prehashes.push(block.pre_hash);
                     ghost.previous_block_hashes.push(block.previous_block_hash);
                     ghost.block_ids.push(block.id);
-                    ghost
-                        .txs
-                        .push(block.has_keylist_transactions(vec![peer_public_key]));
+                    ghost.txs.push(block.has_keylist_txs(vec![peer_public_key]));
                 }
             }
         }

@@ -194,10 +194,15 @@ impl Peer {
     ///
     /// ```
     pub fn get_block_fetch_url(&self, block_hash: SaitoHash, lite: bool) -> String {
-        let str = if !lite { "/block/" } else { "/lite-block/" };
-
         // TODO : generate the url with proper / escapes,etc...
-        self.block_fetch_url.to_string() + str + hex::encode(block_hash).as_str()
+        if lite {
+            self.block_fetch_url.to_string()
+                + "/lite-block/"
+                + hex::encode(block_hash).as_str()
+                + "/"
+        } else {
+            self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
+        }
     }
     pub fn has_service(&self, service: String) -> bool {
         self.services.iter().any(|s| s.service == service)
