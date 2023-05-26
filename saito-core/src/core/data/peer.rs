@@ -194,7 +194,7 @@ impl Peer {
     ///
     /// ```
     pub fn get_block_fetch_url(&self, block_hash: SaitoHash, lite: bool) -> String {
-        let str = if lite { "/block/" } else { "/lite-block/" };
+        let str = if !lite { "/block/" } else { "/lite-block/" };
 
         // TODO : generate the url with proper / escapes,etc...
         self.block_fetch_url.to_string() + str + hex::encode(block_hash).as_str()
