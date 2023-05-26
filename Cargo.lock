@@ -1781,31 +1781,20 @@ dependencies = [
 name = "saito-spammer-new"
 version = "0.1.0"
 dependencies = [
- "ahash",
- "async-trait",
- "base64 0.21.0",
  "criterion",
  "ctor",
  "ctrlc",
  "figment",
  "futures",
  "hex",
- "lazy_static",
  "log",
- "pretty_env_logger",
- "rand",
  "rayon",
- "reqwest",
  "saito-core",
  "saito-rust",
  "serde",
  "serial_test",
  "tokio",
- "tokio-tungstenite 0.19.0",
- "tracing-flame",
  "tracing-subscriber",
- "tungstenite 0.19.0",
- "warp",
 ]
 
 [[package]]
@@ -2367,17 +2356,6 @@ checksum = "24eb03ba0eab1fd845050058ce5e616558e8f8d8fca633e6b163fe25c797213a"
 dependencies = [
  "once_cell",
  "valuable",
-]
-
-[[package]]
-name = "tracing-flame"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bae117ee14789185e129aaee5d93750abe67fdc5a9a62650452bfe4e122a3a9"
-dependencies = [
- "lazy_static",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
