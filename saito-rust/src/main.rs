@@ -36,16 +36,12 @@ use saito_core::core::routing_thread::{
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_read;
-
-use crate::saito::config_handler::ConfigHandler;
-use crate::saito::io_event::IoEvent;
-use crate::saito::network_controller::run_network_controller;
-use crate::saito::rust_io_handler::RustIOHandler;
-use crate::saito::stat_thread::StatThread;
-use crate::saito::time_keeper::TimeKeeper;
-
-mod saito;
-mod test;
+use saito_rust::saito::config_handler::ConfigHandler;
+use saito_rust::saito::io_event::IoEvent;
+use saito_rust::saito::network_controller::run_network_controller;
+use saito_rust::saito::rust_io_handler::RustIOHandler;
+use saito_rust::saito::stat_thread::StatThread;
+use saito_rust::saito::time_keeper::TimeKeeper;
 
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
@@ -588,10 +584,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let keys = generate_keys();
     let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
     {
-        Wallet::load(Box::new(RustIOHandler::new(
-            sender_to_network_controller.clone(),
-            ROUTING_EVENT_PROCESSOR_ID,
-        )))
+        let mut wallet = wallet.write().await;
+        Wallet::load(
+            &mut wallet,
+            Box::new(RustIOHandler::new(
+                sender_to_network_controller.clone(),
+                ROUTING_EVENT_PROCESSOR_ID,
+            )),
+        )
         .await;
     }
     let context = Context::new(configs.clone(), wallet);

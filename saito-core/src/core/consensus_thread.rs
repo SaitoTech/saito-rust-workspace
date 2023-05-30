@@ -206,12 +206,9 @@ impl ConsensusThread {
 
         for _i in 0..txs_to_generate {
             let mut transaction;
-            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000, false);
+            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000, false).unwrap();
             // TODO : generate a message buffer which can be converted back into JSON
-            transaction.data = (0..bytes_per_tx)
-                .into_iter()
-                .map(|_| rand::random::<u8>())
-                .collect();
+            transaction.data = (0..bytes_per_tx).map(|_| rand::random::<u8>()).collect();
             transaction.generate(&public_key, 0, 0);
             transaction.sign(&private_key);
 
@@ -526,6 +523,14 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let (mut blockchain, _blockchain_) =
             lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+        {
+            let (mempool, _mempool_) = lock_for_read!(self.mempool, LOCK_ORDER_MEMPOOL);
+            if configs.get_peer_configs().is_empty() && mempool.blocks_queue.is_empty() {
+                self.generate_genesis_block = true;
+            }
+        }
+
         blockchain
             .add_blocks_from_mempool(
                 self.mempool.clone(),

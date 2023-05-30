@@ -247,9 +247,7 @@ impl RoutingThread {
                     ghost.prehashes.push(block.pre_hash);
                     ghost.previous_block_hashes.push(block.previous_block_hash);
                     ghost.block_ids.push(block.id);
-                    ghost
-                        .txs
-                        .push(block.has_keylist_transactions(vec![peer_public_key]));
+                    ghost.txs.push(block.has_keylist_txs(vec![peer_public_key]));
                 }
             }
         }
@@ -303,6 +301,7 @@ impl RoutingThread {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
             }
+            debug!("sending block header for : {:?}", hex::encode(block_hash));
             let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
