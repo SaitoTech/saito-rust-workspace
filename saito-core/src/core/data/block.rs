@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
-    Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION,
+    Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD, MAX_STAKER_RECURSION,
 };
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
@@ -222,6 +222,8 @@ pub struct Block {
     pub source_connection_id: Option<SaitoPublicKey>,
     #[serde(skip)]
     pub transaction_map: AHashMap<SaitoPublicKey, bool>,
+    #[serde(skip)]
+    pub force_loaded: bool,
 }
 
 impl Block {
@@ -265,6 +267,7 @@ impl Block {
             created_hashmap_of_slips_spent_this_block: false,
             source_connection_id: None,
             transaction_map: Default::default(),
+            force_loaded: false,
         }
     }
 
@@ -1383,7 +1386,7 @@ impl Block {
         //
         if block_type == BlockType::Full {
             let mut new_block = storage
-                .load_block_from_disk(storage.generate_block_filename(&self))
+                .load_block_from_disk(storage.generate_block_filepath(&self))
                 .await
                 .unwrap();
             let hash_for_signature = hash(&new_block.serialize_for_signature());
@@ -1858,13 +1861,20 @@ impl Block {
             }
         }
     }
-    pub fn has_keylist_transactions(&self, keylist: Vec<SaitoPublicKey>) -> bool {
+    pub fn has_keylist_txs(&self, keylist: Vec<SaitoPublicKey>) -> bool {
         for key in keylist {
             if self.transaction_map.contains_key(&key) {
                 return true;
             }
         }
         false
+    }
+
+    pub fn get_file_name(&self) -> String {
+        let timestamp = self.timestamp;
+        let block_hash = self.hash;
+
+        timestamp.to_string() + "-" + hex::encode(block_hash).as_str() + BLOCK_FILE_EXTENSION
     }
 }
 

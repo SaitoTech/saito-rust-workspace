@@ -38,14 +38,16 @@ use saito_core::core::routing_thread::{
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::{lock_for_read, lock_for_write};
+use saito_rust::saito::io_event::IoEvent;
+use saito_rust::saito::network_controller::run_network_controller;
+
+use saito_rust::saito::rust_io_handler::RustIOHandler;
+use saito_rust::saito::stat_thread::StatThread;
+use saito_rust::saito::time_keeper::TimeKeeper;
 
 use crate::saito::config_handler::{ConfigHandler, SpammerConfigs};
-use crate::saito::io_event::IoEvent;
-use crate::saito::network_controller::run_network_controller;
-use crate::saito::rust_io_handler::RustIOHandler;
+// use crate::saito::rust_io_handler::RustIOHandler;
 use crate::saito::spammer::run_spammer;
-use crate::saito::stat_thread::StatThread;
-use crate::saito::time_keeper::TimeKeeper;
 
 mod saito;
 
@@ -514,8 +516,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let keys = generate_keys();
     let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
     {
+        let mut wallet = wallet.write().await;
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
-        Wallet::load(Box::new(RustIOHandler::new(sender, 1))).await;
+        Wallet::load(&mut wallet, Box::new(RustIOHandler::new(sender, 1))).await;
     }
     let context = Context::new(configs_clone.clone(), wallet);
 
@@ -606,9 +609,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         event_sender_to_loop.clone(),
         configs_clone.clone(),
         context.blockchain.clone(),
-        stat_timer_in_ms,
-        thread_sleep_time_in_ms,
         sender_to_stat.clone(),
+        peers.clone(),
     ));
 
     let spammer_handle = tokio::spawn(run_spammer(

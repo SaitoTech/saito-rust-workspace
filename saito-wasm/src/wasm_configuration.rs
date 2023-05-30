@@ -12,9 +12,7 @@ use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig,
 pub struct WasmConfiguration {
     server: Option<Server>,
     peers: Vec<PeerConfig>,
-    #[serde(skip)]
     spv_mode: bool,
-    #[serde(skip)]
     browser_mode: bool,
 }
 
@@ -39,8 +37,8 @@ impl WasmConfiguration {
                 block_fetch_batch_size: 0,
             }),
             peers: vec![],
-            spv_mode: true,
-            browser_mode: true,
+            spv_mode: false,
+            browser_mode: false,
         }
     }
     pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
@@ -70,13 +68,15 @@ impl Configuration for WasmConfiguration {
     }
 
     fn get_block_fetch_url(&self) -> String {
+        if self.get_server_configs().is_none() {
+            return "".to_string();
+        }
         let endpoint = &self.get_server_configs().unwrap().endpoint;
         endpoint.protocol.to_string()
             + "://"
             + endpoint.host.as_str()
             + ":"
             + endpoint.port.to_string().as_str()
-            + "/block/"
     }
     fn is_spv_mode(&self) -> bool {
         self.spv_mode
