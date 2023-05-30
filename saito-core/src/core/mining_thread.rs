@@ -43,7 +43,16 @@ pub struct MiningThread {
 impl MiningThread {
     async fn mine(&mut self) {
         assert!(self.miner_active);
-        debug_assert_ne!(self.public_key, [0; 33]);
+
+        if self.public_key == [0; 33] {
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            if wallet.public_key == [0; 33] {
+                // wallet not initialized yet
+                return;
+            }
+            self.public_key = wallet.public_key;
+            info!("node public key = {:?}", hex::encode(self.public_key));
+        }
 
         let random_bytes = hash(&generate_random_bytes(32));
         // The new way of validation will be wasting a GT instance if the validation fails

@@ -77,4 +77,8 @@ export class MsgHandler {
     static get_my_services() {
         return global.shared_methods.get_my_services();
     }
+
+    static send_block_success(hash, block_id) {
+        return global.shared_methods.send_block_success(hash, block_id);
+    }
 }
