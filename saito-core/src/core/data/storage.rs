@@ -3,7 +3,7 @@ use std::sync::Arc;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
+use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL, SaitoPublicKey};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
@@ -75,6 +75,7 @@ impl Storage {
 
     pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
         info!("loading blocks from disk");
+        self.return_token_supply_slips_from_disk().await;
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
@@ -136,10 +137,45 @@ impl Storage {
     //
     // token issuance functions below
     //
-    pub fn return_token_supply_slips_from_disk(&self) -> Vec<Slip> {
-        // let mut v: Vec<Slip> = vec![];
-        // let mut tokens_issued = 0;
+    pub async fn return_token_supply_slips_from_disk(&self) -> Vec<Slip> {
+        let mut v: Vec<Slip> = vec![];
+        let mut tokens_issued = 0;
         //
+        if self.file_exists(ISSUANCE_FILE_PATH).await {
+            if let Ok(lines) = self
+                .io_interface
+                .read_value(ISSUANCE_FILE_PATH.to_string())
+                .await {
+                            for line in lines {
+                            debug!("{:?} this is a line", line);
+                            if let Ok(slip) =  Slip::deserialize_from_net(&line) {
+                                // println!({"{:?}", slip});
+                                debug!("{:?} the slip", slip);
+                            }else {
+                                debug!("no slip")
+                            }
+                            // if let Ok(ip) = line {
+                            //     let s = Storage::convert_issuance_into_slip(ip);
+                            //     v.push(s);
+                            // }
+                        }
+                 
+                    
+                    // if let Ok(result) = slip.deserialize_from_net(lines) {
+                    //     for line in lines {
+                    //         debug!("{:?} this is a line", line);
+                    //         // if let Ok(ip) = line {
+                    //         //     let s = Storage::convert_issuance_into_slip(ip);
+                    //         //     v.push(s);
+                    //         // }
+                    //     }
+                    // }
+                }
+          
+        } else {
+            debug!("issuance file does not exist");
+        }
+
         // if let Ok(lines) = Storage::read_lines_from_file(ISSUANCE_FILE_PATH) {
         //     for line in lines {
         //         if let Ok(ip) = line {
@@ -187,16 +223,16 @@ impl Storage {
     //     let tmp = iter.next().unwrap();
     //     let tmp2 = iter.next().unwrap();
     //     let typ = iter.next().unwrap();
-    //
+    
     //     let amt: u64 = tmp.parse::<u64>().unwrap();
     //     let tmp3 = tmp2.as_bytes();
-    //
+    
     //     let mut add: SaitoPublicKey = [0; 33];
     //     for i in 0..33 {
     //         add[i] = tmp3[i];
     //     }
-    //
-    //     let mut slip = Slip::new();
+    
+    //     let mut slip = Slip::default();
     //     slip.set_public_key(add);
     //     slip.set_amount(amt);
     //     if typ.eq("VipOutput") {
@@ -208,7 +244,7 @@ impl Storage {
     //     if typ.eq("Normal") {
     //         slip.set_slip_type(SlipType::Normal);
     //     }
-    //
+    
     //     return slip;
     // }
 }

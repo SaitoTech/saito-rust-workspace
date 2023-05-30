@@ -520,6 +520,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             .load_blocks_from_disk(self.mempool.clone())
             .await;
 
+         // 
+
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let (mut blockchain, _blockchain_) =
             lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
