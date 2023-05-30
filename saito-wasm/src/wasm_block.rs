@@ -105,8 +105,9 @@ impl WasmBlock {
     }
     pub fn deserialize(&mut self, buffer: Uint8Array) -> Result<JsValue, JsValue> {
         let buffer = buffer.to_vec();
-        let block = Block::deserialize_from_net(buffer).unwrap();
+        let mut block = Block::deserialize_from_net(buffer).unwrap();
 
+        block.generate();
         self.block = block;
 
         Ok(JsValue::from(""))

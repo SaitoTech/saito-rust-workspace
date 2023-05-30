@@ -319,13 +319,13 @@ impl Network {
                     request = BlockchainRequest {
                         latest_block_id: blockchain.last_block_id,
                         latest_block_hash: blockchain.last_block_hash,
-                        fork_id: blockchain.get_fork_id().clone(),
+                        fork_id: *blockchain.get_fork_id(),
                     };
                 } else {
                     request = BlockchainRequest {
                         latest_block_id: blockchain.get_latest_block_id(),
                         latest_block_hash: blockchain.get_latest_block_hash(),
-                        fork_id: blockchain.get_fork_id().clone(),
+                        fork_id: *blockchain.get_fork_id(),
                     };
                 }
             }
