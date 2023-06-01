@@ -3,12 +3,15 @@ use std::sync::Arc;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL, SaitoPublicKey};
+use super::slip::SlipType;
+use crate::common::defs::{push_lock, SaitoPublicKey, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
+use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
 use crate::lock_for_write;
+use bs58;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -75,49 +78,57 @@ impl Storage {
 
     pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
         info!("loading blocks from disk");
-        self.return_token_supply_slips_from_disk().await;
+        // self.return_token_supply_slips_from_disk().await;
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
             error!("failed loading blocks . {:?}", file_names.err().unwrap());
             return;
         }
+
         let mut file_names = file_names.unwrap();
-        file_names.sort();
-        debug!("block file names : {:?}", file_names);
-
-        trace!("loading files...");
-        for file_name in file_names {
-            info!("loading file : {:?}", file_name);
-            let result = self
-                .io_interface
-                .read_value(self.io_interface.get_block_dir() + file_name.as_str())
-                .await;
-            if result.is_err() {
-                todo!()
-            }
-            info!("file : {:?} loaded", file_name);
-            let buffer: Vec<u8> = result.unwrap();
-            let buffer_len = buffer.len();
-            let result = Block::deserialize_from_net(buffer);
-            if result.is_err() {
-                // ideally this shouldn't happen since we only write blocks which are valid to disk
-                warn!(
-                    "failed deserializing block with buffer length : {:?}",
-                    buffer_len
-                );
-                continue;
-            }
-            let mut block = result.unwrap();
-            block.force_loaded = true;
-            block.generate();
-            info!("block : {:?} loaded from disk", hex::encode(block.hash));
-            let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
-            mempool.add_block(block);
+        if file_names.is_empty() {
+            // add slips
+            println!("disk is empty, adding slip")
         }
-        trace!("block file loading finished");
 
-        info!("loading blocks to mempool completed");
+        {
+            file_names.sort();
+            debug!("block file names : {:?}", file_names);
+
+            trace!("loading files...");
+            for file_name in file_names {
+                info!("loading file : {:?}", file_name);
+                let result = self
+                    .io_interface
+                    .read_value(self.io_interface.get_block_dir() + file_name.as_str())
+                    .await;
+                if result.is_err() {
+                    todo!()
+                }
+                info!("file : {:?} loaded", file_name);
+                let buffer: Vec<u8> = result.unwrap();
+                let buffer_len = buffer.len();
+                let result = Block::deserialize_from_net(buffer);
+                if result.is_err() {
+                    // ideally this shouldn't happen since we only write blocks which are valid to disk
+                    warn!(
+                        "failed deserializing block with buffer length : {:?}",
+                        buffer_len
+                    );
+                    continue;
+                }
+                let mut block: Block = result.unwrap();
+                block.force_loaded = true;
+                block.generate();
+                info!("block : {:?} loaded from disk", hex::encode(block.hash));
+                let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+                mempool.add_block(block);
+            }
+            trace!("block file loading finished");
+
+            info!("loading blocks to mempool completed");
+        }
     }
 
     pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
@@ -145,33 +156,27 @@ impl Storage {
             if let Ok(lines) = self
                 .io_interface
                 .read_value(ISSUANCE_FILE_PATH.to_string())
-                .await {
-                            for line in lines {
-                            debug!("{:?} this is a line", line);
-                            if let Ok(slip) =  Slip::deserialize_from_net(&line) {
-                                // println!({"{:?}", slip});
-                                debug!("{:?} the slip", slip);
-                            }else {
-                                debug!("no slip")
-                            }
-                            // if let Ok(ip) = line {
-                            //     let s = Storage::convert_issuance_into_slip(ip);
-                            //     v.push(s);
-                            // }
-                        }
-                 
-                    
-                    // if let Ok(result) = slip.deserialize_from_net(lines) {
-                    //     for line in lines {
-                    //         debug!("{:?} this is a line", line);
-                    //         // if let Ok(ip) = line {
-                    //         //     let s = Storage::convert_issuance_into_slip(ip);
-                    //         //     v.push(s);
-                    //         // }
-                    //     }
-                    // }
+                .await
+            {
+                let mut contents = String::from_utf8(lines).expect("Failed to convert to String");
+                contents = contents.trim_end_matches('\r').to_string();
+                let lines: Vec<&str> = contents.split("\n").collect();
+
+                for line in lines {
+                    let line = line.trim_end_matches('\r');
+                    if !line.is_empty() {
+                        let slip = self.convert_issuance_into_slip(line);
+                        v.push(slip);
+                    }
                 }
-          
+
+                for i in 0..v.len() {
+                    tokens_issued += v[i].amount;
+                }
+
+                debug!("{:?} tokens issued", tokens_issued);
+                return v;
+            }
         } else {
             debug!("issuance file does not exist");
         }
@@ -193,9 +198,7 @@ impl Storage {
         //     }
         // }
         //
-        // for i in 0..v.len() {
-        //     tokens_issued += v[i].get_amount();
-        // }
+
         //
         // if let Ok(lines) = Storage::read_lines_from_file(DEFAULT_FILE_PATH) {
         //     for line in lines {
@@ -210,6 +213,47 @@ impl Storage {
         return vec![];
     }
 
+    fn convert_issuance_into_slip(&self, line: &str) -> Slip {
+        let entries: Vec<&str> = line.split("\t").collect();
+        debug!("{:?} here is an entry", &line);
+        let amount = entries[0].parse::<u64>().expect("Failed to parse amount");
+        debug!("{:?}here is an amount", &amount);
+        let publickey_str = entries[1];
+        let publickey_vec = bs58::decode(publickey_str)
+            .into_vec()
+            .expect("Decoding failed");
+        let mut publickey_array: [u8; 33] = [0u8; 33];
+        publickey_array.copy_from_slice(&publickey_vec);
+
+        debug!(
+            "{:?} {:?} {:?} here is an array",
+            &entries[0], &entries[1], &entries[2]
+        );
+
+        // public_key_array.copy_from_slice(&v);
+        // slip.public_key = public_key_array;
+        let slip_type = match entries[2].trim_end_matches('\r') {
+            "VipOutput" => SlipType::VipOutput,
+            "Normal" => SlipType::Normal,
+            _ => panic!("Invalid slip type"),
+        };
+
+        let mut slip = Slip {
+            public_key: publickey_array,
+            slip_index: 0,
+            amount,
+            block_id: 1,
+            tx_ordinal: 0,
+            slip_type,
+            utxoset_key: [0; 58],
+            is_utxoset_key_set: false,
+        };
+
+        debug!("{:?} here is a slip", slip);
+        slip.generate_utxoset_key();
+        println!("here is a slip: {:?}", slip);
+        return slip;
+    }
     // pub fn read_lines_from_file<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
     // where
     //     P: AsRef<Path>,
@@ -223,15 +267,15 @@ impl Storage {
     //     let tmp = iter.next().unwrap();
     //     let tmp2 = iter.next().unwrap();
     //     let typ = iter.next().unwrap();
-    
+
     //     let amt: u64 = tmp.parse::<u64>().unwrap();
     //     let tmp3 = tmp2.as_bytes();
-    
+
     //     let mut add: SaitoPublicKey = [0; 33];
     //     for i in 0..33 {
     //         add[i] = tmp3[i];
     //     }
-    
+
     //     let mut slip = Slip::default();
     //     slip.set_public_key(add);
     //     slip.set_amount(amt);
@@ -244,7 +288,7 @@ impl Storage {
     //     if typ.eq("Normal") {
     //         slip.set_slip_type(SlipType::Normal);
     //     }
-    
+
     //     return slip;
     // }
 }

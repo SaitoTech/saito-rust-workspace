@@ -9,8 +9,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -27,6 +27,8 @@ use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::routing_thread::RoutingEvent;
 use crate::{lock_for_read, lock_for_write};
+
+use super::data::wallet;
 
 pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(100).as_millis() as u64;
 pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000).as_millis() as u64;
@@ -248,14 +250,28 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                    let block;
+                    let mut block;
                     let (mut mempool, _mempool_) =
                         lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
-                    {
-                        block = mempool
-                            .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
-                            .await;
+
+                    block = mempool
+                        .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                        .await;
+                    println!(" block ider {:?}", &block.id);
+                    let mut tx = Transaction::default();
+                    let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                    // let private_key = wallet.private_key;
+                    // let block_id = block.id;
+                    let slips = self.storage.return_token_supply_slips_from_disk().await;
+                    for slip in slips {
+                        tx.add_from_slip(slip);
                     }
+                    tx.generate(&wallet.public_key, 0, 1);
+                    tx.sign(&wallet.private_key);
+                    block.add_transaction(tx);
+
+                    // block.generate();
+                    // block.sign(&private_key);
 
                     blockchain
                         .add_block(
@@ -520,7 +536,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             .load_blocks_from_disk(self.mempool.clone())
             .await;
 
-         // 
+        //
 
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let (mut blockchain, _blockchain_) =
