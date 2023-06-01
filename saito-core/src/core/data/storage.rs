@@ -78,7 +78,7 @@ impl Storage {
 
     pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
         info!("loading blocks from disk");
-        // self.return_token_supply_slips_from_disk().await;
+        // self.get_token_supply_slips_from_disk().await;
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
@@ -148,7 +148,7 @@ impl Storage {
     //
     // token issuance functions below
     //
-    pub async fn return_token_supply_slips_from_disk(&self) -> Vec<Slip> {
+    pub async fn get_token_supply_slips_from_disk(&self) -> Vec<Slip> {
         let mut v: Vec<Slip> = vec![];
         let mut tokens_issued = 0;
         //
@@ -308,7 +308,7 @@ mod test {
         let mut t = TestManager::new();
         t.initialize(100, 100_000_000).await;
 
-        let slips = t.storage.return_token_supply_slips_from_disk();
+        let slips = t.storage.get_token_supply_slips_from_disk();
         let mut total_issuance = 0;
 
         for i in 0..slips.len() {

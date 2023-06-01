@@ -262,7 +262,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
                     // let private_key = wallet.private_key;
                     // let block_id = block.id;
-                    let slips = self.storage.return_token_supply_slips_from_disk().await;
+                    let slips = self.storage.get_token_supply_slips_from_disk().await;
                     for slip in slips {
                         tx.add_from_slip(slip);
                     }
