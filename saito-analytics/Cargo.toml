@@ -20,10 +20,12 @@ reqwest = "0.11.14"
 base64 = "0.21.0"
 log = "0.4.17"
 
+
 [dev-dependencies]
 serial_test = "0.10.0"
 ctor = "0.1.26"
 criterion = "0.4.0"
+tokio = { version = "1.24.2", features = ["full"] }
 
 [profile.dev]
 panic = "unwind"
