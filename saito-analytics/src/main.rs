@@ -319,10 +319,14 @@ async fn run_utxodump(
 ) {
     debug!("run_utxodump");
     
-    let store = Storage::new(Box::new(RustIOHandler::new(
+    let mut store = Storage::new(Box::new(RustIOHandler::new(
         sender_to_network_controller.clone(),
         CONSENSUS_EVENT_PROCESSOR_ID,
     )));
+
+    debug!(".......");
+    debug!(">> {:?}", store);
+    store.load_blocks_from_disk_vec().await;
 
     let consensus_event_processor = ConsensusThread {
         mempool: context.mempool.clone(),
@@ -351,8 +355,7 @@ async fn run_utxodump(
         stat_sender: sender_to_stat.clone(),
         configs: context.configuration.clone(),
     };
-    debug!(".......");
-    debug!(">> {:?}", consensus_event_processor.storage);
+    
     // self.storage
     //         .load_blocks_from_disk(self.mempool.clone())
     //         .await;
