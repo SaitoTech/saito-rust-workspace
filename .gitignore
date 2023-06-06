@@ -3,3 +3,4 @@ target/
 dist/
 .DS_Store
 configs/config.json
+saito-js/
