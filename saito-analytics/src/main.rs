@@ -1,6 +1,5 @@
 // saito analytics
 // run separate tool
-mod chain_manager; // linking the chain_manager.rs file
 
 use std::io::prelude::*;
 use std::path::Path;
@@ -23,11 +22,6 @@ use saito_core::core::data::peer_service::PeerService;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
-
-use crate::chain_manager::ChainManager;
-mod stub_iohandler;
 
 
 fn analyseblock(path: String)  {
@@ -81,30 +75,6 @@ fn analyseDir() -> std::io::Result<()> {
 
 fn main() {
     info!("**** Saito analytics ****");
-    //analyseDir();
+    analyseDir();
 
-    let keys = generate_keys();
-
-
-    let chain_manager = ChainManager::new();
-
-    stub_iohandler::test_function();
-
-    // let wallet = Wallet::new(keys.1, keys.0);
-    // let _public_key = wallet.public_key.clone();
-    // let _private_key = wallet.private_key.clone();
-    // let peers = Arc::new(RwLock::new(PeerCollection::new()));
-    // let wallet_lock = Arc::new(RwLock::new(wallet));
-    // let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-    // let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
-    // let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
-    // let configs = Arc::new(RwLock::new(TestConfiguration {}));
-
-    //TODO create empty network
-    // let net = Network::new(
-    //     Box::new(TestIOHandler::new()),
-    //     peers.clone(),
-    //     wallet_lock.clone(),
-    //     configs.clone(),
-    // );
 }

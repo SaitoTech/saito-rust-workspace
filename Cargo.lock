@@ -568,11 +568,24 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
+dependencies = [
+ "atty",
+ "humantime 1.3.0",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
 dependencies = [
- "humantime",
+ "humantime 2.1.0",
  "is-terminal",
  "log",
  "regex",
@@ -893,6 +906,15 @@ name = "httpdate"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4a1e36c821dbe04574f602848a19f742f4fb3c98d40449f11bcad18d6b17421"
+
+[[package]]
+name = "humantime"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df004cfca50ef23c36850aaaa59ad52cc70d0e90243c3c7737a4dd32dc7a3c4f"
+dependencies = [
+ "quick-error",
+]
 
 [[package]]
 name = "humantime"
@@ -1468,11 +1490,21 @@ checksum = "eb9f9e6e233e5c4a35559a617bf40a4ec447db2e84c20b55a6f83167b7e57872"
 
 [[package]]
 name = "pretty_env_logger"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "926d36b9553851b8b0005f1275891b392ee4d2d833852c417ed025477350fb9d"
+dependencies = [
+ "env_logger 0.7.1",
+ "log",
+]
+
+[[package]]
+name = "pretty_env_logger"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "865724d4dbe39d9f3dd3b52b88d859d66bcb2d6a0acfd5ea68a65fb66d4bdc1c"
 dependencies = [
- "env_logger",
+ "env_logger 0.10.0",
  "log",
 ]
 
@@ -1717,6 +1749,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
 
 [[package]]
+name = "saito-analytics"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "async-trait",
+ "base64 0.21.0",
+ "criterion",
+ "ctor",
+ "figment",
+ "futures",
+ "hex",
+ "lazy_static",
+ "log",
+ "pretty_env_logger 0.4.0",
+ "rand",
+ "reqwest",
+ "saito-core",
+ "saito-rust",
+ "serial_test",
+ "tokio",
+]
+
+[[package]]
 name = "saito-core"
 version = "0.1.0"
 dependencies = [
@@ -1736,7 +1791,7 @@ dependencies = [
  "merkle",
  "num-derive",
  "num-traits",
- "pretty_env_logger",
+ "pretty_env_logger 0.5.0",
  "primitive-types",
  "rand",
  "rayon",
@@ -1763,7 +1818,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "log",
- "pretty_env_logger",
+ "pretty_env_logger 0.5.0",
  "rand",
  "rayon",
  "reqwest",
