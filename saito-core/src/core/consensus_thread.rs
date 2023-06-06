@@ -258,20 +258,32 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
                         .await;
                     println!(" block ider {:?}", &block.id);
-                    let mut tx = Transaction::default();
-                    let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+
+                    // // readable wallet
+                    // let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                    // let public_key = wallet.public_key;
+                    // let private_key = wallet.private_key;
+
+                    // writable wallet
+                    let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+                    let public_key = wallet.public_key;
+                    let private_key = wallet.private_key;
+                    let mut tx = Transaction::create(&mut wallet, public_key, 0, 0, false).unwrap();
+                    tx.transaction_type = TransactionType::Issuance;
+                    debug!("{:?}", tx);
                     // let private_key = wallet.private_key;
                     // let block_id = block.id;
                     let slips = self.storage.get_token_supply_slips_from_disk().await;
+
                     for slip in slips {
-                        tx.add_from_slip(slip);
+                        tx.add_to_slip(slip);
                     }
-                    tx.generate(&wallet.public_key, 0, 1);
-                    tx.sign(&wallet.private_key);
+                    tx.generate(&public_key, 0, 1);
+                    tx.sign(&private_key);
                     block.add_transaction(tx);
 
-                    // block.generate();
-                    // block.sign(&private_key);
+                    block.generate();
+                    block.sign(&private_key);
 
                     blockchain
                         .add_block(
