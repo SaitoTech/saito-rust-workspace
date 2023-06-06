@@ -276,14 +276,14 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     let slips = self.storage.get_token_supply_slips_from_disk().await;
 
                     for slip in slips {
-                        tx.add_to_slip(slip);
+                        tx.to.push(slip);
                     }
                     tx.generate(&public_key, 0, 1);
                     tx.sign(&private_key);
                     block.add_transaction(tx);
 
-                    block.generate();
-                    block.sign(&private_key);
+                    // block.generate();
+                    // block.sign(&private_key);
 
                     blockchain
                         .add_block(

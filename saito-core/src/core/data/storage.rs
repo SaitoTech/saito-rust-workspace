@@ -94,11 +94,9 @@ impl Storage {
 
         {
             file_names.sort();
-            debug!("block file names : {:?}", file_names);
 
             trace!("loading files...");
             for file_name in file_names {
-                info!("loading file : {:?}", file_name);
                 let result = self
                     .io_interface
                     .read_value(self.io_interface.get_block_dir() + file_name.as_str())
@@ -165,7 +163,8 @@ impl Storage {
                 for line in lines {
                     let line = line.trim_end_matches('\r');
                     if !line.is_empty() {
-                        let slip = self.convert_issuance_into_slip(line);
+                        let mut slip = self.convert_issuance_into_slip(line);
+                        slip.generate_utxoset_key();
                         v.push(slip);
                     }
                 }
@@ -215,20 +214,13 @@ impl Storage {
 
     fn convert_issuance_into_slip(&self, line: &str) -> Slip {
         let entries: Vec<&str> = line.split("\t").collect();
-        debug!("{:?} here is an entry", &line);
         let amount = entries[0].parse::<u64>().expect("Failed to parse amount");
-        debug!("{:?}here is an amount", &amount);
         let publickey_str = entries[1];
         let publickey_vec = bs58::decode(publickey_str)
             .into_vec()
             .expect("Decoding failed");
         let mut publickey_array: [u8; 33] = [0u8; 33];
         publickey_array.copy_from_slice(&publickey_vec);
-
-        debug!(
-            "{:?} {:?} {:?} here is an array",
-            &entries[0], &entries[1], &entries[2]
-        );
 
         // public_key_array.copy_from_slice(&v);
         // slip.public_key = public_key_array;
@@ -249,9 +241,7 @@ impl Storage {
             is_utxoset_key_set: false,
         };
 
-        debug!("{:?} here is a slip", slip);
         slip.generate_utxoset_key();
-        println!("here is a slip: {:?}", slip);
         return slip;
     }
     // pub fn read_lines_from_file<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
