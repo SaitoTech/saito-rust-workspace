@@ -245,12 +245,14 @@ async fn run_consensus_event_processor(
         create_test_tx = result.unwrap().eq("1");
     }
     let generate_genesis_block: bool;
-    {
-        let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
+    //dont generate genesis 
+    generate_genesis_block = false;
+    // {
+    //     let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
 
-        // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
-        generate_genesis_block = configs.get_peer_configs().is_empty();
-    }
+    //     // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
+    //     generate_genesis_block = configs.get_peer_configs().is_empty();
+    // }
 
     let consensus_event_processor = ConsensusThread {
         mempool: context.mempool.clone(),
@@ -282,6 +284,12 @@ async fn run_consensus_event_processor(
         stat_sender: sender_to_stat.clone(),
         configs: context.configuration.clone(),
     };
+    debug!(".......");
+    debug!(">> {:?}", consensus_event_processor.storage);
+    // self.storage
+    //         .load_blocks_from_disk(self.mempool.clone())
+    //         .await;
+
     let (interface_sender_to_blockchain, _interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
     debug!("running mempool thread");
@@ -295,6 +303,73 @@ async fn run_consensus_event_processor(
     .await;
 
     (interface_sender_to_blockchain, blockchain_handle)
+}
+
+async fn run_utxodump(
+    context: &Context,
+    peers: Arc<RwLock<PeerCollection>>,
+    receiver_for_blockchain: Receiver<ConsensusEvent>,
+    sender_to_routing: &Sender<RoutingEvent>,
+    sender_to_miner: Sender<MiningEvent>,
+    sender_to_network_controller: Sender<IoEvent>,
+    stat_timer_in_ms: u64,
+    thread_sleep_time_in_ms: u64,
+    channel_size: usize,
+    sender_to_stat: Sender<String>,
+) {
+    debug!("run_utxodump");
+    
+    let store = Storage::new(Box::new(RustIOHandler::new(
+        sender_to_network_controller.clone(),
+        CONSENSUS_EVENT_PROCESSOR_ID,
+    )));
+
+    let consensus_event_processor = ConsensusThread {
+        mempool: context.mempool.clone(),
+        blockchain: context.blockchain.clone(),
+        wallet: context.wallet.clone(),
+        generate_genesis_block: false,
+        sender_to_router: sender_to_routing.clone(),
+        sender_to_miner: sender_to_miner.clone(),
+        // sender_global: global_sender.clone(),
+        time_keeper: Box::new(TimeKeeper {}),
+        network: Network::new(
+            Box::new(RustIOHandler::new(
+                sender_to_network_controller.clone(),
+                CONSENSUS_EVENT_PROCESSOR_ID,
+            )),
+            peers.clone(),
+            context.wallet.clone(),
+            context.configuration.clone(),
+        ),
+        block_producing_timer: 0,
+        tx_producing_timer: 0,
+        create_test_tx: false,
+        storage: store,
+        stats: ConsensusStats::new(sender_to_stat.clone()),
+        txs_for_mempool: Vec::new(),
+        stat_sender: sender_to_stat.clone(),
+        configs: context.configuration.clone(),
+    };
+    debug!(".......");
+    debug!(">> {:?}", consensus_event_processor.storage);
+    // self.storage
+    //         .load_blocks_from_disk(self.mempool.clone())
+    //         .await;
+
+    // let (interface_sender_to_blockchain, _interface_receiver_for_mempool) =
+    //     tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
+    // debug!("running mempool thread");
+    // let blockchain_handle = run_thread(
+    //     Box::new(consensus_event_processor),
+    //     None,
+    //     Some(receiver_for_blockchain),
+    //     stat_timer_in_ms,
+    //     thread_sleep_time_in_ms,
+    // )
+    // .await;
+
+    // (interface_sender_to_blockchain, blockchain_handle)
 }
 
 async fn run_routing_event_processor(
@@ -530,7 +605,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(99);
     }));
 
-    println!("Running saito");
+    println!("Running saito analytics");
 
     let filter = tracing_subscriber::EnvFilter::from_default_env();
     let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
@@ -637,7 +712,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (_network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
+
+
+    // let (_network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
+    //     &context,
+    //     peers.clone(),
+    //     receiver_for_consensus,
+    //     &sender_to_routing,
+    //     sender_to_miner,
+    //     sender_to_network_controller.clone(),
+    //     stat_timer_in_ms,
+    //     thread_sleep_time_in_ms,
+    //     channel_size,
+    //     sender_to_stat.clone(),
+    // )
+    // .await;
+
+    // let (_network_event_sender_to_mining, miner_handle) = run_mining_event_processor(
+    //     &context,
+    //     &sender_to_consensus,
+    //     receiver_for_miner,
+    //     stat_timer_in_ms,
+    //     thread_sleep_time_in_ms,
+    //     channel_size,
+    //     sender_to_stat.clone(),
+    // )
+    // .await;
+
+    
+    run_utxodump(
         &context,
         peers.clone(),
         receiver_for_consensus,
@@ -651,16 +754,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let (_network_event_sender_to_mining, miner_handle) = run_mining_event_processor(
-        &context,
-        &sender_to_consensus,
-        receiver_for_miner,
-        stat_timer_in_ms,
-        thread_sleep_time_in_ms,
-        channel_size,
-        sender_to_stat.clone(),
-    )
-    .await;
     let stat_handle = run_thread(
         Box::new(StatThread::new().await),
         None,
@@ -688,8 +781,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _result = tokio::join!(
         routing_handle,
-        blockchain_handle,
-        miner_handle,
+        //blockchain_handle,
+        //miner_handle,
         loop_handle,
         network_handle,
         stat_handle,
