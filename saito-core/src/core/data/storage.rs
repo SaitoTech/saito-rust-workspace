@@ -3,14 +3,12 @@ use std::sync::Arc;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use std::io::{Error, ErrorKind};
 use crate::common::defs::{push_lock, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
 use crate::lock_for_write;
-use std::io::{self, Read};
 
 #[derive(Debug)]
 pub struct Storage {
@@ -75,15 +73,13 @@ impl Storage {
         filename
     }
 
-    pub async fn load_blocks_from_disk_vec(&mut self) -> io::Result<Vec<Block>> {
-        info!("loading blocks from disk vec");
-        let mut blocks = Vec::new();
-        
+    pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
+        info!("loading blocks from disk");
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
-            //error!("failed loading blocks . {:?}", file_names.err().unwrap());
-            //return;
+            error!("failed loading blocks . {:?}", file_names.err().unwrap());
+            return;
         }
         let mut file_names = file_names.unwrap();
         file_names.sort();
@@ -96,9 +92,9 @@ impl Storage {
                 .io_interface
                 .read_value(self.io_interface.get_block_dir() + file_name.as_str())
                 .await;
-            // if result.is_err() {
-            //     todo!()
-            // }
+            if result.is_err() {
+                todo!()
+            }
             info!("file : {:?} loaded", file_name);
             let buffer: Vec<u8> = result.unwrap();
             let buffer_len = buffer.len();
@@ -115,37 +111,12 @@ impl Storage {
             block.force_loaded = true;
             block.generate();
             info!("block : {:?} loaded from disk", hex::encode(block.hash));
-            blocks.push(block)
-            
+            let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+            mempool.add_block(block);
         }
         trace!("block file loading finished");
-        return Ok::<Vec<Block>, std::io::Error>(blocks);
-    }
 
-    pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
-        info!("loading blocks from disk");
-
-        let result = self.load_blocks_from_disk_vec().await;
-    
-        match result {
-            Ok(blocks) => {
-                trace!("block file loading finished");
-                for block in &blocks {  
-                    let mut block = block.clone();                                  
-                    block.force_loaded = true;
-                    block.generate();
-                    info!("block : {:?} loaded from disk", hex::encode(block.hash));
-                    let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
-                    mempool.add_block(block);
-                    info!("loading blocks to mempool completed");
-                }
-            }
-            Err(e) => {
-                // Handle error case
-                eprintln!("Error loading blocks: {}", e);
-            }
-        }
-
+        info!("loading blocks to mempool completed");
     }
 
     pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
