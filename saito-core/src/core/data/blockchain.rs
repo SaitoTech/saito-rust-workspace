@@ -102,7 +102,6 @@ impl Blockchain {
         &self.fork_id
     }
 
-
     #[async_recursion]
     pub async fn add_block(
         &mut self,
