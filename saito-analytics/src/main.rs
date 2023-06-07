@@ -3,14 +3,13 @@ use std::panic;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use ahash::AHashMap;
 
 use log::info;
 use log::{debug, error, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tokio::runtime::Runtime;
 
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
@@ -19,26 +18,20 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{push_lock, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT};
-use saito_core::core::consensus_thread::{ConsensusEvent};
+use saito_core::common::defs::{push_lock, LOCK_ORDER_CONFIGS};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::Configuration;
-use saito_core::core::data::context::Context;
 use saito_core::core::data::crypto::generate_keys;
 use saito_core::core::data::network::Network;
-use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::core::mining_thread::{MiningEvent, MiningThread};
-use saito_core::core::routing_thread::{
-    PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
-};
+
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_read;
 use saito_core::lock_for_write;
+//TODO from saito rust not analytics
 use saito_rust::saito::config_handler::ConfigHandler;
 use saito_rust::saito::io_event::IoEvent;
-use saito_rust::saito::network_controller::run_network_controller;
 use saito_rust::saito::rust_io_handler::RustIOHandler;
 
 use saito_core::common::defs::{
@@ -80,8 +73,25 @@ async fn run_utxodump(
 
     let (mut blockchain, _blockchain_) = lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
     println!("genesis_block_id: {:?}", blockchain.genesis_block_id);
-    println!("last_block_id: {:?}", blockchain.last_block_id);
+    println!("block last_block_id: {:?}", blockchain.last_block_id);
     println!("last_timestamp: {:?}", blockchain.last_timestamp);
+
+    let mut utxoset: UtxoSet = AHashMap::new();
+    let latest_block_id = blockchain.get_latest_block_id();
+
+    info!("---- check utxoset ");
+    for i in 0..=latest_block_id {
+        info!(".... {}", i);
+        let block_hash = blockchain
+            .blockring
+            .get_longest_chain_block_hash_by_block_id(i as u64);
+        info!("block_hash {:?}", block_hash)
+        // info!("WINDING ID HASH - {} {:?}", i, block_hash);
+        // let block = blockchain.get_block(&block_hash).unwrap();
+        // for j in 0..block.transactions.len() {
+        //     block.transactions[j].on_chain_reorganization(&mut utxoset, true, i as u64);
+        // }
+    }
     
     // blockchain.add_block_tmp(blocks[0]);    
     
@@ -174,10 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await;
     }
     debug!("run analytics.....");
-    //let context = Context::new(configs.clone(), wallet);
-
-    //let peers = Arc::new(RwLock::new(PeerCollection::new()));
-
+    
     run_utxodump(sender_to_network_controller, wallet).await;
     
 
