@@ -103,6 +103,19 @@ impl Blockchain {
     }
 
     #[async_recursion]
+    pub async fn add_block_tmp(
+        &mut self,
+        mut block: Block,
+        //network: &Network,
+        //storage: &mut Storage,
+        //sender_to_miner: Sender<MiningEvent>,
+        //mempool: &mut Mempool,
+        //configs: &(dyn Configuration + Send + Sync),
+    ) {
+
+    }
+
+    #[async_recursion]
     pub async fn add_block(
         &mut self,
         mut block: Block,

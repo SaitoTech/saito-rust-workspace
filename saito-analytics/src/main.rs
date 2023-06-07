@@ -33,50 +33,76 @@ use saito_core::core::routing_thread::{
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_read;
+use saito_core::lock_for_write;
 use saito_rust::saito::config_handler::ConfigHandler;
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
 use saito_rust::saito::rust_io_handler::RustIOHandler;
 
+use saito_core::common::defs::{
+    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+    UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+};
+
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
-async fn run_utxodump(
-    context: &Context,
-    peers: Arc<RwLock<PeerCollection>>,
+async fn run_utxodump(        
     sender_to_network_controller: Sender<IoEvent>,
-) {
-    debug!("run_utxodump");
+    wallet: Arc<RwLock<Wallet>>
+) -> io::Result<(), std::io::Error> {
+    info!("run_utxodump");
 
     let mut store = Storage::new(Box::new(RustIOHandler::new(
         sender_to_network_controller.clone(),
         CONSENSUS_EVENT_PROCESSOR_ID,
     )));
 
-    debug!(".......");
-    debug!(">> {:?}", store);
+    info!(".......");
+    info!(">> {:?}", store);
     // TODO want to pass in the directory
     // loading blocks from dir : "./data/blocks/"
 
-    let result = store.load_blocks_from_disk_vec().await;
+    let blocks = store.load_blocks_from_disk_vec().await?;
 
-    match result {
-        Ok(blocks) => {
-            debug!(">>  id: {:?}", blocks[0].id);
-            for block in &blocks {
-                println!("{:?}", block.id);
-            }
-        }
-        Err(e) => {
-            // Handle error case
-            eprintln!("Error loading blocks: {}", e);
-        }
+    info!(">>  id: {:?}", blocks[0].id);
+    for block in &blocks {
+        info!("{:?}", block.id);
     }
+
+    // match result {
+    //     Ok(blocks) => {
+    //         info!(">>  id: {:?}", blocks[0].id);
+    //         for block in &blocks {
+    //             info!("{:?}", block.id);
+    //         }
+    //     }
+    //     Err(e) => {
+    //         // Handle error case
+    //         eprintln!("Error loading blocks: {}", e);
+    //     }
+    // }
+
+    //let wallet_lock = Arc::new(RwLock::new(wallet));
+    let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet.clone())));
+
+    let (mut blockchain, _blockchain_) = lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+    println!("genesis_block_id: {:?}", blockchain.genesis_block_id);
+    println!("last_block_id: {:?}", blockchain.last_block_id);
+    println!("last_timestamp: {:?}", blockchain.last_timestamp);
+    
+    blockchain.add_block_tmp(blocks[0]);
+
+    //run_utxodump(&context, peers.clone(), sender_to_network_controller).await;
+
+    Ok::<(), E>(())
+    
 }
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
     ctrlc::set_handler(move || {
         info!("shutting down the node");
         process::exit(0);
@@ -143,14 +169,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert_ne!(fetch_batch_size, 0);
     }
 
-    let (event_sender_to_loop, event_receiver_in_loop) =
-        tokio::sync::mpsc::channel::<IoEvent>(channel_size);
-
     let (sender_to_network_controller, receiver_in_network_controller) =
         tokio::sync::mpsc::channel::<IoEvent>(channel_size);
 
     let keys = generate_keys();
     let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    
     {
         let mut wallet = wallet.write().await;
         Wallet::load(
@@ -162,19 +186,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await;
     }
-    let context = Context::new(configs.clone(), wallet);
+    //let context = Context::new(configs.clone(), wallet);
 
-    let peers = Arc::new(RwLock::new(PeerCollection::new()));
+    //let wallet_lock = Arc::new(RwLock::new(wallet));
 
-    let (sender_to_consensus, receiver_for_consensus) =
-        tokio::sync::mpsc::channel::<ConsensusEvent>(channel_size);
+    //let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
-    let (sender_to_routing, receiver_for_routing) =
-        tokio::sync::mpsc::channel::<RoutingEvent>(channel_size);
-
-    //let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-
-    run_utxodump(&context, peers.clone(), sender_to_network_controller).await;
+    
+    match run_utxodump(sender_to_network_controller, wallet).await {
+        Ok(_) => {
+            
+            println!("ok")
+        },
+        Err(e) => {
+            eprintln!("Error running utxodump: {:?}", e);
+            return Err(e.into());
+        }
+    }
 
     Ok(())
 }
