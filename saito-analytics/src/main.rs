@@ -46,31 +46,16 @@ const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
-// async fn run_utxodump(        
-//     sender_to_network_controller: Sender<IoEvent>,
-//     wallet: Arc<RwLock<Wallet>>,
-//     context: &Context,
-//     //mempool: Arc<RwLock<Mempool>>
-// ) {
-
-
-//     info!(">> {:?}", store);
-//     // TODO want to pass in the directory
-//     // loading blocks from dir : "./data/blocks/"
-
-//     //let blocks = store.load_blocks_from_disk_vec().await.unwrap();
-//let blocks = store.load_blocks_from_disk().await.unwrap();
-
-//     // info!(">>  id: {:?}", blocks[0].id);
-//     // for block in blocks {
-//     //     info!("{:?}", block.id);
-//     // }
-
+async fn run_utxodump(        
+    store: Storage,
+    wallet: Arc<RwLock<Wallet>>,
+    context: &Context,
+    //mempool: Arc<RwLock<Mempool>>
+) {
 
     
-//     // blockchain.add_block_tmp(blocks[0]);    
-    
-// }
+
+}
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -121,25 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .expect("loading configs failed"),
     ));
 
-    let channel_size;
-    let thread_sleep_time_in_ms;
-    let stat_timer_in_ms;
-    let verification_thread_count;
-    let fetch_batch_size;
-
-    {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
-
-        channel_size = configs.get_server_configs().unwrap().channel_size as usize;
-        thread_sleep_time_in_ms = configs
-            .get_server_configs()
-            .unwrap()
-            .thread_sleep_time_in_ms;
-        stat_timer_in_ms = configs.get_server_configs().unwrap().stat_timer_in_ms;
-        verification_thread_count = configs.get_server_configs().unwrap().verification_threads;
-        fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
-        assert_ne!(fetch_batch_size, 0);
-    }
+    let channel_size = 1000;
 
     let (sender_to_network_controller, receiver_in_network_controller) =
         tokio::sync::mpsc::channel::<IoEvent>(channel_size);
@@ -168,6 +135,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_network_controller.clone(),
         CONSENSUS_EVENT_PROCESSOR_ID,
     )));
+
+    //TODO in fn
 
     info!("........run_utxodump");
 
@@ -216,3 +185,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+
+
+//     info!(">> {:?}", store);
+//     // TODO want to pass in the directory
+//     // loading blocks from dir : "./data/blocks/"
+
+//     //let blocks = store.load_blocks_from_disk_vec().await.unwrap();
+//let blocks = store.load_blocks_from_disk().await.unwrap();
+
+//     // info!(">>  id: {:?}", blocks[0].id);
+//     // for block in blocks {
+//     //     info!("{:?}", block.id);
+//     // }
+
+
+    
+//     // blockchain.add_block_tmp(blocks[0]);    
+    
