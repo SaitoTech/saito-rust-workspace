@@ -10,6 +10,8 @@ use log::{debug, error, trace};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use tokio::runtime::Runtime;
+
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
 use tracing_subscriber::layer::SubscriberExt;
@@ -51,8 +53,9 @@ const MINING_EVENT_PROCESSOR_ID: u8 = 3;
 async fn run_utxodump(        
     sender_to_network_controller: Sender<IoEvent>,
     wallet: Arc<RwLock<Wallet>>
-) -> io::Result<(), std::io::Error> {
-    info!("run_utxodump");
+) {
+
+    debug!("run_utxodump");
 
     let mut store = Storage::new(Box::new(RustIOHandler::new(
         sender_to_network_controller.clone(),
@@ -64,27 +67,15 @@ async fn run_utxodump(
     // TODO want to pass in the directory
     // loading blocks from dir : "./data/blocks/"
 
-    let blocks = store.load_blocks_from_disk_vec().await?;
+    let blocks = store.load_blocks_from_disk_vec().await.unwrap();
 
     info!(">>  id: {:?}", blocks[0].id);
-    for block in &blocks {
+    for block in blocks {
         info!("{:?}", block.id);
     }
 
-    // match result {
-    //     Ok(blocks) => {
-    //         info!(">>  id: {:?}", blocks[0].id);
-    //         for block in &blocks {
-    //             info!("{:?}", block.id);
-    //         }
-    //     }
-    //     Err(e) => {
-    //         // Handle error case
-    //         eprintln!("Error loading blocks: {}", e);
-    //     }
-    // }
-
     //let wallet_lock = Arc::new(RwLock::new(wallet));
+    let wallet_lock = wallet.clone();
     let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet.clone())));
 
     let (mut blockchain, _blockchain_) = lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
@@ -92,11 +83,7 @@ async fn run_utxodump(
     println!("last_block_id: {:?}", blockchain.last_block_id);
     println!("last_timestamp: {:?}", blockchain.last_timestamp);
     
-    blockchain.add_block_tmp(blocks[0]);
-
-    //run_utxodump(&context, peers.clone(), sender_to_network_controller).await;
-
-    Ok::<(), E>(())
+    // blockchain.add_block_tmp(blocks[0]);    
     
 }
 
@@ -186,23 +173,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await;
     }
+    debug!("run analytics.....");
     //let context = Context::new(configs.clone(), wallet);
-
-    //let wallet_lock = Arc::new(RwLock::new(wallet));
 
     //let peers = Arc::new(RwLock::new(PeerCollection::new()));
 
+    run_utxodump(sender_to_network_controller, wallet).await;
     
-    match run_utxodump(sender_to_network_controller, wallet).await {
-        Ok(_) => {
-            
-            println!("ok")
-        },
-        Err(e) => {
-            eprintln!("Error running utxodump: {:?}", e);
-            return Err(e.into());
-        }
-    }
 
     Ok(())
 }
