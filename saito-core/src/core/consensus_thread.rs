@@ -236,7 +236,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         let duration_value = duration.as_millis() as u64;
 
         if self.generate_genesis_block {
-            debug!("generate genesis block");
             Self::generate_spammer_init_tx(
                 self.mempool.clone(),
                 self.wallet.clone(),
