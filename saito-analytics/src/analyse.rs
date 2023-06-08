@@ -1,6 +1,6 @@
 // saito analytics
 // run separate tool
-//mod manager;
+mod manager;
 
 
 use std::io::prelude::*;
@@ -37,9 +37,6 @@ fn read_block(path: String) -> io::Result<Block> {
     let deserialized_block = Block::deserialize_from_net(bytes)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-    println!("...");
-    println!("{:?}", deserialized_block);
-
     Ok(deserialized_block)
 }
 
@@ -58,8 +55,7 @@ fn analyse_block(block: Block)  {
 }
 
 fn get_first() -> io::Result<String> {
-    //let directory_path = "../saito-rust/data/blocks";
-    let directory_path = "/Users/ben/projects/saito/workspace/saito-lite-rust";
+    let directory_path = "../saito-rust/data/blocks";
 
     let entries = fs::read_dir(directory_path)?;
 
@@ -82,8 +78,7 @@ fn get_first() -> io::Result<String> {
 //read block directory as block vector
 fn get_blocks() -> io::Result<Vec<Block>> {
 
-    //let directory_path = "../saito-rust/data/blocks";
-    let directory_path = "/Users/ben/projects/saito/workspace/saito-lite-rust";
+    let directory_path = "../saito-rust/data/blocks";
     let mut blocks = Vec::new();
 
     for entry in fs::read_dir(directory_path)? {
@@ -110,10 +105,10 @@ fn get_blocks() -> io::Result<Vec<Block>> {
 }
 
 
-fn main() {
+fn runAnalytics() {
     println!("**** Saito analytics ****");
 
-    let blocks: AHashMap<SaitoHash, Block>;
+    //let blocks: AHashMap<SaitoHash, Block>;
 
     //get blocks from directory
 
@@ -136,7 +131,7 @@ fn main() {
 
     let keys = generate_keys();
 
-    //let mut t = TestManager::new();
+    let mut t = TestManager::new();
 
     // let first_block_path = match get_first() {
     //     Ok(path) => path,
