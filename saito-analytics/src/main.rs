@@ -688,18 +688,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let blockchain_clone = context.blockchain.clone();
 
-    tokio::spawn(async move {
-        loop {
-            println!(".....");  
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    // tokio::spawn(async move {
+    //     loop {
+    //         println!(".....");  
+    //         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             
-            // Enter the logic to read blockchain here
-            // Note that you may have to lock the blockchain to read it if it's a shared state
-            let blockchain = blockchain_clone.read().await;
-            println!("..... {:?}", blockchain.last_block_id);
-            // Read or print the blockchain here...
-        }
-    });
+    //         // Enter the logic to read blockchain here
+    //         // Note that you may have to lock the blockchain to read it if it's a shared state
+    //         let blockchain = blockchain_clone.read().await;
+    //         println!("last blockid: ..... {:?}", blockchain.last_block_id);
+    //         // Read or print the blockchain here...
+    //     }
+    // });
 
     let _result = tokio::join!(
         routing_handle,
