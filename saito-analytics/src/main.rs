@@ -1,6 +1,4 @@
 // saito analytics
-// run separate tool
-//mod manager;
 
 use ahash::AHashMap;
 use saito_core::core::data::block::{Block, BlockType};

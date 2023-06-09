@@ -17,8 +17,24 @@ use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
     UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
 };
-//use saito_core::common::test_io_handler::test::TestIOHandler;
 use crate::test_io_handler::TestIOHandler;
+
+use saito_core::core::data::block::Block;
+use saito_core::core::data::blockchain::Blockchain;
+use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
+use saito_core::core::data::crypto::{
+    generate_keys, generate_random_bytes, hash, verify_signature,
+};
+use saito_core::core::data::golden_ticket::GoldenTicket;
+use saito_core::core::data::mempool::Mempool;
+use saito_core::core::data::network::Network;
+use saito_core::core::data::peer_collection::PeerCollection;
+use saito_core::core::data::storage::Storage;
+use saito_core::core::data::transaction::{Transaction, TransactionType};
+use saito_core::core::data::wallet::Wallet;
+use saito_core::core::mining_thread::MiningEvent;
+use saito_core::{lock_for_read, lock_for_write};
+
 
 struct TestConfiguration {}
 
@@ -53,22 +69,6 @@ impl Configuration for TestConfiguration {
         todo!()
     }
 }
-
-use saito_core::core::data::block::Block;
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
-use saito_core::core::data::crypto::{
-    generate_keys, generate_random_bytes, hash, verify_signature,
-};
-use saito_core::core::data::golden_ticket::GoldenTicket;
-use saito_core::core::data::mempool::Mempool;
-use saito_core::core::data::network::Network;
-use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::data::storage::Storage;
-use saito_core::core::data::transaction::{Transaction, TransactionType};
-use saito_core::core::data::wallet::Wallet;
-use saito_core::core::mining_thread::MiningEvent;
-use saito_core::{lock_for_read, lock_for_write};
 
 pub fn create_timestamp() -> Timestamp {
     SystemTime::now()
@@ -348,49 +348,6 @@ impl ChainManager {
             }
             //writeln!(file, "{:?}\t{:?}", key, value);
             //writeln!(file, "{}: {}", key_hex, value)?;
-        }
-    }
-
-    pub async fn check1(&self) {
-        println!("check1");
-        let mut token_supply: Currency = 0;
-        let mut current_supply: Currency = 0;
-        let mut block_inputs_amount: Currency;
-        let mut block_outputs_amount: Currency;
-        let mut previous_block_treasury: Currency;
-        let mut current_block_treasury: Currency = 0;
-        let mut unpaid_but_uncollected: Currency = 0;
-        let mut block_contains_fee_tx: bool;
-        let mut block_fee_tx_index: usize = 0;
-
-        let (blockchain, _blockchain_) =
-            lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-
-        let latest_block_id = blockchain.get_latest_block_id();
-
-        for i in 1..=latest_block_id {
-            let block_hash = blockchain
-                .blockring
-                .get_longest_chain_block_hash_by_block_id(i as u64);
-            let block = blockchain.get_block(&block_hash).unwrap();
-
-            block_inputs_amount = 0;
-            block_outputs_amount = 0;
-            block_contains_fee_tx = false;
-
-            previous_block_treasury = current_block_treasury;
-            current_block_treasury = block.treasury;
-
-            for t in 0..block.transactions.len() {
-                for z in 0..block.transactions[t].from.len() {
-                    block_inputs_amount += block.transactions[t].from[z].amount;
-                }
-                for z in 0..block.transactions[t].to.len() {
-                    block_outputs_amount += block.transactions[t].to[z].amount;
-                }
-                println!("block_inputs_amount {}", block_inputs_amount);
-                println!("block_outputs_amount {}", block_outputs_amount);
-            }
         }
     }
 
