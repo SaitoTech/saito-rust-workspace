@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 use std::fs::File;
 use std::io::Write;
 use std::error::Error;
+use std::fmt::Write as FmtWrite;
 
 
 use saito_core::common::defs::{
@@ -209,10 +210,12 @@ impl ChainManager {
         let (blockchain, _blockchain_) =
         lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-        let mut file = File::create("utxoset.dat")?; // Use await and ? here
+        let mut file = File::create("data/utxoset.txt")?; // Use await and ? here
 
         for (key, value) in &blockchain.utxoset {
-            file.write_all(&(*key))?;
+            let key_hex = hex::encode(&(*key));
+            //file.write_all(&(*key))?;
+            writeln!(file, "{}: {}", key_hex, value)?;
             
         }
     
