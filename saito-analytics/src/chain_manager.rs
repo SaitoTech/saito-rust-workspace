@@ -268,7 +268,7 @@ impl ChainManager {
     // check that everything spendable in the main UTXOSET is spendable on the longest
     // chain and vice-versa.
     //
-    pub async fn dump_utxoset(&self) {
+    pub async fn dump_utxoset(&self, threshold: u64) {
         //info!("check_utxoset");
         println!("check_utxoset");
         let (blockchain, _blockchain_) =
@@ -344,7 +344,9 @@ impl ChainManager {
 
         for (key, value) in utxo_balances {
             println!("pubkey: {}\t{}", key, value);
-            writeln!(file, "{} {:?}", key, value);
+            if (value > threshold) {
+                writeln!(file, "{} {:?}", key, value);
+            }
             //writeln!(file, "{:?}\t{:?}", key, value);
             //writeln!(file, "{}: {}", key_hex, value)?;
         }

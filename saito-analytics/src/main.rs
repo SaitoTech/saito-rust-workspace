@@ -76,7 +76,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     //t.check_blockchain().await;
 
-    t.dump_utxoset().await;
+    t.dump_utxoset(1000).await;
+    //t.dump_utxoset(20000000000).await;
 
     //t.check_token_supply().await;
     //t.check_utxo().await;
