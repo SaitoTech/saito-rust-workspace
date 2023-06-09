@@ -30,82 +30,53 @@ use std::fs::File;
 use std::io::Write;
 
 mod analyse;
-mod test_io_handler;
 mod chain_manager;
+mod sutils;
+mod test_io_handler;
 
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-//use serde::de::Error;
-
-
-
-// fn write_utxo_to_file(blockchain: &Blockchain) -> std::io::Result<()> {
-//     //let serialized = serde_json::to_string(&blockchain.utxoset)?;
-
-//     //let mut file = File::create("utxoset.json")?;
-//     //file.write_all(serialized.as_bytes())?;
-
-//     let mut file = File::create("utxoset.dat")?;
-
-//     for (key, value) in &blockchain.utxoset {
-//         //file.write_all(&(*key).0)?;
-//         //file.write_all(&[*value as u8])?;
-        
-//         file.write_all(&(*key))?;
-//         //file.write_all(&[*value as u8])?;
-//     }
-
-//     Ok(())
-// }
-
+use crate::sutils::get_blocks;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //static analysis
     //analyse::runAnalytics();
 
-    //TODO take in blocks from read_blocks    
-
     let mut t = chain_manager::ChainManager::new();
     t.show_info();
-    let viptx = 10;
-    t.initialize(viptx, 1_000_000_000).await;
-    t.wait_for_mining_event().await;
 
-    {
-        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);        
-    }
-    //t.check_blockchain().await;
+    //read from provided directory
+    let directory_path = "../../sampleblocks";
+    let blocks_result = get_blocks(directory_path);
 
-    t.dump_utxoset(1000).await;
-    //t.dump_utxoset(20000000000).await;
+    match blocks_result.as_ref() {
+        Ok(blocks) => {
+            println!("Got {} blocks", blocks.len());
+            for block in blocks {
+                //t.add_block(&block).await;
+                //t.add_block(&*block).await;
+                t.add_block(block.clone()).await;
+            }
+        }
+        Err(e) => {
+            eprintln!("Error reading blocks: {}", e);
+        }
+    };
 
-    //t.check_token_supply().await;
-    //t.check_utxo().await;
+    t.dump_utxoset(0).await;
 
-    //t.dump_utxoset(100).await;
+    //////////
+    //simulated blocks
+    //let viptx = 10;
+    //t.initialize(viptx, 1_000_000_000).await;
+    //t.wait_for_mining_event().await;
 
-    //////
-
-    //t.check_token_supply().await;
-
-    // let mut block1;
-    // let mut block1_id;
-    // let mut block1_hash;
-    // let mut ts;
-
-    // t.initialize_with_timestamp(100, 1_000_000_000, 10_000_000);
-
-    // for _i in (0..20).step_by(1) {
-    //     {
-    //         let (blockchain, _blockchain_) =
-    //             lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-
-    //         block1 = blockchain.get_latest_block().unwrap();
-    //         block1_hash = block1.hash;
-    //         block1_id = block1.id;
-    //         ts = block1.timestamp;
-    //     }
+    // {
+    //     let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
     // }
+    //t.check_blockchain().await;
+    
+    //t.dump_utxoset(20000000000).await;
 
     Ok(())
 }

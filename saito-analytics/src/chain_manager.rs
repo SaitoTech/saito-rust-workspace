@@ -6,13 +6,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use ahash::AHashMap;
 use log::{debug, info};
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::RwLock;
-use std::fs::File;
-use std::io::Write;
 use std::error::Error;
 use std::fmt::Write as FmtWrite;
-
+use std::fs::File;
+use std::io::Write;
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::RwLock;
 
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
@@ -205,9 +204,8 @@ impl ChainManager {
 
     //dump utxo as binary
     pub async fn dump_utxoset_tmp(&self, threshold: i32) -> Result<(), Box<dyn Error>> {
-
         let (blockchain, _blockchain_) =
-        lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
         let mut file = File::create("data/utxoset.txt")?; // Use await and ? here
 
@@ -232,7 +230,7 @@ impl ChainManager {
                 println!("to len {:?}", block.transactions[j].to.len());
 
                 block.transactions[j].from.iter().for_each(|input| {
-                    println!("from {:?}", input);
+                    //println!("from {:?}", input);
                     //input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
                 });
 
@@ -250,7 +248,6 @@ impl ChainManager {
                 //spendable only
                 writeln!(file, "{}: {}", key_hex, value)?;
             }
-            
         }
 
         //self.from.iter().for_each(|input| {
@@ -259,9 +256,8 @@ impl ChainManager {
         // self.to.iter().for_each(|output| {
         //     output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
         // });
-    
-        Ok(())
 
+        Ok(())
     }
 
     //
@@ -274,19 +270,22 @@ impl ChainManager {
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-        type UtxoSetBalance = AHashMap<String, u64>; 
+        type UtxoSetBalance = AHashMap<String, u64>;
 
         //let mut utxoset: UtxoSet = AHashMap::new();
         let latest_block_id = blockchain.get_latest_block_id();
 
         let mut utxo_balances: UtxoSetBalance = AHashMap::new();
-        
+
         //let mut file = File::create("data/utxoset.txt"); // Use await and ? here
         let mut file = File::create("data/utxoset.txt").unwrap();
 
         println!("UTXO state height: latest_block_id {}", latest_block_id);
-        writeln!(file, "UTXO state height: latest_block_id {}", latest_block_id);
-
+        writeln!(
+            file,
+            "UTXO state height: latest_block_id {}",
+            latest_block_id
+        );
 
         for i in 1..=latest_block_id {
             //println!("check {}", i);
@@ -312,7 +311,7 @@ impl ChainManager {
 
                 tx.from.iter().for_each(|input| {
                     //input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
-                    println!("from {:?}", input);
+                    //println!("from {:?}", input);
                     let input_hex = hex::encode(input.public_key);
                     let balance = utxo_balances.entry(input_hex).or_insert(0);
                     *balance -= input.amount;
@@ -322,7 +321,7 @@ impl ChainManager {
 
                 tx.to.iter().for_each(|output| {
                     //check spendable
-                    
+
                     //input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
                     let output_hex = hex::encode(output.public_key);
                     //println!(">> {:?}", output_hex);
@@ -332,7 +331,7 @@ impl ChainManager {
                 });
 
                 // need to add balances?
-        
+
                 // tx.from.iter().for_each(|input| {
                 //     input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
                 // });
@@ -350,8 +349,6 @@ impl ChainManager {
             //writeln!(file, "{:?}\t{:?}", key, value);
             //writeln!(file, "{}: {}", key_hex, value)?;
         }
-
-
     }
 
     pub async fn check1(&self) {
@@ -393,11 +390,9 @@ impl ChainManager {
                 }
                 println!("block_inputs_amount {}", block_inputs_amount);
                 println!("block_outputs_amount {}", block_outputs_amount);
-            
-
             }
         }
-    }    
+    }
 
     pub async fn check_token_supply(&self) {
         println!("check_token_supply");
@@ -457,8 +452,8 @@ impl ChainManager {
                 if i == 1 {
                     token_supply = block_outputs_amount + block.treasury + block.staking_treasury;
                     current_supply = token_supply;
-                    println!("token_supply {}" , token_supply);
-                    println!("current_supply {}" , current_supply);
+                    println!("token_supply {}", token_supply);
+                    println!("current_supply {}", current_supply);
                 } else {
                     //
                     // figure out how much is in circulation
