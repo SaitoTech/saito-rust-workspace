@@ -202,7 +202,7 @@ impl ChainManager {
         }
     }
 
-    //dump utxo as binary
+    //delete
     pub async fn dump_utxoset_tmp(&self, threshold: i32) -> Result<(), Box<dyn Error>> {
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
@@ -230,7 +230,6 @@ impl ChainManager {
                 println!("to len {:?}", block.transactions[j].to.len());
 
                 block.transactions[j].from.iter().for_each(|input| {
-                    //println!("from {:?}", input);
                     //input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
                 });
 
@@ -240,10 +239,6 @@ impl ChainManager {
 
         for (key, value) in &blockchain.utxoset {
             let key_hex = hex::encode(&(*key));
-            //file.write_all(&(*key))?;
-            //println!("value {:?}", value);
-            //1. extract publickey
-            //2. extract amount
             if *value {
                 //spendable only
                 writeln!(file, "{}: {}", key_hex, value)?;
@@ -319,8 +314,9 @@ impl ChainManager {
 
                 //publickey \t amount \t type (normal)
 
+                //TODO check spendable only
+
                 tx.to.iter().for_each(|output| {
-                    //check spendable
 
                     //input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
                     let output_hex = hex::encode(output.public_key);
@@ -346,8 +342,6 @@ impl ChainManager {
             if (value > threshold) {
                 writeln!(file, "{} {:?}", key, value);
             }
-            //writeln!(file, "{:?}\t{:?}", key, value);
-            //writeln!(file, "{}: {}", key_hex, value)?;
         }
     }
 

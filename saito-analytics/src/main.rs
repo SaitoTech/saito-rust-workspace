@@ -40,6 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //static analysis
     //analyse::runAnalytics();
 
+    //need to add type
+
     let mut t = chain_manager::ChainManager::new();
     t.show_info();
 
@@ -51,8 +53,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(blocks) => {
             println!("Got {} blocks", blocks.len());
             for block in blocks {
-                //t.add_block(&block).await;
-                //t.add_block(&*block).await;
                 t.add_block(block.clone()).await;
             }
         }
