@@ -1738,6 +1738,7 @@ dependencies = [
  "saito-core",
  "saito-rust",
  "serde",
+ "serde_json",
  "serial_test",
  "tokio",
  "tokio-tungstenite 0.19.0",

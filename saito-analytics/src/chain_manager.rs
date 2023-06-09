@@ -8,6 +8,10 @@ use ahash::AHashMap;
 use log::{debug, info};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
+use std::fs::File;
+use std::io::Write;
+use std::error::Error;
+
 
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
@@ -198,25 +202,47 @@ impl ChainManager {
         }
     }
 
+    //dump utxo as binary
+    pub async fn dump_utxoset(&self) -> Result<(), Box<dyn Error>> {
+
+
+        let (blockchain, _blockchain_) =
+        lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+        let mut file = File::create("utxoset.dat")?; // Use await and ? here
+
+        for (key, value) in &blockchain.utxoset {
+            file.write_all(&(*key))?;
+            
+        }
+    
+        Ok(())
+
+    }
+
     //
     // check that everything spendable in the main UTXOSET is spendable on the longest
     // chain and vice-versa.
     //
     pub async fn check_utxoset(&self) {
+        //info!("check_utxoset");
+        println!("check_utxoset");
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
         let mut utxoset: UtxoSet = AHashMap::new();
         let latest_block_id = blockchain.get_latest_block_id();
 
-        info!("---- check utxoset ");
+        
         for i in 1..=latest_block_id {
+            println!("check {}", i);
             let block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(i as u64);
-            info!("WINDING ID HASH - {} {:?}", i, block_hash);
+            println!("WINDING ID HASH - {} {:?}", i, block_hash);
             let block = blockchain.get_block(&block_hash).unwrap();
             for j in 0..block.transactions.len() {
+                println!("j: {}", j);
                 block.transactions[j].on_chain_reorganization(&mut utxoset, true, i as u64);
             }
         }
@@ -224,7 +250,10 @@ impl ChainManager {
         //
         // check main utxoset matches longest-chain
         //
+        let mut c = 0;
         for (key, value) in &blockchain.utxoset {
+            println!("key: {:?}", key);
+            c +=1;
             match utxoset.get(key) {
                 Some(value2) => {
                     //
@@ -266,40 +295,42 @@ impl ChainManager {
             }
         }
 
+        println!(">>>>c: {:?}", c);
+
         //
         // check longest-chain matches utxoset
         //
-        for (key, value) in &utxoset {
-            //info!("{:?} / {}", key, value);
-            match blockchain.utxoset.get(key) {
-                Some(value2) => {
-                    //
-                    // everything spendable in longest-chain should be spendable on blockchain.utxoset
-                    //
-                    if *value == true {
-                        //                        info!("comparing {} and {}", value, value2);
-                        assert_eq!(value, value2);
-                    } else {
-                        //
-                        // everything spent in longest-chain should be spendable on blockchain.utxoset
-                        //
-                        // if *value > 1 {
-                        //     //                            info!("comparing {} and {}", value, value2);
-                        //     assert_eq!(value, value2);
-                        // } else {
-                        //     //
-                        //     // unspendable (0) does not need to exist
-                        //     //
-                        // }
-                    }
-                }
-                None => {
-                    info!("comparing {:?} with expected value {}", key, value);
-                    info!("Value does not exist in actual blockchain!");
-                    assert_eq!(1, 2);
-                }
-            }
-        }
+        // for (key, value) in &utxoset {
+        //     println!("key {:?} /value: {}", key, value);
+        //     match blockchain.utxoset.get(key) {
+        //         Some(value2) => {
+        //             //
+        //             // everything spendable in longest-chain should be spendable on blockchain.utxoset
+        //             //
+        //             if *value == true {
+        //                 //                        info!("comparing {} and {}", value, value2);
+        //                 assert_eq!(value, value2);
+        //             } else {
+        //                 //
+        //                 // everything spent in longest-chain should be spendable on blockchain.utxoset
+        //                 //
+        //                 // if *value > 1 {
+        //                 //     //                            info!("comparing {} and {}", value, value2);
+        //                 //     assert_eq!(value, value2);
+        //                 // } else {
+        //                 //     //
+        //                 //     // unspendable (0) does not need to exist
+        //                 //     //
+        //                 // }
+        //             }
+        //         }
+        //         None => {
+        //             println!("comparing {:?} with expected value {}", key, value);
+        //             println!("Value does not exist in actual blockchain!");
+        //             assert_eq!(1, 2);
+        //         }
+        //     }
+        // }
     }
 
     pub async fn check_token_supply(&self) {

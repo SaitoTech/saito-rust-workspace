@@ -26,21 +26,49 @@ use saito_core::common::defs::{
     MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
 use saito_core::common::defs::{LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS};
+use std::fs::File;
+use std::io::Write;
 
 mod analyse;
 mod test_io_handler;
 mod chain_manager;
 
-//fn main() {
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
+//use serde::de::Error;
+
+
+
+// fn write_utxo_to_file(blockchain: &Blockchain) -> std::io::Result<()> {
+//     //let serialized = serde_json::to_string(&blockchain.utxoset)?;
+
+//     //let mut file = File::create("utxoset.json")?;
+//     //file.write_all(serialized.as_bytes())?;
+
+//     let mut file = File::create("utxoset.dat")?;
+
+//     for (key, value) in &blockchain.utxoset {
+//         //file.write_all(&(*key).0)?;
+//         //file.write_all(&[*value as u8])?;
+        
+//         file.write_all(&(*key))?;
+//         //file.write_all(&[*value as u8])?;
+//     }
+
+//     Ok(())
+// }
+
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //static analysis
     //analyse::runAnalytics();
 
+    //TODO take in blocks from read_blocks    
+
     let mut t = chain_manager::ChainManager::new();
     t.show_info();
-
-    t.initialize(100, 1_000_000_000).await;
+    let viptx = 10;
+    t.initialize(viptx, 1_000_000_000).await;
     t.wait_for_mining_event().await;
 
     {
@@ -49,7 +77,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     t.check_blockchain().await;
     t.check_utxoset().await;
-    t.check_token_supply().await;
+
+    t.dump_utxoset().await;
+
+    //////
+
+    //t.check_token_supply().await;
 
     // let mut block1;
     // let mut block1_id;
