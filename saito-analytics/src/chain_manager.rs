@@ -204,20 +204,61 @@ impl ChainManager {
     }
 
     //dump utxo as binary
-    pub async fn dump_utxoset(&self) -> Result<(), Box<dyn Error>> {
-
+    pub async fn dump_utxoset_tmp(&self, threshold: i32) -> Result<(), Box<dyn Error>> {
 
         let (blockchain, _blockchain_) =
         lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
         let mut file = File::create("data/utxoset.txt")?; // Use await and ? here
 
+        // print to file in a format similar to the issuance files
+        //publickey \t amount \t type (normal)
+        //for entries in the hashmap that are spendable (i.e. key => value (1) )
+
+        let latest_block_id = blockchain.get_latest_block_id();
+        println!("latest_block_id {}", latest_block_id);
+
+        for i in 1..=latest_block_id {
+            println!("check {}", i);
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(i as u64);
+            println!("WINDING ID HASH - {} {:?}", i, block_hash);
+            let block = blockchain.get_block(&block_hash).unwrap();
+            for j in 0..block.transactions.len() {
+                println!("tx j: {}", j);
+
+                println!("from len {:?}", block.transactions[j].from.len());
+                println!("to len {:?}", block.transactions[j].to.len());
+
+                block.transactions[j].from.iter().for_each(|input| {
+                    println!("from {:?}", input);
+                    //input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
+                });
+
+                //block.transactions[j].on_chain_reorganization(&blockchain.utxoset, true, i as u64);
+            }
+        }
+
         for (key, value) in &blockchain.utxoset {
             let key_hex = hex::encode(&(*key));
             //file.write_all(&(*key))?;
-            writeln!(file, "{}: {}", key_hex, value)?;
+            //println!("value {:?}", value);
+            //1. extract publickey
+            //2. extract amount
+            if *value {
+                //spendable only
+                writeln!(file, "{}: {}", key_hex, value)?;
+            }
             
         }
+
+        //self.from.iter().for_each(|input| {
+        //     input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
+        // });
+        // self.to.iter().for_each(|output| {
+        //     output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
+        // });
     
         Ok(())
 
@@ -227,121 +268,96 @@ impl ChainManager {
     // check that everything spendable in the main UTXOSET is spendable on the longest
     // chain and vice-versa.
     //
-    pub async fn check_utxoset(&self) {
+    pub async fn dump_utxoset(&self) {
         //info!("check_utxoset");
         println!("check_utxoset");
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-        let mut utxoset: UtxoSet = AHashMap::new();
+        type UtxoSetBalance = AHashMap<String, u64>; 
+
+        //let mut utxoset: UtxoSet = AHashMap::new();
         let latest_block_id = blockchain.get_latest_block_id();
 
+        let mut utxo_balances: UtxoSetBalance = AHashMap::new();
         
+        //let mut file = File::create("data/utxoset.txt"); // Use await and ? here
+        let mut file = File::create("data/utxoset.txt").unwrap();
+
+        println!("UTXO state height: latest_block_id {}", latest_block_id);
+        writeln!(file, "UTXO state height: latest_block_id {}", latest_block_id);
+
+
         for i in 1..=latest_block_id {
-            println!("check {}", i);
+            //println!("check {}", i);
             let block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(i as u64);
-            println!("WINDING ID HASH - {} {:?}", i, block_hash);
+            //println!("WINDING ID HASH - {} {:?}", i, block_hash);
             let block = blockchain.get_block(&block_hash).unwrap();
             for j in 0..block.transactions.len() {
-                println!("j: {}", j);
-                block.transactions[j].on_chain_reorganization(&mut utxoset, true, i as u64);
+                let mut tx = &block.transactions[j];
+                //println!("j: {}", j);
+                //println!("tx: {:?}", tx);
+                //UPDATE
+                //tx.on_chain_reorganization(&mut utxoset, true, i as u64);
+                //utxoset.insert(self.utxoset_key, spendable);
+                //println!(">>> {}", utxoset.len());
+                let input_slip_spendable = false;
+                let output_slip_spendable = true;
+
+                // println!("tx from >> {}", tx.from.len());
+                // println!("tx to >> {}", tx.to.len());
+                // println!("transaction_type  >> {:?}", tx.transaction_type);
+
+                tx.from.iter().for_each(|input| {
+                    //input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
+                    println!("from {:?}", input);
+                    let input_hex = hex::encode(input.public_key);
+                    let balance = utxo_balances.entry(input_hex).or_insert(0);
+                    *balance -= input.amount;
+                });
+
+                //publickey \t amount \t type (normal)
+
+                tx.to.iter().for_each(|output| {
+                    //check spendable
+                    
+                    //input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
+                    let output_hex = hex::encode(output.public_key);
+                    //println!(">> {:?}", output_hex);
+                    //println!(">> amount: {:?}", output.amount);
+                    let balance = utxo_balances.entry(output_hex).or_insert(0);
+                    *balance += output.amount;
+                });
+
+                // need to add balances?
+        
+                // tx.from.iter().for_each(|input| {
+                //     input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
+                // });
+                // tx.to.iter().for_each(|output| {
+                //     output.on_chain_reorganization(&utxoset, longest_chain, output_slip_spendable)
+                // });
             }
         }
 
-        //
-        // check main utxoset matches longest-chain
-        //
-        let mut c = 0;
-        for (key, value) in &blockchain.utxoset {
-            println!("key: {:?}", key);
-            c +=1;
-            match utxoset.get(key) {
-                Some(value2) => {
-                    //
-                    // everything spendable in blockchain.utxoset should be spendable on longest-chain
-                    //
-                    if *value == true {
-                        //info!("for key: {:?}", key);
-                        //info!("comparing {} and {}", value, value2);
-                        assert_eq!(value, value2);
-                    } else {
-                        //
-                        // everything spent in blockchain.utxoset should be spent on longest-chain
-                        //
-                        // if *value > 1 {
-                        //info!("comparing key: {:?}", key);
-                        //info!("comparing blkchn {} and sanitycheck {}", value, value2);
-                        // assert_eq!(value, value2);
-                        // } else {
-                        //
-                        // unspendable (0) does not need to exist
-                        //
-                        // }
-                    }
-                }
-                None => {
-                    //
-                    // if the value is 0, the token is unspendable on the main chain and
-                    // it may still be in the UTXOSET simply because it was not removed
-                    // but rather set to an unspendable value. These entries will be
-                    // removed on purge, although we can look at deleting them on unwind
-                    // as well if that is reasonably efficient.
-                    //
-                    if *value == true {
-                        //info!("Value does not exist in actual blockchain!");
-                        //info!("comparing {:?} with on-chain value {}", key, value);
-                        assert_eq!(1, 2);
-                    }
-                }
-            }
+        for (key, value) in utxo_balances {
+            println!("pubkey: {}\t{}", key, value);
+            writeln!(file, "{} {:?}", key, value);
+            //writeln!(file, "{:?}\t{:?}", key, value);
+            //writeln!(file, "{}: {}", key_hex, value)?;
         }
 
-        println!(">>>>c: {:?}", c);
 
-        //
-        // check longest-chain matches utxoset
-        //
-        // for (key, value) in &utxoset {
-        //     println!("key {:?} /value: {}", key, value);
-        //     match blockchain.utxoset.get(key) {
-        //         Some(value2) => {
-        //             //
-        //             // everything spendable in longest-chain should be spendable on blockchain.utxoset
-        //             //
-        //             if *value == true {
-        //                 //                        info!("comparing {} and {}", value, value2);
-        //                 assert_eq!(value, value2);
-        //             } else {
-        //                 //
-        //                 // everything spent in longest-chain should be spendable on blockchain.utxoset
-        //                 //
-        //                 // if *value > 1 {
-        //                 //     //                            info!("comparing {} and {}", value, value2);
-        //                 //     assert_eq!(value, value2);
-        //                 // } else {
-        //                 //     //
-        //                 //     // unspendable (0) does not need to exist
-        //                 //     //
-        //                 // }
-        //             }
-        //         }
-        //         None => {
-        //             println!("comparing {:?} with expected value {}", key, value);
-        //             println!("Value does not exist in actual blockchain!");
-        //             assert_eq!(1, 2);
-        //         }
-        //     }
-        // }
     }
 
-    pub async fn check_token_supply(&self) {
-        println!("check_token_supply");
+    pub async fn check1(&self) {
+        println!("check1");
         let mut token_supply: Currency = 0;
         let mut current_supply: Currency = 0;
-        let mut block_inputs: Currency;
-        let mut block_outputs: Currency;
+        let mut block_inputs_amount: Currency;
+        let mut block_outputs_amount: Currency;
         let mut previous_block_treasury: Currency;
         let mut current_block_treasury: Currency = 0;
         let mut unpaid_but_uncollected: Currency = 0;
@@ -359,8 +375,53 @@ impl ChainManager {
                 .get_longest_chain_block_hash_by_block_id(i as u64);
             let block = blockchain.get_block(&block_hash).unwrap();
 
-            block_inputs = 0;
-            block_outputs = 0;
+            block_inputs_amount = 0;
+            block_outputs_amount = 0;
+            block_contains_fee_tx = false;
+
+            previous_block_treasury = current_block_treasury;
+            current_block_treasury = block.treasury;
+
+            for t in 0..block.transactions.len() {
+                for z in 0..block.transactions[t].from.len() {
+                    block_inputs_amount += block.transactions[t].from[z].amount;
+                }
+                for z in 0..block.transactions[t].to.len() {
+                    block_outputs_amount += block.transactions[t].to[z].amount;
+                }
+                println!("block_inputs_amount {}", block_inputs_amount);
+                println!("block_outputs_amount {}", block_outputs_amount);
+            
+
+            }
+        }
+    }    
+
+    pub async fn check_token_supply(&self) {
+        println!("check_token_supply");
+        let mut token_supply: Currency = 0;
+        let mut current_supply: Currency = 0;
+        let mut block_inputs_amount: Currency;
+        let mut block_outputs_amount: Currency;
+        let mut previous_block_treasury: Currency;
+        let mut current_block_treasury: Currency = 0;
+        let mut unpaid_but_uncollected: Currency = 0;
+        let mut block_contains_fee_tx: bool;
+        let mut block_fee_tx_index: usize = 0;
+
+        let (blockchain, _blockchain_) =
+            lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+        let latest_block_id = blockchain.get_latest_block_id();
+
+        for i in 1..=latest_block_id {
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(i as u64);
+            let block = blockchain.get_block(&block_hash).unwrap();
+
+            block_inputs_amount = 0;
+            block_outputs_amount = 0;
             block_contains_fee_tx = false;
 
             previous_block_treasury = current_block_treasury;
@@ -379,29 +440,33 @@ impl ChainManager {
                     block_fee_tx_index = t as usize;
                 } else {
                     for z in 0..block.transactions[t].from.len() {
-                        block_inputs += block.transactions[t].from[z].amount;
+                        block_inputs_amount += block.transactions[t].from[z].amount;
                     }
                     for z in 0..block.transactions[t].to.len() {
-                        block_outputs += block.transactions[t].to[z].amount;
+                        block_outputs_amount += block.transactions[t].to[z].amount;
                     }
+                    println!("block_inputs_amount {}", block_inputs_amount);
+                    println!("block_outputs_amount {}", block_outputs_amount);
                 }
 
                 //
                 // block one sets circulation
                 //
                 if i == 1 {
-                    token_supply = block_outputs + block.treasury + block.staking_treasury;
+                    token_supply = block_outputs_amount + block.treasury + block.staking_treasury;
                     current_supply = token_supply;
+                    println!("token_supply {}" , token_supply);
+                    println!("current_supply {}" , current_supply);
                 } else {
                     //
                     // figure out how much is in circulation
                     //
                     if block_contains_fee_tx == false {
-                        current_supply -= block_inputs;
-                        current_supply += block_outputs;
+                        current_supply -= block_inputs_amount;
+                        current_supply += block_outputs_amount;
 
-                        unpaid_but_uncollected += block_inputs;
-                        unpaid_but_uncollected -= block_outputs;
+                        unpaid_but_uncollected += block_inputs_amount;
+                        unpaid_but_uncollected -= block_outputs_amount;
 
                         //
                         // treasury increases must come here uncollected
@@ -420,12 +485,12 @@ impl ChainManager {
                             total_fees_paid += output.amount;
                         }
 
-                        current_supply -= block_inputs;
-                        current_supply += block_outputs;
+                        current_supply -= block_inputs_amount;
+                        current_supply += block_outputs_amount;
                         current_supply += total_fees_paid;
 
-                        unpaid_but_uncollected += block_inputs;
-                        unpaid_but_uncollected -= block_outputs;
+                        unpaid_but_uncollected += block_inputs_amount;
+                        unpaid_but_uncollected -= block_outputs_amount;
                         unpaid_but_uncollected -= total_fees_paid;
 
                         //

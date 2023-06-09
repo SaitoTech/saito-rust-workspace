@@ -72,13 +72,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     t.wait_for_mining_event().await;
 
     {
-        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        assert_eq!(1, blockchain.get_latest_block_id());
+        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);        
     }
-    t.check_blockchain().await;
-    t.check_utxoset().await;
+    //t.check_blockchain().await;
 
     t.dump_utxoset().await;
+
+    //t.check_token_supply().await;
+    //t.check_utxo().await;
+
+    //t.dump_utxoset(100).await;
 
     //////
 
