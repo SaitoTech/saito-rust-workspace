@@ -73,7 +73,7 @@ pub fn create_timestamp() -> Timestamp {
         .as_millis() as Timestamp
 }
 
-pub struct TestManager {
+pub struct ChainManager {
     pub mempool_lock: Arc<RwLock<Mempool>>,
     pub blockchain_lock: Arc<RwLock<Blockchain>>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
@@ -86,7 +86,7 @@ pub struct TestManager {
     pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
 }
 
-impl TestManager {
+impl ChainManager {
     pub fn new() -> Self {
         let keys = generate_keys();
         let wallet = Wallet::new(keys.1, keys.0);

@@ -29,7 +29,7 @@ use saito_core::common::defs::{LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS};
 
 mod analyse;
 mod test_io_handler;
-mod test_manager;
+mod chain_manager;
 
 //fn main() {
 #[tokio::main(flavor = "multi_thread")]
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //static analysis
     //analyse::runAnalytics();
 
-    let mut t = test_manager::TestManager::new();
+    let mut t = chain_manager::ChainManager::new();
     t.show_info();
 
     t.initialize(100, 1_000_000_000).await;
