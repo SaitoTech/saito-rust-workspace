@@ -101,6 +101,50 @@ impl Blockchain {
     pub fn get_fork_id(&self) -> &SaitoHash {
         &self.fork_id
     }
+    
+    pub fn add_block_testing(
+        &mut self,
+        mut block: Block,        
+        //storage: &mut Storage,        
+        //mempool: &mut Mempool,        
+    ) {
+        println!("..testing add block");
+        block.generate();
+        let block_hash = block.hash;
+        println!("block_hash {:?}", block_hash);
+        let block_id = block.id;
+        
+        if self.blocks.contains_key(&block_hash) {
+            println!("already in blocks {:?}", &block_hash);
+        }
+
+        if !self
+        .blockring
+        .contains_block_hash_at_block_id(block.id, block_hash)
+        {
+            println!("... not contains");
+            self.blockring.add_block(&block);
+            //println!("blockring {:?}",self.blockring);
+        } else {
+            println!("... contains");
+            // error!(
+            //     "block : {:?} is already in blockring. therefore not adding",
+            //     hex::encode(block.hash)
+            // );
+            // return AddBlockResult::BlockAlreadyExists;
+        }
+
+        if !self.blocks.contains_key(&block_hash) {
+            self.blocks.insert(block.hash, block);
+            println!("inserted {}", self.blocks.len());
+        } else {
+            error!(
+                "BLOCK IS ALREADY IN THE BLOCKCHAIN, WHY ARE WE ADDING IT????? {:?}",
+                block.hash
+            );
+            //return AddBlockResult::BlockAlreadyExists;
+        }
+    }
 
     #[async_recursion]
     pub async fn add_block(
