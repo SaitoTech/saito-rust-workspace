@@ -19,6 +19,8 @@ use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
+use tokio::time::timeout;
+
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
@@ -61,14 +63,37 @@ impl NetworkController {
         // TODO : can be better optimized if we buffer the messages and flush once per timer event
         match connection {
             PeerSender::Warp(sender) => {
-                if let Err(error) = sender.send(warp::ws::Message::binary(buffer)).await {
-                    error!(
-                        "Error sending message, Peer Index = {:?}, Reason {:?}",
-                        peer_index, error
-                    );
+                trace!("send warp");
 
-                    send_failed = true;
+                let send_message = sender.send(warp::ws::Message::binary(buffer));
+
+                match timeout(Duration::from_secs(5), send_message).await {
+                    Ok(result) => {
+                        if let Err(error) = result {
+                            error!(
+                                "Error sending message, Peer Index = {:?}, Reason {:?}",
+                                peer_index, error
+                            );
+                            send_failed = true;
+                        }
+                    },
+                    Err(_) => {
+                        error!(
+                            "Sending message timed out, Peer Index = {:?}",
+                            peer_index
+                        );
+                        send_failed = true;
+                    }
                 }
+
+                // if let Err(error) = sender.send(warp::ws::Message::binary(buffer)).await {
+                //     error!(
+                //         "Error sending message, Peer Index = {:?}, Reason {:?}",
+                //         peer_index, error
+                //     );
+
+                //     send_failed = true;
+                // }
                 // if let Err(error) = sender.flush().await {
                 //     error!(
                 //         "Error flushing connection, Peer Index = {:?}, Reason {:?}",
@@ -78,16 +103,49 @@ impl NetworkController {
                 // }
             }
             PeerSender::Tungstenite(sender) => {
-                if let Err(error) = sender
-                    .send(tokio_tungstenite::tungstenite::Message::Binary(buffer))
-                    .await
-                {
-                    error!(
-                        "Error sending message, Peer Index = {:?}, Reason {:?}",
-                        peer_index, error
-                    );
-                    send_failed = true;
+                trace!("send Tungstenite");
+                debug!("About to send a message to Peer Index = {:?}", peer_index);
+
+                let msg = tokio_tungstenite::tungstenite::Message::Binary(buffer);
+                debug!("send message {:?}", msg);
+                let send_message = sender.send(msg);
+                
+                debug!("Attempting to send message with a 5 second timeout");
+
+                match timeout(Duration::from_secs(5), send_message).await {
+                    Ok(result) => {
+                        if let Err(error) = result {
+                            error!(
+                                "Error sending message, Peer Index = {:?}, Reason {:?}",
+                                peer_index, error
+                            );
+                            send_failed = true;
+                        }
+                    },
+                    Err(_) => {
+                        error!(
+                            "Sending message timed out, Peer Index = {:?}",
+                            peer_index
+                        );
+                        // Log the timeout event.
+                        error!("Timeout occurred when sending message, Peer Index = {:?}", peer_index);
+                        send_failed = true;
+                    }
                 }
+
+                debug!("send done")
+
+                // if let Err(error) = sender
+                //     .send(tokio_tungstenite::tungstenite::Message::Binary(buffer))
+                //     .await
+                // {
+                //     error!(
+                //         "Error sending message, Peer Index = {:?}, Reason {:?}",
+                //         peer_index, error
+                //     );
+                //     send_failed = true;
+                // }
+
                 // if let Err(error) = sender.flush().await {
                 //     error!(
                 //         "Error flushing connection, Peer Index = {:?}, Reason {:?}",
@@ -96,6 +154,8 @@ impl NetworkController {
                 //     send_failed = true;
                 // }
             }
+
+            
         }
 
         return !send_failed;
@@ -341,6 +401,7 @@ impl NetworkController {
                         continue;
                     }
                     let result = result.unwrap();
+                    
                     if result.is_err() {
                         // TODO : handle peer disconnections
                         warn!("failed receiving message [1] : {:?}", result.err().unwrap());
@@ -352,6 +413,7 @@ impl NetworkController {
 
                     if result.is_binary() {
                         let buffer = result.into_bytes();
+                        warn!("received result {:?} bytes", buffer.len());
                         trace!(
                             "message buffer with size : {:?} received from peer : {:?}",
                             buffer.len(),

@@ -119,6 +119,33 @@ async fn load_configs() -> Arc<RwLock<dyn Configuration + Send + Sync>> {
     ))
 }
 
+async fn get_config_values(configs: &Arc<RwLock<dyn Configuration + Send + Sync>>) -> (u64, u64, u64, u64, u64) {
+    let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+    let channel_size = configs.get_server_configs().unwrap().channel_size as usize;
+    let thread_sleep_time_in_ms = configs.get_server_configs().unwrap().thread_sleep_time_in_ms;
+    let stat_timer_in_ms = configs.get_server_configs().unwrap().stat_timer_in_ms;
+    let verification_thread_count = configs.get_server_configs().unwrap().verification_threads;
+    let fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
+    assert_ne!(fetch_batch_size, 0);
+    (channel_size, thread_sleep_time_in_ms, stat_timer_in_ms, verification_thread_count, fetch_batch_size)
+}
+
+async fn create_wallet(keys: Keys) -> Arc<RwLock<Wallet>> {
+    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    {
+        let mut wallet = wallet.write().await;
+        Wallet::load(
+            &mut wallet,
+            Box::new(RustIOHandler::new(
+                sender_to_network_controller.clone(),
+                ROUTING_EVENT_PROCESSOR_ID,
+            )),
+        )
+        .await;
+    }
+    wallet
+}
+
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -135,19 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let configs = load_configs().await;
 
-    let (channel_size, thread_sleep_time_in_ms, stat_timer_in_ms, verification_thread_count, fetch_batch_size) = {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
-        let server_configs = configs.get_server_configs().unwrap();
-    
-        (
-            server_configs.channel_size as usize,
-            server_configs.thread_sleep_time_in_ms,
-            server_configs.stat_timer_in_ms,
-            server_configs.verification_threads,
-            server_configs.block_fetch_batch_size as usize,
-        )
-    };
-    
+    let (channel_size, thread_sleep_time_in_ms, stat_timer_in_ms, verification_thread_count, fetch_batch_size) = get_config_values(&configs).await;
 
     let (event_sender_to_loop, event_receiver_in_loop) =
         tokio::sync::mpsc::channel::<IoEvent>(channel_size);
@@ -158,18 +173,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("running saito controllers");
 
     let keys = generate_keys();
-    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
-    {
-        let mut wallet = wallet.write().await;
-        Wallet::load(
-            &mut wallet,
-            Box::new(RustIOHandler::new(
-                sender_to_network_controller.clone(),
-                ROUTING_EVENT_PROCESSOR_ID,
-            )),
-        )
-        .await;
-    }
+    let wallet = create_wallet(keys).await;
+
     let context = Context::new(configs.clone(), wallet);
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
@@ -258,7 +263,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _result = tokio::join!(
         routing_handle,
-        //blockchain_handle,
+        blockchain_handle,
         //miner_handle,
         loop_handle,
         network_handle,
