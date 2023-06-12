@@ -6,6 +6,7 @@ use saito_core::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
 use saito_core::core::data::crypto::generate_keys;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::{lock_for_read, lock_for_write};
+use serde_json;
 use std::fs;
 use std::io::prelude::*;
 use std::io::{self, Read};
@@ -13,7 +14,6 @@ use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde_json;
 
 use log::{debug, error, info, trace, warn};
 
@@ -35,7 +35,6 @@ mod test_io_handler;
 
 use crate::sutils::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 
 //take blocks from a directory and output a utxo dump file
 async fn runDump() {
@@ -63,66 +62,51 @@ async fn runDump() {
     t.dump_utxoset(tresh).await;
 }
 
-
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    //runDump().await;
-
+fn pretty_print_blocks() {
     let directory_path = "../../sampleblocks";
 
-    let mut t = chain_manager::ChainManager::new();
-    
     let blocks_result = get_blocks(directory_path);
 
     match blocks_result.as_ref() {
         Ok(blocks) => {
             println!("Got {} blocks", blocks.len());
             for block in blocks {
-                println!(">>>>>>>>>>>");
                 if let Err(e) = pretty_print_block(&block) {
                     eprintln!("Error pretty printing block: {}", e);
                 }
-
-                println!("tx -------");
-
-                //println!("{:?}", block.transactions[0]);
-                //pretty_print_tx(&block.transactions[0]);
-                for tx in &block.transactions {
-                    pretty_print_tx(&tx);
-                }
             }
-
-            
-            //let block = blocks[0];
-            //let serialized_block = serde_json::to_string_pretty(block);
-            //println!("{:?}", serialized_block);
-            //Ok(())
-            
         }
         Err(e) => {
             //eprintln!("Error reading blocks: {}", e);
             eprintln!("Error ");
         }
     };
+}
 
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //TODO need to add type
+    //runDump().await;
+
+    //pretty_print_blocks();
 
     //static analysis
     //analyse::runAnalytics();
 
-    //TODO need to add type
-
     //////////
     //simulated blocks
-    //let viptx = 10;
-    //t.initialize(viptx, 1_000_000_000).await;
-    //t.wait_for_mining_event().await;
+    let viptx = 10;
+    let mut t = chain_manager::ChainManager::new();
+    t.initialize(viptx, 1_000_000_000).await;
+    t.wait_for_mining_event().await;
 
-    // {
-    //     let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-    // }
-    //t.check_blockchain().await;
+    {
+        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+    }
+    t.check_blockchain().await;
 
-    //t.dump_utxoset(20000000000).await;
+    t.dump_utxoset(20000000000).await;
+    t.dump_utxoset(10000000000).await;
 
     Ok(())
 }
