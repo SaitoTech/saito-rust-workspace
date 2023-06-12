@@ -374,7 +374,6 @@ fn run_loop_thread(
 
             let result = receiver.recv().await;
             if result.is_some() {
-                debug!("result {:?}", result);
                 let command = result.unwrap();
                 work_done = true;
                 // TODO : remove hard coded values

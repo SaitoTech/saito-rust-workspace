@@ -101,7 +101,6 @@ impl Blockchain {
     pub fn get_fork_id(&self) -> &SaitoHash {
         &self.fork_id
     }
-    
 
     #[async_recursion]
     pub async fn add_block(
