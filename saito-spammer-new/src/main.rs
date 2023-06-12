@@ -17,8 +17,7 @@ use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
 };
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
@@ -37,7 +36,7 @@ use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::{lock_for_read, lock_for_write};
+use saito_core::lock_for_read;
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
 

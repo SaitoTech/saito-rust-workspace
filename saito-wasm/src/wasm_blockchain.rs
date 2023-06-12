@@ -1,7 +1,7 @@
 use js_sys::JsString;
 use std::sync::Arc;
 
-use saito_core::common::defs::{BlockId};
+use saito_core::common::defs::BlockId;
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 
