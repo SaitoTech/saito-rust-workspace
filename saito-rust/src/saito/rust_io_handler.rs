@@ -2,21 +2,18 @@ use std::fmt::{Debug, Formatter};
 use std::fs;
 use std::io::Error;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, warn};
+use log::{debug};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
 
 use crate::saito::io_event::IoEvent;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::PeerConfig;
 use saito_core::core::data::peer_service::PeerService;
 use saito_core::core::data::wallet::Wallet;

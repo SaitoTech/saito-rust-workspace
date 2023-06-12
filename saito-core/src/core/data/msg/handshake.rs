@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{info, warn};
+use log::{warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
 use crate::core::data::peer_service::PeerService;
