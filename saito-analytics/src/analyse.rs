@@ -91,7 +91,7 @@ pub fn runAnalytics() {
                 // Now you can analyse each block
                 println!(".....");
                 //block.generate();
-                blockchain.add_block_testing(block.clone());
+                //blockchain.add_block_testing(block.clone());
             }
         }
         Err(e) => {

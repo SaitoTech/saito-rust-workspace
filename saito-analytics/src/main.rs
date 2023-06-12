@@ -13,6 +13,7 @@ use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use serde_json;
 
 use log::{debug, error, info, trace, warn};
 
@@ -32,8 +33,9 @@ mod chain_manager;
 mod sutils;
 mod test_io_handler;
 
-use crate::sutils::get_blocks;
+use crate::sutils::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 
 //take blocks from a directory and output a utxo dump file
 async fn runDump() {
@@ -61,9 +63,48 @@ async fn runDump() {
     t.dump_utxoset(tresh).await;
 }
 
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    runDump().await;
+    //runDump().await;
+
+    let directory_path = "../../sampleblocks";
+
+    let mut t = chain_manager::ChainManager::new();
+    
+    let blocks_result = get_blocks(directory_path);
+
+    match blocks_result.as_ref() {
+        Ok(blocks) => {
+            println!("Got {} blocks", blocks.len());
+            for block in blocks {
+                println!(">>>>>>>>>>>");
+                if let Err(e) = pretty_print_block(&block) {
+                    eprintln!("Error pretty printing block: {}", e);
+                }
+
+                println!("tx -------");
+
+                //println!("{:?}", block.transactions[0]);
+                //pretty_print_tx(&block.transactions[0]);
+                for tx in &block.transactions {
+                    pretty_print_tx(&tx);
+                }
+            }
+
+            
+            //let block = blocks[0];
+            //let serialized_block = serde_json::to_string_pretty(block);
+            //println!("{:?}", serialized_block);
+            //Ok(())
+            
+        }
+        Err(e) => {
+            //eprintln!("Error reading blocks: {}", e);
+            eprintln!("Error ");
+        }
+    };
+
 
     //static analysis
     //analyse::runAnalytics();
