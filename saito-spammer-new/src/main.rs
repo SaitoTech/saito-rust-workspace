@@ -370,7 +370,6 @@ fn run_loop_thread(
     let loop_handle = tokio::spawn(async move {
         let mut work_done: bool;
         loop {
-            debug!("loop");
             work_done = false;
 
             let result = receiver.recv().await;
@@ -448,7 +447,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         process::exit(99);
     }));
 
-    println!("Running saito spammer");
+    println!("Running saito");
 
     // install global subscriber configured based on RUST_LOG envvar.
 
@@ -600,7 +599,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    println!("loop thread");
     let loop_handle = run_loop_thread(
         event_receiver_in_loop,
         network_event_sender_to_routing,
