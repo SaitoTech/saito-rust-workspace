@@ -35,18 +35,15 @@ mod test_io_handler;
 use crate::sutils::get_blocks;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    //static analysis
-    //analyse::runAnalytics();
-
-    //need to add type
+//take blocks from a directory and output a utxo dump file
+async fn runDump() {
+    //read from provided directory
+    let directory_path = "../../sampleblocks";
+    let tresh = 1000000;
 
     let mut t = chain_manager::ChainManager::new();
     t.show_info();
 
-    //read from provided directory
-    let directory_path = "../../sampleblocks";
     let blocks_result = get_blocks(directory_path);
 
     match blocks_result.as_ref() {
@@ -61,7 +58,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    t.dump_utxoset(0).await;
+    t.dump_utxoset(tresh).await;
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    runDump().await;
+
+    //static analysis
+    //analyse::runAnalytics();
+
+    //TODO need to add type
 
     //////////
     //simulated blocks
@@ -73,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
     // }
     //t.check_blockchain().await;
-    
+
     //t.dump_utxoset(20000000000).await;
 
     Ok(())

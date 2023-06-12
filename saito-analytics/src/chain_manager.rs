@@ -13,11 +13,11 @@ use std::io::Write;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
+use crate::test_io_handler::TestIOHandler;
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
     UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
 };
-use crate::test_io_handler::TestIOHandler;
 
 use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
@@ -34,7 +34,6 @@ use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::MiningEvent;
 use saito_core::{lock_for_read, lock_for_write};
-
 
 struct TestConfiguration {}
 
@@ -317,7 +316,6 @@ impl ChainManager {
                 //TODO check spendable only
 
                 tx.to.iter().for_each(|output| {
-
                     //input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
                     let output_hex = hex::encode(output.public_key);
                     //println!(">> {:?}", output_hex);
@@ -338,8 +336,8 @@ impl ChainManager {
         }
 
         for (key, value) in utxo_balances {
-            println!("pubkey: {}\t{}", key, value);
             if (value > threshold) {
+                println!("{}\t{}", key, value);
                 writeln!(file, "{} {:?}", key, value);
             }
         }
@@ -467,18 +465,14 @@ impl ChainManager {
         }
     }
 
-    //
-    // create block
-    //
-    pub async fn create_block(
+    pub async fn create_tx(
         &mut self,
-        parent_hash: SaitoHash,
-        timestamp: Timestamp,
+        public_key: &SaitoPublicKey,
+        private_key: &SaitoPrivateKey,
         txs_number: usize,
         txs_amount: Currency,
         txs_fee: Currency,
-        include_valid_golden_ticket: bool,
-    ) -> Block {
+    ) -> AHashMap<SaitoSignature, Transaction> {
         let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
         let private_key: SaitoPrivateKey;
         let public_key: SaitoPublicKey;
@@ -504,6 +498,34 @@ impl ChainManager {
             transaction.generate(&public_key, 0, 0);
             transactions.insert(transaction.signature, transaction);
         }
+
+        return transactions;
+    }
+
+    //
+    // create block
+    //
+    pub async fn create_block(
+        &mut self,
+        parent_hash: SaitoHash,
+        timestamp: Timestamp,
+        txs_number: usize,
+        txs_amount: Currency,
+        txs_fee: Currency,
+        include_valid_golden_ticket: bool,
+    ) -> Block {
+        let private_key: SaitoPrivateKey;
+        let public_key: SaitoPublicKey;
+        {
+            let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
+        }
+
+        let mut transactions = self
+            .create_tx(&public_key, &private_key, txs_number, txs_amount, txs_fee)
+            .await;
 
         if include_valid_golden_ticket {
             let (blockchain, _blockchain_) =
