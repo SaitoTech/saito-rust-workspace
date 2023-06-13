@@ -78,7 +78,7 @@ impl Storage {
 
     pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
         info!("loading blocks from disk");
-        // self.get_token_supply_slips_from_disk().await;
+        self.get_token_supply_slips_from_disk().await;
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
@@ -221,7 +221,7 @@ impl Storage {
             .expect("Decoding failed");
         let mut publickey_array: [u8; 33] = [0u8; 33];
         publickey_array.copy_from_slice(&publickey_vec);
-
+        println!("i am davik");
         // public_key_array.copy_from_slice(&v);
         // slip.public_key = public_key_array;
         let slip_type = match entries[2].trim_end_matches('\r') {
