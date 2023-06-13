@@ -37,6 +37,10 @@ use saito_core::{lock_for_read, lock_for_write};
 
 struct TestConfiguration {}
 
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
+
 impl Debug for TestConfiguration {
     fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
         todo!()
@@ -201,88 +205,63 @@ impl ChainManager {
         }
     }
 
-    //delete
-    pub async fn dump_utxoset_tmp(&self, threshold: i32) -> Result<(), Box<dyn Error>> {
+    pub async fn applyTx(&self, tx: Transaction, utxo_balances: &mut AHashMap<String, u64>) {
+        //apply
+        tx.from.iter().for_each(|input| {                                        
+            let input_hex = hex::encode(input.public_key);
+            let balance = utxo_balances.entry(input_hex).or_insert(0);
+            *balance -= input.amount;
+        });
+
+        tx.to.iter().for_each(|output| {
+            let output_hex = hex::encode(output.public_key);
+            let balance = utxo_balances.entry(output_hex).or_insert(0);
+            *balance += output.amount;
+        });
+    }
+
+    //pub async fn get_blocks(blockchain: Blockchain) -> Vec<Block> {
+    pub async fn get_blocks(&self) -> Vec<Block> {
+        println!(".........");
+        let mut blocks = Vec::new();
+
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-        let mut file = File::create("data/utxoset.txt")?; // Use await and ? here
-
-        // print to file in a format similar to the issuance files
-        //publickey \t amount \t type (normal)
-        //for entries in the hashmap that are spendable (i.e. key => value (1) )
-
-        let latest_block_id = blockchain.get_latest_block_id();
-        println!("latest_block_id {}", latest_block_id);
-
-        for i in 1..=latest_block_id {
-            println!("check {}", i);
+        //print_type_of(&blocks);
+        for i in 1..=blockchain.get_latest_block_id() {
             let block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(i as u64);
-            println!("WINDING ID HASH - {} {:?}", i, block_hash);
+            //println!("WINDING ID HASH - {} {:?}", i, block_hash);
             let block = blockchain.get_block(&block_hash).unwrap();
-            for j in 0..block.transactions.len() {
-                println!("tx j: {}", j);
-
-                println!("from len {:?}", block.transactions[j].from.len());
-                println!("to len {:?}", block.transactions[j].to.len());
-
-                block.transactions[j].from.iter().for_each(|input| {
-                    //input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
-                });
-
-                //block.transactions[j].on_chain_reorganization(&blockchain.utxoset, true, i as u64);
-            }
+            blocks.push(block);
         }
 
-        for (key, value) in &blockchain.utxoset {
-            let key_hex = hex::encode(&(*key));
-            if *value {
-                //spendable only
-                writeln!(file, "{}: {}", key_hex, value)?;
-            }
-        }
-
-        //self.from.iter().for_each(|input| {
-        //     input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
-        // });
-        // self.to.iter().for_each(|output| {
-        //     output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
-        // });
-
-        Ok(())
+        //TODO 
+        // blocks
+        //|         ^^^^^^ expected struct `saito_core::core::data::block::Block`, found `&saito_core::core::data::block::Block`
+        blocks
     }
 
-    //
-    // check that everything spendable in the main UTXOSET is spendable on the longest
-    // chain and vice-versa.
-    //
-    pub async fn dump_utxoset(&self, threshold: u64) {
-        //info!("check_utxoset");
-        println!("check_utxoset");
+    //a function which generates utxo balances by applying each block
+    //doesnt validate and not optimized
+    pub async fn get_utxobalances(&self, threshold: u64) -> AHashMap<String, u64> {
+
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
         type UtxoSetBalance = AHashMap<String, u64>;
 
-        //let mut utxoset: UtxoSet = AHashMap::new();
         let latest_block_id = blockchain.get_latest_block_id();
 
+        //the balance state which we aggregate to
         let mut utxo_balances: UtxoSetBalance = AHashMap::new();
 
-        //let mut file = File::create("data/utxoset.txt"); // Use await and ? here
-        let mut file = File::create("data/utxoset.txt").unwrap();
-
-        println!("UTXO state height: latest_block_id {}", latest_block_id);
-        writeln!(
-            file,
-            "UTXO state height: latest_block_id {}",
-            latest_block_id
-        );
+        //publickey \t amount \t type (normal)
+        //TODO check spendable only
 
         for i in 1..=latest_block_id {
-            //println!("check {}", i);
             let block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(i as u64);
@@ -290,50 +269,54 @@ impl ChainManager {
             let block = blockchain.get_block(&block_hash).unwrap();
             for j in 0..block.transactions.len() {
                 let mut tx = &block.transactions[j];
-                //println!("j: {}", j);
-                //println!("tx: {:?}", tx);
-                //UPDATE
-                //tx.on_chain_reorganization(&mut utxoset, true, i as u64);
-                //utxoset.insert(self.utxoset_key, spendable);
-                //println!(">>> {}", utxoset.len());
-                let input_slip_spendable = false;
-                let output_slip_spendable = true;
 
                 // println!("tx from >> {}", tx.from.len());
                 // println!("tx to >> {}", tx.to.len());
                 // println!("transaction_type  >> {:?}", tx.transaction_type);
 
-                tx.from.iter().for_each(|input| {
-                    //input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
-                    //println!("from {:?}", input);
+                //apply
+                //TODO fix
+                //self.applyTx(tx.clone(), &mut utxo_balances);
+                tx.from.iter().for_each(|input| {                                        
                     let input_hex = hex::encode(input.public_key);
+                    println!(">> {}", input_hex);
                     let balance = utxo_balances.entry(input_hex).or_insert(0);
+                    println!("-- {}", balance);
                     *balance -= input.amount;
                 });
 
-                //publickey \t amount \t type (normal)
-
-                //TODO check spendable only
-
                 tx.to.iter().for_each(|output| {
-                    //input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
                     let output_hex = hex::encode(output.public_key);
-                    //println!(">> {:?}", output_hex);
-                    //println!(">> amount: {:?}", output.amount);
+                    println!(">> {}", output_hex);
                     let balance = utxo_balances.entry(output_hex).or_insert(0);
+                    println!("-- {}", balance);
+                    //println!("{}: {}", output_hex, balance);
                     *balance += output.amount;
                 });
 
-                // need to add balances?
-
-                // tx.from.iter().for_each(|input| {
-                //     input.on_chain_reorganization(&utxoset, longest_chain, input_slip_spendable)
-                // });
-                // tx.to.iter().for_each(|output| {
-                //     output.on_chain_reorganization(&utxoset, longest_chain, output_slip_spendable)
-                // });
             }
         }
+
+        utxo_balances
+    }
+
+    //get utxo and write to file  
+    pub async fn dump_utxoset(&self, threshold: u64) {
+        println!("dump utxoset");
+        //let mut file = File::create("data/utxoset.txt"); // Use await and ? here
+        let mut file = File::create("data/utxoset.txt").unwrap();
+
+        let (blockchain, _blockchain_) =
+            lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+        println!("UTXO state height: latest_block_id {}", blockchain.get_latest_block_id());
+        writeln!(
+            file,
+            "UTXO state height: latest_block_id {}",
+            blockchain.get_latest_block_id()
+        );
+
+        let utxo_balances = self.get_utxobalances(threshold).await;
 
         for (key, value) in utxo_balances {
             if (value > threshold) {

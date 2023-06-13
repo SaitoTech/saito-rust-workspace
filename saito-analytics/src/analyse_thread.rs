@@ -17,7 +17,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{push_lock, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT};
+use saito_core::common::defs::{StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};

@@ -85,6 +85,7 @@ fn pretty_print_blocks() {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("main.....");
     //TODO need to add type
     //runDump().await;
 
@@ -105,8 +106,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     t.check_blockchain().await;
 
-    t.dump_utxoset(20000000000).await;
-    t.dump_utxoset(10000000000).await;
+    println!("... get_blocks ...");
+
+    t.get_blocks().await;
+
+    // t.dump_utxoset(20000000000).await;
+    // t.dump_utxoset(10000000000).await;
+    // t.dump_utxoset(0).await;
 
     Ok(())
 }
