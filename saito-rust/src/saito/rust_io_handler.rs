@@ -12,19 +12,21 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use crate::saito::io_event::IoEvent;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::peer_service::PeerService;
 use saito_core::core::data::wallet::Wallet;
 
 // use crate::saito::io_context::IoContext;
-use crate::IoEvent;
 
 lazy_static! {
     // pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
     pub static ref BLOCKS_DIR_PATH: String = configure_storage();
+    pub static ref WALLET_DIR_PATH: String = String::from("./data/wallet");
 }
 pub fn configure_storage() -> String {
     if cfg!(test) {
@@ -148,7 +150,7 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
+    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
         let filename = key.as_str();
         let path = Path::new(filename);
@@ -248,15 +250,21 @@ impl InterfaceIO for RustIOHandler {
     }
 
     fn send_interface_event(&self, event: InterfaceEvent) {
-        todo!()
+        // no one is listening to these events in rust node
     }
 
-    async fn save_wallet(&self) -> Result<(), Error> {
-        todo!()
+    async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
+        let buffer = wallet.serialize_for_disk();
+        self.write_value(WALLET_DIR_PATH.clone(), buffer).await
     }
 
-    async fn load_wallet(&self) -> Result<(), Error> {
-        todo!()
+    async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
+        if !self.is_existing_file(WALLET_DIR_PATH.clone()).await {
+            return Ok(());
+        }
+        let buffer = self.read_value(WALLET_DIR_PATH.clone()).await?;
+        wallet.deserialize_from_disk(&buffer);
+        Ok(())
     }
 
     async fn save_blockchain(&self) -> Result<(), Error> {
@@ -265,6 +273,10 @@ impl InterfaceIO for RustIOHandler {
 
     async fn load_blockchain(&self) -> Result<(), Error> {
         todo!()
+    }
+
+    fn get_my_services(&self) -> Vec<PeerService> {
+        vec![]
     }
 }
 

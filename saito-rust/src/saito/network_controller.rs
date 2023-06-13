@@ -20,6 +20,7 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
+use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
     push_lock, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
     LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
@@ -33,8 +34,11 @@ use saito_core::core::data::configuration::{Configuration, PeerConfig};
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::lock_for_read;
 
+use crate::saito::io_event::IoEvent;
 use crate::saito::rust_io_handler::BLOCKS_DIR_PATH;
-use crate::{IoEvent, NetworkEvent, TimeKeeper};
+use crate::saito::time_keeper::TimeKeeper;
+
+// use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
 type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
@@ -49,7 +53,12 @@ pub struct NetworkController {
 impl NetworkController {
     pub async fn send(connection: &mut PeerSender, peer_index: u64, buffer: Vec<u8>) -> bool {
         let mut send_failed = false;
-
+        trace!(
+            "sending buffer with size : {:?} to peer : {:?}",
+            buffer.len(),
+            peer_index
+        );
+        // TODO : can be better optimized if we buffer the messages and flush once per timer event
         match connection {
             PeerSender::Warp(sender) => {
                 if let Err(error) = sender.send(warp::ws::Message::binary(buffer)).await {
@@ -97,7 +106,11 @@ impl NetworkController {
         peer_index: u64,
         buffer: Vec<u8>,
     ) {
-        debug!("sending outgoing message : peer = {:?}", peer_index);
+        let buf_len = buffer.len();
+        debug!(
+            "sending outgoing message : peer = {:?} with size : {:?}",
+            peer_index, buf_len
+        );
         let mut sockets = sockets.lock().await;
         let socket = sockets.get_mut(&peer_index);
         if socket.is_none() {
@@ -111,6 +124,10 @@ impl NetworkController {
         let socket = socket.unwrap();
 
         if !Self::send(socket, peer_index, buffer).await {
+            warn!(
+                "failed sending buffer of size : {:?} to peer : {:?}",
+                buf_len, peer_index
+            );
             sockets.remove(&peer_index);
         }
     }
@@ -696,105 +713,121 @@ fn run_websocket_server(
             debug!("served block with : {:?} length", buffer_len);
             return result;
         });
-        let lite_route = warp::path!("lite-block" / String / String)
+        // TODO : review this code
+        let opt = warp::path::param::<String>()
+            .map(Some)
+            .or_else(|_| async { Ok::<(Option<String>,), std::convert::Infallible>((None,)) });
+        let lite_route = warp::path!("lite-block" / String / ..)
+            .and(opt)
+            .and(warp::path::end())
             .and(warp::any().map(move || peers.clone()))
             .and_then(
-            move |block_hash: String, key1: String,peers:Arc<RwLock<PeerCollection>>| async move {
-                debug!("serving block : {:?}", block_hash);
+                move |block_hash: String,
+                      key: Option<String>,
+                      peers: Arc<RwLock<PeerCollection>>| async move {
+                    debug!("serving lite block : {:?}", block_hash);
 
-                if key1.len() != 64 {
-                    warn!("key : {:?} is not valid", key1);
-                    return Err(warp::reject::reject());
-                }
-                let key;
-                if key1.is_empty() {
-                    key = public_key.clone();
-                } else {
-                    let result = hex::decode(key1.as_str());
-                    if result.is_err() {
-                        warn!("key : {:?} couldn't be decoded", key1);
-                        return Err(warp::reject::reject());
-                    }
-                    let result = result.unwrap();
-                    if result.len() != 33 {
-                        warn!("key length : {:?} is not for public key", result.len());
-                        return Err(warp::reject::reject());
-                    }
-                    key = result.try_into().unwrap();
-                }
-                let mut keylist;
-                {
-                    let (peers, _peers_) = lock_for_read!(peers, LOCK_ORDER_PEERS);
-                    let peer = peers.find_peer_by_address(&key);
-                    if peer.is_none() {
-                        keylist = vec![key];
+                    let mut key1 = String::from("");
+                    if key.is_some() {
+                        key1 = key.unwrap();
                     } else {
-                        keylist = peer.as_ref().unwrap().key_list.clone();
-                        keylist.push(key);
+                        warn!("key is not set to request lite blocks");
+                        return Err(warp::reject::reject());
                     }
-                }
 
-                // let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-
-                let mut buffer: Vec<u8> = Default::default();
-                let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
-                if result.is_err() {
-                    debug!("no blocks found");
-                    return Err(warp::reject::not_found());
-                }
-                let paths: Vec<_> = result
-                    .unwrap()
-                    .map(|r| r.unwrap())
-                    .filter(|r| {
-                        let filename = r.file_name().into_string().unwrap();
-                        if !filename.contains(BLOCK_FILE_EXTENSION) {
-                            return false;
+                    if key1.len() != 64 {
+                        warn!("key : {:?} is not valid", key1);
+                        return Err(warp::reject::reject());
+                    }
+                    let key;
+                    if key1.is_empty() {
+                        key = public_key.clone();
+                    } else {
+                        let result = hex::decode(key1.as_str());
+                        if result.is_err() {
+                            warn!("key : {:?} couldn't be decoded", key1);
+                            return Err(warp::reject::reject());
                         }
-                        if !filename.contains(block_hash.as_str()) {
-                            return false;
+                        let result = result.unwrap();
+                        if result.len() != 33 {
+                            warn!("key length : {:?} is not for public key", result.len());
+                            return Err(warp::reject::reject());
                         }
-                        debug!("selected file : {:?}", filename);
-                        return true;
-                    })
-                    .collect();
+                        key = result.try_into().unwrap();
+                    }
+                    let mut keylist;
+                    {
+                        let (peers, _peers_) = lock_for_read!(peers, LOCK_ORDER_PEERS);
+                        let peer = peers.find_peer_by_address(&key);
+                        if peer.is_none() {
+                            keylist = vec![key];
+                        } else {
+                            keylist = peer.as_ref().unwrap().key_list.clone();
+                            keylist.push(key);
+                        }
+                    }
 
-                if paths.is_empty() {
-                    return Err(warp::reject::not_found());
-                }
-                let path = paths.first().unwrap();
-                let file_path = BLOCKS_DIR_PATH.to_string()
-                    + "/"
-                    + path.file_name().into_string().unwrap().as_str();
-                let result = File::open(file_path.as_str()).await;
-                if result.is_err() {
-                    error!("failed opening file : {:?}", result.err().unwrap());
-                    todo!()
-                }
-                let mut file = result.unwrap();
+                    // let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
-                let result = file.read_to_end(&mut buffer).await;
-                if result.is_err() {
-                    error!("failed reading file : {:?}", result.err().unwrap());
-                    todo!()
-                }
-                drop(file);
+                    let mut buffer: Vec<u8> = Default::default();
+                    let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
+                    if result.is_err() {
+                        debug!("no blocks found");
+                        return Err(warp::reject::not_found());
+                    }
+                    let paths: Vec<_> = result
+                        .unwrap()
+                        .map(|r| r.unwrap())
+                        .filter(|r| {
+                            let filename = r.file_name().into_string().unwrap();
+                            if !filename.contains(BLOCK_FILE_EXTENSION) {
+                                return false;
+                            }
+                            if !filename.contains(block_hash.as_str()) {
+                                return false;
+                            }
+                            debug!("selected file : {:?}", filename);
+                            return true;
+                        })
+                        .collect();
 
-                let block = Block::deserialize_from_net(buffer);
-                if block.is_err() {
-                    error!("failed parsing buffer into a block");
-                    todo!()
-                }
-                let block = block.unwrap();
-                let block = block.generate_lite_block(keylist);
-                let buffer = block.serialize_for_net(BlockType::Full);
-                let buffer_len = buffer.len();
-                let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
-                debug!("served block with : {:?} length", buffer_len);
-                return result;
-                // }
-                // .await
-            },
-        );
+                    if paths.is_empty() {
+                        return Err(warp::reject::not_found());
+                    }
+                    let path = paths.first().unwrap();
+                    let file_path = BLOCKS_DIR_PATH.to_string()
+                        + "/"
+                        + path.file_name().into_string().unwrap().as_str();
+                    let result = File::open(file_path.as_str()).await;
+                    if result.is_err() {
+                        error!("failed opening file : {:?}", result.err().unwrap());
+                        todo!()
+                    }
+                    let mut file = result.unwrap();
+
+                    let result = file.read_to_end(&mut buffer).await;
+                    if result.is_err() {
+                        error!("failed reading file : {:?}", result.err().unwrap());
+                        todo!()
+                    }
+                    drop(file);
+
+                    let block = Block::deserialize_from_net(buffer);
+                    if block.is_err() {
+                        error!("failed parsing buffer into a block");
+                        todo!()
+                    }
+                    let block = block.unwrap();
+                    let block = block.generate_lite_block(keylist);
+                    let buffer = block.serialize_for_net(BlockType::Full);
+                    let buffer_len = buffer.len();
+                    let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
+                    debug!("served block with : {:?} length", buffer_len);
+                    return result;
+                    // }
+                    // .await
+                },
+            );
         let routes = http_route.or(ws_route).or(lite_route);
         // let (_, server) =
         //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {

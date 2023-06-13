@@ -23,6 +23,7 @@ use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;
 use crate::core::data::network::Network;
+use crate::core::data::peer_service::PeerService;
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::verification_thread::VerifyRequest;
@@ -246,9 +247,7 @@ impl RoutingThread {
                     ghost.prehashes.push(block.pre_hash);
                     ghost.previous_block_hashes.push(block.previous_block_hash);
                     ghost.block_ids.push(block.id);
-                    ghost
-                        .txs
-                        .push(block.has_keylist_transactions(vec![peer_public_key]));
+                    ghost.txs.push(block.has_keylist_txs(vec![peer_public_key]));
                 }
             }
         }
@@ -302,6 +301,7 @@ impl RoutingThread {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
             }
+            debug!("sending block header for : {:?}", hex::encode(block_hash));
             let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
@@ -424,7 +424,9 @@ impl RoutingThread {
             previous_block_hash = block_hash;
         }
     }
-    async fn process_peer_services(&mut self, services: Vec<String>, peer_index: u64) {
+
+    // TODO : remove if not required
+    async fn process_peer_services(&mut self, services: Vec<PeerService>, peer_index: u64) {
         let (mut peers, _peers_) = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_some() {

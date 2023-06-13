@@ -3,14 +3,17 @@ use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
-use log::{info, trace};
+use log::{debug, error, info, trace};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{PeerIndex, SaitoHash};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-
 use saito_core::core::data::configuration::PeerConfig;
+use saito_core::core::data::peer_service::PeerService;
+use saito_core::core::data::wallet::Wallet;
+
+use crate::wasm_peer_service::{WasmPeerService, WasmPeerServiceList};
 
 pub struct WasmIoHandler {}
 
@@ -98,7 +101,7 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn write_value(&mut self, key: String, value: Vec<u8>) -> Result<(), Error> {
+    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
         let array = js_sys::Uint8Array::new_with_length(value.len() as u32);
         array.copy_from(value.as_slice());
 
@@ -197,16 +200,19 @@ impl InterfaceIO for WasmIoHandler {
             InterfaceEvent::PeerConnected(index) => {
                 MsgHandler::send_interface_event("peer_connect".to_string(), index);
             }
+            InterfaceEvent::BlockAddSuccess(hash, block_id) => {
+                MsgHandler::send_block_success(hex::encode(hash), block_id);
+            }
         }
     }
 
-    async fn save_wallet(&self) -> Result<(), Error> {
+    async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
         MsgHandler::save_wallet();
         // TODO : return error state
         Ok(())
     }
 
-    async fn load_wallet(&self) -> Result<(), Error> {
+    async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
         MsgHandler::load_wallet();
         // TODO : return error state
         Ok(())
@@ -222,6 +228,37 @@ impl InterfaceIO for WasmIoHandler {
         MsgHandler::load_blockchain();
         // TODO : return error state
         Ok(())
+    }
+
+    fn get_my_services(&self) -> Vec<PeerService> {
+        // let mut services = vec![];
+        let mut result: WasmPeerServiceList = MsgHandler::get_my_services();
+        // for i in 0..result.length() {
+        //     // let service: WasmPeerService = result.at(i as i32) as WasmPeerService;
+        //     let service = serde_wasm_bindgen::from_value(result.at(i as i32));
+        //     if service.is_err() {
+        //         error!("failed deserializing service. {:?}", service.err().unwrap());
+        //         return vec![];
+        //     }
+        //     services.push(service.unwrap());
+        // }
+        // debug!("services 1 : {:?}", services);
+        // let services = JsValue::from(services);
+        // debug!("services 2 : {:?}", services);
+        // let services = serde_wasm_bindgen::from_value(services);
+        // if services.is_err() {
+        //     error!(
+        //         "failed deserializing services. {:?}",
+        //         services.err().unwrap()
+        //     );
+        //     return vec![];
+        // }
+        // let mut services: Vec<WasmPeerService> = services.unwrap();
+        result
+            .services
+            .drain(..)
+            .map(|s: WasmPeerService| s.service)
+            .collect()
     }
 }
 
@@ -281,6 +318,9 @@ extern "C" {
     pub fn send_interface_event(event: String, peer_index: u64);
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn send_block_success(hash: String, block_id: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn save_wallet();
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn load_wallet();
@@ -289,4 +329,7 @@ extern "C" {
     pub fn save_blockchain();
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn load_blockchain();
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn get_my_services() -> WasmPeerServiceList;
 }

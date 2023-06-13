@@ -46,6 +46,7 @@ use crate::wasm_blockchain::WasmBlockchain;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_peer::WasmPeer;
+use crate::wasm_peer_service::WasmPeerService;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
 use crate::wasm_wallet::WasmWallet;
@@ -239,13 +240,10 @@ pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue
     info!("initializing saito-wasm");
     trace!("trace test");
     debug!("debug test");
-    // return Ok(JsValue::from("sss"));
     {
         info!("setting configs...");
         let mut configs = CONFIGS.write().await;
         info!("config lock acquired");
-        // let str = js_sys::JSON::stringify(&json);
-        // info!("setting configs : {:?}", str.as_string().unwrap());
 
         let str: Result<String, _> = json.try_into();
         if str.is_err() {
@@ -264,7 +262,7 @@ pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue
         }
         let config = config.unwrap();
 
-        // info!("config : {:?}", config);
+        info!("config : {:?}", config);
 
         configs.replace(&config);
     }
@@ -303,7 +301,8 @@ pub async fn create_transaction(
         error!("failed parsing public key : {:?}", key.err().unwrap());
         todo!()
     }
-    let transaction = Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge);
+    let transaction =
+        Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge).unwrap();
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
     return Ok(wasm_transaction);
 }
@@ -318,6 +317,7 @@ pub async fn get_latest_block_hash() -> JsString {
     hex::encode(hash).into()
 }
 
+#[wasm_bindgen]
 pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
     debug!("get_block");
     let block_hash = string_to_key(block_hash);
@@ -426,7 +426,7 @@ pub async fn process_fetched_block(
 
 #[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
-    // trace!("process_timer_event");
+    // trace!("process_timer_event. duration : {:?}", duration_in_ms);
     let mut saito = SAITO.lock().await;
 
     let duration = Duration::from_millis(duration_in_ms);
@@ -691,22 +691,24 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
         .unwrap();
 }
 
-#[wasm_bindgen]
-pub async fn propagate_services(peer_index: PeerIndex, services: JsValue) {
-    info!("propagating services : {:?} - {:?}", peer_index, services);
-    let saito = SAITO.lock().await;
-    let arr = js_sys::Array::from(&services);
-    let mut services = vec![];
-    for i in 0..arr.length() {
-        let service: String = JsString::from(arr.at(i as i32)).into();
-        services.push(service);
-    }
-    saito
-        .routing_thread
-        .network
-        .propagate_services(peer_index, services)
-        .await;
-}
+// #[wasm_bindgen]
+// pub async fn propagate_services(peer_index: PeerIndex, services: JsValue) {
+//     info!("propagating services : {:?} - {:?}", peer_index, services);
+//     let arr = js_sys::Array::from(&services);
+//     let mut services: Vec<WasmPeerService> = serde_wasm_bindgen::from_value(services).unwrap();
+//     // for i in 0..arr.length() {
+//     //     let service = WasmPeerService::from(arr.at(i as i32));
+//     //     let service = service.service;
+//     //     services.push(service);
+//     // }
+//     let services = services.drain(..).map(|s| s.service).collect();
+//     let saito = SAITO.lock().await;
+//     saito
+//         .routing_thread
+//         .network
+//         .propagate_services(peer_index, services)
+//         .await;
+// }
 
 #[wasm_bindgen]
 pub async fn get_wallet() -> WasmWallet {

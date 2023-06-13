@@ -13,6 +13,7 @@ use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
 use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
+use crate::core::data::peer_service::PeerService;
 use crate::core::data::wallet::Wallet;
 use crate::lock_for_read;
 
@@ -25,7 +26,7 @@ pub struct Peer {
     pub static_peer_config: Option<data::configuration::PeerConfig>,
     pub challenge_for_peer: Option<SaitoHash>,
     pub key_list: Vec<SaitoPublicKey>,
-    pub services: Vec<String>,
+    pub services: Vec<PeerService>,
 }
 
 impl Peer {
@@ -87,6 +88,7 @@ impl Peer {
             challenge: generate_random_bytes(32).try_into().unwrap(),
             is_lite,
             block_fetch_url,
+            services: io_handler.get_my_services(),
         };
 
         self.challenge_for_peer = Some(response.challenge);
@@ -148,6 +150,7 @@ impl Peer {
         self.challenge_for_peer = None;
         self.public_key = Some(response.public_key);
         self.block_fetch_url = response.block_fetch_url;
+        self.services = response.services;
 
         if self.static_peer_config.is_none() {
             // this is only called in initiator's side.
@@ -160,6 +163,7 @@ impl Peer {
                 is_lite,
                 block_fetch_url: block_fetch_url.to_string(),
                 challenge: generate_random_bytes(32).try_into().unwrap(),
+                services: io_handler.get_my_services(),
             };
             io_handler
                 .send_message(self.index, Message::HandshakeResponse(response).serialize())
@@ -190,13 +194,21 @@ impl Peer {
     ///
     /// ```
     pub fn get_block_fetch_url(&self, block_hash: SaitoHash, lite: bool) -> String {
-        let str = if lite { "/block/" } else { "/lite-block/" };
-
         // TODO : generate the url with proper / escapes,etc...
-        self.block_fetch_url.to_string() + str + hex::encode(block_hash).as_str()
+        if lite {
+            self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
+
+            // TODO : uncomment when fixing lite-mode bugs
+            // self.block_fetch_url.to_string()
+            //     + "/lite-block/"
+            //     + hex::encode(block_hash).as_str()
+            //     + "/"
+        } else {
+            self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
+        }
     }
     pub fn has_service(&self, service: String) -> bool {
-        self.services.contains(&service)
+        self.services.iter().any(|s| s.service == service)
     }
     pub fn is_main_peer(&self) -> bool {
         if self.static_peer_config.is_none() {

@@ -16,6 +16,7 @@ use crate::common::defs::{
     LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
     MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
+use crate::common::interface_io::InterfaceEvent;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::configuration::Configuration;
@@ -462,11 +463,13 @@ impl Blockchain {
         // print blockring longest_chain_block_hash infor
         self.print(10);
 
+        let block_id;
         //
         // save to disk
         //
         {
             let block = self.get_mut_block(&block_hash).unwrap();
+            block_id = block.id;
             if block.block_type != BlockType::Header {
                 // TODO : this will have an impact when the block sizes are getting large or there are many forks. need to handle this
                 storage.write_block_to_disk(block).await;
@@ -549,6 +552,9 @@ impl Blockchain {
             }
         }
         info!("block {:?} added successfully", hex::encode(block_hash));
+        network
+            .io_interface
+            .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block_id));
     }
 
     pub async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
@@ -1411,7 +1417,7 @@ impl Blockchain {
         //
         {
             let pblock = self.blocks.get(&delete_block_hash).unwrap();
-            let pblock_filename = storage.generate_block_filename(pblock);
+            let pblock_filename = storage.generate_block_filepath(pblock);
 
             //
             // remove slips from wallet

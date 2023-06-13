@@ -56,18 +56,12 @@ impl Storage {
             .await
     }
 
-    pub fn generate_block_filename(&self, block: &Block) -> String {
-        let timestamp = block.timestamp;
-        let block_hash = block.hash;
-        self.io_interface.get_block_dir().to_string()
-            + timestamp.to_string().as_str()
-            + "-"
-            + hex::encode(block_hash).as_str()
-            + BLOCK_FILE_EXTENSION
+    pub fn generate_block_filepath(&self, block: &Block) -> String {
+        self.io_interface.get_block_dir() + block.get_file_name().as_str()
     }
     pub async fn write_block_to_disk(&mut self, block: &Block) -> String {
         let buffer = block.serialize_for_net(BlockType::Full);
-        let filename = self.generate_block_filename(block);
+        let filename = self.generate_block_filepath(block);
 
         let result = self
             .io_interface
@@ -84,7 +78,7 @@ impl Storage {
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
-            error!("{:?}", file_names.err().unwrap());
+            error!("failed loading blocks . {:?}", file_names.err().unwrap());
             return;
         }
         let mut file_names = file_names.unwrap();
@@ -114,6 +108,7 @@ impl Storage {
                 continue;
             }
             let mut block = result.unwrap();
+            block.force_loaded = true;
             block.generate();
             info!("block : {:?} loaded from disk", hex::encode(block.hash));
             let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
@@ -317,7 +312,7 @@ mod test {
         );
         assert!(result);
 
-        let filename = t.storage.generate_block_filename(&block);
+        let filename = t.storage.generate_block_filepath(&block);
         assert_eq!(
             filename,
             "./data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai"

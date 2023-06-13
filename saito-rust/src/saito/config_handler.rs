@@ -77,9 +77,8 @@ impl ConfigHandler {
 mod test {
     use std::io::ErrorKind;
 
+    use crate::saito::config_handler::ConfigHandler;
     use saito_core::core::data::configuration::Configuration;
-
-    use crate::ConfigHandler;
 
     #[test]
     fn load_config_from_existing_file() {
