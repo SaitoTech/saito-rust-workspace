@@ -75,7 +75,7 @@ jobs:
 
       - name: Wasm Build
         if: ${{ env.latest_version != env.current_version }}
-        run: npm run build
+        run: npm run build-prod
         working-directory: saito-wasm
 
       - name: Publish package
