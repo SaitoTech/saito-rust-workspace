@@ -249,7 +249,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
             if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                let mut block;
+                let block;
                 let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
                 block = mempool
@@ -263,29 +263,41 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 // let private_key = wallet.private_key;
 
                 // writable wallet
-                let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
-                let public_key = wallet.public_key;
-                let private_key = wallet.private_key;
-                let mut tx = Transaction::create(&mut wallet, public_key, 0, 0, false).unwrap();
-                tx.transaction_type = TransactionType::Issuance;
-                debug!("{:?}", tx);
+                // let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+                // let public_key = wallet.public_key;
+                // let private_key = wallet.private_key;
+                // let mut tx = Transaction::create(&mut wallet, public_key, 0, 0, false).unwrap();
+                // tx.transaction_type = TransactionType::Issuance;
+                // debug!("{:?}", tx);
                 // let private_key = wallet.private_key;
                 // let block_id = block.id;
                 let slips = self.storage.get_token_supply_slips_from_disk().await;
 
-                for slip in slips {
-                    tx.to.push(slip);
-                }
-                tx.generate(&public_key, 0, 1);
-                tx.sign(&private_key);
-                block.add_transaction(tx);
+                // for slip in slips {
+                //     tx.to.push(slip);
+                // }
+                // tx.generate(&public_key, 0, 1);
+                // tx.sign(&private_key);
+                // block.add_transaction(tx);
 
                 // block.generate();
                 // block.sign(&private_key);
-            }
 
-            self.generate_genesis_block = false;
-            return Some(());
+                let result = blockchain
+                    .add_block(
+                        block,
+                        &self.network,
+                        &mut self.storage,
+                        self.sender_to_miner.clone(),
+                        &mut mempool,
+                        configs.deref(),
+                    )
+                    .await;
+
+                // println!("{} addblock result", result)
+                self.generate_genesis_block = false;
+                return Some(());
+            }
         }
 
         // generate test transactions
