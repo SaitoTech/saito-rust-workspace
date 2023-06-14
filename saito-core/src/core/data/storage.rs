@@ -221,9 +221,7 @@ impl Storage {
             .expect("Decoding failed");
         let mut publickey_array: [u8; 33] = [0u8; 33];
         publickey_array.copy_from_slice(&publickey_vec);
-        println!("i am davik");
-        // public_key_array.copy_from_slice(&v);
-        // slip.public_key = public_key_array;
+
         let slip_type = match entries[2].trim_end_matches('\r') {
             "VipOutput" => SlipType::VipOutput,
             "Normal" => SlipType::Normal,
