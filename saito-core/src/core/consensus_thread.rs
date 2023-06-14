@@ -191,7 +191,7 @@ impl ConsensusThread {
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
-        info!("generating mock transactions");
+        info!("generating mock transaction");
 
         let txs_to_generate = 10;
         let bytes_per_tx = 1024;
