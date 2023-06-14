@@ -297,7 +297,7 @@ mod test {
 
     #[ignore]
     #[tokio::test]
-    async fn read_issuance_file_test() {
+    // async fn read_issuance_file_test() {
         let mut t = TestManager::new();
         t.initialize(100, 100_000_000).await;
 
