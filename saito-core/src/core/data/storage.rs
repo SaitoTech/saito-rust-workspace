@@ -230,18 +230,23 @@ impl Storage {
             _ => panic!("Invalid slip type"),
         };
 
-        let mut slip = Slip {
-            public_key: publickey_array,
-            slip_index: 0,
-            amount,
-            block_id: 1,
-            tx_ordinal: 0,
-            slip_type,
-            utxoset_key: [0; 58],
-            is_utxoset_key_set: false,
-        };
+        let mut slip = Slip::default();
+        slip.amount = amount;
+        slip.public_key = publickey_array;
+        slip.slip_type = slip_type;
 
-        slip.generate_utxoset_key();
+        // let mut slip = Slip {
+        //     public_key: publickey_array,
+        //     slip_index: 0,
+        //     amount,
+        //     block_id: 1,
+        //     tx_ordinal: 0,
+        //     slip_type,
+        //     utxoset_key: [0; 58],
+        //     is_utxoset_key_set: false,
+        // };
+
+        // slip.generate_utxoset_key();
         return slip;
     }
     // pub fn read_lines_from_file<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>

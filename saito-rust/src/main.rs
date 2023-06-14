@@ -100,8 +100,8 @@ where
                 .is_some()
             {
                 work_done = true;
-            }else {
-                debug!("No work done")
+            } else {
+                // debug!("No work done")
             }
 
             #[cfg(feature = "with-stats")]

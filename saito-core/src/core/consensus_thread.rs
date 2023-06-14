@@ -21,6 +21,7 @@ use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
+use crate::core::data::slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
@@ -140,6 +141,36 @@ impl ConsensusThread {
             );
         }
     }
+    async fn generate_issuance_tx(
+        &self,
+        mempool: Arc<RwLock<Mempool>>,
+        blockchain: Arc<RwLock<Blockchain>>,
+    ) {
+        info!("generating issuance init transaction");
+
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+
+        {
+            let slips = self.storage.get_token_supply_slips_from_disk().await;
+            let mut txs: Vec<Transaction> = vec![];
+            for slip in slips {
+                debug!("{:?} slip public key", hex::encode(slip.public_key));
+                txs.push(Transaction::create_issuance_transaction(
+                    slip.public_key,
+                    slip.amount,
+                ));
+            }
+
+            debug!("{:?} transaction from slips", txs);
+            for tx in txs {
+                mempool
+                    .add_transaction_if_validates(tx.clone(), &blockchain)
+                    .await;
+                info!("added issuance init tx for : {:?}", tx.to[0].public_key);
+            }
+        }
+    }
     /// Test method to generate test transactions
     ///
     /// # Arguments
@@ -238,61 +269,34 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         let duration_value = duration.as_millis() as u64;
 
         if self.generate_genesis_block {
-            Self::generate_spammer_init_tx(
-                self.mempool.clone(),
-                self.wallet.clone(),
-                self.blockchain.clone(),
-            )
-            .await;
+            Self::generate_issuance_tx(self, self.mempool.clone(), self.blockchain.clone()).await;
 
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            let (mut blockchain, _blockchain_) =
-                lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-            if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                let block;
-                let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
+            {
+                let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+                let (mut blockchain, _blockchain_) =
+                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
+                    let block: Block;
+                    let (mut mempool, _mempool_) =
+                        lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
-                block = mempool
-                    .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
-                    .await;
-                println!(" block ider {:?}", &block.id);
+                    block = mempool
+                        .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                        .await;
 
-                // // readable wallet
-                // let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
-                // let public_key = wallet.public_key;
-                // let private_key = wallet.private_key;
+                    println!(" block ider {:?}", &block.id);
 
-                // writable wallet
-                // let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
-                // let public_key = wallet.public_key;
-                // let private_key = wallet.private_key;
-                // let mut tx = Transaction::create(&mut wallet, public_key, 0, 0, false).unwrap();
-                // tx.transaction_type = TransactionType::Issuance;
-                // debug!("{:?}", tx);
-                // let private_key = wallet.private_key;
-                // let block_id = block.id;
-                let slips = self.storage.get_token_supply_slips_from_disk().await;
-
-                // for slip in slips {
-                //     tx.to.push(slip);
-                // }
-                // tx.generate(&public_key, 0, 1);
-                // tx.sign(&private_key);
-                // block.add_transaction(tx);
-
-                // block.generate();
-                // block.sign(&private_key);
-
-                let result = blockchain
-                    .add_block(
-                        block,
-                        &self.network,
-                        &mut self.storage,
-                        self.sender_to_miner.clone(),
-                        &mut mempool,
-                        configs.deref(),
-                    )
-                    .await;
+                    let res = blockchain
+                        .add_block(
+                            block,
+                            &self.network,
+                            &mut self.storage,
+                            self.sender_to_miner.clone(),
+                            &mut mempool,
+                            configs.deref(),
+                        )
+                        .await;
+                }
 
                 // println!("{} addblock result", result)
                 self.generate_genesis_block = false;
