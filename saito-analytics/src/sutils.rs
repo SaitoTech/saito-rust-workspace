@@ -20,7 +20,6 @@ use saito_core::{lock_for_read, lock_for_write};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio::sync::RwLock;
 
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PrettyBlock {
     pub id: u64,
@@ -45,10 +44,8 @@ pub struct PrettyTx {
 
 use saito_core::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
-    Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, LOCK_ORDER_WALLET
+    Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, LOCK_ORDER_WALLET,
 };
-
-
 
 pub fn bytes_to_hex_string(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{:02x}", byte)).collect()
@@ -145,9 +142,7 @@ pub fn get_blocks(directory_path: &str) -> io::Result<Vec<Block>> {
 }
 
 //COPIED
-async fn generate_spammer_init_tx(
-    wallet: Arc<RwLock<Wallet>>,
-) {
+async fn generate_spammer_init_tx(wallet: Arc<RwLock<Wallet>>) {
     info!("generating spammer init transaction");
 
     let private_key;
@@ -167,6 +162,5 @@ async fn generate_spammer_init_tx(
         let mut vip_transaction =
             Transaction::create_vip_transaction(spammer_public_key, 100_000_000);
         vip_transaction.sign(&private_key);
-
     }
 }

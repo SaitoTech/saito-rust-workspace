@@ -1573,9 +1573,7 @@ mod tests {
 
     use tokio::sync::RwLock;
 
-    use crate::common::defs::{
-        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
-    };
+    use crate::common::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET};
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};

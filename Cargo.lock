@@ -1829,26 +1829,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "saito-tester"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "ctor",
- "ctrlc",
- "figment",
- "futures",
- "hex",
- "log",
- "rayon",
- "saito-core",
- "saito-rust",
- "serde",
- "serial_test",
- "tokio",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "saito-wasm"
 version = "0.1.1"
 dependencies = [

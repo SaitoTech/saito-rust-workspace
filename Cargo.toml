@@ -1,3 +1,3 @@
 [workspace]
 
-members = ["saito-core", "saito-wasm", "saito-rust", "saito-spammer-new", "saito-analytics", "saito-tester"]
+members = ["saito-core", "saito-wasm", "saito-rust", "saito-spammer-new", "saito-analytics"]

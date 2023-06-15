@@ -4,9 +4,7 @@ use std::sync::Arc;
 use log::{info, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
-    push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
-};
+use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET};
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data;
 use crate::core::data::configuration::Configuration;

@@ -60,7 +60,6 @@ pub fn runAnalytics() {
         }
     };
 
-
     let keys = generate_keys();
 
     let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
@@ -86,5 +85,4 @@ pub fn runAnalytics() {
             eprintln!("Error reading blocks: {}", e);
         }
     };
-
 }

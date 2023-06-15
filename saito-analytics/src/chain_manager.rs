@@ -22,9 +22,7 @@ use saito_core::common::defs::{
 use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
-use saito_core::core::data::crypto::{
-    generate_keys, generate_random_bytes, hash, verify_signature,
-};
+use saito_core::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
@@ -205,49 +203,45 @@ impl ChainManager {
         }
     }
 
-    pub async fn applyTx(&self, tx: Transaction, utxo_balances: &mut AHashMap<String, u64>) {
+    pub fn applyTx(&self, tx: Transaction, utxo_balances: &mut AHashMap<String, u64>) {
         //apply
-        tx.from.iter().for_each(|input| {                                        
+        println!("applyTx");
+        tx.from.iter().for_each(|input| {
             let input_hex = hex::encode(input.public_key);
             let balance = utxo_balances.entry(input_hex).or_insert(0);
             *balance -= input.amount;
+            println!("bal {}", balance);
         });
 
         tx.to.iter().for_each(|output| {
             let output_hex = hex::encode(output.public_key);
             let balance = utxo_balances.entry(output_hex).or_insert(0);
             *balance += output.amount;
+            println!("bal {}", balance);
         });
     }
 
-    //pub async fn get_blocks(blockchain: Blockchain) -> Vec<Block> {
     pub async fn get_blocks(&self) -> Vec<Block> {
-        println!(".........");
         let mut blocks = Vec::new();
 
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-        //print_type_of(&blocks);
         for i in 1..=blockchain.get_latest_block_id() {
             let block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_by_block_id(i as u64);
             //println!("WINDING ID HASH - {} {:?}", i, block_hash);
-            let block = blockchain.get_block(&block_hash).unwrap();
+            let block = blockchain.get_block(&block_hash).unwrap().clone();
             blocks.push(block);
         }
 
-        //TODO 
-        // blocks
-        //|         ^^^^^^ expected struct `saito_core::core::data::block::Block`, found `&saito_core::core::data::block::Block`
         blocks
     }
 
     //a function which generates utxo balances by applying each block
     //doesnt validate and not optimized
     pub async fn get_utxobalances(&self, threshold: u64) -> AHashMap<String, u64> {
-
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
@@ -270,37 +264,18 @@ impl ChainManager {
             for j in 0..block.transactions.len() {
                 let mut tx = &block.transactions[j];
 
-                // println!("tx from >> {}", tx.from.len());
-                // println!("tx to >> {}", tx.to.len());
+                //println!("tx from >> {}", tx.from.len());
+                //println!("tx to >> {}", tx.to.len());
                 // println!("transaction_type  >> {:?}", tx.transaction_type);
 
-                //apply
-                //TODO fix
-                //self.applyTx(tx.clone(), &mut utxo_balances);
-                tx.from.iter().for_each(|input| {                                        
-                    let input_hex = hex::encode(input.public_key);
-                    println!(">> {}", input_hex);
-                    let balance = utxo_balances.entry(input_hex).or_insert(0);
-                    println!("-- {}", balance);
-                    *balance -= input.amount;
-                });
-
-                tx.to.iter().for_each(|output| {
-                    let output_hex = hex::encode(output.public_key);
-                    println!(">> {}", output_hex);
-                    let balance = utxo_balances.entry(output_hex).or_insert(0);
-                    println!("-- {}", balance);
-                    //println!("{}: {}", output_hex, balance);
-                    *balance += output.amount;
-                });
-
+                self.applyTx(tx.clone(), &mut utxo_balances);
             }
         }
 
         utxo_balances
     }
 
-    //get utxo and write to file  
+    //get utxo and write to file
     pub async fn dump_utxoset(&self, threshold: u64) {
         println!("dump utxoset");
         //let mut file = File::create("data/utxoset.txt"); // Use await and ? here
@@ -309,7 +284,10 @@ impl ChainManager {
         let (blockchain, _blockchain_) =
             lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-        println!("UTXO state height: latest_block_id {}", blockchain.get_latest_block_id());
+        println!(
+            "UTXO state height: latest_block_id {}",
+            blockchain.get_latest_block_id()
+        );
         writeln!(
             file,
             "UTXO state height: latest_block_id {}",

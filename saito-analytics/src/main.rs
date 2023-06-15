@@ -85,8 +85,8 @@ fn pretty_print_blocks() {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("main.....");
-    //TODO need to add type
+    println!("run analytics");
+
     //runDump().await;
 
     //pretty_print_blocks();
@@ -108,7 +108,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("... get_blocks ...");
 
-    t.get_blocks().await;
+    let v = t.get_blocks().await;
+    println!("{}", v.len());
+
+    let b = t.get_utxobalances(0).await;
+    println!("{}", b.len());
+
+    let mut sumv = 0;
+    for (key, value) in b {
+        println!("{}\t{}", key, value);
+        sumv += value;
+    }
+    println!("{}", sumv);
+    //assert_eq(1_000_000_000, sumv);
 
     // t.dump_utxoset(20000000000).await;
     // t.dump_utxoset(10000000000).await;
