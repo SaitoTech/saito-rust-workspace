@@ -14,6 +14,7 @@ use saito_core::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
 use saito_core::core::data::crypto::generate_keys;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::transaction::TransactionType;
+use saito_core::core::data::slip::Slip;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::common::defs::push_lock;
 use saito_core::{lock_for_read, lock_for_write};
@@ -41,6 +42,15 @@ pub struct PrettyTx {
     //pub to: Vec<Slip>,
     pub transaction_type: TransactionType,
 }
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PrettySlip {
+    //pub public_key: SaitoPublicKey,
+    pub amount: Currency,
+}
+
+
 
 use saito_core::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
@@ -79,11 +89,22 @@ pub fn pretty_print_block(block: &Block) -> Result<(), serde_json::Error> {
 pub fn pretty_print_tx(tx: &Transaction) -> Result<(), serde_json::Error> {
     let pretty_tx = PrettyTx {
         timestamp: tx.timestamp,
-        transaction_type: tx.transaction_type,
+        transaction_type: tx.transaction_type,        
     };
 
     let tx_string = serde_json::to_string_pretty(&pretty_tx)?;
     println!("{}", tx_string);
+
+    Ok(())
+}
+
+pub fn pretty_print_slip(slip: &Slip) -> Result<(), serde_json::Error> {
+    let pretty_slip = PrettySlip {
+        amount: slip.amount,        
+    };
+
+    let slip_str = serde_json::to_string_pretty(&pretty_slip)?;
+    println!("{}", slip_str);
 
     Ok(())
 }

@@ -205,7 +205,7 @@ impl ChainManager {
 
     pub fn applyTx(&self, tx: Transaction, utxo_balances: &mut AHashMap<String, u64>) {
         //apply
-        println!("applyTx");
+        //trace!("applyTx");
         tx.from.iter().for_each(|input| {
             let input_hex = hex::encode(input.public_key);
             let balance = utxo_balances.entry(input_hex).or_insert(0);
@@ -557,36 +557,27 @@ impl ChainManager {
         GoldenTicket::new(block_hash, random_bytes, public_key)
     }
 
-    pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: Currency) {
+    pub async fn initialize(&mut self, num_ip_transactions: u64, vip_amount: Currency) {
         let timestamp = create_timestamp();
-        self.initialize_with_timestamp(vip_transactions, vip_amount, timestamp)
+        self.initialize_with_timestamp(num_ip_transactions, vip_amount, timestamp)
             .await;
     }
 
-    //
-    // initialize chain
-    //
-    // creates and adds the first block to the blockchain, with however many VIP
-    // transactions are necessary
-    pub async fn initialize_with_timestamp(
-        &mut self,
-        vip_transactions: u64,
-        vip_amount: Currency,
-        timestamp: Timestamp,
-    ) {
-        //
-        // initialize timestamp
-        //
+    pub async fn generate_vip_transactions(&mut self, n: u64, public_key: SaitoPublicKey, private_key: SaitoPrivateKey, vip_amount: u64) -> Vec<Transaction> {
+        //TODO timestamp?
+        let mut transactions = Vec::new();
+        
+        for _i in 0..n {
+            let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
+            tx.generate(&public_key, 0, 0);
+            tx.sign(&private_key);
+            transactions.push(tx);
+        }
+        
+        transactions
+    }
 
-        //
-        // reset data dirs
-        //
-        tokio::fs::remove_dir_all("data/blocks").await;
-        tokio::fs::create_dir_all("data/blocks").await.unwrap();
-        tokio::fs::remove_dir_all("data/wallets").await;
-        tokio::fs::create_dir_all("data/wallets").await.unwrap();
-
-        //
+    pub async fn generate_tx(&mut self, num_ip_transactions: u64, vip_amount: u64) -> Vec<Transaction> {
         // create initial transactions
         //
         let private_key: SaitoPrivateKey;
@@ -598,37 +589,58 @@ impl ChainManager {
             private_key = wallet.private_key;
         }
 
+        let transactions = self.generate_vip_transactions(num_ip_transactions as u64, public_key, private_key, vip_amount).await;
+        transactions
+    }
+
+    pub async fn initialize_with_block(&mut self, tx_vec: Vec<Transaction>) {
+        // and add first block to blockchain
+        //self.add_block(block).await;
+    }
+
+    pub async fn make_first_block(&mut self, timestamp: Timestamp) -> Block {
         //
         // create first block
         //
         let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
-        //
-        // generate UTXO-carrying VIP transactions
-        //
-        for _i in 0..vip_transactions {
-            let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
-            tx.generate(&public_key, 0, 0);
-            tx.sign(&private_key);
-            block.add_transaction(tx);
-        }
+        // //iterate over the transactions vector and add each transaction to the block
+        // for tx in transactions {
+        //     block.add_transaction(tx);
+        // }
 
-        {
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            // we have added VIP, so need to regenerate the merkle-root
-            block.merkle_root =
-                block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
-        }
-        block.generate();
-        block.sign(&private_key);
+        // {
+        //     let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        //     // we have added VIP, so need to regenerate the merkle-root
+        //     block.merkle_root =
+        //         block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+        // }
+        // block.generate();
+        // block.sign(&private_key);
 
-        assert!(verify_signature(
-            &block.pre_hash,
-            &block.signature,
-            &block.creator,
-        ));
+        // assert!(verify_signature(
+        //     &block.pre_hash,
+        //     &block.signature,
+        //     &block.creator,
+        // ));
 
-        // and add first block to blockchain
-        self.add_block(block).await;
+        block
+    }
+
+    //
+    // initialize chain
+    //
+    // creates and adds the first block to the blockchain, with however many VIP
+    // transactions are necessary
+    pub async fn initialize_with_timestamp(
+        &mut self,
+        num_ip_transactions: u64,
+        vip_amount: Currency,
+        timestamp: Timestamp,
+    ) {
+        
+        //let transactions = self.generate_tx(num_ip_transactions as u64, vip_amount).await;
+
+        //self.initialize_with_block(block);
     }
 }
