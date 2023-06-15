@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::io;
 
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
@@ -80,8 +81,8 @@ impl Storage {
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
-            //error!("failed loading blocks . {:?}", file_names.err().unwrap());
-            //return;
+            error!("failed loading blocks . {:?}", file_names.err().unwrap());
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed loading blocks"));
         }
         let mut file_names = file_names.unwrap();
         file_names.sort();
@@ -126,12 +127,13 @@ impl Storage {
         let result = self.load_blocks_from_disk_vec().await;
     
         match result {
-            Ok(blocks): io::Result<Vec<Block>> => {
+            //Ok(blocks): io::Result<Vec<Block>> => {
+            Ok(blocks) => {    
                 trace!("block file loading finished");
                 
                 let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
                 
-                for block in &mut blocks {                      
+                for block in blocks {                      
                     mempool.add_block(block);
                     info!("loading blocks to mempool completed");
                 }
