@@ -7,10 +7,7 @@ use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use serde_with::serde_as;
-//use serde_hex::{SerHex, Hex};
-use std::array::TryFromSliceError;
+use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
@@ -29,7 +26,6 @@ use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_S
 use crate::iterate;
 
 pub const BLOCK_HEADER_SIZE: usize = 245;
-
 
 //
 // object used when generating and validation transactions, containing the
