@@ -49,11 +49,6 @@ use saito_core::common::defs::{
 };
 
 
-// fn pretty_print_block1(block: &Block) -> Result<(), Error> {
-//     let serialized_block = serde_json::to_string_pretty(block)?;
-//     println!("{}", serialized_block);
-//     Ok(())
-// }
 
 pub fn bytes_to_hex_string(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{:02x}", byte)).collect()
@@ -64,6 +59,7 @@ pub fn pretty_print_block(block: &Block) -> Result<(), serde_json::Error> {
         id: block.id,
         timestamp: block.timestamp,
         previous_block_hash: bytes_to_hex_string(&block.previous_block_hash),
+        //TODO more fields
         //creator: block.creator.iter().map(|byte| format!("{:02x}", byte)).collect(),
         //merkle_root: block.merkle_root.iter().map(|byte| format!("{:02x}", byte)).collect(),
         //merkle_root: string,
@@ -76,8 +72,6 @@ pub fn pretty_print_block(block: &Block) -> Result<(), serde_json::Error> {
     println!("{}", block_string);
 
     println!("--- tx -------");
-    //println!("{:?}", block.transactions[0]);
-    //pretty_print_tx(&block.transactions[0]);
     for tx in &block.transactions {
         pretty_print_tx(&tx);
     }
@@ -113,6 +107,7 @@ pub fn read_block(path: String) -> io::Result<Block> {
 }
 
 //read block directory as block vector
+//SHOULD BE IN CORE?
 pub fn get_blocks(directory_path: &str) -> io::Result<Vec<Block>> {
     let mut blocks = Vec::new();
 
@@ -149,6 +144,7 @@ pub fn get_blocks(directory_path: &str) -> io::Result<Vec<Block>> {
     Ok(blocks)
 }
 
+//COPIED
 async fn generate_spammer_init_tx(
     wallet: Arc<RwLock<Wallet>>,
 ) {

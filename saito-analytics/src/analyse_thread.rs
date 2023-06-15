@@ -47,6 +47,7 @@ const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
+//COPIED
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
     mut network_event_receiver: Option<Receiver<NetworkEvent>>,
@@ -120,6 +121,7 @@ where
     })
 }
 
+//COPIED
 async fn run_verification_thread(
     mut event_processor: Box<VerificationThread>,
     mut event_receiver: Receiver<VerifyRequest>,
@@ -189,6 +191,7 @@ async fn run_verification_thread(
     })
 }
 
+//COPIED
 async fn run_mining_event_processor(
     context: &Context,
     sender_to_mempool: &Sender<ConsensusEvent>,
@@ -227,6 +230,7 @@ async fn run_mining_event_processor(
     (interface_sender_to_miner, miner_handle)
 }
 
+//COPIED
 async fn run_consensus_event_processor(
     context: &Context,
     peers: Arc<RwLock<PeerCollection>>,
@@ -297,6 +301,7 @@ async fn run_consensus_event_processor(
     (interface_sender_to_blockchain, blockchain_handle)
 }
 
+//COPIED
 async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
     configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
@@ -369,6 +374,7 @@ async fn run_routing_event_processor(
     (interface_sender_to_routing, routing_handle)
 }
 
+//COPIED
 async fn run_verification_threads(
     sender_to_consensus: Sender<ConsensusEvent>,
     blockchain: Arc<RwLock<Blockchain>>,
@@ -427,6 +433,7 @@ async fn run_verification_threads(
 }
 
 // TODO : to be moved to routing event processor
+//COPIED
 fn run_loop_thread(
     mut receiver: Receiver<IoEvent>,
     network_event_sender_to_routing_ep: Sender<NetworkEvent>,
@@ -505,6 +512,7 @@ fn run_loop_thread(
     loop_handle
 }
 
+//COPIED
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ctrlc::set_handler(move || {
@@ -687,19 +695,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     let blockchain_clone = context.blockchain.clone();
-
-    // tokio::spawn(async move {
-    //     loop {
-    //         println!(".....");  
-    //         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            
-    //         // Enter the logic to read blockchain here
-    //         // Note that you may have to lock the blockchain to read it if it's a shared state
-    //         let blockchain = blockchain_clone.read().await;
-    //         println!("last blockid: ..... {:?}", blockchain.last_block_id);
-    //         // Read or print the blockchain here...
-    //     }
-    // });
 
     let _result = tokio::join!(
         routing_handle,
