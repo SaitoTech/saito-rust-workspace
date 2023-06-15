@@ -86,9 +86,6 @@ impl Storage {
         }
 
         let mut file_names = file_names.unwrap();
-        if file_names.is_empty() {
-            println!("disk is empty, adding slip")
-        }
 
         {
             file_names.sort();
