@@ -1,13 +1,17 @@
 {
   "name": "saito-wasm",
-  "version": "0.0.7",
+  "version": "0.0.11",
   "description": "js wrappings around saito-core using wasm",
   "scripts": {
     "test": "./node_modules/.bin/jest",
     "start": "ts-node-dev index.ts",
-    "build-prod": "cross-env WASM_BINDGEN_WEAKREF=1 webpack --config webpack.prod.config.js",
-    "build": "cross-env WASM_BINDGEN_WEAKREF=1 webpack",
-    "serve": "webpack-dev-server"
+    "build-prod": "cross-env WASM_BINDGEN_WEAKREF=1 npm run build-web-prod && npm run build-nodejs-prod",
+    "build": "cross-env WASM_BINDGEN_WEAKREF=1 npm run build-web && npm run build-nodejs",
+    "serve": "webpack-dev-server",
+    "build-web": "wasm-pack build --target web --out-dir ./pkg/web --out-name index",
+    "build-nodejs": "wasm-pack build --target nodejs --out-dir ./pkg/node --out-name index",
+    "build-web-prod": "wasm-pack build --target web --out-dir ./pkg/web --out-name index --release",
+    "build-nodejs-prod": "wasm-pack build --target nodejs --out-dir ./pkg/node --out-name index --release"
   },
   "author": "",
   "license": "ISC",
@@ -38,5 +42,6 @@
   "dependencies": {
     "node-fetch": "^3.3.0",
     "cross-env": "^7.0.3"
-  }
+  },
+  "type": "module"
 }
