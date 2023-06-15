@@ -100,10 +100,7 @@ where
                 .is_some()
             {
                 work_done = true;
-            } else {
-                // debug!("No work done")
             }
-
             #[cfg(feature = "with-stats")]
             {
                 let duration = current_instant.duration_since(stat_timer);
