@@ -148,27 +148,25 @@ impl ConsensusThread {
     ) {
         info!("generating issuance init transaction");
 
+        let slips = self.storage.get_token_supply_slips_from_disk().await;
+        let mut txs: Vec<Transaction> = vec![];
+        for slip in slips {
+            debug!("{:?} slip public key", hex::encode(slip.public_key));
+            txs.push(Transaction::create_issuance_transaction(
+                slip.public_key,
+                slip.amount,
+            ));
+        }
+
         let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
         let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
 
-        {
-            let slips = self.storage.get_token_supply_slips_from_disk().await;
-            let mut txs: Vec<Transaction> = vec![];
-            for slip in slips {
-                debug!("{:?} slip public key", hex::encode(slip.public_key));
-                txs.push(Transaction::create_issuance_transaction(
-                    slip.public_key,
-                    slip.amount,
-                ));
-            }
-
-            debug!("{:?} transaction from slips", txs);
-            for tx in txs {
-                mempool
-                    .add_transaction_if_validates(tx.clone(), &blockchain)
-                    .await;
-                info!("added issuance init tx for : {:?}", tx.to[0].public_key);
-            }
+        debug!("{:?} transaction from slips", txs);
+        for tx in txs {
+            mempool
+                .add_transaction_if_validates(tx.clone(), &blockchain)
+                .await;
+            info!("added issuance init tx for : {:?}", tx.to[0].public_key);
         }
     }
     /// Test method to generate test transactions
@@ -192,7 +190,6 @@ impl ConsensusThread {
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating mock transactions");
-
         let txs_to_generate = 10;
         let bytes_per_tx = 1024;
         let public_key;
@@ -549,8 +546,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         self.storage
             .load_blocks_from_disk(self.mempool.clone())
             .await;
-
-        //
 
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let (mut blockchain, _blockchain_) =

@@ -78,7 +78,6 @@ impl Storage {
 
     pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
         info!("loading blocks from disk");
-        self.get_token_supply_slips_from_disk().await;
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
@@ -88,7 +87,6 @@ impl Storage {
 
         let mut file_names = file_names.unwrap();
         if file_names.is_empty() {
-            // add slips
             println!("disk is empty, adding slip")
         }
 
@@ -177,7 +175,7 @@ impl Storage {
                 return v;
             }
         } else {
-            debug!("issuance file does not exist");
+            panic!("issuance file does not exist");
         }
 
         // if let Ok(lines) = Storage::read_lines_from_file(ISSUANCE_FILE_PATH) {
@@ -298,17 +296,17 @@ mod test {
     #[ignore]
     #[tokio::test]
     async fn read_issuance_file_test() {
-        // let mut t = TestManager::new();
-        // t.initialize(100, 100_000_000).await;
+        let mut t = TestManager::new();
+        t.initialize(100, 100_000_000).await;
 
-        // let slips = t.storage.get_token_supply_slips_from_disk();
-        // let mut total_issuance = 0;
+        let slips = t.storage.get_token_supply_slips_from_disk().await;
+        let mut total_issuance = 0;
 
-        // for i in 0..slips.len() {
-        //     total_issuance += slips[i].amount;
-        // }
+        for i in 0..slips.len() {
+            total_issuance += slips[i].amount;
+        }
 
-        assert_eq!(true, true);
+        assert_eq!(total_issuance, MAX_TOKEN_SUPPLY);
     }
 
     #[tokio::test]
