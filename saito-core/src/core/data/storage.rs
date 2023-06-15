@@ -77,12 +77,15 @@ impl Storage {
     pub async fn load_blocks_from_disk_vec(&mut self) -> io::Result<Vec<Block>> {
         info!("loading blocks from disk vec");
         let mut blocks = Vec::new();
-        
+
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
             error!("failed loading blocks . {:?}", file_names.err().unwrap());
-            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed loading blocks"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Failed loading blocks",
+            ));
         }
         let mut file_names = file_names.unwrap();
         file_names.sort();
@@ -115,7 +118,6 @@ impl Storage {
             block.generate();
             info!("block : {:?} loaded from disk", hex::encode(block.hash));
             blocks.push(block)
-            
         }
         trace!("block file loading finished");
         return Ok::<Vec<Block>, std::io::Error>(blocks);
@@ -125,15 +127,14 @@ impl Storage {
         info!("loading blocks from disk");
 
         let result = self.load_blocks_from_disk_vec().await;
-    
+
         match result {
-            //Ok(blocks): io::Result<Vec<Block>> => {
-            Ok(blocks) => {    
+            Ok(blocks) => {
                 trace!("block file loading finished");
-                
+
                 let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
-                
-                for block in blocks {                      
+
+                for block in blocks {
                     mempool.add_block(block);
                     info!("loading blocks to mempool completed");
                 }
@@ -143,9 +144,8 @@ impl Storage {
                 eprintln!("Error loading blocks: {}", e);
             }
         }
-
     }
-    
+
     pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
         debug!("loading block {:?} from disk", file_name);
         let result = self.io_interface.read_value(file_name).await;
