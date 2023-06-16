@@ -29,12 +29,12 @@ use std::fs::File;
 use std::io::Write;
 
 mod calc;
-mod chain_manager;
+mod config;
+mod runner;
 mod sutils;
 mod test_io_handler;
-mod config;
 
-use crate::sutils::*;
+//use crate::sutils::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[tokio::main(flavor = "multi_thread")]
@@ -42,26 +42,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("saito analytics");
 
     let directory_path = "../../sampleblocks";
-    let blocks_result = get_blocks(&directory_path);
 
-    blocks_result.as_ref().unwrap_or_else(|e| {
-        eprintln!("Error reading blocks: {}", e);
-        std::process::exit(1);
-    });
-    let blocks = blocks_result.unwrap();
+    //fix log
 
-    println!("read {} blocks from disk", blocks.len());
+    let mut r = runner::ChainRunner::new();
+    println!("....");
+    r.load_blocks(&directory_path).await;
 
-    let gen_block = &blocks[0];
-    let sum_issued = calc::calc_sum_issued(&gen_block);
-    println!("sum issued {}", sum_issued);
+    //     let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+    //     let (mut blockchain, _blockchain_) =
+    //         lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
-    let mut t = chain_manager::ChainManager::new();
+    //     {
+    //         let (mempool, _mempool_) = lock_for_read!(self.mempool, LOCK_ORDER_MEMPOOL);
+    //         if configs.get_peer_configs().is_empty() && mempool.blocks_queue.is_empty() {
+    //             self.generate_genesis_block = true;
+    //         }
+    //     }
 
-    t.add_block(gen_block.clone());
+    //     blockchain
+    //         .add_blocks_from_mempool(
+    //             self.mempool.clone(),
+    //             &self.network,
+    //             &mut self.storage,
+    //             self.sender_to_miner.clone(),
+    //             configs.deref(),
+    //         )
+    //         .await;
 
-    let blocks2 = t.get_blocks_vec().await;
-    println!("{}", blocks2.len());
+    // println!("read {} blocks from disk", blocks.len());
+
+    // let gen_block = &blocks[0];
+    // let sum_issued = calc::calc_sum_issued(&gen_block);
+    // println!("sum issued {}", sum_issued);
+
+    // let mut t = chain_manager::ChainManager::new();
+
+    // t.add_block(gen_block.clone());
+
+    // let blocks2 = t.get_blocks_vec().await;
+    // println!("{}", blocks2.len());
 
     //init chain manager
     //apply genesis block

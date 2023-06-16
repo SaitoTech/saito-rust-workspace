@@ -38,7 +38,6 @@ fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
 
-
 pub fn create_timestamp() -> Timestamp {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
