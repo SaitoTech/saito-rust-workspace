@@ -36,7 +36,8 @@ mod test_io_handler;
 use crate::sutils::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-fn main() {
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("saito analytics");
 
     let directory_path = "../../sampleblocks";
@@ -54,6 +55,13 @@ fn main() {
     let sum_issued = calc::calc_sum_issued(&gen_block);
     println!("sum issued {}", sum_issued);
 
+    let mut t = chain_manager::ChainManager::new();
+
+    t.add_block(gen_block.clone());
+
+    let blocks2 = t.get_blocks_vec().await;
+    println!("{}", blocks2.len());
+
     //init chain manager
     //apply genesis block
     //run utox calc
@@ -65,4 +73,6 @@ fn main() {
     // for slip in &blocks[0].transactions[0].to {
     //     pretty_print_slip(&slip);
     // }
+
+    Ok(())
 }

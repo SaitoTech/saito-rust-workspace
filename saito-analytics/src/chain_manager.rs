@@ -233,7 +233,7 @@ impl ChainManager {
         });
     }
 
-    pub async fn get_blocks(&self) -> Vec<Block> {
+    pub async fn get_blocks_vec(&self) -> Vec<Block> {
         let mut blocks = Vec::new();
 
         let (blockchain, _blockchain_) =
@@ -267,12 +267,9 @@ impl ChainManager {
         //publickey \t amount \t type (normal)
         //TODO check spendable only
 
-        for i in 1..=latest_block_id {
-            let block_hash = blockchain
-                .blockring
-                .get_longest_chain_block_hash_by_block_id(i as u64);
-            //println!("WINDING ID HASH - {} {:?}", i, block_hash);
-            let block = blockchain.get_block(&block_hash).unwrap();
+        let blocks = self.get_blocks_vec().await;
+
+        for block in blocks {
             for j in 0..block.transactions.len() {
                 let mut tx = &block.transactions[j];
 
