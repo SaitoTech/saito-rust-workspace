@@ -199,6 +199,20 @@ impl ChainManager {
         }
     }
 
+    pub fn applyTxSet(tx: Transaction) {
+        //set inputs to false
+        //
+        tx.from.iter().for_each(|input| {
+            //input.on_chain_reorganization(utxoset, input_slip_spendable)
+            //let input_hex = hex::encode(input.public_key);
+            //utxoset.insert(input_hex, false);
+        });
+
+        tx.to.iter().for_each(|output| {
+            //output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
+        });
+    }
+
     pub fn applyTx(&self, tx: Transaction, utxo_balances: &mut AHashMap<String, u64>) {
         //apply
         println!("applyTx");

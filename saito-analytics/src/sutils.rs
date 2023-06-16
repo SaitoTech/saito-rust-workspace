@@ -26,13 +26,13 @@ pub struct PrettyBlock {
     pub id: u64,
     pub timestamp: Timestamp,
     pub previous_block_hash: String,
-                                     //pub creator: string,
-                                     //pub merkle_root: string,
-                                     // pub signature: string,
-                                     // pub treasury: Currency,
-                                     // pub burnfee: Currency,
-                                     // pub difficulty: u64,
-                                     // pub staking_treasury: Currency,
+    //pub creator: string,
+    //pub merkle_root: string,
+    // pub signature: string,
+    // pub treasury: Currency,
+    // pub burnfee: Currency,
+    // pub difficulty: u64,
+    // pub staking_treasury: Currency,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -45,7 +45,7 @@ pub struct PrettyTx {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PrettySlip {
-    //pub public_key: SaitoPublicKey,
+    pub public_key: String,
     pub amount: Currency,
 }
 
@@ -83,6 +83,25 @@ pub fn pretty_print_block(block: &Block) -> Result<(), serde_json::Error> {
     Ok(())
 }
 
+fn pretty_print_blocks(directory_path: String) {
+    let blocks_result = get_blocks(&directory_path);
+
+    match blocks_result.as_ref() {
+        Ok(blocks) => {
+            println!("Got {} blocks", blocks.len());
+            for block in blocks {
+                if let Err(e) = pretty_print_block(&block) {
+                    eprintln!("Error pretty printing block: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            //eprintln!("Error reading blocks: {}", e);
+            eprintln!("Error ");
+        }
+    };
+}
+
 pub fn pretty_print_tx(tx: &Transaction) -> Result<(), serde_json::Error> {
     let pretty_tx = PrettyTx {
         timestamp: tx.timestamp,
@@ -92,12 +111,16 @@ pub fn pretty_print_tx(tx: &Transaction) -> Result<(), serde_json::Error> {
     let tx_string = serde_json::to_string_pretty(&pretty_tx)?;
     println!("{}", tx_string);
 
+    println!("from {}", tx.from.len());
+    println!("to {}", tx.to.len());
+
     Ok(())
 }
 
 pub fn pretty_print_slip(slip: &Slip) -> Result<(), serde_json::Error> {
     let pretty_slip = PrettySlip {
         amount: slip.amount,
+        public_key: bytes_to_hex_string(&slip.public_key),
     };
 
     let slip_str = serde_json::to_string_pretty(&pretty_slip)?;
