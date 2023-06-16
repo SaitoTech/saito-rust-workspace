@@ -32,6 +32,7 @@ mod calc;
 mod chain_manager;
 mod sutils;
 mod test_io_handler;
+mod config;
 
 use crate::sutils::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

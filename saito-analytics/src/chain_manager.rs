@@ -21,7 +21,6 @@ use saito_core::common::defs::{
 
 use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
 use saito_core::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
@@ -32,45 +31,13 @@ use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::MiningEvent;
 use saito_core::{lock_for_read, lock_for_write};
+use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
+use crate::config::TestConfiguration;
 
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
 
-//TODO move
-struct TestConfiguration {}
-
-impl Debug for TestConfiguration {
-    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
-
-impl Configuration for TestConfiguration {
-    fn get_server_configs(&self) -> Option<&Server> {
-        todo!()
-    }
-
-    fn get_peer_configs(&self) -> &Vec<PeerConfig> {
-        todo!()
-    }
-
-    fn get_block_fetch_url(&self) -> String {
-        todo!()
-    }
-
-    fn is_spv_mode(&self) -> bool {
-        false
-    }
-
-    fn is_browser(&self) -> bool {
-        false
-    }
-
-    fn replace(&mut self, _config: &dyn Configuration) {
-        todo!()
-    }
-}
 
 pub fn create_timestamp() -> Timestamp {
     SystemTime::now()
@@ -167,40 +134,7 @@ impl ChainManager {
         debug!("block added to test manager blockchain");
     }
 
-    //
-    // check that the blockchain connects properly
-    //
-    pub async fn check_blockchain(&self) {
-        let (blockchain, _blockchain_) =
-            lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-
-        for i in 1..blockchain.blocks.len() {
-            let block_hash = blockchain
-                .blockring
-                .get_longest_chain_block_hash_by_block_id(i as u64);
-
-            let previous_block_hash = blockchain
-                .blockring
-                .get_longest_chain_block_hash_by_block_id((i as u64) - 1);
-
-            let block = blockchain.get_block_sync(&block_hash);
-            let previous_block = blockchain.get_block_sync(&previous_block_hash);
-
-            if block_hash == [0; 32] {
-                assert_eq!(block.is_none(), true);
-            } else {
-                assert_eq!(block.is_none(), false);
-                if i != 1 && previous_block_hash != [0; 32] {
-                    assert_eq!(previous_block.is_none(), false);
-                    assert_eq!(
-                        block.unwrap().previous_block_hash,
-                        previous_block.unwrap().hash
-                    );
-                }
-            }
-        }
-    }
-
+    //TODO
     pub fn applyTxSet(tx: Transaction) {
         //set inputs to false
         //
@@ -309,128 +243,6 @@ impl ChainManager {
             if (value > threshold) {
                 println!("{}\t{}", key, value);
                 writeln!(file, "{} {:?}", key, value);
-            }
-        }
-    }
-
-    pub async fn check_token_supply(&self) {
-        println!("check_token_supply");
-        let mut token_supply: Currency = 0;
-        let mut current_supply: Currency = 0;
-        let mut block_inputs_amount: Currency;
-        let mut block_outputs_amount: Currency;
-        let mut previous_block_treasury: Currency;
-        let mut current_block_treasury: Currency = 0;
-        let mut unpaid_but_uncollected: Currency = 0;
-        let mut block_contains_fee_tx: bool;
-        let mut block_fee_tx_index: usize = 0;
-
-        let (blockchain, _blockchain_) =
-            lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-
-        let latest_block_id = blockchain.get_latest_block_id();
-
-        for i in 1..=latest_block_id {
-            let block_hash = blockchain
-                .blockring
-                .get_longest_chain_block_hash_by_block_id(i as u64);
-            let block = blockchain.get_block(&block_hash).unwrap();
-
-            block_inputs_amount = 0;
-            block_outputs_amount = 0;
-            block_contains_fee_tx = false;
-
-            previous_block_treasury = current_block_treasury;
-            current_block_treasury = block.treasury;
-
-            for t in 0..block.transactions.len() {
-                //
-                // we ignore the inputs in staking / fee transactions as they have
-                // been pulled from the staking treasury and are already technically
-                // counted in the money supply as an output from a previous slip.
-                // we only care about the difference in token supply represented by
-                // the difference in the staking_treasury.
-                //
-                if block.transactions[t].transaction_type == TransactionType::Fee {
-                    block_contains_fee_tx = true;
-                    block_fee_tx_index = t as usize;
-                } else {
-                    for z in 0..block.transactions[t].from.len() {
-                        block_inputs_amount += block.transactions[t].from[z].amount;
-                    }
-                    for z in 0..block.transactions[t].to.len() {
-                        block_outputs_amount += block.transactions[t].to[z].amount;
-                    }
-                    println!("block_inputs_amount {}", block_inputs_amount);
-                    println!("block_outputs_amount {}", block_outputs_amount);
-                }
-
-                //
-                // block one sets circulation
-                //
-                if i == 1 {
-                    token_supply = block_outputs_amount + block.treasury + block.staking_treasury;
-                    current_supply = token_supply;
-                    println!("token_supply {}", token_supply);
-                    println!("current_supply {}", current_supply);
-                } else {
-                    //
-                    // figure out how much is in circulation
-                    //
-                    if block_contains_fee_tx == false {
-                        current_supply -= block_inputs_amount;
-                        current_supply += block_outputs_amount;
-
-                        unpaid_but_uncollected += block_inputs_amount;
-                        unpaid_but_uncollected -= block_outputs_amount;
-
-                        //
-                        // treasury increases must come here uncollected
-                        //
-                        if current_block_treasury > previous_block_treasury {
-                            unpaid_but_uncollected -=
-                                current_block_treasury - previous_block_treasury;
-                        }
-                    } else {
-                        //
-                        // calculate total amount paid
-                        //
-                        let mut total_fees_paid: Currency = 0;
-                        let fee_transaction = &block.transactions[block_fee_tx_index];
-                        for output in fee_transaction.to.iter() {
-                            total_fees_paid += output.amount;
-                        }
-
-                        current_supply -= block_inputs_amount;
-                        current_supply += block_outputs_amount;
-                        current_supply += total_fees_paid;
-
-                        unpaid_but_uncollected += block_inputs_amount;
-                        unpaid_but_uncollected -= block_outputs_amount;
-                        unpaid_but_uncollected -= total_fees_paid;
-
-                        //
-                        // treasury increases must come here uncollected
-                        //
-                        if current_block_treasury > previous_block_treasury {
-                            unpaid_but_uncollected -=
-                                current_block_treasury - previous_block_treasury;
-                        }
-                    }
-
-                    //
-                    // token supply should be constant
-                    //
-                    let total_in_circulation = current_supply
-                        + unpaid_but_uncollected
-                        + block.treasury
-                        + block.staking_treasury;
-
-                    //
-                    // we check that overall token supply has not changed
-                    //
-                    assert_eq!(total_in_circulation, token_supply);
-                }
             }
         }
     }
@@ -579,7 +391,7 @@ impl ChainManager {
     // transactions are necessary
     pub async fn initialize_with_timestamp(
         &mut self,
-        vip_transactions: u64,
+        vip_transactions_num: u64,
         vip_amount: Currency,
         timestamp: Timestamp,
     ) {
@@ -615,7 +427,7 @@ impl ChainManager {
         //
         // generate UTXO-carrying VIP transactions
         //
-        for _i in 0..vip_transactions {
+        for _i in 0..vip_transactions_num {
             let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
             tx.generate(&public_key, 0, 0);
             tx.sign(&private_key);
