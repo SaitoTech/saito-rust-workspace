@@ -33,11 +33,12 @@ use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::MiningEvent;
 use saito_core::{lock_for_read, lock_for_write};
 
-struct TestConfiguration {}
-
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
+
+//TODO move
+struct TestConfiguration {}
 
 impl Debug for TestConfiguration {
     fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -78,6 +79,7 @@ pub fn create_timestamp() -> Timestamp {
         .as_millis() as Timestamp
 }
 
+//struct to manage setup of chain for analytics
 pub struct ChainManager {
     pub mempool_lock: Arc<RwLock<Mempool>>,
     pub blockchain_lock: Arc<RwLock<Blockchain>>,
