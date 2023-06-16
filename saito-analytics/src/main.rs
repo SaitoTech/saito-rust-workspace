@@ -28,29 +28,16 @@ use saito_core::common::defs::{LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS};
 use std::fs::File;
 use std::io::Write;
 
+mod calc;
 mod chain_manager;
-mod cli;
 mod sutils;
 mod test_io_handler;
 
 use crate::sutils::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-
-pub fn calc_sum_issued(block: &Block) -> u64 {
-    let mut sum_issued = 0;
-    for tx in &block.transactions {
-        for slip in &tx.to {
-            sum_issued += slip.amount;
-        }
-    }
-    sum_issued
-}
-
 fn main() {
     println!("saito analytics");
-
-    //cli::runAnalytics(directory_path.to_string());
 
     let directory_path = "../../sampleblocks";
     let blocks_result = get_blocks(&directory_path);
@@ -64,11 +51,13 @@ fn main() {
     println!("read {} blocks from disk", blocks.len());
 
     let gen_block = &blocks[0];
-    let sum_issued = calc_sum_issued(&gen_block);
+    let sum_issued = calc::calc_sum_issued(&gen_block);
     println!("sum issued {}", sum_issued);
 
-    
-    
+    //init chain manager
+    //apply genesis block
+    //run utox calc
+
     // pretty_print_tx(&blocks[0].transactions[0]);
     // for slip in &blocks[0].transactions[0].from {
     //     pretty_print_slip(&slip);
