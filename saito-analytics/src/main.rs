@@ -36,6 +36,17 @@ mod test_io_handler;
 use crate::sutils::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+
+pub fn calc_sum_issued(block: &Block) -> u64 {
+    let mut sum_issued = 0;
+    for tx in &block.transactions {
+        for slip in &tx.to {
+            sum_issued += slip.amount;
+        }
+    }
+    sum_issued
+}
+
 fn main() {
     println!("saito analytics");
 
@@ -44,25 +55,25 @@ fn main() {
     let directory_path = "../../sampleblocks";
     let blocks_result = get_blocks(&directory_path);
 
-    blocks_result
-        .as_ref()
-        .map(|blocks| {
-            println!("Got {} blocks", blocks.len());
-            //pretty_print_block(&blocks[0]);
-            pretty_print_tx(&blocks[0].transactions[0]);
-            for slip in &blocks[0].transactions[0].from {
-                pretty_print_slip(&slip);
-            }
-            for slip in &blocks[0].transactions[0].to {
-                pretty_print_slip(&slip);
-            }
-            // for block in blocks {
-            //     if let Err(e) = pretty_print_block(&block) {
-            //         eprintln!("Error pretty printing block: {}", e);
-            //     }
-            // }
-        })
-        .map_err(|e| {
-            eprintln!("Error reading blocks: {}", e);
-        });
+    blocks_result.as_ref().unwrap_or_else(|e| {
+        eprintln!("Error reading blocks: {}", e);
+        std::process::exit(1);
+    });
+    let blocks = blocks_result.unwrap();
+
+    println!("read {} blocks from disk", blocks.len());
+
+    let gen_block = &blocks[0];
+    let sum_issued = calc_sum_issued(&gen_block);
+    println!("sum issued {}", sum_issued);
+
+    
+    
+    // pretty_print_tx(&blocks[0].transactions[0]);
+    // for slip in &blocks[0].transactions[0].from {
+    //     pretty_print_slip(&slip);
+    // }
+    // for slip in &blocks[0].transactions[0].to {
+    //     pretty_print_slip(&slip);
+    // }
 }
