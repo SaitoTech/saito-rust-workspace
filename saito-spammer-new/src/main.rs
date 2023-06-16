@@ -513,8 +513,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("running saito controllers");
 
-    let keys = generate_keys();
-    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    // let keys = generate_keys();
+    let wallet = Arc::new(RwLock::new(Wallet::new(private_key, public_key)));
     {
         let mut wallet = wallet.write().await;
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
