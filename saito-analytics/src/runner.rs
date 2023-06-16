@@ -50,7 +50,7 @@ pub fn create_timestamp() -> Timestamp {
 //struct to manage setup of chain
 pub struct ChainRunner {
     pub mempool: Arc<RwLock<Mempool>>,
-    pub blockchain_lock: Arc<RwLock<Blockchain>>,
+    pub blockchain: Arc<RwLock<Blockchain>>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub latest_block_hash: SaitoHash,
     pub network: Network,
@@ -69,7 +69,7 @@ impl ChainRunner {
         let _private_key = wallet.private_key.clone();
         let peers = Arc::new(RwLock::new(PeerCollection::new()));
         let wallet_lock = Arc::new(RwLock::new(wallet));
-        let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
+        let blockchain = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
         let mempool = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
 
         let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
@@ -77,7 +77,7 @@ impl ChainRunner {
 
         Self {
             wallet_lock: wallet_lock.clone(),
-            blockchain_lock,
+            blockchain,
             mempool,
             latest_block_hash: [0; 32],
             network: Network::new(
@@ -102,11 +102,11 @@ impl ChainRunner {
         return self.wallet_lock.clone();
     }
 
-    pub fn get_blockchain_lock(&self) -> Arc<RwLock<Blockchain>> {
-        return self.blockchain_lock.clone();
+    pub fn get_blockchain(&self) -> Arc<RwLock<Blockchain>> {
+        return self.blockchain.clone();
     }
 
-    pub async fn load_blocks(&self, directory_path: &str) {
+    pub async fn load_blocks(&mut self, directory_path: &str) {
         let blocks_result = get_blocks(&directory_path);
 
         blocks_result.as_ref().unwrap_or_else(|e| {
@@ -124,24 +124,22 @@ impl ChainRunner {
             mempool.add_block(block);
         }
 
-        let (blockchain, _blockchain_) =
-            lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let (mut blockchain, _blockchain_) =
+                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                
+        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
 
-        //error[E0277]: the size for values of type `(dyn Configuration + Send + Sync + 'static)` cannot be known at compilation time
-        // --> saito-analytics/src/runner.rs:136:17
-        // |
-        // 136 |                 self.configs.deref(),
-        // |                 ^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
-        // |
+        println!("add_blocks_from_mempool");
+        let updated = blockchain
+            .add_blocks_from_mempool(
+                self.mempool.clone(),
+                &self.network,
+                &mut self.storage,
+                self.sender_to_miner.clone(),
+                configs.deref(),
+            )
+            .await;
 
-        // let updated = blockchain
-        //     .add_blocks_from_mempool(
-        //         self.mempool.clone(),
-        //         &self.network,
-        //         &mut self.storage,
-        //         self.sender_to_miner.clone(),
-        //         self.configs.deref(),
-        //     )
-        //     .await;
+        println!("updated {}", updated);
     }
 }
