@@ -107,21 +107,29 @@ impl ChainRunner {
         return self.blockchain.clone();
     }
 
-    pub async fn load_blocks_from_path_internal(&mut self, directory_path: &str) {
-        //let generate_genesis_block = true;
-        //storage.load_blocks_from_disk(mempool.clone()).await;
-        // let updated = blockchain
-        //     .add_blocks_from_mempool(
-        //         self.mempool.clone(),
-        //         &self.network,
-        //         &mut self.storage,
-        //         self.sender_to_miner.clone(),
-        //         configs.deref(),
-        //     )
-        //     .await;
+    //load blocks via id    
+    //this is just the vector of blocks
+    pub async fn get_blocks_vec(&self) -> Vec<Block> {
+        let mut blocks = Vec::new();
+
+        let (blockchain, _blockchain_) =
+            lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+        let latest_id = blockchain.get_latest_block_id();
+        for i in 1..=latest_id {
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(i as u64);
+            //println!("WINDING ID HASH - {} {:?}", i, block_hash);
+            let block = blockchain.get_block(&block_hash).unwrap().clone();
+            blocks.push(block);
+        }
+
+        blocks
     }
 
     pub async fn load_blocks_from_path(&mut self, directory_path: &str) {
+        //TODO put util in core/storage or use existing one here
         let blocks_result = load_blocks_disk(&directory_path);
 
         blocks_result.as_ref().unwrap_or_else(|e| {

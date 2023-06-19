@@ -72,10 +72,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut r = runner::ChainRunner::new();
     println!("....");
     r.load_blocks_from_path(&directory_path).await;
-    println!("wating");
 
     //TODO
     //utxocalc
+
+    let mut utxoset: UtxoSet = AHashMap::new();
+
+    info!("---- utxoset ");
+    
+    let blocks = r.get_blocks_vec().await;
+    for block in blocks {
+        println!("block {}", block.id);
+        for j in 0..block.transactions.len() {
+            let tx = &block.transactions[j];
+            println!("tx {}", tx.from.len())
+            
+            // //block.transactions[j].on_chain_reorganization(&mut utxoset, true, block.id);
+            //will do this
+            // tx.from.iter().for_each(|input| {
+            //     //input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
+            // });
+            // self.to.iter().for_each(|output| {
+            //     output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
+            // })
+        }
+    }
+    
+    
 
     Ok(())
 }
