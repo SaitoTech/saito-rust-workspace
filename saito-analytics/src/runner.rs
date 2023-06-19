@@ -107,13 +107,12 @@ impl ChainRunner {
         return self.blockchain.clone();
     }
 
-    //load blocks via id    
+    //load blocks via id
     //this is just the vector of blocks
     pub async fn get_blocks_vec(&self) -> Vec<Block> {
         let mut blocks = Vec::new();
 
-        let (blockchain, _blockchain_) =
-            lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
         let latest_id = blockchain.get_latest_block_id();
         for i in 1..=latest_id {
@@ -150,8 +149,8 @@ impl ChainRunner {
         }
 
         let (mut blockchain, _blockchain_) =
-                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-                
+            lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
 
         println!("add_blocks_from_mempool");

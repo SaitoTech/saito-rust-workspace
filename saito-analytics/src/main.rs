@@ -22,7 +22,6 @@ use tracing_subscriber::Layer;
 use std::str::FromStr;
 use tracing_subscriber::filter::LevelFilter;
 
-
 use log::{debug, error, info, trace, warn};
 
 use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey};
@@ -73,32 +72,104 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("....");
     r.load_blocks_from_path(&directory_path).await;
 
-    //TODO
     //utxocalc
+
+    //pub type SaitoUTXOSetKey = [u8; 58];
+    //pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 
     let mut utxoset: UtxoSet = AHashMap::new();
 
+    type UtxoSetBalance = AHashMap<SaitoUTXOSetKey, u64>;
+    let mut utxo_balances: UtxoSetBalance = AHashMap::new();
+
     info!("---- utxoset ");
-    
+
     let blocks = r.get_blocks_vec().await;
+    //this call the reorg chain here, simpler
+
+    //get total output of first block
+    let firstblock = &blocks[0];
+    let mut inital_out = 0;
+    for j in 0..firstblock.transactions.len() {
+        let tx = &firstblock.transactions[j];
+        tx.from.iter().for_each(|input| {
+        });
+
+        tx.to.iter().for_each(|output| {
+            inital_out += output.amount;
+        });
+    }
+
+    println!("inital_out {}", inital_out);
+
+    //assume longest chain
+    let input_slip_spendable = false;
+    let output_slip_spendable = true;
+    
     for block in blocks {
         println!("block {}", block.id);
         for j in 0..block.transactions.len() {
             let tx = &block.transactions[j];
-            println!("tx {}", tx.from.len())
+            //println!("from {}", tx.from.len());
+            //println!("to {}", tx.to.len());
+
             
+
             // //block.transactions[j].on_chain_reorganization(&mut utxoset, true, block.id);
             //will do this
-            // tx.from.iter().for_each(|input| {
-            //     //input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
-            // });
-            // self.to.iter().for_each(|output| {
-            //     output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
-            // })
+            tx.from.iter().for_each(|input| {
+                // if self.amount > 0 {
+                utxoset.insert(input.utxoset_key, input_slip_spendable);
+
+                utxo_balances
+                    .entry(input.utxoset_key)
+                    .and_modify(|e| *e -= input.amount)
+                    .or_insert(0);
+
+                //check if its there already
+                // if !utxo_balances.contains_key(&input.utxoset_key) {
+                //     utxo_balances.insert(input.utxoset_key, 0);
+                // } else {
+                //     println!("key exists, TODO");
+
+                // }
+            });
+
+            tx.to.iter().for_each(|output| {
+                // if self.amount > 0 {
+                utxoset.insert(output.utxoset_key, output_slip_spendable);
+                //println!("{:?}", output.utxoset_key);
+                //TODO need to check if its there already
+                utxo_balances
+                    .entry(output.utxoset_key)
+                    .and_modify(|e| *e += output.amount)
+                    .or_insert(output.amount);
+                // if !utxo_balances.contains_key(&output.utxoset_key) {
+                //     utxo_balances.insert(output.utxoset_key, output.amount);
+                // } else {
+                //     println!("key exists, TODO");
+                // }
+            });
         }
     }
-    
-    
+
+    // for (key, value) in utxoset {
+    //     println!("{:?} {:?}", key, value);
+    //     // match utxoset.get(key) {
+    // }
+
+    let mut total_value = 0;
+    for (key, value) in utxo_balances {
+        if (value > 0) {
+            println!("{:?} {:?}", key, value);
+            total_value += value;
+        }
+        // match utxoset.get(key) {
+    }
+    println!("total_value {}", total_value);
+    //100_000_000
+
+    println!("{}", total_value==inital_out);
 
     Ok(())
 }
