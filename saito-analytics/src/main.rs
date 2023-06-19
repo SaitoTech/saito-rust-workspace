@@ -110,8 +110,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             //println!("from {}", tx.from.len());
             //println!("to {}", tx.to.len());
 
-            // //block.transactions[j].on_chain_reorganization(&mut utxoset, true, block.id);
-            //will do this
             tx.from.iter().for_each(|input| {
                 // if self.amount > 0 {
                 utxoset.insert(input.utxoset_key, input_slip_spendable);
@@ -120,8 +118,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .entry(input.utxoset_key)
                     .and_modify(|e| *e -= input.amount)
                     .or_insert(0);
-
-                
             });
 
             tx.to.iter().for_each(|output| {
