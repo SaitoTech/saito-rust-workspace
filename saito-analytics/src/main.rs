@@ -53,6 +53,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let directory_path = "../../sampleblocks";
 
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+
+    tracing_subscriber::registry().with(fmt_layer).init();
 
     let mut r = runner::ChainRunner::new();
     println!("....");

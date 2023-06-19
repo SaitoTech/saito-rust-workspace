@@ -128,15 +128,17 @@ impl ChainRunner {
             eprintln!("Error reading blocks: {}", e);
             std::process::exit(1);
         });
-        let blocks = blocks_result.unwrap();
-        let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
+        {
+            let blocks = blocks_result.unwrap();
+            let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
-        println!("got blocks {}", blocks.len());
-        for mut block in blocks {
-            block.force_loaded = true;
-            block.generate();
-            println!("block : {:?} loaded from disk", hex::encode(block.hash));
-            mempool.add_block(block);
+            debug!("got blocks {}", blocks.len());
+            for mut block in blocks {
+                block.force_loaded = true;
+                block.generate();
+                debug!("block : {:?} loaded from disk", hex::encode(block.hash));
+                mempool.add_block(block);
+            }
         }
 
         let (mut blockchain, _blockchain_) =
