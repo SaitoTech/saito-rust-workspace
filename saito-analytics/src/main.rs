@@ -59,54 +59,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     r.load_blocks_from_path(&directory_path).await;
     println!("wating");
 
-///////////////
-    // 
-    // init storage
-    // init mempool
-    // init configs
-    // init blockchain
-    // init network
-
-
-    //let generate_genesis_block = true;
-
-    // storage
-    //         .load_blocks_from_disk(mempool.clone())
-    //         .await;
-
-    //     let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
-    //     let (mut blockchain, _blockchain_) =
-    //         lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-
-
-    //     blockchain
-    //         .add_blocks_from_mempool(
-    //             self.mempool.clone(),
-    //             &self.network,
-    //             &mut self.storage,
-    //             self.sender_to_miner.clone(),
-    //             configs.deref(),
-    //         )
-    //         .await;
-///////////////
-    
-    // println!("read {} blocks from disk", blocks.len());
-
-    // let gen_block = &blocks[0];
-    // let sum_issued = calc::calc_sum_issued(&gen_block);
-    // println!("sum issued {}", sum_issued);
-
-    //init chain runner
-    //apply genesis block
-    //run utox calc
-
-    // pretty_print_tx(&blocks[0].transactions[0]);
-    // for slip in &blocks[0].transactions[0].from {
-    //     pretty_print_slip(&slip);
-    // }
-    // for slip in &blocks[0].transactions[0].to {
-    //     pretty_print_slip(&slip);
-    // }
+    //TODO
+    //utxocalc
 
     Ok(())
 }
