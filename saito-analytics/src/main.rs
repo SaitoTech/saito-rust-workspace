@@ -3,6 +3,7 @@
 use ahash::AHashMap;
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
+use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::crypto::generate_keys;
 use saito_core::core::data::wallet::Wallet;
 use saito_core::{lock_for_read, lock_for_write};
@@ -21,11 +22,11 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 use std::str::FromStr;
 use tracing_subscriber::filter::LevelFilter;
-
+use std::time::{SystemTime, UNIX_EPOCH};
 use log::{debug, error, info, trace, warn};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use saito_core::common::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey};
-
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
     LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
@@ -41,15 +42,18 @@ mod runner;
 mod sutils;
 mod test_io_handler;
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+
+pub fn create_timestamp() -> Timestamp {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as Timestamp
+}
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("saito analytics");
-
-    println!("Running saito");
-
-    let directory_path = "../../sampleblocks";
+    info!("saito analytics");
 
     let filter = tracing_subscriber::EnvFilter::from_default_env();
     let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
@@ -67,11 +71,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::registry().with(fmt_layer).init();
 
+   
     let mut r = runner::ChainRunner::new();
-    println!("....");
-    r.load_blocks_from_path(&directory_path).await;
+    
+    //run check on created blocks
 
-    //utxocalc
+    
+
+    // let parent_hash = [0; 32];
+    // let timestamp = create_timestamp();
+    // let txs_number = 1;
+    // let txs_amount: Currency = 10;
+    // let txs_fee: Currency = 1;
+
+    // {
+    //     //not enough funds
+    //     let txs: Vec<Transaction> = r.create_txs(parent_hash, timestamp, txs_number, txs_amount, txs_fee).await;
+    //     //r.create_block(parent_hash, txs, timestamp);
+
+    // }
+    //r.create_block(parent_hash, txs, timestamp);
+
+
+    // utxocalc based on sample blocks
+    //run check on static path
+    let directory_path = "../../sampleblocks";
+    r.load_blocks_from_path(&directory_path).await;
 
     let mut utxoset: UtxoSet = AHashMap::new();
 
@@ -93,14 +118,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    println!("inital supply: {}", inital_out);
+    info!("inital supply: {}", inital_out);
 
     //assume longest chain
     let input_slip_spendable = false;
     let output_slip_spendable = true;
 
     for block in blocks {
-        println!("block {}", block.id);
+        info!("block {}", block.id);
         for j in 0..block.transactions.len() {
             let tx = &block.transactions[j];
             //println!("from {}", tx.from.len());
@@ -136,14 +161,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut total_value = 0;
     for (key, value) in utxo_balances {
         if (value > 0) {
-            println!("{:?} {:?}", key, value);
+            info!("{:?} {:?}", key, value);
             total_value += value;
         }
     }
-    println!("total_value {}", total_value);
+    info!("total_value {}", total_value);
 
     //should be equal
-    println!("{}", total_value == inital_out);
+    info!("{}", total_value == inital_out);
 
     Ok(())
 }

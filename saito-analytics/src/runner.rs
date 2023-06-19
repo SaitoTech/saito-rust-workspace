@@ -153,7 +153,7 @@ impl ChainRunner {
 
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
 
-        println!("add_blocks_from_mempool");
+        debug!("add_blocks_from_mempool");
         let updated = blockchain
             .add_blocks_from_mempool(
                 self.mempool.clone(),
@@ -164,6 +164,85 @@ impl ChainRunner {
             )
             .await;
 
-        println!("updated {}", updated);
+        debug!("updated {}", updated);
+    }
+
+    pub async fn create_txs(
+        &self,
+        parent_hash: SaitoHash,
+        timestamp: Timestamp,
+        txs_number: usize,
+        txs_amount: Currency,
+        txs_fee: Currency,        
+    ) -> Vec<Transaction> {
+        let mut transactions: Vec<Transaction> = Vec::new();
+        let private_key: SaitoPrivateKey;
+        let public_key: SaitoPublicKey;
+
+        {
+            let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
+        }
+
+        for _i in 0..txs_number {
+            let mut transaction;
+            {
+                let (mut wallet, _wallet_) =
+                    lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
+
+                transaction =
+                    Transaction::create(&mut wallet, public_key, txs_amount, txs_fee, false)
+                        .unwrap();
+            }
+
+            transaction.sign(&private_key);
+            transaction.generate(&public_key, 0, 0);
+            //transactions.insert(transaction.signature, transaction);
+            transactions.push(transaction);
+        }
+
+        transactions       
+    }
+
+    pub async fn create_block(
+        &mut self,
+        parent_hash: SaitoHash,
+        transactions: Vec<Transaction> ,
+        timestamp: u64
+    ) -> Block {
+        let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
+        let private_key: SaitoPrivateKey;
+        let public_key: SaitoPublicKey;
+
+        {
+            let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
+        }
+
+        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        let (mut blockchain, _blockchain_) =
+            lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        //
+        // create block
+        //
+        let mut block = Block::create(
+            &mut transactions,
+            parent_hash,
+            blockchain.borrow_mut(),
+            timestamp,
+            &public_key,
+            &private_key,
+            None,
+            configs.deref(),
+        )
+        .await;
+        block.generate();
+        block.sign(&private_key);
+
+        block
     }
 }
