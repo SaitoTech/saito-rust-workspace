@@ -23,7 +23,6 @@ use saito_core::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
     Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION,
 };
-use crate::sutils::get_blocks;
 
 pub fn calc_sum_issued(block: &Block) -> u64 {
     let mut sum_issued = 0;

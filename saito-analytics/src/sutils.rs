@@ -83,24 +83,24 @@ pub fn pretty_print_block(block: &Block) -> Result<(), serde_json::Error> {
     Ok(())
 }
 
-fn pretty_print_blocks(directory_path: String) {
-    let blocks_result = get_blocks(&directory_path);
+// fn pretty_print_blocks(directory_path: String) {
+//     let blocks_result = get_blocks(&directory_path);
 
-    match blocks_result.as_ref() {
-        Ok(blocks) => {
-            println!("Got {} blocks", blocks.len());
-            for block in blocks {
-                if let Err(e) = pretty_print_block(&block) {
-                    eprintln!("Error pretty printing block: {}", e);
-                }
-            }
-        }
-        Err(e) => {
-            //eprintln!("Error reading blocks: {}", e);
-            eprintln!("Error ");
-        }
-    };
-}
+//     match blocks_result.as_ref() {
+//         Ok(blocks) => {
+//             println!("Got {} blocks", blocks.len());
+//             for block in blocks {
+//                 if let Err(e) = pretty_print_block(&block) {
+//                     eprintln!("Error pretty printing block: {}", e);
+//                 }
+//             }
+//         }
+//         Err(e) => {
+//             //eprintln!("Error reading blocks: {}", e);
+//             eprintln!("Error ");
+//         }
+//     };
+// }
 
 pub fn pretty_print_tx(tx: &Transaction) -> Result<(), serde_json::Error> {
     let pretty_tx = PrettyTx {
@@ -146,7 +146,7 @@ pub fn read_block(path: String) -> io::Result<Block> {
 
 //read block directory as block vector
 //TODO: should be in core?
-pub fn get_blocks(directory_path: &str) -> io::Result<Vec<Block>> {
+pub fn load_blocks_disk(directory_path: &str) -> io::Result<Vec<Block>> {
     let mut blocks = Vec::new();
 
     for entry in fs::read_dir(directory_path)? {

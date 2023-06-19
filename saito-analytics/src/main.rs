@@ -14,6 +14,14 @@ use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing_subscriber;
+use tracing_subscriber::filter::Directive;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
+use std::str::FromStr;
+use tracing_subscriber::filter::LevelFilter;
+
 
 use log::{debug, error, info, trace, warn};
 
@@ -41,24 +49,35 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("saito analytics");
 
+    println!("Running saito");
+
     let directory_path = "../../sampleblocks";
 
-    //fix log
 
     let mut r = runner::ChainRunner::new();
     println!("....");
-    r.load_blocks(&directory_path).await;
+    r.load_blocks_from_path(&directory_path).await;
+    println!("wating");
 
-    //     let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+///////////////
+    // 
+    // init storage
+    // init mempool
+    // init configs
+    // init blockchain
+    // init network
+
+
+    //let generate_genesis_block = true;
+
+    // storage
+    //         .load_blocks_from_disk(mempool.clone())
+    //         .await;
+
+    //     let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
     //     let (mut blockchain, _blockchain_) =
     //         lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
-    //     {
-    //         let (mempool, _mempool_) = lock_for_read!(self.mempool, LOCK_ORDER_MEMPOOL);
-    //         if configs.get_peer_configs().is_empty() && mempool.blocks_queue.is_empty() {
-    //             self.generate_genesis_block = true;
-    //         }
-    //     }
 
     //     blockchain
     //         .add_blocks_from_mempool(
@@ -69,21 +88,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //             configs.deref(),
     //         )
     //         .await;
-
+///////////////
+    
     // println!("read {} blocks from disk", blocks.len());
 
     // let gen_block = &blocks[0];
     // let sum_issued = calc::calc_sum_issued(&gen_block);
     // println!("sum issued {}", sum_issued);
 
-    // let mut t = chain_manager::ChainManager::new();
-
-    // t.add_block(gen_block.clone());
-
-    // let blocks2 = t.get_blocks_vec().await;
-    // println!("{}", blocks2.len());
-
-    //init chain manager
+    //init chain runner
     //apply genesis block
     //run utox calc
 

@@ -34,7 +34,8 @@ use saito_core::{lock_for_read, lock_for_write};
 use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
 use crate::config::TestConfiguration;
 
-use crate::sutils::*;
+//use crate::sutils::*;
+use crate::sutils::load_blocks_disk;
 
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
@@ -106,8 +107,22 @@ impl ChainRunner {
         return self.blockchain.clone();
     }
 
-    pub async fn load_blocks(&mut self, directory_path: &str) {
-        let blocks_result = get_blocks(&directory_path);
+    pub async fn load_blocks_from_path_internal(&mut self, directory_path: &str) {
+        //let generate_genesis_block = true;
+        //storage.load_blocks_from_disk(mempool.clone()).await;
+        // let updated = blockchain
+        //     .add_blocks_from_mempool(
+        //         self.mempool.clone(),
+        //         &self.network,
+        //         &mut self.storage,
+        //         self.sender_to_miner.clone(),
+        //         configs.deref(),
+        //     )
+        //     .await;
+    }
+
+    pub async fn load_blocks_from_path(&mut self, directory_path: &str) {
+        let blocks_result = load_blocks_disk(&directory_path);
 
         blocks_result.as_ref().unwrap_or_else(|e| {
             eprintln!("Error reading blocks: {}", e);
