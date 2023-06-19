@@ -74,9 +74,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //utxocalc
 
-    //pub type SaitoUTXOSetKey = [u8; 58];
-    //pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
-
     let mut utxoset: UtxoSet = AHashMap::new();
 
     type UtxoSetBalance = AHashMap<SaitoUTXOSetKey, u64>;
@@ -92,8 +89,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut inital_out = 0;
     for j in 0..firstblock.transactions.len() {
         let tx = &firstblock.transactions[j];
-        tx.from.iter().for_each(|input| {
-        });
+        // tx.from.iter().for_each(|input| {
+        // });
 
         tx.to.iter().for_each(|output| {
             inital_out += output.amount;
@@ -105,15 +102,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //assume longest chain
     let input_slip_spendable = false;
     let output_slip_spendable = true;
-    
+
     for block in blocks {
         println!("block {}", block.id);
         for j in 0..block.transactions.len() {
             let tx = &block.transactions[j];
             //println!("from {}", tx.from.len());
             //println!("to {}", tx.to.len());
-
-            
 
             // //block.transactions[j].on_chain_reorganization(&mut utxoset, true, block.id);
             //will do this
@@ -126,29 +121,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .and_modify(|e| *e -= input.amount)
                     .or_insert(0);
 
-                //check if its there already
-                // if !utxo_balances.contains_key(&input.utxoset_key) {
-                //     utxo_balances.insert(input.utxoset_key, 0);
-                // } else {
-                //     println!("key exists, TODO");
-
-                // }
+                
             });
 
             tx.to.iter().for_each(|output| {
                 // if self.amount > 0 {
                 utxoset.insert(output.utxoset_key, output_slip_spendable);
-                //println!("{:?}", output.utxoset_key);
-                //TODO need to check if its there already
+                
                 utxo_balances
                     .entry(output.utxoset_key)
                     .and_modify(|e| *e += output.amount)
                     .or_insert(output.amount);
-                // if !utxo_balances.contains_key(&output.utxoset_key) {
-                //     utxo_balances.insert(output.utxoset_key, output.amount);
-                // } else {
-                //     println!("key exists, TODO");
-                // }
+             
             });
         }
     }
@@ -169,6 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("total_value {}", total_value);
     //100_000_000
 
+    //should be equal
     println!("{}", total_value==inital_out);
 
     Ok(())
