@@ -41,7 +41,6 @@ mod runner;
 mod sutils;
 mod test_io_handler;
 
-//use crate::sutils::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[tokio::main(flavor = "multi_thread")]
@@ -82,22 +81,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("---- utxoset ");
 
     let blocks = r.get_blocks_vec().await;
-    //this call the reorg chain here, simpler
 
     //get total output of first block
     let firstblock = &blocks[0];
     let mut inital_out = 0;
     for j in 0..firstblock.transactions.len() {
         let tx = &firstblock.transactions[j];
-        // tx.from.iter().for_each(|input| {
-        // });
 
         tx.to.iter().for_each(|output| {
             inital_out += output.amount;
         });
     }
 
-    println!("inital_out {}", inital_out);
+    println!("inital supply: {}", inital_out);
 
     //assume longest chain
     let input_slip_spendable = false;
@@ -123,12 +119,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tx.to.iter().for_each(|output| {
                 // if self.amount > 0 {
                 utxoset.insert(output.utxoset_key, output_slip_spendable);
-                
+
                 utxo_balances
                     .entry(output.utxoset_key)
                     .and_modify(|e| *e += output.amount)
                     .or_insert(output.amount);
-             
             });
         }
     }
@@ -144,13 +139,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{:?} {:?}", key, value);
             total_value += value;
         }
-        // match utxoset.get(key) {
     }
     println!("total_value {}", total_value);
-    //100_000_000
 
     //should be equal
-    println!("{}", total_value==inital_out);
+    println!("{}", total_value == inital_out);
 
     Ok(())
 }
