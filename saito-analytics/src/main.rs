@@ -25,6 +25,7 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
+use clap::{App, Arg};
 
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
@@ -75,8 +76,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //utxocalc based on sample blocks
     //run check on static path
 
-    //TODO arg in CLI
-    let directory_path = "../../sampleblocks";
+    let matches = App::new("Saito")
+    .arg(
+        Arg::with_name("blockdir")
+            .long("blockdir")
+            .value_name("BLOCKDIR")
+            .help("Sets a custom block path")
+            .takes_value(true),
+    )
+    .get_matches();
+
+    let directory_path = matches.value_of("blockdir").unwrap_or("../../sampleblocks");
+    //let directory_path = ;
     let utxodump_file = "utxoset.dat";
 
     r.load_blocks_from_path(&directory_path).await;
