@@ -86,10 +86,8 @@ impl Storage {
         }
 
         let mut file_names = file_names.unwrap();
-
         {
             file_names.sort();
-
             trace!("loading files...");
             for file_name in file_names {
                 let result = self
@@ -175,35 +173,6 @@ impl Storage {
             error!("issuance file does not exist");
         }
 
-        // if let Ok(lines) = Storage::read_lines_from_file(ISSUANCE_FILE_PATH) {
-        //     for line in lines {
-        //         if let Ok(ip) = line {
-        //             let s = Storage::convert_issuance_into_slip(ip);
-        //             v.push(s);
-        //         }
-        //     }
-        // }
-        // if let Ok(lines) = Storage::read_lines_from_file(EARLYBIRDS_FILE_PATH) {
-        //     for line in lines {
-        //         if let Ok(ip) = line {
-        //             let s = Storage::convert_issuance_into_slip(ip);
-        //             v.push(s);
-        //         }
-        //     }
-        // }
-        //
-
-        //
-        // if let Ok(lines) = Storage::read_lines_from_file(DEFAULT_FILE_PATH) {
-        //     for line in lines {
-        //         if let Ok(ip) = line {
-        //             let mut s = Storage::convert_issuance_into_slip(ip);
-        //             s.set_amount(MAX_TOKEN_SUPPLY - tokens_issued);
-        //             v.push(s);
-        //         }
-        //     }
-        // }
-
         return vec![];
     }
 
@@ -226,61 +195,13 @@ impl Storage {
         slip.public_key = publickey_array;
         slip.slip_type = slip_type;
 
-        // let mut slip = Slip {
-        //     public_key: publickey_array,
-        //     slip_index: 0,
-        //     amount,
-        //     block_id: 1,
-        //     tx_ordinal: 0,
-        //     slip_type,
-        //     utxoset_key: [0; 58],
-        //     is_utxoset_key_set: false,
-        // };
-
-        // slip.generate_utxoset_key();
         return slip;
     }
 
     fn decode_str(string: &str) -> Vec<u8> {
         return bs58::decode(string).into_vec().expect("Decoding failed");
     }
-    // pub fn read_lines_from_file<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-    // where
-    //     P: AsRef<Path>,
-    // {
-    //     // let file = File::open(filename)?;
-    //     Ok(io::BufReader::new(file).lines())
-    // }
-    //
-    // pub fn convert_issuance_into_slip(line: std::string::String) -> Slip {
-    //     let mut iter = line.split_whitespace();
-    //     let tmp = iter.next().unwrap();
-    //     let tmp2 = iter.next().unwrap();
-    //     let typ = iter.next().unwrap();
 
-    //     let amt: u64 = tmp.parse::<u64>().unwrap();
-    //     let tmp3 = tmp2.as_bytes();
-
-    //     let mut add: SaitoPublicKey = [0; 33];
-    //     for i in 0..33 {
-    //         add[i] = tmp3[i];
-    //     }
-
-    //     let mut slip = Slip::default();
-    //     slip.set_public_key(add);
-    //     slip.set_amount(amt);
-    //     if typ.eq("VipOutput") {
-    //         slip.set_slip_type(SlipType::VipOutput);
-    //     }
-    //     if typ.eq("StakerDeposit") {
-    //         slip.set_slip_type(SlipType::StakerDeposit);
-    //     }
-    //     if typ.eq("Normal") {
-    //         slip.set_slip_type(SlipType::Normal);
-    //     }
-
-    //     return slip;
-    // }
 }
 
 #[cfg(test)]
