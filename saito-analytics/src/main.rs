@@ -1,6 +1,7 @@
 // saito analytics
 
 use ahash::AHashMap;
+use clap::{App, Arg};
 use log::{debug, error, info, trace, warn};
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
@@ -25,7 +26,6 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
-use clap::{App, Arg};
 
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
@@ -77,14 +77,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //run check on static path
 
     let matches = App::new("Saito")
-    .arg(
-        Arg::with_name("blockdir")
-            .long("blockdir")
-            .value_name("BLOCKDIR")
-            .help("Sets a custom block path")
-            .takes_value(true),
-    )
-    .get_matches();
+        .arg(
+            Arg::with_name("blockdir")
+                .long("blockdir")
+                .value_name("BLOCKDIR")
+                .help("Sets a custom block path")
+                .takes_value(true),
+        )
+        .get_matches();
 
     let directory_path = matches.value_of("blockdir").unwrap_or("../../sampleblocks");
     //let directory_path = ;
