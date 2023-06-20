@@ -211,9 +211,7 @@ impl Storage {
         let entries: Vec<&str> = line.split("\t").collect();
         let amount = entries[0].parse::<u64>().expect("Failed to parse amount");
         let publickey_str = entries[1];
-        let publickey_vec = bs58::decode(publickey_str)
-            .into_vec()
-            .expect("Decoding failed");
+        let publickey_vec = Self::decode_str(publickey_str);
         let mut publickey_array: [u8; 33] = [0u8; 33];
         publickey_array.copy_from_slice(&publickey_vec);
 
@@ -241,6 +239,10 @@ impl Storage {
 
         // slip.generate_utxoset_key();
         return slip;
+    }
+
+    fn decode_str(string: &str) -> Vec<u8> {
+        return bs58::decode(string).into_vec().expect("Decoding failed");
     }
     // pub fn read_lines_from_file<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
     // where
