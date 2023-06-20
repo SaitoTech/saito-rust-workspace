@@ -51,6 +51,7 @@ pub fn create_timestamp() -> Timestamp {
         .as_millis() as Timestamp
 }
 
+    
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("saito analytics");
@@ -153,14 +154,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    //output should be
+    //25000	21ronA4HFRaoqJdPt1fZQ6rz7SS5TKAyr3QzN429miBZA	VipOutput
+
+
     // for (key, value) in utxoset {
     //     println!("{:?} {:?}", key, value);
     //     // match utxoset.get(key) {
     // }
 
     let mut total_value = 0;
-    for (key, value) in utxo_balances {
-        if (value > 0) {
+    for (key, value) in &utxo_balances {
+        if (value > &0) {
             info!("{:?} {:?}", key, value);
             total_value += value;
         }
@@ -169,6 +174,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //should be equal
     info!("{}", total_value == inital_out);
+
+    let mut file = File::create("data/utxoset.txt").unwrap();
+
+    let (mut blockchain, _blockchain_) =
+    lock_for_write!(r.blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+    writeln!(
+        file,
+        "UTXO state height: latest_block_id {}",
+        blockchain.get_latest_block_id()
+    );
+
+    let threshold = 1;
+    //TODO
+    let txtype = "normal";
+    
+    for (key, value) in &utxo_balances {
+        if (value > &threshold) {
+            let key_hex = hex::encode(key);
+            println!("{}\t{}", key_hex, value);
+            writeln!(file, "{}\t{:?}\t{}", key_hex, value, txtype);
+        }
+    }
+
 
     Ok(())
 }
