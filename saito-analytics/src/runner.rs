@@ -94,18 +94,6 @@ impl ChainRunner {
         }
     }
 
-    pub fn get_mempool(&self) -> Arc<RwLock<Mempool>> {
-        return self.mempool.clone();
-    }
-
-    pub fn get_wallet_lock(&self) -> Arc<RwLock<Wallet>> {
-        return self.wallet_lock.clone();
-    }
-
-    pub fn get_blockchain(&self) -> Arc<RwLock<Blockchain>> {
-        return self.blockchain.clone();
-    }
-
     //load blocks via id
     //this is just the vector of blocks
     pub async fn get_blocks_vec(&self) -> Vec<Block> {
