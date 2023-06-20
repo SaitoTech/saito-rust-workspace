@@ -43,7 +43,6 @@ mod sutils;
 mod test_io_handler;
 
 
-
 pub fn create_timestamp() -> Timestamp {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -66,37 +65,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
-    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
 
     let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
 
     tracing_subscriber::registry().with(fmt_layer).init();
-
    
     let mut r = runner::ChainRunner::new();
     
-    //run check on created blocks
-
-    
-
-    // let parent_hash = [0; 32];
-    // let timestamp = create_timestamp();
-    // let txs_number = 1;
-    // let txs_amount: Currency = 10;
-    // let txs_fee: Currency = 1;
-
-    // {
-    //     //not enough funds
-    //     let txs: Vec<Transaction> = r.create_txs(parent_hash, timestamp, txs_number, txs_amount, txs_fee).await;
-    //     //r.create_block(parent_hash, txs, timestamp);
-
-    // }
-    //r.create_block(parent_hash, txs, timestamp);
-
-
-    // utxocalc based on sample blocks
+    //utxocalc based on sample blocks
     //run check on static path
+    
+    //TODO arg in CLI
     let directory_path = "../../sampleblocks";
+    let utxodump_file = "utxoset.dat";
+    
     r.load_blocks_from_path(&directory_path).await;
 
     let mut utxoset: UtxoSet = AHashMap::new();
@@ -104,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     type UtxoSetBalance = AHashMap<SaitoUTXOSetKey, u64>;
     let mut utxo_balances: UtxoSetBalance = AHashMap::new();
 
-    info!("---- utxoset ");
+    info!("run dump utxoset. take blocks from {}", directory_path);
 
     let blocks = r.get_blocks_vec().await;
 
@@ -125,15 +107,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input_slip_spendable = false;
     let output_slip_spendable = true;
 
+    //iterate through all blocks and tx
     for block in blocks {
         info!("block {}", block.id);
         for j in 0..block.transactions.len() {
             let tx = &block.transactions[j];
-            //println!("from {}", tx.from.len());
-            //println!("to {}", tx.to.len());
 
-            tx.from.iter().for_each(|input| {
-                // if self.amount > 0 {
+            tx.from.iter().for_each(|input| {                
                 utxoset.insert(input.utxoset_key, input_slip_spendable);
 
                 utxo_balances
@@ -142,8 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .or_insert(0);
             });
 
-            tx.to.iter().for_each(|output| {
-                // if self.amount > 0 {
+            tx.to.iter().for_each(|output| {                
                 utxoset.insert(output.utxoset_key, output_slip_spendable);
 
                 utxo_balances
@@ -153,16 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
     }
-
-    //output should be
-    //25000	21ronA4HFRaoqJdPt1fZQ6rz7SS5TKAyr3QzN429miBZA	VipOutput
-
-
-    // for (key, value) in utxoset {
-    //     println!("{:?} {:?}", key, value);
-    //     // match utxoset.get(key) {
-    // }
-
+    
     let mut total_value = 0;
     for (key, value) in &utxo_balances {
         if (value > &0) {
@@ -174,8 +144,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //should be equal
     info!("{}", total_value == inital_out);
-
-    let mut file = File::create("data/utxoset.txt").unwrap();
+    
+    let file_path = format!("data/{}", utxodump_file);
+    let mut file = File::create(file_path).unwrap();
 
     let (mut blockchain, _blockchain_) =
     lock_for_write!(r.blockchain, LOCK_ORDER_BLOCKCHAIN);
@@ -190,6 +161,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //TODO
     let txtype = "normal";
     
+    //output should be
+    //TODO public key compressed
+    //25000	21ronA4HFRaoqJdPt1fZQ6rz7SS5TKAyr3QzN429miBZA	VipOutput
+
     for (key, value) in &utxo_balances {
         if (value > &threshold) {
             let key_hex = hex::encode(key);
