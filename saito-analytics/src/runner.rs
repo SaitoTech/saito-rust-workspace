@@ -34,8 +34,7 @@ use saito_core::{lock_for_read, lock_for_write};
 use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
 use crate::config::TestConfiguration;
 
-//use crate::sutils::*;
-use crate::sutils::load_blocks_disk;
+use crate::utils::load_blocks_disk;
 
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
@@ -173,7 +172,7 @@ impl ChainRunner {
         timestamp: Timestamp,
         txs_number: usize,
         txs_amount: Currency,
-        txs_fee: Currency,        
+        txs_fee: Currency,
     ) -> Vec<Transaction> {
         let mut transactions: Vec<Transaction> = Vec::new();
         let private_key: SaitoPrivateKey;
@@ -189,8 +188,7 @@ impl ChainRunner {
         for _i in 0..txs_number {
             let mut transaction;
             {
-                let (mut wallet, _wallet_) =
-                    lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
                 transaction =
                     Transaction::create(&mut wallet, public_key, txs_amount, txs_fee, false)
@@ -203,14 +201,14 @@ impl ChainRunner {
             transactions.push(transaction);
         }
 
-        transactions       
+        transactions
     }
 
     pub async fn create_block(
         &mut self,
         parent_hash: SaitoHash,
-        transactions: Vec<Transaction> ,
-        timestamp: u64
+        transactions: Vec<Transaction>,
+        timestamp: u64,
     ) -> Block {
         let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
         let private_key: SaitoPrivateKey;

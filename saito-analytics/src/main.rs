@@ -39,9 +39,10 @@ use std::io::Write;
 mod calc;
 mod config;
 mod runner;
-mod sutils;
 mod test_io_handler;
+mod utils;
 
+use utils::pretty_print_block;
 
 pub fn create_timestamp() -> Timestamp {
     SystemTime::now()
@@ -50,7 +51,6 @@ pub fn create_timestamp() -> Timestamp {
         .as_millis() as Timestamp
 }
 
-    
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("saito analytics");
@@ -69,16 +69,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
 
     tracing_subscriber::registry().with(fmt_layer).init();
-   
+
     let mut r = runner::ChainRunner::new();
-    
+
     //utxocalc based on sample blocks
     //run check on static path
-    
+
     //TODO arg in CLI
     let directory_path = "../../sampleblocks";
     let utxodump_file = "utxoset.dat";
-    
+
     r.load_blocks_from_path(&directory_path).await;
 
     let mut utxoset: UtxoSet = AHashMap::new();
@@ -89,6 +89,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("run dump utxoset. take blocks from {}", directory_path);
 
     let blocks = r.get_blocks_vec().await;
+
+    pretty_print_block(&blocks[0]);
 
     //get total output of first block
     let firstblock = &blocks[0];
@@ -113,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         for j in 0..block.transactions.len() {
             let tx = &block.transactions[j];
 
-            tx.from.iter().for_each(|input| {                
+            tx.from.iter().for_each(|input| {
                 utxoset.insert(input.utxoset_key, input_slip_spendable);
 
                 utxo_balances
@@ -122,7 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .or_insert(0);
             });
 
-            tx.to.iter().for_each(|output| {                
+            tx.to.iter().for_each(|output| {
                 utxoset.insert(output.utxoset_key, output_slip_spendable);
 
                 utxo_balances
@@ -132,10 +134,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
     }
-    
+
     let mut total_value = 0;
     for (key, value) in &utxo_balances {
-        if (value > &0) {
+        if value > &0 {
             info!("{:?} {:?}", key, value);
             total_value += value;
         }
@@ -144,12 +146,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //should be equal
     info!("{}", total_value == inital_out);
-    
+
     let file_path = format!("data/{}", utxodump_file);
     let mut file = File::create(file_path).unwrap();
 
-    let (mut blockchain, _blockchain_) =
-    lock_for_write!(r.blockchain, LOCK_ORDER_BLOCKCHAIN);
+    let (mut blockchain, _blockchain_) = lock_for_write!(r.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
     writeln!(
         file,
@@ -160,19 +161,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let threshold = 1;
     //TODO
     let txtype = "normal";
-    
+
     //output should be
     //TODO public key compressed
     //25000	21ronA4HFRaoqJdPt1fZQ6rz7SS5TKAyr3QzN429miBZA	VipOutput
 
     for (key, value) in &utxo_balances {
-        if (value > &threshold) {
+        if value > &threshold {
             let key_hex = hex::encode(key);
             println!("{}\t{}", key_hex, value);
             writeln!(file, "{}\t{:?}\t{}", key_hex, value, txtype);
         }
     }
-
 
     Ok(())
 }
