@@ -19,9 +19,13 @@ use saito_core::common::defs::{
     UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
 };
 
+use crate::config::TestConfiguration;
 use saito_core::core::data::block::Block;
 use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
+use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
+use saito_core::core::data::crypto::{
+    generate_keys, generate_random_bytes, hash, verify_signature,
+};
 use saito_core::core::data::golden_ticket::GoldenTicket;
 use saito_core::core::data::mempool::Mempool;
 use saito_core::core::data::network::Network;
@@ -31,8 +35,6 @@ use saito_core::core::data::transaction::{Transaction, TransactionType};
 use saito_core::core::data::wallet::Wallet;
 use saito_core::core::mining_thread::MiningEvent;
 use saito_core::{lock_for_read, lock_for_write};
-use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
-use crate::config::TestConfiguration;
 
 use crate::utils::load_blocks_disk;
 

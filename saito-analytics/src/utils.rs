@@ -1,22 +1,22 @@
 // utilities
 
+use std::cmp::Ordering;
 use std::fs;
 use std::io::prelude::*;
 use std::io::{self, Read};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::sync::Arc;
-use std::cmp::Ordering;
 
 use log::{debug, error, info, trace, warn};
+use saito_core::common::defs::push_lock;
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
 use saito_core::core::data::crypto::generate_keys;
+use saito_core::core::data::slip::Slip;
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::transaction::TransactionType;
-use saito_core::core::data::slip::Slip;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::common::defs::push_lock;
 use saito_core::{lock_for_read, lock_for_write};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio::sync::RwLock;
@@ -51,7 +51,7 @@ pub struct PrettySlip {
 
 use saito_core::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
-    Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, LOCK_ORDER_WALLET,
+    Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION,
 };
 
 pub fn bytes_to_hex_string(bytes: &[u8]) -> String {

@@ -1,3 +1,4 @@
+rustfmt.toml
 .idea/
 target/
 dist/
