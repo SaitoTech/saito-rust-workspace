@@ -172,7 +172,7 @@ impl Storage {
                 return v;
             }
         } else {
-            panic!("issuance file does not exist");
+            error!("issuance file does not exist");
         }
 
         // if let Ok(lines) = Storage::read_lines_from_file(ISSUANCE_FILE_PATH) {
