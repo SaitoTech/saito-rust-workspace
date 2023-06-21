@@ -25,6 +25,7 @@ use tracing_subscriber::filter::Directive;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Layer;
 
 use bs58;
@@ -38,7 +39,6 @@ use saito_core::common::defs::{LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS};
 use std::fs::File;
 use std::io::Write;
 
-mod calc;
 mod config;
 mod runner;
 mod test_io_handler;
@@ -53,29 +53,50 @@ pub fn create_timestamp() -> Timestamp {
         .as_millis() as Timestamp
 }
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    info!("saito analytics");
+fn setup_logging() {
+    let mut filter = EnvFilter::from_default_env();
 
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
-    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    let directives = vec![
+        "tokio_tungstenite",
+        "tungstenite",
+        "mio::poll",
+        "hyper::proto",
+        "hyper::client",
+        "want",
+        "reqwest::async_impl",
+        "reqwest::connect",
+        "warp::filters",
+    ];
+
+    for directive in directives {
+        filter = filter.add_directive(Directive::from_str(&format!("{}=info", directive)).unwrap());
+    }
 
     let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
 
     tracing_subscriber::registry().with(fmt_layer).init();
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    info!("saito analytics");
+
+    let default_path = "../../sampleblocks";
+    let utxodump_file = "utxoset.dat";
+
+    setup_logging();
 
     let mut r = runner::ChainRunner::new();
 
     //utxocalc based on sample blocks
     //run check on static path
+
+    fn is_u64(val: String) -> Result<(), String> {
+        match val.parse::<u64>() {
+            Ok(_) => Ok(()),
+            Err(_) => Err(String::from("This value must be a valid u64")),
+        }
+    }
 
     let matches = App::new("Saito")
         .arg(
@@ -85,25 +106,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Sets a custom block path")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("threshold")
+                .long("threshold")
+                .value_name("THRESHOLD")
+                .help("Sets a custom threshold")
+                .takes_value(true)
+                .default_value("1")
+                .validator(|v| match v.parse::<u64>() {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(String::from("This value must be a valid u64")),
+                }),
+        )
         .get_matches();
 
-    let directory_path = matches.value_of("blockdir").unwrap_or("../../sampleblocks");
-    //let directory_path = ;
-    let utxodump_file = "utxoset.dat";
+    let threshold: u64 = matches
+        .value_of("threshold")
+        .unwrap_or("1")
+        .parse()
+        .unwrap();
+
+    let directory_path = matches.value_of("blockdir").unwrap_or(default_path);
 
     r.load_blocks_from_path(&directory_path).await;
 
-    //let mut utxoset: UtxoSet = AHashMap::new();
-
-    //type UtxoSetBalance = AHashMap<SaitoUTXOSetKey, u64>;
     type UtxoSetBalance = AHashMap<SaitoPublicKey, u64>;
     let mut utxo_balances: UtxoSetBalance = AHashMap::new();
 
     info!("run dump utxoset. take blocks from {}", directory_path);
 
     let blocks = r.get_blocks_vec().await;
-
-    pretty_print_block(&blocks[0]);
 
     //get total output of first block
     let firstblock = &blocks[0];
@@ -122,20 +154,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input_slip_spendable = false;
     let output_slip_spendable = true;
 
-    //TODO
-    //pub slip_type: SlipType,
-
     //iterate through all blocks and tx
     for block in blocks {
         info!("block {}", block.id);
         for j in 0..block.transactions.len() {
             let tx = &block.transactions[j];
 
-            println!("type {:?}", tx.transaction_type);
-
             tx.from.iter().for_each(|input| {
-                //utxoset.insert(input.utxoset_key, input_slip_spendable);
-
                 utxo_balances
                     .entry(input.public_key)
                     .and_modify(|e| *e -= input.amount)
@@ -143,8 +168,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
 
             tx.to.iter().for_each(|output| {
-                //utxoset.insert(output.utxoset_key, output_slip_spendable);
-
                 utxo_balances
                     .entry(output.public_key)
                     .and_modify(|e| *e += output.amount)
@@ -156,35 +179,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut total_value = 0;
     for (key, value) in &utxo_balances {
         if value > &0 {
-            info!("{:?} {:?}", key, value);
             total_value += value;
         }
     }
     info!("total_value {}", total_value);
 
-    //should be equal
-    info!("{}", total_value == inital_out);
+    assert_eq!(total_value, inital_out);
 
     let file_path = format!("data/{}", utxodump_file);
     let mut file = File::create(file_path).unwrap();
 
     let (mut blockchain, _blockchain_) = lock_for_write!(r.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
+    //if we want to add type need to check on pub slip_type: SlipType,
+    //write header
     writeln!(
         file,
         "UTXO state height: latest_block_id {}",
         blockchain.get_latest_block_id()
     );
 
-    let threshold = 1;
     let txtype = "normal";
 
     for (key, value) in &utxo_balances {
         if value > &threshold {
             let key_base58 = bs58::encode(key).into_string();
-            
-            println!("{}\t{}", key_base58, value);
-            writeln!(file, "{}\t{:?}\t{}", key_base58, value, txtype);
+
+            writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
         }
     }
 

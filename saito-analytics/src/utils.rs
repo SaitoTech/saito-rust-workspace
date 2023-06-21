@@ -129,6 +129,16 @@ pub fn pretty_print_slip(slip: &Slip) -> Result<(), serde_json::Error> {
     Ok(())
 }
 
+pub fn calc_sum_issued(block: &Block) -> u64 {
+    let mut sum_issued = 0;
+    for tx in &block.transactions {
+        for slip in &tx.to {
+            sum_issued += slip.amount;
+        }
+    }
+    sum_issued
+}
+
 pub fn read_block(path: String) -> io::Result<Block> {
     let bytes = match fs::read(&path) {
         Ok(bytes) => bytes,
