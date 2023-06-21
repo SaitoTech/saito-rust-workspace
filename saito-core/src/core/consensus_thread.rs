@@ -143,31 +143,33 @@ impl ConsensusThread {
     }
     async fn generate_issuance_tx(
         &self,
-        mempool: Arc<RwLock<Mempool>>,
+        _mempool: Arc<RwLock<Mempool>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating issuance init transaction");
 
         let slips = self.storage.get_token_supply_slips_from_disk().await;
+        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
         let mut txs: Vec<Transaction> = vec![];
         for slip in slips {
             debug!("{:?} slip public key", hex::encode(slip.public_key));
-            txs.push(Transaction::create_issuance_transaction(
-                slip.public_key,
-                slip.amount,
-            ));
+            let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
+            tx.sign(&wallet.private_key);
+            txs.push(tx);
         }
 
         let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+        let (mut mempool, _mempool_) = lock_for_write!(_mempool, LOCK_ORDER_MEMPOOL);
 
-        debug!("{:?} transaction from slips", txs);
+        // debug!("{:?} transaction from slips", txs);
         for tx in txs {
             mempool
                 .add_transaction_if_validates(tx.clone(), &blockchain)
                 .await;
-            info!("added issuance init tx for : {:?}", tx.to[0].public_key);
+            info!("added issuance init tx for : {:?}", tx.signature);
         }
+
+        debug!("{:?} mempool transacts", mempool.transactions);
     }
     /// Test method to generate test transactions
     ///
@@ -281,7 +283,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
                         .await;
 
-                    println!(" block ider {:?}", &block.id);
+                    println!(" block ider {:?}", &block.transactions);
 
                     let res = blockchain
                         .add_block(

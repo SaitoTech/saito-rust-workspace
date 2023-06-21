@@ -210,6 +210,8 @@ impl Mempool {
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
+
+       
         let mut block = Block::create(
             &mut self.transactions,
             [0; 32],
