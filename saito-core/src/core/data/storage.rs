@@ -149,7 +149,7 @@ impl Storage {
                 .read_value(ISSUANCE_FILE_PATH.to_string())
                 .await
             {
-                let mut contents = String::from_utf8(lines).expect("Failed to convert to String");
+                let mut contents = String::from_utf8(lines).unwrap();
                 contents = contents.trim_end_matches('\r').to_string();
                 let lines: Vec<&str> = contents.split("\n").collect();
 
@@ -178,10 +178,12 @@ impl Storage {
 
     fn convert_issuance_into_slip(&self, line: &str) -> Slip {
         let entries: Vec<&str> = line.split("\t").collect();
-        let amount = entries[0].parse::<u64>().expect("Failed to parse amount");
+        let amount = entries[0]
+            .parse::<u64>()
+            .expect("Failed to parse amount from slip entry");
         let publickey_str = entries[1];
-        let publickey_vec = Self::decode_str(publickey_str);
-        let mut publickey_array: [u8; 33] = [0u8; 33];
+        let publickey_vec = Self::decode_str(publickey_str).unwrap();
+        let mut publickey_array: SaitoPublicKey = [0u8; 33];
         publickey_array.copy_from_slice(&publickey_vec);
 
         let slip_type = match entries[2].trim_end_matches('\r') {
@@ -198,10 +200,9 @@ impl Storage {
         return slip;
     }
 
-    fn decode_str(string: &str) -> Vec<u8> {
-        return bs58::decode(string).into_vec().expect("Decoding failed");
+    fn decode_str(string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
+        return bs58::decode(string).into_vec();
     }
-
 }
 
 #[cfg(test)]
