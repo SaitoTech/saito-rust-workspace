@@ -156,9 +156,10 @@ impl Storage {
                 for line in lines {
                     let line = line.trim_end_matches('\r');
                     if !line.is_empty() {
-                        let mut slip = self.convert_issuance_into_slip(line);
-                        slip.generate_utxoset_key();
-                        v.push(slip);
+                        if let Some(mut slip) = self.convert_issuance_into_slip(line) {
+                            slip.generate_utxoset_key();
+                            v.push(slip);
+                        }
                     }
                 }
 
@@ -176,28 +177,37 @@ impl Storage {
         return vec![];
     }
 
-    fn convert_issuance_into_slip(&self, line: &str) -> Slip {
+    fn convert_issuance_into_slip(&self, line: &str) -> Option<Slip> {
         let entries: Vec<&str> = line.split("\t").collect();
         let amount = entries[0]
             .parse::<u64>()
             .expect("Failed to parse amount from slip entry");
         let publickey_str = entries[1];
-        let publickey_vec = Self::decode_str(publickey_str).unwrap();
-        let mut publickey_array: SaitoPublicKey = [0u8; 33];
-        publickey_array.copy_from_slice(&publickey_vec);
+        let publickey_result = Self::decode_str(publickey_str);
 
-        let slip_type = match entries[2].trim_end_matches('\r') {
-            "VipOutput" => SlipType::VipOutput,
-            "Normal" => SlipType::Normal,
-            _ => panic!("Invalid slip type"),
-        };
+        match publickey_result {
+            Ok(val) => {
+                let mut publickey_array: SaitoPublicKey = [0u8; 33];
+                publickey_array.copy_from_slice(&val);
 
-        let mut slip = Slip::default();
-        slip.amount = amount;
-        slip.public_key = publickey_array;
-        slip.slip_type = slip_type;
+                let slip_type = match entries[2].trim_end_matches('\r') {
+                    "VipOutput" => SlipType::VipOutput,
+                    "Normal" => SlipType::Normal,
+                    _ => panic!("Invalid slip type"),
+                };
 
-        return slip;
+                let mut slip = Slip::default();
+                slip.amount = amount;
+                slip.public_key = publickey_array;
+                slip.slip_type = slip_type;
+
+                return Some(slip);
+            }
+            Err(err) => {
+                debug!("error reading issuance line {:?}", err);
+                None
+            }
+        }
     }
 
     fn decode_str(string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
