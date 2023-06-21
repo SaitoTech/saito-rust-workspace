@@ -551,7 +551,13 @@ impl Blockchain {
                     .await;
             }
         }
-        info!("block {:?} added successfully", hex::encode(block_hash));
+        info!("block added successfully {:?}", hex::encode(block_hash));
+        {
+            let block = self.get_mut_block(&block_hash).unwrap();
+            info!(">>>>> block..txs. {:?}", block.transactions.len());
+            info!(">>>>> from. {:?}", block.transactions[0].from.len());
+            info!(">>>>> to. {:?}", block.transactions[0].to.len());
+        }
         network
             .io_interface
             .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block_id));

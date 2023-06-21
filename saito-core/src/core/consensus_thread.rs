@@ -163,11 +163,15 @@ impl ConsensusThread {
 
         debug!("{:?} transaction from slips", txs);
         for tx in txs {
+            info!(">>> input len {:?} ", tx.from.len());
+            info!(">>> output len {:?} ", tx.to.len());
             mempool
                 .add_transaction_if_validates(tx.clone(), &blockchain)
                 .await;
             info!("added issuance init tx for : {:?}", tx.to[0].public_key);
         }
+
+        
     }
     /// Test method to generate test transactions
     ///
