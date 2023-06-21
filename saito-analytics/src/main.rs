@@ -27,6 +27,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
+use bs58;
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
     LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
@@ -179,9 +180,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (key, value) in &utxo_balances {
         if value > &threshold {
-            let key_hex = hex::encode(key);
-            println!("{}\t{}", key_hex, value);
-            writeln!(file, "{}\t{:?}\t{}", key_hex, value, txtype);
+            //let key_hex = hex::encode(key);
+
+            let key_base58 = bs58::encode(key).into_string();
+
+            // let publickey_vec = bs58::decode(publickey_str)
+            //     .into_vec()
+            //     .expect("Decoding failed");
+            // let mut publickey_array: [u8; 33] = [0u8; 33];
+            // publickey_array.copy_from_slice(&publickey_vec);
+            //println!("{}\t{}", key_hex, value);
+            println!("{}\t{}", key_base58, value);
+            writeln!(file, "{}\t{:?}\t{}", key_base58, value, txtype);
         }
     }
 
