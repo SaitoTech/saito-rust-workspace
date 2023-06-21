@@ -122,11 +122,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input_slip_spendable = false;
     let output_slip_spendable = true;
 
+    //TODO
+    //pub slip_type: SlipType,
+
     //iterate through all blocks and tx
     for block in blocks {
         info!("block {}", block.id);
         for j in 0..block.transactions.len() {
             let tx = &block.transactions[j];
+
+            println!("type {:?}", tx.transaction_type);
 
             tx.from.iter().for_each(|input| {
                 //utxoset.insert(input.utxoset_key, input_slip_spendable);
@@ -172,25 +177,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let threshold = 1;
-    //TODO
     let txtype = "normal";
-
-    //output should be
-    //TODO public key compressed
-    //25000	21ronA4HFRaoqJdPt1fZQ6rz7SS5TKAyr3QzN429miBZA	VipOutput
 
     for (key, value) in &utxo_balances {
         if value > &threshold {
-            //let key_hex = hex::encode(key);
-
             let key_base58 = bs58::encode(key).into_string();
-
-            // let publickey_vec = bs58::decode(publickey_str)
-            //     .into_vec()
-            //     .expect("Decoding failed");
-            // let mut publickey_array: [u8; 33] = [0u8; 33];
-            // publickey_array.copy_from_slice(&publickey_vec);
-            //println!("{}\t{}", key_hex, value);
+            
             println!("{}\t{}", key_base58, value);
             writeln!(file, "{}\t{:?}\t{}", key_base58, value, txtype);
         }
