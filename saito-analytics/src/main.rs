@@ -93,9 +93,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     r.load_blocks_from_path(&directory_path).await;
 
-    let mut utxoset: UtxoSet = AHashMap::new();
+    //let mut utxoset: UtxoSet = AHashMap::new();
 
-    type UtxoSetBalance = AHashMap<SaitoUTXOSetKey, u64>;
+    //type UtxoSetBalance = AHashMap<SaitoUTXOSetKey, u64>;
+    type UtxoSetBalance = AHashMap<SaitoPublicKey, u64>;
     let mut utxo_balances: UtxoSetBalance = AHashMap::new();
 
     info!("run dump utxoset. take blocks from {}", directory_path);
@@ -128,19 +129,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let tx = &block.transactions[j];
 
             tx.from.iter().for_each(|input| {
-                utxoset.insert(input.utxoset_key, input_slip_spendable);
+                //utxoset.insert(input.utxoset_key, input_slip_spendable);
 
                 utxo_balances
-                    .entry(input.utxoset_key)
+                    .entry(input.public_key)
                     .and_modify(|e| *e -= input.amount)
                     .or_insert(0);
             });
 
             tx.to.iter().for_each(|output| {
-                utxoset.insert(output.utxoset_key, output_slip_spendable);
+                //utxoset.insert(output.utxoset_key, output_slip_spendable);
 
                 utxo_balances
-                    .entry(output.utxoset_key)
+                    .entry(output.public_key)
                     .and_modify(|e| *e += output.amount)
                     .or_insert(output.amount);
             });
