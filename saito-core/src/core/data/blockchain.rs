@@ -112,6 +112,8 @@ impl Blockchain {
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
     ) -> AddBlockResult {
+        //------------------------
+        trace!("add block start");
         // confirm hash first
         // block.generate_pre_hash();
         // block.generate_hash();
@@ -134,6 +136,8 @@ impl Blockchain {
         // let previous_block_hash = block.previous_block_hash;
 
         // sanity checks
+        //------------------------
+        trace!("sanity checks");
         if self.blocks.contains_key(&block_hash) {
             error!(
                 "block already exists in blockchain {:?}. not adding",
@@ -148,8 +152,9 @@ impl Blockchain {
         // and we may want to tag and use the degree of distance to impose
         // penalties on routing peers.
         //
+        //------------------------
         // get missing block
-        //
+        trace!("get missing block");
         if !self.blockring.is_empty() && self.get_block(&block.previous_block_hash).is_none() {
             if block.previous_block_hash == [0; 32] {
                 trace!(
@@ -237,6 +242,10 @@ impl Blockchain {
         // needing to borrow the value back for insertion into the BlockRing.
         //
         // TODO : check if this "if" condition can be moved to an assert
+
+        //------------------------
+        trace!("pre-validation");
+        trace!("save block to disk");
         if !self
             .blockring
             .contains_block_hash_at_block_id(block_id, block_hash)
@@ -267,6 +276,8 @@ impl Blockchain {
         //
         // find shared ancestor of new_block with old_chain
         //
+        //------------------------
+        trace!("find shared ancestor");
         let mut new_chain: Vec<[u8; 32]> = Vec::new();
         let mut old_chain: Vec<[u8; 32]> = Vec::new();
         let mut shared_ancestor_found = false;
@@ -300,6 +311,8 @@ impl Blockchain {
         }
 
         // and get existing current chain for comparison
+        //------------------------
+        trace!("get existing current chain");
         if shared_ancestor_found {
             debug!("shared ancestor found");
 
@@ -395,6 +408,9 @@ impl Blockchain {
         // the blockring.
         //
         self.blockring.empty = false;
+
+        //------------------------
+        trace!("validate");
 
         //
         // validate
