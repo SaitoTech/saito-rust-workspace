@@ -72,7 +72,7 @@ where
                 // TODO : update to recv().await
                 let result = network_event_receiver.as_mut().unwrap().try_recv();
                 if result.is_ok() {
-                    let event = result.unwrap();
+                    let event: NetworkEvent = result.unwrap();
                     if event_processor.process_network_event(event).await.is_some() {
                         work_done = true;
                     }
@@ -101,7 +101,6 @@ where
             {
                 work_done = true;
             }
-
             #[cfg(feature = "with-stats")]
             {
                 let duration = current_instant.duration_since(stat_timer);
