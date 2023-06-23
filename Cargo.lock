@@ -323,9 +323,12 @@ version = "3.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
 dependencies = [
+ "atty",
  "bitflags",
  "clap_lex",
  "indexmap",
+ "strsim",
+ "termcolor",
  "textwrap",
 ]
 
@@ -1724,6 +1727,39 @@ name = "safemem"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
+
+[[package]]
+name = "saito-analytics"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "async-trait",
+ "base64 0.21.0",
+ "bs58",
+ "clap",
+ "criterion",
+ "ctor",
+ "ctrlc",
+ "figment",
+ "futures",
+ "hex",
+ "lazy_static",
+ "log",
+ "pretty_env_logger",
+ "rand",
+ "rayon",
+ "reqwest",
+ "saito-core",
+ "saito-rust",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "tokio",
+ "tokio-tungstenite 0.19.0",
+ "tracing-subscriber",
+ "tungstenite 0.19.0",
+ "warp",
+]
 
 [[package]]
 name = "saito-core"

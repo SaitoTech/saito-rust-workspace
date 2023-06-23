@@ -1,5 +1,7 @@
+rustfmt.toml
 .idea/
 target/
 dist/
 .DS_Store
 .vscode
+configs/config.json
