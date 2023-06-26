@@ -116,7 +116,58 @@ async fn get_utxobalances(blocks: Vec<Block>) -> UtxoSetBalance {
     
     utxo_balances
 }
- 
+
+async fn run_utxodump_blocks(blocks: Vec<Block>, utxodump_file: String, threshold: u64) {
+    let utxo_balances = get_utxobalances(blocks.clone()).await;
+
+    //get total output of first block
+    let firstblock = &blocks[0];
+    let mut inital_out = 0;
+    for j in 0..firstblock.transactions.len() {
+        let tx = &firstblock.transactions[j];
+
+        tx.to.iter().for_each(|output| {
+            inital_out += output.amount;
+        });
+    }
+
+    info!("inital supply: {}", inital_out);
+
+    let mut total_value = 0;
+    for (key, value) in &utxo_balances {
+        if value > &0 {
+            total_value += value;
+        }
+    }
+    info!("total_value {}", total_value);
+
+    assert_eq!(total_value, inital_out);
+
+    let file_path = format!("data/{}", utxodump_file);
+    let mut file = File::create(file_path).unwrap();
+
+    //header, currently not used
+    //let (mut blockchain, _blockchain_) = lock_for_write!(r.blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+    //if we want to add type need to check on pub slip_type: SlipType,
+    //write header
+    // writeln!(
+    //     file,
+    //     "UTXO state height: latest_block_id {}",
+    //     blockchain.get_latest_block_id()
+    // );
+
+    let txtype = "Normal";
+
+    for (key, value) in &utxo_balances {
+        if value > &threshold {
+            let key_base58 = bs58::encode(key).into_string();
+
+            writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
+        }
+    }
+} 
+
 async fn run_utxodump() {
     let default_path = "../../sampleblocks";
     let utxodump_file = "utxoset.dat";
@@ -166,54 +217,9 @@ async fn run_utxodump() {
 
     r.load_blocks_from_path(&directory_path).await;
     let blocks = r.get_blocks_vec().await;
-
-    let utxo_balances = get_utxobalances(blocks.clone()).await;
-
-    //get total output of first block
-    let firstblock = &blocks[0];
-    let mut inital_out = 0;
-    for j in 0..firstblock.transactions.len() {
-        let tx = &firstblock.transactions[j];
-
-        tx.to.iter().for_each(|output| {
-            inital_out += output.amount;
-        });
-    }
-
-    info!("inital supply: {}", inital_out);
-
-    let mut total_value = 0;
-    for (key, value) in &utxo_balances {
-        if value > &0 {
-            total_value += value;
-        }
-    }
-    info!("total_value {}", total_value);
-
-    assert_eq!(total_value, inital_out);
-
-    let file_path = format!("data/{}", utxodump_file);
-    let mut file = File::create(file_path).unwrap();
-
-    let (mut blockchain, _blockchain_) = lock_for_write!(r.blockchain, LOCK_ORDER_BLOCKCHAIN);
-
-    //if we want to add type need to check on pub slip_type: SlipType,
-    //write header
-    writeln!(
-        file,
-        "UTXO state height: latest_block_id {}",
-        blockchain.get_latest_block_id()
-    );
-
-    let txtype = "Normal";
-
-    for (key, value) in &utxo_balances {
-        if value > &threshold {
-            let key_base58 = bs58::encode(key).into_string();
-
-            writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
-        }
-    }
+    info!("blocks loaded {}", blocks.len());
+    run_utxodump_blocks(blocks, utxodump_file.to_string(), threshold).await;
+    
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -223,14 +229,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("saito analytics");
 
-    //run_utxodump().await;
-
-    let mut r = runner::ChainRunner::new();
-    let blocks = r.get_blocks_vec().await;
-
-    r.create_gen_block().await;
-
     run_utxodump().await;
+
+    //try to spend
+
+    //Testing
+    // let mut r = runner::ChainRunner::new();
+    // let blocks = r.get_blocks_vec().await;
+    // r.create_gen_block().await;
+
 
     Ok(())
 }
