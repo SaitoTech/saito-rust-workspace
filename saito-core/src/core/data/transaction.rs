@@ -174,13 +174,17 @@ impl Transaction {
             with_payment,
             with_fee
         );
-        if available_balance < total_requested {
-            warn!(
-                "not enough funds to create transaction. required : {:?} available : {:?}",
-                total_requested, available_balance
-            );
-            return Err(Error::from(ErrorKind::NotFound));
-        }
+        
+        debug!("available_balance {}", available_balance);
+
+        //TODO checks external
+        // if available_balance < total_requested {
+        //     warn!(
+        //         "not enough funds to create transaction. required : {:?} available : {:?}",
+        //         total_requested, available_balance
+        //     );
+        //     return Err(Error::from(ErrorKind::NotFound));
+        // }
 
         let mut transaction = Transaction::default();
         if total_requested == 0 {
@@ -208,6 +212,8 @@ impl Transaction {
         transaction.add_to_slip(output);
 
         Ok(transaction)
+
+        // TODO comment
         //
         // if available_balance >= total_requested {
         //

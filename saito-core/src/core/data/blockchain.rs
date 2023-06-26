@@ -150,6 +150,7 @@ impl Blockchain {
         //
         // get missing block
         //
+        trace!("fetch blocks");
         if !self.blockring.is_empty() && self.get_block(&block.previous_block_hash).is_none() {
             if block.previous_block_hash == [0; 32] {
                 trace!(
@@ -237,6 +238,7 @@ impl Blockchain {
         // needing to borrow the value back for insertion into the BlockRing.
         //
         // TODO : check if this "if" condition can be moved to an assert
+        trace!("prevalidation");
         if !self
             .blockring
             .contains_block_hash_at_block_id(block_id, block_hash)
@@ -273,7 +275,7 @@ impl Blockchain {
         let mut new_chain_hash = block_hash;
         let mut old_chain_hash = previous_block_hash;
         let mut am_i_the_longest_chain = false;
-
+        trace!("find shared ancestor");
         while !shared_ancestor_found {
             trace!(
                 "checking new chain hash : {:?}",
@@ -410,10 +412,12 @@ impl Blockchain {
             debug!("this is the longest chain");
             self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
+            trace!("validate");
             let does_new_chain_validate = self
                 .validate(new_chain.as_slice(), old_chain.as_slice(), storage, configs)
                 .await;
 
+            trace!("does_new_chain_validate {}", does_new_chain_validate);
             if does_new_chain_validate {
                 self.add_block_success(block_hash, network, storage, mempool, configs)
                     .await;
@@ -920,6 +924,7 @@ impl Blockchain {
         }
 
         if old_chain.is_empty() {
+            trace!("old_chain is_empty");
             self.wind_chain(
                 new_chain,
                 old_chain,
@@ -930,6 +935,7 @@ impl Blockchain {
             )
             .await
         } else if !new_chain.is_empty() {
+            trace!("unwind_chain");
             self.unwind_chain(new_chain, old_chain, 0, true, storage, configs)
                 .await
         } else {
@@ -1020,7 +1026,8 @@ impl Blockchain {
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
-        // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
+        trace!("blockchain.wind_chain");
+        //trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
         //
         // if we are winding a non-existent chain with a wind_failure it
@@ -1058,6 +1065,7 @@ impl Blockchain {
             // tables or the nolan that are potentially falling off the chain have
             // full access to their transaction data.
             //
+            trace!("ensure previous blocks");
             for i in 1..MAX_STAKER_RECURSION {
                 if i >= latest_block_id {
                     break;
@@ -1078,9 +1086,11 @@ impl Blockchain {
         assert_eq!(block.block_type, BlockType::Full);
 
         let does_block_validate = block.validate(self, &self.utxoset, configs).await;
+        trace!("does_block_validate {}", does_block_validate);
 
         if does_block_validate {
             // blockring update
+            trace!("blockring update");
             self.blockring
                 .on_chain_reorganization(block.id, block.hash, true);
 
@@ -1092,8 +1102,9 @@ impl Blockchain {
             //
             {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
+                trace!("wallet processing start");
                 let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
-
+                trace!("wallet on chain reorg");
                 wallet.on_chain_reorganization(block, true);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
@@ -1106,6 +1117,7 @@ impl Blockchain {
                 block.on_chain_reorganization(&mut self.utxoset, true);
             }
 
+            trace!("on_chain_reorganization");
             self.on_chain_reorganization(block_id, true, storage).await;
 
             //
@@ -1125,6 +1137,7 @@ impl Blockchain {
                 return true;
             }
 
+            trace!("call wind_chain");
             let res = self
                 .wind_chain(
                     new_chain,
