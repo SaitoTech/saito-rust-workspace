@@ -233,4 +233,47 @@ impl ChainRunner {
 
         block
     }
+
+    pub async fn create_gen_block(&mut self){
+
+        let wallet_read = self.wallet_lock.read().await;
+        debug!("public_key {:?}", wallet_read.public_key);
+
+        let amount = 1000;
+        let mut tx = Transaction::create_issuance_transaction(wallet_read.public_key, amount);
+        debug!("tx {:?}", tx);
+        tx.sign(&wallet_read.private_key);
+        drop(wallet_read);
+
+        {
+            let mut mem = self.mempool.write().await;
+            let (mut blockchain, _blockchain_) =
+            lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            mem.add_transaction_if_validates(tx.clone(), &blockchain).await;
+            //println!("mem {:?}", mem.transactions.len());
+            assert_eq!(mem.transactions.len(), 1);
+
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            
+            //let ts = tx.timestamp;
+            let ts = 1;
+
+            let genblock: Block = mem.bundle_genesis_block(&mut blockchain, ts, configs.deref()).await;
+            info!("add block");
+            let res = blockchain
+                        .add_block(
+                            genblock,
+                            &self.network,
+                            &mut self.storage,
+                            self.sender_to_miner.clone(),
+                            &mut mem,
+                            configs.deref(),
+                        )
+                        .await;
+            info!("add block done");
+        }
+        
+        //println!("available_balance {:?}", wallet_read.available_balance);
+
+    }
 }

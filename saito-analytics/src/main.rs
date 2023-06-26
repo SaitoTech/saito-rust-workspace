@@ -46,6 +46,8 @@ mod utils;
 
 use utils::pretty_print_block;
 
+type UtxoSetBalance = AHashMap<SaitoPublicKey, u64>;
+
 pub fn create_timestamp() -> Timestamp {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -82,16 +84,42 @@ fn setup_log() {
     log::info!("start logging");
 }
 
+async fn get_utxobalances(blocks: Vec<Block>) -> UtxoSetBalance {
+    
+    let mut utxo_balances: UtxoSetBalance = AHashMap::new();    
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    info!("saito analytics");
+    //assume longest chain
+    let input_slip_spendable = false;
+    let output_slip_spendable = true;
 
+    //iterate through all blocks and tx
+    for block in blocks {
+        info!("block {}", block.id);
+        for j in 0..block.transactions.len() {
+            let tx = &block.transactions[j];
+
+            tx.from.iter().for_each(|input| {
+                utxo_balances
+                    .entry(input.public_key)
+                    .and_modify(|e| *e -= input.amount)
+                    .or_insert(0);
+            });
+
+            tx.to.iter().for_each(|output| {
+                utxo_balances
+                    .entry(output.public_key)
+                    .and_modify(|e| *e += output.amount)
+                    .or_insert(output.amount);
+            });
+        }
+    }
+    
+    utxo_balances
+}
+ 
+async fn run_utxodump() {
     let default_path = "../../sampleblocks";
     let utxodump_file = "utxoset.dat";
-
-    //setup_logging();
-    setup_log();
 
     let mut r = runner::ChainRunner::new();
 
@@ -134,15 +162,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     let directory_path = matches.value_of("blockdir").unwrap_or(default_path);
-
-    r.load_blocks_from_path(&directory_path).await;
-
-    type UtxoSetBalance = AHashMap<SaitoPublicKey, u64>;
-    let mut utxo_balances: UtxoSetBalance = AHashMap::new();
-
     info!("run dump utxoset. take blocks from {}", directory_path);
 
+    r.load_blocks_from_path(&directory_path).await;
     let blocks = r.get_blocks_vec().await;
+
+    let utxo_balances = get_utxobalances(blocks.clone()).await;
 
     //get total output of first block
     let firstblock = &blocks[0];
@@ -156,32 +181,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     info!("inital supply: {}", inital_out);
-
-    //assume longest chain
-    let input_slip_spendable = false;
-    let output_slip_spendable = true;
-
-    //iterate through all blocks and tx
-    for block in blocks {
-        info!("block {}", block.id);
-        for j in 0..block.transactions.len() {
-            let tx = &block.transactions[j];
-
-            tx.from.iter().for_each(|input| {
-                utxo_balances
-                    .entry(input.public_key)
-                    .and_modify(|e| *e -= input.amount)
-                    .or_insert(0);
-            });
-
-            tx.to.iter().for_each(|output| {
-                utxo_balances
-                    .entry(output.public_key)
-                    .and_modify(|e| *e += output.amount)
-                    .or_insert(output.amount);
-            });
-        }
-    }
 
     let mut total_value = 0;
     for (key, value) in &utxo_balances {
@@ -215,6 +214,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
         }
     }
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //setup_logging();
+    setup_log();
+
+    info!("saito analytics");
+
+    //run_utxodump().await;
+
+    let mut r = runner::ChainRunner::new();
+    let blocks = r.get_blocks_vec().await;
+
+    r.create_gen_block().await;
+
+    run_utxodump().await;
 
     Ok(())
 }
