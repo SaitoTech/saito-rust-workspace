@@ -28,7 +28,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Layer;
 
-
 use bs58;
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
@@ -86,8 +85,7 @@ fn setup_log() {
 }
 
 async fn get_utxobalances(blocks: Vec<Block>) -> UtxoSetBalance {
-    
-    let mut utxo_balances: UtxoSetBalance = AHashMap::new();    
+    let mut utxo_balances: UtxoSetBalance = AHashMap::new();
 
     //assume longest chain
     let input_slip_spendable = false;
@@ -114,7 +112,7 @@ async fn get_utxobalances(blocks: Vec<Block>) -> UtxoSetBalance {
             });
         }
     }
-    
+
     utxo_balances
 }
 
@@ -167,7 +165,7 @@ async fn run_utxodump_blocks(blocks: Vec<Block>, utxodump_file: String, threshol
             writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
         }
     }
-} 
+}
 
 async fn run_utxodump() {
     let default_path = "../../sampleblocks";
@@ -220,7 +218,6 @@ async fn run_utxodump() {
     let blocks = r.get_blocks_vec().await;
     info!("blocks loaded {}", blocks.len());
     run_utxodump_blocks(blocks, utxodump_file.to_string(), threshold).await;
-    
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -233,11 +230,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_utxodump().await;
 
     //------------------------------------------
-    
+
     //Testing wallet
     let mut r = runner::ChainRunner::new();
     let blocks = r.get_blocks_vec().await;
-    r.create_gen_block().await;
+    r.create_test_gen_block(1000).await;
 
     {
         let wallet_read = r.wallet_lock.read().await;
@@ -247,7 +244,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut wallet_write = r.wallet_lock.write().await;
-    
+
+    //let mut txs: VecDeque<Transaction> = Default::default();
+
     let mut transaction = Transaction::default();
     let total_nolans_requested_per_slip = 100;
     let s = wallet_write.generate_slips(total_nolans_requested_per_slip);
@@ -264,17 +263,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //TOOD create a second wallet
 
+    let keys = generate_keys();
+    let wallet2 = Wallet::new(keys.1, keys.0);
+    let _public_key2 = wallet2.public_key.clone();
+    let _private_key = wallet2.private_key.clone();
+
     //transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
     transaction.generate(&wallet_write.public_key, 0, 0);
     transaction.sign(&wallet_write.private_key);
+
     //send to self
-    let to_public_key = wallet_write.public_key;
+    //let to_public_key = wallet_write.public_key;
     //thread 'main' panicked at 'assertion failed: `(left != right)`
-    //transaction.add_hop(&wallet_write.private_key, &wallet_write.public_key, &to_public_key);
+    transaction.add_hop(
+        &wallet_write.private_key,
+        &wallet_write.public_key,
+        &_public_key2,
+    );
+    drop(wallet_write);
 
+    {
+        //r.make_block(transaction.clone());
+        //let blocks = r.get_blocks_vec().await;
+        //info!("blocks after block2 {}", blocks.len())
+    }
 
-    
+    //add tx to block
+    //block = mempool
+    // .bundle_block(
+    //     blockchain.deref_mut(),
+    //     timestamp,
+    //     gt_result.clone(),
+    //     configs.deref(),
+    // )
+    // .await;
+    //txs.push_back(transaction);
+
     //try to spend
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::runner::*;
+
+    #[tokio::test]
+    async fn test_genesis_block() {
+        assert_eq!(0, 0);
+        let mut r = ChainRunner::new();
+        let amount = 1000;
+        r.create_test_gen_block(amount).await;
+        let blocks = r.get_blocks_vec().await;
+        assert_eq!(blocks.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_genesis_balance() {
+        assert_eq!(0, 0);
+        let mut r = ChainRunner::new();
+        let amount = 1000;
+        r.create_test_gen_block(amount).await;
+
+        let wallet_read = r.wallet_lock.read().await;
+        let bal = wallet_read.get_available_balance();
+        assert_eq!(bal, amount);
+    }
 }

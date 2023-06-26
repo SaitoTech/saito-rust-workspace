@@ -50,6 +50,7 @@ pub fn create_timestamp() -> Timestamp {
 }
 
 //struct to manage setup of chain
+//currently for analytics and testing
 pub struct ChainRunner {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
@@ -234,12 +235,11 @@ impl ChainRunner {
         block
     }
 
-    pub async fn create_gen_block(&mut self){
-
+    pub async fn create_test_gen_block(&mut self, amount: u64) {
         let wallet_read = self.wallet_lock.read().await;
         debug!("public_key {:?}", wallet_read.public_key);
 
-        let amount = 1000;
+        //let amount = 1000;
         let mut tx = Transaction::create_issuance_transaction(wallet_read.public_key, amount);
         debug!("tx {:?}", tx);
         tx.sign(&wallet_read.private_key);
@@ -248,32 +248,90 @@ impl ChainRunner {
         {
             let mut mem = self.mempool.write().await;
             let (mut blockchain, _blockchain_) =
-            lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-            mem.add_transaction_if_validates(tx.clone(), &blockchain).await;
+                lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            mem.add_transaction_if_validates(tx.clone(), &blockchain)
+                .await;
             //println!("mem {:?}", mem.transactions.len());
             assert_eq!(mem.transactions.len(), 1);
 
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            
+
             //let ts = tx.timestamp;
+            //TODO
             let ts = 1;
 
-            let genblock: Block = mem.bundle_genesis_block(&mut blockchain, ts, configs.deref()).await;
+            let genblock: Block = mem
+                .bundle_genesis_block(&mut blockchain, ts, configs.deref())
+                .await;
             info!("add block");
             let res = blockchain
-                        .add_block(
-                            genblock,
-                            &self.network,
-                            &mut self.storage,
-                            self.sender_to_miner.clone(),
-                            &mut mem,
-                            configs.deref(),
-                        )
-                        .await;
+                .add_block(
+                    genblock,
+                    &self.network,
+                    &mut self.storage,
+                    self.sender_to_miner.clone(),
+                    &mut mem,
+                    configs.deref(),
+                )
+                .await;
             info!("add block done");
         }
-        
-        //println!("available_balance {:?}", wallet_read.available_balance);
 
+        //println!("available_balance {:?}", wallet_read.available_balance);
     }
+
+    // pub async fn add_block_mgr(&mut self, block: Block) {
+    //     let mut mem = self.mempool.write().await;
+    //     let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+    //     let (mut blockchain, _blockchain_) =
+    //         lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+    //     let res = blockchain
+    //         .add_block(
+    //             block,
+    //             &self.network,
+    //             &mut self.storage,
+    //             self.sender_to_miner.clone(),
+    //             &mut mem,
+    //             configs.deref(),
+    //         )
+    //         .await;
+    //     //info!("?? {:?}",res);
+    // }
+
+    pub async fn add_block(&mut self, block: Block) {
+        // debug!("adding block to test manager blockchain");
+        // let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        // let (mut blockchain, _blockchain_) =
+        //     lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        // let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
+
+        // blockchain
+        //     .add_block(
+        //         block,
+        //         &mut self.network,
+        //         &mut self.storage,
+        //         self.sender_to_miner.clone(),
+        //         &mut mempool,
+        //         configs.deref(),
+        //     )
+        //     .await;
+        // debug!("block added to test manager blockchain");
+    }
+
+    // pub async fn make_block(&mut self, tx: Transaction) {
+    //     //let mut mem = self.mempool.write().await;
+    //     let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
+    //     let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+    //     let (mut blockchain, _blockchain_) =
+    //         lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+    //     mempool.add_transaction_if_validates(tx.clone(), &blockchain);
+    //     let ts = 1;
+    //     let mut gt_result = None;
+    //     let mut block: Block = mempool
+    //         .bundle_block(&mut blockchain, ts, gt_result, configs.deref())
+    //         .await
+    //         .unwrap();
+    //     info!("add block");
+    //     //self.add_block(block);
+    // }
 }
