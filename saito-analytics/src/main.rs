@@ -245,8 +245,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut wallet_write = r.wallet_lock.write().await;
 
-    //let mut txs: VecDeque<Transaction> = Default::default();
-
     let mut transaction = Transaction::default();
     let total_nolans_requested_per_slip = 100;
     let s = wallet_write.generate_slips(total_nolans_requested_per_slip);
@@ -304,6 +302,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+//test-log = "0.2.12"
 #[cfg(test)]
 mod tests {
 
@@ -311,7 +310,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_genesis_block() {
-        assert_eq!(0, 0);
         let mut r = ChainRunner::new();
         let amount = 1000;
         r.create_test_gen_block(amount).await;
@@ -321,7 +319,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_genesis_balance() {
-        assert_eq!(0, 0);
         let mut r = ChainRunner::new();
         let amount = 1000;
         r.create_test_gen_block(amount).await;
@@ -329,5 +326,27 @@ mod tests {
         let wallet_read = r.wallet_lock.read().await;
         let bal = wallet_read.get_available_balance();
         assert_eq!(bal, amount);
+    }
+
+    #[tokio::test]
+    async fn test_create_block() {
+        let mut r = ChainRunner::new();
+        let amount = 1000;
+        r.create_test_gen_block(amount).await;
+
+        let timestamp = create_timestamp();        
+        let phash = [0; 32];
+
+        //FIX wallet is now 0?
+        //let txs = r.create_txs(timestamp, 10, 100, 1).await;
+        //assert_eq!(txs.len(), 10);
+        
+        let wallet_read = r.wallet_lock.read().await;
+        let bal = wallet_read.get_available_balance();
+        assert_eq!(bal, amount);
+
+        //println!(">>> {}", txs.len());
+
+        //let mut block = r.create_block(phash, timestamp).await;
     }
 }

@@ -159,7 +159,6 @@ impl ChainRunner {
 
     pub async fn create_txs(
         &self,
-        parent_hash: SaitoHash,
         timestamp: Timestamp,
         txs_number: usize,
         txs_amount: Currency,
@@ -299,23 +298,23 @@ impl ChainRunner {
     // }
 
     pub async fn add_block(&mut self, block: Block) {
-        // debug!("adding block to test manager blockchain");
-        // let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-        // let (mut blockchain, _blockchain_) =
-        //     lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        // let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
+        debug!("adding block to manager blockchain");
+        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        let (mut blockchain, _blockchain_) =
+            lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
-        // blockchain
-        //     .add_block(
-        //         block,
-        //         &mut self.network,
-        //         &mut self.storage,
-        //         self.sender_to_miner.clone(),
-        //         &mut mempool,
-        //         configs.deref(),
-        //     )
-        //     .await;
-        // debug!("block added to test manager blockchain");
+        blockchain
+            .add_block(
+                block,
+                &mut self.network,
+                &mut self.storage,
+                self.sender_to_miner.clone(),
+                &mut mempool,
+                configs.deref(),
+            )
+            .await;
+        debug!("block added to test manager blockchain");
     }
 
     // pub async fn make_block(&mut self, tx: Transaction) {
