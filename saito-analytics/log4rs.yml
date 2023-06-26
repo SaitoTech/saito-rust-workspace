@@ -1,0 +1,29 @@
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S)} {h({file}:{line})} - {m}{n}"
+      
+loggers:
+  tokio_tungstenite:
+    level: off
+  tungstenite:
+    level: off
+  mio::poll:
+    level: off
+  hyper::proto:
+    level: off
+  hyper::client:
+    level: off
+  want:
+    level: off
+  reqwest::async_impl:
+    level: off
+  reqwest::connect:
+    level: off
+  warp::filters:
+    level: off      
+root:
+  level: trace
+  appenders:
+    - stdout

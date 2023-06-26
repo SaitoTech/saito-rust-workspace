@@ -77,6 +77,12 @@ fn setup_logging() {
     tracing_subscriber::registry().with(fmt_layer).init();
 }
 
+fn setup_log() {
+    log4rs::init_file("log4rs.yml", Default::default()).unwrap();
+    log::info!("start logging");
+}
+
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("saito analytics");
@@ -84,7 +90,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let default_path = "../../sampleblocks";
     let utxodump_file = "utxoset.dat";
 
-    setup_logging();
+    //setup_logging();
+    setup_log();
 
     let mut r = runner::ChainRunner::new();
 
@@ -199,7 +206,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         blockchain.get_latest_block_id()
     );
 
-    let txtype = "normal";
+    let txtype = "Normal";
 
     for (key, value) in &utxo_balances {
         if value > &threshold {
