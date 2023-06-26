@@ -28,6 +28,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Layer;
 
+
 use bs58;
 use saito_core::common::defs::{
     push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
@@ -231,13 +232,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     run_utxodump().await;
 
+    //------------------------------------------
+    
+    //Testing wallet
+    let mut r = runner::ChainRunner::new();
+    let blocks = r.get_blocks_vec().await;
+    r.create_gen_block().await;
+
+    {
+        let wallet_read = r.wallet_lock.read().await;
+        let bal = wallet_read.get_available_balance();
+        println!("bal: {:?}", bal);
+        assert_eq!(bal, 1000);
+    }
+
+    let mut wallet_write = r.wallet_lock.write().await;
+    
+    let mut transaction = Transaction::default();
+    let total_nolans_requested_per_slip = 100;
+    let s = wallet_write.generate_slips(total_nolans_requested_per_slip);
+    println!("s {:?}", s);
+
+    let (input_slips, output_slips) = wallet_write.generate_slips(total_nolans_requested_per_slip);
+
+    for slip in input_slips {
+        transaction.add_from_slip(slip);
+    }
+    for slip in output_slips {
+        transaction.add_to_slip(slip);
+    }
+
+    //TOOD create a second wallet
+
+    //transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
+    transaction.generate(&wallet_write.public_key, 0, 0);
+    transaction.sign(&wallet_write.private_key);
+    //send to self
+    let to_public_key = wallet_write.public_key;
+    //thread 'main' panicked at 'assertion failed: `(left != right)`
+    //transaction.add_hop(&wallet_write.private_key, &wallet_write.public_key, &to_public_key);
+
+
+    
     //try to spend
-
-    //Testing
-    // let mut r = runner::ChainRunner::new();
-    // let blocks = r.get_blocks_vec().await;
-    // r.create_gen_block().await;
-
 
     Ok(())
 }
