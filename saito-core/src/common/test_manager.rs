@@ -620,6 +620,40 @@ pub mod test {
                 )
                 .await;
         }
+
+        //convenience function assuming longest chain
+        pub async fn balance_map(&mut self) -> AHashMap<SaitoPublicKey, u64> {
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            let mut utxo_balances: AHashMap<SaitoPublicKey, u64> = AHashMap::new();
+
+            let latest_id = blockchain.get_latest_block_id();
+            for i in 1..=latest_id {
+                let block_hash = blockchain
+                    .blockring
+                    .get_longest_chain_block_hash_by_block_id(i as u64);
+                let block = blockchain.get_block(&block_hash).unwrap().clone();
+                for j in 0..block.transactions.len() {
+                    let tx = &block.transactions[j];
+
+                    tx.from.iter().for_each(|input| {
+                        utxo_balances
+                            .entry(input.public_key)
+                            .and_modify(|e| *e -= input.amount)
+                            .or_insert(0);
+                    });
+
+                    tx.to.iter().for_each(|output| {
+                        utxo_balances
+                            .entry(output.public_key)
+                            .and_modify(|e| *e += output.amount)
+                            .or_insert(output.amount);
+                    });
+                }
+            }
+            utxo_balances
+        }
     }
 
     struct TestConfiguration {}

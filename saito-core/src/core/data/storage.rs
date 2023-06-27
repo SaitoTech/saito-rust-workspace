@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
+use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
+use std::fs::File;
+use std::io::Write;
 
 use super::slip::SlipType;
 use crate::common::defs::{push_lock, SaitoPublicKey, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
@@ -21,6 +24,8 @@ pub struct Storage {
 pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
 pub const DEFAULT_FILE_PATH: &'static str = "./data/issuance/default";
+
+pub const UTXOSTATE_FILE_PATH: &'static str = "./data/issuance/utxoset";
 
 pub struct StorageConfigurer {}
 
@@ -212,6 +217,25 @@ impl Storage {
 
     fn decode_str(string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
         return bs58::decode(string).into_vec();
+    }
+
+    // store the state of balances
+    pub async fn store_balance_map(&self, bmap: AHashMap<SaitoPublicKey, u64>, threshold: u64) {                
+        
+        let file_path = format!("{}", UTXOSTATE_FILE_PATH);
+        let mut file = File::create(file_path).unwrap();
+
+        //TODO check if file exists and give a warning if so
+
+        let txtype = "Normal";
+
+        for (key, value) in &bmap {
+            if value > &threshold {
+                let key_base58 = bs58::encode(key).into_string();
+
+                writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
+            }
+        }
     }
 }
 

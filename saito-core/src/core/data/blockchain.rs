@@ -11,6 +11,8 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+
+
 use crate::common::defs::{
     push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
     LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
@@ -1583,6 +1585,9 @@ mod tests {
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
+    use std::fs;
+    use crate::core::data::storage::UTXOSTATE_FILE_PATH;
+
 
     fn init_testlog() {
         let _ = pretty_env_logger::try_init();
@@ -2738,14 +2743,29 @@ mod tests {
         init_testlog();
 
         let mut t = TestManager::new();
+        //generate a test genesis block
         t.create_test_gen_block(1000).await;
-        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        {
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-        let block1 = blockchain.get_latest_block().unwrap();
-        //block1_hash = block1.hash;
-        assert_eq!(block1.id, 1);
-        assert!(block1.timestamp > 1687867265673);
-        assert_eq!(block1.transactions.len(), 1);
+            let block1 = blockchain.get_latest_block().unwrap();
+            assert_eq!(block1.id, 1);
+            assert!(block1.timestamp > 1687867265673);
+            assert_eq!(block1.transactions.len(), 1);
+        }
+
+        //create the bmap
+        let bmap = t.balance_map().await;
+
+        //store it
+        t.storage.store_balance_map(bmap, 1).await;
+
+        //TODO read back in
+
+        fs::remove_file(UTXOSTATE_FILE_PATH);
+
+        //TODO read back and delete testing files
 
     }
 }
