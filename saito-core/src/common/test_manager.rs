@@ -587,6 +587,39 @@ pub mod test {
             // and add first block to blockchain
             self.add_block(block).await;
         }
+
+        pub async fn create_test_gen_block(&mut self, amount: u64) {
+            debug!("create_test_gen_block");
+            let wallet_read = self.wallet_lock.read().await;
+            let mut tx = Transaction::create_issuance_transaction(wallet_read.public_key, amount);
+            tx.sign(&wallet_read.private_key);
+            drop(wallet_read);
+
+            let mut mempool = self.mempool_lock.write().await;
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            mempool
+                .add_transaction_if_validates(tx.clone(), &blockchain)
+                .await;
+
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+
+            let timestamp = create_timestamp();
+
+            let genblock: Block = mempool
+                .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                .await;
+            let res = blockchain
+                .add_block(
+                    genblock,
+                    &self.network,
+                    &mut self.storage,
+                    self.sender_to_miner.clone(),
+                    &mut mempool,
+                    configs.deref(),
+                )
+                .await;
+        }
     }
 
     struct TestConfiguration {}

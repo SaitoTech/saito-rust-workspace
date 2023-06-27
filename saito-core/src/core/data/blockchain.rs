@@ -39,6 +39,7 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
     (top, bottom)
 }
 
+#[derive(Debug)]
 pub enum AddBlockResult {
     BlockAdded,
     BlockAlreadyExists,
@@ -1583,6 +1584,10 @@ mod tests {
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 
+    fn init_testlog() {
+        let _ = pretty_env_logger::try_init();
+    }
+
     #[tokio::test]
     async fn test_blockchain_init() {
         let keys = generate_keys();
@@ -2725,5 +2730,22 @@ mod tests {
             assert_ne!(fork_id, [0; 32]);
             assert_eq!(fork_id[4..], [0; 28]);
         }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn generate_genesis() {
+        init_testlog();
+
+        let mut t = TestManager::new();
+        t.create_test_gen_block(1000).await;
+        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+        let block1 = blockchain.get_latest_block().unwrap();
+        //block1_hash = block1.hash;
+        assert_eq!(block1.id, 1);
+        assert!(block1.timestamp > 1687867265673);
+        assert_eq!(block1.transactions.len(), 1);
+
     }
 }
