@@ -54,7 +54,7 @@ pub fn create_timestamp() -> Timestamp {
 pub struct ChainRunner {
     pub mempool: Arc<RwLock<Mempool>>,
     pub blockchain: Arc<RwLock<Blockchain>>,
-    pub wallet_lock: Arc<RwLock<Wallet>>,
+    pub wallet: Arc<RwLock<Wallet>>,
     pub latest_block_hash: SaitoHash,
     pub network: Network,
     pub storage: Storage,
@@ -71,22 +71,22 @@ impl ChainRunner {
         let _public_key = wallet.public_key.clone();
         let _private_key = wallet.private_key.clone();
         let peers = Arc::new(RwLock::new(PeerCollection::new()));
-        let wallet_lock = Arc::new(RwLock::new(wallet));
-        let blockchain = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let mempool = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
+        let wallet = Arc::new(RwLock::new(wallet));
+        let blockchain = Arc::new(RwLock::new(Blockchain::new(wallet.clone())));
+        let mempool = Arc::new(RwLock::new(Mempool::new(wallet.clone())));
 
         let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
         let configs = Arc::new(RwLock::new(TestConfiguration {}));
 
         Self {
-            wallet_lock: wallet_lock.clone(),
+            wallet: wallet.clone(),
             blockchain,
             mempool,
             latest_block_hash: [0; 32],
             network: Network::new(
                 Box::new(TestIOHandler::new()),
                 peers.clone(),
-                wallet_lock.clone(),
+                wallet.clone(),
                 configs.clone(),
             ),
             peers: peers.clone(),
@@ -169,7 +169,7 @@ impl ChainRunner {
         let public_key: SaitoPublicKey;
 
         {
-            let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
             public_key = wallet.public_key;
             private_key = wallet.private_key;
@@ -178,7 +178,7 @@ impl ChainRunner {
         for _i in 0..txs_number {
             let mut transaction;
             {
-                let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
 
                 transaction =
                     Transaction::create(&mut wallet, public_key, txs_amount, txs_fee, false)
@@ -205,7 +205,7 @@ impl ChainRunner {
         let public_key: SaitoPublicKey;
 
         {
-            let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
             public_key = wallet.public_key;
             private_key = wallet.private_key;
@@ -235,7 +235,7 @@ impl ChainRunner {
     }
 
     pub async fn create_test_gen_block(&mut self, amount: u64) {
-        let wallet_read = self.wallet_lock.read().await;
+        let wallet_read = self.wallet.read().await;
         debug!("public_key {:?}", wallet_read.public_key);
 
         //let amount = 1000;

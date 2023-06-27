@@ -230,55 +230,74 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_utxodump().await;
 
     //------------------------------------------
+    
+    let mut r = runner::ChainRunner::new();
+    let amount = 1000;
+    r.create_test_gen_block(amount).await;
+
+    let timestamp = create_timestamp();        
+    let phash = [0; 32];
+
+    //FIX wallet is now 0?
+    let w = r.wallet.clone();
+    let wallet_read = r.wallet_lock.read().await;
+    let bal = wallet_read.get_available_balance();
+    println!("{}", bal);
+    drop(wallet_read);
+    let wallet_read2 = r.wallet_lock.read().await;
+    let txs = r.create_txs(timestamp, 10, 100, 1).await;
+    // let bal2 = wallet_read2.get_available_balance();
+    // println!("{}", bal2);
+    //------------------------------------------
 
     //Testing wallet
-    let mut r = runner::ChainRunner::new();
-    let blocks = r.get_blocks_vec().await;
-    r.create_test_gen_block(1000).await;
+    // let mut r = runner::ChainRunner::new();
+    // let blocks = r.get_blocks_vec().await;
+    // r.create_test_gen_block(1000).await;
 
-    {
-        let wallet_read = r.wallet_lock.read().await;
-        let bal = wallet_read.get_available_balance();
-        println!("bal: {:?}", bal);
-        assert_eq!(bal, 1000);
-    }
+    // {
+    //     let wallet_read = r.wallet_lock.read().await;
+    //     let bal = wallet_read.get_available_balance();
+    //     println!("bal: {:?}", bal);
+    //     assert_eq!(bal, 1000);
+    // }
 
-    let mut wallet_write = r.wallet_lock.write().await;
+    // let mut wallet_write = r.wallet_lock.write().await;
 
-    let mut transaction = Transaction::default();
-    let total_nolans_requested_per_slip = 100;
-    let s = wallet_write.generate_slips(total_nolans_requested_per_slip);
-    println!("s {:?}", s);
+    // let mut transaction = Transaction::default();
+    // let total_nolans_requested_per_slip = 100;
+    // let s = wallet_write.generate_slips(total_nolans_requested_per_slip);
+    // println!("s {:?}", s);
 
-    let (input_slips, output_slips) = wallet_write.generate_slips(total_nolans_requested_per_slip);
+    // let (input_slips, output_slips) = wallet_write.generate_slips(total_nolans_requested_per_slip);
 
-    for slip in input_slips {
-        transaction.add_from_slip(slip);
-    }
-    for slip in output_slips {
-        transaction.add_to_slip(slip);
-    }
+    // for slip in input_slips {
+    //     transaction.add_from_slip(slip);
+    // }
+    // for slip in output_slips {
+    //     transaction.add_to_slip(slip);
+    // }
 
-    //TOOD create a second wallet
+    // //TOOD create a second wallet
 
-    let keys = generate_keys();
-    let wallet2 = Wallet::new(keys.1, keys.0);
-    let _public_key2 = wallet2.public_key.clone();
-    let _private_key = wallet2.private_key.clone();
+    // let keys = generate_keys();
+    // let wallet2 = Wallet::new(keys.1, keys.0);
+    // let _public_key2 = wallet2.public_key.clone();
+    // let _private_key = wallet2.private_key.clone();
 
-    //transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
-    transaction.generate(&wallet_write.public_key, 0, 0);
-    transaction.sign(&wallet_write.private_key);
+    // //transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
+    // transaction.generate(&wallet_write.public_key, 0, 0);
+    // transaction.sign(&wallet_write.private_key);
 
-    //send to self
-    //let to_public_key = wallet_write.public_key;
-    //thread 'main' panicked at 'assertion failed: `(left != right)`
-    transaction.add_hop(
-        &wallet_write.private_key,
-        &wallet_write.public_key,
-        &_public_key2,
-    );
-    drop(wallet_write);
+    // //send to self
+    // //let to_public_key = wallet_write.public_key;
+    // //thread 'main' panicked at 'assertion failed: `(left != right)`
+    // transaction.add_hop(
+    //     &wallet_write.private_key,
+    //     &wallet_write.public_key,
+    //     &_public_key2,
+    // );
+    // drop(wallet_write);
 
     {
         //r.make_block(transaction.clone());
@@ -338,7 +357,7 @@ mod tests {
         let phash = [0; 32];
 
         //FIX wallet is now 0?
-        //let txs = r.create_txs(timestamp, 10, 100, 1).await;
+        let txs = r.create_txs(timestamp, 10, 100, 1).await;
         //assert_eq!(txs.len(), 10);
         
         let wallet_read = r.wallet_lock.read().await;
