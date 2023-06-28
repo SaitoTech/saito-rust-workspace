@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
-use tokio::sync::RwLock;
 use std::fs::File;
 use std::io::Write;
+use tokio::sync::RwLock;
 
 use super::slip::SlipType;
 use crate::common::defs::{push_lock, SaitoPublicKey, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
@@ -144,7 +144,7 @@ impl Storage {
     //
     // token issuance functions below
     //
-    pub async fn get_token_supply_slips_from_disk(&self) -> Vec<Slip> {
+    pub async fn get_token_supply_slips_from_disk_path(&self, issuance_file: &str) -> Vec<Slip> {
         let mut v: Vec<Slip> = vec![];
         let mut tokens_issued = 0;
         //
@@ -180,6 +180,13 @@ impl Storage {
         }
 
         return vec![];
+    }
+
+    // from predefined file
+    pub async fn get_token_supply_slips_from_disk(&self) -> Vec<Slip> {
+        return self
+            .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+            .await;
     }
 
     fn convert_issuance_into_slip(&self, line: &str) -> Option<Slip> {
@@ -220,22 +227,44 @@ impl Storage {
     }
 
     // store the state of balances
-    pub async fn store_balance_map(&self, bmap: AHashMap<SaitoPublicKey, u64>, threshold: u64) {                
-        
-        let file_path = format!("{}", UTXOSTATE_FILE_PATH);
-        let mut file = File::create(file_path).unwrap();
+    pub async fn store_balance_map_path(
+        &self,
+        balance_map: AHashMap<SaitoPublicKey, u64>,
+        threshold: u64,
+        path: &str,
+    ) {
+        debug!("store to {}", path);
+        debug!("entries {}", balance_map.len());
+        let file_path = format!("{}", path);
+        let mut file = match File::create(&file_path) {
+            Ok(file) => file,
+            Err(e) => {
+                //return Err(e.into()),
+                //println!("error creating file");
+            }
+        };
 
         //TODO check if file exists and give a warning if so
 
         let txtype = "Normal";
 
-        for (key, value) in &bmap {
+        for (key, value) in &balance_map {
             if value > &threshold {
                 let key_base58 = bs58::encode(key).into_string();
-
+                debug!("write {}\t{}\t{}", value, key_base58, txtype);
                 writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
             }
         }
+        //file.flush().await;
+    }
+
+    pub async fn store_balance_map(
+        &self,
+        balance_map: AHashMap<SaitoPublicKey, u64>,
+        threshold: u64,
+    ) {
+        self.store_balance_map_path(balance_map, threshold, UTXOSTATE_FILE_PATH)
+            .await;
     }
 }
 

@@ -11,8 +11,6 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-
-
 use crate::common::defs::{
     push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
     LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
@@ -1583,11 +1581,11 @@ mod tests {
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
+    use crate::core::data::slip::Slip;
+    use crate::core::data::storage::UTXOSTATE_FILE_PATH;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
     use std::fs;
-    use crate::core::data::storage::UTXOSTATE_FILE_PATH;
-
 
     fn init_testlog() {
         let _ = pretty_env_logger::try_init();
@@ -2755,17 +2753,21 @@ mod tests {
             assert_eq!(block1.transactions.len(), 1);
         }
 
-        //create the bmap
+        //create the balance map
         let bmap = t.balance_map().await;
 
         //store it
-        t.storage.store_balance_map(bmap, 1).await;
+        //TODO rename to tmp
+        let filepath = "./data/issuance/utxoset";
+        //TOOD pass in
+        t.storage.store_balance_map_path(bmap, 1, filepath).await;
 
-        //TODO read back in
+        //convert_issuance_into_slip
+        //let slips: Vec<Slip> = t.storage.get_token_supply_slips_from_disk_path(filepath).await;
+        //assert_eq!(slips.len(), 11);
 
-        fs::remove_file(UTXOSTATE_FILE_PATH);
+        fs::remove_file(filepath);
 
         //TODO read back and delete testing files
-
     }
 }
