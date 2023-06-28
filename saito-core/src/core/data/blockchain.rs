@@ -1558,7 +1558,18 @@ impl Blockchain {
         }
     }
     pub async fn reset(&mut self) {
-        todo!()
+        info!("resetting blockchain state");
+        self.last_block_hash = [0; 32];
+        self.last_block_id = 0;
+        self.last_timestamp = 0; // TODO : check if this needs to be current time
+        self.last_burnfee = 0;
+
+        self.genesis_block_id = 0;
+        self.genesis_timestamp = 0;
+
+        self.lowest_acceptable_block_hash = [0; 32];
+        self.lowest_acceptable_timestamp = 0;
+        self.lowest_acceptable_block_id = 0;
     }
 
     pub async fn save(&self) {

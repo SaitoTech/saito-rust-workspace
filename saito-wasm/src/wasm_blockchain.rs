@@ -1,10 +1,10 @@
-use js_sys::JsString;
 use std::sync::Arc;
 
-use saito_core::common::defs::{BlockId, SaitoHash};
+use js_sys::JsString;
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 
+use saito_core::common::defs::{BlockId, SaitoHash};
 use saito_core::core::data::blockchain::Blockchain;
 
 #[wasm_bindgen]
@@ -20,7 +20,10 @@ impl WasmBlockchain {
         blockchain.reset().await;
         blockchain.save().await;
     }
-
+    pub async fn save(&self) {
+        let mut blockchain = self.blockchain.write().await;
+        blockchain.save().await;
+    }
     pub async fn get_last_block_id(&self) -> u64 {
         let blockchain = self.blockchain.read().await;
         blockchain.last_block_id
