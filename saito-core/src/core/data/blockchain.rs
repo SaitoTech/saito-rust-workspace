@@ -1588,9 +1588,9 @@ mod tests {
     use log::{debug, error, info, trace, warn};
     use std::fs;
 
-    fn init_testlog() {
-        let _ = pretty_env_logger::try_init();
-    }
+    // fn init_testlog() {
+    //     let _ = pretty_env_logger::try_init();
+    // }
 
     #[tokio::test]
     async fn test_blockchain_init() {
@@ -2740,7 +2740,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_genesis_inout() {
-        init_testlog();
+        //init_testlog();
 
         let mut t = TestManager::new();
         //generate a test genesis block
