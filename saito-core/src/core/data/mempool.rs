@@ -205,11 +205,11 @@ impl Mempool {
         debug!("bundling genesis block...");
         let public_key;
         let private_key;
-        {
-            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
-            public_key = wallet.public_key;
-            private_key = wallet.private_key;
-        }
+
+        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+        public_key = wallet.public_key;
+        private_key = wallet.private_key;
+
         let mut block = Block::create(
             &mut self.transactions,
             [0; 32],

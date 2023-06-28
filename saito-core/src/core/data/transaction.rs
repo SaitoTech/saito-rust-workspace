@@ -312,6 +312,21 @@ impl Transaction {
         transaction
     }
 
+    pub fn create_issuance_transaction(
+        to_public_key: SaitoPublicKey,
+        with_amount: Currency,
+    ) -> Transaction {
+        debug!("generate issuance transaction : amount = {:?}", with_amount);
+        let mut transaction = Transaction::default();
+        transaction.transaction_type = TransactionType::Issuance;
+        let mut output = Slip::default();
+        output.public_key = to_public_key;
+        output.amount = with_amount;
+        output.slip_type = SlipType::VipOutput;
+        transaction.add_to_slip(output);
+        transaction
+    }
+
     /// create rebroadcast transaction
     ///
     /// # Arguments

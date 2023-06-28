@@ -202,6 +202,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 
 [[package]]
+name = "bs58"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5353f36341f7451062466f0b755b96ac3a9547e4d7f6b70d603fc721a7d7896"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "buf_redux"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -314,9 +323,12 @@ version = "3.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
 dependencies = [
+ "atty",
  "bitflags",
  "clap_lex",
  "indexmap",
+ "strsim",
+ "termcolor",
  "textwrap",
 ]
 
@@ -1717,6 +1729,39 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
 
 [[package]]
+name = "saito-analytics"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "async-trait",
+ "base64 0.21.0",
+ "bs58",
+ "clap",
+ "criterion",
+ "ctor",
+ "ctrlc",
+ "figment",
+ "futures",
+ "hex",
+ "lazy_static",
+ "log",
+ "pretty_env_logger",
+ "rand",
+ "rayon",
+ "reqwest",
+ "saito-core",
+ "saito-rust",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "tokio",
+ "tokio-tungstenite 0.19.0",
+ "tracing-subscriber",
+ "tungstenite 0.19.0",
+ "warp",
+]
+
+[[package]]
 name = "saito-core"
 version = "0.1.0"
 dependencies = [
@@ -1727,6 +1772,7 @@ dependencies = [
  "base58",
  "blake3",
  "block-modes",
+ "bs58",
  "byteorder",
  "criterion",
  "futures",
@@ -1755,6 +1801,7 @@ dependencies = [
  "ahash",
  "async-trait",
  "base64 0.21.0",
+ "bs58",
  "criterion",
  "ctor",
  "ctrlc",
@@ -2203,9 +2250,9 @@ dependencies = [
 
 [[package]]
 name = "tinyvec"
-version = "1.5.1"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c1c1d5a42b6245520c249549ec267180beaffcc0615401ac8e31853d4b6d8d2"
+checksum = "87cc5ceb3875bb20c2890005a4e226a4651264a5c75edb2421b52861a0a0cb50"
 dependencies = [
  "tinyvec_macros",
 ]

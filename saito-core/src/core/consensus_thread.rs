@@ -9,8 +9,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -21,12 +21,15 @@ use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
+use crate::core::data::slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::routing_thread::RoutingEvent;
 use crate::{lock_for_read, lock_for_write};
+
+use super::data::wallet;
 
 pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(100).as_millis() as u64;
 pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000).as_millis() as u64;
@@ -138,6 +141,36 @@ impl ConsensusThread {
             );
         }
     }
+    async fn generate_issuance_tx(
+        &self,
+        _mempool: Arc<RwLock<Mempool>>,
+        blockchain: Arc<RwLock<Blockchain>>,
+    ) {
+        info!("generating issuance init transaction");
+
+        let slips = self.storage.get_token_supply_slips_from_disk().await;
+        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+        let mut txs: Vec<Transaction> = vec![];
+        for slip in slips {
+            debug!("{:?} slip public key", hex::encode(slip.public_key));
+            let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
+            tx.sign(&wallet.private_key);
+            txs.push(tx);
+        }
+
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let (mut mempool, _mempool_) = lock_for_write!(_mempool, LOCK_ORDER_MEMPOOL);
+
+        // debug!("{:?} transaction from slips", txs);
+        for tx in txs {
+            mempool
+                .add_transaction_if_validates(tx.clone(), &blockchain)
+                .await;
+            info!("added issuance init tx for : {:?}", tx.signature);
+        }
+
+        debug!("{:?} mempool transacts", mempool.transactions);
+    }
     /// Test method to generate test transactions
     ///
     /// # Arguments
@@ -159,7 +192,6 @@ impl ConsensusThread {
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating mock transactions");
-
         let txs_to_generate = 10;
         let bytes_per_tx = 1024;
         let public_key;
@@ -236,28 +268,24 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         let duration_value = duration.as_millis() as u64;
 
         if self.generate_genesis_block {
-            Self::generate_spammer_init_tx(
-                self.mempool.clone(),
-                self.wallet.clone(),
-                self.blockchain.clone(),
-            )
-            .await;
+            Self::generate_issuance_tx(self, self.mempool.clone(), self.blockchain.clone()).await;
 
             {
                 let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                    let block;
+                    let block: Block;
                     let (mut mempool, _mempool_) =
                         lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
-                    {
-                        block = mempool
-                            .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
-                            .await;
-                    }
 
-                    blockchain
+                    block = mempool
+                        .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                        .await;
+
+                    println!(" block ider {:?}", &block.transactions);
+
+                    let res = blockchain
                         .add_block(
                             block,
                             &self.network,
@@ -268,10 +296,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         )
                         .await;
                 }
-            }
 
-            self.generate_genesis_block = false;
-            return Some(());
+                // println!("{} addblock result", result)
+                self.generate_genesis_block = false;
+                return Some(());
+            }
         }
 
         // generate test transactions

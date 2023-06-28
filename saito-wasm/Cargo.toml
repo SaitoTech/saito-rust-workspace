@@ -36,3 +36,6 @@ wasm-opt = ['-Oz']
 
 [profile.release]
 lto = true
+
+[features]
+default = []
