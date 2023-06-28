@@ -24,8 +24,7 @@ pub struct Storage {
 pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
 pub const DEFAULT_FILE_PATH: &'static str = "./data/issuance/default";
-
-pub const UTXOSTATE_FILE_PATH: &'static str = "./data/issuance/utxoset";
+pub const UTXOSTATE_FILE_PATH: &'static str = "./data/issuance/utxodata";
 
 pub struct StorageConfigurer {}
 

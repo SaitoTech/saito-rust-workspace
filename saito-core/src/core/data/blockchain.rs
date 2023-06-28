@@ -2738,7 +2738,7 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
-    async fn generate_genesis() {
+    async fn test_genesis_inout() {
         init_testlog();
 
         let mut t = TestManager::new();
@@ -2768,6 +2768,8 @@ mod tests {
                 error!("Error: {:?}", e);
             }
         }
+
+        //now assume the stored map is issued as issued, pass it in
 
         //convert_issuance_into_slip
         let slips: Vec<Slip> = t

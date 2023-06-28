@@ -588,6 +588,7 @@ pub mod test {
             self.add_block(block).await;
         }
 
+        //create a genesis block for testing
         pub async fn create_test_gen_block(&mut self, amount: u64) {
             debug!("create_test_gen_block");
             let wallet_read = self.wallet_lock.read().await;
