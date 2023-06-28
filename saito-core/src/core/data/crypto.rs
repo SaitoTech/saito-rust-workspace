@@ -91,11 +91,20 @@ pub fn hash(data: &[u8]) -> SaitoHash {
     // Hashing in parallel can be faster if large enough
     // TODO: Blake3 has benchmarked 128 kb as the cutoff,
     // the benchmark should be redone for Saito's needs
-    if data.len() > PARALLEL_HASH_BYTE_THRESHOLD {
-        hasher.update_rayon(data);
-    } else {
+
+    #[cfg(feature = "with-rayon")]
+    {
+        if data.len() > PARALLEL_HASH_BYTE_THRESHOLD {
+            hasher.update_rayon(data);
+        } else {
+            hasher.update(data);
+        }
+    }
+    #[cfg(not(feature = "with-rayon"))]
+    {
         hasher.update(data);
     }
+
     hasher.finalize().into()
 }
 
