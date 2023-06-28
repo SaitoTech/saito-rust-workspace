@@ -235,8 +235,6 @@ impl Storage {
         debug!("store to {}", path);
         let file_path = format!("{}", path);
         let mut file = File::create(&file_path)?;
-        //let absolute_path = std::fs::canonicalize(&file_path)?;
-        //debug!("Absolute path of the created file: {:?}", absolute_path);
 
         //assume normal txtype
         let txtype = "Normal";
@@ -244,10 +242,10 @@ impl Storage {
         for (key, value) in &balance_map {
             if value > &threshold {
                 let key_base58 = bs58::encode(key).into_string();
-                debug!("write {}\t{}\t{}", value, key_base58, txtype);
                 writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
             }
         }
+        debug!("written {} records", balance_map.len());
         Ok(())
     }
 

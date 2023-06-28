@@ -2736,6 +2736,7 @@ mod tests {
         }
     }
 
+    //create a test genesis block and test store state and reload from the same file
     #[tokio::test]
     #[serial_test::serial]
     async fn test_genesis_inout() {
@@ -2778,6 +2779,8 @@ mod tests {
             .get_token_supply_slips_from_disk_path(filepath)
             .await;
         assert_eq!(slips.len(), 1);
+
+        //TODO more tests on slips
 
         //clean up the testing file
         fs::remove_file(filepath);
