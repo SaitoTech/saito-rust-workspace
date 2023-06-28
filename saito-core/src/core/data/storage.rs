@@ -179,9 +179,15 @@ impl Storage {
 
     fn convert_issuance_into_slip(&self, line: &str) -> Option<Slip> {
         let entries: Vec<&str> = line.split("\t").collect();
-        let amount = entries[0]
-            .parse::<u64>()
-            .expect("Failed to parse amount from slip entry");
+
+        let result = entries[0].parse::<u64>();
+
+        if result.is_err() {
+            panic!("{:?}", result.err().unwrap());
+        }
+
+        let amount = result.unwrap();
+
         let publickey_str = entries[1];
         let publickey_result = Self::decode_str(publickey_str);
 
