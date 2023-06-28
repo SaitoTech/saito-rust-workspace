@@ -2758,7 +2758,8 @@ mod tests {
         let bmap = t.balance_map().await;
 
         //store it
-        let filepath = "./data/issuance/utxoset_test";
+        //TODO path errors
+        let filepath = "./utxoset_test";
 
         match t.storage.store_balance_map_path(bmap, 1, filepath).await {
             Ok(_) => {
