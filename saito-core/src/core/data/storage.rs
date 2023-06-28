@@ -148,10 +148,10 @@ impl Storage {
         let mut v: Vec<Slip> = vec![];
         let mut tokens_issued = 0;
         //
-        if self.file_exists(ISSUANCE_FILE_PATH).await {
+        if self.file_exists(issuance_file).await {
             if let Ok(lines) = self
                 .io_interface
-                .read_value(ISSUANCE_FILE_PATH.to_string())
+                .read_value(issuance_file.to_string())
                 .await
             {
                 let mut contents = String::from_utf8(lines).unwrap();
@@ -232,20 +232,14 @@ impl Storage {
         balance_map: AHashMap<SaitoPublicKey, u64>,
         threshold: u64,
         path: &str,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         debug!("store to {}", path);
-        debug!("entries {}", balance_map.len());
         let file_path = format!("{}", path);
-        let mut file = match File::create(&file_path) {
-            Ok(file) => file,
-            Err(e) => {
-                //return Err(e.into()),
-                //println!("error creating file");
-            }
-        };
+        let mut file = File::create(&file_path)?;
+        //let absolute_path = std::fs::canonicalize(&file_path)?;
+        //debug!("Absolute path of the created file: {:?}", absolute_path);
 
-        //TODO check if file exists and give a warning if so
-
+        //assume normal txtype
         let txtype = "Normal";
 
         for (key, value) in &balance_map {
@@ -255,7 +249,7 @@ impl Storage {
                 writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
             }
         }
-        //file.flush().await;
+        Ok(())
     }
 
     pub async fn store_balance_map(

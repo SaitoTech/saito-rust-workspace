@@ -1585,6 +1585,7 @@ mod tests {
     use crate::core::data::storage::UTXOSTATE_FILE_PATH;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
+    use log::{debug, error, info, trace, warn};
     use std::fs;
 
     fn init_testlog() {
@@ -2757,17 +2758,25 @@ mod tests {
         let bmap = t.balance_map().await;
 
         //store it
-        //TODO rename to tmp
-        let filepath = "./data/issuance/utxoset";
-        //TOOD pass in
-        t.storage.store_balance_map_path(bmap, 1, filepath).await;
+        let filepath = "./data/issuance/utxoset_test";
+
+        match t.storage.store_balance_map_path(bmap, 1, filepath).await {
+            Ok(_) => {
+                debug!("store file ok");
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+            }
+        }
 
         //convert_issuance_into_slip
-        //let slips: Vec<Slip> = t.storage.get_token_supply_slips_from_disk_path(filepath).await;
-        //assert_eq!(slips.len(), 11);
+        let slips: Vec<Slip> = t
+            .storage
+            .get_token_supply_slips_from_disk_path(filepath)
+            .await;
+        assert_eq!(slips.len(), 1);
 
+        //clean up the testing file
         fs::remove_file(filepath);
-
-        //TODO read back and delete testing files
     }
 }
