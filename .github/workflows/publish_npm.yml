@@ -31,6 +31,8 @@ jobs:
         run: |
           echo latest_version=$(npm show saito-wasm version) >> $GITHUB_ENV
           echo current_version=$(npm pkg get version) >> $GITHUB_ENV
+          echo "current version : ${{ env.current_version }}"
+          echo "published version : ${{ env.latest_version }}"
         working-directory: saito-wasm
 
       - name: version check
