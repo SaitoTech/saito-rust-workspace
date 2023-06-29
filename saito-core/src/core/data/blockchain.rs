@@ -2762,7 +2762,7 @@ mod tests {
         //TODO path errors
         let filepath = "./utxoset_test";
 
-        match t.storage.store_balance_map_path(bmap, 1, filepath).await {
+        match t.storage.write_utxoset_to_disk_path(bmap, 1, filepath).await {
             Ok(_) => {
                 debug!("store file ok");
             }

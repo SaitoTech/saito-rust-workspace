@@ -257,7 +257,7 @@ impl Storage {
         balance_map: AHashMap<SaitoPublicKey, u64>,
         threshold: u64,
     ) {
-        self.store_balance_map_path(balance_map, threshold, UTXOSTATE_FILE_PATH)
+        self.write_utxoset_to_disk_path(balance_map, threshold, UTXOSTATE_FILE_PATH)
             .await;
     }
 }
