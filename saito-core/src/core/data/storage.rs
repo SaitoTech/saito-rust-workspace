@@ -140,9 +140,10 @@ impl Storage {
         self.io_interface.remove_value(filename).await.is_ok()
     }
 
-    //
-    // token issuance functions below
-    //
+    /// Asynchronously retrieves token issuance slips from the provided file path.
+    ///
+    /// This function reads a file from disk that contains the token issuance slips
+    /// and returns these slips as a vector.
     pub async fn get_token_supply_slips_from_disk_path(&self, issuance_file: &str) -> Vec<Slip> {
         let mut v: Vec<Slip> = vec![];
         let mut tokens_issued = 0;
@@ -181,13 +182,14 @@ impl Storage {
         return vec![];
     }
 
-    // from predefined file
+    /// get issuance slips from the standard file
     pub async fn get_token_supply_slips_from_disk(&self) -> Vec<Slip> {
         return self
             .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
             .await;
     }
 
+    /// convert an issuance expression to slip
     fn convert_issuance_into_slip(&self, line: &str) -> Option<Slip> {
         let entries: Vec<&str> = line.split("\t").collect();
         let amount = entries[0]
@@ -225,8 +227,8 @@ impl Storage {
         return bs58::decode(string).into_vec();
     }
 
-    // store the state of balances
-    pub async fn store_balance_map_path(
+    /// store the state of utxo balances given that map of balances and a treshold
+    pub async fn write_utxoset_to_disk_path(
         &self,
         balance_map: AHashMap<SaitoPublicKey, u64>,
         threshold: u64,
@@ -249,7 +251,8 @@ impl Storage {
         Ok(())
     }
 
-    pub async fn store_balance_map(
+    /// store the state of utxo balances to standard file
+    pub async fn write_utxoset_to_disk(
         &self,
         balance_map: AHashMap<SaitoPublicKey, u64>,
         threshold: u64,
