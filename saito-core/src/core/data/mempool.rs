@@ -166,7 +166,6 @@ impl Mempool {
                 mempool_work
             );
             previous_block_hash = blockchain.get_latest_block_hash();
-
         } else {
             previous_block_hash = [0; 32];
         }
