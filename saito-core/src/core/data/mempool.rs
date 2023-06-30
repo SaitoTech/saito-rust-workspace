@@ -157,6 +157,9 @@ impl Mempool {
     ) -> Option<Block> {
         let previous_block_hash: SaitoHash;
         if !is_genesis {
+            previous_block_hash = blockchain.get_latest_block_hash();
+            
+            //note this is note used
             let mempool_work = self
                 .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
                 .await?;
@@ -165,7 +168,7 @@ impl Mempool {
                 self.transactions.len(),
                 mempool_work
             );
-            previous_block_hash = blockchain.get_latest_block_hash();
+            // assert_eq!(block.total_work, mempool_work);            
         } else {
             previous_block_hash = [0; 32];
         }
@@ -194,7 +197,7 @@ impl Mempool {
             "block generated with work : {:?} and burnfee : {:?}",
             block.total_work, block.burnfee
         );
-        // assert_eq!(block.total_work, mempool_work);
+        
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 
