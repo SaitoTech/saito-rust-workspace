@@ -39,6 +39,7 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
     (top, bottom)
 }
 
+#[derive(Debug)]
 pub enum AddBlockResult {
     BlockAdded,
     BlockAlreadyExists,
@@ -1580,8 +1581,16 @@ mod tests {
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
+    use crate::core::data::slip::Slip;
+    use crate::core::data::storage::UTXOSTATE_FILE_PATH;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
+    use log::{debug, error, info, trace, warn};
+    use std::fs;
+
+    // fn init_testlog() {
+    //     let _ = pretty_env_logger::try_init();
+    // }
 
     #[tokio::test]
     async fn test_blockchain_init() {
@@ -2725,5 +2734,59 @@ mod tests {
             assert_ne!(fork_id, [0; 32]);
             assert_eq!(fork_id[4..], [0; 28]);
         }
+    }
+
+    //create a test genesis block and test store state and reload from the same file
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_genesis_inout() {
+        //init_testlog();
+
+        let mut t = TestManager::new();
+        //generate a test genesis block
+        t.create_test_gen_block(1000).await;
+        {
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            let block1 = blockchain.get_latest_block().unwrap();
+            assert_eq!(block1.id, 1);
+            assert!(block1.timestamp > 1687867265673);
+            assert_eq!(block1.transactions.len(), 1);
+        }
+
+        //create the balance map
+        let bmap = t.balance_map().await;
+
+        //store it
+        //TODO path errors
+        let filepath = "./utxoset_test";
+
+        match t
+            .storage
+            .write_utxoset_to_disk_path(bmap, 1, filepath)
+            .await
+        {
+            Ok(_) => {
+                debug!("store file ok");
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+            }
+        }
+
+        //now assume the stored map is issued as issued, pass it in
+
+        //convert_issuance_into_slip
+        let slips: Vec<Slip> = t
+            .storage
+            .get_token_supply_slips_from_disk_path(filepath)
+            .await;
+        assert_eq!(slips.len(), 1);
+
+        //TODO more tests on slips
+
+        //clean up the testing file
+        fs::remove_file(filepath);
     }
 }
