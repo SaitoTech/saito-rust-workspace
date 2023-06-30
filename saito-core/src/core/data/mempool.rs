@@ -153,22 +153,28 @@ impl Mempool {
         current_timestamp: Timestamp,
         gt_tx: Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),
+        is_genesis: bool,
     ) -> Option<Block> {
-        let mempool_work = self
-            .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
-            .await?;
-        info!(
-            "bundling block with {:?} txs with work : {:?}",
-            self.transactions.len(),
-            mempool_work
-        );
-
         let previous_block_hash: SaitoHash;
+        if !is_genesis {
+            let mempool_work = self
+                .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
+                .await?;
+            info!(
+                "bundling block with {:?} txs with work : {:?}",
+                self.transactions.len(),
+                mempool_work
+            );
+            previous_block_hash = blockchain.get_latest_block_hash();
+
+        } else {
+            previous_block_hash = [0; 32];
+        }
+
         let public_key;
         let private_key;
         {
             let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
-            previous_block_hash = blockchain.get_latest_block_hash();
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
@@ -194,38 +200,6 @@ impl Mempool {
         self.routing_work_in_mempool = 0;
 
         Some(block)
-    }
-
-    pub async fn bundle_genesis_block(
-        &mut self,
-        blockchain: &mut Blockchain,
-        current_timestamp: Timestamp,
-        configs: &(dyn Configuration + Send + Sync),
-    ) -> Block {
-        debug!("bundling genesis block...");
-        let public_key;
-        let private_key;
-
-        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
-        public_key = wallet.public_key;
-        private_key = wallet.private_key;
-
-        let mut block = Block::create(
-            &mut self.transactions,
-            [0; 32],
-            blockchain,
-            current_timestamp,
-            &public_key,
-            &private_key,
-            None,
-            configs,
-        )
-        .await;
-        block.generate();
-        self.new_tx_added = false;
-        self.routing_work_in_mempool = 0;
-
-        block
     }
 
     pub async fn can_bundle_block(

@@ -275,13 +275,12 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                    let block: Block;
                     let (mut mempool, _mempool_) =
-                        lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
-
-                    block = mempool
-                        .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
-                        .await;
+                    lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
+                                        
+                    let block: Block = (mempool
+                        .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
+                        .await).unwrap();
 
                     println!(" block ider {:?}", &block.transactions);
 
@@ -365,6 +364,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         timestamp,
                         gt_result.clone(),
                         configs.deref(),
+                        false
                     )
                     .await;
             }

@@ -607,9 +607,9 @@ pub mod test {
 
             let timestamp = create_timestamp();
 
-            let genblock: Block = mempool
-                .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
-                .await;
+            let genblock: Block = (mempool
+                .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
+                .await).unwrap();
             let res = blockchain
                 .add_block(
                     genblock,
