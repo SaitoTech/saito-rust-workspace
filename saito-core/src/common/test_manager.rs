@@ -157,11 +157,11 @@ pub mod test {
             for i in 1..blockchain.blocks.len() {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
+                    .get_longest_chain_block_hash_at_block_id(i as u64);
 
                 let previous_block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id((i as u64) - 1);
+                    .get_longest_chain_block_hash_at_block_id((i as u64) - 1);
 
                 let block = blockchain.get_block_sync(&block_hash);
                 let previous_block = blockchain.get_block_sync(&previous_block_hash);
@@ -196,7 +196,7 @@ pub mod test {
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
+                    .get_longest_chain_block_hash_at_block_id(i as u64);
                 info!("WINDING ID HASH - {} {:?}", i, block_hash);
                 let block = blockchain.get_block(&block_hash).unwrap();
                 for j in 0..block.transactions.len() {
@@ -304,7 +304,7 @@ pub mod test {
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
+                    .get_longest_chain_block_hash_at_block_id(i as u64);
                 let block = blockchain.get_block(&block_hash).unwrap();
 
                 block_inputs = 0;
@@ -633,7 +633,7 @@ pub mod test {
             for i in 1..=latest_id {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
+                    .get_longest_chain_block_hash_at_block_id(i as u64);
                 let block = blockchain.get_block(&block_hash).unwrap().clone();
                 for j in 0..block.transactions.len() {
                     let tx = &block.transactions[j];

@@ -207,6 +207,12 @@ impl RoutingThread {
         fork_id: SaitoHash,
         peer_index: u64,
     ) {
+        debug!("processing ghost chain request from peer : {:?}. block_id : {:?} block_hash: {:?} fork_id: {:?}",
+            peer_index,
+            block_id,
+            hex::encode(block_hash),
+            hex::encode(fork_id)
+        );
         let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
         let peer_public_key;
         {
@@ -220,13 +226,17 @@ impl RoutingThread {
 
         let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
 
+        debug!("last_shared_ancestor 1 : {:?}", last_shared_ancestor);
+
         if last_shared_ancestor == 0 && blockchain.get_latest_block_id() > 10 {
             last_shared_ancestor = blockchain.get_latest_block_id() - 10;
         }
+
+        let start = blockchain
+            .blockring
+            .get_longest_chain_block_hash_at_block_id(last_shared_ancestor);
         let mut ghost = GhostChainSync {
-            start: blockchain
-                .blockring
-                .get_longest_chain_block_hash_by_block_id(last_shared_ancestor),
+            start,
             prehashes: vec![],
             previous_block_hashes: vec![],
             block_ids: vec![],
@@ -234,14 +244,23 @@ impl RoutingThread {
             txs: vec![],
             gts: vec![],
         };
-        for i in (last_shared_ancestor + 1)..=blockchain.blockring.get_latest_block_id() {
+        let latest_block_id = blockchain.blockring.get_latest_block_id();
+        debug!("latest_block_id : {:?}", latest_block_id);
+        debug!("last_shared_ancestor : {:?}", last_shared_ancestor);
+        debug!("start : {:?}", start);
+        for i in (last_shared_ancestor + 1)..=latest_block_id {
             let hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(i);
+                .get_longest_chain_block_hash_at_block_id(i);
             if hash != [0; 32] {
                 let block = blockchain.get_block(&block_hash);
                 if block.is_some() {
                     let block = block.unwrap();
+                    debug!(
+                        "pushing block : {:?} at index : {:?}",
+                        hex::encode(block.hash),
+                        i
+                    );
                     ghost.gts.push(block.has_golden_ticket);
                     ghost.block_ts.push(block.timestamp);
                     ghost.prehashes.push(block.pre_hash);
@@ -252,6 +271,8 @@ impl RoutingThread {
             }
         }
 
+        debug!("sending ghost chain to peer : {:?}", peer_index);
+        debug!("ghost : {:?}", ghost);
         let buffer = Message::GhostChain(ghost).serialize();
         self.network
             .io_interface
@@ -259,6 +280,7 @@ impl RoutingThread {
             .await
             .unwrap();
     }
+
     async fn handle_new_peer(
         &mut self,
         peer_data: Option<data::configuration::PeerConfig>,
@@ -296,7 +318,7 @@ impl RoutingThread {
         for i in last_shared_ancestor..(blockchain.blockring.get_latest_block_id() + 1) {
             let block_hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(i);
+                .get_longest_chain_block_hash_at_block_id(i);
             if block_hash == [0; 32] {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
@@ -387,6 +409,9 @@ impl RoutingThread {
         }
     }
     async fn process_ghost_chain(&self, chain: GhostChainSync, peer_index: u64) {
+        debug!("processing ghost chain from peer : {:?}", peer_index);
+        debug!("ghost : {:?}", chain);
+
         let mut previous_block_hash = chain.start;
         let peer_key;
         {
@@ -404,12 +429,14 @@ impl RoutingThread {
             ]
             .concat();
             let block_hash = hash(&buf);
+            debug!("block_hash : {:?}", hex::encode(block_hash));
             if chain.txs[i] {
                 self.network
                     .fetch_missing_block(block_hash, &peer_key)
                     .await
                     .unwrap();
             } else {
+                // TODO : lock should be taken out of for loop
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 blockchain.add_ghost_block(

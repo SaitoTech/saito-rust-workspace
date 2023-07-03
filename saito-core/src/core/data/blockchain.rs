@@ -358,7 +358,7 @@ impl Blockchain {
                     let disconnected_block_id = self.get_latest_block_id();
                     for i in block_id + 1..disconnected_block_id {
                         let disconnected_block_hash =
-                            self.blockring.get_longest_chain_block_hash_by_block_id(i);
+                            self.blockring.get_longest_chain_block_hash_at_block_id(i);
                         if disconnected_block_hash != [0; 32] {
                             self.blockring.on_chain_reorganization(
                                 i,
@@ -531,7 +531,7 @@ impl Blockchain {
         // ensure pruning of next block OK will have the right CVs
         //
         if self.get_latest_block_id() > GENESIS_PERIOD {
-            let pruned_block_hash = self.blockring.get_longest_chain_block_hash_by_block_id(
+            let pruned_block_hash = self.blockring.get_longest_chain_block_hash_at_block_id(
                 self.get_latest_block_id() - GENESIS_PERIOD,
             );
 
@@ -680,7 +680,7 @@ impl Blockchain {
             //
             let block_hash = self
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(current_block_id);
+                .get_longest_chain_block_hash_at_block_id(current_block_id);
             fork_id[index] = block_hash[index];
             fork_id[index + 1] = block_hash[index + 1];
         }
@@ -724,7 +724,7 @@ impl Blockchain {
                 if peer_block_id <= my_block_id {
                     let block_hash = self
                         .blockring
-                        .get_longest_chain_block_hash_by_block_id(peer_block_id);
+                        .get_longest_chain_block_hash_at_block_id(peer_block_id);
                     if fork_id[index] == block_hash[index]
                         && fork_id[index + 1] == block_hash[index + 1]
                     {
@@ -751,7 +751,7 @@ impl Blockchain {
                 if peer_block_id <= my_block_id {
                     let block_hash = self
                         .blockring
-                        .get_longest_chain_block_hash_by_block_id(peer_block_id);
+                        .get_longest_chain_block_hash_at_block_id(peer_block_id);
                     if fork_id[index] == block_hash[index]
                         && fork_id[index + 1] == block_hash[index + 1]
                     {
@@ -776,7 +776,7 @@ impl Blockchain {
         while current_id > 0 && current_id >= min_id {
             let hash = self
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(current_id);
+                .get_longest_chain_block_hash_at_block_id(current_id);
             if hash == [0; 32] {
                 break;
             }
@@ -785,7 +785,7 @@ impl Blockchain {
                 current_id,
                 hex::encode(
                     self.blockring
-                        .get_longest_chain_block_hash_by_block_id(current_id)
+                        .get_longest_chain_block_hash_at_block_id(current_id)
                 )
             );
             current_id -= 1;
@@ -1065,7 +1065,7 @@ impl Blockchain {
                 }
                 let bid = latest_block_id - i;
                 let previous_block_hash =
-                    self.blockring.get_longest_chain_block_hash_by_block_id(bid);
+                    self.blockring.get_longest_chain_block_hash_at_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
                     let block = self.get_mut_block(&previous_block_hash).unwrap();
                     block

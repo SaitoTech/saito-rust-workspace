@@ -77,7 +77,7 @@ impl BlockRing {
         }
     }
 
-    pub fn get_longest_chain_block_hash_by_block_id(&self, id: u64) -> SaitoHash {
+    pub fn get_longest_chain_block_hash_at_block_id(&self, id: u64) -> SaitoHash {
         let insert_pos = (id % RING_BUFFER_LENGTH) as usize;
         match self.ring[insert_pos].lc_pos {
             Some(lc_pos) => self.ring[insert_pos].block_hashes[lc_pos],
@@ -185,7 +185,7 @@ impl BlockRing {
                 trace!(
                     "Block {:?}: {:?}",
                     i,
-                    self.get_longest_chain_block_hash_by_block_id(i)
+                    self.get_longest_chain_block_hash_at_block_id(i)
                 );
             }
         }
@@ -221,7 +221,7 @@ mod tests {
         assert_eq!(blockring.get_latest_block_hash(), [0; 32]);
         assert_eq!(blockring.get_latest_block_id(), 0);
         assert_eq!(
-            blockring.get_longest_chain_block_hash_by_block_id(0),
+            blockring.get_longest_chain_block_hash_at_block_id(0),
             [0; 32]
         );
         assert_eq!(
@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(blockring.get_latest_block_hash(), block_hash);
         assert_eq!(blockring.get_latest_block_id(), block_id);
         assert_eq!(
-            blockring.get_longest_chain_block_hash_by_block_id(block_id),
+            blockring.get_longest_chain_block_hash_at_block_id(block_id),
             block_hash
         );
         assert_eq!(
@@ -258,7 +258,7 @@ mod tests {
         assert_eq!(blockring.get_latest_block_hash(), [0; 32]);
         assert_eq!(blockring.get_latest_block_id(), 0);
         assert_eq!(
-            blockring.get_longest_chain_block_hash_by_block_id(0),
+            blockring.get_longest_chain_block_hash_at_block_id(0),
             [0; 32]
         );
         assert_eq!(
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(blockring.get_latest_block_hash(), block_hash);
         assert_eq!(blockring.get_latest_block_id(), block_id);
         assert_eq!(
-            blockring.get_longest_chain_block_hash_by_block_id(block_id),
+            blockring.get_longest_chain_block_hash_at_block_id(block_id),
             block_hash
         );
         assert_eq!(
