@@ -2749,6 +2749,7 @@ mod tests {
         {
             let cblock = genblock.clone();
             t.add_block(cblock).await;
+            //assert_eq!(t.blockchain.get_latest_block_id(), 2);
         }
 
         // block hashes should have updated
