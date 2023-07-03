@@ -2759,7 +2759,6 @@ mod tests {
         let bmap = t.balance_map().await;
 
         //store it
-        //TODO path errors
         let filepath = "./utxoset_test";
 
         match t
@@ -2788,5 +2787,51 @@ mod tests {
 
         //clean up the testing file
         fs::remove_file(filepath);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_genesis_cv() {
+        //init_testlog();
+
+        let mut t = TestManager::new();
+        //generate a test genesis block
+        t.create_test_gen_block(1000).await;
+        {
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            let block1 = blockchain.get_latest_block().unwrap();
+            assert_eq!(block1.id, 1);
+
+            let cv = block1.generate_consensus_values(&blockchain).await;
+            assert_eq!(cv.it_num, 1);
+            assert_eq!(cv.gt_num, 0);
+
+            assert_eq!(cv.total_rebroadcast_nolan, 0);
+            assert_eq!(cv.total_rebroadcast_fees_nolan, 0);
+            assert_eq!(cv.total_rebroadcast_staking_payouts_nolan, 0);
+            assert_eq!(cv.nolan_falling_off_chain, 0);
+            assert_eq!(cv.staking_treasury, 0);
+            assert_eq!(cv.avg_income, 0);
+            assert_eq!(cv.avg_variance, 0);
+            assert_eq!(cv.avg_atr_income, 0);
+            assert_eq!(cv.avg_atr_variance, 0);
+
+            // it_index: Option<usize>,
+            // ft_index: Option<usize>,
+            // gt_index: Option<usize>,
+            // expected_difficulty: u64,
+            // rebroadcasts: Vec<Transaction>,
+            // total_rebroadcast_slips: u64,
+            // rebroadcast_hash: [u8; 32],
+            // block_payout: Vec<BlockPayout>,
+
+            //check validate
+            let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
+
+            let isvalid = block1.validate(&blockchain, &blockchain.utxoset, configs.deref()).await;
+            assert_eq!(isvalid, true);
+        }
     }
 }
