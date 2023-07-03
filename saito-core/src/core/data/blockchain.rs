@@ -2830,7 +2830,9 @@ mod tests {
             //check validate
             let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
 
-            let isvalid = block1.validate(&blockchain, &blockchain.utxoset, configs.deref()).await;
+            let isvalid = block1
+                .validate(&blockchain, &blockchain.utxoset, configs.deref())
+                .await;
             assert_eq!(isvalid, true);
         }
     }
