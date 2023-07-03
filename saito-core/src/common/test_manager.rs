@@ -589,7 +589,7 @@ pub mod test {
         }
 
         //create a genesis block for testing
-        pub async fn create_test_gen_block(&mut self, amount: u64) {
+        pub async fn create_test_gen_block(&mut self, amount: u64) -> Block {
             debug!("create_test_gen_block");
             let wallet_read = self.wallet_lock.read().await;
             let mut tx = Transaction::create_issuance_transaction(wallet_read.public_key, amount);
@@ -611,16 +611,7 @@ pub mod test {
                 .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
                 .await)
                 .unwrap();
-            let res = blockchain
-                .add_block(
-                    genblock,
-                    &self.network,
-                    &mut self.storage,
-                    self.sender_to_miner.clone(),
-                    &mut mempool,
-                    configs.deref(),
-                )
-                .await;
+            genblock
         }
 
         //convenience function assuming longest chain

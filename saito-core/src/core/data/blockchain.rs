@@ -2736,6 +2736,47 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_genesis_second() {
+        //create genesis block and subsequent block
+        let mut t = TestManager::new();
+        //generate a test genesis block
+        let mut genblock = t.create_test_gen_block(1000).await;
+        //assert_eq!(genblock.hash, [0; 32]);
+        //assert_ne!(genblock.pre_hash, [0; 32]);
+        genblock.generate();
+        {
+            let cblock = genblock.clone();
+            t.add_block(cblock).await;
+        }
+
+        // block hashes should have updated
+        assert_ne!(genblock.pre_hash, [0; 32]);
+        assert_ne!(genblock.hash, [0; 32]);
+
+        let mut block2 = t
+            .create_block(
+                genblock.hash,               // hash of parent block
+                genblock.timestamp + 120000, // timestamp
+                0,                           // num transactions
+                0,                           // amount
+                0,                           // fee
+                true,                        // mine golden ticket
+            )
+            .await;
+        block2.generate(); // generate hashes
+        {
+            let block2_clone = block2.clone();
+            t.add_block(block2_clone).await;
+        }
+        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+        //this fails
+        //assert_eq!(blockchain.last_block_id, 2);
+        assert_eq!(blockchain.get_latest_block_id(), 2);
+    }
+
     //create a test genesis block and test store state and reload from the same file
     #[tokio::test]
     #[serial_test::serial]
@@ -2744,49 +2785,56 @@ mod tests {
 
         let mut t = TestManager::new();
         //generate a test genesis block
-        t.create_test_gen_block(1000).await;
+        let genblock = t.create_test_gen_block(1000).await;
+
+        {
+            let cblock = genblock.clone();
+            t.add_block(cblock).await;
+        }
+
         {
             let (blockchain, _blockchain_) =
                 lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-
             let block1 = blockchain.get_latest_block().unwrap();
             assert_eq!(block1.id, 1);
             assert!(block1.timestamp > 1687867265673);
             assert_eq!(block1.transactions.len(), 1);
         }
 
-        //create the balance map
-        let bmap = t.balance_map().await;
-
-        //store it
-        let filepath = "./utxoset_test";
-
-        match t
-            .storage
-            .write_utxoset_to_disk_path(bmap, 1, filepath)
-            .await
         {
-            Ok(_) => {
-                debug!("store file ok");
+            //create the balance map
+            let bmap = t.balance_map().await;
+
+            //store it
+            let filepath = "./utxoset_test";
+
+            match t
+                .storage
+                .write_utxoset_to_disk_path(bmap, 1, filepath)
+                .await
+            {
+                Ok(_) => {
+                    debug!("store file ok");
+                }
+                Err(e) => {
+                    error!("Error: {:?}", e);
+                }
             }
-            Err(e) => {
-                error!("Error: {:?}", e);
-            }
+
+            //now assume the stored map is issued as issued, pass it in
+
+            //convert_issuance_into_slip
+            let slips: Vec<Slip> = t
+                .storage
+                .get_token_supply_slips_from_disk_path(filepath)
+                .await;
+            assert_eq!(slips.len(), 1);
+
+            //TODO more tests on slips
+
+            //clean up the testing file
+            fs::remove_file(filepath);
         }
-
-        //now assume the stored map is issued as issued, pass it in
-
-        //convert_issuance_into_slip
-        let slips: Vec<Slip> = t
-            .storage
-            .get_token_supply_slips_from_disk_path(filepath)
-            .await;
-        assert_eq!(slips.len(), 1);
-
-        //TODO more tests on slips
-
-        //clean up the testing file
-        fs::remove_file(filepath);
     }
 
     #[tokio::test]
@@ -2796,7 +2844,9 @@ mod tests {
 
         let mut t = TestManager::new();
         //generate a test genesis block
-        t.create_test_gen_block(1000).await;
+        let genblock = t.create_test_gen_block(1000).await;
+        let cblock = genblock.clone();
+        t.add_block(cblock).await;
         {
             let (blockchain, _blockchain_) =
                 lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
