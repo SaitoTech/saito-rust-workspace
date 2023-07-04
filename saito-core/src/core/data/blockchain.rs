@@ -2753,7 +2753,10 @@ mod tests {
         //create genesis block and subsequent block
         let mut t = TestManager::new();
         //generate a test genesis block
-        let mut genblock = t.create_test_gen_block_single(1000).await;
+
+        let numtx: u64 = 10;
+        let mut genblock: Block = t.create_test_gen_block_tx(numtx).await;
+
         //assert_eq!(genblock.hash, [0; 32]);
         //assert_ne!(genblock.pre_hash, [0; 32]);
         genblock.generate();
@@ -2797,7 +2800,8 @@ mod tests {
 
         let mut t = TestManager::new();
         //generate a test genesis block
-        let genblock = t.create_test_gen_block_single(1000).await;
+        let numtx: u64 = 10;
+        let mut genblock: Block = t.create_test_gen_block_tx(numtx).await;
 
         {
             let cblock = genblock.clone();
@@ -2810,7 +2814,7 @@ mod tests {
             let block1 = blockchain.get_latest_block().unwrap();
             assert_eq!(block1.id, 1);
             assert!(block1.timestamp > 1687867265673);
-            assert_eq!(block1.transactions.len(), 1);
+            assert_eq!(block1.transactions.len(), numtx.try_into().unwrap());
         }
 
         {
@@ -2840,7 +2844,7 @@ mod tests {
                 .storage
                 .get_token_supply_slips_from_disk_path(filepath)
                 .await;
-            assert_eq!(slips.len(), 1);
+            assert_eq!(slips.len(), numtx.try_into().unwrap());
 
             //TODO more tests on slips
 
@@ -2856,7 +2860,8 @@ mod tests {
 
         let mut t = TestManager::new();
         //generate a test genesis block
-        let genblock = t.create_test_gen_block_single(1000).await;
+        let numtx: u64 = 10;
+        let mut genblock: Block = t.create_test_gen_block_tx(numtx).await;
         let cblock = genblock.clone();
         t.add_block(cblock).await;
         {
@@ -2867,7 +2872,7 @@ mod tests {
             assert_eq!(block1.id, 1);
 
             let cv = block1.generate_consensus_values(&blockchain).await;
-            assert_eq!(cv.it_num, 1);
+            assert_eq!(cv.it_num, numtx.try_into().unwrap());
             assert_eq!(cv.gt_num, 0);
 
             assert_eq!(cv.total_rebroadcast_nolan, 0);
@@ -2906,13 +2911,6 @@ mod tests {
         info!("basic");
 
         let mut t = TestManager::new();
-
-        let txs = t.create_test_issuance_tx(1, 100).await;
-        assert_eq!(1, txs.len());
-
-        //fails because tx hash not unique, need several wallets
-        //let txs2 = t.create_test_issuance_tx(2, 100).await;
-        //assert_eq!(2, txs2.len());
 
         //create
         let numtx: u64 = 10;
