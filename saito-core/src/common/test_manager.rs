@@ -664,17 +664,17 @@ pub mod test {
                 .await)
                 .unwrap();
 
-
-
-                genblock
+            genblock
         }
 
-        pub async fn call_validate(&mut self) -> bool{
+        pub async fn call_validate(&mut self) -> bool {
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            let block1 = blockchain.get_latest_block().unwrap();            
+            let block1 = blockchain.get_latest_block().unwrap();
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            let valid = block1.validate(&blockchain, &blockchain.utxoset, configs.deref()).await;
+            let valid = block1
+                .validate(&blockchain, &blockchain.utxoset, configs.deref())
+                .await;
             valid
         }
 
