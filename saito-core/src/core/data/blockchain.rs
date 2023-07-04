@@ -1574,23 +1574,34 @@ mod tests {
 
     use tokio::sync::RwLock;
 
+    use crate::common::defs::SaitoSignature;
     use crate::common::defs::{
         push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
     };
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
+    use crate::core::data::block::Block;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
     use crate::core::data::storage::UTXOSTATE_FILE_PATH;
+    use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
+    use ahash::AHashMap;
     use log::{debug, error, info, trace, warn};
+    use std::convert::TryInto;
+    use std::env;
     use std::fs;
 
-    // fn init_testlog() {
-    //     let _ = pretty_env_logger::try_init();
-    // }
+    fn init_testlog() {
+        if env::var("TEST_LOG").is_ok() {
+            let _ = pretty_env_logger::try_init();
+            info!("set test log");
+        } else {
+            //info!("no test log");
+        }
+    }
 
     #[tokio::test]
     async fn test_blockchain_init() {
@@ -2742,7 +2753,7 @@ mod tests {
         //create genesis block and subsequent block
         let mut t = TestManager::new();
         //generate a test genesis block
-        let mut genblock = t.create_test_gen_block(1000).await;
+        let mut genblock = t.create_test_gen_block_single(1000).await;
         //assert_eq!(genblock.hash, [0; 32]);
         //assert_ne!(genblock.pre_hash, [0; 32]);
         genblock.generate();
@@ -2786,7 +2797,7 @@ mod tests {
 
         let mut t = TestManager::new();
         //generate a test genesis block
-        let genblock = t.create_test_gen_block(1000).await;
+        let genblock = t.create_test_gen_block_single(1000).await;
 
         {
             let cblock = genblock.clone();
@@ -2845,7 +2856,7 @@ mod tests {
 
         let mut t = TestManager::new();
         //generate a test genesis block
-        let genblock = t.create_test_gen_block(1000).await;
+        let genblock = t.create_test_gen_block_single(1000).await;
         let cblock = genblock.clone();
         t.add_block(cblock).await;
         {
@@ -2886,5 +2897,38 @@ mod tests {
                 .await;
             assert_eq!(isvalid, true);
         }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_genblock_create() {
+        init_testlog();
+        info!("basic");
+
+        let mut t = TestManager::new();
+
+        let txs = t.create_test_issuance_tx(1, 100).await;
+        assert_eq!(1, txs.len());
+
+        //fails because tx hash not unique, need several wallets
+        //let txs2 = t.create_test_issuance_tx(2, 100).await;
+        //assert_eq!(2, txs2.len());
+
+        //create
+        let numtx: u64 = 10;
+        let genblock: Block = t.create_test_gen_block_tx(numtx).await;
+        let b = genblock.clone();
+        t.add_block(genblock).await;
+
+        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let block_hash = blockchain
+            .blockring
+            .get_longest_chain_block_hash_by_block_id(1);
+        assert_eq!(b.hash, block_hash);
+
+        assert_eq!(b.transactions.len(), numtx.try_into().unwrap());
+
+        let block1 = blockchain.get_latest_block().unwrap();
+        assert_eq!(block1.id, 1);
     }
 }
