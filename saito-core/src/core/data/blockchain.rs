@@ -2916,17 +2916,30 @@ mod tests {
         let numtx: u64 = 10;
         let genblock: Block = t.create_test_gen_block_tx(numtx).await;
         let b = genblock.clone();
-        t.add_block(genblock).await;
+        {
+            t.add_block(genblock).await;
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_by_block_id(1);
+            assert_eq!(b.hash, block_hash);
+            assert_eq!(b.transactions.len(), numtx.try_into().unwrap());
 
-        let (blockchain, _blockchain_) = lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        let block_hash = blockchain
-            .blockring
-            .get_longest_chain_block_hash_by_block_id(1);
-        assert_eq!(b.hash, block_hash);
+            let block1 = blockchain.get_latest_block().unwrap();
+            assert_eq!(block1.id, 1);
+        }
 
-        assert_eq!(b.transactions.len(), numtx.try_into().unwrap());
+        let valid: bool = t.call_validate().await;
+        assert_eq!(valid, true);
 
-        let block1 = blockchain.get_latest_block().unwrap();
-        assert_eq!(block1.id, 1);
+        //block1.validate(blockchain, );
     }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_cv() {}
+
+    //block.generate_consensus_values()
+    //returns a struct that should include any issuance transactions if block.id == 1
 }
