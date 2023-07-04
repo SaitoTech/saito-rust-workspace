@@ -645,6 +645,7 @@ pub mod test {
             transactions
         }
 
+        //create genblock with number of issuance tx
         pub async fn create_test_gen_block_tx(&mut self, num: u64) -> Block {
             let txs = self.create_test_issuance_tx_wallets(num).await;
             let mut mempool = self.mempool_lock.write().await;
@@ -662,7 +663,10 @@ pub mod test {
                 .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
                 .await)
                 .unwrap();
-            genblock
+
+
+
+                genblock
         }
 
         pub async fn call_validate(&mut self) -> bool{
