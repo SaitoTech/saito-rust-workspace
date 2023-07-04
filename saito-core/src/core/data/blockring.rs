@@ -1,4 +1,4 @@
-use log::trace;
+use log::{debug, trace};
 
 use crate::common::defs::{SaitoHash, GENESIS_PERIOD};
 use crate::core::data::block::Block;
@@ -79,8 +79,20 @@ impl BlockRing {
 
     pub fn get_longest_chain_block_hash_at_block_id(&self, id: u64) -> SaitoHash {
         let insert_pos = (id % RING_BUFFER_LENGTH) as usize;
+        debug!(
+            "insert_pos : {:?}, id : {:?}, ring_length : {:?}",
+            insert_pos, id, RING_BUFFER_LENGTH
+        );
         match self.ring[insert_pos].lc_pos {
-            Some(lc_pos) => self.ring[insert_pos].block_hashes[lc_pos],
+            Some(lc_pos) => {
+                debug!(
+                    "lc_pos : {:?}, ring_size : {:?} hash_count : {:?}",
+                    lc_pos,
+                    self.ring.len(),
+                    self.ring[insert_pos].block_hashes.len()
+                );
+                self.ring[insert_pos].block_hashes[lc_pos]
+            }
             None => {
                 trace!(
                     "get_longest_chain_block_hash_by_block_id : {:?} insert_pos = {:?} is not set",

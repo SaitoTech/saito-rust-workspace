@@ -247,7 +247,7 @@ impl RoutingThread {
         let latest_block_id = blockchain.blockring.get_latest_block_id();
         debug!("latest_block_id : {:?}", latest_block_id);
         debug!("last_shared_ancestor : {:?}", last_shared_ancestor);
-        debug!("start : {:?}", start);
+        debug!("start : {:?}", hex::encode(start));
         for i in (last_shared_ancestor + 1)..=latest_block_id {
             let hash = blockchain
                 .blockring
