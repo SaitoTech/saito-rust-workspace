@@ -402,18 +402,14 @@ pub mod test {
             }
         }
 
-        //
-        // create block
-        //
-        pub async fn create_block(
+        pub async fn create_test_tx(
             &mut self,
             parent_hash: SaitoHash,
-            timestamp: Timestamp,
             txs_number: usize,
             txs_amount: Currency,
             txs_fee: Currency,
             include_valid_golden_ticket: bool,
-        ) -> Block {
+        ) -> AHashMap<SaitoSignature, Transaction> {
             let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
@@ -466,6 +462,40 @@ pub mod test {
                 gttx.generate(&public_key, 0, 0);
                 transactions.insert(gttx.signature, gttx);
             }
+            transactions
+        }
+
+        //
+        // create block
+        //
+        pub async fn create_block(
+            &mut self,
+            parent_hash: SaitoHash,
+            timestamp: Timestamp,
+            txs_number: usize,
+            txs_amount: Currency,
+            txs_fee: Currency,
+            include_valid_golden_ticket: bool,
+        ) -> Block {
+            let private_key: SaitoPrivateKey;
+            let public_key: SaitoPublicKey;
+
+            {
+                let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+
+                public_key = wallet.public_key;
+                private_key = wallet.private_key;
+            }
+
+            let mut transactions: AHashMap<SaitoSignature, Transaction> = self
+                .create_test_tx(
+                    parent_hash,
+                    txs_number,
+                    txs_amount,
+                    txs_fee,
+                    include_valid_golden_ticket,
+                )
+                .await;
 
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain, _blockchain_) =
