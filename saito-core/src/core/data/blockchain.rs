@@ -2947,7 +2947,6 @@ mod tests {
 
         //issuance genesis block and test balance
         let numtx: u64 = 10;
-        //let txs = t.create_test_issuance_tx_wallets(numtx);
         let mut txs: AHashMap<SaitoSignature, Transaction> = Default::default();
         let amount = 100;
         let tx = t.create_test_issuance_from(amount).await;
@@ -2961,25 +2960,13 @@ mod tests {
         let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
         //check wallet balance
         assert_eq!(wallet.get_available_balance(), amount);
-
-        // //
-        // // block 2
-        // //
-        // let mut block2 = t
-        //     .create_block(
-        //         block1_hash, // hash of parent block
-        //         ts + 120000, // timestamp
-        //         0,           // num transactions
-        //         0,           // amount
-        //         0,           // fee
-        //         true,        // mine golden ticket
-        //     )
-        //     .await;
-        // block2.generate(); // generate hashes
-
-        // let block2_hash = block2.hash;
-        // let block2_id = block2.id;
-
-        // t.add_block(block2).await;
+        let wclone = wallet.clone();
+        drop(wallet);
+        {
+            let bmap = t.balance_map().await;
+            let v = bmap.get(&wclone.public_key).unwrap();
+            info!("{:?} ", v);
+            assert_eq!(*v, amount);
+        }
     }
 }
