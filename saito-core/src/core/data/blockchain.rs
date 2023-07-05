@@ -2871,6 +2871,7 @@ mod tests {
             let block1 = blockchain.get_latest_block().unwrap();
             assert_eq!(block1.id, 1);
 
+            //should include any issuance transactions if block.id == 1
             let cv = block1.generate_consensus_values(&blockchain).await;
             assert_eq!(cv.it_num, numtx.try_into().unwrap());
             assert_eq!(cv.gt_num, 0);
@@ -2938,8 +2939,47 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
-    async fn test_cv() {}
+    async fn test_genblock_balance() {
+        init_testlog();
+        info!("test_genblock_balance");
 
-    //block.generate_consensus_values()
-    //returns a struct that should include any issuance transactions if block.id == 1
+        let mut t = TestManager::new();
+
+        //issuance genesis block and test balance
+        let numtx: u64 = 10;
+        //let txs = t.create_test_issuance_tx_wallets(numtx);
+        let mut txs: AHashMap<SaitoSignature, Transaction> = Default::default();
+        let amount = 100;
+        let tx = t.create_test_issuance_from(amount).await;
+        txs.insert(tx.signature, tx);
+        let genblock: Block = t.create_test_gen_block_txs(txs).await;
+        let b = genblock.clone();
+        {
+            t.add_block(genblock).await;
+        }
+
+        let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+        //check wallet balance
+        assert_eq!(wallet.get_available_balance(), amount);
+
+        // //
+        // // block 2
+        // //
+        // let mut block2 = t
+        //     .create_block(
+        //         block1_hash, // hash of parent block
+        //         ts + 120000, // timestamp
+        //         0,           // num transactions
+        //         0,           // amount
+        //         0,           // fee
+        //         true,        // mine golden ticket
+        //     )
+        //     .await;
+        // block2.generate(); // generate hashes
+
+        // let block2_hash = block2.hash;
+        // let block2_id = block2.id;
+
+        // t.add_block(block2).await;
+    }
 }

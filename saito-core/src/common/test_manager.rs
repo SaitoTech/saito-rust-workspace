@@ -630,6 +630,15 @@ pub mod test {
             tx
         }
 
+        pub async fn create_test_issuance_from(&mut self, amount: u64) -> Transaction {
+            let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+            let mut tx = Transaction::create_issuance_transaction(wallet.public_key, amount);
+            tx.sign(&wallet.private_key);
+            //changes fees and work
+            tx.generate(&wallet.public_key, 0, 0);
+            tx
+        }
+
         //create test issuance tx from several wallets
         pub async fn create_test_issuance_tx_wallets(
             &mut self,
@@ -643,6 +652,37 @@ pub mod test {
                 transactions.insert(tx.signature, tx);
             }
             transactions
+        }
+
+        //create genesis block from number
+        pub async fn create_test_gen_block(&mut self, num: u64) -> Block {
+            let txs = self.create_test_issuance_tx_wallets(num).await;
+            let block: Block = self.create_test_gen_block_txs(txs).await;
+            block
+        }
+
+        //create genblock with number of issuance tx
+        pub async fn create_test_gen_block_txs(
+            &mut self,
+            txs: AHashMap<SaitoSignature, Transaction>,
+        ) -> Block {
+            let mut mempool = self.mempool_lock.write().await;
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let timestamp = create_timestamp();
+            //Block::create
+            for (key, tx) in &txs {
+                mempool
+                    .add_transaction_if_validates(tx.clone(), &blockchain)
+                    .await;
+            }
+            let genblock: Block = (mempool
+                .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
+                .await)
+                .unwrap();
+
+            genblock
         }
 
         //create genblock with number of issuance tx
