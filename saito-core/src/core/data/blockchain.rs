@@ -2968,5 +2968,8 @@ mod tests {
             info!("{:?} ", v);
             assert_eq!(*v, amount);
         }
+
+        //try spend balance+100
+        //transaction.validate(&blockchain.utxoset)
     }
 }
