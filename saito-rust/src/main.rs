@@ -549,6 +549,8 @@ fn setup_hook() {
 }
 
 async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
+    info!("Running saito with config {:?}", configs.read().await);
+
     let channel_size;
     let thread_sleep_time_in_ms;
     let stat_timer_in_ms;
@@ -713,8 +715,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_hook();
 
     info!("Using config file: {}", config_file.to_string());
-
-    info!("Running saito");
 
     let configs: Arc<RwLock<dyn Configuration + Send + Sync>> = Arc::new(RwLock::new(
         ConfigHandler::load_configs(config_file.to_string()).expect("loading configs failed"),
