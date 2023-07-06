@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::io::Error;
 use std::panic;
 use std::process;
 use std::str::FromStr;
@@ -238,18 +239,12 @@ async fn run_consensus_event_processor(
     thread_sleep_time_in_ms: u64,
     channel_size: usize,
     sender_to_stat: Sender<String>,
+    generate_genesis_block: bool,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let result = std::env::var("GEN_TX");
     let mut create_test_tx = false;
     if result.is_ok() {
         create_test_tx = result.unwrap().eq("1");
-    }
-    let generate_genesis_block: bool;
-    {
-        let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
-
-        // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
-        generate_genesis_block = configs.get_peer_configs().is_empty();
     }
 
     let consensus_event_processor = ConsensusThread {
@@ -548,7 +543,10 @@ fn setup_hook() {
     }));
 }
 
-async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
+async fn run_node(
+    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    generate_genesis_block: bool,
+) {
     info!("Running saito with config {:?}", configs.read().await);
 
     let channel_size;
@@ -646,6 +644,7 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         thread_sleep_time_in_ms,
         channel_size,
         sender_to_stat.clone(),
+        generate_genesis_block,
     )
     .await;
 
@@ -720,7 +719,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ConfigHandler::load_configs(config_file.to_string()).expect("loading configs failed"),
     ));
 
-    run_node(configs).await;
+    //TODO make this part of config
+    let generate_genesis_block;
+    {
+        let (configsr, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+
+        // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
+        generate_genesis_block = configsr.get_peer_configs().is_empty();
+        info!("generate genesis block {}", generate_genesis_block);
+
+        // should crosscheck. if we have genesis block on disk we shouldn't generate one
+    }
+
+    run_node(configs, generate_genesis_block).await;
 
     Ok(())
 }
