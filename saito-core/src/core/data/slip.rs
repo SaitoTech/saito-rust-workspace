@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{debug, error};
+use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -124,7 +124,16 @@ impl Slip {
                 self.tx_ordinal,
                 self.slip_index
             );
+
             utxoset.insert(self.utxoset_key, spendable);
+
+            {
+                for (key, value) in utxoset {
+                    let key_base58 = bs58::encode(key).into_string();
+                    trace!(">>>> {}\t{}", key_base58, value);
+                }
+            }
+
             // if utxoset.contains_key(&self.utxoset_key) {
             //     utxoset.insert(self.utxoset_key, spendable);
             // } else {

@@ -751,6 +751,36 @@ pub mod test {
             }
             utxo_balances
         }
+
+        pub async fn create_next_block(
+            &mut self,
+            txs: AHashMap<SaitoSignature, Transaction>,
+        ) -> Block {
+            let mut mempool = self.mempool_lock.write().await;
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let timestamp = create_timestamp();
+
+            let genblock: Block = (mempool
+                .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
+                .await)
+                .unwrap();
+
+            genblock
+
+            // let mut block = Block::create(
+            //     &mut txs,
+            //     parent_hash,
+            //     blockchain.borrow_mut(),
+            //     timestamp,
+            //     &public_key,
+            //     &private_key,
+            //     None,
+            //     configs.deref(),
+            // )
+            // .await;
+        }
     }
 
     struct TestConfiguration {}
