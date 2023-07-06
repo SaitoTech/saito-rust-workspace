@@ -16,6 +16,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
+use clap::{App, Arg};
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{push_lock, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT};
 use saito_core::common::keep_time::KeepTime;
@@ -504,8 +505,25 @@ fn run_loop_thread(
     loop_handle
 }
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn setup_log() {
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+
+    tracing_subscriber::registry().with(fmt_layer).init();
+}
+
+fn setup_hook() {
     ctrlc::set_handler(move || {
         info!("shutting down the node");
         process::exit(0);
@@ -528,29 +546,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         orig_hook(panic_info);
         process::exit(99);
     }));
+}
 
-    println!("Running saito");
-
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
-    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
-    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
-
-    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
-
-    tracing_subscriber::registry().with(fmt_layer).init();
-
-    let configs: Arc<RwLock<dyn Configuration + Send + Sync>> = Arc::new(RwLock::new(
-        ConfigHandler::load_configs("configs/config.json".to_string())
-            .expect("loading configs failed"),
-    ));
+async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
+    info!("Running saito with config {:?}", configs.read().await);
 
     let channel_size;
     let thread_sleep_time_in_ms;
@@ -694,5 +693,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_handle,
         futures::future::join_all(verification_handles)
     );
+}
+
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let matches = App::new("Saito")
+        .arg(
+            Arg::with_name("config")
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file")
+                .takes_value(true),
+        )
+        .get_matches();
+
+    // config.json as default
+    let config_file = matches.value_of("config").unwrap_or("configs/config.json");
+
+    setup_log();
+
+    setup_hook();
+
+    info!("Using config file: {}", config_file.to_string());
+
+    let configs: Arc<RwLock<dyn Configuration + Send + Sync>> = Arc::new(RwLock::new(
+        ConfigHandler::load_configs(config_file.to_string()).expect("loading configs failed"),
+    ));
+
+    run_node(configs).await;
+
     Ok(())
 }
