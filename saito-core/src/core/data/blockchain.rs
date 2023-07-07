@@ -1079,6 +1079,7 @@ impl Blockchain {
         assert_eq!(block.block_type, BlockType::Full);
 
         let does_block_validate = block.validate(self, &self.utxoset, configs).await;
+        trace!("does_block_validate {}", does_block_validate);
 
         if does_block_validate {
             // blockring update
@@ -1104,7 +1105,12 @@ impl Blockchain {
             // utxoset update
             {
                 let block = self.blocks.get_mut(block_hash).unwrap();
+                trace!("utxoset update");
                 block.on_chain_reorganization(&mut self.utxoset, true);
+                for (key, value) in &self.utxoset {
+                    let key_base58 = bs58::encode(key).into_string();
+                    trace!("? {}\t{}", key_base58, value);
+                }
             }
 
             self.on_chain_reorganization(block_id, true, storage).await;
@@ -1583,6 +1589,7 @@ mod tests {
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
+    use crate::core::data::crypto::{hash, sign, verify, verify_signature};
     use crate::core::data::slip::Slip;
     use crate::core::data::storage::UTXOSTATE_FILE_PATH;
     use crate::core::data::transaction::{Transaction, TransactionType};
@@ -2961,7 +2968,7 @@ mod tests {
         let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
         //check wallet balance
         assert_eq!(wallet.get_available_balance(), amount);
-        let wclone = wallet.clone();
+        let mut wclone = wallet.clone();
         drop(wallet);
         info!("balances at the end");
         {
@@ -2972,7 +2979,88 @@ mod tests {
             assert_eq!(*v, amount);
         }
 
+        let keys = generate_keys();
+        let wallet2 = Wallet::new(keys.1, keys.0);
+        let _public_key2 = wallet2.public_key.clone();
+        let _private_key = wallet2.private_key.clone();
+
         //try spend balance+100
         //transaction.validate(&blockchain.utxoset)
+        let mut tx = Transaction::default();
+        //send 20 of 100
+        let total_nolans_requested_per_slip = 20;
+        let (input_slips, output_slips) = wclone.generate_slips(total_nolans_requested_per_slip);
+
+        //serialize_for_net_and_deserialize_from_net_test
+        for slip in input_slips {
+            tx.add_from_slip(slip);
+        }
+        for slip in output_slips {
+            tx.add_to_slip(slip);
+        }
+
+        tx.generate(&wclone.public_key, 0, 0);
+        //sign first then add hop
+        tx.sign(&wclone.private_key);
+
+        let to_tx = bs58::encode(_public_key2).into_string();
+        info!("tx to >> {:?}", to_tx);
+
+        tx.add_hop(&wclone.private_key, &wclone.public_key, &_public_key2);
+
+        {
+            let mut mempool = t.mempool_lock.write().await;
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            info!("tx.path {:?}", tx.path[0].from);
+
+            assert_eq!(tx.path[0].from, wclone.public_key);
+
+            //test sign hop by hand
+            let hopbytes: Vec<u8> = [tx.signature.as_slice(), _public_key2.as_slice()].concat();
+            let v = verify(hopbytes.as_slice(), &tx.path[0].sig, &tx.path[0].from);
+            assert!(v);
+
+            let tv = tx.validate_routing_path();
+            assert!(tv);
+            mempool
+                .add_transaction_if_validates(tx.clone(), &blockchain)
+                .await;
+        }
+
+        let mut txs: AHashMap<SaitoSignature, Transaction> = Default::default();
+        txs.insert(tx.signature, tx);
+
+        let b: Block = t.create_next_block(txs).await;
+        info!("add block  with # txs {:?}", b.transactions.len());
+        t.add_block(b).await;
+
+        let bmap = t.balance_map().await;
+        let first_balance = bmap.get(&wclone.public_key).unwrap();
+        assert_eq!(*first_balance, 80);
+
+        info!("---------");
+        for (key, value) in &bmap {
+            let key_base58 = bs58::encode(key).into_string();
+            info!("{}\t{}", key_base58, value);
+        }
+
+        //checking utxoset/bool
+        {
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            for (key, value) in &blockchain.utxoset {
+                let key_base58 = bs58::encode(key).into_string();
+                info!("{}\t{}", key_base58, value);
+            }
+        }
+
+        //bug! 20 is missing
+        //need to call reorg?
+
+        //info!("{:?}", _public_key2);
+        //let second_balance = bmap.get(&_public_key2).unwrap();
+        //assert_eq!(*second_balance, 20);
     }
 }

@@ -128,8 +128,18 @@ impl Slip {
                 self.slip_index
             );
             let key_hex = encode(self.utxoset_key);
-            info!("insert {:?}", key_hex);
+            trace!("insert {:?}", key_hex);
+
             utxoset.insert(self.utxoset_key, spendable);
+
+            // {
+            //     trace!("{}\t{}", key_base58, value);
+            //     for (key, value) in utxoset {
+            //         let key_base58 = bs58::encode(key).into_string();
+            //         trace!("{}\t{}", key_base58, value);
+            //     }
+            // }
+
             // if utxoset.contains_key(&self.utxoset_key) {
             //     utxoset.insert(self.utxoset_key, spendable);
             // } else {
