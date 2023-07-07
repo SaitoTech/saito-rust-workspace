@@ -3000,8 +3000,8 @@ mod tests {
         //sign first then add hop
         tx.sign(&wclone.private_key);
 
-        let to_kk = bs58::encode(_public_key2).into_string();
-        info!("tx to >> {:?}", to_kk);
+        let to_tx = bs58::encode(_public_key2).into_string();
+        info!("tx to >> {:?}", to_tx);
 
         tx.add_hop(&wclone.private_key, &wclone.public_key, &_public_key2);
 
@@ -3041,6 +3041,16 @@ mod tests {
         for (key, value) in &bmap {
             let key_base58 = bs58::encode(key).into_string();
             info!("{}\t{}", key_base58, value);
+        }
+
+        //checking utxoset/bool
+        {
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            for (key, value) in &blockchain.utxoset {
+                let key_base58 = bs58::encode(key).into_string();
+                info!("{}\t{}", key_base58, value);
+            }
         }
 
         //bug! 20 is missing
