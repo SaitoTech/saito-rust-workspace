@@ -3006,6 +3006,8 @@ mod tests {
         info!("tx to >> {:?}", to_tx);
 
         tx.add_hop(&wclone.private_key, &wclone.public_key, &_public_key2);
+        info!("from {:}", tx.from.len());
+        info!("to {:}", tx.to.len());
 
         {
             let mut mempool = t.mempool_lock.write().await;
