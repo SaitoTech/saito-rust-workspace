@@ -1,5 +1,6 @@
 use std::io::{Error, ErrorKind};
 
+use bs58;
 use hex::encode;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
@@ -66,7 +67,7 @@ impl Slip {
             false;
         }
         let key_hex = encode(&self.get_utxoset_key());
-        info!("remove {:?}", key_hex);
+        info!("slip: remove {:?}", key_hex);
         utxoset.remove_entry(&self.get_utxoset_key());
         true
     }
@@ -120,15 +121,15 @@ impl Slip {
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
         if self.amount > 0 {
             debug!(
-                "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?}",
+                "slip: reorg updating {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?} pubkey {:?}",
                 hex::encode(self.utxoset_key),
                 spendable,
                 self.block_id,
                 self.tx_ordinal,
-                self.slip_index
+                self.slip_index,
+                hex::encode(self.public_key),
+                //bs58::encode(self.public_key),
             );
-            let key_hex = encode(self.utxoset_key);
-            trace!("insert {:?}", key_hex);
 
             utxoset.insert(self.utxoset_key, spendable);
 

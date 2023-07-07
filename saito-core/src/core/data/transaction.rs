@@ -733,12 +733,12 @@ impl Transaction {
         }
         self.from.iter().for_each(|input| {
             let x = bs58::encode(input.public_key).into_string();
-            info!("> input from: on_chain_reorganization {:?}", x);
+            info!("tx reorg: input {:?}", x);
             input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
         });
         self.to.iter().for_each(|output| {
             let x = bs58::encode(output.public_key).into_string();
-            info!("> output to: on_chain_reorganization {:?}", x);
+            info!("tx reorg: output {:?}", x);
             output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
         });
     }

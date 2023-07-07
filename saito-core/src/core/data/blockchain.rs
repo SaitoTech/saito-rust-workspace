@@ -1107,10 +1107,6 @@ impl Blockchain {
                 let block = self.blocks.get_mut(block_hash).unwrap();
                 trace!("utxoset update");
                 block.on_chain_reorganization(&mut self.utxoset, true);
-                for (key, value) in &self.utxoset {
-                    let key_base58 = bs58::encode(key).into_string();
-                    trace!("? {}\t{}", key_base58, value);
-                }
             }
 
             self.on_chain_reorganization(block_id, true, storage).await;
@@ -2945,6 +2941,8 @@ mod tests {
         //block1.validate(blockchain, );
     }
 
+    async fn log_data() {}
+
     #[tokio::test]
     #[serial_test::serial]
     async fn test_genblock_balance() {
@@ -2968,6 +2966,7 @@ mod tests {
         let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
         //check wallet balance
         assert_eq!(wallet.get_available_balance(), amount);
+
         let mut wclone = wallet.clone();
         drop(wallet);
         info!("balances at the end");
@@ -3040,12 +3039,13 @@ mod tests {
         let first_balance = bmap.get(&wclone.public_key).unwrap();
         assert_eq!(*first_balance, 80);
 
-        info!("---------");
+        info!("balance ---------");
         for (key, value) in &bmap {
             let key_base58 = bs58::encode(key).into_string();
             info!("{}\t{}", key_base58, value);
         }
 
+        info!("utxoset bool ---------");
         //checking utxoset/bool
         {
             let (mut blockchain, _blockchain_) =

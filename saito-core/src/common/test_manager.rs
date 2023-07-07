@@ -30,7 +30,7 @@ pub mod test {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
-    use log::{debug, info};
+    use log::{debug, info, trace};
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
@@ -733,8 +733,14 @@ pub mod test {
                 let block = blockchain.get_block(&block_hash).unwrap().clone();
                 for j in 0..block.transactions.len() {
                     let tx = &block.transactions[j];
+                    trace!("set tx {:?}", tx);
 
                     tx.from.iter().for_each(|input| {
+                        trace!(
+                            "set input {:?} {:?}",
+                            hex::encode(input.public_key),
+                            input.amount
+                        );
                         utxo_balances
                             .entry(input.public_key)
                             .and_modify(|e| *e -= input.amount)
@@ -742,6 +748,11 @@ pub mod test {
                     });
 
                     tx.to.iter().for_each(|output| {
+                        trace!(
+                            "set output {:?} {:?}",
+                            hex::encode(output.public_key),
+                            output.amount
+                        );
                         utxo_balances
                             .entry(output.public_key)
                             .and_modify(|e| *e += output.amount)
@@ -780,6 +791,32 @@ pub mod test {
             //     configs.deref(),
             // )
             // .await;
+        }
+
+        pub async fn log_data(&mut self) {
+            //let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+            //let pkey = wallet.public_key;
+            //drop(wallet);
+            let bmap = self.balance_map().await;
+            //let first_balance = bmap.get(&pkey).unwrap();
+            //assert_eq!(*first_balance, 80);
+
+            info!("balance ---------");
+            for (key, value) in &bmap {
+                let key_base58 = bs58::encode(key).into_string();
+                info!("{}\t{}", key_base58, value);
+            }
+
+            // info!("utxoset bool ---------");
+            // //checking utxoset/bool
+            // {
+            //     let (mut blockchain, _blockchain_) =
+            //         lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            //     for (key, value) in &blockchain.utxoset {
+            //         let key_base58 = bs58::encode(key).into_string();
+            //         info!("{}\t{}", key_base58, value);
+            //     }
+            // }
         }
     }
 
