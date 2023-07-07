@@ -1,6 +1,7 @@
 use std::io::{Error, ErrorKind};
 
-use log::{debug, error};
+use hex::encode;
+use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -64,6 +65,8 @@ impl Slip {
             error!("ERROR 572034: asked to remove a slip without its utxoset_key properly set!");
             false;
         }
+        let key_hex = encode(&self.get_utxoset_key());
+        info!("remove {:?}", key_hex);
         utxoset.remove_entry(&self.get_utxoset_key());
         true
     }
@@ -124,6 +127,8 @@ impl Slip {
                 self.tx_ordinal,
                 self.slip_index
             );
+            let key_hex = encode(self.utxoset_key);
+            info!("insert {:?}", key_hex);
             utxoset.insert(self.utxoset_key, spendable);
             // if utxoset.contains_key(&self.utxoset_key) {
             //     utxoset.insert(self.utxoset_key, spendable);

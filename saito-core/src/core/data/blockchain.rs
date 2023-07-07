@@ -1589,6 +1589,7 @@ mod tests {
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
     use ahash::AHashMap;
+    use hex::encode;
     use log::{debug, error, info, trace, warn};
     use std::convert::TryInto;
     use std::env;
@@ -2962,10 +2963,12 @@ mod tests {
         assert_eq!(wallet.get_available_balance(), amount);
         let wclone = wallet.clone();
         drop(wallet);
+        info!("balances at the end");
         {
             let bmap = t.balance_map().await;
             let v = bmap.get(&wclone.public_key).unwrap();
-            info!("{:?} ", v);
+            let key_hex = encode(&wclone.public_key);
+            info!("{:?} : {:?}", v, key_hex);
             assert_eq!(*v, amount);
         }
 

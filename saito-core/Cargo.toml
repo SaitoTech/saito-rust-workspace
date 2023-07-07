@@ -46,6 +46,3 @@ with-rayon = []
 name = "benches"
 harness = false
 
-[profile.release]
-debug = true
-lto = true
