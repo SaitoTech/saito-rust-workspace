@@ -214,7 +214,7 @@ impl StatVariable {
             self.count_since_last_stat += 1;
         }
     }
-    pub fn increment_by(&mut self, amount: u64) {
+    pub fn increment_by(&mut self, _amount: u64) {
         #[cfg(feature = "with-stats")]
         {
             self.total += amount;

@@ -610,7 +610,7 @@ pub mod test {
             let genblock: Block = mempool
                 .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
                 .await;
-            let res = blockchain
+            let _res = blockchain
                 .add_block(
                     genblock,
                     &self.network,
@@ -624,7 +624,7 @@ pub mod test {
 
         //convenience function assuming longest chain
         pub async fn balance_map(&mut self) -> AHashMap<SaitoPublicKey, u64> {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             let mut utxo_balances: AHashMap<SaitoPublicKey, u64> = AHashMap::new();

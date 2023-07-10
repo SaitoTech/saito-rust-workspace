@@ -7,8 +7,8 @@ use std::io::Write;
 use tokio::sync::RwLock;
 
 use super::slip::SlipType;
-use crate::common::defs::{push_lock, SaitoPublicKey, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
-use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
+use crate::common::defs::{push_lock, SaitoPublicKey, LOCK_ORDER_MEMPOOL};
+
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;

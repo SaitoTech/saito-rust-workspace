@@ -1602,7 +1602,7 @@ mod tests {
     use std::ops::Deref;
     use std::sync::Arc;
 
-    use log::{debug, error, info, trace, warn};
+    use log::{debug, error};
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
@@ -1613,7 +1613,7 @@ mod tests {
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
-    use crate::core::data::storage::UTXOSTATE_FILE_PATH;
+
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 
