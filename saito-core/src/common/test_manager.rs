@@ -47,6 +47,7 @@ pub mod test {
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
     use crate::core::data::peer_collection::PeerCollection;
+    use crate::core::data::slip::Slip;
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -134,7 +135,7 @@ pub mod test {
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
 
-            blockchain
+            let res = blockchain
                 .add_block(
                     block,
                     &mut self.network,
@@ -144,7 +145,7 @@ pub mod test {
                     configs.deref(),
                 )
                 .await;
-            debug!("block added to test manager blockchain");
+            debug!("block added to test manager blockchain {:?}", res);
         }
 
         //
@@ -720,12 +721,15 @@ pub mod test {
 
         //convenience function assuming longest chain
         pub async fn balance_map(&mut self) -> AHashMap<SaitoPublicKey, u64> {
+            info!("balance_map");
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             let mut utxo_balances: AHashMap<SaitoPublicKey, u64> = AHashMap::new();
 
             let latest_id = blockchain.get_latest_block_id();
+            trace!("latest_id {}", latest_id);
+            //currently BUG related to id
             for i in 1..=latest_id {
                 let block_hash = blockchain
                     .blockring
@@ -767,30 +771,27 @@ pub mod test {
             &mut self,
             txs: AHashMap<SaitoSignature, Transaction>,
         ) -> Block {
+            //TODO! parent_hash: SaitoHash,
+
             let mut mempool = self.mempool_lock.write().await;
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            //TODO add tx to mempool
+            for (key, tx) in &txs {
+                mempool
+                    .add_transaction_if_validates(tx.clone(), &blockchain)
+                    .await;
+            }
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let timestamp = create_timestamp();
 
-            let genblock: Block = (mempool
-                .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
+            let block: Block = (mempool
+                .bundle_block(&mut blockchain, timestamp, None, configs.deref(), false)
                 .await)
                 .unwrap();
-
-            genblock
-
-            // let mut block = Block::create(
-            //     &mut txs,
-            //     parent_hash,
-            //     blockchain.borrow_mut(),
-            //     timestamp,
-            //     &public_key,
-            //     &private_key,
-            //     None,
-            //     configs.deref(),
-            // )
-            // .await;
+            info!("bundle block {:?}", block.previous_block_hash);
+            block
         }
 
         pub async fn log_data(&mut self) {
@@ -818,6 +819,75 @@ pub mod test {
             //     }
             // }
         }
+
+        pub async fn create_slip_transaction(
+            &mut self,
+            nolans: Currency,
+            to_public_key: &SaitoPublicKey,
+            to_public_key2: &SaitoPublicKey,
+        ) -> Transaction {
+            let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
+
+            let mut transaction = Transaction::default();
+
+            let (input_slips, output_slips) = wallet.generate_slips(nolans);
+
+            for slip in input_slips {
+                transaction.add_from_slip(slip);
+            }
+
+            // for slip in output_slips {
+            //     transaction.add_to_slip(slip);
+            // }
+
+            let mut output = Slip::default();
+            output.public_key = *to_public_key;
+            output.amount = nolans;
+            transaction.add_to_slip(output);
+
+            let mut output2 = Slip::default();
+            output2.public_key = *to_public_key2;
+            output2.amount = nolans;
+            transaction.add_to_slip(output2);
+
+            //TODO
+            // let remaining_bytes: i64 =
+            //     self.tx_size as i64 - (*total_output_slips_created + 1) as i64 * SLIP_SIZE as i64;
+
+            // if remaining_bytes > 0 {
+            //     transaction.data = generate_random_bytes(remaining_bytes as u64);
+            // }
+
+            //transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
+            transaction.generate(&wallet.public_key, 0, 0);
+            transaction.sign(&wallet.private_key);
+            //transaction.add_hop(&wallet.private_key, &wallet.public_key, to_public_key);
+
+            transaction
+        }
+
+        // pub fn pretty_print_tx(tx: &Transaction) -> Result<(), serde_json::Error> {
+        //     // let pretty_tx = PrettyTx {
+        //     //     timestamp: tx.timestamp,
+        //     //     transaction_type: tx.transaction_type,
+        //     // };
+
+        //     // let tx_string = serde_json::to_string_pretty(&pretty_tx)?;
+        //     // println!("{}", tx_string);
+
+        //     Ok(())
+        // }
+
+        // pub fn pretty_print_slip(slip: &Slip) -> Result<(), serde_json::Error> {
+        //     // let pretty_slip = PrettySlip {
+        //     //     amount: slip.amount,
+        //     // };
+
+        //     // let slip_str = serde_json::to_string_pretty(&pretty_slip)?;
+        //     // println!("{}", slip_str);
+
+        //     Ok(())
+        // }
     }
 
     struct TestConfiguration {}

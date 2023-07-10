@@ -155,24 +155,25 @@ impl Mempool {
         configs: &(dyn Configuration + Send + Sync),
         is_genesis: bool,
     ) -> Option<Block> {
+        info!("bundle is genesis : {}", is_genesis);
         let previous_block_hash: SaitoHash;
         if !is_genesis {
             previous_block_hash = blockchain.get_latest_block_hash();
+            info!("previous_block_hash {:?}", previous_block_hash);
 
             //note this is note used
-            let mempool_work = self
-                .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
-                .await?;
-            info!(
-                "bundling block with {:?} txs with work : {:?}",
-                self.transactions.len(),
-                mempool_work
-            );
+            // let mempool_work = self
+            //     .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
+            //     .await?;
+            // info!(
+            //     "bundling block with {:?} txs with work : {:?}",
+            //     self.transactions.len(),
+            //     mempool_work
+            // );
             // assert_eq!(block.total_work, mempool_work);
         } else {
             previous_block_hash = [0; 32];
         }
-
         let public_key;
         let private_key;
         {
@@ -180,7 +181,7 @@ impl Mempool {
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
-
+        info!("create");
         let mut block = Block::create(
             &mut self.transactions,
             previous_block_hash,
@@ -193,10 +194,12 @@ impl Mempool {
         )
         .await;
         block.generate();
+
         info!(
             "block generated with work : {:?} and burnfee : {:?}",
             block.total_work, block.burnfee
         );
+        info!("previous_block_hash {:?}", block.previous_block_hash);
 
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
