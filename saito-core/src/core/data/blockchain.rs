@@ -358,7 +358,7 @@ impl Blockchain {
                     let disconnected_block_id = self.get_latest_block_id();
                     for i in block_id + 1..disconnected_block_id {
                         let disconnected_block_hash =
-                            self.blockring.get_longest_chain_block_hash_by_block_id(i);
+                            self.blockring.get_longest_chain_block_hash_at_block_id(i);
                         if disconnected_block_hash != [0; 32] {
                             self.blockring.on_chain_reorganization(
                                 i,
@@ -531,7 +531,7 @@ impl Blockchain {
         // ensure pruning of next block OK will have the right CVs
         //
         if self.get_latest_block_id() > GENESIS_PERIOD {
-            let pruned_block_hash = self.blockring.get_longest_chain_block_hash_by_block_id(
+            let pruned_block_hash = self.blockring.get_longest_chain_block_hash_at_block_id(
                 self.get_latest_block_id() - GENESIS_PERIOD,
             );
 
@@ -680,7 +680,7 @@ impl Blockchain {
             //
             let block_hash = self
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(current_block_id);
+                .get_longest_chain_block_hash_at_block_id(current_block_id);
             fork_id[index] = block_hash[index];
             fork_id[index + 1] = block_hash[index + 1];
         }
@@ -698,16 +698,27 @@ impl Blockchain {
         let mut peer_block_id = peer_latest_block_id;
         let mut my_block_id = my_latest_block_id;
 
+        debug!(
+            "generate last shared ancestor : peer_latest_id : {:?}, fork_id : {:?} my_latest_id : {:?}",
+            peer_latest_block_id,
+            hex::encode(fork_id),
+            my_latest_block_id
+        );
         let weights = vec![
             0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
         ];
         if peer_latest_block_id >= my_latest_block_id {
             // roll back to last even 10 blocks
             peer_block_id = peer_block_id - (peer_block_id % 10);
+            debug!("peer_block_id : {:?}", peer_block_id);
 
             // their fork id
             for (index, weight) in weights.iter().enumerate() {
-                if peer_block_id <= *weight {
+                if peer_block_id < *weight {
+                    debug!(
+                        "peer_block_id : {:?} is less than weight : {:?}",
+                        peer_block_id, weight
+                    );
                     return 0;
                 }
                 peer_block_id -= weight;
@@ -716,31 +727,50 @@ impl Blockchain {
                 if peer_block_id > peer_latest_block_id {
                     return 0;
                 }
+                if peer_block_id >= my_block_id {
+                    return 0;
+                }
 
                 // index in fork_id hash
                 let index = 2 * index;
 
                 // compare input hash to my hash
-                if peer_block_id <= my_block_id {
-                    let block_hash = self
-                        .blockring
-                        .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[index] == block_hash[index]
-                        && fork_id[index + 1] == block_hash[index + 1]
-                    {
-                        return peer_block_id;
-                    }
+                let block_hash = self
+                    .blockring
+                    .get_longest_chain_block_hash_at_block_id(peer_block_id);
+                if fork_id[index] == block_hash[index]
+                    && fork_id[index + 1] == block_hash[index + 1]
+                {
+                    return peer_block_id;
                 }
             }
         } else {
+            my_block_id = my_block_id - (my_block_id % 10);
+
+            debug!("my_block_id after rounding : {:?}", my_block_id);
             for (index, weight) in weights.iter().enumerate() {
-                if my_block_id <= *weight {
+                if my_block_id < *weight {
+                    debug!(
+                        "my_block_id : {:?} is less than weight : {:?}",
+                        my_block_id, weight
+                    );
                     return 0;
                 }
                 my_block_id -= weight;
 
                 // do not loop around if block id < 0
                 if my_block_id > my_latest_block_id {
+                    debug!(
+                        "my_block_id {:?} > my_latest_block_id : {:?}",
+                        my_block_id, my_latest_block_id
+                    );
+                    return 0;
+                }
+                if peer_block_id > my_block_id {
+                    debug!(
+                        "peer_block_id {:?} > my_block_id {:?}",
+                        peer_block_id, my_block_id
+                    );
                     return 0;
                 }
 
@@ -748,19 +778,18 @@ impl Blockchain {
                 let index = 2 * index;
 
                 // compare input hash to my hash
-                if peer_block_id <= my_block_id {
-                    let block_hash = self
-                        .blockring
-                        .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[index] == block_hash[index]
-                        && fork_id[index + 1] == block_hash[index + 1]
-                    {
-                        return peer_block_id;
-                    }
+                let block_hash = self
+                    .blockring
+                    .get_longest_chain_block_hash_at_block_id(my_block_id);
+                if fork_id[index] == block_hash[index]
+                    && fork_id[index + 1] == block_hash[index + 1]
+                {
+                    return my_block_id;
                 }
             }
         }
 
+        debug!("no shared ancestor found. returning 0");
         // no match? return 0 -- no shared ancestor
         0
     }
@@ -776,7 +805,7 @@ impl Blockchain {
         while current_id > 0 && current_id >= min_id {
             let hash = self
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(current_id);
+                .get_longest_chain_block_hash_at_block_id(current_id);
             if hash == [0; 32] {
                 break;
             }
@@ -785,7 +814,7 @@ impl Blockchain {
                 current_id,
                 hex::encode(
                     self.blockring
-                        .get_longest_chain_block_hash_by_block_id(current_id)
+                        .get_longest_chain_block_hash_at_block_id(current_id)
                 )
             );
             current_id -= 1;
@@ -1065,7 +1094,7 @@ impl Blockchain {
                 }
                 let bid = latest_block_id - i;
                 let previous_block_hash =
-                    self.blockring.get_longest_chain_block_hash_by_block_id(bid);
+                    self.blockring.get_longest_chain_block_hash_at_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
                     let block = self.get_mut_block(&previous_block_hash).unwrap();
                     block
@@ -1569,9 +1598,11 @@ impl Blockchain {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::ops::Deref;
     use std::sync::Arc;
 
+    use log::{debug, error, info, trace, warn};
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
@@ -1585,8 +1616,6 @@ mod tests {
     use crate::core::data::storage::UTXOSTATE_FILE_PATH;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
-    use log::{debug, error, info, trace, warn};
-    use std::fs;
 
     // fn init_testlog() {
     //     let _ = pretty_env_logger::try_init();

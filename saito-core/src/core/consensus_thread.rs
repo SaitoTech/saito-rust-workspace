@@ -143,7 +143,7 @@ impl ConsensusThread {
     }
     async fn generate_issuance_tx(
         &self,
-        _mempool: Arc<RwLock<Mempool>>,
+        mempool: Arc<RwLock<Mempool>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating issuance init transaction");
@@ -159,7 +159,7 @@ impl ConsensusThread {
         }
 
         let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(_mempool, LOCK_ORDER_MEMPOOL);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
 
         // debug!("{:?} transaction from slips", txs);
         for tx in txs {
@@ -169,7 +169,7 @@ impl ConsensusThread {
             info!("added issuance init tx for : {:?}", tx.signature);
         }
 
-        debug!("{:?} mempool transacts", mempool.transactions);
+        // debug!("{:?} mempool transacts", mempool.transactions);
     }
     /// Test method to generate test transactions
     ///

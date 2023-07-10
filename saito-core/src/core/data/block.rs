@@ -901,7 +901,7 @@ impl Block {
         if self.id > GENESIS_PERIOD + 1 {
             let pruned_block_hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(self.id - GENESIS_PERIOD);
+                .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
 
             //
             // generate metadata should have prepared us with a pre-prune block
@@ -1194,7 +1194,7 @@ impl Block {
                 let bid = self.id - i;
                 let previous_block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(bid);
+                    .get_longest_chain_block_hash_at_block_id(bid);
 
                 // previous block hash can be [0; 32] if there is no longest-chain block
 

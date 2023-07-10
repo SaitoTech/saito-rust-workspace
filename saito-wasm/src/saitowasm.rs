@@ -237,9 +237,9 @@ pub fn new() -> SaitoWasm {
 pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue, JsValue> {
     console_log::init_with_level(Level::Trace).unwrap();
 
-    info!("initializing saito-wasm");
     trace!("trace test");
     debug!("debug test");
+    info!("initializing saito-wasm");
     {
         info!("setting configs...");
         let mut configs = CONFIGS.write().await;
@@ -247,18 +247,17 @@ pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue
 
         let str: Result<String, _> = json.try_into();
         if str.is_err() {
-            info!(
+            error!(
                 "cannot parse json configs string : {:?}",
                 str.err().unwrap()
             );
-            return Ok(JsValue::from("initialized"));
+            return Err(JsValue::from("Failed parsing configs string"));
         }
-        // let str: JsString = str.unwrap();
         let config = WasmConfiguration::new_from_json(str.expect("couldn't get string").as_str());
 
         if config.is_err() {
             info!("failed parsing configs");
-            return Ok(JsValue::from("initialized"));
+            return Ok(JsValue::from("failed parsing configs"));
         }
         let config = config.unwrap();
 
@@ -295,11 +294,10 @@ pub async fn create_transaction(
     debug!("create_transaction");
     let saito = SAITO.lock().await;
     let mut wallet = saito.context.wallet.write().await;
-    // let (mut wallet, _wallet_) = lock_for_write!(saito.context.wallet, LOCK_ORDER_WALLET);
     let key = string_to_key(public_key);
     if key.is_err() {
         error!("failed parsing public key : {:?}", key.err().unwrap());
-        todo!()
+        return Err(JsValue::from("failed parsing public key"));
     }
     let transaction =
         Transaction::create(&mut wallet, key.unwrap(), amount, fee, force_merge).unwrap();
@@ -323,7 +321,7 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
     let block_hash = string_to_key(block_hash);
     if block_hash.is_err() {
         error!("block hash string is invalid");
-        todo!()
+        return Err(JsValue::from("block hash string is invalid"));
     }
 
     let block_hash = block_hash.unwrap();
@@ -335,7 +333,7 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
 
     if result.is_none() {
         warn!("block {:?} not found", hex::encode(block_hash));
-        todo!()
+        return Err(JsValue::from("block not found"));
     }
     let block = result.cloned().unwrap();
 
@@ -355,7 +353,6 @@ pub async fn process_new_peer(index: u64, peer_config: JsValue) {
             error!("{:?}", result.err().unwrap());
             return;
         }
-        // drop(peer_config);
         let json = result.unwrap();
 
         let configs = Figment::new()
