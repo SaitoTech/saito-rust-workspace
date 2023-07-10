@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
+use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
+use std::fs::File;
+use std::io::Write;
 use tokio::sync::RwLock;
 
 use super::slip::SlipType;
@@ -21,6 +24,7 @@ pub struct Storage {
 pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
 pub const DEFAULT_FILE_PATH: &'static str = "./data/issuance/default";
+pub const UTXOSTATE_FILE_PATH: &'static str = "./data/issuance/utxodata";
 
 pub struct StorageConfigurer {}
 
@@ -136,17 +140,18 @@ impl Storage {
         self.io_interface.remove_value(filename).await.is_ok()
     }
 
-    //
-    // token issuance functions below
-    //
-    pub async fn get_token_supply_slips_from_disk(&self) -> Vec<Slip> {
+    /// Asynchronously retrieves token issuance slips from the provided file path.
+    ///
+    /// This function reads a file from disk that contains the token issuance slips
+    /// and returns these slips as a vector.
+    pub async fn get_token_supply_slips_from_disk_path(&self, issuance_file: &str) -> Vec<Slip> {
         let mut v: Vec<Slip> = vec![];
         let mut tokens_issued = 0;
         //
-        if self.file_exists(ISSUANCE_FILE_PATH).await {
+        if self.file_exists(issuance_file).await {
             if let Ok(lines) = self
                 .io_interface
-                .read_value(ISSUANCE_FILE_PATH.to_string())
+                .read_value(issuance_file.to_string())
                 .await
             {
                 let mut contents = String::from_utf8(lines).unwrap();
@@ -177,6 +182,14 @@ impl Storage {
         return vec![];
     }
 
+    /// get issuance slips from the standard file
+    pub async fn get_token_supply_slips_from_disk(&self) -> Vec<Slip> {
+        return self
+            .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+            .await;
+    }
+
+    /// convert an issuance expression to slip
     fn convert_issuance_into_slip(&self, line: &str) -> Option<Slip> {
         let entries: Vec<&str> = line.split("\t").collect();
 
@@ -218,6 +231,40 @@ impl Storage {
 
     fn decode_str(string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
         return bs58::decode(string).into_vec();
+    }
+
+    /// store the state of utxo balances given that map of balances and a treshold
+    pub async fn write_utxoset_to_disk_path(
+        &self,
+        balance_map: AHashMap<SaitoPublicKey, u64>,
+        threshold: u64,
+        path: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        debug!("store to {}", path);
+        let file_path = format!("{}", path);
+        let mut file = File::create(&file_path)?;
+
+        //assume normal txtype
+        let txtype = "Normal";
+
+        for (key, value) in &balance_map {
+            if value > &threshold {
+                let key_base58 = bs58::encode(key).into_string();
+                writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
+            }
+        }
+        debug!("written {} records", balance_map.len());
+        Ok(())
+    }
+
+    /// store the state of utxo balances to standard file
+    pub async fn write_utxoset_to_disk(
+        &self,
+        balance_map: AHashMap<SaitoPublicKey, u64>,
+        threshold: u64,
+    ) {
+        self.write_utxoset_to_disk_path(balance_map, threshold, UTXOSTATE_FILE_PATH)
+            .await;
     }
 }
 

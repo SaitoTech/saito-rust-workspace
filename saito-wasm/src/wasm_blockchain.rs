@@ -33,7 +33,7 @@ impl WasmBlockchain {
         let blockchain = self.blockchain.read().await;
         let hash = blockchain
             .blockring
-            .get_longest_chain_block_hash_by_block_id(id);
+            .get_longest_chain_block_hash_at_block_id(id);
         hex::encode(hash).into()
     }
 }
