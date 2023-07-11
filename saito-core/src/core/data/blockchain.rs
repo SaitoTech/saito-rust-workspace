@@ -1610,6 +1610,7 @@ mod tests {
     };
     use crate::common::test_manager::test;
     use crate::common::test_manager::test::TestManager;
+    use crate::core::data::block::Block;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
@@ -2817,5 +2818,89 @@ mod tests {
 
         //clean up the testing file
         fs::remove_file(filepath);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_genesis_cv() {
+        //init_testlog();
+
+        let mut t = TestManager::new();
+        //generate a test genesis block
+        let numtx: u64 = 10;
+        let mut genblock: Block = t.create_test_gen_block_tx(numtx).await;
+        let cblock = genblock.clone();
+        t.add_block(cblock).await;
+        {
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            let block1 = blockchain.get_latest_block().unwrap();
+            assert_eq!(block1.id, 1);
+
+            //should include any issuance transactions if block.id == 1
+            let cv = block1.generate_consensus_values(&blockchain).await;
+            assert_eq!(cv.it_num, numtx.try_into().unwrap());
+            assert_eq!(cv.gt_num, 0);
+
+            assert_eq!(cv.total_rebroadcast_nolan, 0);
+            assert_eq!(cv.total_rebroadcast_fees_nolan, 0);
+            assert_eq!(cv.total_rebroadcast_staking_payouts_nolan, 0);
+            assert_eq!(cv.nolan_falling_off_chain, 0);
+            assert_eq!(cv.staking_treasury, 0);
+            assert_eq!(cv.avg_income, 0);
+            assert_eq!(cv.avg_variance, 0);
+            assert_eq!(cv.avg_atr_income, 0);
+            assert_eq!(cv.avg_atr_variance, 0);
+
+            // it_index: Option<usize>,
+            // ft_index: Option<usize>,
+            // gt_index: Option<usize>,
+            // expected_difficulty: u64,
+            // rebroadcasts: Vec<Transaction>,
+            // total_rebroadcast_slips: u64,
+            // rebroadcast_hash: [u8; 32],
+            // block_payout: Vec<BlockPayout>,
+
+            //check validate
+            let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
+
+            let isvalid = block1
+                .validate(&blockchain, &blockchain.utxoset, configs.deref())
+                .await;
+            assert_eq!(isvalid, true);
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_genblock_create() {
+        //init_testlog();
+        //info!("basic");
+
+        let mut t = TestManager::new();
+
+        //create
+        let numtx: u64 = 10;
+        let genblock: Block = t.create_test_gen_block_tx(numtx).await;
+        let b = genblock.clone();
+        {
+            t.add_block(genblock).await;
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_at_block_id(1);
+            assert_eq!(b.hash, block_hash);
+            assert_eq!(b.transactions.len(), numtx.try_into().unwrap());
+
+            let block1 = blockchain.get_latest_block().unwrap();
+            assert_eq!(block1.id, 1);
+        }
+
+        let valid: bool = t.call_validate().await;
+        assert_eq!(valid, true);
+
+        //block1.validate(blockchain, );
     }
 }

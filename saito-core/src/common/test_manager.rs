@@ -651,6 +651,65 @@ pub mod test {
                 .await;
         }
 
+        //create test issuance tx from several wallets
+        pub async fn create_test_issuance_tx_wallets(
+            &mut self,
+            num: u64,
+        ) -> AHashMap<SaitoSignature, Transaction> {
+            let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
+            for i in 0..num {
+                let keys = generate_keys();
+                let wallet = Wallet::new(keys.1, keys.0);
+                let tx = self.create_test_issuance_tx_wallet(100, wallet).await;
+                transactions.insert(tx.signature, tx);
+            }
+            transactions
+        }
+
+        pub async fn create_test_issuance_tx_wallet(
+            &mut self,
+            amount: u64,
+            wallet: Wallet,
+        ) -> Transaction {
+            let mut tx = Transaction::create_issuance_transaction(wallet.public_key, amount);
+            tx.sign(&wallet.private_key);
+            //changes fees and work
+            tx.generate(&wallet.public_key, 0, 0);
+            tx
+        }
+
+        pub async fn create_test_gen_block_tx(&mut self, num: u64) -> Block {
+            let txs = self.create_test_issuance_tx_wallets(num).await;
+            let mut mempool = self.mempool_lock.write().await;
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let timestamp = create_timestamp();
+            //Block::create
+            for (key, tx) in &txs {
+                mempool
+                    .add_transaction_if_validates(tx.clone(), &blockchain)
+                    .await;
+            }
+            let genblock: Block = (mempool
+                .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
+                .await)
+                .unwrap();
+
+            genblock
+        }
+
+        pub async fn call_validate(&mut self) -> bool {
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let block1 = blockchain.get_latest_block().unwrap();
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let valid = block1
+                .validate(&blockchain, &blockchain.utxoset, configs.deref())
+                .await;
+            valid
+        }
+
         //convenience function assuming longest chain
         pub async fn balance_map(&mut self) -> AHashMap<SaitoPublicKey, u64> {
             let (mut blockchain, _blockchain_) =
