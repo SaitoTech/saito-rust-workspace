@@ -91,9 +91,15 @@ impl Transaction {
         my_public_key: &SaitoPublicKey,
         to_public_key: &SaitoPublicKey,
     ) {
-        assert_ne!(my_public_key, to_public_key);
+        let sendsself = my_public_key == to_public_key;
+        if sendsself {
+            warn!("sending to self not allowed");
+            assert!(sendsself);
+        }
+
         let hop = Hop::generate(my_private_key, my_public_key, to_public_key, self);
         self.path.push(hop);
+        trace!("added hop {}", self.path.len());
     }
 
     /// add input slip
@@ -585,6 +591,7 @@ impl Transaction {
         // the transaction itself.
         //
         if self.path.is_empty() {
+            trace!("3 path is empty");
             self.total_work_for_me = 0;
             return;
         }

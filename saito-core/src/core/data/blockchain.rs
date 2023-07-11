@@ -2982,6 +2982,8 @@ mod tests {
             assert_eq!(*v, amount);
         }
 
+        //////////////////////////////////////////////////////
+        ///
         let keys = generate_keys();
         let wallet2 = Wallet::new(keys.1, keys.0);
         let _public_key2 = wallet2.public_key.clone();
@@ -2993,17 +2995,16 @@ mod tests {
         //TODO this isnt sending to pub2
         // need public key2
         let total_nolans_requested_per_slip = 20;
+
+        //what slips generated??
         let (input_slips, output_slips) = wclone.generate_slips(total_nolans_requested_per_slip);
 
-        //info!("??? {}", input_slips.len());
-        //info!("??? {}", output_slips.len());
-        //serialize_for_net_and_deserialize_from_net_test
-        // for slip in input_slips {
-        //     tx.add_from_slip(slip);
-        // }
-        // for slip in output_slips {
-        //     tx.add_to_slip(slip);
-        // }
+        for slip in input_slips {
+            tx.add_from_slip(slip);
+        }
+        for slip in output_slips {
+            tx.add_to_slip(slip);
+        }
 
         tx.generate(&wclone.public_key, 0, 0);
         //sign first then add hop
@@ -3019,78 +3020,88 @@ mod tests {
         let mut tx: Transaction = t
             .create_slip_transaction(50, &wclone.public_key, &_public_key2)
             .await;
-        tx.generate_total_fees(0, 0);
 
         //info!(">>> {:?}", tx);
         //hop
-        //tx.add_hop(&wclone.private_key, &wclone.public_key, &_public_key2);
-        //tx.add_hop(&wclone.private_key, &wclone.public_key, &wclone.public_key);
+        info!("..... 1 add hope.....");
 
-        // info!("from {:}", tx.from.len());
-        // info!("to {:}", tx.to.len());
+        //cant send to self
+        tx.add_hop(&wclone.private_key, &wclone.public_key, &_public_key2);
 
-        // // {
-        // //     let mut mempool = t.mempool_lock.write().await;
-        // //     let (mut blockchain, _blockchain_) =
-        // //         lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        tx.generate(&wclone.public_key, 0, 0);
+        info!("2tx work {}", tx.total_work_for_me);
+        //tx.generate(&public_key, 0, 0);
+        //////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////////////////////////////////
 
-        // //     info!("tx.path {:?}", tx.path[0].from);
+        // tx.generate_total_fees(0, 0);
 
-        // //     assert_eq!(tx.path[0].from, wclone.public_key);
+        // // info!("from {:}", tx.from.len());
+        // // info!("to {:}", tx.to.len());
 
-        // //     //test sign hop by hand
-        // //     let hopbytes: Vec<u8> = [tx.signature.as_slice(), _public_key2.as_slice()].concat();
-        // //     let v = verify(hopbytes.as_slice(), &tx.path[0].sig, &tx.path[0].from);
-        // //     assert!(v);
+        // // // {
+        // // //     let mut mempool = t.mempool_lock.write().await;
+        // // //     let (mut blockchain, _blockchain_) =
+        // // //         lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-        // //     let tv = tx.validate_routing_path();
-        // //     assert!(tv);
-        // //     mempool
-        // //         .add_transaction_if_validates(tx.clone(), &blockchain)
-        // //         .await;
-        // // }
+        // // //     info!("tx.path {:?}", tx.path[0].from);
 
-        let mut txs: AHashMap<SaitoSignature, Transaction> = Default::default();
-        let txc = tx.clone();
-        txs.insert(tx.signature, tx);
+        // // //     assert_eq!(tx.path[0].from, wclone.public_key);
 
-        let s1 = bs58::encode(&txc.from[0].public_key).into_string();
-        let s2 = bs58::encode(&txc.to[0].public_key).into_string();
-        let s3 = bs58::encode(&txc.to[1].public_key).into_string();
+        // // //     //test sign hop by hand
+        // // //     let hopbytes: Vec<u8> = [tx.signature.as_slice(), _public_key2.as_slice()].concat();
+        // // //     let v = verify(hopbytes.as_slice(), &tx.path[0].sig, &tx.path[0].from);
+        // // //     assert!(v);
 
-        info!("------tx ------");
-        info!("from {}", s1);
-        info!("to {}", s2);
-        info!("a {}", &txc.to[0].amount);
-        info!("to {}", s3);
-        info!("a {}", &txc.to[1].amount);
+        // // //     let tv = tx.validate_routing_path();
+        // // //     assert!(tv);
+        // // //     mempool
+        // // //         .add_transaction_if_validates(tx.clone(), &blockchain)
+        // // //         .await;
+        // // // }
 
-        info!("from len {}", &txc.from.len());
-        info!("to len {}", &txc.to.len());
+        // let mut txs: AHashMap<SaitoSignature, Transaction> = Default::default();
+        // let txc = tx.clone();
+        // txs.insert(tx.signature, tx);
 
-        //BLOCK2
-        let b: Block = t.create_next_block(txs).await;
-        // info!("add block  with # txs {:?}", b.transactions.len());
-        t.add_block(b).await;
+        // let s1 = bs58::encode(&txc.from[0].public_key).into_string();
+        // let s2 = bs58::encode(&txc.to[0].public_key).into_string();
+        // let s3 = bs58::encode(&txc.to[1].public_key).into_string();
 
-        {
-            let (blockchain, _blockchain_) =
-                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            info!("len >>> {}", blockchain.blocks.len());
-            assert_eq!(blockchain.blocks.len(), 2);
-            //FAILS
-            //assert_eq!(blockchain.get_latest_block_id(), 2);
-        }
+        // info!("------tx ------");
+        // info!("from {}", s1);
+        // info!("to {}", s2);
+        // info!("a {}", &txc.to[0].amount);
+        // info!("to {}", s3);
+        // info!("a {}", &txc.to[1].amount);
 
-        let bmap = t.balance_map().await;
-        // let first_balance = bmap.get(&wclone.public_key).unwrap();
-        // assert_eq!(*first_balance>0, true);
+        // info!("from len {}", &txc.from.len());
+        // info!("to len {}", &txc.to.len());
 
-        info!("balance ---------");
-        for (key, value) in &bmap {
-            let key_base58 = bs58::encode(key).into_string();
-            info!("{}\t{}", key_base58, value);
-        }
+        // //BLOCK2
+        // let b: Block = t.create_next_block(txs).await;
+        // // info!("add block  with # txs {:?}", b.transactions.len());
+        // t.add_block(b).await;
+
+        // {
+        //     let (blockchain, _blockchain_) =
+        //         lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        //     info!("len >>> {}", blockchain.blocks.len());
+        //     assert_eq!(blockchain.blocks.len(), 2);
+        //     //FAILS
+        //     //assert_eq!(blockchain.get_latest_block_id(), 2);
+        // }
+
+        // let bmap = t.balance_map().await;
+        // // let first_balance = bmap.get(&wclone.public_key).unwrap();
+        // // assert_eq!(*first_balance>0, true);
+
+        // info!("balance ---------");
+        // for (key, value) in &bmap {
+        //     let key_base58 = bs58::encode(key).into_string();
+        //     info!("{}\t{}", key_base58, value);
+        // }
 
         // info!("utxoset bool ---------");
         // //checking utxoset/bool

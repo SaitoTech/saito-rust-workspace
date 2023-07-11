@@ -843,12 +843,14 @@ pub mod test {
             let mut output = Slip::default();
             output.public_key = *to_public_key;
             output.amount = nolans;
-            transaction.add_to_slip(output);
+            //transaction.add_to_slip(output);
 
             let mut output2 = Slip::default();
             output2.public_key = *to_public_key2;
             output2.amount = nolans;
             transaction.add_to_slip(output2);
+
+            transaction.add_hop(&wallet.private_key, &wallet.public_key, &to_public_key2);
 
             //TODO
             // let remaining_bytes: i64 =
@@ -859,6 +861,7 @@ pub mod test {
             // }
 
             //transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
+            info!("..............");
             transaction.generate(&wallet.public_key, 0, 0);
             transaction.sign(&wallet.private_key);
             //transaction.add_hop(&wallet.private_key, &wallet.public_key, to_public_key);
