@@ -466,7 +466,7 @@ pub mod test {
         }
 
         //
-        // create block
+        // create block for testing
         //
         pub async fn create_block(
             &mut self,
@@ -477,7 +477,6 @@ pub mod test {
             txs_fee: Currency,
             include_valid_golden_ticket: bool,
         ) -> Block {
-            let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
 
@@ -501,9 +500,7 @@ pub mod test {
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            //
-            // create block
-            //
+
             let mut block = Block::create(
                 &mut transactions,
                 parent_hash,
