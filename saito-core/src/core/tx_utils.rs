@@ -1,15 +1,19 @@
+use crate::common::defs::{
+    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+};
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
 use crate::{lock_for_read, lock_for_write};
 use log::info;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::common::defs::{
-    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
-};
 
-pub async fn gen_tx(_wallet_lock: Arc<RwLock<Wallet>>, latest_block_id: u64, pubkey: SaitoPrivateKey) -> Vec<Transaction> {
+pub async fn gen_tx(
+    _wallet_lock: Arc<RwLock<Wallet>>,
+    latest_block_id: u64,
+    pubkey: SaitoPublicKey,
+) -> Vec<Transaction> {
     info!("generating mock transactions");
     let mut transactions = Vec::new();
     let txs_to_generate = 10;
@@ -30,8 +34,7 @@ pub async fn gen_tx(_wallet_lock: Arc<RwLock<Wallet>>, latest_block_id: u64, pub
 
             transactions.push(vip_transaction);
 
-            let mut vip_transaction =
-                Transaction::create_vip_transaction(pubkey, 50_000_000);
+            let mut vip_transaction = Transaction::create_vip_transaction(pubkey, 50_000_000);
             vip_transaction.sign(&private_key);
 
             transactions.push(vip_transaction);
@@ -54,4 +57,3 @@ pub async fn gen_tx(_wallet_lock: Arc<RwLock<Wallet>>, latest_block_id: u64, pub
     info!("generated transaction count: {:?}", txs_to_generate);
     transactions
 }
-

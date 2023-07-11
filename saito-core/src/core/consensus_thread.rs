@@ -195,17 +195,16 @@ impl ConsensusThread {
         let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
         let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
         let latest_block_id = blockchain.get_latest_block_id();
-        let txs = gen_tx(wallet, latest_block_id).await;
-        let c = 0;
         let spammer_public_key: SaitoPublicKey =
             hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
                 .unwrap()
                 .try_into()
                 .unwrap();
+        let txs = gen_tx(wallet, latest_block_id, spammer_public_key).await;
+        let mut c = 0;
+
         for tx in txs {
-            mempool
-                .add_transaction_if_validates(tx, &blockchain, spammer_public_key)
-                .await;
+            mempool.add_transaction_if_validates(tx, &blockchain).await;
             c += 1;
         }
 
