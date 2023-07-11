@@ -9,8 +9,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -21,15 +21,14 @@ use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
-use crate::core::data::slip;
+
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::routing_thread::RoutingEvent;
+use crate::core::tx_utils::gen_tx;
 use crate::{lock_for_read, lock_for_write};
-
-use super::data::wallet;
 
 pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(100).as_millis() as u64;
 pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000).as_millis() as u64;
@@ -187,71 +186,30 @@ impl ConsensusThread {
     ///
     /// ```
     async fn generate_tx(
-        mempool: Arc<RwLock<Mempool>>,
+        mempool_lock: Arc<RwLock<Mempool>>,
         wallet: Arc<RwLock<Wallet>>,
-        blockchain: Arc<RwLock<Blockchain>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating mock transactions");
-        let txs_to_generate = 10;
-        let bytes_per_tx = 1024;
-        let public_key;
-        let private_key;
 
-        {
-            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
-            public_key = wallet.public_key;
-            private_key = wallet.private_key;
-        }
-
-        let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
-
+        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
         let latest_block_id = blockchain.get_latest_block_id();
-
+        let txs = gen_tx(wallet, latest_block_id).await;
+        let c = 0;
         let spammer_public_key: SaitoPublicKey =
             hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
                 .unwrap()
                 .try_into()
                 .unwrap();
-
-        {
-            if latest_block_id == 0 {
-                let mut vip_transaction =
-                    Transaction::create_vip_transaction(public_key, 50_000_000);
-                vip_transaction.sign(&private_key);
-
-                mempool
-                    .add_transaction_if_validates(vip_transaction, &blockchain)
-                    .await;
-
-                let mut vip_transaction =
-                    Transaction::create_vip_transaction(spammer_public_key, 50_000_000);
-                vip_transaction.sign(&private_key);
-
-                mempool
-                    .add_transaction_if_validates(vip_transaction, &blockchain)
-                    .await;
-            }
+        for tx in txs {
+            mempool
+                .add_transaction_if_validates(tx, &blockchain, spammer_public_key)
+                .await;
+            c += 1;
         }
 
-        let (mut wallet, _wallet_) = lock_for_write!(wallet, LOCK_ORDER_WALLET);
-
-        for _i in 0..txs_to_generate {
-            let mut transaction;
-            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000, false).unwrap();
-            // TODO : generate a message buffer which can be converted back into JSON
-            transaction.data = (0..bytes_per_tx).map(|_| rand::random::<u8>()).collect();
-            transaction.generate(&public_key, 0, 0);
-            transaction.sign(&private_key);
-
-            transaction.add_hop(&private_key, &public_key, &public_key);
-            {
-                mempool
-                    .add_transaction_if_validates(transaction, &blockchain)
-                    .await;
-            }
-        }
-        info!("generated transaction count: {:?}", txs_to_generate);
+        info!("generated transaction count: {:?}", c);
     }
 }
 
@@ -285,7 +243,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
                     println!(" block ider {:?}", &block.transactions);
 
-                    let res = blockchain
+                    let _res = blockchain
                         .add_block(
                             block,
                             &self.network,
