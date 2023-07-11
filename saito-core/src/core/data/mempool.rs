@@ -153,15 +153,20 @@ impl Mempool {
         current_timestamp: Timestamp,
         gt_tx: Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),
+        is_genesis: bool,
     ) -> Option<Block> {
-        let mempool_work = self
-            .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
-            .await?;
-        info!(
-            "bundling block with {:?} txs with work : {:?}",
-            self.transactions.len(),
-            mempool_work
-        );
+        if !is_genesis {
+            let mempool_work = self
+                .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
+                .await?;
+            info!(
+                "bundling block with {:?} txs with work : {:?}",
+                self.transactions.len(),
+                mempool_work
+            );
+        } else {
+            previous_block_hash = [0; 32];
+        }
 
         let previous_block_hash: SaitoHash;
         let public_key;
