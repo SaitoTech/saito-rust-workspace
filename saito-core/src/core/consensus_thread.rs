@@ -143,7 +143,7 @@ impl ConsensusThread {
     }
     async fn generate_issuance_tx(
         &self,
-        mempool: Arc<RwLock<Mempool>>,
+        _mempool: Arc<RwLock<Mempool>>,
         blockchain: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating issuance init transaction");
@@ -159,7 +159,7 @@ impl ConsensusThread {
         }
 
         let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+        let (mut mempool, _mempool_) = lock_for_write!(_mempool, LOCK_ORDER_MEMPOOL);
 
         // debug!("{:?} transaction from slips", txs);
         for tx in txs {
@@ -169,7 +169,7 @@ impl ConsensusThread {
             info!("added issuance init tx for : {:?}", tx.signature);
         }
 
-        // debug!("{:?} mempool transacts", mempool.transactions);
+        debug!("{:?} mempool transacts", mempool.transactions);
     }
     /// Test method to generate test transactions
     ///
@@ -275,13 +275,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                    let block: Block;
                     let (mut mempool, _mempool_) =
                         lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
-                    block = mempool
-                        .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
-                        .await;
+                    let block: Block = (mempool
+                        .bundle_block(&mut blockchain, timestamp, None, configs.deref(), true)
+                        .await)
+                        .unwrap();
 
                     println!(" block ider {:?}", &block.transactions);
 
@@ -365,6 +365,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         timestamp,
                         gt_result.clone(),
                         configs.deref(),
+                        false,
                     )
                     .await;
             }

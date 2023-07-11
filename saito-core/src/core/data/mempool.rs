@@ -201,38 +201,6 @@ impl Mempool {
         Some(block)
     }
 
-    pub async fn bundle_genesis_block(
-        &mut self,
-        blockchain: &mut Blockchain,
-        current_timestamp: Timestamp,
-        configs: &(dyn Configuration + Send + Sync),
-    ) -> Block {
-        debug!("bundling genesis block...");
-        let public_key;
-        let private_key;
-
-        let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
-        public_key = wallet.public_key;
-        private_key = wallet.private_key;
-
-        let mut block = Block::create(
-            &mut self.transactions,
-            [0; 32],
-            blockchain,
-            current_timestamp,
-            &public_key,
-            &private_key,
-            None,
-            configs,
-        )
-        .await;
-        block.generate();
-        self.new_tx_added = false;
-        self.routing_work_in_mempool = 0;
-
-        block
-    }
-
     pub async fn can_bundle_block(
         &self,
         blockchain: &Blockchain,
