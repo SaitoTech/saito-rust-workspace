@@ -155,6 +155,7 @@ impl Mempool {
         configs: &(dyn Configuration + Send + Sync),
         is_genesis: bool,
     ) -> Option<Block> {
+        let previous_block_hash: SaitoHash;
         if !is_genesis {
             let mempool_work = self
                 .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
@@ -168,7 +169,6 @@ impl Mempool {
             previous_block_hash = [0; 32];
         }
 
-        let previous_block_hash: SaitoHash;
         let public_key;
         let private_key;
         {
