@@ -545,6 +545,39 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
     async fn on_init(&mut self) {
         debug!("on_init");
+
+        {
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain_configs = configs.get_blockchain_configs();
+            if let Some(blockchain_configs) = blockchain_configs {
+                info!(
+                    "loading blockchain state from configs : {:?}",
+                    blockchain_configs
+                );
+                blockchain.last_block_hash = hex::decode(blockchain_configs.last_block_hash)
+                    .expect("last block hash cannot be parsed")
+                    .try_into()
+                    .unwrap();
+                blockchain.last_block_id = blockchain_configs.last_block_id;
+                blockchain.last_timestamp = blockchain_configs.last_timestamp;
+                blockchain.genesis_block_id = blockchain_configs.genesis_block_id;
+                blockchain.genesis_timestamp = blockchain_configs.genesis_timestamp;
+                blockchain.lowest_acceptable_timestamp =
+                    blockchain_configs.lowest_acceptable_timestamp;
+                blockchain.lowest_acceptable_block_hash =
+                    hex::decode(blockchain_configs.lowest_acceptable_block_hash)
+                        .expect("lowest block hash cannot be parsed")
+                        .try_into()
+                        .unwrap();
+                blockchain.lowest_acceptable_block_id =
+                    blockchain_configs.lowest_acceptable_block_id;
+            } else {
+                info!("blockchain state is not loaded");
+            }
+        }
+
         self.storage
             .load_blocks_from_disk(self.mempool.clone())
             .await;
@@ -555,7 +588,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
         {
             let (mempool, _mempool_) = lock_for_read!(self.mempool, LOCK_ORDER_MEMPOOL);
-            if configs.get_peer_configs().is_empty() && mempool.blocks_queue.is_empty() {
+            if configs.get_peer_configs().is_empty()
+                && mempool.blocks_queue.is_empty()
+                && configs.get_blockchain_configs().is_none()
+            {
                 self.generate_genesis_block = true;
             }
         }

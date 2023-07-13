@@ -41,7 +41,7 @@ pub mod test {
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
-    use crate::core::data::configuration::{Configuration, PeerConfig, Server};
+    use crate::core::data::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
@@ -671,6 +671,10 @@ pub mod test {
         }
 
         fn get_peer_configs(&self) -> &Vec<PeerConfig> {
+            todo!()
+        }
+
+        fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
             todo!()
         }
 

@@ -60,11 +60,11 @@ pub struct Blockchain {
     pub last_timestamp: u64,
     pub last_burnfee: Currency,
 
-    genesis_timestamp: u64,
+    pub genesis_timestamp: u64,
     genesis_block_hash: SaitoHash,
-    lowest_acceptable_timestamp: u64,
-    lowest_acceptable_block_hash: SaitoHash,
-    lowest_acceptable_block_id: u64,
+    pub lowest_acceptable_timestamp: u64,
+    pub lowest_acceptable_block_hash: SaitoHash,
+    pub lowest_acceptable_block_id: u64,
 
     last_callback_block_id: u64,
 }
@@ -1129,6 +1129,7 @@ impl Blockchain {
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
             let block_id = block.id;
+            // let block_hash = block.hash;
             drop(block);
             // utxoset update
             {
@@ -1136,7 +1137,8 @@ impl Blockchain {
                 block.on_chain_reorganization(&mut self.utxoset, true);
             }
 
-            self.on_chain_reorganization(block_id, true, storage).await;
+            self.on_chain_reorganization(block_id, block_hash.clone(), true, storage)
+                .await;
 
             //
             // we have received the first entry in new_blocks() which means we
@@ -1274,6 +1276,7 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         let block_id;
+        let block_hash;
         {
             let block = self
                 .blocks
@@ -1283,6 +1286,7 @@ impl Blockchain {
                 .upgrade_block_to_block_type(BlockType::Full, storage)
                 .await;
             block_id = block.id;
+            block_hash = block.hash;
 
             // utxoset update
             block.on_chain_reorganization(&mut self.utxoset, false);
@@ -1298,7 +1302,8 @@ impl Blockchain {
                 wallet.on_chain_reorganization(&block, false);
             }
         }
-        self.on_chain_reorganization(block_id, false, storage).await;
+        self.on_chain_reorganization(block_id, block_hash, false, storage)
+            .await;
         if current_unwind_index == old_chain.len() - 1 {
             //
             // start winding new chain
@@ -1350,25 +1355,38 @@ impl Blockchain {
     async fn on_chain_reorganization(
         &mut self,
         block_id: u64,
+        block_hash: SaitoHash,
         longest_chain: bool,
         storage: &Storage,
     ) {
-        //
         // skip out if earlier than we need to be vis-a-vis last_block_id
-        //
         if self.get_latest_block_id() >= block_id {
             return;
         }
 
         if longest_chain {
-            //
+            {
+                let block = self.blocks.get(&block_hash);
+                if let Some(block) = block {
+                    self.last_block_id = block_id;
+                    self.last_block_hash = block.hash;
+                    self.last_timestamp = block.timestamp;
+                    self.last_burnfee = block.burnfee;
+
+                    if self.lowest_acceptable_timestamp == 0 {
+                        self.lowest_acceptable_block_id = block_id;
+                        self.lowest_acceptable_block_hash = block.hash;
+                        self.lowest_acceptable_timestamp = block.timestamp;
+                    }
+                } else {
+                    warn!("block not found for hash : {:?}", hex::encode(block_hash));
+                }
+            }
+
             // update genesis period, purge old data
-            //
             self.update_genesis_period(storage).await;
 
-            //
             // generate fork_id
-            //
             let fork_id = self.generate_fork_id(block_id);
             self.set_fork_id(fork_id);
         }
@@ -1602,7 +1620,7 @@ mod tests {
     use std::ops::Deref;
     use std::sync::Arc;
 
-    use log::{debug, error, info, trace, warn};
+    use log::{debug, error};
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
@@ -1613,7 +1631,6 @@ mod tests {
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
-    use crate::core::data::storage::UTXOSTATE_FILE_PATH;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 

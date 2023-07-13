@@ -4,19 +4,23 @@ use figment::providers::{Format, Json};
 use figment::Figment;
 use log::error;
 use serde::Deserialize;
+use wasm_bindgen::prelude::*;
 
-use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
+use saito_core::core::data::configuration::{
+    BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
+};
 
-// #[wasm_bindgen]
+#[wasm_bindgen]
 #[derive(Deserialize, Debug)]
 pub struct WasmConfiguration {
     server: Option<Server>,
     peers: Vec<PeerConfig>,
+    blockchain: Option<BlockchainConfig>,
     spv_mode: bool,
     browser_mode: bool,
 }
 
-// #[wasm_bindgen]
+#[wasm_bindgen]
 impl WasmConfiguration {
     pub fn new() -> WasmConfiguration {
         WasmConfiguration {
@@ -37,10 +41,13 @@ impl WasmConfiguration {
                 block_fetch_batch_size: 0,
             }),
             peers: vec![],
+            blockchain: None,
             spv_mode: false,
             browser_mode: false,
         }
     }
+}
+impl WasmConfiguration {
     pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
         // info!("new from json : {:?}", json);
         let configs = Figment::new()
@@ -57,7 +64,6 @@ impl WasmConfiguration {
         Ok(configs)
     }
 }
-
 impl Configuration for WasmConfiguration {
     fn get_server_configs(&self) -> Option<&Server> {
         return self.server.as_ref();
@@ -65,6 +71,10 @@ impl Configuration for WasmConfiguration {
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
         return &self.peers;
+    }
+
+    fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
+        self.blockchain.clone()
     }
 
     fn get_block_fetch_url(&self) -> String {

@@ -218,17 +218,17 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn save_blockchain(&self) -> Result<(), Error> {
-        MsgHandler::save_blockchain();
-        // TODO : return error state
-        Ok(())
-    }
-
-    async fn load_blockchain(&self) -> Result<(), Error> {
-        MsgHandler::load_blockchain();
-        // TODO : return error state
-        Ok(())
-    }
+    // async fn save_blockchain(&self) -> Result<(), Error> {
+    //     MsgHandler::save_blockchain();
+    //     // TODO : return error state
+    //     Ok(())
+    // }
+    //
+    // async fn load_blockchain(&self) -> Result<(), Error> {
+    //     MsgHandler::load_blockchain();
+    //     // TODO : return error state
+    //     Ok(())
+    // }
 
     fn get_my_services(&self) -> Vec<PeerService> {
         // let mut services = vec![];
