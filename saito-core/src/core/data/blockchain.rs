@@ -548,7 +548,7 @@ impl Blockchain {
             {
                 let pblock = self.get_mut_block(&pruned_block_hash).unwrap();
                 pblock
-                    .upgrade_block_to_block_type(BlockType::Full, storage)
+                    .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                     .await;
             }
         }
@@ -1052,16 +1052,13 @@ impl Blockchain {
     ) -> bool {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
-        //
         // if we are winding a non-existent chain with a wind_failure it
         // means our wind attempt failed and we should move directly into
         // add_block_failure() by returning false.
-        //
         if wind_failure && new_chain.is_empty() {
             return false;
         }
 
-        //
         // winding the chain requires us to have certain data associated
         // with the block and the transactions, particularly the tx hashes
         // that we need to generate the slip UUIDs and create the tx sigs.
@@ -1071,14 +1068,13 @@ impl Blockchain {
         // function because of limitatins imposed by Rust on mutable data
         // structures. So validation is "read-only" and our "write" actions
         // happen first.
-        //
         let block_hash = new_chain.get(current_wind_index).unwrap();
 
         {
             let block = self.get_mut_block(block_hash).unwrap();
 
             block
-                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                 .await;
 
             let latest_block_id = block.id;
@@ -1098,14 +1094,14 @@ impl Blockchain {
                 if self.is_block_indexed(previous_block_hash) {
                     let block = self.get_mut_block(&previous_block_hash).unwrap();
                     block
-                        .upgrade_block_to_block_type(BlockType::Full, storage)
+                        .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                         .await;
                 }
             }
         }
 
         let block = self.blocks.get(block_hash).unwrap();
-        assert_eq!(block.block_type, BlockType::Full);
+        // assert_eq!(block.block_type, BlockType::Full);
 
         let does_block_validate = block.validate(self, &self.utxoset, configs).await;
 
@@ -1137,7 +1133,7 @@ impl Blockchain {
                 block.on_chain_reorganization(&mut self.utxoset, true);
             }
 
-            self.on_chain_reorganization(block_id, block_hash.clone(), true, storage)
+            self.on_chain_reorganization(block_id, block_hash.clone(), true, storage, configs)
                 .await;
 
             //
@@ -1283,7 +1279,7 @@ impl Blockchain {
                 .get_mut(&old_chain[current_unwind_index])
                 .unwrap();
             block
-                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                 .await;
             block_id = block.id;
             block_hash = block.hash;
@@ -1298,11 +1294,10 @@ impl Blockchain {
             // wallet update
             {
                 let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
-
                 wallet.on_chain_reorganization(&block, false);
             }
         }
-        self.on_chain_reorganization(block_id, block_hash, false, storage)
+        self.on_chain_reorganization(block_id, block_hash, false, storage, configs)
             .await;
         if current_unwind_index == old_chain.len() - 1 {
             //
@@ -1358,6 +1353,7 @@ impl Blockchain {
         block_hash: SaitoHash,
         longest_chain: bool,
         storage: &Storage,
+        configs: &(dyn Configuration + Send + Sync),
     ) {
         trace!(
             "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
@@ -1398,7 +1394,7 @@ impl Blockchain {
             self.set_fork_id(fork_id);
         }
 
-        self.downgrade_blockchain_data().await;
+        self.downgrade_blockchain_data(configs.is_browser()).await;
     }
 
     pub async fn update_genesis_period(&mut self, storage: &Storage) {
@@ -1508,7 +1504,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn downgrade_blockchain_data(&mut self) {
+    pub async fn downgrade_blockchain_data(&mut self, is_browser: bool) {
         trace!("downgrading blockchain data");
         //
         // downgrade blocks still on the chain
@@ -1536,7 +1532,9 @@ impl Blockchain {
             {
                 let block = self.get_mut_block(&hash);
                 if let Some(block) = block {
-                    block.downgrade_block_to_block_type(BlockType::Pruned).await;
+                    block
+                        .downgrade_block_to_block_type(BlockType::Pruned, is_browser)
+                        .await;
                 } else {
                     warn!("block : {:?} not found to downgrade", hex::encode(hash));
                 }

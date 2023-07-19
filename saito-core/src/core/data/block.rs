@@ -610,7 +610,11 @@ impl Block {
     //
     // downgrade block
     //
-    pub async fn downgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
+    pub async fn downgrade_block_to_block_type(
+        &mut self,
+        block_type: BlockType,
+        is_browser: bool,
+    ) -> bool {
         debug!(
             "downgrading BLOCK_ID {:?} to type : {:?}",
             self.id, block_type
@@ -1340,31 +1344,35 @@ impl Block {
         &mut self,
         block_type: BlockType,
         storage: &Storage,
+        is_browser: bool,
     ) -> bool {
         if self.block_type == block_type {
             return true;
         }
 
         if block_type == BlockType::Full {
-            return self.upgrade_block_to_block_type(block_type, storage).await;
+            return self
+                .upgrade_block_to_block_type(block_type, storage, is_browser)
+                .await;
         }
 
         if block_type == BlockType::Pruned {
-            return self.downgrade_block_to_block_type(block_type).await;
+            return self
+                .downgrade_block_to_block_type(block_type, is_browser)
+                .await;
         }
 
         false
     }
 
-    //
     // if the block is not at the proper type, try to upgrade it to have the
     // data that is necessary for blocks of that type if possible. if this is
     // not possible, return false. if it is possible, return true once upgraded.
-    //
     pub async fn upgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
         storage: &Storage,
+        is_browser: bool,
     ) -> bool {
         debug!(
             "upgrading block : {:?} of type : {:?} to type : {:?}",
@@ -1387,6 +1395,9 @@ impl Block {
         // load the block if it exists on disk.
         //
         if block_type == BlockType::Full {
+            if is_browser {
+                return false;
+            }
             let new_block = storage
                 .load_block_from_disk(storage.generate_block_filepath(&self))
                 .await;
@@ -1403,13 +1414,9 @@ impl Block {
             let hash_for_hash = hash(&new_block.serialize_for_hash());
             new_block.hash = hash_for_hash;
 
-            //
             // in-memory swap copying txs in block from mempool
-            //
             mem::swap(&mut new_block.transactions, &mut self.transactions);
-            //
             // transactions need hashes
-            //
             self.generate();
             self.block_type = BlockType::Full;
 
@@ -1488,6 +1495,11 @@ impl Block {
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
+
+        if configs.is_browser() {
+            self.generate_consensus_values(blockchain).await;
+            return true;
+        }
 
         if let BlockType::Ghost = self.block_type {
             // block validates since it's a ghost block

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
 use std::fs::File;
-use std::io::Write;
+use std::io::{Error, ErrorKind, Write};
 use tokio::sync::RwLock;
 
 use super::slip::SlipType;
@@ -129,7 +129,11 @@ impl Storage {
         debug!("loading block {:?} from disk", file_name);
         let result = self.io_interface.read_value(file_name).await;
         if result.is_err() {
-            todo!()
+            error!(
+                "failed loading block from disk : {:?}",
+                result.err().unwrap()
+            );
+            return Err(Error::from(ErrorKind::NotFound));
         }
         let buffer = result.unwrap();
         Block::deserialize_from_net(buffer)
