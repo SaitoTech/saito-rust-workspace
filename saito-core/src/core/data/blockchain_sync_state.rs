@@ -203,18 +203,13 @@ impl BlockchainSyncState {
             block_id,
             peer_index
         );
+        if self.blocks_to_fetch.is_empty() {
+            self.set_latest_blockchain_id(block_id);
+        }
         self.received_block_picture
             .entry(peer_index)
             .or_default()
             .push_back((block_id, block_hash));
-        // let result = self.received_block_picture.get_mut(&peer_index);
-        // if let Some(deq) = result {
-        //     deq.push_back((block_id, block_hash));
-        // } else {
-        //     let mut deq: VecDeque<(BlockId, SaitoHash)> = Default::default();
-        //     deq.push_back((block_id, block_hash));
-        //     self.received_block_picture.insert(peer_index, deq);
-        // }
     }
     /// Removes entry when the hash is added to the blockchain. If so we can move the block ceiling up.
     ///

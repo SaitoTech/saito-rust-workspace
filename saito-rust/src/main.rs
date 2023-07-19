@@ -244,19 +244,19 @@ async fn run_consensus_event_processor(
     if result.is_ok() {
         create_test_tx = result.unwrap().eq("1");
     }
-    let generate_genesis_block: bool;
-    {
-        let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
-
-        // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
-        generate_genesis_block = configs.get_peer_configs().is_empty();
-    }
+    // let generate_genesis_block: bool;
+    // {
+    //     let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
+    //
+    //     // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
+    //     generate_genesis_block = configs.get_peer_configs().is_empty();
+    // }
 
     let consensus_event_processor = ConsensusThread {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
         wallet: context.wallet.clone(),
-        generate_genesis_block,
+        generate_genesis_block: false,
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
@@ -299,9 +299,9 @@ async fn run_consensus_event_processor(
 
 async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
-    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     context: &Context,
-    peers: Arc<RwLock<PeerCollection>>,
+    peers_lock: Arc<RwLock<PeerCollection>>,
     sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MiningEvent>,
@@ -318,16 +318,16 @@ async fn run_routing_event_processor(
         sender_to_miner: sender_to_miner.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         static_peers: vec![],
-        configs: configs.clone(),
+        configs: configs_lock.clone(),
         wallet: context.wallet.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_io_controller.clone(),
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
-            peers.clone(),
+            peers_lock.clone(),
             context.wallet.clone(),
-            configs.clone(),
+            configs_lock.clone(),
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
@@ -340,7 +340,7 @@ async fn run_routing_event_processor(
     };
 
     {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -548,8 +548,8 @@ fn setup_hook() {
     }));
 }
 
-async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
-    info!("Running saito with config {:?}", configs.read().await);
+async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
+    info!("Running saito with config {:?}", configs_lock.read().await);
 
     let channel_size;
     let thread_sleep_time_in_ms;
@@ -558,7 +558,7 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     let fetch_batch_size;
 
     {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs
@@ -580,9 +580,9 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     info!("running saito controllers");
 
     let keys = generate_keys();
-    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    let wallet_lock = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
     {
-        let mut wallet = wallet.write().await;
+        let mut wallet = wallet_lock.write().await;
         Wallet::load(
             &mut wallet,
             Box::new(RustIOHandler::new(
@@ -592,9 +592,9 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         )
         .await;
     }
-    let context = Context::new(configs.clone(), wallet);
+    let context = Context::new(configs_lock.clone(), wallet_lock);
 
-    let peers = Arc::new(RwLock::new(PeerCollection::new()));
+    let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =
         tokio::sync::mpsc::channel::<ConsensusEvent>(channel_size);
@@ -609,7 +609,7 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
         context.blockchain.clone(),
-        peers.clone(),
+        peers_lock.clone(),
         context.wallet.clone(),
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
@@ -620,9 +620,9 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
 
     let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),
-        configs.clone(),
+        configs_lock.clone(),
         &context,
-        peers.clone(),
+        peers_lock.clone(),
         &sender_to_consensus,
         receiver_for_routing,
         &sender_to_miner,
@@ -637,7 +637,7 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
 
     let (_network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
         &context,
-        peers.clone(),
+        peers_lock.clone(),
         receiver_for_consensus,
         &sender_to_routing,
         sender_to_miner,
@@ -678,10 +678,10 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     let network_handle = tokio::spawn(run_network_controller(
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
-        configs.clone(),
+        configs_lock.clone(),
         context.blockchain.clone(),
         sender_to_stat.clone(),
-        peers.clone(),
+        peers_lock.clone(),
     ));
 
     let _result = tokio::join!(
@@ -696,6 +696,7 @@ async fn run_node(configs: Arc<RwLock<dyn Configuration + Send + Sync>>) {
 }
 
 #[tokio::main(flavor = "multi_thread")]
+// #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = App::new("Saito")
         .arg(

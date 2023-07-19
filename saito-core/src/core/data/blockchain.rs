@@ -1359,28 +1359,35 @@ impl Blockchain {
         longest_chain: bool,
         storage: &Storage,
     ) {
+        trace!(
+            "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
+            block_id,
+            hex::encode(block_hash)
+        );
         // skip out if earlier than we need to be vis-a-vis last_block_id
-        if self.get_latest_block_id() >= block_id {
+        if self.last_block_id >= block_id {
+            debug!(
+                "last block id : {:?} is later than this block id : {:?}. skipping reorg",
+                self.last_block_id, block_id
+            );
             return;
         }
 
         if longest_chain {
-            {
-                let block = self.blocks.get(&block_hash);
-                if let Some(block) = block {
-                    self.last_block_id = block_id;
-                    self.last_block_hash = block.hash;
-                    self.last_timestamp = block.timestamp;
-                    self.last_burnfee = block.burnfee;
+            let block = self.blocks.get(&block_hash);
+            if let Some(block) = block {
+                self.last_block_id = block_id;
+                self.last_block_hash = block.hash;
+                self.last_timestamp = block.timestamp;
+                self.last_burnfee = block.burnfee;
 
-                    if self.lowest_acceptable_timestamp == 0 {
-                        self.lowest_acceptable_block_id = block_id;
-                        self.lowest_acceptable_block_hash = block.hash;
-                        self.lowest_acceptable_timestamp = block.timestamp;
-                    }
-                } else {
-                    warn!("block not found for hash : {:?}", hex::encode(block_hash));
+                if self.lowest_acceptable_timestamp == 0 {
+                    self.lowest_acceptable_block_id = block_id;
+                    self.lowest_acceptable_block_hash = block.hash;
+                    self.lowest_acceptable_timestamp = block.timestamp;
                 }
+            } else {
+                warn!("block not found for hash : {:?}", hex::encode(block_hash));
             }
 
             // update genesis period, purge old data
@@ -1412,6 +1419,7 @@ impl Blockchain {
             //
             let purge_bid = latest_block_id - (GENESIS_PERIOD * 2);
             self.genesis_block_id = latest_block_id - GENESIS_PERIOD;
+            debug!("genesis block id set as : {:?}", self.genesis_block_id);
 
             //
             // in either case, we are OK to throw out everything below the
@@ -1537,7 +1545,7 @@ impl Blockchain {
     }
     pub async fn add_blocks_from_mempool(
         &mut self,
-        mempool: Arc<RwLock<Mempool>>,
+        mempool_lock: Arc<RwLock<Mempool>>,
         network: &Network,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
@@ -1545,7 +1553,7 @@ impl Blockchain {
     ) -> bool {
         debug!("adding blocks from mempool to blockchain");
         let mut blocks: VecDeque<Block>;
-        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
 
         blocks = mempool.blocks_queue.drain(..).collect();
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
@@ -1606,11 +1614,21 @@ impl Blockchain {
         }
     }
     pub async fn reset(&mut self) {
-        todo!()
+        self.last_burnfee = 0;
+        self.last_timestamp = 0;
+        self.last_block_id = 0;
+        self.last_block_hash = [0; 32];
+        self.genesis_timestamp = 0;
+        self.genesis_block_hash = [0; 32];
+        self.genesis_block_id = 0;
+        self.lowest_acceptable_block_id = 0;
+        self.lowest_acceptable_timestamp = 0;
+        self.lowest_acceptable_block_hash = [0; 32];
+        self.save().await;
     }
 
     pub async fn save(&self) {
-        todo!()
+        // TODO : what should be done here in rust code?
     }
 }
 

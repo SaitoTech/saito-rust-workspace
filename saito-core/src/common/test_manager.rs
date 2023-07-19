@@ -491,13 +491,13 @@ pub mod test {
         }
 
         pub async fn create_golden_ticket(
-            wallet: Arc<RwLock<Wallet>>,
+            wallet_lock: Arc<RwLock<Wallet>>,
             block_hash: SaitoHash,
             block_difficulty: u64,
         ) -> GoldenTicket {
             let public_key;
             {
-                let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+                let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
                 public_key = wallet.public_key;
             }
@@ -595,15 +595,15 @@ pub mod test {
             let mut tx = Transaction::create_issuance_transaction(wallet_read.public_key, amount);
             tx.sign(&wallet_read.private_key);
             drop(wallet_read);
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
 
-            let mut mempool = self.mempool_lock.write().await;
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
+
             mempool
                 .add_transaction_if_validates(tx.clone(), &blockchain)
                 .await;
-
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
 
             let timestamp = create_timestamp();
 

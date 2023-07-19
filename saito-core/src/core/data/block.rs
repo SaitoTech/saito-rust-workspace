@@ -1353,7 +1353,7 @@ impl Block {
             return self.downgrade_block_to_block_type(block_type).await;
         }
 
-        return false;
+        false
     }
 
     //
@@ -1367,11 +1367,13 @@ impl Block {
         storage: &Storage,
     ) -> bool {
         debug!(
-            "upgrading block : {:?} to type : {:?}",
+            "upgrading block : {:?} of type : {:?} to type : {:?}",
             hex::encode(self.hash),
-            self.block_type
+            self.block_type,
+            block_type
         );
         if self.block_type == block_type {
+            trace!("block type is already {:?}", self.block_type);
             return true;
         }
 
@@ -1385,10 +1387,17 @@ impl Block {
         // load the block if it exists on disk.
         //
         if block_type == BlockType::Full {
-            let mut new_block = storage
+            let new_block = storage
                 .load_block_from_disk(storage.generate_block_filepath(&self))
-                .await
-                .unwrap();
+                .await;
+            if new_block.is_err() {
+                error!(
+                    "block not found in disk to upgrade : {:?}",
+                    hex::encode(self.hash)
+                );
+                return false;
+            }
+            let mut new_block = new_block.unwrap();
             let hash_for_signature = hash(&new_block.serialize_for_signature());
             new_block.pre_hash = hash_for_signature;
             let hash_for_hash = hash(&new_block.serialize_for_hash());

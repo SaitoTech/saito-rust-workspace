@@ -80,13 +80,12 @@ impl Storage {
         filename
     }
 
-    pub async fn load_blocks_from_disk(&mut self, mempool: Arc<RwLock<Mempool>>) {
+    pub async fn load_blocks_from_disk(&mut self, mempool_lock: Arc<RwLock<Mempool>>) {
         info!("loading blocks from disk");
         let file_names = self.io_interface.load_block_file_list().await;
 
         if file_names.is_err() {
-            error!("failed loading blocks . {:?}", file_names.err().unwrap());
-            return;
+            panic!("failed loading blocks . {:?}", file_names.err().unwrap());
         }
 
         let mut file_names = file_names.unwrap();
@@ -117,7 +116,7 @@ impl Storage {
                 block.force_loaded = true;
                 block.generate();
                 info!("block : {:?} loaded from disk", hex::encode(block.hash));
-                let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+                let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
                 mempool.add_block(block);
             }
             trace!("block file loading finished");

@@ -22,6 +22,7 @@ pub struct WasmConfiguration {
 
 #[wasm_bindgen]
 impl WasmConfiguration {
+    #[wasm_bindgen(constructor)]
     pub fn new() -> WasmConfiguration {
         WasmConfiguration {
             server: Option::Some(Server {
@@ -47,6 +48,7 @@ impl WasmConfiguration {
         }
     }
 }
+
 impl WasmConfiguration {
     pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
         // info!("new from json : {:?}", json);
@@ -64,6 +66,7 @@ impl WasmConfiguration {
         Ok(configs)
     }
 }
+
 impl Configuration for WasmConfiguration {
     fn get_server_configs(&self) -> Option<&Server> {
         return self.server.as_ref();
