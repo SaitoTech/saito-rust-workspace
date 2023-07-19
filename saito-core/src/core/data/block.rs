@@ -2155,14 +2155,14 @@ mod tests {
 
         let serialized_full_block = block.serialize_for_net(BlockType::Full);
         block
-            .update_block_to_block_type(BlockType::Pruned, &mut t.storage)
+            .update_block_to_block_type(BlockType::Pruned, &mut t.storage, false)
             .await;
 
         assert_eq!(block.transactions.len(), 0);
         assert_eq!(block.block_type, BlockType::Pruned);
 
         block
-            .update_block_to_block_type(BlockType::Full, &mut t.storage)
+            .update_block_to_block_type(BlockType::Full, &mut t.storage, false)
             .await;
 
         assert_eq!(block.transactions.len(), 5);
