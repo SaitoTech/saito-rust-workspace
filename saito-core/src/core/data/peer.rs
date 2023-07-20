@@ -64,14 +64,14 @@ impl Peer {
         &mut self,
         challenge: HandshakeChallenge,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
-        wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
         info!("handling handshake challenge : {:?}", self.index,);
         let block_fetch_url;
         let is_lite;
         {
-            let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+            let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
             is_lite = configs.is_browser();
             if is_lite {
@@ -81,7 +81,7 @@ impl Peer {
             }
         }
 
-        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+        let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(challenge.challenge.as_slice(), &wallet.private_key),
@@ -104,8 +104,8 @@ impl Peer {
         &mut self,
         response: HandshakeResponse,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
-        wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
         info!(
             "handling handshake response :{:?} with address : {:?}",
@@ -133,12 +133,10 @@ impl Peer {
             todo!()
         }
 
-        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
-
         let block_fetch_url;
         let is_lite;
         {
-            let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+            let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
             is_lite = configs.is_browser();
             if is_lite {
@@ -151,6 +149,8 @@ impl Peer {
         self.public_key = Some(response.public_key);
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
+
+        let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
         if self.static_peer_config.is_none() {
             // this is only called in initiator's side.

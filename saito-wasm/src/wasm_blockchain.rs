@@ -1,10 +1,10 @@
-use js_sys::JsString;
 use std::sync::Arc;
 
-use saito_core::common::defs::{BlockId, SaitoHash};
+use js_sys::JsString;
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 
+use saito_core::common::defs::{BlockId, SaitoHash};
 use saito_core::core::data::blockchain::Blockchain;
 
 #[wasm_bindgen]
@@ -33,7 +33,36 @@ impl WasmBlockchain {
         let blockchain = self.blockchain.read().await;
         let hash = blockchain
             .blockring
-            .get_longest_chain_block_hash_by_block_id(id);
+            .get_longest_chain_block_hash_at_block_id(id);
         hex::encode(hash).into()
+    }
+    pub async fn get_last_block_hash(&self) -> JsString {
+        let blockchain = self.blockchain.read().await;
+        let hash = blockchain.last_block_hash;
+        hex::encode(hash).into()
+    }
+    pub async fn get_last_burnfee(&self) -> u64 {
+        let blockchain = self.blockchain.read().await;
+        blockchain.last_burnfee
+    }
+    pub async fn get_genesis_block_id(&self) -> u64 {
+        let blockchain = self.blockchain.read().await;
+        blockchain.genesis_block_id
+    }
+    pub async fn get_genesis_timestamp(&self) -> u64 {
+        let blockchain = self.blockchain.read().await;
+        blockchain.genesis_timestamp
+    }
+    pub async fn get_lowest_acceptable_timestamp(&self) -> u64 {
+        let blockchain = self.blockchain.read().await;
+        blockchain.lowest_acceptable_timestamp
+    }
+    pub async fn get_lowest_acceptable_block_hash(&self) -> JsString {
+        let blockchain = self.blockchain.read().await;
+        hex::encode(blockchain.lowest_acceptable_block_hash).into()
+    }
+    pub async fn get_lowest_acceptable_block_id(&self) -> u64 {
+        let blockchain = self.blockchain.read().await;
+        blockchain.lowest_acceptable_block_id
     }
 }

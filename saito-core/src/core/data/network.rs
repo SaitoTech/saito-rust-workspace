@@ -269,7 +269,7 @@ impl Network {
         blockchain: Arc<RwLock<Blockchain>>,
         configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
-        debug!("received handshake response");
+        debug!("handling handshake response");
         let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
@@ -303,32 +303,52 @@ impl Network {
     async fn request_blockchain_from_peer(
         &self,
         peer_index: u64,
-        blockchain: Arc<RwLock<Blockchain>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
         info!("requesting blockchain from peer : {:?}", peer_index);
 
         // TODO : should this be moved inside peer ?
+        let fork_id;
+        {
+            // TODO : will this create a race condition if we release the lock after reading fork id ?
+            let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            fork_id = *blockchain.get_fork_id();
+        }
 
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         if configs.is_spv_mode() {
             let request;
             {
-                let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+                let (blockchain, _blockchain_) =
+                    lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
                 if blockchain.last_block_id > blockchain.get_latest_block_id() {
+                    debug!(
+                        "blockchain request 1 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
+                        blockchain.last_block_id,
+                        hex::encode(blockchain.last_block_hash),
+                        hex::encode(fork_id)
+                    );
                     request = BlockchainRequest {
                         latest_block_id: blockchain.last_block_id,
                         latest_block_hash: blockchain.last_block_hash,
-                        fork_id: *blockchain.get_fork_id(),
+                        fork_id,
                     };
                 } else {
+                    debug!(
+                        "blockchain request 2 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
+                        blockchain.get_latest_block_id(),
+                        hex::encode(blockchain.get_latest_block_hash()),
+                        hex::encode(fork_id)
+                    );
                     request = BlockchainRequest {
                         latest_block_id: blockchain.get_latest_block_id(),
                         latest_block_hash: blockchain.get_latest_block_hash(),
-                        fork_id: *blockchain.get_fork_id(),
+                        fork_id,
                     };
                 }
             }
+            debug!("sending ghost chain request to peer : {:?}", peer_index);
             let buffer = Message::GhostChainRequest(
                 request.latest_block_id,
                 request.latest_block_hash,
@@ -342,14 +362,16 @@ impl Network {
         } else {
             let request;
             {
-                let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+                let (blockchain, _blockchain_) =
+                    lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
                 request = BlockchainRequest {
                     latest_block_id: blockchain.get_latest_block_id(),
                     latest_block_hash: blockchain.get_latest_block_hash(),
-                    fork_id: blockchain.get_fork_id().clone(),
+                    fork_id,
                 };
             }
+            debug!("sending blockchain request to peer : {:?}", peer_index);
             let buffer = Message::BlockchainRequest(request).serialize();
             self.io_interface
                 .send_message(peer_index, buffer)
@@ -361,12 +383,12 @@ impl Network {
         &self,
         block_hash: SaitoHash,
         peer_index: PeerIndex,
-        blockchain: Arc<RwLock<Blockchain>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
     ) -> Option<()> {
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let block_exists;
         {
-            let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             block_exists = blockchain.is_block_indexed(block_hash);
         }
@@ -392,9 +414,9 @@ impl Network {
 
     pub async fn initialize_static_peers(
         &mut self,
-        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
         self.static_peer_configs = configs.get_peer_configs().clone();
         if !self.static_peer_configs.is_empty() {
             self.static_peer_configs.get_mut(0).unwrap().is_main = true;

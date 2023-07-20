@@ -126,8 +126,8 @@ pub trait InterfaceIO: Debug {
     async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error>;
     async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error>;
 
-    async fn save_blockchain(&self) -> Result<(), Error>;
-    async fn load_blockchain(&self) -> Result<(), Error>;
+    // async fn save_blockchain(&self) -> Result<(), Error>;
+    // async fn load_blockchain(&self) -> Result<(), Error>;
 
     fn get_my_services(&self) -> Vec<PeerService>;
 }

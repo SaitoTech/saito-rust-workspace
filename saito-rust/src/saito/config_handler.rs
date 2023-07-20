@@ -5,7 +5,7 @@ use figment::Figment;
 use serde::Deserialize;
 
 use log::{debug, error};
-use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
+use saito_core::core::data::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
 
 #[derive(Deserialize, Debug)]
 pub struct NodeConfigurations {
@@ -24,6 +24,10 @@ impl Configuration for NodeConfigurations {
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
         return &self.peers;
+    }
+
+    fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
+        None
     }
 
     fn get_block_fetch_url(&self) -> String {

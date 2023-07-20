@@ -30,31 +30,31 @@ pub struct Spammer {
 
 impl Spammer {
     pub async fn new(
-        wallet: Arc<RwLock<Wallet>>,
-        peers: Arc<RwLock<PeerCollection>>,
-        blockchain: Arc<RwLock<Blockchain>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        peers_lock: Arc<RwLock<PeerCollection>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
         sender_to_network: Sender<IoEvent>,
         sender: Sender<VecDeque<Transaction>>,
-        configs: Arc<RwLock<SpammerConfigs>>,
+        configs_lock: Arc<RwLock<SpammerConfigs>>,
     ) -> Spammer {
         let tx_payment;
         let tx_fee;
         {
-            let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+            let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
             tx_payment = configs.get_spammer_configs().tx_payment;
             tx_fee = configs.get_spammer_configs().tx_fee;
         }
         Spammer {
             sender_to_network,
-            peers: peers.clone(),
-            configs: configs.clone(),
+            peers: peers_lock.clone(),
+            configs: configs_lock.clone(),
             bootstrap_done: false,
             sent_tx_count: 0,
             tx_generator: TransactionGenerator::create(
-                wallet.clone(),
-                peers.clone(),
-                blockchain.clone(),
-                configs.clone(),
+                wallet_lock.clone(),
+                peers_lock.clone(),
+                blockchain_lock.clone(),
+                configs_lock.clone(),
                 sender,
                 tx_payment as Currency,
                 tx_fee as Currency,
@@ -128,21 +128,21 @@ impl Spammer {
 }
 
 pub async fn run_spammer(
-    wallet: Arc<RwLock<Wallet>>,
-    peers: Arc<RwLock<PeerCollection>>,
-    blockchain: Arc<RwLock<Blockchain>>,
+    wallet_lock: Arc<RwLock<Wallet>>,
+    peers_lock: Arc<RwLock<PeerCollection>>,
+    blockchain_lock: Arc<RwLock<Blockchain>>,
     sender_to_network: Sender<IoEvent>,
-    configs: Arc<RwLock<SpammerConfigs>>,
+    configs_lock: Arc<RwLock<SpammerConfigs>>,
 ) {
     info!("starting the spammer");
     let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(10);
     let mut spammer = Spammer::new(
-        wallet,
-        peers,
-        blockchain,
+        wallet_lock,
+        peers_lock,
+        blockchain_lock,
         sender_to_network,
         sender,
-        configs,
+        configs_lock,
     )
     .await;
     spammer.run(receiver).await;

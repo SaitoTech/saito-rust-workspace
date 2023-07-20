@@ -41,7 +41,7 @@ pub mod test {
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
-    use crate::core::data::configuration::{Configuration, PeerConfig, Server};
+    use crate::core::data::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::mempool::Mempool;
@@ -157,21 +157,21 @@ pub mod test {
             for i in 1..blockchain.blocks.len() {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
+                    .get_longest_chain_block_hash_at_block_id(i as u64);
 
                 let previous_block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id((i as u64) - 1);
+                    .get_longest_chain_block_hash_at_block_id((i as u64) - 1);
 
                 let block = blockchain.get_block_sync(&block_hash);
                 let previous_block = blockchain.get_block_sync(&previous_block_hash);
 
                 if block_hash == [0; 32] {
-                    assert_eq!(block.is_none(), true);
+                    assert!(block.is_none());
                 } else {
-                    assert_eq!(block.is_none(), false);
+                    assert!(block.is_some());
                     if i != 1 && previous_block_hash != [0; 32] {
-                        assert_eq!(previous_block.is_none(), false);
+                        assert!(previous_block.is_some());
                         assert_eq!(
                             block.unwrap().previous_block_hash,
                             previous_block.unwrap().hash
@@ -196,11 +196,24 @@ pub mod test {
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
-                info!("WINDING ID HASH - {} {:?}", i, block_hash);
+                    .get_longest_chain_block_hash_at_block_id(i);
                 let block = blockchain.get_block(&block_hash).unwrap();
+                info!(
+                    "WINDING ID HASH - {} {:?} with txs : {:?} block_type : {:?}",
+                    block.id,
+                    hex::encode(block_hash),
+                    block.transactions.len(),
+                    block.block_type
+                );
+
                 for j in 0..block.transactions.len() {
-                    block.transactions[j].on_chain_reorganization(&mut utxoset, true, i as u64);
+                    block.transactions[j].on_chain_reorganization(&mut utxoset, true);
+                    debug!(
+                        "from : {:?} to : {:?} utxo len : {:?}",
+                        block.transactions[j].from.len(),
+                        block.transactions[j].to.len(),
+                        utxoset.len()
+                    );
                 }
             }
 
@@ -239,12 +252,12 @@ pub mod test {
                         // but rather set to an unspendable value. These entries will be
                         // removed on purge, although we can look at deleting them on unwind
                         // as well if that is reasonably efficient.
-                        //
-                        if *value == true {
-                            //info!("Value does not exist in actual blockchain!");
-                            //info!("comparing {:?} with on-chain value {}", key, value);
-                            assert_eq!(1, 2);
-                        }
+                        assert!(!*value, "utxoset value should be false for key : {:?}. generated utxo size : {:?}. current utxo size : {:?}", hex::encode(key), utxoset.len(), blockchain.utxoset.len());
+                        // if *value == true {
+                        //     //info!("Value does not exist in actual blockchain!");
+                        //     //info!("comparing {:?} with on-chain value {}", key, value);
+                        //     assert_eq!(1, 2);
+                        // }
                     }
                 }
             }
@@ -304,7 +317,7 @@ pub mod test {
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(i as u64);
+                    .get_longest_chain_block_hash_at_block_id(i as u64);
                 let block = blockchain.get_block(&block_hash).unwrap();
 
                 block_inputs = 0;
@@ -491,13 +504,13 @@ pub mod test {
         }
 
         pub async fn create_golden_ticket(
-            wallet: Arc<RwLock<Wallet>>,
+            wallet_lock: Arc<RwLock<Wallet>>,
             block_hash: SaitoHash,
             block_difficulty: u64,
         ) -> GoldenTicket {
             let public_key;
             {
-                let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+                let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
                 public_key = wallet.public_key;
             }
@@ -587,6 +600,74 @@ pub mod test {
             // and add first block to blockchain
             self.add_block(block).await;
         }
+
+        //create a genesis block for testing
+        pub async fn create_test_gen_block(&mut self, amount: u64) {
+            debug!("create_test_gen_block");
+            let wallet_read = self.wallet_lock.read().await;
+            let mut tx = Transaction::create_issuance_transaction(wallet_read.public_key, amount);
+            tx.sign(&wallet_read.private_key);
+            drop(wallet_read);
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
+
+            mempool
+                .add_transaction_if_validates(tx.clone(), &blockchain)
+                .await;
+
+            let timestamp = create_timestamp();
+
+            let genblock: Block = mempool
+                .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                .await;
+            let res = blockchain
+                .add_block(
+                    genblock,
+                    &self.network,
+                    &mut self.storage,
+                    self.sender_to_miner.clone(),
+                    &mut mempool,
+                    configs.deref(),
+                )
+                .await;
+        }
+
+        //convenience function assuming longest chain
+        pub async fn balance_map(&mut self) -> AHashMap<SaitoPublicKey, u64> {
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            let mut utxo_balances: AHashMap<SaitoPublicKey, u64> = AHashMap::new();
+
+            let latest_id = blockchain.get_latest_block_id();
+            for i in 1..=latest_id {
+                let block_hash = blockchain
+                    .blockring
+                    .get_longest_chain_block_hash_at_block_id(i as u64);
+                let block = blockchain.get_block(&block_hash).unwrap().clone();
+                for j in 0..block.transactions.len() {
+                    let tx = &block.transactions[j];
+
+                    tx.from.iter().for_each(|input| {
+                        utxo_balances
+                            .entry(input.public_key)
+                            .and_modify(|e| *e -= input.amount)
+                            .or_insert(0);
+                    });
+
+                    tx.to.iter().for_each(|output| {
+                        utxo_balances
+                            .entry(output.public_key)
+                            .and_modify(|e| *e += output.amount)
+                            .or_insert(output.amount);
+                    });
+                }
+            }
+            utxo_balances
+        }
     }
 
     struct TestConfiguration {}
@@ -603,6 +684,10 @@ pub mod test {
         }
 
         fn get_peer_configs(&self) -> &Vec<PeerConfig> {
+            todo!()
+        }
+
+        fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
             todo!()
         }
 

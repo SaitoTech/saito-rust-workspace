@@ -1,3 +1,4 @@
 *.block
 *.sai
-*
+/test/*
+/issuance/issuance

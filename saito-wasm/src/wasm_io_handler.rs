@@ -112,8 +112,9 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        let result = MsgHandler::read_value(key);
+        let result = MsgHandler::read_value(key.clone());
         if result.is_err() {
+            error!("couldn't read value for key: {:?}", key);
             return Err(Error::from(ErrorKind::Other));
         }
 
@@ -218,17 +219,17 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn save_blockchain(&self) -> Result<(), Error> {
-        MsgHandler::save_blockchain();
-        // TODO : return error state
-        Ok(())
-    }
-
-    async fn load_blockchain(&self) -> Result<(), Error> {
-        MsgHandler::load_blockchain();
-        // TODO : return error state
-        Ok(())
-    }
+    // async fn save_blockchain(&self) -> Result<(), Error> {
+    //     MsgHandler::save_blockchain();
+    //     // TODO : return error state
+    //     Ok(())
+    // }
+    //
+    // async fn load_blockchain(&self) -> Result<(), Error> {
+    //     MsgHandler::load_blockchain();
+    //     // TODO : return error state
+    //     Ok(())
+    // }
 
     fn get_my_services(&self) -> Vec<PeerService> {
         // let mut services = vec![];
