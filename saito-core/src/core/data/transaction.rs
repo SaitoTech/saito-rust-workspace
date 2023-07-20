@@ -718,12 +718,7 @@ impl Transaction {
     }
 
     /// Runs when the chain is re-organized
-    pub fn on_chain_reorganization(
-        &self,
-        utxoset: &mut UtxoSet,
-        longest_chain: bool,
-        _block_id: u64,
-    ) {
+    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) {
         let mut input_slip_spendable = true;
         let mut output_slip_spendable = false;
 
@@ -732,12 +727,12 @@ impl Transaction {
             output_slip_spendable = true;
         }
 
-        self.from.iter().for_each(|input| {
-            input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
-        });
-        self.to.iter().for_each(|output| {
-            output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
-        });
+        self.from
+            .iter()
+            .for_each(|input| input.on_chain_reorganization(utxoset, input_slip_spendable));
+        self.to
+            .iter()
+            .for_each(|output| output.on_chain_reorganization(utxoset, output_slip_spendable));
     }
 
     /// [len of inputs - 4 bytes - u32]

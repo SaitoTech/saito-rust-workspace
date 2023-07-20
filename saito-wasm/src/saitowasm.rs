@@ -46,32 +46,9 @@ use crate::wasm_blockchain::WasmBlockchain;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_peer::WasmPeer;
-use crate::wasm_peer_service::WasmPeerService;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
 use crate::wasm_wallet::WasmWallet;
-
-// pub(crate) struct NetworkResultFuture {
-//     pub result: Option<Result<Vec<u8>, Error>>,
-//     pub key: u64,
-// }
-//
-// // TODO : check if this gets called from somewhere or need a runtime
-// impl Future for NetworkResultFuture {
-//     type Output = Result<Vec<u8>, Error>;
-//
-//     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-//         let mut saito = SAITO.blocking_lock();
-//         let result = saito.results.remove(&self.key);
-//         if result.is_some() {
-//             let result = result.unwrap();
-//             return Poll::Ready(result);
-//         }
-//         let waker = cx.waker().clone();
-//         saito.wakers.insert(self.key, waker);
-//         return Poll::Pending;
-//     }
-// }
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
@@ -118,6 +95,12 @@ pub fn new() -> SaitoWasm {
     // let private_key = wallet.private_key.clone();
     let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
 
+    let channel_size = 1_000;
+    // {
+    //     let configs = configuration.read().await;
+    //     channel_size = configs.get_server_configs().unwrap().channel_size;
+    // }
+
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
         blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
@@ -126,11 +109,12 @@ pub fn new() -> SaitoWasm {
         configuration: configuration.clone(),
     };
 
-    let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(10);
-    let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(10);
-    let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
-    let (sender_to_stat, _receiver_in_stats) = tokio::sync::mpsc::channel(10);
-    let (sender_to_verification, receiver_in_verification) = tokio::sync::mpsc::channel(10);
+    let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(channel_size);
+    let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(channel_size);
+    let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(channel_size);
+    let (sender_to_stat, _receiver_in_stats) = tokio::sync::mpsc::channel(channel_size);
+    let (sender_to_verification, receiver_in_verification) =
+        tokio::sync::mpsc::channel(channel_size);
 
     SaitoWasm {
         routing_thread: RoutingThread {
@@ -182,7 +166,6 @@ pub fn new() -> SaitoWasm {
         },
         mining_thread: MiningThread {
             wallet: context.wallet.clone(),
-
             sender_to_mempool: sender_to_consensus.clone(),
             time_keeper: Box::new(WasmTimeKeeper {}),
             miner_active: false,
@@ -256,7 +239,7 @@ pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue
         let config = WasmConfiguration::new_from_json(str.expect("couldn't get string").as_str());
 
         if config.is_err() {
-            info!("failed parsing configs");
+            error!("failed parsing configs. {:?}", config.err().unwrap());
             return Ok(JsValue::from("failed parsing configs"));
         }
         let config = config.unwrap();

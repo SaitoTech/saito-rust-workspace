@@ -112,8 +112,9 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        let result = MsgHandler::read_value(key);
+        let result = MsgHandler::read_value(key.clone());
         if result.is_err() {
+            error!("couldn't read value for key: {:?}", key);
             return Err(Error::from(ErrorKind::Other));
         }
 
