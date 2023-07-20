@@ -5,7 +5,9 @@ use figment::Figment;
 use serde::Deserialize;
 
 use log::{debug, error};
-use saito_core::core::data::configuration::{Configuration, Endpoint, PeerConfig, Server};
+use saito_core::core::data::configuration::{
+    BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
+};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Spammer {
@@ -72,6 +74,10 @@ impl Configuration for SpammerConfigs {
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
         return &self.peers;
+    }
+
+    fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
+        None
     }
 
     fn get_block_fetch_url(&self) -> String {

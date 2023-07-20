@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, PeerIndex, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    push_lock, BlockId, PeerIndex, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
     LOCK_ORDER_PEERS, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
@@ -32,6 +32,7 @@ use crate::{lock_for_read, lock_for_write};
 #[derive(Debug)]
 pub enum RoutingEvent {
     BlockchainUpdated,
+    StartBlockIdUpdated(BlockId),
 }
 
 #[derive(Debug)]
@@ -352,12 +353,12 @@ impl RoutingThread {
     async fn fetch_next_blocks(&mut self) {
         trace!("fetching next blocks");
 
-        {
-            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-
-            self.blockchain_sync_state
-                .set_latest_blockchain_id(blockchain.get_latest_block_id());
-        }
+        // {
+        //     let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        //
+        //     self.blockchain_sync_state
+        //         .set_latest_blockchain_id(blockchain.get_latest_block_id());
+        // }
 
         self.blockchain_sync_state.build_peer_block_picture();
 
@@ -562,6 +563,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             RoutingEvent::BlockchainUpdated => {
                 debug!("received blockchain update event");
                 self.fetch_next_blocks().await;
+            }
+            RoutingEvent::StartBlockIdUpdated(block_id) => {
+                debug!("start block id received as : {:?}", block_id);
+                self.blockchain_sync_state
+                    .set_latest_blockchain_id(block_id);
             }
         }
         None

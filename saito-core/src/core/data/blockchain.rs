@@ -60,11 +60,11 @@ pub struct Blockchain {
     pub last_timestamp: u64,
     pub last_burnfee: Currency,
 
-    genesis_timestamp: u64,
+    pub genesis_timestamp: u64,
     genesis_block_hash: SaitoHash,
-    lowest_acceptable_timestamp: u64,
-    lowest_acceptable_block_hash: SaitoHash,
-    lowest_acceptable_block_id: u64,
+    pub lowest_acceptable_timestamp: u64,
+    pub lowest_acceptable_block_hash: SaitoHash,
+    pub lowest_acceptable_block_id: u64,
 
     last_callback_block_id: u64,
 }
@@ -548,7 +548,7 @@ impl Blockchain {
             {
                 let pblock = self.get_mut_block(&pruned_block_hash).unwrap();
                 pblock
-                    .upgrade_block_to_block_type(BlockType::Full, storage)
+                    .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                     .await;
             }
         }
@@ -1052,16 +1052,13 @@ impl Blockchain {
     ) -> bool {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
-        //
         // if we are winding a non-existent chain with a wind_failure it
         // means our wind attempt failed and we should move directly into
         // add_block_failure() by returning false.
-        //
         if wind_failure && new_chain.is_empty() {
             return false;
         }
 
-        //
         // winding the chain requires us to have certain data associated
         // with the block and the transactions, particularly the tx hashes
         // that we need to generate the slip UUIDs and create the tx sigs.
@@ -1071,14 +1068,13 @@ impl Blockchain {
         // function because of limitatins imposed by Rust on mutable data
         // structures. So validation is "read-only" and our "write" actions
         // happen first.
-        //
         let block_hash = new_chain.get(current_wind_index).unwrap();
 
         {
             let block = self.get_mut_block(block_hash).unwrap();
 
             block
-                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                 .await;
 
             let latest_block_id = block.id;
@@ -1098,14 +1094,14 @@ impl Blockchain {
                 if self.is_block_indexed(previous_block_hash) {
                     let block = self.get_mut_block(&previous_block_hash).unwrap();
                     block
-                        .upgrade_block_to_block_type(BlockType::Full, storage)
+                        .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                         .await;
                 }
             }
         }
 
         let block = self.blocks.get(block_hash).unwrap();
-        assert_eq!(block.block_type, BlockType::Full);
+        // assert_eq!(block.block_type, BlockType::Full);
 
         let does_block_validate = block.validate(self, &self.utxoset, configs).await;
 
@@ -1129,6 +1125,7 @@ impl Blockchain {
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
             let block_id = block.id;
+            // let block_hash = block.hash;
             drop(block);
             // utxoset update
             {
@@ -1136,7 +1133,8 @@ impl Blockchain {
                 block.on_chain_reorganization(&mut self.utxoset, true);
             }
 
-            self.on_chain_reorganization(block_id, true, storage).await;
+            self.on_chain_reorganization(block_id, block_hash.clone(), true, storage, configs)
+                .await;
 
             //
             // we have received the first entry in new_blocks() which means we
@@ -1274,15 +1272,17 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         let block_id;
+        let block_hash;
         {
             let block = self
                 .blocks
                 .get_mut(&old_chain[current_unwind_index])
                 .unwrap();
             block
-                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                 .await;
             block_id = block.id;
+            block_hash = block.hash;
 
             // utxoset update
             block.on_chain_reorganization(&mut self.utxoset, false);
@@ -1294,11 +1294,11 @@ impl Blockchain {
             // wallet update
             {
                 let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
-
                 wallet.on_chain_reorganization(&block, false);
             }
         }
-        self.on_chain_reorganization(block_id, false, storage).await;
+        self.on_chain_reorganization(block_id, block_hash, false, storage, configs)
+            .await;
         if current_unwind_index == old_chain.len() - 1 {
             //
             // start winding new chain
@@ -1350,30 +1350,51 @@ impl Blockchain {
     async fn on_chain_reorganization(
         &mut self,
         block_id: u64,
+        block_hash: SaitoHash,
         longest_chain: bool,
         storage: &Storage,
+        configs: &(dyn Configuration + Send + Sync),
     ) {
-        //
+        trace!(
+            "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
+            block_id,
+            hex::encode(block_hash)
+        );
         // skip out if earlier than we need to be vis-a-vis last_block_id
-        //
-        if self.get_latest_block_id() >= block_id {
+        if self.last_block_id >= block_id {
+            debug!(
+                "last block id : {:?} is later than this block id : {:?}. skipping reorg",
+                self.last_block_id, block_id
+            );
             return;
         }
 
         if longest_chain {
-            //
+            let block = self.blocks.get(&block_hash);
+            if let Some(block) = block {
+                self.last_block_id = block_id;
+                self.last_block_hash = block.hash;
+                self.last_timestamp = block.timestamp;
+                self.last_burnfee = block.burnfee;
+
+                if self.lowest_acceptable_timestamp == 0 {
+                    self.lowest_acceptable_block_id = block_id;
+                    self.lowest_acceptable_block_hash = block.hash;
+                    self.lowest_acceptable_timestamp = block.timestamp;
+                }
+            } else {
+                warn!("block not found for hash : {:?}", hex::encode(block_hash));
+            }
+
             // update genesis period, purge old data
-            //
             self.update_genesis_period(storage).await;
 
-            //
             // generate fork_id
-            //
             let fork_id = self.generate_fork_id(block_id);
             self.set_fork_id(fork_id);
         }
 
-        self.downgrade_blockchain_data().await;
+        self.downgrade_blockchain_data(configs.is_browser()).await;
     }
 
     pub async fn update_genesis_period(&mut self, storage: &Storage) {
@@ -1394,6 +1415,7 @@ impl Blockchain {
             //
             let purge_bid = latest_block_id - (GENESIS_PERIOD * 2);
             self.genesis_block_id = latest_block_id - GENESIS_PERIOD;
+            debug!("genesis block id set as : {:?}", self.genesis_block_id);
 
             //
             // in either case, we are OK to throw out everything below the
@@ -1482,7 +1504,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn downgrade_blockchain_data(&mut self) {
+    pub async fn downgrade_blockchain_data(&mut self, is_browser: bool) {
         trace!("downgrading blockchain data");
         //
         // downgrade blocks still on the chain
@@ -1510,7 +1532,9 @@ impl Blockchain {
             {
                 let block = self.get_mut_block(&hash);
                 if let Some(block) = block {
-                    block.downgrade_block_to_block_type(BlockType::Pruned).await;
+                    block
+                        .downgrade_block_to_block_type(BlockType::Pruned, is_browser)
+                        .await;
                 } else {
                     warn!("block : {:?} not found to downgrade", hex::encode(hash));
                 }
@@ -1519,7 +1543,7 @@ impl Blockchain {
     }
     pub async fn add_blocks_from_mempool(
         &mut self,
-        mempool: Arc<RwLock<Mempool>>,
+        mempool_lock: Arc<RwLock<Mempool>>,
         network: &Network,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
@@ -1527,7 +1551,7 @@ impl Blockchain {
     ) -> bool {
         debug!("adding blocks from mempool to blockchain");
         let mut blocks: VecDeque<Block>;
-        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
 
         blocks = mempool.blocks_queue.drain(..).collect();
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
@@ -1588,11 +1612,21 @@ impl Blockchain {
         }
     }
     pub async fn reset(&mut self) {
-        todo!()
+        self.last_burnfee = 0;
+        self.last_timestamp = 0;
+        self.last_block_id = 0;
+        self.last_block_hash = [0; 32];
+        self.genesis_timestamp = 0;
+        self.genesis_block_hash = [0; 32];
+        self.genesis_block_id = 0;
+        self.lowest_acceptable_block_id = 0;
+        self.lowest_acceptable_timestamp = 0;
+        self.lowest_acceptable_block_hash = [0; 32];
+        self.save().await;
     }
 
     pub async fn save(&self) {
-        todo!()
+        // TODO : what should be done here in rust code?
     }
 }
 
@@ -1602,7 +1636,7 @@ mod tests {
     use std::ops::Deref;
     use std::sync::Arc;
 
-    use log::{debug, error, info, trace, warn};
+    use log::{debug, error};
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
@@ -1613,7 +1647,6 @@ mod tests {
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
-    use crate::core::data::storage::UTXOSTATE_FILE_PATH;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 
@@ -2139,21 +2172,18 @@ mod tests {
         t.check_token_supply().await;
     }
 
+    // test we do not add blocks because of insufficient mining
     #[tokio::test]
     #[serial_test::serial]
-    //
-    // test we do not add blocks because of insufficient mining
-    //
     async fn seven_blocks_with_sufficient_golden_tickets_test() {
+        // pretty_env_logger::init();
         let mut t = TestManager::new();
         let block1;
         let block1_id;
         let block1_hash;
         let ts;
 
-        //
         // block 1
-        //
         t.initialize(100, 1_000_000_000).await;
 
         {
@@ -2168,6 +2198,7 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
             assert_eq!(blockchain.get_latest_block_id(), block1_id);
             assert_eq!(blockchain.get_latest_block_id(), 1);
+            assert_eq!(block1.transactions.len(), 100);
         }
 
         //

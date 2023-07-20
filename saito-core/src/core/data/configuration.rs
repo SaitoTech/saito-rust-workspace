@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 
-use crate::common::defs::Timestamp;
 use serde::Deserialize;
 use serde::Serialize;
+
+use crate::common::defs::Timestamp;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct PeerConfig {
@@ -35,10 +36,22 @@ pub struct Server {
     pub reconnection_wait_time: Timestamp,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct BlockchainConfig {
+    pub last_block_hash: String,
+    pub last_block_id: u64,
+    pub last_timestamp: u64,
+    pub genesis_block_id: u64,
+    pub genesis_timestamp: u64,
+    pub lowest_acceptable_timestamp: u64,
+    pub lowest_acceptable_block_hash: String,
+    pub lowest_acceptable_block_id: u64,
+}
+
 pub trait Configuration: Debug {
     fn get_server_configs(&self) -> Option<&Server>;
-
     fn get_peer_configs(&self) -> &Vec<PeerConfig>;
+    fn get_blockchain_configs(&self) -> Option<BlockchainConfig>;
     fn get_block_fetch_url(&self) -> String;
     fn is_spv_mode(&self) -> bool;
     fn is_browser(&self) -> bool;

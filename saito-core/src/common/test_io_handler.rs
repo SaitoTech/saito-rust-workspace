@@ -190,13 +190,13 @@ pub mod test {
             todo!()
         }
 
-        async fn save_blockchain(&self) -> Result<(), Error> {
-            todo!()
-        }
-
-        async fn load_blockchain(&self) -> Result<(), Error> {
-            todo!()
-        }
+        // async fn save_blockchain(&self) -> Result<(), Error> {
+        //     todo!()
+        // }
+        //
+        // async fn load_blockchain(&self) -> Result<(), Error> {
+        //     todo!()
+        // }
 
         fn get_my_services(&self) -> Vec<PeerService> {
             todo!()

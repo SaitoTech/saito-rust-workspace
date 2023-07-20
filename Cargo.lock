@@ -323,9 +323,12 @@ version = "3.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
 dependencies = [
+ "atty",
  "bitflags",
  "clap_lex",
  "indexmap",
+ "strsim",
+ "termcolor",
  "textwrap",
 ]
 
@@ -1766,6 +1769,7 @@ dependencies = [
  "async-trait",
  "base64 0.21.0",
  "bs58",
+ "clap",
  "criterion",
  "ctor",
  "ctrlc",
