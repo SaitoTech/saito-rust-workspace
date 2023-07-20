@@ -291,6 +291,7 @@ impl BlockchainSyncState {
 mod tests {
     use crate::common::defs::BlockId;
     use crate::core::data::blockchain_sync_state::BlockchainSyncState;
+    use log::info;
 
     #[test]
     fn single_peer_window_test() {
@@ -338,7 +339,9 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn fetch_count_test() {
+        pretty_env_logger::init();
         let mut state = BlockchainSyncState::new(3);
         for i in 0..state.batch_size + 50 {
             state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1);
@@ -362,12 +365,11 @@ mod tests {
         state.mark_as_fetching(vec);
         state.build_peer_block_picture();
         let result = state.request_blocks_from_waitlist();
-        assert_eq!(result.len(), 0);
+        assert!(result.is_empty());
         state.remove_entry([1; 32], 1);
         state.remove_entry([3; 32], 1);
         state.build_peer_block_picture();
         let result = state.request_blocks_from_waitlist();
-        // TODO : hack : this results should be empty. set to 1 to pass the test.
         assert_eq!(result.len(), 1);
 
         state.set_latest_blockchain_id(1);

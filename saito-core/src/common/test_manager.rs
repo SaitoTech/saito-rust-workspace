@@ -167,11 +167,11 @@ pub mod test {
                 let previous_block = blockchain.get_block_sync(&previous_block_hash);
 
                 if block_hash == [0; 32] {
-                    assert_eq!(block.is_none(), true);
+                    assert!(block.is_none());
                 } else {
-                    assert_eq!(block.is_none(), false);
+                    assert!(block.is_some());
                     if i != 1 && previous_block_hash != [0; 32] {
-                        assert_eq!(previous_block.is_none(), false);
+                        assert!(previous_block.is_some());
                         assert_eq!(
                             block.unwrap().previous_block_hash,
                             previous_block.unwrap().hash
@@ -196,11 +196,24 @@ pub mod test {
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_at_block_id(i as u64);
-                info!("WINDING ID HASH - {} {:?}", i, block_hash);
+                    .get_longest_chain_block_hash_at_block_id(i);
                 let block = blockchain.get_block(&block_hash).unwrap();
+                info!(
+                    "WINDING ID HASH - {} {:?} with txs : {:?} block_type : {:?}",
+                    block.id,
+                    hex::encode(block_hash),
+                    block.transactions.len(),
+                    block.block_type
+                );
+
                 for j in 0..block.transactions.len() {
-                    block.transactions[j].on_chain_reorganization(&mut utxoset, true, i as u64);
+                    block.transactions[j].on_chain_reorganization(&mut utxoset, true);
+                    debug!(
+                        "from : {:?} to : {:?} utxo len : {:?}",
+                        block.transactions[j].from.len(),
+                        block.transactions[j].to.len(),
+                        utxoset.len()
+                    );
                 }
             }
 
@@ -239,12 +252,12 @@ pub mod test {
                         // but rather set to an unspendable value. These entries will be
                         // removed on purge, although we can look at deleting them on unwind
                         // as well if that is reasonably efficient.
-                        //
-                        if *value == true {
-                            //info!("Value does not exist in actual blockchain!");
-                            //info!("comparing {:?} with on-chain value {}", key, value);
-                            assert_eq!(1, 2);
-                        }
+                        assert!(!*value, "utxoset value should be false for key : {:?}. generated utxo size : {:?}. current utxo size : {:?}", hex::encode(key), utxoset.len(), blockchain.utxoset.len());
+                        // if *value == true {
+                        //     //info!("Value does not exist in actual blockchain!");
+                        //     //info!("comparing {:?} with on-chain value {}", key, value);
+                        //     assert_eq!(1, 2);
+                        // }
                     }
                 }
             }

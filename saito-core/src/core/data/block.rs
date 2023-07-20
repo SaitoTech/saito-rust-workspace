@@ -1235,7 +1235,7 @@ impl Block {
             hex::encode(self.hash)
         );
         for tx in &self.transactions {
-            tx.on_chain_reorganization(utxoset, longest_chain, self.id);
+            tx.on_chain_reorganization(utxoset, longest_chain);
         }
         self.in_longest_chain = longest_chain;
         true
@@ -1495,7 +1495,7 @@ impl Block {
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
-
+        assert!(self.id > 0);
         if configs.is_browser() {
             self.generate_consensus_values(blockchain).await;
             return true;

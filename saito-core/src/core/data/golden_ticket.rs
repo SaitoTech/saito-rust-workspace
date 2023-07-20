@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn gt_against_slr_2() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
 
         assert_eq!(primitive_types::U256::one().leading_zeros(), 255);
         assert_eq!(primitive_types::U256::zero().leading_zeros(), 256);

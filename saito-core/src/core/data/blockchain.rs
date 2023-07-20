@@ -2172,21 +2172,18 @@ mod tests {
         t.check_token_supply().await;
     }
 
+    // test we do not add blocks because of insufficient mining
     #[tokio::test]
     #[serial_test::serial]
-    //
-    // test we do not add blocks because of insufficient mining
-    //
     async fn seven_blocks_with_sufficient_golden_tickets_test() {
+        // pretty_env_logger::init();
         let mut t = TestManager::new();
         let block1;
         let block1_id;
         let block1_hash;
         let ts;
 
-        //
         // block 1
-        //
         t.initialize(100, 1_000_000_000).await;
 
         {
@@ -2201,6 +2198,7 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
             assert_eq!(blockchain.get_latest_block_id(), block1_id);
             assert_eq!(blockchain.get_latest_block_id(), 1);
+            assert_eq!(block1.transactions.len(), 100);
         }
 
         //
