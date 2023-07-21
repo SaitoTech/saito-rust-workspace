@@ -190,6 +190,14 @@ impl NetworkController {
             );
         }
     }
+
+    pub async fn disconnect_from_peer(
+        event_id: u64,
+        io_controller: Arc<RwLock<NetworkController>>,
+        peer_id: u64,
+    ) {
+        todo!()
+    }
     pub async fn send_to_all(
         sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
         buffer: Vec<u8>,
@@ -369,7 +377,7 @@ impl NetworkController {
                         sockets.lock().await.remove(&peer_index);
                         break;
                     } else {
-                        todo!("handle these scenarios 1")
+                        // warn!("unhandled type");
                     }
                 },
                 PeerReceiver::Tungstenite(mut receiver) => loop {
@@ -401,7 +409,6 @@ impl NetworkController {
                         }
                         _ => {
                             // Not handling these scenarios
-                            todo!("handle these scenarios 2")
                         }
                     }
                 },
@@ -574,6 +581,14 @@ pub async fn run_network_controller(
                     NetworkEvent::BlockFetched { .. } => {
                         unreachable!()
                     }
+                    NetworkEvent::DisconnectFromPeer { peer_index } => {
+                        NetworkController::disconnect_from_peer(
+                            event_id,
+                            network_controller_lock.clone(),
+                            peer_index,
+                        )
+                        .await
+                    }
                 }
             }
 
@@ -710,14 +725,14 @@ fn run_websocket_server(
             let result = File::open(file_path.as_str()).await;
             if result.is_err() {
                 error!("failed opening file : {:?}", result.err().unwrap());
-                todo!()
+                return Err(warp::reject::not_found());
             }
             let mut file = result.unwrap();
 
             let result = file.read_to_end(&mut buffer).await;
             if result.is_err() {
                 error!("failed reading file : {:?}", result.err().unwrap());
-                todo!()
+                return Err(warp::reject::not_found());
             }
             drop(file);
 
@@ -814,21 +829,21 @@ fn run_websocket_server(
                     let result = File::open(file_path.as_str()).await;
                     if result.is_err() {
                         error!("failed opening file : {:?}", result.err().unwrap());
-                        todo!()
+                        return Err(warp::reject::not_found());
                     }
                     let mut file = result.unwrap();
 
                     let result = file.read_to_end(&mut buffer).await;
                     if result.is_err() {
                         error!("failed reading file : {:?}", result.err().unwrap());
-                        todo!()
+                        return Err(warp::reject::not_found());
                     }
                     drop(file);
 
                     let block = Block::deserialize_from_net(buffer);
                     if block.is_err() {
                         error!("failed parsing buffer into a block");
-                        todo!()
+                        return Err(warp::reject::not_found());
                     }
                     let block = block.unwrap();
                     let block = block.generate_lite_block(keylist);

@@ -69,22 +69,10 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    // async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
-    //     todo!()
-    // }
-
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
         MsgHandler::disconnect_from_peer(js_sys::BigInt::from(peer_index));
         Ok(())
     }
-
-    // fn set_write_result(
-    //     &mut self,
-    //     result_key: String,
-    //     result: Result<String, Error>,
-    // ) -> Result<(), Error> {
-    //     todo!()
-    // }
 
     async fn fetch_block_from_peer(
         &self,

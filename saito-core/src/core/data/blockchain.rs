@@ -173,10 +173,10 @@ impl Blockchain {
                         .await;
                     if result.is_err() {
                         warn!(
-                            "couldn't fetch block : {:?}",
-                            hex::encode(block.previous_block_hash)
+                            "couldn't fetch parent block : {:?} for block : {:?}",
+                            hex::encode(block.previous_block_hash),
+                            hex::encode(block.hash)
                         );
-                        todo!()
                     }
                 } else {
                     debug!(
@@ -280,9 +280,8 @@ impl Blockchain {
                 "checking new chain hash : {:?}",
                 hex::encode(new_chain_hash)
             );
-            // TODO : following 2 lines can be optimized for a single search
-            if self.blocks.contains_key(&new_chain_hash) {
-                if self.blocks.get(&new_chain_hash).unwrap().in_longest_chain {
+            if let Some(block) = self.blocks.get(&new_chain_hash) {
+                if block.in_longest_chain {
                     shared_ancestor_found = true;
                     trace!("shared ancestor found : {:?}", hex::encode(new_chain_hash));
                     break;
