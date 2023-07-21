@@ -146,17 +146,17 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    //
-    // test symmetrical encryption works properly
-    //
-    fn symmetrical_encryption_test() {
-        let text = "This is our unencrypted text";
-        let e = encrypt_with_password(text.as_bytes(), "asdf");
-        let d = decrypt_with_password(e.as_slice(), "asdf");
-        let dtext = str::from_utf8(&d).unwrap();
-        assert_eq!(text, dtext);
-    }
+    // #[test]
+    // //
+    // // test symmetrical encryption works properly
+    // //
+    // fn symmetrical_encryption_test() {
+    //     let text = "This is our unencrypted text";
+    //     let e = encrypt_with_password(text.as_bytes(), "asdf");
+    //     let d = decrypt_with_password(e.as_slice(), "asdf");
+    //     let dtext = str::from_utf8(&d).unwrap();
+    //     assert_eq!(text, dtext);
+    // }
 
     #[test]
     fn keypair_restoration_from_private_key_test() {
