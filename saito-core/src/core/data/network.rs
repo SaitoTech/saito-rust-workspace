@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
@@ -18,7 +18,6 @@ use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::peer_service::PeerService;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{lock_for_read, lock_for_write};
@@ -53,12 +52,10 @@ impl Network {
         block: &Block,
         configs: &(dyn Configuration + Send + Sync),
     ) {
-        debug!("propagating block : {:?}", hex::encode(&block.hash));
-        {
-            // let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            if configs.is_browser() {
-                return;
-            }
+        debug!("propagating block : {:?}", hex::encode(block.hash));
+        if configs.is_browser() {
+            trace!("not propagating block since we are in browser");
+            return;
         }
 
         let mut excluded_peers = vec![];
@@ -83,7 +80,7 @@ impl Network {
             }
         }
 
-        debug!("sending block : {:?} to peers", hex::encode(&block.hash));
+        debug!("sending block : {:?} to peers", hex::encode(block.hash));
         let message = Message::BlockHeaderHash(block.hash, block.id);
         self.io_interface
             .send_message_to_all(message.serialize(), excluded_peers)
@@ -166,6 +163,14 @@ impl Network {
                 return Err(Error::from(ErrorKind::NotFound));
             }
             let peer = peer.unwrap();
+            if peer.block_fetch_url.is_empty() {
+                debug!(
+                    "won't fetch block : {:?} from peer : {:?} since no url found",
+                    hex::encode(block_hash),
+                    peer.index
+                );
+                return Err(Error::from(ErrorKind::AddrNotAvailable));
+            }
             url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
             peer_index = peer.index;
         }
@@ -413,6 +418,14 @@ impl Network {
                 .index_to_peers
                 .get(&peer_index)
                 .expect("peer not found");
+            if peer.block_fetch_url.is_empty() {
+                debug!(
+                    "won't fetch block : {:?} from peer : {:?} since no url found",
+                    hex::encode(block_hash),
+                    peer_index
+                );
+                return None;
+            }
             url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
         }
         self.io_interface
