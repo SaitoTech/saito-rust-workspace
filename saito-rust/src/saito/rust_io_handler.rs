@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, warn};
+use log::{debug, error, warn};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
@@ -121,8 +121,14 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn disconnect_from_peer(&mut self, _peer_index: u64) -> Result<(), Error> {
-        todo!()
+    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+        self.sender
+            .send(IoEvent::new(NetworkEvent::DisconnectFromPeer {
+                peer_index,
+            }))
+            .await
+            .unwrap();
+        Ok(())
     }
 
     async fn fetch_block_from_peer(
@@ -173,16 +179,20 @@ impl InterfaceIO for RustIOHandler {
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        let result = File::open(key).await;
+        let result = File::open(key.clone()).await;
         if result.is_err() {
-            todo!()
+            let err = result.err().unwrap();
+            error!("couldn't open file for : {:?}. {:?}", key, err);
+            return Err(err);
         }
         let mut file = result.unwrap();
         let mut encoded = Vec::<u8>::new();
 
         let result = file.read_to_end(&mut encoded).await;
         if result.is_err() {
-            todo!()
+            let err = result.err().unwrap();
+            error!("couldn't read file : {:?}. {:?}", key, err);
+            return Err(err);
         }
         Ok(encoded)
     }
@@ -266,14 +276,6 @@ impl InterfaceIO for RustIOHandler {
         wallet.deserialize_from_disk(&buffer);
         Ok(())
     }
-
-    // async fn save_blockchain(&self) -> Result<(), Error> {
-    //     todo!()
-    // }
-    //
-    // async fn load_blockchain(&self) -> Result<(), Error> {
-    //     todo!()
-    // }
 
     fn get_my_services(&self) -> Vec<PeerService> {
         vec![]

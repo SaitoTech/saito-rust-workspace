@@ -1,20 +1,20 @@
+use std::fs::File;
+use std::io::{Error, ErrorKind, Write};
 use std::sync::Arc;
 
 use ahash::AHashMap;
+use bs58;
 use log::{debug, error, info, trace, warn};
-use std::fs::File;
-use std::io::{Error, ErrorKind, Write};
 use tokio::sync::RwLock;
 
-use super::slip::SlipType;
-use crate::common::defs::{push_lock, SaitoPublicKey, BLOCK_FILE_EXTENSION, LOCK_ORDER_MEMPOOL};
-use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
+use crate::common::defs::{push_lock, SaitoPublicKey, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
 use crate::core::data::slip::Slip;
 use crate::lock_for_write;
-use bs58;
+
+use super::slip::SlipType;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -44,7 +44,9 @@ impl Storage {
     pub async fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
         let buffer = self.io_interface.read_value(path.to_string()).await;
         if buffer.is_err() {
-            todo!()
+            let err = buffer.err().unwrap();
+            error!("reading failed : {:?}", err);
+            return Err(err);
         }
         let buffer = buffer.unwrap();
         Ok(buffer)
@@ -75,7 +77,9 @@ impl Storage {
             .write_value(filename.clone(), buffer)
             .await;
         if result.is_err() {
-            todo!()
+            let err = result.err().unwrap();
+            error!("failed writing block to disk. {:?}", err);
+            return "".to_string();
         }
         filename
     }
@@ -98,7 +102,11 @@ impl Storage {
                     .read_value(self.io_interface.get_block_dir() + file_name.as_str())
                     .await;
                 if result.is_err() {
-                    todo!()
+                    error!(
+                        "failed loading block from disk : {:?}",
+                        result.err().unwrap()
+                    );
+                    continue;
                 }
                 info!("file : {:?} loaded", file_name);
                 let buffer: Vec<u8> = result.unwrap();

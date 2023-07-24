@@ -116,12 +116,6 @@ impl WasmTransaction {
         self.tx.sign(&wallet.private_key);
     }
 
-    pub async fn sign_and_encrypt(&mut self) {
-        let saito = SAITO.lock().await;
-        let wallet = saito.context.wallet.read().await;
-
-        self.tx.sign_and_encrypt(&wallet.private_key);
-    }
     #[wasm_bindgen(getter = type)]
     pub fn get_type(&self) -> u8 {
         self.tx.transaction_type as u8

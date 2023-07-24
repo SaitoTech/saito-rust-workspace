@@ -1,4 +1,4 @@
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 use log::{info, warn};
@@ -117,8 +117,7 @@ impl Peer {
                 "we don't have a challenge to verify for peer : {:?}",
                 self.index
             );
-            // TODO : handle the scenario.
-            todo!()
+            return Err(Error::from(ErrorKind::InvalidInput));
         }
         // TODO : validate block fetch URL
         let sent_challenge = self.challenge_for_peer.unwrap();
@@ -130,7 +129,7 @@ impl Peer {
                 hex::encode(response.signature),
                 hex::encode(response.public_key)
             );
-            todo!()
+            return Err(Error::from(ErrorKind::InvalidInput));
         }
 
         let block_fetch_url;

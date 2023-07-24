@@ -18,6 +18,9 @@ pub enum NetworkEvent {
     ConnectToPeer {
         peer_details: data::configuration::PeerConfig,
     },
+    DisconnectFromPeer {
+        peer_index: u64,
+    },
     PeerConnectionResult {
         peer_details: Option<data::configuration::PeerConfig>,
         result: Result<u64, std::io::Error>,

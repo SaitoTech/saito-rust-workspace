@@ -1,8 +1,8 @@
 use std::fmt::Debug;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
@@ -18,7 +18,6 @@ use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::peer_service::PeerService;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{lock_for_read, lock_for_write};
@@ -53,12 +52,10 @@ impl Network {
         block: &Block,
         configs: &(dyn Configuration + Send + Sync),
     ) {
-        debug!("propagating block : {:?}", hex::encode(&block.hash));
-        {
-            // let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            if configs.is_browser() {
-                return;
-            }
+        debug!("propagating block : {:?}", hex::encode(block.hash));
+        if configs.is_browser() {
+            trace!("not propagating block since we are in browser");
+            return;
         }
 
         let mut excluded_peers = vec![];
@@ -83,7 +80,7 @@ impl Network {
             }
         }
 
-        debug!("sending block : {:?} to peers", hex::encode(&block.hash));
+        debug!("sending block : {:?} to peers", hex::encode(block.hash));
         let message = Message::BlockHeaderHash(block.hash, block.id);
         self.io_interface
             .send_message_to_all(message.serialize(), excluded_peers)
@@ -157,10 +154,23 @@ impl Network {
 
             let peer = peers.find_peer_by_address(public_key);
             if peer.is_none() {
-                debug!("a = {:?}", peers.address_to_peers.len());
-                todo!()
+                debug!("peer count = {:?}", peers.address_to_peers.len());
+                error!(
+                    "peer : {:?} not found to fetch missing block : {:?}",
+                    hex::encode(public_key),
+                    hex::encode(block_hash)
+                );
+                return Err(Error::from(ErrorKind::NotFound));
             }
             let peer = peer.unwrap();
+            if peer.block_fetch_url.is_empty() {
+                debug!(
+                    "won't fetch block : {:?} from peer : {:?} since no url found",
+                    hex::encode(block_hash),
+                    peer.index
+                );
+                return Err(Error::from(ErrorKind::AddrNotAvailable));
+            }
             url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
             peer_index = peer.index;
         }
@@ -200,11 +210,9 @@ impl Network {
 
                 self.static_peer_configs
                     .push(peer.static_peer_config.as_ref().unwrap().clone());
-            } else {
-                if peer.public_key.is_some() {
-                    info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
-                    peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
-                }
+            } else if peer.public_key.is_some() {
+                info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
+                peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
             }
 
             if public_key.is_some() {
@@ -212,7 +220,7 @@ impl Network {
             }
             peers.index_to_peers.remove(&peer_index);
         } else {
-            todo!("Handle the unknown peer disconnect");
+            error!("unknown peer : {:?} disconnected", peer_index);
         }
     }
     pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
@@ -254,7 +262,11 @@ impl Network {
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
-            todo!()
+            error!(
+                "peer not found for index : {:?}. cannot handle handshake challenge",
+                peer_index
+            );
+            return;
         }
         let peer = peer.unwrap();
         peer.handle_handshake_challenge(challenge, &self.io_interface, wallet.clone(), configs)
@@ -274,8 +286,11 @@ impl Network {
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
-            warn!("peer not found : {:?}", peer_index);
-            todo!()
+            error!(
+                "peer not found for index : {:?}. cannot handle handshake response",
+                peer_index
+            );
+            return;
         }
         let peer = peer.unwrap();
         peer.handle_handshake_response(
@@ -403,6 +418,14 @@ impl Network {
                 .index_to_peers
                 .get(&peer_index)
                 .expect("peer not found");
+            if peer.block_fetch_url.is_empty() {
+                debug!(
+                    "won't fetch block : {:?} from peer : {:?} since no url found",
+                    hex::encode(block_hash),
+                    peer_index
+                );
+                return None;
+            }
             url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
         }
         self.io_interface

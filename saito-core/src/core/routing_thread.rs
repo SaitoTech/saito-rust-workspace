@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -484,9 +484,14 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     peer_index,
                     buffer.len()
                 );
+                let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
-                    //todo!()
+                    trace!(
+                        "failed deserializing msg from peer : {:?} with buffer size : {:?}",
+                        peer_index,
+                        buffer_len
+                    );
                     return None;
                 }
 
@@ -534,6 +539,9 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 self.fetch_next_blocks().await;
 
                 return Some(());
+            }
+            NetworkEvent::DisconnectFromPeer { .. } => {
+                todo!()
             }
         }
         debug!("network event processed");

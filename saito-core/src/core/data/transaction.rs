@@ -835,9 +835,6 @@ impl Transaction {
         self.hash_for_signature = Some(hash_for_signature);
         self.signature = sign(&buffer, private_key);
     }
-    pub fn sign_and_encrypt(&mut self, _private_key: &SaitoPrivateKey) {
-        todo!()
-    }
 
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {
         // trace!(

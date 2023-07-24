@@ -62,7 +62,7 @@ impl Message {
             Message::Error(data) => data.serialize(),
             _ => {
                 error!("unhandled type : {:?}", message_type);
-                todo!()
+                vec![]
             }
         });
 
