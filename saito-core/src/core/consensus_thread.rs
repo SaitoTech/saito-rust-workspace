@@ -167,7 +167,10 @@ impl ConsensusThread {
             mempool
                 .add_transaction_if_validates(tx.clone(), &blockchain)
                 .await;
-            info!("added issuance init tx for : {:?}", tx.signature);
+            info!(
+                "added issuance init tx for : {:?}",
+                hex::encode(tx.signature)
+            );
         }
 
         // debug!("{:?} mempool transacts", mempool.transactions);
