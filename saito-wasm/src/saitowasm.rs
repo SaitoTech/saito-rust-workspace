@@ -217,8 +217,21 @@ pub fn new() -> SaitoWasm {
 }
 
 #[wasm_bindgen]
-pub async fn initialize(json: JsString, private_key: JsString) -> Result<JsValue, JsValue> {
-    console_log::init_with_level(Level::Trace).unwrap();
+pub async fn initialize(
+    json: JsString,
+    private_key: JsString,
+    log_level_num: u8,
+) -> Result<JsValue, JsValue> {
+    let log_level = match log_level_num {
+        0 => Level::Error,
+        1 => Level::Warn,
+        2 => Level::Info,
+        3 => Level::Debug,
+        4 => Level::Trace,
+        _ => Level::Info,
+    };
+
+    console_log::init_with_level(log_level).unwrap();
 
     trace!("trace test");
     debug!("debug test");
