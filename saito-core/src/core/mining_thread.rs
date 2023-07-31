@@ -118,6 +118,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         {
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             self.enabled = !configs.is_browser();
+            info!("miner is enabled");
         }
         let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
         self.public_key = wallet.public_key;
