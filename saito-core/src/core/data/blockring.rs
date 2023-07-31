@@ -123,7 +123,7 @@ impl BlockRing {
         self.ring[(insert_pos as usize)].delete_block(block_id, block_hash);
     }
 
-    pub fn get_block_hashes_at_block_id(&mut self, block_id: u64) -> Vec<SaitoHash> {
+    pub fn get_block_hashes_at_block_id(&self, block_id: u64) -> Vec<SaitoHash> {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         let mut v: Vec<SaitoHash> = vec![];
         for i in 0..self.ring[(insert_pos as usize)].block_hashes.len() {

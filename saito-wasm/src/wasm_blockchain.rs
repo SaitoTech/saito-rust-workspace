@@ -3,8 +3,9 @@ use std::sync::Arc;
 use js_sys::JsString;
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{BlockId, SaitoHash};
+use saito_core::common::defs::BlockId;
 use saito_core::core::data::blockchain::Blockchain;
 
 #[wasm_bindgen]
@@ -64,5 +65,27 @@ impl WasmBlockchain {
     pub async fn get_lowest_acceptable_block_id(&self) -> u64 {
         let blockchain = self.blockchain.read().await;
         blockchain.lowest_acceptable_block_id
+    }
+
+    pub async fn get_latest_block_id(&self) -> u64 {
+        let blockchain = self.blockchain.read().await;
+        return blockchain.get_latest_block_id();
+    }
+    pub async fn get_longest_chain_hash_at_id(&self, block_id: u64) -> JsString {
+        let blockchain = self.blockchain.read().await;
+        let hash = blockchain
+            .blockring
+            .get_longest_chain_block_hash_at_block_id(block_id);
+        hex::encode(hash).into()
+    }
+    pub async fn get_hashes_at_id(&self, block_id: u64) -> js_sys::Array {
+        let blockchain = self.blockchain.read().await;
+        let hashes = blockchain.blockring.get_block_hashes_at_block_id(block_id);
+        let arr = js_sys::Array::new_with_length(hashes.len() as u32);
+        for (index, hash) in hashes.iter().enumerate() {
+            let str: JsString = hex::encode(hash).into();
+            arr.set(index as u32, JsValue::from(str));
+        }
+        arr
     }
 }
