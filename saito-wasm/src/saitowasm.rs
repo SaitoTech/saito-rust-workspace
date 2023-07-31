@@ -716,20 +716,16 @@ pub async fn get_blockchain() -> WasmBlockchain {
 }
 
 #[wasm_bindgen]
-pub fn test_buffer_in(buffer: js_sys::Uint8Array) {
-    let _buffer = buffer.to_vec();
-}
+pub async fn get_mempool_txs() -> js_sys::Array {
+    let saito = SAITO.lock().await;
+    let mempool = saito.consensus_thread.mempool.read().await;
+    let txs = js_sys::Array::new_with_length(mempool.transactions.len() as u32);
+    for (index, (_, tx)) in mempool.transactions.iter().enumerate() {
+        let wasm_tx = WasmTransaction::from_transaction(tx.clone());
+        txs.set(index as u32, JsValue::from(wasm_tx));
+    }
 
-#[wasm_bindgen]
-pub fn test_buffer_out() -> js_sys::Uint8Array {
-    let buffer = js_sys::Uint8Array::new_with_length(1000);
-    buffer
-}
-
-#[wasm_bindgen]
-pub async fn test_buffer_out_async() -> js_sys::Uint8Array {
-    let buffer = js_sys::Uint8Array::new_with_length(1000);
-    buffer
+    txs
 }
 
 // #[wasm_bindgen]
