@@ -608,7 +608,7 @@ pub async fn propagate_transaction(tx: &WasmTransaction) {
 
 #[wasm_bindgen]
 pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
-    info!("send_api_call : {:?}", peer_index);
+    trace!("send_api_call : {:?}", peer_index);
     let saito = SAITO.lock().await;
     let api_message = ApiMessage {
         msg_index,
