@@ -1,11 +1,9 @@
 class MsgHandler {
     static send_message(peer_index, buffer) {
-        console.debug("MsgHandler::send_message : " + peer_index);
         return global.shared_methods.send_message(peer_index, buffer);
     }
 
     static send_message_to_all(buffer, exceptions) {
-        console.debug("MsgHandler::send_message_to_all");
         return global.shared_methods.send_message_to_all(buffer, exceptions);
     }
 
