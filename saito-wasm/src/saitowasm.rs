@@ -597,7 +597,7 @@ pub fn generate_public_key(private_key: JsString) -> JsString {
 
 #[wasm_bindgen]
 pub async fn propagate_transaction(tx: &WasmTransaction) {
-    info!("propagate_transaction");
+    trace!("propagate_transaction");
 
     let mut saito = SAITO.lock().await;
     saito
@@ -639,7 +639,7 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
 
 #[wasm_bindgen]
 pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
-    info!("send_api_success : {:?}", peer_index);
+    trace!("send_api_success : {:?}", peer_index);
     let saito = SAITO.lock().await;
     let api_message = ApiMessage {
         msg_index,
@@ -651,7 +651,7 @@ pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: Pe
     // let mut tx = Transaction::default();
     // tx.data = buffer;
     // let buffer = Message::Transaction(tx).serialize();
-    info!("buffer size = {:?}", buffer.len());
+    // trace!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
         .network
@@ -663,7 +663,7 @@ pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: Pe
 
 #[wasm_bindgen]
 pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
-    info!("send_api_error : {:?}", peer_index);
+    trace!("send_api_error : {:?}", peer_index);
     let saito = SAITO.lock().await;
     let api_message = ApiMessage {
         msg_index,
@@ -676,7 +676,7 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
     // tx.data = buffer;
     // let buffer = Message::Transaction(tx).serialize();
 
-    info!("buffer size = {:?}", buffer.len());
+    // info!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
         .network
