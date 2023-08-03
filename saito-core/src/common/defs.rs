@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::time::Duration;
 
 use ahash::AHashMap;
 use tokio::sync::mpsc::Sender;
@@ -33,6 +34,9 @@ pub const MIN_GOLDEN_TICKETS_DENOMINATOR: u64 = 6;
 
 pub const BLOCK_FILE_EXTENSION: &str = ".sai";
 pub const STAT_BIN_COUNT: usize = 3;
+
+pub const PEER_RECONNECT_WAIT_PERIOD: Timestamp = Duration::from_secs(10).as_millis() as Timestamp;
+pub const WS_KEEP_ALIVE_PERIOD: Timestamp = Duration::from_secs(10).as_millis() as Timestamp;
 
 /// NOTE : Lock ordering is decided from how frequent the usage is for that resource. Please make sure to follow the order given below to avoid deadlocks
 /// network controller
