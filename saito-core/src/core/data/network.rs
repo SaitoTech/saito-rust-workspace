@@ -6,10 +6,11 @@ use log::{debug, error, info, trace};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, PeerIndex, SaitoHash, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    push_lock, PeerIndex, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, PEER_RECONNECT_WAIT_PERIOD,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
+use crate::common::keep_time::KeepTime;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
@@ -22,14 +23,15 @@ use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{lock_for_read, lock_for_write};
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Network {
     // TODO : manage peers from network
     pub peers: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
-    static_peer_configs: Vec<PeerConfig>,
+    static_peer_configs: Vec<(PeerConfig, Timestamp)>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
 }
 
 impl Network {
@@ -38,6 +40,7 @@ impl Network {
         peers: Arc<RwLock<PeerCollection>>,
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        time_keeper: Box<dyn KeepTime + Send + Sync>,
     ) -> Network {
         Network {
             peers,
@@ -45,6 +48,7 @@ impl Network {
             static_peer_configs: Default::default(),
             wallet,
             configs,
+            time_keeper,
         }
     }
     pub async fn propagate_block(
@@ -208,8 +212,9 @@ impl Network {
                     .await
                     .unwrap();
 
+                // setting to immediately reconnect. if failed, it will connect after a time
                 self.static_peer_configs
-                    .push(peer.static_peer_config.as_ref().unwrap().clone());
+                    .push((peer.static_peer_config.as_ref().unwrap().clone(), 0));
             } else if peer.public_key.is_some() {
                 info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
                 peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
@@ -241,8 +246,9 @@ impl Network {
             );
             let data = peer.static_peer_config.as_ref().unwrap();
 
-            self.static_peer_configs
-                .retain(|config| config.host != data.host || config.port != data.port);
+            self.static_peer_configs.retain(|(config, reconnect_time)| {
+                config.host != data.host || config.port != data.port
+            });
         }
 
         info!("new peer added : {:?}", peer_index);
@@ -440,43 +446,50 @@ impl Network {
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
         let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
-        self.static_peer_configs = configs.get_peer_configs().clone();
+
+        configs
+            .get_peer_configs()
+            .clone()
+            .drain(..)
+            .for_each(|config| {
+                self.static_peer_configs.push((config, 0));
+            });
         if !self.static_peer_configs.is_empty() {
-            self.static_peer_configs.get_mut(0).unwrap().is_main = true;
+            self.static_peer_configs.get_mut(0).unwrap().0.is_main = true;
         }
         trace!("static peers : {:?}", self.static_peer_configs);
     }
 
     pub async fn connect_to_static_peers(&mut self) {
-        // trace!(
-        //     "connect to static peers : count = {:?}",
-        //     self.static_peer_configs.len()
-        // );
-
-        for peer in &self.static_peer_configs {
+        let current_time = self.time_keeper.get_timestamp_in_ms();
+        for (peer, reconnect_after) in &mut self.static_peer_configs {
             trace!("connecting to peer : {:?}", peer);
+            if *reconnect_after > current_time {
+                continue;
+            }
+            *reconnect_after = current_time + PEER_RECONNECT_WAIT_PERIOD;
             self.io_interface
                 .connect_to_peer(peer.clone())
                 .await
                 .unwrap();
         }
-        // trace!("connected to peers");
     }
-    // pub async fn propagate_services(&self, peer_index: PeerIndex, services: Vec<PeerService>) {
-    //     let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
-    //     let buffer = Message::Services(services).serialize();
-    //     if peer_index == 0 {
-    //         for (i, _) in peers.index_to_peers.iter() {
-    //             self.io_interface
-    //                 .send_message(*i, buffer.clone())
-    //                 .await
-    //                 .unwrap();
-    //         }
-    //     } else {
-    //         self.io_interface
-    //             .send_message(peer_index, buffer)
-    //             .await
-    //             .unwrap();
-    //     }
-    // }
+
+    pub async fn send_pings(&mut self) {
+        let current_time = self.time_keeper.get_timestamp_in_ms();
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        for (_, peer) in peers.index_to_peers.iter_mut() {
+            peer.send_ping(current_time, &self.io_interface).await;
+        }
+    }
+
+    pub async fn update_peer_timer(&mut self, peer_index: PeerIndex) {
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_none() {
+            return;
+        }
+        let peer = peer.unwrap();
+        peer.last_msg_at = self.time_keeper.get_timestamp_in_ms();
+    }
 }

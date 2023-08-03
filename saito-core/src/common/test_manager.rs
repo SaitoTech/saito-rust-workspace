@@ -38,6 +38,7 @@ pub mod test {
         push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
         UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
+    use crate::common::keep_time::KeepTime;
     use crate::common::test_io_handler::test::TestIOHandler;
     use crate::core::data::block::Block;
     use crate::core::data::blockchain::Blockchain;
@@ -59,7 +60,12 @@ pub mod test {
             .unwrap()
             .as_millis() as Timestamp
     }
-
+    struct TestTimeKeeper {}
+    impl KeepTime for TestTimeKeeper {
+        fn get_timestamp_in_ms(&self) -> Timestamp {
+            create_timestamp()
+        }
+    }
     pub struct TestManager {
         pub mempool_lock: Arc<RwLock<Mempool>>,
         pub blockchain_lock: Arc<RwLock<Blockchain>>,
@@ -96,6 +102,7 @@ pub mod test {
                     peers.clone(),
                     wallet_lock.clone(),
                     configs.clone(),
+                    Box::new(TestTimeKeeper {}),
                 ),
                 peers: peers.clone(),
                 storage: Storage::new(Box::new(TestIOHandler::new())),

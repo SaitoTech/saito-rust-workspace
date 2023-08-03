@@ -278,7 +278,7 @@ impl Mempool {
                 previous_block.timestamp, current_timestamp, work_available, work_needed, time_elapsed, true
                 );
             } else {
-                debug!(
+                info!(
                 "last ts: {:?}, this ts: {:?}, work available: {:?}, work needed: {:?}, time_elapsed : {:?} can_bundle : {:?}",
                 previous_block.timestamp, current_timestamp, work_available, work_needed, time_elapsed, false
                 );

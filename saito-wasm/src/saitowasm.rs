@@ -130,6 +130,7 @@ pub fn new() -> SaitoWasm {
                 peers.clone(),
                 context.wallet.clone(),
                 context.configuration.clone(),
+                Box::new(WasmTimeKeeper {}),
             ),
             reconnection_timer: 0,
             stats: RoutingStats::new(sender_to_stat.clone()),
@@ -157,6 +158,7 @@ pub fn new() -> SaitoWasm {
                 peers.clone(),
                 context.wallet.clone(),
                 configuration.clone(),
+                Box::new(WasmTimeKeeper {}),
             ),
             storage: Storage::new(Box::new(WasmIoHandler {})),
             stats: ConsensusStats::new(sender_to_stat.clone()),
@@ -388,7 +390,7 @@ pub async fn process_peer_disconnection(peer_index: u64) {
 pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
     let mut saito = SAITO.lock().await;
     let buffer = buffer.to_vec();
-    info!(
+    trace!(
         "process_msg_buffer_from_peer : {:?} length = {:?}",
         peer_index,
         buffer.len()

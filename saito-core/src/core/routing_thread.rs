@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -93,7 +93,9 @@ pub struct RoutingThread {
     pub last_verification_thread_index: usize,
     pub stat_sender: Sender<String>,
     pub blockchain_sync_state: BlockchainSyncState,
+    // TODO : can be removed since we are handling reconnection for each peer now
     pub initial_connection: bool,
+    // TODO : can be removed since we are handling reconnection for each peer now
     pub reconnection_wait_time: Timestamp,
 }
 
@@ -118,6 +120,7 @@ impl RoutingThread {
             message.get_type_value(),
             peer_index
         );
+        self.network.update_peer_timer(peer_index).await;
 
         match message {
             Message::HandshakeChallenge(challenge) => {
@@ -559,10 +562,10 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             self.reconnection_timer += duration_value;
             if self.reconnection_timer >= self.reconnection_wait_time {
                 self.network.connect_to_static_peers().await;
+                self.network.send_pings().await;
                 self.reconnection_timer = 0;
             }
         }
-
         None
     }
 
