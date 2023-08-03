@@ -1,11 +1,12 @@
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{info, warn};
+use log::{info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+    push_lock, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+    WS_KEEP_ALIVE_PERIOD,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data;
@@ -27,6 +28,7 @@ pub struct Peer {
     pub challenge_for_peer: Option<SaitoHash>,
     pub key_list: Vec<SaitoPublicKey>,
     pub services: Vec<PeerService>,
+    pub last_msg_at: Timestamp,
 }
 
 impl Peer {
@@ -39,6 +41,7 @@ impl Peer {
             challenge_for_peer: None,
             key_list: vec![],
             services: vec![],
+            last_msg_at: 0,
         }
     }
     pub async fn initiate_handshake(
@@ -204,6 +207,20 @@ impl Peer {
             //     + "/"
         } else {
             self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
+        }
+    }
+    pub async fn send_ping(
+        &mut self,
+        current_time: Timestamp,
+        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+    ) {
+        if self.last_msg_at + WS_KEEP_ALIVE_PERIOD < current_time {
+            self.last_msg_at = current_time;
+            trace!("sending ping to peer : {:?}", self.index);
+            io_handler
+                .send_message(self.index, Message::Ping().serialize())
+                .await
+                .unwrap();
         }
     }
     pub fn has_service(&self, service: String) -> bool {
