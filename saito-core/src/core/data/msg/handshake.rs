@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{info, trace, warn};
+use log::{trace, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
 use crate::core::data::peer_service::PeerService;
@@ -86,6 +86,14 @@ impl Serialize<Self> for HandshakeResponse {
 
         // if we detect a block fetch url, we will retrieve it
         if url_length > 0 {
+            if buffer.len() < 134 + url_length as usize {
+                warn!(
+                    "cannot read block fetch url of size : {:?} from buffer size : {:?}",
+                    url_length,
+                    buffer.len()
+                );
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
             trace!("reading URL with length : {:?}", url_length);
             let result = String::from_utf8(buffer[134..(134 + url_length) as usize].to_vec());
             if result.is_err() {
