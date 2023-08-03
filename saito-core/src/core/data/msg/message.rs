@@ -120,7 +120,12 @@ impl Message {
             7 => Ok(Message::Ping()),
             8 => Ok(Message::SPVChain()),
             9 => {
-                let services = PeerService::deserialize_services(buffer)?;
+                let services = PeerService::deserialize_services(buffer);
+                if services.is_err() {
+                    warn!("couldn't parse peer service from buffer");
+                    return Err(Error::from(ErrorKind::InvalidData));
+                }
+                let services = services.unwrap();
                 Ok(Message::Services(services))
             }
             10 => Ok(Message::GhostChain(GhostChainSync::deserialize(buffer))),

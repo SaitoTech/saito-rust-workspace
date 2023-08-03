@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::warn;
+use log::{error, warn};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,12 +48,23 @@ impl PeerService {
         }
         let str = String::from_utf8(buffer);
         if str.is_err() {
-            warn!("failed parsing services. {:?}", str.err().unwrap());
+            warn!("failed parsing services.");
+            error!("{:?}", str.err().unwrap());
             return Err(Error::from(ErrorKind::InvalidData));
         }
         let str = str.unwrap();
         let strings = str.split(";");
-        let services: Vec<PeerService> = strings.map(|str| str.to_string().into()).collect();
+        let mut services: Vec<PeerService> = Default::default();
+        for str in strings {
+            let service = str.to_string().try_into();
+
+            if service.is_err() {
+                warn!("cannot parse services from : {:?}", str);
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
+
+            services.push(service.unwrap());
+        }
         Ok(services)
     }
 }
