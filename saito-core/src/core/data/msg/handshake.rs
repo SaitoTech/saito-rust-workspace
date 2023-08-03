@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{info, warn};
+use log::{info, trace, warn};
 
 use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
 use crate::core::data::peer_service::PeerService;
@@ -65,6 +65,7 @@ impl Serialize<Self> for HandshakeResponse {
         .concat()
     }
     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
+        trace!("deserializing handshake buffer : {:?}", buffer.len());
         if buffer.len() < 134 {
             warn!(
                 "Deserializing failed for handshake response, buffer size is :{:?}",
@@ -85,6 +86,7 @@ impl Serialize<Self> for HandshakeResponse {
 
         // if we detect a block fetch url, we will retrieve it
         if url_length > 0 {
+            trace!("reading URL with length : {:?}", url_length);
             let result = String::from_utf8(buffer[134..(134 + url_length) as usize].to_vec());
             if result.is_err() {
                 warn!(
@@ -95,12 +97,15 @@ impl Serialize<Self> for HandshakeResponse {
             }
 
             response.block_fetch_url = result.unwrap();
+            trace!("block fetch url read as : {:?}", response.block_fetch_url);
         }
         // if we detect services, we deserialize that too
         if buffer.len() > (134 + url_length) as usize {
+            trace!("reading peer services");
             let service_buffer = buffer[(134 + url_length) as usize..].to_vec();
 
             let services = PeerService::deserialize_services(service_buffer)?;
+            trace!("{:?} services read from handshake response", services.len());
             response.services = services;
         }
 
