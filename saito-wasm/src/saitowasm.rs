@@ -794,6 +794,7 @@ where
 {
     let str = key.as_string();
     if str.is_none() {
+        error!("cannot create key from empty string");
         return Err(Error::from(ErrorKind::InvalidInput));
     }
     let str = str.unwrap();
@@ -805,7 +806,7 @@ where
     let key = key.unwrap();
     let key = key.try_into();
     if key.is_err() {
-        // error!("{:?}", key.err().unwrap());
+        error!("{:?}", key.err().unwrap());
         return Err(Error::from(ErrorKind::InvalidInput));
     }
     let key = key.unwrap();
