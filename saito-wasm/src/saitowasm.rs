@@ -12,7 +12,7 @@ use figment::providers::{Format, Json};
 use figment::Figment;
 use js_sys::{Array, JsString, Uint8Array};
 use lazy_static::lazy_static;
-use log::{debug, error, info, trace, warn, Level};
+use log::{debug, error, info, trace, warn};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -225,12 +225,12 @@ pub async fn initialize(
     log_level_num: u8,
 ) -> Result<JsValue, JsValue> {
     let log_level = match log_level_num {
-        0 => Level::Error,
-        1 => Level::Warn,
-        2 => Level::Info,
-        3 => Level::Debug,
-        4 => Level::Trace,
-        _ => Level::Info,
+        0 => log::Level::Error,
+        1 => log::Level::Warn,
+        2 => log::Level::Info,
+        3 => log::Level::Debug,
+        4 => log::Level::Trace,
+        _ => log::Level::Info,
     };
 
     console_log::init_with_level(log_level).unwrap();
@@ -260,8 +260,10 @@ pub async fn initialize(
         let config = config.unwrap();
 
         info!("config : {:?}", config);
+        info!("config.is_browser 1: {:?}", config.is_browser());
 
         configs.replace(&config);
+        info!("config.is_browser 2: {:?}", configs.is_browser());
     }
 
     let mut saito = SAITO.lock().await;

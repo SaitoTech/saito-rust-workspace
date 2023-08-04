@@ -103,5 +103,7 @@ impl Configuration for WasmConfiguration {
         self.server = config.get_server_configs().cloned();
         self.peers = config.get_peer_configs().clone();
         self.spv_mode = config.is_spv_mode();
+        self.browser_mode = config.is_browser();
+        self.blockchain = config.get_blockchain_configs();
     }
 }

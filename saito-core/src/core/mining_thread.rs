@@ -115,11 +115,10 @@ impl ProcessEvent<MiningEvent> for MiningThread {
     }
 
     async fn on_init(&mut self) {
-        {
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            self.enabled = !configs.is_browser();
-            info!("miner is enabled");
-        }
+        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        info!("is browser = {:?}", configs.is_browser());
+        self.enabled = !configs.is_browser();
+        info!("miner is enabled");
         let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
         self.public_key = wallet.public_key;
         info!("node public key = {:?}", hex::encode(self.public_key));
