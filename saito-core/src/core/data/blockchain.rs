@@ -119,8 +119,9 @@ impl Blockchain {
         block.generate();
 
         debug!(
-            "add_block {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
+            "add_block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
             hex::encode(block.hash),
+            block.block_type,
             block.id,
             self.get_latest_block_id(),
             block.transactions.len()
