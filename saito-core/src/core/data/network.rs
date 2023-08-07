@@ -207,10 +207,10 @@ impl Network {
                     peer.index
                 );
 
-                self.io_interface
-                    .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
-                    .await
-                    .unwrap();
+                // self.io_interface
+                //     .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
+                //     .await
+                //     .unwrap();
 
                 // setting to immediately reconnect. if failed, it will connect after a time
                 self.static_peer_configs

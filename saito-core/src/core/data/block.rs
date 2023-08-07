@@ -728,7 +728,11 @@ impl Block {
 
         let creator_public_key = &self.creator;
 
-        trace!("generating block data : {:?}", hex::encode(self.hash));
+        trace!(
+            "generating block data : {:?} of type : {:?}",
+            hex::encode(self.hash),
+            self.block_type
+        );
 
         let _transactions_pre_calculated = &self
             .transactions
