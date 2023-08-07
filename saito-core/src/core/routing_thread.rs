@@ -257,7 +257,7 @@ impl RoutingThread {
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(i);
             if hash != [0; 32] {
-                let block = blockchain.get_block(&block_hash);
+                let block = blockchain.get_block(&hash);
                 if block.is_some() {
                     let block = block.unwrap();
                     debug!(

@@ -1457,7 +1457,7 @@ impl Block {
                     .try_into()
                     .unwrap(),
                     path: vec![],
-                    hash_for_signature: tx.hash_for_signature.clone(),
+                    hash_for_signature: tx.hash_for_signature,
                     total_in: 0,
                     total_out: 0,
                     total_fees: 0,

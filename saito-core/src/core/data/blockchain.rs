@@ -126,6 +126,7 @@ impl Blockchain {
             self.get_latest_block_id(),
             block.transactions.len()
         );
+        trace!("block : {:?}", block);
 
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
@@ -471,10 +472,10 @@ impl Blockchain {
         {
             let block = self.get_mut_block(&block_hash).unwrap();
             block_id = block.id;
-            if block.block_type != BlockType::Header {
+            if block.block_type != BlockType::Header && !configs.is_browser() {
                 // TODO : this will have an impact when the block sizes are getting large or there are many forks. need to handle this
                 storage.write_block_to_disk(block).await;
-            } else {
+            } else if block.block_type == BlockType::Header {
                 debug!(
                     "block : {:?} not written to disk as type : {:?}",
                     hex::encode(block.hash),

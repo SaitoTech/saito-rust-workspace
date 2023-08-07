@@ -361,7 +361,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             }
 
             let mut block = None;
-            if !configs.is_browser() && !configs.is_spv_mode() {
+            if !configs.is_browser() && !configs.is_spv_mode() && !blockchain.blocks.is_empty() {
                 block = mempool
                     .bundle_block(
                         blockchain.deref_mut(),
