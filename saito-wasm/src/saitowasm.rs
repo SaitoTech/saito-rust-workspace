@@ -317,7 +317,7 @@ pub async fn get_latest_block_hash() -> JsString {
 
 #[wasm_bindgen]
 pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
-    debug!("get_block");
+    // debug!("get_block");
     let block_hash = string_to_key(block_hash);
     if block_hash.is_err() {
         error!("block hash string is invalid");
@@ -392,11 +392,11 @@ pub async fn process_peer_disconnection(peer_index: u64) {
 pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
     let mut saito = SAITO.lock().await;
     let buffer = buffer.to_vec();
-    trace!(
-        "process_msg_buffer_from_peer : {:?} length = {:?}",
-        peer_index,
-        buffer.len()
-    );
+    // trace!(
+    //     "process_msg_buffer_from_peer : {:?} length = {:?}",
+    //     peer_index,
+    //     buffer.len()
+    // );
     saito
         .routing_thread
         .process_network_event(NetworkEvent::IncomingNetworkMessage { peer_index, buffer })

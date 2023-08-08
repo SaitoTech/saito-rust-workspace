@@ -195,14 +195,19 @@ impl Peer {
     /// ```
     ///
     /// ```
-    pub fn get_block_fetch_url(&self, block_hash: SaitoHash, lite: bool) -> String {
+    pub fn get_block_fetch_url(
+        &self,
+        block_hash: SaitoHash,
+        lite: bool,
+        my_public_key: SaitoPublicKey,
+    ) -> String {
         // TODO : generate the url with proper / escapes,etc...
         if lite {
-            // self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
-
-            // TODO : uncomment when fixing lite-mode bugs
-            self.block_fetch_url.to_string() + "/lite-block/" + hex::encode(block_hash).as_str()
-            // + "/"
+            self.block_fetch_url.to_string()
+                + "/lite-block/"
+                + hex::encode(block_hash).as_str()
+                + "/"
+                + hex::encode(my_public_key).as_str()
         } else {
             self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
         }

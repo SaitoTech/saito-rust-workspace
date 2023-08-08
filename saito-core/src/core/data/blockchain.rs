@@ -126,7 +126,7 @@ impl Blockchain {
             self.get_latest_block_id(),
             block.transactions.len()
         );
-        trace!("block : {:?}", block);
+        // trace!("block : {:?}", block);
 
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the

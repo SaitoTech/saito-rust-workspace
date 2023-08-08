@@ -31,7 +31,7 @@ impl BlockchainSyncState {
         }
     }
     pub(crate) fn build_peer_block_picture(&mut self) {
-        debug!("building peer block picture");
+        // debug!("building peer block picture");
         // for every block picture received from a peer, we sort and create a list of sequential hashes to fetch from peers
         for (peer_index, received_picture) in self.received_block_picture.iter_mut() {
             if received_picture.is_empty() {
