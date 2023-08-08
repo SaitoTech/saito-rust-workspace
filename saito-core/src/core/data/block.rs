@@ -1431,7 +1431,12 @@ impl Block {
     }
 
     pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
+        info!(
+            "generating lite block for keys : {:?}",
+            keylist.iter().map(hex::encode).collect::<Vec<String>>()
+        );
         let mut pruned_txs = vec![];
+        let mut selected_txs = 0;
         for tx in self.transactions.iter() {
             if tx
                 .from
@@ -1441,6 +1446,7 @@ impl Block {
                 || tx.is_golden_ticket()
             {
                 pruned_txs.push(tx.clone());
+                selected_txs += 1;
             } else {
                 let spv = Transaction {
                     timestamp: tx.timestamp,
@@ -1468,6 +1474,11 @@ impl Block {
                 pruned_txs.push(spv);
             }
         }
+        debug!(
+            "selected txs : {:?} out of {:?}",
+            selected_txs,
+            self.transactions.len()
+        );
 
         // TODO : prune transactions here
 

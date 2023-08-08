@@ -152,9 +152,14 @@ impl Network {
         );
         let peer_index;
         let url;
+        let my_public_key;
         {
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+            {
+                let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                my_public_key = wallet.public_key;
+            }
 
             let peer = peers.find_peer_by_address(public_key);
             if peer.is_none() {
@@ -175,7 +180,7 @@ impl Network {
                 );
                 return Err(Error::from(ErrorKind::AddrNotAvailable));
             }
-            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
+            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
             peer_index = peer.index;
         }
 
@@ -408,10 +413,13 @@ impl Network {
     ) -> Option<()> {
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let block_exists;
+        let my_public_key;
         {
             let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
             block_exists = blockchain.is_block_indexed(block_hash);
+            my_public_key = wallet.public_key;
         }
         if block_exists {
             return None;
@@ -432,7 +440,7 @@ impl Network {
                 );
                 return None;
             }
-            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
+            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
         }
         self.io_interface
             .fetch_block_from_peer(block_hash, peer_index, url)

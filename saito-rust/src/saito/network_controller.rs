@@ -758,15 +758,15 @@ fn run_websocket_server(
                     let mut key1 = String::from("");
                     if key.is_some() {
                         key1 = key.unwrap();
+                        if key1.len() != 64 {
+                            warn!("key : {:?} is not valid", key1);
+                            return Err(warp::reject::reject());
+                        }
                     } else {
                         warn!("key is not set to request lite blocks");
                         return Err(warp::reject::reject());
                     }
 
-                    if key1.len() != 64 {
-                        warn!("key : {:?} is not valid", key1);
-                        return Err(warp::reject::reject());
-                    }
                     let key;
                     if key1.is_empty() {
                         key = public_key.clone();

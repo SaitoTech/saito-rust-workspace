@@ -354,7 +354,7 @@ impl RoutingThread {
         self.fetch_next_blocks().await;
     }
     async fn fetch_next_blocks(&mut self) {
-        trace!("fetching next blocks");
+        // trace!("fetching next blocks");
 
         // {
         //     let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
@@ -482,11 +482,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 unreachable!()
             }
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                trace!(
-                    "incoming message received from peer : {:?} buffer_len : {:?}",
-                    peer_index,
-                    buffer.len()
-                );
+                // trace!(
+                //     "incoming message received from peer : {:?} buffer_len : {:?}",
+                //     peer_index,
+                //     buffer.len()
+                // );
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
