@@ -380,7 +380,7 @@ pub async fn process_new_peer(index: u64, peer_config: JsValue) {
 
 #[wasm_bindgen]
 pub async fn process_peer_disconnection(peer_index: u64) {
-    info!("process_peer_disconnection : {:?}", peer_index);
+    debug!("process_peer_disconnection : {:?}", peer_index);
     let mut saito = SAITO.lock().await;
     saito
         .routing_thread

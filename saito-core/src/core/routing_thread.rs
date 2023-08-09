@@ -490,11 +490,15 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
-                    trace!(
-                        "failed deserializing msg from peer : {:?} with buffer size : {:?}",
-                        peer_index,
-                        buffer_len
+                    warn!(
+                        "failed deserializing msg from peer : {:?} with buffer size : {:?}. disconnecting peer",
+                        peer_index, buffer_len
                     );
+                    self.network
+                        .io_interface
+                        .disconnect_from_peer(peer_index)
+                        .await
+                        .unwrap();
                     return None;
                 }
 

@@ -69,7 +69,7 @@ impl Message {
         buffer
     }
     pub fn deserialize(buffer: Vec<u8>) -> Result<Message, Error> {
-        if buffer.len() == 0 {
+        if buffer.is_empty() {
             warn!("empty buffer is not valid for message deserialization",);
             return Err(Error::from(ErrorKind::InvalidData));
         }
