@@ -522,10 +522,23 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
 pub async fn get_peers() -> Array {
     let saito = SAITO.lock().await;
     let peers = saito.routing_thread.network.peers.read().await;
-    let array = Array::new_with_length(peers.index_to_peers.len() as u32);
+    let valid_peer_count = peers
+        .index_to_peers
+        .iter()
+        .filter(|(index, peer)| peer.public_key.is_some())
+        .count();
+    let array = Array::new_with_length(valid_peer_count as u32);
+    let mut array_index = 0;
     for (i, (_peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
+        if peer.public_key.is_none() {
+            continue;
+        }
         let peer = peer.clone();
-        array.set(i as u32, JsValue::from(WasmPeer::new_from_peer(peer)));
+        array.set(
+            array_index as u32,
+            JsValue::from(WasmPeer::new_from_peer(peer)),
+        );
+        array_index += 1;
     }
     array
 }
@@ -535,7 +548,7 @@ pub async fn get_peer(peer_index: u64) -> Option<WasmPeer> {
     let saito = SAITO.lock().await;
     let peers = saito.routing_thread.network.peers.read().await;
     let peer = peers.find_peer_by_index(peer_index);
-    if peer.is_none() {
+    if peer.is_none() || peer.unwrap().public_key.is_none() {
         warn!("peer not found");
         // return Err(JsValue::from("peer not found"));
         return None;

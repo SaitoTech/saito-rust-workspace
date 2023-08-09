@@ -285,7 +285,7 @@ impl Network {
             .unwrap();
     }
     pub async fn handle_handshake_response(
-        &self,
+        &mut self,
         peer_index: u64,
         response: HandshakeResponse,
         wallet: Arc<RwLock<Wallet>>,
@@ -304,26 +304,35 @@ impl Network {
             return;
         }
         let peer = peer.unwrap();
-        peer.handle_handshake_response(
-            response,
-            &self.io_interface,
-            wallet.clone(),
-            configs.clone(),
-        )
-        .await
-        .unwrap();
-        if peer.public_key.is_some() {
-            debug!(
-                "peer : {:?} handshake successful for peer : {:?}",
-                peer.index,
-                hex::encode(peer.public_key.as_ref().unwrap())
+        let result = peer
+            .handle_handshake_response(
+                response,
+                &self.io_interface,
+                wallet.clone(),
+                configs.clone(),
+            )
+            .await;
+        if result.is_err() || peer.public_key.is_none() {
+            info!(
+                "disconnecting peer : {:?} as handshake response was not handled",
+                peer_index
             );
-            let public_key = peer.public_key.clone().unwrap();
-            peers.address_to_peers.insert(public_key, peer_index);
-            // start block syncing here
-            self.request_blockchain_from_peer(peer_index, blockchain.clone())
-                .await;
+            self.io_interface
+                .disconnect_from_peer(peer_index)
+                .await
+                .unwrap();
+            return;
         }
+        debug!(
+            "peer : {:?} handshake successful for peer : {:?}",
+            peer.index,
+            hex::encode(peer.public_key.as_ref().unwrap())
+        );
+        let public_key = peer.public_key.unwrap();
+        peers.address_to_peers.insert(public_key, peer_index);
+        // start block syncing here
+        self.request_blockchain_from_peer(peer_index, blockchain.clone())
+            .await;
     }
 
     async fn request_blockchain_from_peer(
