@@ -191,16 +191,19 @@ impl Network {
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
 
-        // calling here before removing the peer from collections
-        self.io_interface
-            .send_interface_event(InterfaceEvent::PeerConnectionDropped(peer_index));
-
         let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let result = peers.find_peer_by_index(peer_index);
 
         if result.is_some() {
             let peer = result.unwrap();
+
+            if peer.public_key.is_some() {
+                // calling here before removing the peer from collections
+                self.io_interface
+                    .send_interface_event(InterfaceEvent::PeerConnectionDropped(peer_index));
+            }
+
             let public_key = peer.public_key;
             if peer.static_peer_config.is_some() {
                 // This means the connection has been initiated from this side, therefore we must
@@ -259,8 +262,6 @@ impl Network {
         info!("new peer added : {:?}", peer_index);
         peers.index_to_peers.insert(peer_index, peer);
         info!("current peer count = {:?}", peers.index_to_peers.len());
-        self.io_interface
-            .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
     }
     pub async fn handle_handshake_challenge(
         &self,
@@ -328,6 +329,8 @@ impl Network {
             peer.index,
             hex::encode(peer.public_key.as_ref().unwrap())
         );
+        self.io_interface
+            .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
         let public_key = peer.public_key.unwrap();
         peers.address_to_peers.insert(public_key, peer_index);
         // start block syncing here

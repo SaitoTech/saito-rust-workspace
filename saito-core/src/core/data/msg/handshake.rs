@@ -112,7 +112,15 @@ impl Serialize<Self> for HandshakeResponse {
             trace!("reading peer services");
             let service_buffer = buffer[(134 + url_length) as usize..].to_vec();
 
-            let services = PeerService::deserialize_services(service_buffer)?;
+            let services = PeerService::deserialize_services(service_buffer);
+            if services.is_err() {
+                let len = buffer.len() - (134 + url_length) as usize;
+                warn!(
+                "Deserializing failed for handshake response, remaining buffer of size :{:?} cannot be parsed for peer services",
+                len);
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
+            let services = services.unwrap();
             trace!("{:?} services read from handshake response", services.len());
             response.services = services;
         }

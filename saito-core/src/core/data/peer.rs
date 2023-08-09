@@ -1,7 +1,7 @@
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{info, trace, warn};
+use log::{debug, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
@@ -48,7 +48,7 @@ impl Peer {
         &mut self,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
     ) -> Result<(), Error> {
-        info!("initiating handshake : {:?}", self.index);
+        debug!("initiating handshake : {:?}", self.index);
 
         let challenge = HandshakeChallenge {
             challenge: generate_random_bytes(32).try_into().unwrap(),
@@ -59,7 +59,7 @@ impl Peer {
             .send_message(self.index, message.serialize())
             .await
             .unwrap();
-        info!("handshake challenge sent for peer: {:?}", self.index);
+        debug!("handshake challenge sent for peer: {:?}", self.index);
 
         Ok(())
     }
@@ -70,7 +70,7 @@ impl Peer {
         wallet_lock: Arc<RwLock<Wallet>>,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
-        info!("handling handshake challenge : {:?}", self.index,);
+        debug!("handling handshake challenge : {:?}", self.index,);
         let block_fetch_url;
         let is_lite;
         {
@@ -99,7 +99,7 @@ impl Peer {
             .send_message(self.index, Message::HandshakeResponse(response).serialize())
             .await
             .unwrap();
-        info!("handshake response sent for peer: {:?}", self.index);
+        debug!("handshake response sent for peer: {:?}", self.index);
 
         Ok(())
     }
@@ -110,7 +110,7 @@ impl Peer {
         wallet_lock: Arc<RwLock<Wallet>>,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
-        info!(
+        debug!(
             "handling handshake response :{:?} with address : {:?}",
             self.index,
             hex::encode(response.public_key)
@@ -171,7 +171,7 @@ impl Peer {
                 .send_message(self.index, Message::HandshakeResponse(response).serialize())
                 .await
                 .unwrap();
-            info!("handshake response sent for peer: {:?}", self.index);
+            debug!("handshake response sent for peer: {:?}", self.index);
         } else {
             info!(
                 "handshake completed for peer : {:?}",
