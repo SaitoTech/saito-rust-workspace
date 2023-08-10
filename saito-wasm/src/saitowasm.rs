@@ -95,7 +95,7 @@ pub fn new() -> SaitoWasm {
     // let private_key = wallet.private_key.clone();
     let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
 
-    let channel_size = 1_000;
+    let channel_size = 1_000_000;
     // {
     //     let configs = configuration.read().await;
     //     channel_size = configs.get_server_configs().unwrap().channel_size;
