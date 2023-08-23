@@ -60,12 +60,15 @@ pub mod test {
             .unwrap()
             .as_millis() as Timestamp
     }
+
     struct TestTimeKeeper {}
+
     impl KeepTime for TestTimeKeeper {
         fn get_timestamp_in_ms(&self) -> Timestamp {
             create_timestamp()
         }
     }
+
     pub struct TestManager {
         pub mempool_lock: Arc<RwLock<Mempool>>,
         pub blockchain_lock: Arc<RwLock<Blockchain>>,
@@ -149,6 +152,7 @@ pub mod test {
                     self.sender_to_miner.clone(),
                     &mut mempool,
                     configs.deref(),
+                    true,
                 )
                 .await;
             debug!("block added to test manager blockchain");
@@ -638,6 +642,7 @@ pub mod test {
                     self.sender_to_miner.clone(),
                     &mut mempool,
                     configs.deref(),
+                    true,
                 )
                 .await;
         }
