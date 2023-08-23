@@ -180,7 +180,7 @@ impl RoutingThread {
                     .await;
             }
             Message::ApplicationMessage(api_message) => {
-                debug!(
+                trace!(
                     "processing application msg with buffer size : {:?}",
                     api_message.data.len()
                 );

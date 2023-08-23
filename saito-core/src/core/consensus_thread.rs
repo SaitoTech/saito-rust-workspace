@@ -296,6 +296,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                             self.sender_to_miner.clone(),
                             &mut mempool,
                             configs.deref(),
+                            true,
                         )
                         .await;
                 }
