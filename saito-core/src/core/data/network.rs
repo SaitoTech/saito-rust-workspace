@@ -191,6 +191,11 @@ impl Network {
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
 
+        self.io_interface
+            .disconnect_from_peer(peer_index)
+            .await
+            .unwrap();
+
         let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let result = peers.find_peer_by_index(peer_index);

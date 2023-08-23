@@ -3,7 +3,7 @@ use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
-use log::{debug, error, info, trace};
+use log::{error, trace};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -70,6 +70,7 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+        trace!("disconnect from peer : {:?}", peer_index);
         MsgHandler::disconnect_from_peer(js_sys::BigInt::from(peer_index));
         Ok(())
     }

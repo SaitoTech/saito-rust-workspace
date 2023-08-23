@@ -112,6 +112,7 @@ impl Blockchain {
         sender_to_miner: Sender<MiningEvent>,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
+        notify_miner: bool,
     ) -> AddBlockResult {
         // confirm hash first
         // block.generate_pre_hash();
@@ -417,20 +418,29 @@ impl Blockchain {
                 .await;
 
             if does_new_chain_validate {
-                self.add_block_success(block_hash, network, storage, mempool, configs)
-                    .await;
+                self.add_block_success(
+                    block_hash,
+                    network,
+                    storage,
+                    mempool,
+                    configs,
+                    notify_miner,
+                )
+                .await;
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
-                info!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
-                // TODO : remove the sender by using a return value.
-                sender_to_miner
-                    .send(MiningEvent::LongestChainBlockAdded {
-                        hash: block_hash,
-                        difficulty,
-                    })
-                    .await
-                    .unwrap();
+                if notify_miner {
+                    info!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
+                    sender_to_miner
+                        .send(MiningEvent::LongestChainBlockAdded {
+                            hash: block_hash,
+                            difficulty,
+                        })
+                        .await
+                        .unwrap();
+                }
+
                 AddBlockResult::BlockAdded
             } else {
                 warn!(
@@ -443,7 +453,7 @@ impl Blockchain {
             }
         } else {
             debug!("this is not the longest chain");
-            self.add_block_success(block_hash, network, storage, mempool, configs)
+            self.add_block_success(block_hash, network, storage, mempool, configs, notify_miner)
                 .await;
             AddBlockResult::BlockAdded
         };
@@ -456,6 +466,7 @@ impl Blockchain {
         storage: &mut Storage,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
+        notify_miner: bool,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -463,7 +474,10 @@ impl Blockchain {
         //     create_timestamp()
         // );
         // print blockring longest_chain_block_hash infor
-        self.print(10);
+        if notify_miner {
+            // we only print blockchain after block queue is added to reduce the clutter in logs
+            self.print(10);
+        }
 
         let block_id;
         //
@@ -1568,6 +1582,8 @@ impl Blockchain {
                     sender_to_miner.clone(),
                     &mut mempool,
                     configs.deref(),
+                    // notify miner once all the blocks are added
+                    blocks.is_empty(),
                 )
                 .await;
             if !blockchain_updated {
