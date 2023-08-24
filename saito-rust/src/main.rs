@@ -315,6 +315,7 @@ async fn run_routing_event_processor(
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
         blockchain: context.blockchain.clone(),
+        mempool: context.mempool.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         time_keeper: Box::new(TimeKeeper {}),

@@ -196,7 +196,7 @@ impl NetworkController {
         io_controller: Arc<RwLock<NetworkController>>,
         peer_id: u64,
     ) {
-        todo!()
+        info!("TODO : handle disconnect_from_peer")
     }
     pub async fn send_to_all(
         sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,

@@ -624,75 +624,25 @@ impl Blockchain {
                 break;
             }
         }
+        let weights = [
+            0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
+        ];
 
-        //
         // loop backwards through blockchain
-        //
-        for i in 0..16 {
-            if i == 0 {
-                current_block_id -= 0;
+        for i in 0..weights.len() {
+            if current_block_id <= weights[i] {
+                break;
             }
-            if i == 1 {
-                current_block_id -= 10;
-            }
-            if i == 2 {
-                current_block_id -= 10;
-            }
-            if i == 3 {
-                current_block_id -= 10;
-            }
-            if i == 4 {
-                current_block_id -= 10;
-            }
-            if i == 5 {
-                current_block_id -= 10;
-            }
-            if i == 6 {
-                current_block_id -= 25;
-            }
-            if i == 7 {
-                current_block_id -= 25;
-            }
-            if i == 8 {
-                current_block_id -= 100;
-            }
-            if i == 9 {
-                current_block_id -= 300;
-            }
-            if i == 10 {
-                current_block_id -= 500;
-            }
-            if i == 11 {
-                current_block_id -= 4000;
-            }
-            if i == 12 {
-                current_block_id -= 10000;
-            }
-            if i == 13 {
-                current_block_id -= 20000;
-            }
-            if i == 14 {
-                current_block_id -= 50000;
-            }
-            if i == 15 {
-                current_block_id -= 100000;
-            }
+            current_block_id -= weights[i];
 
-            //
             // do not loop around if block id < 0
-            //
             if current_block_id > block_id || current_block_id == 0 {
                 break;
             }
 
-            //
             // index to update
-            //
             let index = 2 * i;
 
-            //
-            //
-            //
             let block_hash = self
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(current_block_id);

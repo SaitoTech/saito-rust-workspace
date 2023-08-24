@@ -119,6 +119,7 @@ pub fn new() -> SaitoWasm {
     SaitoWasm {
         routing_thread: RoutingThread {
             blockchain: context.blockchain.clone(),
+            mempool: context.mempool.clone(),
             sender_to_consensus: sender_to_consensus.clone(),
             sender_to_miner: sender_to_miner.clone(),
             static_peers: vec![],

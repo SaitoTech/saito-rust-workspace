@@ -7,13 +7,15 @@ use tokio::sync::RwLock;
 
 use crate::common::defs::{
     push_lock, PeerIndex, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, PEER_RECONNECT_WAIT_PERIOD,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    PEER_RECONNECT_WAIT_PERIOD,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::common::keep_time::KeepTime;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
+use crate::core::data::mempool::Mempool;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
@@ -427,15 +429,18 @@ impl Network {
         block_hash: SaitoHash,
         peer_index: PeerIndex,
         blockchain_lock: Arc<RwLock<Blockchain>>,
+        mempool_lock: Arc<RwLock<Mempool>>,
     ) -> Option<()> {
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let block_exists;
         let my_public_key;
         {
             let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (mempool, _mempool_) = lock_for_read!(mempool_lock, LOCK_ORDER_MEMPOOL);
             let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
-            block_exists = blockchain.is_block_indexed(block_hash);
+            block_exists = blockchain.is_block_indexed(block_hash)
+                || mempool.blocks_queue.iter().any(|b| b.hash == block_hash);
             my_public_key = wallet.public_key;
         }
         if block_exists {
