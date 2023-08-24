@@ -19,6 +19,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
+use crate::core::data::mempool::Mempool;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;
@@ -79,6 +80,7 @@ impl RoutingStats {
 /// Manages peers and routes messages to correct controller
 pub struct RoutingThread {
     pub blockchain: Arc<RwLock<Blockchain>>,
+    pub mempool: Arc<RwLock<Mempool>>,
     pub sender_to_consensus: Sender<ConsensusEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
     // TODO : remove this if not needed
@@ -372,7 +374,12 @@ impl RoutingThread {
             for hash in vec.iter() {
                 let result = self
                     .network
-                    .process_incoming_block_hash(*hash, peer_index, self.blockchain.clone())
+                    .process_incoming_block_hash(
+                        *hash,
+                        peer_index,
+                        self.blockchain.clone(),
+                        self.mempool.clone(),
+                    )
                     .await;
                 if result.is_some() {
                     fetched_blocks.push((peer_index, *hash));
