@@ -1,0 +1,32 @@
+[package]
+name = "utxo-issuance-converter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+saito-core = { path = "../saito-core" }
+saito-rust = { path = "../saito-rust" }
+tokio = { version = "1.24.2", features = ["full", "tracing"] }
+figment = { version = "0.10.8", features = ["json"] }
+futures = { version = "0.3.25", default-features = false }
+rayon = "1.6.1"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+hex = "0.4.3"
+ctrlc = { version = "3.2.4", features = ["termination"] }
+serde = { version = "1.0.163", features = ["derive"] }
+log = "0.4.17"
+bs58 = "0.5.0"
+env_logger = "0.10.0"
+
+[dev-dependencies]
+serial_test = "0.10.0"
+ctor = "0.1.26"
+criterion = "0.4.0"
+
+[features]
+default = ["with-stats", "saito-core/with-rayon", "saito-rust/default"]
+locking-logs = ["saito-core/locking-logs"]
+with-stats = ["saito-core/with-stats"]
+

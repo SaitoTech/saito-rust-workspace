@@ -104,11 +104,11 @@ impl Blockchain {
         &self.fork_id
     }
 
-    #[async_recursion]
+    // #[async_recursion]
     pub async fn add_block(
         &mut self,
         mut block: Block,
-        network: &Network,
+        network: Option<&Network>,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
         mempool: &mut Mempool,
@@ -168,8 +168,9 @@ impl Blockchain {
                     block_in_mempool_queue =
                         iterate!(mempool.blocks_queue, 100).any(|b| block_hash == b.hash);
                 }
-                if !block_in_mempool_queue {
+                if !block_in_mempool_queue && network.is_some() {
                     let result = network
+                        .unwrap()
                         .fetch_missing_block(
                             block_hash,
                             block.source_connection_id.as_ref().unwrap(),
@@ -463,7 +464,7 @@ impl Blockchain {
     pub async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
-        network: &Network,
+        network: Option<&Network>,
         storage: &mut Storage,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
@@ -480,11 +481,11 @@ impl Blockchain {
             self.print(10);
         }
 
-        let block_id;
+        let mut block_id = 0;
         //
         // save to disk
         //
-        {
+        if network.is_some() {
             let block = self.get_mut_block(&block_hash).unwrap();
             block_id = block.id;
             if block.block_type != BlockType::Header && !configs.is_browser() {
@@ -497,7 +498,7 @@ impl Blockchain {
                     block.block_type
                 );
             }
-            network.propagate_block(block, configs).await;
+            network.unwrap().propagate_block(block, configs).await;
         }
 
         //
@@ -569,9 +570,12 @@ impl Blockchain {
             }
         }
         info!("block {:?} added successfully", hex::encode(block_hash));
-        network
-            .io_interface
-            .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block_id));
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block_id));
+        }
     }
 
     pub async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
@@ -1510,7 +1514,7 @@ impl Blockchain {
     pub async fn add_blocks_from_mempool(
         &mut self,
         mempool_lock: Arc<RwLock<Mempool>>,
-        network: &Network,
+        network: Option<&Network>,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
         configs: &(dyn Configuration + Send + Sync),
@@ -2683,7 +2687,7 @@ mod tests {
             blockchain2
                 .add_blocks_from_mempool(
                     t2.mempool_lock.clone(),
-                    &t2.network,
+                    Some(&t2.network),
                     &mut t2.storage,
                     t2.sender_to_miner.clone(),
                     configs.deref(),
