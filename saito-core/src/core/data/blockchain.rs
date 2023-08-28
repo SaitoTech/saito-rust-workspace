@@ -4,7 +4,7 @@ use std::io::Error;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ahash::AHashMap;
+use ahash::{AHashMap, HashMap};
 use async_recursion::async_recursion;
 use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
@@ -12,16 +12,17 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
-    LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
+    push_lock, Currency, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD,
+    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
     MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
-use crate::common::interface_io::InterfaceEvent;
+use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
+use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
@@ -1594,6 +1595,18 @@ impl Blockchain {
 
     pub async fn save(&self) {
         // TODO : what should be done here in rust code?
+    }
+    pub fn get_utxoset_data(&self) -> HashMap<SaitoPublicKey, Currency> {
+        let mut data: HashMap<SaitoPublicKey, Currency> = Default::default();
+        self.utxoset.iter().for_each(|(key, value)| {
+            if !value {
+                return;
+            }
+            let slip = Slip::parse_slip_from_utxokey(key);
+            *data.entry(slip.public_key).or_default() += slip.amount;
+            // data.insert(slip.public_key, slip.amount);
+        });
+        data
     }
 }
 
