@@ -1,12 +1,18 @@
 use std::collections::VecDeque;
+use std::fmt::Error;
+use std::ops::Deref;
 use std::panic;
+use std::path::Path;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use clap::{App, Arg};
 use log::info;
 use log::{debug, error, trace};
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -16,9 +22,11 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
-use clap::{App, Arg};
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{push_lock, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT};
+use saito_core::common::defs::{
+    push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
+};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -36,8 +44,8 @@ use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::lock_for_read;
-use saito_rust::saito::config_handler::ConfigHandler;
+use saito_core::{lock_for_read, lock_for_write};
+use saito_rust::saito::config_handler::{ConfigHandler, NodeConfigurations};
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
 use saito_rust::saito::rust_io_handler::RustIOHandler;
@@ -698,6 +706,97 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     );
 }
 
+pub async fn run_utxo_to_issuance_converter() {
+    let (sender_to_network_controller, receiver_in_network_controller) =
+        tokio::sync::mpsc::channel::<IoEvent>(100);
+
+    info!("running saito controllers");
+    let public_key: SaitoPublicKey =
+        hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
+            .unwrap()
+            .try_into()
+            .unwrap();
+    let private_key: SaitoPrivateKey =
+        hex::decode("ddb4ba7e5d70c2234f035853902c6bc805cae9163085f2eac5e585e2d6113ccd")
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+    let configs_lock: Arc<RwLock<NodeConfigurations>> =
+        Arc::new(RwLock::new(NodeConfigurations::default()));
+
+    let configs_clone: Arc<RwLock<dyn Configuration + Send + Sync>> = configs_lock.clone();
+
+    let wallet = Arc::new(RwLock::new(Wallet::new(private_key, public_key)));
+    {
+        let mut wallet = wallet.write().await;
+        let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(100);
+        Wallet::load(&mut wallet, Box::new(RustIOHandler::new(sender, 1))).await;
+    }
+    let context = Context::new(configs_clone.clone(), wallet);
+
+    let mut storage = Storage::new(Box::new(RustIOHandler::new(
+        sender_to_network_controller.clone(),
+        0,
+    )));
+    storage.load_blocks_from_disk(context.mempool.clone()).await;
+
+    let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
+
+    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(100);
+
+    let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+
+    let (mut blockchain, _blockchain_) = lock_for_write!(context.blockchain, LOCK_ORDER_BLOCKCHAIN);
+    blockchain
+        .add_blocks_from_mempool(
+            context.mempool.clone(),
+            None,
+            &mut storage,
+            sender_to_miner.clone(),
+            configs.deref(),
+        )
+        .await;
+
+    let data = blockchain.get_utxoset_data();
+
+    info!("{:?} entries to write to file", data.len());
+    let issuance_path: String = "./data/issuance.file".to_string();
+    let threshold: Currency = 0;
+    info!("opening file : {:?}", issuance_path);
+
+    let path = Path::new(issuance_path.as_str());
+    if path.parent().is_some() {
+        tokio::fs::create_dir_all(path.parent().unwrap())
+            .await
+            .expect("failed creating directory structure");
+    }
+
+    let file = File::create(issuance_path.clone()).await;
+    if file.is_err() {
+        error!("error opening file. {:?}", file.err().unwrap());
+        File::create(issuance_path)
+            .await
+            .expect("couldn't create file");
+        return;
+    }
+    let mut file = file.unwrap();
+
+    let txtype = "Normal";
+
+    for (key, value) in &data {
+        if value > &threshold {
+            let key_base58 = bs58::encode(key).into_string();
+            file.write_all(format!("{}\t{}\t{}\n", value, key_base58, txtype).as_bytes())
+                .await
+                .expect("failed writing to issuance file");
+        }
+    }
+    file.flush()
+        .await
+        .expect("failed flushing issuance file data");
+}
+
 #[tokio::main(flavor = "multi_thread")]
 // #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -709,22 +808,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Sets a custom config file")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("mode")
+                .long("mode")
+                .value_name("MODE")
+                .default_value("node")
+                .possible_values(["node", "utxo-issuance"])
+                .help("Sets the mode for execution")
+                .takes_value(true),
+        )
         .get_matches();
 
     // config.json as default
     let config_file = matches.value_of("config").unwrap_or("configs/config.json");
 
+    let program_mode = matches.value_of("mode").unwrap_or("node");
+
     setup_log();
 
     setup_hook();
 
-    info!("Using config file: {}", config_file.to_string());
+    if program_mode == "node" {
+        info!("Using config file: {}", config_file.to_string());
+        let configs = ConfigHandler::load_configs(config_file.to_string());
+        if configs.is_err() {
+            error!("failed loading configs. {:?}", configs.err().unwrap());
+            return Ok(());
+        }
 
-    let configs: Arc<RwLock<dyn Configuration + Send + Sync>> = Arc::new(RwLock::new(
-        ConfigHandler::load_configs(config_file.to_string()).expect("loading configs failed"),
-    ));
+        let configs: Arc<RwLock<dyn Configuration + Send + Sync>> =
+            Arc::new(RwLock::new(configs.unwrap()));
 
-    run_node(configs).await;
+        run_node(configs).await;
+    } else if program_mode == "utxo-issuance" {
+        info!("running the program in utxo to issuance converter mode");
+
+        run_utxo_to_issuance_converter().await;
+    }
 
     Ok(())
 }
