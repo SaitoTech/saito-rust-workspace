@@ -291,7 +291,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     let res = blockchain
                         .add_block(
                             block,
-                            &self.network,
+                            Some(&self.network),
                             &mut self.storage,
                             self.sender_to_miner.clone(),
                             &mut mempool,
@@ -392,7 +392,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let updated = blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
-                        &self.network,
+                        Some(&self.network),
                         &mut self.storage,
                         self.sender_to_miner.clone(),
                         configs.deref(),
@@ -489,7 +489,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let updated = blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
-                        &self.network,
+                        Some(&self.network),
                         &mut self.storage,
                         self.sender_to_miner.clone(),
                         configs.deref(),
@@ -604,7 +604,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         blockchain
             .add_blocks_from_mempool(
                 self.mempool.clone(),
-                &self.network,
+                Some(&self.network),
                 &mut self.storage,
                 self.sender_to_miner.clone(),
                 configs.deref(),
