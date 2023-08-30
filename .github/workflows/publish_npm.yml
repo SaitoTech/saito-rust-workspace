@@ -91,3 +91,21 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: saito-wasm
+
+      - name: Upload Saito Rust Artifact
+        if: ${{ env.latest_version != env.current_version }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: "saito-rust"
+          path: "target/saito-rust"
+
+      - name: Build documentation
+        if: ${{ env.latest_version != env.current_version }}
+        run: cargo doc --no-deps
+
+      - name: Upload Documentation Artifacts
+        if: ${{ env.latest_version != env.current_version }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: "saito-docs"
+          path: "target/doc"
