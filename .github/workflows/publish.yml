@@ -13,7 +13,6 @@ on:
 jobs:
   build_and_publish:
     runs-on: ubuntu-latest
-
     steps:
 
       - name: Checkout repository
@@ -29,22 +28,21 @@ jobs:
 
       - name: get latest version
         run: |
-          echo latest_version=$(npm show saito-wasm version) >> $GITHUB_ENV
-          echo current_version=$(npm pkg get version) >> $GITHUB_ENV
-          echo "current version : ${{ env.current_version }}"
-          echo "published version : ${{ env.latest_version }}"
+          echo latest_npm_version=$(npm show saito-wasm version) >> $GITHUB_ENV
+          echo current_npm_version=$(npm pkg get version) >> $GITHUB_ENV
+          echo "current node package version : ${{ env.current_npm_version }}"
+          echo "published node package version : ${{ env.latest_npm_version }}"
         working-directory: saito-wasm
 
       - name: version check
-        if: ${{ env.latest_version == env.current_version }}
+        if: ${{ env.latest_npm_version == env.current_npm_version }}
         run: |
-          echo "same version is already published"
-          echo "current version : ${{ env.current_version }}"
-          echo "published version : ${{ env.latest_version }}"
+          echo "same npm package version is already published"
+          echo "current npm package version : ${{ env.current_npm_version }}"
+          echo "published npm package version : ${{ env.latest_npm_version }}"
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
-        if: ${{ env.latest_version != env.current_version }}
         with:
           profile: minimal
           toolchain: stable
@@ -53,58 +51,50 @@ jobs:
 
       - name: Build
         uses: actions-rs/cargo@v1
-        if: ${{ env.latest_version != env.current_version }}
         with:
           command: build
           args: --release
 
       - name: Run tests
         uses: actions-rs/cargo@v1
-        if: ${{ env.latest_version != env.current_version }}
         with:
           command: test
           args: --release
 
       - name: Bootstrapping
-        if: ${{ env.latest_version != env.current_version }}
         run: bash ./scripts/bootstrap_for_ci.sh
         shell: bash
 
       - name: Install npm packages
-        if: ${{ env.latest_version != env.current_version }}
         run: npm ci
         working-directory: saito-wasm
 
       - name: Wasm Build
-        if: ${{ env.latest_version != env.current_version }}
         run: npm run build-prod
         working-directory: saito-wasm
 
       - name: Remove gitignore files
-        if: ${{ env.latest_version != env.current_version }}
+        if: ${{ env.latest_npm_version != env.current_npm_version }}
         run: rm -rf pkg/web/.gitignore pkg/node/.gitignore
         working-directory: saito-wasm
 
       - name: Publish package
-        if: ${{ env.latest_version != env.current_version }}
+        if: ${{ env.latest_npm_version != env.current_npm_version }}
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: saito-wasm
 
       - name: Upload Saito Rust Artifact
-        if: ${{ env.latest_version != env.current_version }}
         uses: actions/upload-artifact@v3
         with:
           name: "saito-rust"
-          path: "target/saito-rust"
+          path: "target/release/saito-rust"
 
       - name: Build documentation
-        if: ${{ env.latest_version != env.current_version }}
         run: cargo doc --no-deps
 
       - name: Upload Documentation Artifacts
-        if: ${{ env.latest_version != env.current_version }}
         uses: actions/upload-artifact@v3
         with:
           name: "saito-docs"
