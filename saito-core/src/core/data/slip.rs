@@ -114,6 +114,16 @@ impl Slip {
         res[0..58].try_into().unwrap()
     }
 
+    pub fn parse_slip_from_utxokey(key: &SaitoUTXOSetKey) -> Slip {
+        let mut slip = Slip::default();
+        slip.public_key = key[0..33].to_vec().try_into().unwrap();
+        slip.block_id = u64::from_be_bytes(key[33..41].try_into().unwrap());
+        slip.tx_ordinal = u64::from_be_bytes(key[41..49].try_into().unwrap());
+        slip.slip_index = key[49];
+        slip.amount = u64::from_be_bytes(key[50..58].try_into().unwrap());
+        slip
+    }
+
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, spendable: bool) {
         if self.amount > 0 {
             debug!(
