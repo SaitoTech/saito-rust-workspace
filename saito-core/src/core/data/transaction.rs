@@ -312,6 +312,21 @@ impl Transaction {
         transaction
     }
 
+    pub fn create_issuance_transaction(
+        to_public_key: SaitoPublicKey,
+        with_amount: Currency,
+    ) -> Transaction {
+        debug!("generate issuance transaction : amount = {:?}", with_amount);
+        let mut transaction = Transaction::default();
+        transaction.transaction_type = TransactionType::Issuance;
+        let mut output = Slip::default();
+        output.public_key = to_public_key;
+        output.amount = with_amount;
+        output.slip_type = SlipType::VipOutput;
+        transaction.add_to_slip(output);
+        transaction
+    }
+
     /// create rebroadcast transaction
     ///
     /// # Arguments
@@ -703,12 +718,7 @@ impl Transaction {
     }
 
     /// Runs when the chain is re-organized
-    pub fn on_chain_reorganization(
-        &self,
-        utxoset: &mut UtxoSet,
-        longest_chain: bool,
-        _block_id: u64,
-    ) {
+    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) {
         let mut input_slip_spendable = true;
         let mut output_slip_spendable = false;
 
@@ -717,12 +727,12 @@ impl Transaction {
             output_slip_spendable = true;
         }
 
-        self.from.iter().for_each(|input| {
-            input.on_chain_reorganization(utxoset, longest_chain, input_slip_spendable)
-        });
-        self.to.iter().for_each(|output| {
-            output.on_chain_reorganization(utxoset, longest_chain, output_slip_spendable)
-        });
+        self.from
+            .iter()
+            .for_each(|input| input.on_chain_reorganization(utxoset, input_slip_spendable));
+        self.to
+            .iter()
+            .for_each(|output| output.on_chain_reorganization(utxoset, output_slip_spendable));
     }
 
     /// [len of inputs - 4 bytes - u32]
@@ -824,9 +834,6 @@ impl Transaction {
         let hash_for_signature = hash(&buffer);
         self.hash_for_signature = Some(hash_for_signature);
         self.signature = sign(&buffer, private_key);
-    }
-    pub fn sign_and_encrypt(&mut self, _private_key: &SaitoPrivateKey) {
-        todo!()
     }
 
     pub fn validate(&self, utxoset: &UtxoSet) -> bool {

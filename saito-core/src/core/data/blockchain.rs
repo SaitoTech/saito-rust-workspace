@@ -4,7 +4,7 @@ use std::io::Error;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ahash::AHashMap;
+use ahash::{AHashMap, HashMap};
 use async_recursion::async_recursion;
 use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
@@ -12,16 +12,17 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, Currency, SaitoHash, Timestamp, UtxoSet, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL,
-    LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
+    push_lock, Currency, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD,
+    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
     MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
-use crate::common::interface_io::InterfaceEvent;
+use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::mempool::Mempool;
 use crate::core::data::network::Network;
+use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
@@ -39,6 +40,7 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
     (top, bottom)
 }
 
+#[derive(Debug)]
 pub enum AddBlockResult {
     BlockAdded,
     BlockAlreadyExists,
@@ -59,11 +61,11 @@ pub struct Blockchain {
     pub last_timestamp: u64,
     pub last_burnfee: Currency,
 
-    genesis_timestamp: u64,
+    pub genesis_timestamp: u64,
     genesis_block_hash: SaitoHash,
-    lowest_acceptable_timestamp: u64,
-    lowest_acceptable_block_hash: SaitoHash,
-    lowest_acceptable_block_id: u64,
+    pub lowest_acceptable_timestamp: u64,
+    pub lowest_acceptable_block_hash: SaitoHash,
+    pub lowest_acceptable_block_id: u64,
 
     last_callback_block_id: u64,
 }
@@ -102,15 +104,16 @@ impl Blockchain {
         &self.fork_id
     }
 
-    #[async_recursion]
+    // #[async_recursion]
     pub async fn add_block(
         &mut self,
         mut block: Block,
-        network: &Network,
+        network: Option<&Network>,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
+        notify_miner: bool,
     ) -> AddBlockResult {
         // confirm hash first
         // block.generate_pre_hash();
@@ -118,12 +121,14 @@ impl Blockchain {
         block.generate();
 
         debug!(
-            "add_block {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
+            "add_block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
             hex::encode(block.hash),
+            block.block_type,
             block.id,
             self.get_latest_block_id(),
             block.transactions.len()
         );
+        // trace!("block : {:?}", block);
 
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
@@ -163,8 +168,9 @@ impl Blockchain {
                     block_in_mempool_queue =
                         iterate!(mempool.blocks_queue, 100).any(|b| block_hash == b.hash);
                 }
-                if !block_in_mempool_queue {
+                if !block_in_mempool_queue && network.is_some() {
                     let result = network
+                        .unwrap()
                         .fetch_missing_block(
                             block_hash,
                             block.source_connection_id.as_ref().unwrap(),
@@ -172,10 +178,10 @@ impl Blockchain {
                         .await;
                     if result.is_err() {
                         warn!(
-                            "couldn't fetch block : {:?}",
-                            hex::encode(block.previous_block_hash)
+                            "couldn't fetch parent block : {:?} for block : {:?}",
+                            hex::encode(block.previous_block_hash),
+                            hex::encode(block.hash)
                         );
-                        todo!()
                     }
                 } else {
                     debug!(
@@ -279,9 +285,8 @@ impl Blockchain {
                 "checking new chain hash : {:?}",
                 hex::encode(new_chain_hash)
             );
-            // TODO : following 2 lines can be optimized for a single search
-            if self.blocks.contains_key(&new_chain_hash) {
-                if self.blocks.get(&new_chain_hash).unwrap().in_longest_chain {
+            if let Some(block) = self.blocks.get(&new_chain_hash) {
+                if block.in_longest_chain {
                     shared_ancestor_found = true;
                     trace!("shared ancestor found : {:?}", hex::encode(new_chain_hash));
                     break;
@@ -357,7 +362,7 @@ impl Blockchain {
                     let disconnected_block_id = self.get_latest_block_id();
                     for i in block_id + 1..disconnected_block_id {
                         let disconnected_block_hash =
-                            self.blockring.get_longest_chain_block_hash_by_block_id(i);
+                            self.blockring.get_longest_chain_block_hash_at_block_id(i);
                         if disconnected_block_hash != [0; 32] {
                             self.blockring.on_chain_reorganization(
                                 i,
@@ -415,20 +420,29 @@ impl Blockchain {
                 .await;
 
             if does_new_chain_validate {
-                self.add_block_success(block_hash, network, storage, mempool, configs)
-                    .await;
+                self.add_block_success(
+                    block_hash,
+                    network,
+                    storage,
+                    mempool,
+                    configs,
+                    notify_miner,
+                )
+                .await;
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
-                info!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
-                // TODO : remove the sender by using a return value.
-                sender_to_miner
-                    .send(MiningEvent::LongestChainBlockAdded {
-                        hash: block_hash,
-                        difficulty,
-                    })
-                    .await
-                    .unwrap();
+                if notify_miner {
+                    info!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
+                    sender_to_miner
+                        .send(MiningEvent::LongestChainBlockAdded {
+                            hash: block_hash,
+                            difficulty,
+                        })
+                        .await
+                        .unwrap();
+                }
+
                 AddBlockResult::BlockAdded
             } else {
                 warn!(
@@ -441,7 +455,7 @@ impl Blockchain {
             }
         } else {
             debug!("this is not the longest chain");
-            self.add_block_success(block_hash, network, storage, mempool, configs)
+            self.add_block_success(block_hash, network, storage, mempool, configs, notify_miner)
                 .await;
             AddBlockResult::BlockAdded
         };
@@ -450,10 +464,11 @@ impl Blockchain {
     pub async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
-        network: &Network,
+        network: Option<&Network>,
         storage: &mut Storage,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
+        notify_miner: bool,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
         // trace!(
@@ -461,26 +476,29 @@ impl Blockchain {
         //     create_timestamp()
         // );
         // print blockring longest_chain_block_hash infor
-        self.print(10);
+        if notify_miner {
+            // we only print blockchain after block queue is added to reduce the clutter in logs
+            self.print(10);
+        }
 
-        let block_id;
+        let mut block_id = 0;
         //
         // save to disk
         //
-        {
+        if network.is_some() {
             let block = self.get_mut_block(&block_hash).unwrap();
             block_id = block.id;
-            if block.block_type != BlockType::Header {
+            if block.block_type != BlockType::Header && !configs.is_browser() {
                 // TODO : this will have an impact when the block sizes are getting large or there are many forks. need to handle this
                 storage.write_block_to_disk(block).await;
-            } else {
+            } else if block.block_type == BlockType::Header {
                 debug!(
                     "block : {:?} not written to disk as type : {:?}",
                     hex::encode(block.hash),
                     block.block_type
                 );
             }
-            network.propagate_block(block, configs).await;
+            network.unwrap().propagate_block(block, configs).await;
         }
 
         //
@@ -530,7 +548,7 @@ impl Blockchain {
         // ensure pruning of next block OK will have the right CVs
         //
         if self.get_latest_block_id() > GENESIS_PERIOD {
-            let pruned_block_hash = self.blockring.get_longest_chain_block_hash_by_block_id(
+            let pruned_block_hash = self.blockring.get_longest_chain_block_hash_at_block_id(
                 self.get_latest_block_id() - GENESIS_PERIOD,
             );
 
@@ -547,14 +565,17 @@ impl Blockchain {
             {
                 let pblock = self.get_mut_block(&pruned_block_hash).unwrap();
                 pblock
-                    .upgrade_block_to_block_type(BlockType::Full, storage)
+                    .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                     .await;
             }
         }
         info!("block {:?} added successfully", hex::encode(block_hash));
-        network
-            .io_interface
-            .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block_id));
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block_id));
+        }
     }
 
     pub async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
@@ -608,78 +629,28 @@ impl Blockchain {
                 break;
             }
         }
+        let weights = [
+            0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
+        ];
 
-        //
         // loop backwards through blockchain
-        //
-        for i in 0..16 {
-            if i == 0 {
-                current_block_id -= 0;
+        for i in 0..weights.len() {
+            if current_block_id <= weights[i] {
+                break;
             }
-            if i == 1 {
-                current_block_id -= 10;
-            }
-            if i == 2 {
-                current_block_id -= 10;
-            }
-            if i == 3 {
-                current_block_id -= 10;
-            }
-            if i == 4 {
-                current_block_id -= 10;
-            }
-            if i == 5 {
-                current_block_id -= 10;
-            }
-            if i == 6 {
-                current_block_id -= 25;
-            }
-            if i == 7 {
-                current_block_id -= 25;
-            }
-            if i == 8 {
-                current_block_id -= 100;
-            }
-            if i == 9 {
-                current_block_id -= 300;
-            }
-            if i == 10 {
-                current_block_id -= 500;
-            }
-            if i == 11 {
-                current_block_id -= 4000;
-            }
-            if i == 12 {
-                current_block_id -= 10000;
-            }
-            if i == 13 {
-                current_block_id -= 20000;
-            }
-            if i == 14 {
-                current_block_id -= 50000;
-            }
-            if i == 15 {
-                current_block_id -= 100000;
-            }
+            current_block_id -= weights[i];
 
-            //
             // do not loop around if block id < 0
-            //
             if current_block_id > block_id || current_block_id == 0 {
                 break;
             }
 
-            //
             // index to update
-            //
             let index = 2 * i;
 
-            //
-            //
-            //
             let block_hash = self
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(current_block_id);
+                .get_longest_chain_block_hash_at_block_id(current_block_id);
             fork_id[index] = block_hash[index];
             fork_id[index + 1] = block_hash[index + 1];
         }
@@ -697,16 +668,27 @@ impl Blockchain {
         let mut peer_block_id = peer_latest_block_id;
         let mut my_block_id = my_latest_block_id;
 
+        debug!(
+            "generate last shared ancestor : peer_latest_id : {:?}, fork_id : {:?} my_latest_id : {:?}",
+            peer_latest_block_id,
+            hex::encode(fork_id),
+            my_latest_block_id
+        );
         let weights = vec![
             0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
         ];
         if peer_latest_block_id >= my_latest_block_id {
             // roll back to last even 10 blocks
             peer_block_id = peer_block_id - (peer_block_id % 10);
+            debug!("peer_block_id : {:?}", peer_block_id);
 
             // their fork id
             for (index, weight) in weights.iter().enumerate() {
-                if peer_block_id <= *weight {
+                if peer_block_id < *weight {
+                    debug!(
+                        "peer_block_id : {:?} is less than weight : {:?}",
+                        peer_block_id, weight
+                    );
                     return 0;
                 }
                 peer_block_id -= weight;
@@ -715,31 +697,50 @@ impl Blockchain {
                 if peer_block_id > peer_latest_block_id {
                     return 0;
                 }
+                if peer_block_id >= my_block_id {
+                    return 0;
+                }
 
                 // index in fork_id hash
                 let index = 2 * index;
 
                 // compare input hash to my hash
-                if peer_block_id <= my_block_id {
-                    let block_hash = self
-                        .blockring
-                        .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[index] == block_hash[index]
-                        && fork_id[index + 1] == block_hash[index + 1]
-                    {
-                        return peer_block_id;
-                    }
+                let block_hash = self
+                    .blockring
+                    .get_longest_chain_block_hash_at_block_id(peer_block_id);
+                if fork_id[index] == block_hash[index]
+                    && fork_id[index + 1] == block_hash[index + 1]
+                {
+                    return peer_block_id;
                 }
             }
         } else {
+            my_block_id = my_block_id - (my_block_id % 10);
+
+            debug!("my_block_id after rounding : {:?}", my_block_id);
             for (index, weight) in weights.iter().enumerate() {
-                if my_block_id <= *weight {
+                if my_block_id < *weight {
+                    debug!(
+                        "my_block_id : {:?} is less than weight : {:?}",
+                        my_block_id, weight
+                    );
                     return 0;
                 }
                 my_block_id -= weight;
 
                 // do not loop around if block id < 0
                 if my_block_id > my_latest_block_id {
+                    debug!(
+                        "my_block_id {:?} > my_latest_block_id : {:?}",
+                        my_block_id, my_latest_block_id
+                    );
+                    return 0;
+                }
+                if peer_block_id > my_block_id {
+                    debug!(
+                        "peer_block_id {:?} > my_block_id {:?}",
+                        peer_block_id, my_block_id
+                    );
                     return 0;
                 }
 
@@ -747,19 +748,18 @@ impl Blockchain {
                 let index = 2 * index;
 
                 // compare input hash to my hash
-                if peer_block_id <= my_block_id {
-                    let block_hash = self
-                        .blockring
-                        .get_longest_chain_block_hash_by_block_id(peer_block_id);
-                    if fork_id[index] == block_hash[index]
-                        && fork_id[index + 1] == block_hash[index + 1]
-                    {
-                        return peer_block_id;
-                    }
+                let block_hash = self
+                    .blockring
+                    .get_longest_chain_block_hash_at_block_id(my_block_id);
+                if fork_id[index] == block_hash[index]
+                    && fork_id[index + 1] == block_hash[index + 1]
+                {
+                    return my_block_id;
                 }
             }
         }
 
+        debug!("no shared ancestor found. returning 0");
         // no match? return 0 -- no shared ancestor
         0
     }
@@ -775,7 +775,7 @@ impl Blockchain {
         while current_id > 0 && current_id >= min_id {
             let hash = self
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(current_id);
+                .get_longest_chain_block_hash_at_block_id(current_id);
             if hash == [0; 32] {
                 break;
             }
@@ -784,7 +784,7 @@ impl Blockchain {
                 current_id,
                 hex::encode(
                     self.blockring
-                        .get_longest_chain_block_hash_by_block_id(current_id)
+                        .get_longest_chain_block_hash_at_block_id(current_id)
                 )
             );
             current_id -= 1;
@@ -981,7 +981,7 @@ impl Blockchain {
         if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
             && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
         {
-            warn!(
+            debug!(
                 "not enough golden tickets : found = {:?} depth = {:?}",
                 golden_tickets_found, search_depth_index
             );
@@ -1022,16 +1022,13 @@ impl Blockchain {
     ) -> bool {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
-        //
         // if we are winding a non-existent chain with a wind_failure it
         // means our wind attempt failed and we should move directly into
         // add_block_failure() by returning false.
-        //
         if wind_failure && new_chain.is_empty() {
             return false;
         }
 
-        //
         // winding the chain requires us to have certain data associated
         // with the block and the transactions, particularly the tx hashes
         // that we need to generate the slip UUIDs and create the tx sigs.
@@ -1041,14 +1038,13 @@ impl Blockchain {
         // function because of limitatins imposed by Rust on mutable data
         // structures. So validation is "read-only" and our "write" actions
         // happen first.
-        //
         let block_hash = new_chain.get(current_wind_index).unwrap();
 
         {
             let block = self.get_mut_block(block_hash).unwrap();
 
             block
-                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                 .await;
 
             let latest_block_id = block.id;
@@ -1064,18 +1060,18 @@ impl Blockchain {
                 }
                 let bid = latest_block_id - i;
                 let previous_block_hash =
-                    self.blockring.get_longest_chain_block_hash_by_block_id(bid);
+                    self.blockring.get_longest_chain_block_hash_at_block_id(bid);
                 if self.is_block_indexed(previous_block_hash) {
                     let block = self.get_mut_block(&previous_block_hash).unwrap();
                     block
-                        .upgrade_block_to_block_type(BlockType::Full, storage)
+                        .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                         .await;
                 }
             }
         }
 
         let block = self.blocks.get(block_hash).unwrap();
-        assert_eq!(block.block_type, BlockType::Full);
+        // assert_eq!(block.block_type, BlockType::Full);
 
         let does_block_validate = block.validate(self, &self.utxoset, configs).await;
 
@@ -1099,6 +1095,7 @@ impl Blockchain {
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
             let block_id = block.id;
+            // let block_hash = block.hash;
             drop(block);
             // utxoset update
             {
@@ -1106,7 +1103,8 @@ impl Blockchain {
                 block.on_chain_reorganization(&mut self.utxoset, true);
             }
 
-            self.on_chain_reorganization(block_id, true, storage).await;
+            self.on_chain_reorganization(block_id, block_hash.clone(), true, storage, configs)
+                .await;
 
             //
             // we have received the first entry in new_blocks() which means we
@@ -1244,15 +1242,17 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         let block_id;
+        let block_hash;
         {
             let block = self
                 .blocks
                 .get_mut(&old_chain[current_unwind_index])
                 .unwrap();
             block
-                .upgrade_block_to_block_type(BlockType::Full, storage)
+                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
                 .await;
             block_id = block.id;
+            block_hash = block.hash;
 
             // utxoset update
             block.on_chain_reorganization(&mut self.utxoset, false);
@@ -1264,11 +1264,11 @@ impl Blockchain {
             // wallet update
             {
                 let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
-
                 wallet.on_chain_reorganization(&block, false);
             }
         }
-        self.on_chain_reorganization(block_id, false, storage).await;
+        self.on_chain_reorganization(block_id, block_hash, false, storage, configs)
+            .await;
         if current_unwind_index == old_chain.len() - 1 {
             //
             // start winding new chain
@@ -1320,30 +1320,51 @@ impl Blockchain {
     async fn on_chain_reorganization(
         &mut self,
         block_id: u64,
+        block_hash: SaitoHash,
         longest_chain: bool,
         storage: &Storage,
+        configs: &(dyn Configuration + Send + Sync),
     ) {
-        //
+        trace!(
+            "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
+            block_id,
+            hex::encode(block_hash)
+        );
         // skip out if earlier than we need to be vis-a-vis last_block_id
-        //
-        if self.get_latest_block_id() >= block_id {
+        if self.last_block_id >= block_id {
+            debug!(
+                "last block id : {:?} is later than this block id : {:?}. skipping reorg",
+                self.last_block_id, block_id
+            );
             return;
         }
 
         if longest_chain {
-            //
+            let block = self.blocks.get(&block_hash);
+            if let Some(block) = block {
+                self.last_block_id = block_id;
+                self.last_block_hash = block.hash;
+                self.last_timestamp = block.timestamp;
+                self.last_burnfee = block.burnfee;
+
+                if self.lowest_acceptable_timestamp == 0 {
+                    self.lowest_acceptable_block_id = block_id;
+                    self.lowest_acceptable_block_hash = block.hash;
+                    self.lowest_acceptable_timestamp = block.timestamp;
+                }
+            } else {
+                warn!("block not found for hash : {:?}", hex::encode(block_hash));
+            }
+
             // update genesis period, purge old data
-            //
             self.update_genesis_period(storage).await;
 
-            //
             // generate fork_id
-            //
             let fork_id = self.generate_fork_id(block_id);
             self.set_fork_id(fork_id);
         }
 
-        self.downgrade_blockchain_data().await;
+        self.downgrade_blockchain_data(configs.is_browser()).await;
     }
 
     pub async fn update_genesis_period(&mut self, storage: &Storage) {
@@ -1364,6 +1385,7 @@ impl Blockchain {
             //
             let purge_bid = latest_block_id - (GENESIS_PERIOD * 2);
             self.genesis_block_id = latest_block_id - GENESIS_PERIOD;
+            debug!("genesis block id set as : {:?}", self.genesis_block_id);
 
             //
             // in either case, we are OK to throw out everything below the
@@ -1452,7 +1474,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn downgrade_blockchain_data(&mut self) {
+    pub async fn downgrade_blockchain_data(&mut self, is_browser: bool) {
         trace!("downgrading blockchain data");
         //
         // downgrade blocks still on the chain
@@ -1480,7 +1502,9 @@ impl Blockchain {
             {
                 let block = self.get_mut_block(&hash);
                 if let Some(block) = block {
-                    block.downgrade_block_to_block_type(BlockType::Pruned).await;
+                    block
+                        .downgrade_block_to_block_type(BlockType::Pruned, is_browser)
+                        .await;
                 } else {
                     warn!("block : {:?} not found to downgrade", hex::encode(hash));
                 }
@@ -1489,15 +1513,15 @@ impl Blockchain {
     }
     pub async fn add_blocks_from_mempool(
         &mut self,
-        mempool: Arc<RwLock<Mempool>>,
-        network: &Network,
+        mempool_lock: Arc<RwLock<Mempool>>,
+        network: Option<&Network>,
         storage: &mut Storage,
         sender_to_miner: Sender<MiningEvent>,
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         debug!("adding blocks from mempool to blockchain");
         let mut blocks: VecDeque<Block>;
-        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
 
         blocks = mempool.blocks_queue.drain(..).collect();
         blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
@@ -1513,6 +1537,8 @@ impl Blockchain {
                     sender_to_miner.clone(),
                     &mut mempool,
                     configs.deref(),
+                    // notify miner once all the blocks are added
+                    blocks.is_empty(),
                 )
                 .await;
             if !blockchain_updated {
@@ -1558,19 +1584,43 @@ impl Blockchain {
         }
     }
     pub async fn reset(&mut self) {
-        todo!()
+        self.last_burnfee = 0;
+        self.last_timestamp = 0;
+        self.last_block_id = 0;
+        self.last_block_hash = [0; 32];
+        self.genesis_timestamp = 0;
+        self.genesis_block_hash = [0; 32];
+        self.genesis_block_id = 0;
+        self.lowest_acceptable_block_id = 0;
+        self.lowest_acceptable_timestamp = 0;
+        self.lowest_acceptable_block_hash = [0; 32];
+        self.save().await;
     }
 
     pub async fn save(&self) {
-        todo!()
+        // TODO : what should be done here in rust code?
+    }
+    pub fn get_utxoset_data(&self) -> HashMap<SaitoPublicKey, Currency> {
+        let mut data: HashMap<SaitoPublicKey, Currency> = Default::default();
+        self.utxoset.iter().for_each(|(key, value)| {
+            if !value {
+                return;
+            }
+            let slip = Slip::parse_slip_from_utxokey(key);
+            *data.entry(slip.public_key).or_default() += slip.amount;
+            // data.insert(slip.public_key, slip.amount);
+        });
+        data
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::ops::Deref;
     use std::sync::Arc;
 
+    use log::{debug, error};
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
@@ -1580,8 +1630,13 @@ mod tests {
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
+    use crate::core::data::slip::Slip;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
+
+    // fn init_testlog() {
+    //     let _ = pretty_env_logger::try_init();
+    // }
 
     #[tokio::test]
     async fn test_blockchain_init() {
@@ -2101,21 +2156,18 @@ mod tests {
         t.check_token_supply().await;
     }
 
+    // test we do not add blocks because of insufficient mining
     #[tokio::test]
     #[serial_test::serial]
-    //
-    // test we do not add blocks because of insufficient mining
-    //
     async fn seven_blocks_with_sufficient_golden_tickets_test() {
+        // pretty_env_logger::init();
         let mut t = TestManager::new();
         let block1;
         let block1_id;
         let block1_hash;
         let ts;
 
-        //
         // block 1
-        //
         t.initialize(100, 1_000_000_000).await;
 
         {
@@ -2130,6 +2182,7 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
             assert_eq!(blockchain.get_latest_block_id(), block1_id);
             assert_eq!(blockchain.get_latest_block_id(), 1);
+            assert_eq!(block1.transactions.len(), 100);
         }
 
         //
@@ -2634,7 +2687,7 @@ mod tests {
             blockchain2
                 .add_blocks_from_mempool(
                     t2.mempool_lock.clone(),
-                    &t2.network,
+                    Some(&t2.network),
                     &mut t2.storage,
                     t2.sender_to_miner.clone(),
                     configs.deref(),
@@ -2725,5 +2778,59 @@ mod tests {
             assert_ne!(fork_id, [0; 32]);
             assert_eq!(fork_id[4..], [0; 28]);
         }
+    }
+
+    //create a test genesis block and test store state and reload from the same file
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_genesis_inout() {
+        //init_testlog();
+
+        let mut t = TestManager::new();
+        //generate a test genesis block
+        t.create_test_gen_block(1000).await;
+        {
+            let (blockchain, _blockchain_) =
+                lock_for_read!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            let block1 = blockchain.get_latest_block().unwrap();
+            assert_eq!(block1.id, 1);
+            assert!(block1.timestamp > 1687867265673);
+            assert_eq!(block1.transactions.len(), 1);
+        }
+
+        //create the balance map
+        let bmap = t.balance_map().await;
+
+        //store it
+        //TODO path errors
+        let filepath = "./utxoset_test";
+
+        match t
+            .storage
+            .write_utxoset_to_disk_path(bmap, 1, filepath)
+            .await
+        {
+            Ok(_) => {
+                debug!("store file ok");
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+            }
+        }
+
+        //now assume the stored map is issued as issued, pass it in
+
+        //convert_issuance_into_slip
+        let slips: Vec<Slip> = t
+            .storage
+            .get_token_supply_slips_from_disk_path(filepath)
+            .await;
+        assert_eq!(slips.len(), 1);
+
+        //TODO more tests on slips
+
+        //clean up the testing file
+        fs::remove_file(filepath);
     }
 }

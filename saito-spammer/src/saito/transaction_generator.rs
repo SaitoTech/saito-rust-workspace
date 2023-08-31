@@ -48,10 +48,10 @@ pub struct TransactionGenerator {
 
 impl TransactionGenerator {
     pub async fn create(
-        wallet: Arc<RwLock<Wallet>>,
-        peers: Arc<RwLock<PeerCollection>>,
-        blockchain: Arc<RwLock<Blockchain>>,
-        configuration: Arc<RwLock<SpammerConfigs>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        peers_lock: Arc<RwLock<PeerCollection>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
+        configuration_lock: Arc<RwLock<SpammerConfigs>>,
         sender: Sender<VecDeque<Transaction>>,
         tx_payment: Currency,
         tx_fee: Currency,
@@ -59,7 +59,7 @@ impl TransactionGenerator {
         let mut tx_size = 10;
         let tx_count;
         {
-            let (configs, _configs_) = lock_for_read!(configuration, LOCK_ORDER_CONFIGS);
+            let (configs, _configs_) = lock_for_read!(configuration_lock, LOCK_ORDER_CONFIGS);
 
             tx_size = configs.get_spammer_configs().tx_size;
             tx_count = configs.get_spammer_configs().tx_count;
@@ -67,8 +67,8 @@ impl TransactionGenerator {
 
         let mut res = TransactionGenerator {
             state: GeneratorState::CreatingSlips,
-            wallet: wallet.clone(),
-            blockchain,
+            wallet: wallet_lock.clone(),
+            blockchain: blockchain_lock.clone(),
             expected_slip_count: 1,
             tx_size,
             tx_count,
@@ -78,10 +78,10 @@ impl TransactionGenerator {
             sender,
             tx_payment,
             tx_fee,
-            peers,
+            peers: peers_lock.clone(),
         };
         {
-            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
             res.public_key = wallet.public_key;
             res.private_key = wallet.private_key;
         }

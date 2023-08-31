@@ -1,11 +1,12 @@
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{info, warn};
+use log::{debug, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+    push_lock, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+    WS_KEEP_ALIVE_PERIOD,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data;
@@ -27,6 +28,7 @@ pub struct Peer {
     pub challenge_for_peer: Option<SaitoHash>,
     pub key_list: Vec<SaitoPublicKey>,
     pub services: Vec<PeerService>,
+    pub last_msg_at: Timestamp,
 }
 
 impl Peer {
@@ -39,13 +41,14 @@ impl Peer {
             challenge_for_peer: None,
             key_list: vec![],
             services: vec![],
+            last_msg_at: 0,
         }
     }
     pub async fn initiate_handshake(
         &mut self,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
     ) -> Result<(), Error> {
-        info!("initiating handshake : {:?}", self.index);
+        debug!("initiating handshake : {:?}", self.index);
 
         let challenge = HandshakeChallenge {
             challenge: generate_random_bytes(32).try_into().unwrap(),
@@ -56,7 +59,7 @@ impl Peer {
             .send_message(self.index, message.serialize())
             .await
             .unwrap();
-        info!("handshake challenge sent for peer: {:?}", self.index);
+        debug!("handshake challenge sent for peer: {:?}", self.index);
 
         Ok(())
     }
@@ -64,14 +67,14 @@ impl Peer {
         &mut self,
         challenge: HandshakeChallenge,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
-        wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
-        info!("handling handshake challenge : {:?}", self.index,);
+        debug!("handling handshake challenge : {:?}", self.index,);
         let block_fetch_url;
         let is_lite;
         {
-            let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+            let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
             is_lite = configs.is_browser();
             if is_lite {
@@ -81,7 +84,7 @@ impl Peer {
             }
         }
 
-        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+        let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(challenge.challenge.as_slice(), &wallet.private_key),
@@ -96,7 +99,7 @@ impl Peer {
             .send_message(self.index, Message::HandshakeResponse(response).serialize())
             .await
             .unwrap();
-        info!("handshake response sent for peer: {:?}", self.index);
+        debug!("handshake response sent for peer: {:?}", self.index);
 
         Ok(())
     }
@@ -104,10 +107,10 @@ impl Peer {
         &mut self,
         response: HandshakeResponse,
         io_handler: &Box<dyn InterfaceIO + Send + Sync>,
-        wallet: Arc<RwLock<Wallet>>,
-        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
-        info!(
+        debug!(
             "handling handshake response :{:?} with address : {:?}",
             self.index,
             hex::encode(response.public_key)
@@ -117,8 +120,7 @@ impl Peer {
                 "we don't have a challenge to verify for peer : {:?}",
                 self.index
             );
-            // TODO : handle the scenario.
-            todo!()
+            return Err(Error::from(ErrorKind::InvalidInput));
         }
         // TODO : validate block fetch URL
         let sent_challenge = self.challenge_for_peer.unwrap();
@@ -130,15 +132,13 @@ impl Peer {
                 hex::encode(response.signature),
                 hex::encode(response.public_key)
             );
-            todo!()
+            return Err(Error::from(ErrorKind::InvalidInput));
         }
-
-        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
 
         let block_fetch_url;
         let is_lite;
         {
-            let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+            let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
             is_lite = configs.is_browser();
             if is_lite {
@@ -151,6 +151,8 @@ impl Peer {
         self.public_key = Some(response.public_key);
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
+
+        let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
         if self.static_peer_config.is_none() {
             // this is only called in initiator's side.
@@ -169,7 +171,7 @@ impl Peer {
                 .send_message(self.index, Message::HandshakeResponse(response).serialize())
                 .await
                 .unwrap();
-            info!("handshake response sent for peer: {:?}", self.index);
+            debug!("handshake response sent for peer: {:?}", self.index);
         } else {
             info!(
                 "handshake completed for peer : {:?}",
@@ -193,18 +195,35 @@ impl Peer {
     /// ```
     ///
     /// ```
-    pub fn get_block_fetch_url(&self, block_hash: SaitoHash, lite: bool) -> String {
+    pub fn get_block_fetch_url(
+        &self,
+        block_hash: SaitoHash,
+        lite: bool,
+        my_public_key: SaitoPublicKey,
+    ) -> String {
         // TODO : generate the url with proper / escapes,etc...
         if lite {
-            self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
-
-            // TODO : uncomment when fixing lite-mode bugs
-            // self.block_fetch_url.to_string()
-            //     + "/lite-block/"
-            //     + hex::encode(block_hash).as_str()
-            //     + "/"
+            self.block_fetch_url.to_string()
+                + "/lite-block/"
+                + hex::encode(block_hash).as_str()
+                + "/"
+                + hex::encode(my_public_key).as_str()
         } else {
             self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
+        }
+    }
+    pub async fn send_ping(
+        &mut self,
+        current_time: Timestamp,
+        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+    ) {
+        if self.last_msg_at + WS_KEEP_ALIVE_PERIOD < current_time {
+            self.last_msg_at = current_time;
+            trace!("sending ping to peer : {:?}", self.index);
+            io_handler
+                .send_message(self.index, Message::Ping().serialize())
+                .await
+                .unwrap();
         }
     }
     pub fn has_service(&self, service: String) -> bool {

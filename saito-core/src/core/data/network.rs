@@ -1,36 +1,39 @@
 use std::fmt::Debug;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, PeerIndex, SaitoHash, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    push_lock, PeerIndex, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    PEER_RECONNECT_WAIT_PERIOD,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
+use crate::common::keep_time::KeepTime;
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::{Configuration, PeerConfig};
+use crate::core::data::mempool::Mempool;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::data::msg::message::Message;
 use crate::core::data::peer::Peer;
 use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::peer_service::PeerService;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{lock_for_read, lock_for_write};
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Network {
     // TODO : manage peers from network
     pub peers: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
-    static_peer_configs: Vec<PeerConfig>,
+    static_peer_configs: Vec<(PeerConfig, Timestamp)>,
     pub wallet: Arc<RwLock<Wallet>>,
     pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
 }
 
 impl Network {
@@ -39,6 +42,7 @@ impl Network {
         peers: Arc<RwLock<PeerCollection>>,
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        time_keeper: Box<dyn KeepTime + Send + Sync>,
     ) -> Network {
         Network {
             peers,
@@ -46,6 +50,7 @@ impl Network {
             static_peer_configs: Default::default(),
             wallet,
             configs,
+            time_keeper,
         }
     }
     pub async fn propagate_block(
@@ -53,12 +58,10 @@ impl Network {
         block: &Block,
         configs: &(dyn Configuration + Send + Sync),
     ) {
-        debug!("propagating block : {:?}", hex::encode(&block.hash));
-        {
-            // let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            if configs.is_browser() {
-                return;
-            }
+        debug!("propagating block : {:?}", hex::encode(block.hash));
+        if configs.is_browser() {
+            trace!("not propagating block since we are in browser");
+            return;
         }
 
         let mut excluded_peers = vec![];
@@ -83,7 +86,7 @@ impl Network {
             }
         }
 
-        debug!("sending block : {:?} to peers", hex::encode(&block.hash));
+        debug!("sending block : {:?} to peers", hex::encode(block.hash));
         let message = Message::BlockHeaderHash(block.hash, block.id);
         self.io_interface
             .send_message_to_all(message.serialize(), excluded_peers)
@@ -151,17 +154,35 @@ impl Network {
         );
         let peer_index;
         let url;
+        let my_public_key;
         {
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+            {
+                let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                my_public_key = wallet.public_key;
+            }
 
             let peer = peers.find_peer_by_address(public_key);
             if peer.is_none() {
-                debug!("a = {:?}", peers.address_to_peers.len());
-                todo!()
+                debug!("peer count = {:?}", peers.address_to_peers.len());
+                error!(
+                    "peer : {:?} not found to fetch missing block : {:?}",
+                    hex::encode(public_key),
+                    hex::encode(block_hash)
+                );
+                return Err(Error::from(ErrorKind::NotFound));
             }
             let peer = peer.unwrap();
-            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
+            if peer.block_fetch_url.is_empty() {
+                debug!(
+                    "won't fetch block : {:?} from peer : {:?} since no url found",
+                    hex::encode(block_hash),
+                    peer.index
+                );
+                return Err(Error::from(ErrorKind::AddrNotAvailable));
+            }
+            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
             peer_index = peer.index;
         }
 
@@ -172,9 +193,10 @@ impl Network {
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
 
-        // calling here before removing the peer from collections
         self.io_interface
-            .send_interface_event(InterfaceEvent::PeerConnectionDropped(peer_index));
+            .disconnect_from_peer(peer_index)
+            .await
+            .unwrap();
 
         let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
@@ -182,6 +204,13 @@ impl Network {
 
         if result.is_some() {
             let peer = result.unwrap();
+
+            if peer.public_key.is_some() {
+                // calling here before removing the peer from collections
+                self.io_interface
+                    .send_interface_event(InterfaceEvent::PeerConnectionDropped(peer_index));
+            }
+
             let public_key = peer.public_key;
             if peer.static_peer_config.is_some() {
                 // This means the connection has been initiated from this side, therefore we must
@@ -193,18 +222,17 @@ impl Network {
                     peer.index
                 );
 
-                self.io_interface
-                    .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
-                    .await
-                    .unwrap();
+                // self.io_interface
+                //     .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
+                //     .await
+                //     .unwrap();
 
+                // setting to immediately reconnect. if failed, it will connect after a time
                 self.static_peer_configs
-                    .push(peer.static_peer_config.as_ref().unwrap().clone());
-            } else {
-                if peer.public_key.is_some() {
-                    info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
-                    peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
-                }
+                    .push((peer.static_peer_config.as_ref().unwrap().clone(), 0));
+            } else if peer.public_key.is_some() {
+                info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
+                peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
             }
 
             if public_key.is_some() {
@@ -212,7 +240,7 @@ impl Network {
             }
             peers.index_to_peers.remove(&peer_index);
         } else {
-            todo!("Handle the unknown peer disconnect");
+            error!("unknown peer : {:?} disconnected", peer_index);
         }
     }
     pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
@@ -233,15 +261,14 @@ impl Network {
             );
             let data = peer.static_peer_config.as_ref().unwrap();
 
-            self.static_peer_configs
-                .retain(|config| config.host != data.host || config.port != data.port);
+            self.static_peer_configs.retain(|(config, reconnect_time)| {
+                config.host != data.host || config.port != data.port
+            });
         }
 
         info!("new peer added : {:?}", peer_index);
         peers.index_to_peers.insert(peer_index, peer);
         info!("current peer count = {:?}", peers.index_to_peers.len());
-        self.io_interface
-            .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
     }
     pub async fn handle_handshake_challenge(
         &self,
@@ -254,7 +281,11 @@ impl Network {
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
-            todo!()
+            error!(
+                "peer not found for index : {:?}. cannot handle handshake challenge",
+                peer_index
+            );
+            return;
         }
         let peer = peer.unwrap();
         peer.handle_handshake_challenge(challenge, &self.io_interface, wallet.clone(), configs)
@@ -262,73 +293,107 @@ impl Network {
             .unwrap();
     }
     pub async fn handle_handshake_response(
-        &self,
+        &mut self,
         peer_index: u64,
         response: HandshakeResponse,
         wallet: Arc<RwLock<Wallet>>,
         blockchain: Arc<RwLock<Blockchain>>,
         configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
-        debug!("received handshake response");
+        debug!("handling handshake response");
         let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
-            warn!("peer not found : {:?}", peer_index);
-            todo!()
+            error!(
+                "peer not found for index : {:?}. cannot handle handshake response",
+                peer_index
+            );
+            return;
         }
         let peer = peer.unwrap();
-        peer.handle_handshake_response(
-            response,
-            &self.io_interface,
-            wallet.clone(),
-            configs.clone(),
-        )
-        .await
-        .unwrap();
-        if peer.public_key.is_some() {
-            debug!(
-                "peer : {:?} handshake successful for peer : {:?}",
-                peer.index,
-                hex::encode(peer.public_key.as_ref().unwrap())
+        let result = peer
+            .handle_handshake_response(
+                response,
+                &self.io_interface,
+                wallet.clone(),
+                configs.clone(),
+            )
+            .await;
+        if result.is_err() || peer.public_key.is_none() {
+            info!(
+                "disconnecting peer : {:?} as handshake response was not handled",
+                peer_index
             );
-            let public_key = peer.public_key.clone().unwrap();
-            peers.address_to_peers.insert(public_key, peer_index);
-            // start block syncing here
-            self.request_blockchain_from_peer(peer_index, blockchain.clone())
-                .await;
+            self.io_interface
+                .disconnect_from_peer(peer_index)
+                .await
+                .unwrap();
+            return;
         }
+        debug!(
+            "peer : {:?} handshake successful for peer : {:?}",
+            peer.index,
+            hex::encode(peer.public_key.as_ref().unwrap())
+        );
+        self.io_interface
+            .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
+        let public_key = peer.public_key.unwrap();
+        peers.address_to_peers.insert(public_key, peer_index);
+        // start block syncing here
+        self.request_blockchain_from_peer(peer_index, blockchain.clone())
+            .await;
     }
 
     async fn request_blockchain_from_peer(
         &self,
         peer_index: u64,
-        blockchain: Arc<RwLock<Blockchain>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
         info!("requesting blockchain from peer : {:?}", peer_index);
 
         // TODO : should this be moved inside peer ?
+        let fork_id;
+        {
+            // TODO : will this create a race condition if we release the lock after reading fork id ?
+            let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            fork_id = *blockchain.get_fork_id();
+        }
 
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         if configs.is_spv_mode() {
             let request;
             {
-                let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+                let (blockchain, _blockchain_) =
+                    lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
                 if blockchain.last_block_id > blockchain.get_latest_block_id() {
+                    debug!(
+                        "blockchain request 1 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
+                        blockchain.last_block_id,
+                        hex::encode(blockchain.last_block_hash),
+                        hex::encode(fork_id)
+                    );
                     request = BlockchainRequest {
                         latest_block_id: blockchain.last_block_id,
                         latest_block_hash: blockchain.last_block_hash,
-                        fork_id: *blockchain.get_fork_id(),
+                        fork_id,
                     };
                 } else {
+                    debug!(
+                        "blockchain request 2 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
+                        blockchain.get_latest_block_id(),
+                        hex::encode(blockchain.get_latest_block_hash()),
+                        hex::encode(fork_id)
+                    );
                     request = BlockchainRequest {
                         latest_block_id: blockchain.get_latest_block_id(),
                         latest_block_hash: blockchain.get_latest_block_hash(),
-                        fork_id: *blockchain.get_fork_id(),
+                        fork_id,
                     };
                 }
             }
+            debug!("sending ghost chain request to peer : {:?}", peer_index);
             let buffer = Message::GhostChainRequest(
                 request.latest_block_id,
                 request.latest_block_hash,
@@ -342,14 +407,16 @@ impl Network {
         } else {
             let request;
             {
-                let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+                let (blockchain, _blockchain_) =
+                    lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
                 request = BlockchainRequest {
                     latest_block_id: blockchain.get_latest_block_id(),
                     latest_block_hash: blockchain.get_latest_block_hash(),
-                    fork_id: blockchain.get_fork_id().clone(),
+                    fork_id,
                 };
             }
+            debug!("sending blockchain request to peer : {:?}", peer_index);
             let buffer = Message::BlockchainRequest(request).serialize();
             self.io_interface
                 .send_message(peer_index, buffer)
@@ -361,14 +428,20 @@ impl Network {
         &self,
         block_hash: SaitoHash,
         peer_index: PeerIndex,
-        blockchain: Arc<RwLock<Blockchain>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
+        mempool_lock: Arc<RwLock<Mempool>>,
     ) -> Option<()> {
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let block_exists;
+        let my_public_key;
         {
-            let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let (mempool, _mempool_) = lock_for_read!(mempool_lock, LOCK_ORDER_MEMPOOL);
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
-            block_exists = blockchain.is_block_indexed(block_hash);
+            block_exists = blockchain.is_block_indexed(block_hash)
+                || mempool.blocks_queue.iter().any(|b| b.hash == block_hash);
+            my_public_key = wallet.public_key;
         }
         if block_exists {
             return None;
@@ -381,7 +454,15 @@ impl Network {
                 .index_to_peers
                 .get(&peer_index)
                 .expect("peer not found");
-            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode());
+            if peer.block_fetch_url.is_empty() {
+                debug!(
+                    "won't fetch block : {:?} from peer : {:?} since no url found",
+                    hex::encode(block_hash),
+                    peer_index
+                );
+                return None;
+            }
+            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
         }
         self.io_interface
             .fetch_block_from_peer(block_hash, peer_index, url)
@@ -392,46 +473,53 @@ impl Network {
 
     pub async fn initialize_static_peers(
         &mut self,
-        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
-        self.static_peer_configs = configs.get_peer_configs().clone();
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+
+        configs
+            .get_peer_configs()
+            .clone()
+            .drain(..)
+            .for_each(|config| {
+                self.static_peer_configs.push((config, 0));
+            });
         if !self.static_peer_configs.is_empty() {
-            self.static_peer_configs.get_mut(0).unwrap().is_main = true;
+            self.static_peer_configs.get_mut(0).unwrap().0.is_main = true;
         }
         trace!("static peers : {:?}", self.static_peer_configs);
     }
 
     pub async fn connect_to_static_peers(&mut self) {
-        // trace!(
-        //     "connect to static peers : count = {:?}",
-        //     self.static_peer_configs.len()
-        // );
-
-        for peer in &self.static_peer_configs {
+        let current_time = self.time_keeper.get_timestamp_in_ms();
+        for (peer, reconnect_after) in &mut self.static_peer_configs {
             trace!("connecting to peer : {:?}", peer);
+            if *reconnect_after > current_time {
+                continue;
+            }
+            *reconnect_after = current_time + PEER_RECONNECT_WAIT_PERIOD;
             self.io_interface
                 .connect_to_peer(peer.clone())
                 .await
                 .unwrap();
         }
-        // trace!("connected to peers");
     }
-    // pub async fn propagate_services(&self, peer_index: PeerIndex, services: Vec<PeerService>) {
-    //     let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
-    //     let buffer = Message::Services(services).serialize();
-    //     if peer_index == 0 {
-    //         for (i, _) in peers.index_to_peers.iter() {
-    //             self.io_interface
-    //                 .send_message(*i, buffer.clone())
-    //                 .await
-    //                 .unwrap();
-    //         }
-    //     } else {
-    //         self.io_interface
-    //             .send_message(peer_index, buffer)
-    //             .await
-    //             .unwrap();
-    //     }
-    // }
+
+    pub async fn send_pings(&mut self) {
+        let current_time = self.time_keeper.get_timestamp_in_ms();
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        for (_, peer) in peers.index_to_peers.iter_mut() {
+            peer.send_ping(current_time, &self.io_interface).await;
+        }
+    }
+
+    pub async fn update_peer_timer(&mut self, peer_index: PeerIndex) {
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_none() {
+            return;
+        }
+        let peer = peer.unwrap();
+        peer.last_msg_at = self.time_keeper.get_timestamp_in_ms();
+    }
 }

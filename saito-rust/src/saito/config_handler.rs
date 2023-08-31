@@ -5,7 +5,9 @@ use figment::Figment;
 use serde::Deserialize;
 
 use log::{debug, error};
-use saito_core::core::data::configuration::{Configuration, PeerConfig, Server};
+use saito_core::core::data::configuration::{
+    BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
+};
 
 #[derive(Deserialize, Debug)]
 pub struct NodeConfigurations {
@@ -16,6 +18,30 @@ pub struct NodeConfigurations {
 }
 
 impl NodeConfigurations {}
+impl Default for NodeConfigurations {
+    fn default() -> Self {
+        NodeConfigurations {
+            server: Server {
+                host: "".to_string(),
+                port: 0,
+                protocol: "".to_string(),
+                endpoint: Endpoint {
+                    host: "".to_string(),
+                    port: 0,
+                    protocol: "".to_string(),
+                },
+                verification_threads: 0,
+                channel_size: 0,
+                stat_timer_in_ms: 0,
+                thread_sleep_time_in_ms: 0,
+                block_fetch_batch_size: 0,
+                reconnection_wait_time: 0,
+            },
+            peers: vec![],
+            lite: false,
+        }
+    }
+}
 
 impl Configuration for NodeConfigurations {
     fn get_server_configs(&self) -> Option<&Server> {
@@ -24,6 +50,10 @@ impl Configuration for NodeConfigurations {
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
         return &self.peers;
+    }
+
+    fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
+        None
     }
 
     fn get_block_fetch_url(&self) -> String {

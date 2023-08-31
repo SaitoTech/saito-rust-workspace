@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{debug, error};
+use log::{debug, error, trace};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -114,7 +114,17 @@ impl Slip {
         res[0..58].try_into().unwrap()
     }
 
-    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, _lc: bool, spendable: bool) {
+    pub fn parse_slip_from_utxokey(key: &SaitoUTXOSetKey) -> Slip {
+        let mut slip = Slip::default();
+        slip.public_key = key[0..33].to_vec().try_into().unwrap();
+        slip.block_id = u64::from_be_bytes(key[33..41].try_into().unwrap());
+        slip.tx_ordinal = u64::from_be_bytes(key[41..49].try_into().unwrap());
+        slip.slip_index = key[49];
+        slip.amount = u64::from_be_bytes(key[50..58].try_into().unwrap());
+        slip
+    }
+
+    pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, spendable: bool) {
         if self.amount > 0 {
             debug!(
                 "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?}",
@@ -135,6 +145,11 @@ impl Slip {
             // } else {
             //     utxoset.remove(&self.utxoset_key);
             // }
+        } else {
+            // trace!(
+            //     "not updating slip : {:?} as amount is 0",
+            //     hex::encode(self.utxoset_key)
+            // );
         }
     }
 
@@ -301,7 +316,7 @@ mod tests {
         slip.generate_utxoset_key();
 
         // add to utxoset
-        slip.on_chain_reorganization(&mut blockchain.utxoset, true, true);
+        slip.on_chain_reorganization(&mut blockchain.utxoset, true);
         assert!(blockchain.utxoset.contains_key(&slip.get_utxoset_key()));
 
         // remove from utxoset

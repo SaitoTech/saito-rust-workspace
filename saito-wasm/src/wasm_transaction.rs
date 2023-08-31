@@ -1,5 +1,5 @@
 use js_sys::{Array, JsString, Uint8Array};
-
+use log::info;
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
@@ -113,16 +113,9 @@ impl WasmTransaction {
     pub async fn sign(&mut self) {
         let saito = SAITO.lock().await;
         let wallet = saito.context.wallet.read().await;
-
         self.tx.sign(&wallet.private_key);
     }
 
-    pub async fn sign_and_encrypt(&mut self) {
-        let saito = SAITO.lock().await;
-        let wallet = saito.context.wallet.read().await;
-
-        self.tx.sign_and_encrypt(&wallet.private_key);
-    }
     #[wasm_bindgen(getter = type)]
     pub fn get_type(&self) -> u8 {
         self.tx.transaction_type as u8

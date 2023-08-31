@@ -95,21 +95,21 @@ pub struct ConsensusThread {
 
 impl ConsensusThread {
     async fn generate_spammer_init_tx(
-        mempool: Arc<RwLock<Mempool>>,
-        wallet: Arc<RwLock<Wallet>>,
-        blockchain: Arc<RwLock<Blockchain>>,
+        mempool_lock: Arc<RwLock<Mempool>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating spammer init transaction");
 
         let private_key;
 
         {
-            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
             private_key = wallet.private_key;
         }
 
-        let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
 
         let spammer_public_key: SaitoPublicKey =
             hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
@@ -138,6 +138,43 @@ impl ConsensusThread {
             );
         }
     }
+    async fn generate_issuance_tx(
+        &self,
+        mempool_lock: Arc<RwLock<Mempool>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
+    ) {
+        info!("generating issuance init transaction");
+
+        let slips = self.storage.get_token_supply_slips_from_disk().await;
+        let private_key;
+        {
+            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            private_key = wallet.private_key;
+        }
+        let mut txs: Vec<Transaction> = vec![];
+        for slip in slips {
+            debug!("{:?} slip public key", hex::encode(slip.public_key));
+            let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
+            tx.sign(&private_key);
+            txs.push(tx);
+        }
+
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
+
+        // debug!("{:?} transaction from slips", txs);
+        for tx in txs {
+            mempool
+                .add_transaction_if_validates(tx.clone(), &blockchain)
+                .await;
+            info!(
+                "added issuance init tx for : {:?}",
+                hex::encode(tx.signature)
+            );
+        }
+
+        // debug!("{:?} mempool transacts", mempool.transactions);
+    }
     /// Test method to generate test transactions
     ///
     /// # Arguments
@@ -154,25 +191,24 @@ impl ConsensusThread {
     ///
     /// ```
     async fn generate_tx(
-        mempool: Arc<RwLock<Mempool>>,
-        wallet: Arc<RwLock<Wallet>>,
-        blockchain: Arc<RwLock<Blockchain>>,
+        mempool_lock: Arc<RwLock<Mempool>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
+        blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating mock transactions");
-
         let txs_to_generate = 10;
         let bytes_per_tx = 1024;
         let public_key;
         let private_key;
 
         {
-            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
 
-        let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(mempool, LOCK_ORDER_MEMPOOL);
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
 
         let latest_block_id = blockchain.get_latest_block_id();
 
@@ -202,7 +238,7 @@ impl ConsensusThread {
             }
         }
 
-        let (mut wallet, _wallet_) = lock_for_write!(wallet, LOCK_ORDER_WALLET);
+        let (mut wallet, _wallet_) = lock_for_write!(wallet_lock, LOCK_ORDER_WALLET);
 
         for _i in 0..txs_to_generate {
             let mut transaction;
@@ -236,42 +272,39 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         let duration_value = duration.as_millis() as u64;
 
         if self.generate_genesis_block {
-            Self::generate_spammer_init_tx(
-                self.mempool.clone(),
-                self.wallet.clone(),
-                self.blockchain.clone(),
-            )
-            .await;
+            Self::generate_issuance_tx(self, self.mempool.clone(), self.blockchain.clone()).await;
 
             {
                 let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                    let block;
                     let (mut mempool, _mempool_) =
                         lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
-                    {
-                        block = mempool
-                            .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
-                            .await;
-                    }
 
-                    blockchain
+                    let block = mempool
+                        .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                        .await;
+
+                    println!(" block ider {:?}", &block.transactions);
+
+                    let res = blockchain
                         .add_block(
                             block,
-                            &self.network,
+                            Some(&self.network),
                             &mut self.storage,
                             self.sender_to_miner.clone(),
                             &mut mempool,
                             configs.deref(),
+                            true,
                         )
                         .await;
                 }
-            }
 
-            self.generate_genesis_block = false;
-            return Some(());
+                // println!("{} addblock result", result)
+                self.generate_genesis_block = false;
+                return Some(());
+            }
         }
 
         // generate test transactions
@@ -329,7 +362,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             }
 
             let mut block = None;
-            if !configs.is_browser() && !configs.is_spv_mode() {
+            if !configs.is_browser() && !configs.is_spv_mode() && !blockchain.blocks.is_empty() {
                 block = mempool
                     .bundle_block(
                         blockchain.deref_mut(),
@@ -359,7 +392,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let updated = blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
-                        &self.network,
+                        Some(&self.network),
                         &mut self.storage,
                         self.sender_to_miner.clone(),
                         configs.deref(),
@@ -456,7 +489,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let updated = blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
-                        &self.network,
+                        Some(&self.network),
                         &mut self.storage,
                         self.sender_to_miner.clone(),
                         configs.deref(),
@@ -464,6 +497,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     .await;
 
                 if updated {
+                    self.sender_to_router
+                        .send(RoutingEvent::StartBlockIdUpdated(blockchain.last_block_id))
+                        .await
+                        .unwrap();
                     self.sender_to_router
                         .send(RoutingEvent::BlockchainUpdated)
                         .await
@@ -516,6 +553,39 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
     async fn on_init(&mut self) {
         debug!("on_init");
+
+        {
+            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain_configs = configs.get_blockchain_configs();
+            if let Some(blockchain_configs) = blockchain_configs {
+                info!(
+                    "loading blockchain state from configs : {:?}",
+                    blockchain_configs
+                );
+                blockchain.last_block_hash = hex::decode(blockchain_configs.last_block_hash)
+                    .expect("last block hash cannot be parsed")
+                    .try_into()
+                    .unwrap();
+                blockchain.last_block_id = blockchain_configs.last_block_id;
+                blockchain.last_timestamp = blockchain_configs.last_timestamp;
+                blockchain.genesis_block_id = blockchain_configs.genesis_block_id;
+                blockchain.genesis_timestamp = blockchain_configs.genesis_timestamp;
+                blockchain.lowest_acceptable_timestamp =
+                    blockchain_configs.lowest_acceptable_timestamp;
+                blockchain.lowest_acceptable_block_hash =
+                    hex::decode(blockchain_configs.lowest_acceptable_block_hash)
+                        .expect("lowest block hash cannot be parsed")
+                        .try_into()
+                        .unwrap();
+                blockchain.lowest_acceptable_block_id =
+                    blockchain_configs.lowest_acceptable_block_id;
+            } else {
+                info!("blockchain state is not loaded");
+            }
+        }
+
         self.storage
             .load_blocks_from_disk(self.mempool.clone())
             .await;
@@ -534,12 +604,21 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         blockchain
             .add_blocks_from_mempool(
                 self.mempool.clone(),
-                &self.network,
+                Some(&self.network),
                 &mut self.storage,
                 self.sender_to_miner.clone(),
                 configs.deref(),
             )
             .await;
+
+        debug!(
+            "sending block id update as : {:?}",
+            blockchain.last_block_id
+        );
+        self.sender_to_router
+            .send(RoutingEvent::StartBlockIdUpdated(blockchain.last_block_id))
+            .await
+            .unwrap();
     }
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {

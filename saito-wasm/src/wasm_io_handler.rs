@@ -3,7 +3,7 @@ use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
-use log::{debug, error, info, trace};
+use log::{error, trace};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -20,7 +20,7 @@ pub struct WasmIoHandler {}
 #[async_trait]
 impl InterfaceIO for WasmIoHandler {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
-        info!("WasmIoHandler::send_message : {:?}", peer_index);
+        trace!("WasmIoHandler::send_message : {:?}", peer_index);
 
         let array = js_sys::Uint8Array::new_with_length(buffer.len() as u32);
         array.copy_from(buffer.as_slice());
@@ -69,22 +69,11 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    // async fn process_interface_event(&mut self, event: InterfaceEvent) -> Result<(), Error> {
-    //     todo!()
-    // }
-
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+        trace!("disconnect from peer : {:?}", peer_index);
         MsgHandler::disconnect_from_peer(js_sys::BigInt::from(peer_index));
         Ok(())
     }
-
-    // fn set_write_result(
-    //     &mut self,
-    //     result_key: String,
-    //     result: Result<String, Error>,
-    // ) -> Result<(), Error> {
-    //     todo!()
-    // }
 
     async fn fetch_block_from_peer(
         &self,
@@ -112,8 +101,9 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        let result = MsgHandler::read_value(key);
+        let result = MsgHandler::read_value(key.clone());
         if result.is_err() {
+            error!("couldn't read value for key: {:?}", key);
             return Err(Error::from(ErrorKind::Other));
         }
 
@@ -218,17 +208,17 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn save_blockchain(&self) -> Result<(), Error> {
-        MsgHandler::save_blockchain();
-        // TODO : return error state
-        Ok(())
-    }
-
-    async fn load_blockchain(&self) -> Result<(), Error> {
-        MsgHandler::load_blockchain();
-        // TODO : return error state
-        Ok(())
-    }
+    // async fn save_blockchain(&self) -> Result<(), Error> {
+    //     MsgHandler::save_blockchain();
+    //     // TODO : return error state
+    //     Ok(())
+    // }
+    //
+    // async fn load_blockchain(&self) -> Result<(), Error> {
+    //     MsgHandler::load_blockchain();
+    //     // TODO : return error state
+    //     Ok(())
+    // }
 
     fn get_my_services(&self) -> Vec<PeerService> {
         // let mut services = vec![];

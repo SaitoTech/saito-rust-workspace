@@ -610,7 +610,11 @@ impl Block {
     //
     // downgrade block
     //
-    pub async fn downgrade_block_to_block_type(&mut self, block_type: BlockType) -> bool {
+    pub async fn downgrade_block_to_block_type(
+        &mut self,
+        block_type: BlockType,
+        is_browser: bool,
+    ) -> bool {
         debug!(
             "downgrading BLOCK_ID {:?} to type : {:?}",
             self.id, block_type
@@ -724,7 +728,11 @@ impl Block {
 
         let creator_public_key = &self.creator;
 
-        trace!("generating block data : {:?}", hex::encode(self.hash));
+        trace!(
+            "generating block data : {:?} of type : {:?}",
+            hex::encode(self.hash),
+            self.block_type
+        );
 
         let _transactions_pre_calculated = &self
             .transactions
@@ -901,7 +909,7 @@ impl Block {
         if self.id > GENESIS_PERIOD + 1 {
             let pruned_block_hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(self.id - GENESIS_PERIOD);
+                .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
 
             //
             // generate metadata should have prepared us with a pre-prune block
@@ -1194,7 +1202,7 @@ impl Block {
                 let bid = self.id - i;
                 let previous_block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_by_block_id(bid);
+                    .get_longest_chain_block_hash_at_block_id(bid);
 
                 // previous block hash can be [0; 32] if there is no longest-chain block
 
@@ -1231,7 +1239,7 @@ impl Block {
             hex::encode(self.hash)
         );
         for tx in &self.transactions {
-            tx.on_chain_reorganization(utxoset, longest_chain, self.id);
+            tx.on_chain_reorganization(utxoset, longest_chain);
         }
         self.in_longest_chain = longest_chain;
         true
@@ -1340,38 +1348,44 @@ impl Block {
         &mut self,
         block_type: BlockType,
         storage: &Storage,
+        is_browser: bool,
     ) -> bool {
         if self.block_type == block_type {
             return true;
         }
 
         if block_type == BlockType::Full {
-            return self.upgrade_block_to_block_type(block_type, storage).await;
+            return self
+                .upgrade_block_to_block_type(block_type, storage, is_browser)
+                .await;
         }
 
         if block_type == BlockType::Pruned {
-            return self.downgrade_block_to_block_type(block_type).await;
+            return self
+                .downgrade_block_to_block_type(block_type, is_browser)
+                .await;
         }
 
-        return false;
+        false
     }
 
-    //
     // if the block is not at the proper type, try to upgrade it to have the
     // data that is necessary for blocks of that type if possible. if this is
     // not possible, return false. if it is possible, return true once upgraded.
-    //
     pub async fn upgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
         storage: &Storage,
+        is_browser: bool,
     ) -> bool {
         debug!(
-            "upgrading block : {:?} to type : {:?}",
+            "upgrading block : {:?} of type : {:?} to type : {:?}",
             hex::encode(self.hash),
-            self.block_type
+            self.block_type,
+            block_type
         );
         if self.block_type == block_type {
+            trace!("block type is already {:?}", self.block_type);
             return true;
         }
 
@@ -1385,22 +1399,28 @@ impl Block {
         // load the block if it exists on disk.
         //
         if block_type == BlockType::Full {
-            let mut new_block = storage
+            if is_browser {
+                return false;
+            }
+            let new_block = storage
                 .load_block_from_disk(storage.generate_block_filepath(&self))
-                .await
-                .unwrap();
+                .await;
+            if new_block.is_err() {
+                error!(
+                    "block not found in disk to upgrade : {:?}",
+                    hex::encode(self.hash)
+                );
+                return false;
+            }
+            let mut new_block = new_block.unwrap();
             let hash_for_signature = hash(&new_block.serialize_for_signature());
             new_block.pre_hash = hash_for_signature;
             let hash_for_hash = hash(&new_block.serialize_for_hash());
             new_block.hash = hash_for_hash;
 
-            //
             // in-memory swap copying txs in block from mempool
-            //
             mem::swap(&mut new_block.transactions, &mut self.transactions);
-            //
             // transactions need hashes
-            //
             self.generate();
             self.block_type = BlockType::Full;
 
@@ -1411,7 +1431,12 @@ impl Block {
     }
 
     pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
+        info!(
+            "generating lite block for keys : {:?}",
+            keylist.iter().map(hex::encode).collect::<Vec<String>>()
+        );
         let mut pruned_txs = vec![];
+        let mut selected_txs = 0;
         for tx in self.transactions.iter() {
             if tx
                 .from
@@ -1421,6 +1446,7 @@ impl Block {
                 || tx.is_golden_ticket()
             {
                 pruned_txs.push(tx.clone());
+                selected_txs += 1;
             } else {
                 let spv = Transaction {
                     timestamp: tx.timestamp,
@@ -1437,7 +1463,7 @@ impl Block {
                     .try_into()
                     .unwrap(),
                     path: vec![],
-                    hash_for_signature: tx.hash_for_signature.clone(),
+                    hash_for_signature: tx.hash_for_signature,
                     total_in: 0,
                     total_out: 0,
                     total_fees: 0,
@@ -1448,6 +1474,11 @@ impl Block {
                 pruned_txs.push(spv);
             }
         }
+        debug!(
+            "selected txs : {:?} out of {:?}",
+            selected_txs,
+            self.transactions.len()
+        );
 
         // TODO : prune transactions here
 
@@ -1479,6 +1510,11 @@ impl Block {
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
+        assert!(self.id > 0);
+        if configs.is_browser() {
+            self.generate_consensus_values(blockchain).await;
+            return true;
+        }
 
         if let BlockType::Ghost = self.block_type {
             // block validates since it's a ghost block
@@ -2134,14 +2170,14 @@ mod tests {
 
         let serialized_full_block = block.serialize_for_net(BlockType::Full);
         block
-            .update_block_to_block_type(BlockType::Pruned, &mut t.storage)
+            .update_block_to_block_type(BlockType::Pruned, &mut t.storage, false)
             .await;
 
         assert_eq!(block.transactions.len(), 0);
         assert_eq!(block.block_type, BlockType::Pruned);
 
         block
-            .update_block_to_block_type(BlockType::Full, &mut t.storage)
+            .update_block_to_block_type(BlockType::Full, &mut t.storage, false)
             .await;
 
         assert_eq!(block.transactions.len(), 5);

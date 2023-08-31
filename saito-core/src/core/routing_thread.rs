@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, PeerIndex, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    push_lock, BlockId, PeerIndex, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
     LOCK_ORDER_PEERS, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
@@ -19,6 +19,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
+use crate::core::data::mempool::Mempool;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;
@@ -32,6 +33,7 @@ use crate::{lock_for_read, lock_for_write};
 #[derive(Debug)]
 pub enum RoutingEvent {
     BlockchainUpdated,
+    StartBlockIdUpdated(BlockId),
 }
 
 #[derive(Debug)]
@@ -78,6 +80,7 @@ impl RoutingStats {
 /// Manages peers and routes messages to correct controller
 pub struct RoutingThread {
     pub blockchain: Arc<RwLock<Blockchain>>,
+    pub mempool: Arc<RwLock<Mempool>>,
     pub sender_to_consensus: Sender<ConsensusEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
     // TODO : remove this if not needed
@@ -92,7 +95,9 @@ pub struct RoutingThread {
     pub last_verification_thread_index: usize,
     pub stat_sender: Sender<String>,
     pub blockchain_sync_state: BlockchainSyncState,
+    // TODO : can be removed since we are handling reconnection for each peer now
     pub initial_connection: bool,
+    // TODO : can be removed since we are handling reconnection for each peer now
     pub reconnection_wait_time: Timestamp,
 }
 
@@ -117,6 +122,7 @@ impl RoutingThread {
             message.get_type_value(),
             peer_index
         );
+        self.network.update_peer_timer(peer_index).await;
 
         match message {
             Message::HandshakeChallenge(challenge) => {
@@ -176,7 +182,7 @@ impl RoutingThread {
                     .await;
             }
             Message::ApplicationMessage(api_message) => {
-                debug!(
+                trace!(
                     "processing application msg with buffer size : {:?}",
                     api_message.data.len()
                 );
@@ -207,6 +213,12 @@ impl RoutingThread {
         fork_id: SaitoHash,
         peer_index: u64,
     ) {
+        debug!("processing ghost chain request from peer : {:?}. block_id : {:?} block_hash: {:?} fork_id: {:?}",
+            peer_index,
+            block_id,
+            hex::encode(block_hash),
+            hex::encode(fork_id)
+        );
         let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
         let peer_public_key;
         {
@@ -220,13 +232,17 @@ impl RoutingThread {
 
         let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
 
+        debug!("last_shared_ancestor 1 : {:?}", last_shared_ancestor);
+
         if last_shared_ancestor == 0 && blockchain.get_latest_block_id() > 10 {
             last_shared_ancestor = blockchain.get_latest_block_id() - 10;
         }
+
+        let start = blockchain
+            .blockring
+            .get_longest_chain_block_hash_at_block_id(last_shared_ancestor);
         let mut ghost = GhostChainSync {
-            start: blockchain
-                .blockring
-                .get_longest_chain_block_hash_by_block_id(last_shared_ancestor),
+            start,
             prehashes: vec![],
             previous_block_hashes: vec![],
             block_ids: vec![],
@@ -234,14 +250,23 @@ impl RoutingThread {
             txs: vec![],
             gts: vec![],
         };
-        for i in (last_shared_ancestor + 1)..=blockchain.blockring.get_latest_block_id() {
+        let latest_block_id = blockchain.blockring.get_latest_block_id();
+        debug!("latest_block_id : {:?}", latest_block_id);
+        debug!("last_shared_ancestor : {:?}", last_shared_ancestor);
+        debug!("start : {:?}", hex::encode(start));
+        for i in (last_shared_ancestor + 1)..=latest_block_id {
             let hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(i);
+                .get_longest_chain_block_hash_at_block_id(i);
             if hash != [0; 32] {
-                let block = blockchain.get_block(&block_hash);
+                let block = blockchain.get_block(&hash);
                 if block.is_some() {
                     let block = block.unwrap();
+                    debug!(
+                        "pushing block : {:?} at index : {:?}",
+                        hex::encode(block.hash),
+                        i
+                    );
                     ghost.gts.push(block.has_golden_ticket);
                     ghost.block_ts.push(block.timestamp);
                     ghost.prehashes.push(block.pre_hash);
@@ -252,6 +277,8 @@ impl RoutingThread {
             }
         }
 
+        debug!("sending ghost chain to peer : {:?}", peer_index);
+        debug!("ghost : {:?}", ghost);
         let buffer = Message::GhostChain(ghost).serialize();
         self.network
             .io_interface
@@ -259,6 +286,7 @@ impl RoutingThread {
             .await
             .unwrap();
     }
+
     async fn handle_new_peer(
         &mut self,
         peer_data: Option<data::configuration::PeerConfig>,
@@ -296,7 +324,7 @@ impl RoutingThread {
         for i in last_shared_ancestor..(blockchain.blockring.get_latest_block_id() + 1) {
             let block_hash = blockchain
                 .blockring
-                .get_longest_chain_block_hash_by_block_id(i);
+                .get_longest_chain_block_hash_at_block_id(i);
             if block_hash == [0; 32] {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
@@ -328,14 +356,14 @@ impl RoutingThread {
         self.fetch_next_blocks().await;
     }
     async fn fetch_next_blocks(&mut self) {
-        trace!("fetching next blocks");
+        // trace!("fetching next blocks");
 
-        {
-            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-
-            self.blockchain_sync_state
-                .set_latest_blockchain_id(blockchain.get_latest_block_id());
-        }
+        // {
+        //     let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        //
+        //     self.blockchain_sync_state
+        //         .set_latest_blockchain_id(blockchain.get_latest_block_id());
+        // }
 
         self.blockchain_sync_state.build_peer_block_picture();
 
@@ -346,7 +374,12 @@ impl RoutingThread {
             for hash in vec.iter() {
                 let result = self
                     .network
-                    .process_incoming_block_hash(*hash, peer_index, self.blockchain.clone())
+                    .process_incoming_block_hash(
+                        *hash,
+                        peer_index,
+                        self.blockchain.clone(),
+                        self.mempool.clone(),
+                    )
                     .await;
                 if result.is_some() {
                     fetched_blocks.push((peer_index, *hash));
@@ -387,6 +420,9 @@ impl RoutingThread {
         }
     }
     async fn process_ghost_chain(&self, chain: GhostChainSync, peer_index: u64) {
+        debug!("processing ghost chain from peer : {:?}", peer_index);
+        debug!("ghost : {:?}", chain);
+
         let mut previous_block_hash = chain.start;
         let peer_key;
         {
@@ -404,12 +440,14 @@ impl RoutingThread {
             ]
             .concat();
             let block_hash = hash(&buf);
+            debug!("block_hash : {:?}", hex::encode(block_hash));
             if chain.txs[i] {
                 self.network
                     .fetch_missing_block(block_hash, &peer_key)
                     .await
                     .unwrap();
             } else {
+                // TODO : lock should be taken out of for loop
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 blockchain.add_ghost_block(
@@ -451,14 +489,23 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 unreachable!()
             }
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                trace!(
-                    "incoming message received from peer : {:?} buffer_len : {:?}",
-                    peer_index,
-                    buffer.len()
-                );
+                // trace!(
+                //     "incoming message received from peer : {:?} buffer_len : {:?}",
+                //     peer_index,
+                //     buffer.len()
+                // );
+                let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
-                    //todo!()
+                    warn!(
+                        "failed deserializing msg from peer : {:?} with buffer size : {:?}. disconnecting peer",
+                        peer_index, buffer_len
+                    );
+                    self.network
+                        .io_interface
+                        .disconnect_from_peer(peer_index)
+                        .await
+                        .unwrap();
                     return None;
                 }
 
@@ -507,6 +554,9 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
                 return Some(());
             }
+            NetworkEvent::DisconnectFromPeer { .. } => {
+                todo!()
+            }
         }
         debug!("network event processed");
         None
@@ -523,10 +573,10 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             self.reconnection_timer += duration_value;
             if self.reconnection_timer >= self.reconnection_wait_time {
                 self.network.connect_to_static_peers().await;
+                self.network.send_pings().await;
                 self.reconnection_timer = 0;
             }
         }
-
         None
     }
 
@@ -535,6 +585,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             RoutingEvent::BlockchainUpdated => {
                 debug!("received blockchain update event");
                 self.fetch_next_blocks().await;
+            }
+            RoutingEvent::StartBlockIdUpdated(block_id) => {
+                debug!("start block id received as : {:?}", block_id);
+                self.blockchain_sync_state
+                    .set_latest_blockchain_id(block_id);
             }
         }
         None

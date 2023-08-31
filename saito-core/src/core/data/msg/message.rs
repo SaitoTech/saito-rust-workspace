@@ -62,13 +62,17 @@ impl Message {
             Message::Error(data) => data.serialize(),
             _ => {
                 error!("unhandled type : {:?}", message_type);
-                todo!()
+                vec![]
             }
         });
 
         buffer
     }
     pub fn deserialize(buffer: Vec<u8>) -> Result<Message, Error> {
+        if buffer.is_empty() {
+            warn!("empty buffer is not valid for message deserialization",);
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
         let message_type: u8 = u8::from_be_bytes(buffer[0..1].try_into().unwrap());
         let buffer = buffer[1..].to_vec();
 
@@ -101,7 +105,14 @@ impl Message {
                 Ok(Message::BlockchainRequest(result))
             }
             6 => {
-                assert_eq!(buffer.len(), 40);
+                if buffer.len() != 40 {
+                    warn!(
+                        "buffer size : {:?} is not valid for type : {:?}",
+                        buffer.len(),
+                        message_type
+                    );
+                    return Err(Error::from(ErrorKind::InvalidData));
+                }
                 let block_hash = buffer[0..32].to_vec().try_into().unwrap();
                 let block_id = u64::from_be_bytes(buffer[32..40].to_vec().try_into().unwrap());
                 Ok(Message::BlockHeaderHash(block_hash, block_id))
@@ -109,25 +120,62 @@ impl Message {
             7 => Ok(Message::Ping()),
             8 => Ok(Message::SPVChain()),
             9 => {
-                let services = PeerService::deserialize_services(buffer).unwrap();
+                let services = PeerService::deserialize_services(buffer);
+                if services.is_err() {
+                    warn!("couldn't parse peer service from buffer");
+                    return Err(Error::from(ErrorKind::InvalidData));
+                }
+                let services = services.unwrap();
                 Ok(Message::Services(services))
             }
             10 => Ok(Message::GhostChain(GhostChainSync::deserialize(buffer))),
             11 => {
+                if buffer.len() != 72 {
+                    warn!(
+                        "buffer size : {:?} is not valid for type : {:?}",
+                        buffer.len(),
+                        message_type
+                    );
+                    return Err(Error::from(ErrorKind::InvalidData));
+                }
                 let block_id = u64::from_be_bytes(buffer[0..8].try_into().unwrap());
                 let block_hash = buffer[8..40].to_vec().try_into().unwrap();
                 let fork_id = buffer[40..72].to_vec().try_into().unwrap();
                 return Ok(Message::GhostChainRequest(block_id, block_hash, fork_id));
             }
             12 => {
+                if buffer.len() < 4 {
+                    warn!(
+                        "buffer size : {:?} is not valid for type : {:?}",
+                        buffer.len(),
+                        message_type
+                    );
+                    return Err(Error::from(ErrorKind::InvalidData));
+                }
                 let result = ApiMessage::deserialize(&buffer);
                 Ok(Message::ApplicationMessage(result))
             }
             13 => {
+                if buffer.len() < 4 {
+                    warn!(
+                        "buffer size : {:?} is not valid for type : {:?}",
+                        buffer.len(),
+                        message_type
+                    );
+                    return Err(Error::from(ErrorKind::InvalidData));
+                }
                 let result = ApiMessage::deserialize(&buffer);
                 Ok(Message::Result(result))
             }
             14 => {
+                if buffer.len() < 4 {
+                    warn!(
+                        "buffer size : {:?} is not valid for type : {:?}",
+                        buffer.len(),
+                        message_type
+                    );
+                    return Err(Error::from(ErrorKind::InvalidData));
+                }
                 let result = ApiMessage::deserialize(&buffer);
                 Ok(Message::Error(result))
             }

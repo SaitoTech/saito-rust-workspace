@@ -14,31 +14,31 @@ type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
 pub const PARALLEL_HASH_BYTE_THRESHOLD: usize = 128_000;
 
-pub fn encrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
-    let hash = hash(password.as_bytes());
-    let mut key: [u8; 16] = [0; 16];
-    let mut iv: [u8; 16] = [0; 16];
-    key.clone_from_slice(&hash[0..16]);
-    iv.clone_from_slice(&hash[16..32]);
+// pub fn encrypt_with_password(msg: &[u8], password: &[u8]) -> Vec<u8> {
+//     let hash = hash(password);
+//     let mut key: [u8; 16] = [0; 16];
+//     let mut iv: [u8; 16] = [0; 16];
+//     key.clone_from_slice(&hash[0..16]);
+//     iv.clone_from_slice(&hash[16..32]);
+//
+//     let cipher = Aes128Cbc::new_from_slices(&key, &iv).unwrap();
+//     let encrypt_msg = cipher.encrypt_vec(msg);
+//
+//     return encrypt_msg;
+// }
 
-    let cipher = Aes128Cbc::new_from_slices(&key, &iv).unwrap();
-    let encrypt_msg = cipher.encrypt_vec(msg);
-
-    return encrypt_msg;
-}
-
-pub fn decrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
-    let hash = hash(password.as_bytes());
-    let mut key: [u8; 16] = [0; 16];
-    let mut iv: [u8; 16] = [0; 16];
-    key.clone_from_slice(&hash[0..16]);
-    iv.clone_from_slice(&hash[16..32]);
-
-    let cipher = Aes128Cbc::new_from_slices(&key, &iv).unwrap();
-    let decrypt_msg = cipher.decrypt_vec(msg).unwrap();
-
-    return decrypt_msg;
-}
+// pub fn decrypt_with_password(msg: &[u8], password: &str) -> Vec<u8> {
+//     let hash = hash(password.as_bytes());
+//     let mut key: [u8; 16] = [0; 16];
+//     let mut iv: [u8; 16] = [0; 16];
+//     key.clone_from_slice(&hash[0..16]);
+//     iv.clone_from_slice(&hash[16..32]);
+//
+//     let cipher = Aes128Cbc::new_from_slices(&key, &iv).unwrap();
+//     let decrypt_msg = cipher.decrypt_vec(msg).unwrap();
+//
+//     return decrypt_msg;
+// }
 
 pub fn generate_keys() -> (SaitoPublicKey, SaitoPrivateKey) {
     let (mut secret_key, mut public_key) =
@@ -91,11 +91,20 @@ pub fn hash(data: &[u8]) -> SaitoHash {
     // Hashing in parallel can be faster if large enough
     // TODO: Blake3 has benchmarked 128 kb as the cutoff,
     // the benchmark should be redone for Saito's needs
-    if data.len() > PARALLEL_HASH_BYTE_THRESHOLD {
-        hasher.update_rayon(data);
-    } else {
+
+    #[cfg(feature = "with-rayon")]
+    {
+        if data.len() > PARALLEL_HASH_BYTE_THRESHOLD {
+            hasher.update_rayon(data);
+        } else {
+            hasher.update(data);
+        }
+    }
+    #[cfg(not(feature = "with-rayon"))]
+    {
         hasher.update(data);
     }
+
     hasher.finalize().into()
 }
 
@@ -137,17 +146,17 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    //
-    // test symmetrical encryption works properly
-    //
-    fn symmetrical_encryption_test() {
-        let text = "This is our unencrypted text";
-        let e = encrypt_with_password(text.as_bytes(), "asdf");
-        let d = decrypt_with_password(e.as_slice(), "asdf");
-        let dtext = str::from_utf8(&d).unwrap();
-        assert_eq!(text, dtext);
-    }
+    // #[test]
+    // //
+    // // test symmetrical encryption works properly
+    // //
+    // fn symmetrical_encryption_test() {
+    //     let text = "This is our unencrypted text";
+    //     let e = encrypt_with_password(text.as_bytes(), "asdf");
+    //     let d = decrypt_with_password(e.as_slice(), "asdf");
+    //     let dtext = str::from_utf8(&d).unwrap();
+    //     assert_eq!(text, dtext);
+    // }
 
     #[test]
     fn keypair_restoration_from_private_key_test() {

@@ -2,7 +2,6 @@ use std::cmp::min;
 use std::collections::VecDeque;
 
 use ahash::HashMap;
-
 use log::{debug, trace};
 
 use crate::common::defs::{BlockId, PeerIndex, SaitoHash};
@@ -32,7 +31,7 @@ impl BlockchainSyncState {
         }
     }
     pub(crate) fn build_peer_block_picture(&mut self) {
-        debug!("building peer block picture");
+        // debug!("building peer block picture");
         // for every block picture received from a peer, we sort and create a list of sequential hashes to fetch from peers
         for (peer_index, received_picture) in self.received_block_picture.iter_mut() {
             if received_picture.is_empty() {
@@ -203,18 +202,13 @@ impl BlockchainSyncState {
             block_id,
             peer_index
         );
+        if self.blocks_to_fetch.is_empty() {
+            self.set_latest_blockchain_id(block_id);
+        }
         self.received_block_picture
             .entry(peer_index)
             .or_default()
             .push_back((block_id, block_hash));
-        // let result = self.received_block_picture.get_mut(&peer_index);
-        // if let Some(deq) = result {
-        //     deq.push_back((block_id, block_hash));
-        // } else {
-        //     let mut deq: VecDeque<(BlockId, SaitoHash)> = Default::default();
-        //     deq.push_back((block_id, block_hash));
-        //     self.received_block_picture.insert(peer_index, deq);
-        // }
     }
     /// Removes entry when the hash is added to the blockchain. If so we can move the block ceiling up.
     ///
@@ -297,6 +291,7 @@ impl BlockchainSyncState {
 mod tests {
     use crate::common::defs::BlockId;
     use crate::core::data::blockchain_sync_state::BlockchainSyncState;
+    use log::info;
 
     #[test]
     fn single_peer_window_test() {
@@ -344,7 +339,9 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn fetch_count_test() {
+        pretty_env_logger::init();
         let mut state = BlockchainSyncState::new(3);
         for i in 0..state.batch_size + 50 {
             state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1);
@@ -368,12 +365,12 @@ mod tests {
         state.mark_as_fetching(vec);
         state.build_peer_block_picture();
         let result = state.request_blocks_from_waitlist();
-        assert_eq!(result.len(), 0);
+        assert!(result.is_empty());
         state.remove_entry([1; 32], 1);
         state.remove_entry([3; 32], 1);
         state.build_peer_block_picture();
         let result = state.request_blocks_from_waitlist();
-        assert_eq!(result.len(), 0);
+        assert_eq!(result.len(), 1);
 
         state.set_latest_blockchain_id(1);
         state.build_peer_block_picture();

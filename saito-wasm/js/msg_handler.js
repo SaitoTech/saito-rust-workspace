@@ -1,11 +1,9 @@
-export class MsgHandler {
+class MsgHandler {
     static send_message(peer_index, buffer) {
-        console.debug("MsgHandler::send_message : " + peer_index);
         return global.shared_methods.send_message(peer_index, buffer);
     }
 
     static send_message_to_all(buffer, exceptions) {
-        console.debug("MsgHandler::send_message_to_all");
         return global.shared_methods.send_message_to_all(buffer, exceptions);
     }
 
@@ -81,4 +79,15 @@ export class MsgHandler {
     static send_block_success(hash, block_id) {
         return global.shared_methods.send_block_success(hash, block_id);
     }
+}
+
+try {
+    // if (typeof exports === "undefined") {
+    //     module.exports = MsgHandler;
+    // } else {
+    //     exports = MsgHandler;
+    // }
+    module.exports = exports = {MsgHandler};
+} catch (e) {
+    console.error(e);
 }

@@ -190,6 +190,14 @@ impl NetworkController {
             );
         }
     }
+
+    pub async fn disconnect_from_peer(
+        event_id: u64,
+        io_controller: Arc<RwLock<NetworkController>>,
+        peer_id: u64,
+    ) {
+        info!("TODO : handle disconnect_from_peer")
+    }
     pub async fn send_to_all(
         sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
         buffer: Vec<u8>,
@@ -369,7 +377,7 @@ impl NetworkController {
                         sockets.lock().await.remove(&peer_index);
                         break;
                     } else {
-                        todo!("handle these scenarios 1")
+                        // warn!("unhandled type");
                     }
                 },
                 PeerReceiver::Tungstenite(mut receiver) => loop {
@@ -401,7 +409,6 @@ impl NetworkController {
                         }
                         _ => {
                             // Not handling these scenarios
-                            todo!("handle these scenarios 2")
                         }
                     }
                 },
@@ -426,10 +433,10 @@ impl PeerCounter {
 pub async fn run_network_controller(
     mut receiver: Receiver<IoEvent>,
     sender: Sender<IoEvent>,
-    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
-    blockchain: Arc<RwLock<Blockchain>>,
+    configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    blockchain_lock: Arc<RwLock<Blockchain>>,
     sender_to_stat: Sender<String>,
-    peers: Arc<RwLock<PeerCollection>>,
+    peers_lock: Arc<RwLock<PeerCollection>>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -439,7 +446,7 @@ pub async fn run_network_controller(
     let port;
     let public_key;
     {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         url = configs.get_server_configs().unwrap().host.clone()
             + ":"
@@ -452,7 +459,7 @@ pub async fn run_network_controller(
         port = configs.get_server_configs().unwrap().port;
         host = configs.get_server_configs().unwrap().host.clone();
 
-        let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
         let (wallet, _wallet_) = lock_for_read!(blockchain.wallet_lock, LOCK_ORDER_WALLET);
         public_key = wallet.public_key;
     }
@@ -460,22 +467,20 @@ pub async fn run_network_controller(
     info!("starting server on : {:?}", url);
     let sender_clone = sender.clone();
 
-    let network_controller = Arc::new(RwLock::new(NetworkController {
+    let network_controller_lock = Arc::new(RwLock::new(NetworkController {
         sockets: Arc::new(Mutex::new(HashMap::new())),
         sender_to_saito_controller: sender,
         peer_counter: peer_index_counter.clone(),
         currently_queried_urls: Arc::new(Default::default()),
     }));
 
-    let network_controller_clone = network_controller.clone();
-
     let server_handle = run_websocket_server(
         sender_clone.clone(),
-        network_controller_clone.clone(),
+        network_controller_lock.clone(),
         port,
         host,
         public_key,
-        peers,
+        peers_lock,
     );
 
     let mut work_done = false;
@@ -500,9 +505,15 @@ pub async fn run_network_controller(
                 work_done = true;
                 match interface_event {
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
-                        let (network_controller, _network_controller_) =
-                            lock_for_read!(network_controller, LOCK_ORDER_NETWORK_CONTROLLER);
-                        let sockets = network_controller.sockets.clone();
+                        let sockets;
+                        {
+                            let (network_controller, _network_controller_) = lock_for_read!(
+                                network_controller_lock,
+                                LOCK_ORDER_NETWORK_CONTROLLER
+                            );
+                            sockets = network_controller.sockets.clone();
+                        }
+
                         NetworkController::send_to_all(sockets, buffer, exceptions).await;
                         outgoing_messages.increment();
                     }
@@ -510,16 +521,21 @@ pub async fn run_network_controller(
                         peer_index: index,
                         buffer,
                     } => {
-                        let (network_controller, _network_controller_) =
-                            lock_for_read!(network_controller, LOCK_ORDER_NETWORK_CONTROLLER);
-                        let sockets = network_controller.sockets.clone();
+                        let sockets;
+                        {
+                            let (network_controller, _network_controller_) = lock_for_read!(
+                                network_controller_lock,
+                                LOCK_ORDER_NETWORK_CONTROLLER
+                            );
+                            sockets = network_controller.sockets.clone();
+                        }
                         NetworkController::send_outgoing_message(sockets, index, buffer).await;
                         outgoing_messages.increment();
                     }
                     NetworkEvent::ConnectToPeer { peer_details } => {
                         NetworkController::connect_to_peer(
                             event_id,
-                            network_controller.clone(),
+                            network_controller_lock.clone(),
                             peer_details,
                         )
                         .await;
@@ -541,8 +557,10 @@ pub async fn run_network_controller(
                         let sender;
                         let current_queries;
                         {
-                            let (network_controller, _network_controller_) =
-                                lock_for_read!(network_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+                            let (network_controller, _network_controller_) = lock_for_read!(
+                                network_controller_lock,
+                                LOCK_ORDER_NETWORK_CONTROLLER
+                            );
 
                             sender = network_controller.sender_to_saito_controller.clone();
                             current_queries = network_controller.currently_queried_urls.clone();
@@ -563,22 +581,32 @@ pub async fn run_network_controller(
                     NetworkEvent::BlockFetched { .. } => {
                         unreachable!()
                     }
+                    NetworkEvent::DisconnectFromPeer { peer_index } => {
+                        NetworkController::disconnect_from_peer(
+                            event_id,
+                            network_controller_lock.clone(),
+                            peer_index,
+                        )
+                        .await
+                    }
                 }
             }
 
             #[cfg(feature = "with-stats")]
             {
-                let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+                let (configs_temp, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
                 if Instant::now().duration_since(last_stat_on)
-                    > Duration::from_millis(configs.get_server_configs().unwrap().stat_timer_in_ms)
+                    > Duration::from_millis(
+                        configs_temp.get_server_configs().unwrap().stat_timer_in_ms,
+                    )
                 {
                     last_stat_on = Instant::now();
                     outgoing_messages
                         .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
                         .await;
                     let (network_controller, _network_controller_) =
-                        lock_for_read!(network_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+                        lock_for_read!(network_controller_lock, LOCK_ORDER_NETWORK_CONTROLLER);
 
                     let stat = format!(
                         "--- stats ------ {} - capacity : {:?} / {:?}",
@@ -591,10 +619,10 @@ pub async fn run_network_controller(
             }
 
             if !work_done {
-                let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+                let (configs_temp, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
                 tokio::time::sleep(Duration::from_millis(
-                    configs
+                    configs_temp
                         .get_server_configs()
                         .unwrap()
                         .thread_sleep_time_in_ms,
@@ -697,14 +725,14 @@ fn run_websocket_server(
             let result = File::open(file_path.as_str()).await;
             if result.is_err() {
                 error!("failed opening file : {:?}", result.err().unwrap());
-                todo!()
+                return Err(warp::reject::not_found());
             }
             let mut file = result.unwrap();
 
             let result = file.read_to_end(&mut buffer).await;
             if result.is_err() {
                 error!("failed reading file : {:?}", result.err().unwrap());
-                todo!()
+                return Err(warp::reject::not_found());
             }
             drop(file);
 
@@ -730,15 +758,15 @@ fn run_websocket_server(
                     let mut key1 = String::from("");
                     if key.is_some() {
                         key1 = key.unwrap();
+                        if key1.len() != 64 {
+                            warn!("key : {:?} is not valid", key1);
+                            return Err(warp::reject::reject());
+                        }
                     } else {
                         warn!("key is not set to request lite blocks");
                         return Err(warp::reject::reject());
                     }
 
-                    if key1.len() != 64 {
-                        warn!("key : {:?} is not valid", key1);
-                        return Err(warp::reject::reject());
-                    }
                     let key;
                     if key1.is_empty() {
                         key = public_key.clone();
@@ -801,21 +829,21 @@ fn run_websocket_server(
                     let result = File::open(file_path.as_str()).await;
                     if result.is_err() {
                         error!("failed opening file : {:?}", result.err().unwrap());
-                        todo!()
+                        return Err(warp::reject::not_found());
                     }
                     let mut file = result.unwrap();
 
                     let result = file.read_to_end(&mut buffer).await;
                     if result.is_err() {
                         error!("failed reading file : {:?}", result.err().unwrap());
-                        todo!()
+                        return Err(warp::reject::not_found());
                     }
                     drop(file);
 
                     let block = Block::deserialize_from_net(buffer);
                     if block.is_err() {
                         error!("failed parsing buffer into a block");
-                        todo!()
+                        return Err(warp::reject::not_found());
                     }
                     let block = block.unwrap();
                     let block = block.generate_lite_block(keylist);

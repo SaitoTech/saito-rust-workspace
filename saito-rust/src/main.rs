@@ -1,12 +1,18 @@
 use std::collections::VecDeque;
+use std::fmt::Error;
+use std::ops::Deref;
 use std::panic;
+use std::path::Path;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use clap::{App, Arg};
 use log::info;
 use log::{debug, error, trace};
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -17,7 +23,10 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{push_lock, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT};
+use saito_core::common::defs::{
+    push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
+};
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -35,8 +44,8 @@ use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::lock_for_read;
-use saito_rust::saito::config_handler::ConfigHandler;
+use saito_core::{lock_for_read, lock_for_write};
+use saito_rust::saito::config_handler::{ConfigHandler, NodeConfigurations};
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
 use saito_rust::saito::rust_io_handler::RustIOHandler;
@@ -72,7 +81,7 @@ where
                 // TODO : update to recv().await
                 let result = network_event_receiver.as_mut().unwrap().try_recv();
                 if result.is_ok() {
-                    let event = result.unwrap();
+                    let event: NetworkEvent = result.unwrap();
                     if event_processor.process_network_event(event).await.is_some() {
                         work_done = true;
                     }
@@ -101,7 +110,6 @@ where
             {
                 work_done = true;
             }
-
             #[cfg(feature = "with-stats")]
             {
                 let duration = current_instant.duration_since(stat_timer);
@@ -244,19 +252,19 @@ async fn run_consensus_event_processor(
     if result.is_ok() {
         create_test_tx = result.unwrap().eq("1");
     }
-    let generate_genesis_block: bool;
-    {
-        let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
-
-        // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
-        generate_genesis_block = configs.get_peer_configs().is_empty();
-    }
+    // let generate_genesis_block: bool;
+    // {
+    //     let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
+    //
+    //     // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
+    //     generate_genesis_block = configs.get_peer_configs().is_empty();
+    // }
 
     let consensus_event_processor = ConsensusThread {
         mempool: context.mempool.clone(),
         blockchain: context.blockchain.clone(),
         wallet: context.wallet.clone(),
-        generate_genesis_block,
+        generate_genesis_block: false,
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
@@ -269,6 +277,7 @@ async fn run_consensus_event_processor(
             peers.clone(),
             context.wallet.clone(),
             context.configuration.clone(),
+            Box::new(TimeKeeper {}),
         ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
@@ -299,9 +308,9 @@ async fn run_consensus_event_processor(
 
 async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
-    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     context: &Context,
-    peers: Arc<RwLock<PeerCollection>>,
+    peers_lock: Arc<RwLock<PeerCollection>>,
     sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MiningEvent>,
@@ -314,20 +323,22 @@ async fn run_routing_event_processor(
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
         blockchain: context.blockchain.clone(),
+        mempool: context.mempool.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         static_peers: vec![],
-        configs: configs.clone(),
+        configs: configs_lock.clone(),
         wallet: context.wallet.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_io_controller.clone(),
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
-            peers.clone(),
+            peers_lock.clone(),
             context.wallet.clone(),
-            configs.clone(),
+            configs_lock.clone(),
+            Box::new(TimeKeeper {}),
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
@@ -340,7 +351,7 @@ async fn run_routing_event_processor(
     };
 
     {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -505,8 +516,25 @@ fn run_loop_thread(
     loop_handle
 }
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn setup_log() {
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+
+    tracing_subscriber::registry().with(fmt_layer).init();
+}
+
+fn setup_hook() {
     ctrlc::set_handler(move || {
         info!("shutting down the node");
         process::exit(0);
@@ -529,29 +557,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         orig_hook(panic_info);
         process::exit(99);
     }));
+}
 
-    println!("Running saito");
-
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
-    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
-    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
-
-    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
-
-    tracing_subscriber::registry().with(fmt_layer).init();
-
-    let configs: Arc<RwLock<dyn Configuration + Send + Sync>> = Arc::new(RwLock::new(
-        ConfigHandler::load_configs("configs/config.json".to_string())
-            .expect("loading configs failed"),
-    ));
+async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
+    info!("Running saito with config {:?}", configs_lock.read().await);
 
     let channel_size;
     let thread_sleep_time_in_ms;
@@ -560,7 +569,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fetch_batch_size;
 
     {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs
@@ -582,9 +591,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("running saito controllers");
 
     let keys = generate_keys();
-    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    let wallet_lock = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
     {
-        let mut wallet = wallet.write().await;
+        let mut wallet = wallet_lock.write().await;
         Wallet::load(
             &mut wallet,
             Box::new(RustIOHandler::new(
@@ -594,9 +603,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await;
     }
-    let context = Context::new(configs.clone(), wallet);
+    let context = Context::new(configs_lock.clone(), wallet_lock);
 
-    let peers = Arc::new(RwLock::new(PeerCollection::new()));
+    let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =
         tokio::sync::mpsc::channel::<ConsensusEvent>(channel_size);
@@ -611,7 +620,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
         context.blockchain.clone(),
-        peers.clone(),
+        peers_lock.clone(),
         context.wallet.clone(),
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
@@ -622,9 +631,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),
-        configs.clone(),
+        configs_lock.clone(),
         &context,
-        peers.clone(),
+        peers_lock.clone(),
         &sender_to_consensus,
         receiver_for_routing,
         &sender_to_miner,
@@ -639,7 +648,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (_network_event_sender_to_consensus, blockchain_handle) = run_consensus_event_processor(
         &context,
-        peers.clone(),
+        peers_lock.clone(),
         receiver_for_consensus,
         &sender_to_routing,
         sender_to_miner,
@@ -680,10 +689,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let network_handle = tokio::spawn(run_network_controller(
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
-        configs.clone(),
+        configs_lock.clone(),
         context.blockchain.clone(),
         sender_to_stat.clone(),
-        peers.clone(),
+        peers_lock.clone(),
     ));
 
     let _result = tokio::join!(
@@ -695,5 +704,147 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_handle,
         futures::future::join_all(verification_handles)
     );
+}
+
+pub async fn run_utxo_to_issuance_converter() {
+    let (sender_to_network_controller, receiver_in_network_controller) =
+        tokio::sync::mpsc::channel::<IoEvent>(100);
+
+    info!("running saito controllers");
+    let public_key: SaitoPublicKey =
+        hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
+            .unwrap()
+            .try_into()
+            .unwrap();
+    let private_key: SaitoPrivateKey =
+        hex::decode("ddb4ba7e5d70c2234f035853902c6bc805cae9163085f2eac5e585e2d6113ccd")
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+    let configs_lock: Arc<RwLock<NodeConfigurations>> =
+        Arc::new(RwLock::new(NodeConfigurations::default()));
+
+    let configs_clone: Arc<RwLock<dyn Configuration + Send + Sync>> = configs_lock.clone();
+
+    let wallet = Arc::new(RwLock::new(Wallet::new(private_key, public_key)));
+    {
+        let mut wallet = wallet.write().await;
+        let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(100);
+        Wallet::load(&mut wallet, Box::new(RustIOHandler::new(sender, 1))).await;
+    }
+    let context = Context::new(configs_clone.clone(), wallet);
+
+    let mut storage = Storage::new(Box::new(RustIOHandler::new(
+        sender_to_network_controller.clone(),
+        0,
+    )));
+    storage.load_blocks_from_disk(context.mempool.clone()).await;
+
+    let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
+
+    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(100);
+
+    let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+
+    let (mut blockchain, _blockchain_) = lock_for_write!(context.blockchain, LOCK_ORDER_BLOCKCHAIN);
+    blockchain
+        .add_blocks_from_mempool(
+            context.mempool.clone(),
+            None,
+            &mut storage,
+            sender_to_miner.clone(),
+            configs.deref(),
+        )
+        .await;
+
+    let data = blockchain.get_utxoset_data();
+
+    info!("{:?} entries to write to file", data.len());
+    let issuance_path: String = "./data/issuance.file".to_string();
+    let threshold: Currency = 0;
+    info!("opening file : {:?}", issuance_path);
+
+    let path = Path::new(issuance_path.as_str());
+    if path.parent().is_some() {
+        tokio::fs::create_dir_all(path.parent().unwrap())
+            .await
+            .expect("failed creating directory structure");
+    }
+
+    let file = File::create(issuance_path.clone()).await;
+    if file.is_err() {
+        error!("error opening file. {:?}", file.err().unwrap());
+        File::create(issuance_path)
+            .await
+            .expect("couldn't create file");
+        return;
+    }
+    let mut file = file.unwrap();
+
+    let txtype = "Normal";
+
+    for (key, value) in &data {
+        if value > &threshold {
+            let key_base58 = bs58::encode(key).into_string();
+            file.write_all(format!("{}\t{}\t{}\n", value, key_base58, txtype).as_bytes())
+                .await
+                .expect("failed writing to issuance file");
+        }
+    }
+    file.flush()
+        .await
+        .expect("failed flushing issuance file data");
+}
+
+#[tokio::main(flavor = "multi_thread")]
+// #[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let matches = App::new("Saito")
+        .arg(
+            Arg::with_name("config")
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("mode")
+                .long("mode")
+                .value_name("MODE")
+                .default_value("node")
+                .possible_values(["node", "utxo-issuance"])
+                .help("Sets the mode for execution")
+                .takes_value(true),
+        )
+        .get_matches();
+
+    // config.json as default
+    let config_file = matches.value_of("config").unwrap_or("configs/config.json");
+
+    let program_mode = matches.value_of("mode").unwrap_or("node");
+
+    setup_log();
+
+    setup_hook();
+
+    if program_mode == "node" {
+        info!("Using config file: {}", config_file.to_string());
+        let configs = ConfigHandler::load_configs(config_file.to_string());
+        if configs.is_err() {
+            error!("failed loading configs. {:?}", configs.err().unwrap());
+            return Ok(());
+        }
+
+        let configs: Arc<RwLock<dyn Configuration + Send + Sync>> =
+            Arc::new(RwLock::new(configs.unwrap()));
+
+        run_node(configs).await;
+    } else if program_mode == "utxo-issuance" {
+        info!("running the program in utxo to issuance converter mode");
+
+        run_utxo_to_issuance_converter().await;
+    }
+
     Ok(())
 }

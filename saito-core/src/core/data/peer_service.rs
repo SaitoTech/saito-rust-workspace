@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::warn;
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10,14 +10,31 @@ pub struct PeerService {
     pub name: String,
 }
 
-impl From<String> for PeerService {
-    fn from(value: String) -> Self {
-        let values: Vec<&str> = value.split("|").collect();
-        PeerService {
-            service: values[0].to_string(),
-            domain: values[1].to_string(),
-            name: values[2].to_string(),
+impl TryFrom<String> for PeerService {
+    type Error = std::io::Error;
+
+    fn try_from(value: String) -> Result<PeerService, std::io::Error> {
+        let values: Vec<&str> = value.split('|').collect();
+        if values.len() != 3 {
+            return Err(Error::from(ErrorKind::InvalidData));
         }
+        let service = values[0].try_into();
+        let domain = values[1].try_into();
+        let name = values[2].try_into();
+        if service.is_err() {
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
+        if domain.is_err() {
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
+        if name.is_err() {
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
+        Ok(PeerService {
+            service: service.unwrap(),
+            domain: domain.unwrap(),
+            name: name.unwrap(),
+        })
     }
 }
 
@@ -48,12 +65,32 @@ impl PeerService {
         }
         let str = String::from_utf8(buffer);
         if str.is_err() {
-            warn!("failed parsing services. {:?}", str.err().unwrap());
+            warn!("failed parsing services.");
+            error!("{:?}", str.err().unwrap());
             return Err(Error::from(ErrorKind::InvalidData));
         }
         let str = str.unwrap();
         let strings = str.split(";");
-        let services: Vec<PeerService> = strings.map(|str| str.to_string().into()).collect();
+        let mut services: Vec<PeerService> = Default::default();
+        for str in strings {
+            if str.is_empty() {
+                continue;
+            }
+            let result = str.try_into();
+            if result.is_err() {
+                warn!("cannot parse services from : {:?}", str);
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
+            let result: String = result.unwrap();
+            let service = result.try_into();
+
+            if service.is_err() {
+                warn!("cannot parse services from : {:?}", str);
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
+
+            services.push(service.unwrap());
+        }
         Ok(services)
     }
 }

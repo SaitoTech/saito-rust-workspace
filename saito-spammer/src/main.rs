@@ -205,6 +205,7 @@ async fn run_consensus_event_processor(
             peers.clone(),
             context.wallet.clone(),
             context.configuration.clone(),
+            Box::new(TimeKeeper {}),
         ),
         block_producing_timer: 0,
         tx_producing_timer: 0,
@@ -292,9 +293,9 @@ async fn run_verification_threads(
 
 async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
-    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     context: &Context,
-    peers: Arc<RwLock<PeerCollection>>,
+    peers_lock: Arc<RwLock<PeerCollection>>,
     sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_routing: Receiver<RoutingEvent>,
     sender_to_miner: &Sender<MiningEvent>,
@@ -307,20 +308,22 @@ async fn run_routing_event_processor(
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
         blockchain: context.blockchain.clone(),
+        mempool: context.mempool.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         static_peers: vec![],
-        configs: configs.clone(),
+        configs: configs_lock.clone(),
         wallet: context.wallet.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_io_controller.clone(),
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
-            peers.clone(),
+            peers_lock.clone(),
             context.wallet.clone(),
             context.configuration.clone(),
+            Box::new(TimeKeeper {}),
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
@@ -332,7 +335,7 @@ async fn run_routing_event_processor(
         reconnection_wait_time: 0,
     };
     {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -481,7 +484,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = ConfigHandler::load_configs("configs/config.json".to_string())
         .expect("loading configs failed");
-    let configs: Arc<RwLock<SpammerConfigs>> = Arc::new(RwLock::new(config.clone()));
+    let configs_lock: Arc<RwLock<SpammerConfigs>> = Arc::new(RwLock::new(config.clone()));
 
     let channel_size;
     let thread_sleep_time_in_ms;
@@ -490,7 +493,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fetch_batch_size: usize;
 
     {
-        let (configs, _configs_) = lock_for_read!(configs, LOCK_ORDER_CONFIGS);
+        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs
@@ -513,8 +516,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("running saito controllers");
 
-    let keys = generate_keys();
-    let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
+    // let keys = generate_keys();
+    let wallet = Arc::new(RwLock::new(Wallet::new(private_key, public_key)));
     {
         let mut wallet = wallet.write().await;
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
@@ -522,7 +525,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let context = Context::new(configs_clone.clone(), wallet);
 
-    let peers = Arc::new(RwLock::new(PeerCollection::new()));
+    let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
     let (sender_to_consensus, receiver_for_consensus) =
         tokio::sync::mpsc::channel::<ConsensusEvent>(channel_size);
@@ -538,7 +541,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
         context.blockchain.clone(),
-        peers.clone(),
+        peers_lock.clone(),
         context.wallet.clone(),
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
@@ -551,7 +554,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_network_controller.clone(),
         configs_clone.clone(),
         &context,
-        peers.clone(),
+        peers_lock.clone(),
         &sender_to_consensus,
         receiver_for_routing,
         &sender_to_miner,
@@ -566,7 +569,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let blockchain_handle = run_consensus_event_processor(
         &context,
-        peers.clone(),
+        peers_lock.clone(),
         receiver_for_consensus,
         &sender_to_routing,
         sender_to_miner,
@@ -584,7 +587,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
         sender_to_stat.clone(),
-        configs.clone(),
+        configs_lock.clone(),
     )
     .await;
 
@@ -610,15 +613,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         configs_clone.clone(),
         context.blockchain.clone(),
         sender_to_stat.clone(),
-        peers.clone(),
+        peers_lock.clone(),
     ));
 
     let spammer_handle = tokio::spawn(run_spammer(
         context.wallet.clone(),
-        peers.clone(),
+        peers_lock.clone(),
         context.blockchain.clone(),
         sender_to_network_controller.clone(),
-        configs.clone(),
+        configs_lock.clone(),
     ));
 
     let _result = tokio::join!(

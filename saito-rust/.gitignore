@@ -4,3 +4,5 @@ flamegraph.svg
 perf.data
 perf.data.old
 data/saito.stats
+data/issuance/issuance
+data/issuance.file

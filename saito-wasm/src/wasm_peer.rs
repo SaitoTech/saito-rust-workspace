@@ -19,6 +19,7 @@ impl WasmPeer {
     pub fn get_public_key(&self) -> JsString {
         if self.peer.public_key.is_none() {
             warn!("peer : {:?} public key is not set", self.peer.index);
+            return JsString::from(hex::encode([0; 33]));
         }
         hex::encode(self.peer.public_key.unwrap()).into()
     }
