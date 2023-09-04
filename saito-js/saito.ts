@@ -404,6 +404,9 @@ export default class Saito {
     return Saito.getLibInstance().get_mempool_txs();
   }
 
+  public async getAccountSlips(publicKey:string){
+    return Saito.getLibInstance().get_account_slips(publicKey);
+  }
   // public async loadWallet() {
   //     return Saito.getLibInstance().load_wallet();
   // }
