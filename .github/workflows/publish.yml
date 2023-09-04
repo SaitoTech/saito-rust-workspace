@@ -2,7 +2,7 @@ name: publish
 
 on:
   push:
-    branches: [ prod ]
+    branches: [ prod, master ]
 #  pull_request:
 #    branches: [ develop ]
 #  workflow_run:
