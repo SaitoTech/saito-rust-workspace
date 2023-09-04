@@ -66,7 +66,7 @@ jobs:
         shell: bash
 
       - name: Install npm packages for saito-wasm
-        run: npm ci
+        run: npm install
         working-directory: saito-wasm
 
       - name: Wasm Build
