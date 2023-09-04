@@ -46,6 +46,7 @@ use crate::wasm_blockchain::WasmBlockchain;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_peer::WasmPeer;
+use crate::wasm_slip::WasmSlip;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
 use crate::wasm_wallet::WasmWallet;
@@ -551,12 +552,30 @@ pub async fn get_peer(peer_index: u64) -> Option<WasmPeer> {
     let peer = peers.find_peer_by_index(peer_index);
     if peer.is_none() || peer.unwrap().public_key.is_none() {
         warn!("peer not found");
-        // return Err(JsValue::from("peer not found"));
         return None;
-        // return Ok(JsValue::NULL);
     }
     let peer = peer.cloned().unwrap();
     Some(WasmPeer::new_from_peer(peer))
+}
+
+#[wasm_bindgen]
+pub async fn get_account_slips(public_key: JsString) -> Array {
+    let saito = SAITO.lock().await;
+    let blockchain = saito.routing_thread.blockchain.read().await;
+    let key = string_to_key(public_key);
+    if key.is_err() {
+        error!("error {:?}", key.err().unwrap());
+        return js_sys::Array::new_with_length(0);
+    }
+    let mut slips = blockchain.get_slips_for(key.unwrap());
+    let array = js_sys::Array::new_with_length(slips.len() as u32);
+
+    for (index, slip) in slips.drain(..).enumerate() {
+        let wasm_slip = WasmSlip::new_from_slip(slip);
+        array.set(index as u32, JsValue::from(wasm_slip));
+    }
+
+    array
 }
 
 // #[wasm_bindgen]

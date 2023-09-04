@@ -1612,6 +1612,19 @@ impl Blockchain {
         });
         data
     }
+    pub fn get_slips_for(&self, public_key: SaitoPublicKey) -> Vec<Slip> {
+        let mut slips: Vec<Slip> = Default::default();
+        self.utxoset
+            .iter()
+            .filter(|(_, value)| **value)
+            .for_each(|(key, _)| {
+                let slip = Slip::parse_slip_from_utxokey(key);
+                if slip.public_key == public_key {
+                    slips.push(slip);
+                }
+            });
+        slips
+    }
 }
 
 #[cfg(test)]
