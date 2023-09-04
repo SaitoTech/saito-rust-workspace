@@ -108,7 +108,7 @@ impl Storage {
                     );
                     continue;
                 }
-                info!("file : {:?} loaded", file_name);
+                debug!("file : {:?} loaded", file_name);
                 let buffer: Vec<u8> = result.unwrap();
                 let buffer_len = buffer.len();
                 let result = Block::deserialize_from_net(buffer);
@@ -123,7 +123,7 @@ impl Storage {
                 let mut block: Block = result.unwrap();
                 block.force_loaded = true;
                 block.generate();
-                info!("block : {:?} loaded from disk", hex::encode(block.hash));
+                debug!("block : {:?} loaded from disk", hex::encode(block.hash));
                 let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
                 mempool.add_block(block);
             }
