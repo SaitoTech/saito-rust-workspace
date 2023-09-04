@@ -115,7 +115,7 @@ jobs:
 
       - name: Install npm packages for saito-js
         if: ${{ env.published_saito_js_version != env.current_saito_js_version }}
-        run: npm ci
+        run: npm install
         working-directory: saito-js
 
       - name: Update saito-wasm package
