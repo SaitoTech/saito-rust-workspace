@@ -155,7 +155,7 @@ impl Transaction {
         mut with_fee: Currency,
         _force_merge: bool,
     ) -> Result<Transaction, Error> {
-        trace!(
+        dbg!(
             "generating transaction : payment = {:?}, fee = {:?}",
             with_payment,
             with_fee
@@ -168,16 +168,17 @@ impl Transaction {
         }
 
         let total_requested = with_payment + with_fee;
-        trace!(
+        dbg!(
             "in generate transaction. available: {} and payment: {} and fee: {}",
             available_balance,
             with_payment,
             with_fee
         );
         if available_balance < total_requested {
-            warn!(
+            dbg!(
                 "not enough funds to create transaction. required : {:?} available : {:?}",
-                total_requested, available_balance
+                total_requested,
+                available_balance
             );
             return Err(Error::from(ErrorKind::NotFound));
         }

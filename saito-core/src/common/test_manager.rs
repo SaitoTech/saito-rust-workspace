@@ -48,10 +48,10 @@ pub mod test {
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
     use crate::core::data::peer_collection::PeerCollection;
-    use crate::core::data::slip::Slip;
+    use crate::core::data::slip::{Slip, SlipType};
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
-    use crate::core::data::wallet::Wallet;
+    use crate::core::data::wallet::{self, Wallet};
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
 
@@ -116,11 +116,13 @@ pub mod test {
             }
         }
 
-        pub async fn convert_issuance_to_hashmap(&self , filepath: &'static str) -> AHashMap<SaitoPublicKey, u64> {
-
+        pub async fn convert_issuance_to_hashmap(
+            &self,
+            filepath: &'static str,
+        ) -> AHashMap<SaitoPublicKey, u64> {
             let buffer = self.storage.read(filepath).await.unwrap();
             let content = String::from_utf8(buffer).expect("Failed to convert to String");
-  
+
             let mut issuance_map = AHashMap::new();
             for line in content.lines() {
                 let parts: Vec<&str> = line.split_whitespace().collect();
@@ -129,18 +131,20 @@ pub mod test {
                         Ok(num) => num,
                         Err(_) => continue, // skip lines with invalid numbers
                     };
-                    
-                    let decoded = bs58::decode(parts[1]).into_vec().expect("Failed to decode Base58");
-                    
+
+                    let decoded = bs58::decode(parts[1])
+                        .into_vec()
+                        .expect("Failed to decode Base58");
+
                     if decoded.len() == 33 {
                         let mut address: [u8; 33] = [0; 33];
                         address.copy_from_slice(&decoded);
-        
+
                         issuance_map.insert(address, amount);
                     }
                 }
             }
-            
+
             dbg!("{}  buffer", &issuance_map);
 
             issuance_map
@@ -169,23 +173,29 @@ pub mod test {
         //
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            let (mut blockchain, _blockchain_) =
-                lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            let (mut mempool, _mempool_) = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
 
-            blockchain
-                .add_block(
-                    block,
-                    Some(&mut self.network),
-                    &mut self.storage,
-                    self.sender_to_miner.clone(),
-                    &mut mempool,
-                    configs.deref(),
-                    true,
-                )
-                .await;
-            debug!("block added to test manager blockchain");
+            {
+                let (configs, _configs_) = lock_for_write!(self.configs, LOCK_ORDER_CONFIGS);
+                let (mut blockchain, _blockchain_) =
+                    lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+                let (mut mempool, _mempool_) =
+                    lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
+
+                blockchain
+                    .add_block(
+                        block,
+                        Some(&mut self.network),
+                        &mut self.storage,
+                        self.sender_to_miner.clone(),
+                        &mut mempool,
+                        configs.deref(),
+                        true,
+                    )
+                    .await;
+
+                // dbg!(blockchain.blockring.get_latest_block_hash());
+                dbg!("block added to test manager blockchain");
+            }
         }
 
         //
@@ -569,10 +579,8 @@ pub mod test {
 
         pub async fn get_latest_block_hash(&self) -> SaitoHash {
             let (blockchain, _blockchain_) =
-                    lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-                
-            blockchain.last_block_hash
-
+                lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            blockchain.blockring.get_latest_block_hash()
         }
 
         pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: Currency) {
@@ -584,8 +592,7 @@ pub mod test {
         //
         // initialize chain from slips
         //
-        pub async fn initialize_from_slips(&mut self, slips:Vec<Slip>) {
-      
+        pub async fn initialize_from_slips(&mut self, slips: Vec<Slip>) {
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
             {
@@ -594,7 +601,7 @@ pub mod test {
                 public_key = wallet.public_key;
             }
 
-             //
+            //
             // create first block
             //
             let timestamp = create_timestamp();
@@ -603,22 +610,18 @@ pub mod test {
             for slip in slips {
                 // debug!("{:?} slip public key", hex::encode(slip.public_key));
                 let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
-                tx.generate(&public_key, 0, 0);
                 tx.sign(&private_key);
-                // txs.push(tx);
                 block.add_transaction(tx);
             }
-    
+
             {
                 let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-               
 
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
             block.generate();
             block.sign(&private_key);
-            
 
             assert!(verify_signature(
                 &block.pre_hash,
@@ -628,8 +631,6 @@ pub mod test {
 
             // and add first block to blockchain
             self.add_block(block).await;
-    
-
         }
         //
         // initialize chain
@@ -769,7 +770,77 @@ pub mod test {
             utxo_balances
         }
 
-    
+        pub async fn get_wallet(&self) -> tokio::sync::RwLockReadGuard<'_, Wallet> {
+            let wallet;
+            let _wallet_;
+            (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+            return wallet;
+        }
+        pub async fn transfer_value_to_public_key(
+            &mut self,
+
+            to_public_key: SaitoPublicKey,
+            amount: u64,
+            timestamp_addition: u64,
+        ) {
+            let latest_block_hash = self.get_latest_block_hash().await;
+            dbg!(latest_block_hash);
+            {
+                let (blockchain, _blockchain_) =
+                    lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+                // dbg!(blockchain.get_latest_block());
+                // latest_block_hash = blockchain.blockring.get_latest_block_hash()
+            }
+
+            dbg!("{}", hex::encode(latest_block_hash));
+
+            let timestamp = create_timestamp();
+
+            let mut block = self
+                .create_block(
+                    latest_block_hash,
+                    timestamp + timestamp_addition,
+                    0,
+                    0,
+                    0,
+                    false,
+                )
+                .await;
+
+            let private_key;
+            let from_public_key;
+
+            {
+                let wallet;
+                let _wallet_;
+                (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                from_public_key = wallet.public_key;
+                private_key = wallet.private_key;
+                let mut tx =
+                    Transaction::create(&mut wallet.clone(), to_public_key, amount, 0, false)
+                        .unwrap();
+                tx.sign(&private_key);
+                block.add_transaction(tx);
+            }
+
+            {
+                let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+
+                block.merkle_root =
+                    block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+            }
+
+            block.generate();
+            block.sign(&private_key);
+
+            assert!(verify_signature(
+                &block.pre_hash,
+                &block.signature,
+                &block.creator,
+            ));
+            self.add_block(block).await;
+        }
     }
 
     struct TestConfiguration {}

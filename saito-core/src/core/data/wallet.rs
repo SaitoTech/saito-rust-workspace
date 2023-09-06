@@ -360,6 +360,10 @@ impl WalletSlip {
 #[cfg(test)]
 mod tests {
 
+    use std::thread;
+    use std::time::Duration;
+
+    use tokio::time::Sleep;
     use tracing_subscriber::field::debug;
 
     use crate::common::defs::LOCK_ORDER_WALLET;
@@ -367,7 +371,7 @@ mod tests {
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
     use crate::lock_for_read;
-
+    const ISSUANCE_FILE_PATH: &'static str = "../saito-rust/data/issuance/issuance";
     use super::*;
 
     #[test]
@@ -378,6 +382,8 @@ mod tests {
         assert_ne!(wallet.private_key, [0; 32]);
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
         use log::{debug, info, trace};
+        use std::thread;
+        use std::time::Duration;
     }
 
     #[tokio::test]
@@ -385,28 +391,30 @@ mod tests {
         let mut public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
         let mut t = TestManager::new();
         let public_key = t.storage.decode_str(public_key_string).unwrap();
-        let mut public_key_array: SaitoPublicKey = [0u8; 33];
-        public_key_array.copy_from_slice(&public_key);
+        let mut to_public_key: SaitoPublicKey = [0u8; 33];
+        to_public_key.copy_from_slice(&public_key);
+
+        // let slips = t
+        //     .storage
+        //     .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+        //     .await;
+
+        // t.initialize_from_slips(slips).await;
+
+        // t.initialize(100, 100000).await;
+
         t.initialize(100, 100000).await;
 
-        let latest_block_hash = t.get_latest_block_hash().await;
-        let timestamp = create_timestamp();
-
-        let block = t
-            .create_block(latest_block_hash, timestamp, 0, 0, 0, false)
+        t.transfer_value_to_public_key(to_public_key, 500, 120000)
             .await;
 
-        let private_key;
-        {
-            let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
-            private_key = wallet.private_key;
-        }
+        let balance_map = t.balance_map().await;
+        let their_balance = *balance_map.get(&to_public_key).unwrap();
+        let my_balance = t.get_wallet().await.available_balance;
 
-        let tx = Transaction::create_vip_transaction(public_key_array, 100);
-        tx.sign(&private_key);
-        block.add_transaction(tx);
-
-        dbg!("{:?}", t.balance_map().await);
+        dbg!(t.balance_map().await);
+        assert_eq!(500, their_balance);
+        assert_eq!(10000000 - 500, my_balance)
     }
 
     #[test]
