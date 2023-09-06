@@ -1,4 +1,3 @@
-#[cfg(test)]
 pub mod test {
     //
     // TestManager provides a set of functions to simplify the testing of dynamic
@@ -24,6 +23,7 @@ pub mod test {
     //
     //
     use std::borrow::BorrowMut;
+    use std::collections::HashMap;
     use std::fmt::{Debug, Formatter};
     use std::ops::Deref;
     use std::sync::Arc;
@@ -48,6 +48,7 @@ pub mod test {
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
     use crate::core::data::peer_collection::PeerCollection;
+    use crate::core::data::slip::Slip;
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -115,6 +116,35 @@ pub mod test {
             }
         }
 
+        pub async fn convert_issuance_to_hashmap(&self , filepath: &'static str) -> AHashMap<SaitoPublicKey, u64> {
+
+            let buffer = self.storage.read(filepath).await.unwrap();
+            let content = String::from_utf8(buffer).expect("Failed to convert to String");
+  
+            let mut issuance_map = AHashMap::new();
+            for line in content.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let amount: u64 = match parts[0].parse() {
+                        Ok(num) => num,
+                        Err(_) => continue, // skip lines with invalid numbers
+                    };
+                    
+                    let decoded = bs58::decode(parts[1]).into_vec().expect("Failed to decode Base58");
+                    
+                    if decoded.len() == 33 {
+                        let mut address: [u8; 33] = [0; 33];
+                        address.copy_from_slice(&decoded);
+        
+                        issuance_map.insert(address, amount);
+                    }
+                }
+            }
+            
+            dbg!("{}  buffer", &issuance_map);
+
+            issuance_map
+        }
         pub fn get_mempool_lock(&self) -> Arc<RwLock<Mempool>> {
             return self.mempool_lock.clone();
         }
@@ -544,6 +574,56 @@ pub mod test {
         }
 
         //
+        // initialize chain from slips
+        //
+        pub async fn initialize_from_slips(&mut self, slips:Vec<Slip>) {
+      
+            let private_key: SaitoPrivateKey;
+            let public_key: SaitoPublicKey;
+            {
+                let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                private_key = wallet.private_key;
+                public_key = wallet.public_key;
+            }
+
+             //
+            // create first block
+            //
+            let timestamp = create_timestamp();
+            let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
+
+            for slip in slips {
+                // debug!("{:?} slip public key", hex::encode(slip.public_key));
+                let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
+                tx.generate(&public_key, 0, 0);
+                tx.sign(&private_key);
+                // txs.push(tx);
+                block.add_transaction(tx);
+            }
+    
+            {
+                let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+               
+
+                block.merkle_root =
+                    block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+            }
+            block.generate();
+            block.sign(&private_key);
+            
+
+            assert!(verify_signature(
+                &block.pre_hash,
+                &block.signature,
+                &block.creator,
+            ));
+
+            // and add first block to blockchain
+            self.add_block(block).await;
+    
+
+        }
+        //
         // initialize chain
         //
         // creates and adds the first block to the blockchain, with however many VIP
@@ -680,6 +760,8 @@ pub mod test {
             }
             utxo_balances
         }
+
+    
     }
 
     struct TestConfiguration {}
