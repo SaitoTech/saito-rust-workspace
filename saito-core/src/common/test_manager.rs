@@ -567,6 +567,14 @@ pub mod test {
             GoldenTicket::new(block_hash, random_bytes, public_key)
         }
 
+        pub async fn get_latest_block_hash(&self) -> SaitoHash {
+            let (blockchain, _blockchain_) =
+                    lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+                
+            blockchain.last_block_hash
+
+        }
+
         pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: Currency) {
             let timestamp = create_timestamp();
             self.initialize_with_timestamp(vip_transactions, vip_amount, timestamp)

@@ -359,8 +359,14 @@ impl WalletSlip {
 
 #[cfg(test)]
 mod tests {
+
+    use tracing_subscriber::field::debug;
+
+    use crate::common::defs::LOCK_ORDER_WALLET;
+    use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
+    use crate::lock_for_read;
 
     use super::*;
 
@@ -371,6 +377,36 @@ mod tests {
         assert_ne!(wallet.public_key, [0; 33]);
         assert_ne!(wallet.private_key, [0; 32]);
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
+        use log::{debug, info, trace};
+    }
+
+    #[tokio::test]
+    async fn wallet_value_transfer_test() {
+        let mut public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
+        let mut t = TestManager::new();
+        let public_key = t.storage.decode_str(public_key_string).unwrap();
+        let mut public_key_array: SaitoPublicKey = [0u8; 33];
+        public_key_array.copy_from_slice(&public_key);
+        t.initialize(100, 100000).await;
+
+        let latest_block_hash = t.get_latest_block_hash().await;
+        let timestamp = create_timestamp();
+
+        let block = t
+            .create_block(latest_block_hash, timestamp, 0, 0, 0, false)
+            .await;
+
+        let private_key;
+        {
+            let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+            private_key = wallet.private_key;
+        }
+
+        let tx = Transaction::create_vip_transaction(public_key_array, 100);
+        tx.sign(&private_key);
+        block.add_transaction(tx);
+
+        dbg!("{:?}", t.balance_map().await);
     }
 
     #[test]

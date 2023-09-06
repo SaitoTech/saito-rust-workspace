@@ -214,7 +214,7 @@ impl Storage {
         let amount = result.unwrap();
 
         let publickey_str = entries[1];
-        let publickey_result = Self::decode_str(publickey_str);
+        let publickey_result = self.decode_str(publickey_str);
 
         match publickey_result {
             Ok(val) => {
@@ -241,7 +241,7 @@ impl Storage {
         }
     }
 
-    fn decode_str(string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
+    pub fn decode_str(&self, string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
         return bs58::decode(string).into_vec();
     }
 
@@ -319,7 +319,7 @@ mod test {
         t.initialize_from_slips(slips).await;
 
         // get the backup;
-        
+
 
         let balance_map = t.balance_map().await;
         assert_eq!(issuance_hashmap, balance_map);
