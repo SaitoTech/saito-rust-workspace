@@ -24,6 +24,7 @@ pub mod test {
     //
     use std::borrow::BorrowMut;
     use std::collections::HashMap;
+    use std::error::Error;
     use std::fmt::{Debug, Formatter};
     use std::ops::Deref;
     use std::sync::Arc;
@@ -782,7 +783,7 @@ pub mod test {
             to_public_key: SaitoPublicKey,
             amount: u64,
             timestamp_addition: u64,
-        ) {
+        ) -> Result<(), Box<dyn Error>> {
             let latest_block_hash = self.get_latest_block_hash().await;
             dbg!(latest_block_hash);
             {
@@ -818,8 +819,7 @@ pub mod test {
                 from_public_key = wallet.public_key;
                 private_key = wallet.private_key;
                 let mut tx =
-                    Transaction::create(&mut wallet.clone(), to_public_key, amount, 0, false)
-                        .unwrap();
+                    Transaction::create(&mut wallet.clone(), to_public_key, amount, 0, false)?;
                 tx.sign(&private_key);
                 block.add_transaction(tx);
             }
@@ -840,6 +840,8 @@ pub mod test {
                 &block.creator,
             ));
             self.add_block(block).await;
+
+            Ok(())
         }
     }
 

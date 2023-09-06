@@ -387,34 +387,78 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn wallet_value_transfer_test() {
-        let mut public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
+    async fn wallet_wallet_transfer_to_address_test() {
+        let public_keys = [
+            "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            "s9adoFPjBX972vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            "s223oFPjBX97NC2bmE5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            // Add more public key strings here
+        ];
+
         let mut t = TestManager::new();
+        t.initialize(100, 100000).await;
+
+        let mut last_param = 120000;
+
+        for &public_key_string in &public_keys {
+            let public_key = t.storage.decode_str(public_key_string).unwrap();
+            let mut to_public_key: SaitoPublicKey = [0u8; 33];
+            to_public_key.copy_from_slice(&public_key);
+
+            t.transfer_value_to_public_key(to_public_key, 500, last_param)
+                .await
+                .unwrap();
+
+            let balance_map = t.balance_map().await;
+            let their_balance = *balance_map.get(&to_public_key).unwrap();
+            assert_eq!(500, their_balance);
+
+            last_param += 120000; // Increment the last parameter for next iteration
+        }
+
+        let my_balance = t.get_wallet().await.available_balance;
+        let expected_balance = 10000000 - 500 * public_keys.len() as u64; // 500 is the amount transferred each time
+        assert_eq!(expected_balance, my_balance);
+
+        dbg!(t.balance_map().await);
+    }
+
+    #[tokio::test]
+    async fn test_transfer_with_insufficient_funds() {
+        let mut t = TestManager::new();
+        t.initialize(100, 100000).await; // Initialize with smaller amount
+        let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
         let public_key = t.storage.decode_str(public_key_string).unwrap();
         let mut to_public_key: SaitoPublicKey = [0u8; 33];
         to_public_key.copy_from_slice(&public_key);
 
-        // let slips = t
-        //     .storage
-        //     .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
-        //     .await;
+        // Try transferring more than what the wallet contains
+        let result = t
+            .transfer_value_to_public_key(to_public_key, 1000000000, 120000)
+            .await;
+        assert!(result.is_err() || !result.is_ok());
+    }
 
-        // t.initialize_from_slips(slips).await;
+    #[tokio::test]
+    async fn test_transfer_with_exact_funds() {
+        let mut t = TestManager::new();
+        t.initialize(1, 500).await;
 
-        // t.initialize(100, 100000).await;
-
-        t.initialize(100, 100000).await;
+        let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
+        let public_key = t.storage.decode_str(public_key_string).unwrap();
+        let mut to_public_key: SaitoPublicKey = [0u8; 33];
+        to_public_key.copy_from_slice(&public_key);
 
         t.transfer_value_to_public_key(to_public_key, 500, 120000)
-            .await;
+            .await
+            .unwrap();
 
         let balance_map = t.balance_map().await;
-        let their_balance = *balance_map.get(&to_public_key).unwrap();
-        let my_balance = t.get_wallet().await.available_balance;
 
-        dbg!(t.balance_map().await);
+        let their_balance = *balance_map.get(&to_public_key).unwrap();
         assert_eq!(500, their_balance);
-        assert_eq!(10000000 - 500, my_balance)
+        let my_balance = t.get_wallet().await.available_balance;
+        assert_eq!(0, my_balance); // Should be empty
     }
 
     #[test]
