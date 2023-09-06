@@ -1,4 +1,5 @@
 pub mod saitowasm;
+mod wasm_balance_snapshot;
 mod wasm_block;
 mod wasm_blockchain;
 mod wasm_configuration;
