@@ -341,7 +341,7 @@ mod tests {
     #[test]
     #[serial_test::serial]
     fn fetch_count_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         let mut state = BlockchainSyncState::new(3);
         for i in 0..state.batch_size + 50 {
             state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1);

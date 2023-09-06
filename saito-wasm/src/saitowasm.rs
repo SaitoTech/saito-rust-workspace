@@ -17,6 +17,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
+use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
     PeerIndex, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
@@ -576,6 +577,15 @@ pub async fn get_account_slips(public_key: JsString) -> Array {
     }
 
     array
+}
+
+#[wasm_bindgen]
+pub async fn get_balance_snapshot() -> WasmBalanceSnapshot {
+    let saito = SAITO.lock().await;
+    let blockchain = saito.routing_thread.blockchain.read().await;
+    let snapshot = blockchain.get_balance_snapshot();
+
+    WasmBalanceSnapshot::new(snapshot)
 }
 
 // #[wasm_bindgen]

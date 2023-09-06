@@ -27,6 +27,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
+use crate::core::util::balance_snapshot::BalanceSnapshot;
 use crate::{iterate, lock_for_read, lock_for_write};
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
@@ -1624,6 +1625,23 @@ impl Blockchain {
                 }
             });
         slips
+    }
+    pub fn get_balance_snapshot(&self) -> BalanceSnapshot {
+        let mut snapshot = BalanceSnapshot {
+            latest_block_id: self.get_latest_block_id(),
+            latest_block_hash: self.get_latest_block_hash(),
+            timestamp: self.last_timestamp,
+            slips: vec![],
+        };
+        self.utxoset
+            .iter()
+            .filter(|(_, value)| **value)
+            .for_each(|(key, _)| {
+                let slip = Slip::parse_slip_from_utxokey(key);
+                snapshot.slips.push(slip);
+            });
+
+        snapshot
     }
 }
 
