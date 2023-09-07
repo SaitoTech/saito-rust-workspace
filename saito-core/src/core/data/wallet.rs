@@ -371,7 +371,7 @@ mod tests {
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
     use crate::lock_for_read;
-    const ISSUANCE_FILE_PATH: &'static str = "../saito-rust/data/issuance/issuance";
+    const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/test/issuance";
     use super::*;
 
     #[test]
@@ -421,7 +421,7 @@ mod tests {
 
     // Test if transfer is possible even with issufficient funds
     #[tokio::test]
-    async fn transfer_with_insufficient_funds_test() {
+    async fn transfer_with_insufficient_funds_failure_test() {
         let mut t = TestManager::new();
         t.initialize(100, 100000).await;
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";

@@ -121,7 +121,7 @@ impl Blockchain {
         // block.generate_hash();
         block.generate();
 
-        dbg!(
+        debug!(
             "add_block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
             hex::encode(block.hash),
             block.block_type,
@@ -141,7 +141,7 @@ impl Blockchain {
 
         // sanity checks
         if self.blocks.contains_key(&block_hash) {
-            dbg!(
+            debug!(
                 "block already exists in blockchain {:?}. not adding",
                 &hex::encode(&block.hash)
             );
@@ -158,7 +158,7 @@ impl Blockchain {
         //
         if !self.blockring.is_empty() && self.get_block(&block.previous_block_hash).is_none() {
             if block.previous_block_hash == [0; 32] {
-                dbg!(
+                debug!(
                     "hash is empty for parent of block : {:?}",
                     hex::encode(block.hash)
                 );
@@ -264,7 +264,7 @@ impl Blockchain {
         if !self.blocks.contains_key(&block_hash) {
             self.blocks.insert(block_hash, block);
         } else {
-            dbg!(
+            debug!(
                 "BLOCK IS ALREADY IN THE BLOCKCHAIN, WHY ARE WE ADDING IT????? {:?}",
                 block.hash
             );
@@ -307,7 +307,7 @@ impl Blockchain {
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
-            dbg!("shared ancestor found");
+            debug!("shared ancestor found");
 
             while new_chain_hash != old_chain_hash {
                 if self.blocks.contains_key(&old_chain_hash) {
@@ -325,7 +325,7 @@ impl Blockchain {
                 }
             }
         } else {
-            dbg!(
+            debug!(
                 "block without parent. block : {:?}, latest : {:?}",
                 hex::encode(block_hash),
                 hex::encode(previous_block_hash)
@@ -413,7 +413,7 @@ impl Blockchain {
         // viable.
         //
         return if am_i_the_longest_chain {
-            dbg!("this is the longest chain");
+            debug!("this is the longest chain");
             self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
             let does_new_chain_validate = self
@@ -434,7 +434,7 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
                 if notify_miner {
-                    dbg!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
+                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
                     sender_to_miner
                         .send(MiningEvent::LongestChainBlockAdded {
                             hash: block_hash,
@@ -446,7 +446,7 @@ impl Blockchain {
 
                 AddBlockResult::BlockAdded
             } else {
-                dbg!(
+                trace!(
                     "new chain doesn't validate with hash : {:?}",
                     hex::encode(block_hash)
                 );
@@ -455,7 +455,7 @@ impl Blockchain {
                 AddBlockResult::FailedButRetry
             }
         } else {
-            dbg!("this is not the longest chain");
+            debug!("this is not the longest chain");
             self.add_block_success(block_hash, network, storage, mempool, configs, notify_miner)
                 .await;
             AddBlockResult::BlockAdded

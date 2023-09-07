@@ -180,7 +180,6 @@ pub mod test {
                     )
                     .await;
 
-                // dbg!(blockchain.blockring.get_latest_block_hash());
                 dbg!("block added to test manager blockchain");
             }
         }
@@ -616,7 +615,7 @@ pub mod test {
                 let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
                 private_key = wallet.private_key;
                 my_public_key = wallet.public_key;
-                dbg!(hex::encode(my_public_key));
+                // dbg!(hex::encode(my_public_key));
             }
 
             //
@@ -856,7 +855,7 @@ pub mod test {
             timestamp_addition: u64,
         ) -> Result<(), Box<dyn Error>> {
             let latest_block_hash = self.get_latest_block_hash().await;
-            dbg!(latest_block_hash);
+            // dbg!(latest_block_hash);
             {
                 let (blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
@@ -864,8 +863,6 @@ pub mod test {
                 // dbg!(blockchain.get_latest_block());
                 // latest_block_hash = blockchain.blockring.get_latest_block_hash()
             }
-
-            dbg!("{}", hex::encode(latest_block_hash));
 
             let timestamp = create_timestamp();
 
