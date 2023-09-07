@@ -13,6 +13,9 @@ impl WasmBalanceSnapshot {
     pub fn new(snapshot: BalanceSnapshot) -> WasmBalanceSnapshot {
         WasmBalanceSnapshot { snapshot }
     }
+    pub fn get_snapshot(self) -> BalanceSnapshot {
+        self.snapshot
+    }
 }
 
 #[wasm_bindgen]
@@ -28,5 +31,21 @@ impl WasmBalanceSnapshot {
             array.set(index as u32, JsValue::from(entry));
         }
         array
+    }
+    pub fn from_string(str: JsString) -> Result<WasmBalanceSnapshot, JsValue> {
+        let str: String = str.into();
+        let result = str.try_into();
+        if result.is_err() {
+            // log::info!("str = {:?}", str);
+            return Err(JsValue::from("failed converting string to snapshot"));
+        }
+        let snapshot: BalanceSnapshot = result.unwrap();
+        let snapshot = WasmBalanceSnapshot::new(snapshot);
+
+        Ok(snapshot)
+    }
+
+    pub fn to_string(&self) -> JsString {
+        self.snapshot.to_string().into()
     }
 }

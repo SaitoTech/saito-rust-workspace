@@ -1,4 +1,7 @@
-use log::debug;
+use std::fmt::{Display, Formatter, Write};
+use std::io::{BufRead, BufReader};
+
+use log::{debug, info};
 
 use crate::common::defs::{BlockId, SaitoHash, SaitoPublicKey, Timestamp};
 use crate::core::data::slip::{Slip, SlipType};
@@ -32,7 +35,7 @@ impl BalanceSnapshot {
     /// - A `String`: File name
     /// - A `Vec<String>`: Rows of the file
     ///
-    pub fn to_text(&self) -> (String, Vec<String>) {
+    pub fn get_data(&self) -> (String, Vec<String>) {
         let file_name: String = self.get_file_name();
         let entries: Vec<String> = self.get_rows();
 
@@ -67,6 +70,8 @@ impl BalanceSnapshot {
             file_name,
             rows.len()
         );
+        let mut tokens: Vec<&str> = file_name.split('.').collect();
+        let file_name = tokens.remove(0);
         let tokens: Vec<&str> = file_name.split('-').collect();
         if tokens.len() != 3 {
             return Err(format!(
@@ -152,6 +157,50 @@ impl BalanceSnapshot {
     }
 }
 
+impl Display for BalanceSnapshot {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let (file_name, rows) = self.get_data();
+        writeln!(f, "{}", file_name).unwrap();
+        rows.iter().for_each(|row| {
+            writeln!(f, "{}", row).unwrap();
+        });
+
+        std::fmt::Result::Ok(())
+    }
+}
+
+impl TryFrom<String> for BalanceSnapshot {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let mut reader = BufReader::new(value.as_bytes());
+
+        let mut file_name = "".to_string();
+        reader
+            .read_line(&mut file_name)
+            .map_err(|err| "failed reading file name from balance snapshot")?;
+        file_name.pop();
+
+        let mut rows = vec![];
+        loop {
+            let mut row = "".to_string();
+            if reader.read_line(&mut row).is_ok() {
+                info!("row = {}", row);
+                if row.is_empty() {
+                    break;
+                }
+                // removing the new line
+                row.pop();
+                rows.push(row);
+            } else {
+                break;
+            }
+        }
+
+        BalanceSnapshot::new(file_name, rows)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use log::info;
@@ -161,8 +210,6 @@ mod tests {
 
     #[test]
     fn load_save_test() {
-        pretty_env_logger::init();
-        info!("aaaaaaaaa");
         let mut snapshot = BalanceSnapshot {
             latest_block_id: 200,
             latest_block_hash: [1; 32],
@@ -199,7 +246,7 @@ mod tests {
             utxoset_key: [0; 58],
             is_utxoset_key_set: false,
         });
-        let (file_name, rows) = snapshot.to_text();
+        let (file_name, rows) = snapshot.get_data();
         assert!(!file_name.is_empty());
         let expected_file_name = snapshot.timestamp.to_string()
             + "-"
@@ -237,6 +284,67 @@ mod tests {
         assert_eq!(snapshot.timestamp, snapshot2.timestamp);
         assert_eq!(snapshot.latest_block_id, snapshot2.latest_block_id);
         assert_eq!(snapshot.latest_block_hash, snapshot2.latest_block_hash);
+
+        for (index, slip) in snapshot.slips.iter().enumerate() {
+            let slip2 = snapshot2.slips.get(index).unwrap();
+            assert_eq!(slip.public_key, slip2.public_key);
+            assert_eq!(slip.block_id, slip2.block_id);
+            assert_eq!(slip.tx_ordinal, slip2.tx_ordinal);
+            assert_eq!(slip.amount, slip2.amount);
+        }
+    }
+
+    #[test]
+    fn to_string_test() {
+        // pretty_env_logger::init();
+        let mut snapshot = BalanceSnapshot {
+            latest_block_id: 200,
+            latest_block_hash: [1; 32],
+            timestamp: 10000,
+            slips: vec![],
+        };
+        snapshot.slips.push(Slip {
+            public_key: [1; 33],
+            amount: 10,
+            slip_index: 1,
+            block_id: 1,
+            tx_ordinal: 1,
+            slip_type: SlipType::Normal,
+            utxoset_key: [0; 58],
+            is_utxoset_key_set: false,
+        });
+        snapshot.slips.push(Slip {
+            public_key: [2; 33],
+            amount: 20,
+            slip_index: 2,
+            block_id: 2,
+            tx_ordinal: 2,
+            slip_type: SlipType::Normal,
+            utxoset_key: [0; 58],
+            is_utxoset_key_set: false,
+        });
+        snapshot.slips.push(Slip {
+            public_key: [3; 33],
+            amount: 30,
+            slip_index: 3,
+            block_id: 3,
+            tx_ordinal: 3,
+            slip_type: SlipType::Normal,
+            utxoset_key: [0; 58],
+            is_utxoset_key_set: false,
+        });
+
+        let str = snapshot.to_string();
+        assert_ne!(str.len(), 0);
+
+        let result: Result<BalanceSnapshot, String> = str.try_into();
+        assert!(result.is_ok(), "{:?}", result.err().unwrap());
+
+        let snapshot2 = result.unwrap();
+        assert_eq!(snapshot.timestamp, snapshot2.timestamp);
+        assert_eq!(snapshot.latest_block_id, snapshot2.latest_block_id);
+        assert_eq!(snapshot.latest_block_hash, snapshot2.latest_block_hash);
+        assert_eq!(snapshot2.slips.len(), 3);
 
         for (index, slip) in snapshot.slips.iter().enumerate() {
             let slip2 = snapshot2.slips.get(index).unwrap();
