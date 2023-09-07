@@ -135,13 +135,13 @@ impl Blockchain {
         // repeatedly in the course of adding this block to the
         // blockchain and our various indices.
         let block_hash = block.hash;
-        let block_id: u64 = block.id;
+        let block_id = block.id;
         let previous_block_hash = self.blockring.get_latest_block_hash();
         // let previous_block_hash = block.previous_block_hash;
 
         // sanity checks
         if self.blocks.contains_key(&block_hash) {
-            debug!(
+            error!(
                 "block already exists in blockchain {:?}. not adding",
                 &hex::encode(&block.hash)
             );
@@ -158,7 +158,7 @@ impl Blockchain {
         //
         if !self.blockring.is_empty() && self.get_block(&block.previous_block_hash).is_none() {
             if block.previous_block_hash == [0; 32] {
-                debug!(
+                trace!(
                     "hash is empty for parent of block : {:?}",
                     hex::encode(block.hash)
                 );
@@ -264,7 +264,7 @@ impl Blockchain {
         if !self.blocks.contains_key(&block_hash) {
             self.blocks.insert(block_hash, block);
         } else {
-            debug!(
+            error!(
                 "BLOCK IS ALREADY IN THE BLOCKCHAIN, WHY ARE WE ADDING IT????? {:?}",
                 block.hash
             );
@@ -434,7 +434,7 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
                 if notify_miner {
-                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
+                    info!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
                     sender_to_miner
                         .send(MiningEvent::LongestChainBlockAdded {
                             hash: block_hash,
@@ -446,7 +446,7 @@ impl Blockchain {
 
                 AddBlockResult::BlockAdded
             } else {
-                trace!(
+                warn!(
                     "new chain doesn't validate with hash : {:?}",
                     hex::encode(block_hash)
                 );
