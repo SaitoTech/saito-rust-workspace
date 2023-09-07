@@ -3,7 +3,7 @@ use std::io::Error;
 
 use async_trait::async_trait;
 
-use crate::common::defs::{PeerIndex, SaitoHash};
+use crate::common::defs::{PeerIndex, SaitoHash, SaitoPublicKey};
 use crate::core::data;
 use crate::core::data::peer_service::PeerService;
 use crate::core::data::wallet::Wallet;

@@ -18,4 +18,18 @@ export default class BalanceSnapshot extends WasmWrapper<WasmBalanceSnapshot> {
     public get rows(): Array<string> {
         return this.instance.get_entries();
     }
+
+    public static fromString(str: string): BalanceSnapshot | null {
+        try {
+            let snapshot = this.Type.from_string(str);
+            return new BalanceSnapshot(snapshot);
+        } catch (error) {
+            console.error(error);
+            return null;
+        }
+    }
+
+    public toString(): string {
+        return this.instance.to_string();
+    }
 }
