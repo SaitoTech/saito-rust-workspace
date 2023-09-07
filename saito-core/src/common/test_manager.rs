@@ -26,7 +26,7 @@ pub mod test {
     use std::collections::HashMap;
     use std::error::Error;
     use std::fmt::{Debug, Formatter};
-    use std::ops::Deref;
+    use std::ops::{Deref, DerefMut};
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -117,6 +117,7 @@ pub mod test {
             }
         }
 
+        // generates utxo hashmap from an issuance file
         pub async fn convert_issuance_to_hashmap(
             &self,
             filepath: &'static str,
@@ -140,26 +141,11 @@ pub mod test {
                     if decoded.len() == 33 {
                         let mut address: [u8; 33] = [0; 33];
                         address.copy_from_slice(&decoded);
-
                         issuance_map.insert(address, amount);
                     }
                 }
             }
-
-            dbg!("{}  buffer", &issuance_map);
-
             issuance_map
-        }
-        pub fn get_mempool_lock(&self) -> Arc<RwLock<Mempool>> {
-            return self.mempool_lock.clone();
-        }
-
-        pub fn get_wallet_lock(&self) -> Arc<RwLock<Wallet>> {
-            return self.wallet_lock.clone();
-        }
-
-        pub fn get_blockchain_lock(&self) -> Arc<RwLock<Blockchain>> {
-            return self.blockchain_lock.clone();
         }
 
         pub async fn wait_for_mining_event(&mut self) {
@@ -578,10 +564,40 @@ pub mod test {
             GoldenTicket::new(block_hash, random_bytes, public_key)
         }
 
+        pub fn get_mempool_lock(&self) -> Arc<RwLock<Mempool>> {
+            return self.mempool_lock.clone();
+        }
+
+        pub fn get_wallet_lock(&self) -> Arc<RwLock<Wallet>> {
+            return self.wallet_lock.clone();
+        }
+
+        pub async fn get_wallet(&self) -> tokio::sync::RwLockReadGuard<'_, Wallet> {
+            let wallet;
+            let _wallet_;
+            (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+            return wallet;
+        }
+
+        pub fn get_blockchain_lock(&self) -> Arc<RwLock<Blockchain>> {
+            return self.blockchain_lock.clone();
+        }
+
         pub async fn get_latest_block_hash(&self) -> SaitoHash {
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             blockchain.blockring.get_latest_block_hash()
+        }
+        pub async fn get_latest_block(&self) -> Block {
+            let (blockchain, _blockchain_) =
+                lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let block = blockchain.get_latest_block().unwrap().clone();
+            return block;
+        }
+        pub async fn get_latest_block_id(&self) -> u64 {
+            let (blockchain, _blockchain_) =
+                lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            blockchain.blockring.get_latest_block_id()
         }
 
         pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: Currency) {
@@ -591,15 +607,16 @@ pub mod test {
         }
 
         //
-        // initialize chain from slips
+        // initialize chain from slips and add some amount my public key
         //
-        pub async fn initialize_from_slips(&mut self, slips: Vec<Slip>) {
+        pub async fn initialize_from_slips_and_value(&mut self, slips: Vec<Slip>, amount: u64) {
             let private_key: SaitoPrivateKey;
-            let public_key: SaitoPublicKey;
+            let my_public_key: SaitoPublicKey;
             {
                 let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
                 private_key = wallet.private_key;
-                public_key = wallet.public_key;
+                my_public_key = wallet.public_key;
+                dbg!(hex::encode(my_public_key));
             }
 
             //
@@ -609,15 +626,21 @@ pub mod test {
             let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
             for slip in slips {
-                // debug!("{:?} slip public key", hex::encode(slip.public_key));
-                let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
+                let mut tx = Transaction::create_vip_transaction(slip.public_key, slip.amount);
+                tx.generate(&slip.public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
             }
 
+            // add some value to my own public key
+            let mut tx = Transaction::create_vip_transaction(my_public_key, amount);
+
+            tx.generate(&my_public_key, 0, 0);
+            tx.sign(&private_key);
+            block.add_transaction(tx);
+
             {
                 let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
@@ -633,11 +656,65 @@ pub mod test {
             // and add first block to blockchain
             self.add_block(block).await;
         }
+
         //
-        // initialize chain
-        //
-        // creates and adds the first block to the blockchain, with however many VIP
-        // transactions are necessary
+        // initialize chain from just slips properties
+        pub async fn initialize_from_slips(&mut self, slips: Vec<Slip>) {
+            //
+            // initialize timestamp
+            //
+            let timestamp = create_timestamp();
+            //
+            // reset data dirs
+            //
+            tokio::fs::remove_dir_all("data/blocks").await;
+            tokio::fs::create_dir_all("data/blocks").await.unwrap();
+            tokio::fs::remove_dir_all("data/wallets").await;
+            tokio::fs::create_dir_all("data/wallets").await.unwrap();
+
+            //
+            // create initial transactions
+            //
+            let private_key: SaitoPrivateKey;
+            {
+                let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                private_key = wallet.private_key;
+            }
+
+            //
+            // create first block
+            //
+
+            let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
+
+            //
+            // generate UTXO-carrying VIP transactions
+            //
+            for slip in slips {
+                let mut tx = Transaction::create_vip_transaction(slip.public_key, slip.amount);
+                tx.generate(&slip.public_key, 0, 0);
+                tx.sign(&private_key);
+                block.add_transaction(tx);
+            }
+
+            {
+                let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+                // we have added VIP, so need to regenerate the merkle-root
+                block.merkle_root =
+                    block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+            }
+            block.generate();
+            block.sign(&private_key);
+
+            assert!(verify_signature(
+                &block.pre_hash,
+                &block.signature,
+                &block.creator,
+            ));
+
+            // and add first block to blockchain
+            self.add_block(block).await;
+        }
         pub async fn initialize_with_timestamp(
             &mut self,
             vip_transactions: u64,
@@ -771,12 +848,6 @@ pub mod test {
             utxo_balances
         }
 
-        pub async fn get_wallet(&self) -> tokio::sync::RwLockReadGuard<'_, Wallet> {
-            let wallet;
-            let _wallet_;
-            (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
-            return wallet;
-        }
         pub async fn transfer_value_to_public_key(
             &mut self,
 

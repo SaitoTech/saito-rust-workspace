@@ -282,50 +282,56 @@ impl Storage {
 
 #[cfg(test)]
 mod test {
-    use log::{info, trace, debug};
+    use log::{debug, info, trace};
 
     use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::block::Block;
-    use crate::core::data::storage::{Storage};
     use crate::core::data::crypto::{hash, verify};
+    use crate::core::data::storage::Storage;
     // use std::io::{BufRead, BufReader};
 
-    const  ISSUANCE_FILE_PATH: &'static str = "../saito-rust/data/issuance/issuance";
+    const ISSUANCE_FILE_PATH: &'static str = "../saito-rust/data/issuance/issuance";
     // part is relative to it's cargo.toml
-    // #[ignore]
+
+    // tests if issuance file can be read
     #[tokio::test]
     async fn read_issuance_file_test() {
         let t = TestManager::new();
         let read_result = t.storage.read(ISSUANCE_FILE_PATH).await;
         assert!(read_result.is_ok(), "Failed to read issuance file.");
     }
+
+    // test if issuance file utxo is equal to the resultant balance map on created blockchain
     #[tokio::test]
     async fn issuance_hashmap_equals_balance_hashmap_test() {
-        let mut  t = TestManager::new();
+        let mut t = TestManager::new();
 
-        let issuance_hashmap =  t.convert_issuance_to_hashmap(ISSUANCE_FILE_PATH).await;
-        let slips = t.storage.get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH).await;
+        let issuance_hashmap = t.convert_issuance_to_hashmap(ISSUANCE_FILE_PATH).await;
+        let slips = t
+            .storage
+            .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+            .await;
+
         t.initialize_from_slips(slips).await;
-
-        let balance_map = t.balance_map().await;
-        assert_eq!(issuance_hashmap, balance_map);
-    }
-    #[tokio::test]
-    async fn balance_hashmap_persists_after_reset_test() {
-        let mut  t = TestManager::new();
-        let issuance_hashmap =  t.convert_issuance_to_hashmap(ISSUANCE_FILE_PATH).await;
-        let slips = t.storage.get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH).await;
-        t.initialize_from_slips(slips).await;
-
-        // get the backup;
-
-
         let balance_map = t.balance_map().await;
         assert_eq!(issuance_hashmap, balance_map);
     }
 
+    // // check if issuance occurs on block one
+    // #[tokio::test]
+    // async fn issuance_occurs_only_on_block_one_test() {
+    //     let mut t = TestManager::new();
+    //     let issuance_hashmap = t.convert_issuance_to_hashmap(ISSUANCE_FILE_PATH).await;
+    //     let slips = t
+    //         .storage
+    //         .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+    //         .await;
+    //     t.initialize_from_slips(slips).await;
+    //     dbg!();
 
+    //     assert_eq!(t.get_latest_block_id().await, 1);
+    // }
 
     #[tokio::test]
     #[serial_test::serial]
