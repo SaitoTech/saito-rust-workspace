@@ -144,7 +144,7 @@ impl ConsensusThread {
         blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
         info!("generating issuance init transaction");
-    
+
         let slips = self.storage.get_token_supply_slips_from_disk().await;
         let private_key;
         {
