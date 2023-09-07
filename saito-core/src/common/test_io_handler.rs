@@ -1,3 +1,4 @@
+#[cfg(test)]
 pub mod test {
     use std::fs;
     use std::io::Error;
@@ -86,21 +87,22 @@ pub mod test {
 
         async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
             let result = File::open(key.clone()).await;
-        if result.is_err() {
-            let err = result.err().unwrap();
-            println!("couldn't open file for : {:?}. {:?}", key, err);
-            return Err(err);
-        }
-        let mut file = result.unwrap();
-        let mut encoded = Vec::<u8>::new();
+            if result.is_err() {
+                error!(
+                    "error : path {:?} \r\n : {:?}",
+                    key.to_string(),
+                    result.err().unwrap()
+                );
+                todo!()
+            }
+            let mut file = result.unwrap();
+            let mut encoded = Vec::<u8>::new();
 
-        let result = file.read_to_end(&mut encoded).await;
-        if result.is_err() {
-            let err = result.err().unwrap();
-            error!("couldn't read file : {:?}. {:?}", key, err);
-            return Err(err);
-        }
-        Ok(encoded)
+            let result = file.read_to_end(&mut encoded).await;
+            if result.is_err() {
+                todo!()
+            }
+            Ok(encoded)
         }
         async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
             info!("current dir = {:?}", std::env::current_dir().unwrap());
