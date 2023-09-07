@@ -388,7 +388,7 @@ mod tests {
 
     // tests value transfer to other addresses and verifies the resulting utxo hashmap
     #[tokio::test]
-    async fn wallet_wallet_transfer_to_address_test() {
+    async fn wallet_transfer_to_address_test() {
         let mut t = TestManager::new();
         t.initialize(100, 100000).await;
 
