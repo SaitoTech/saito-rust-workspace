@@ -8,24 +8,6 @@ import Blockchain from "./lib/blockchain";
 import {fromBase58, toBase58} from "./lib/util";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
-// export enum MessageType {
-//     HandshakeChallenge = 1,
-//     HandshakeResponse,
-//     //HandshakeCompletion,
-//     ApplicationMessage = 4,
-//     Block,
-//     Transaction,
-//     BlockchainRequest,
-//     BlockHeaderHash,
-//     Ping,
-//     SPVChain,
-//     Services,
-//     GhostChain,
-//     GhostChainRequest,
-//     Result,
-//     Error,
-//     ApplicationTransaction,
-// }
 
 export enum LogLevel {
     Error = 0,
@@ -212,13 +194,6 @@ export default class Saito {
         }
     }
 
-    // public async getPublicKey(): Promise<string> {
-    //     return Saito.getLibInstance().get_public_key();
-    // }
-    //
-    // public async getPrivateKey(): Promise<string> {
-    //     return Saito.getLibInstance().get_private_key();
-    // }
 
     public async processNewPeer(index: bigint, peer_config: any): Promise<void> {
         return Saito.getLibInstance().process_new_peer(index, peer_config);
@@ -415,15 +390,7 @@ export default class Saito {
         return new BalanceSnapshot(snapshot);
     }
 
-    // public async loadWallet() {
-    //     return Saito.getLibInstance().load_wallet();
-    // }
-    //
-    // public async saveWallet() {
-    //     return Saito.getLibInstance().save_wallet();
-    // }
-    //
-    // public async resetWallet() {
-    //     return Saito.getLibInstance().reset_wallet();
-    // }
+    public async updateBalanceFrom(snapshot: BalanceSnapshot) {
+        await Saito.getLibInstance().update_from_balance_snapshot(snapshot.instance);
+    }
 }

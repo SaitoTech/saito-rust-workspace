@@ -1643,6 +1643,14 @@ impl Blockchain {
 
         snapshot
     }
+    pub fn add_to_utxo(&mut self, slip: &Slip) {
+        self.utxoset.insert(slip.get_utxoset_key(), true);
+    }
+    pub fn update_from_balance_snapshot(&mut self, snapshot: BalanceSnapshot) {
+        snapshot.slips.iter().for_each(|slip| {
+            self.add_to_utxo(slip);
+        });
+    }
 }
 
 #[cfg(test)]
