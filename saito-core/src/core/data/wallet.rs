@@ -421,7 +421,7 @@ mod tests {
 
     // Test if transfer is possible even with issufficient funds
     #[tokio::test]
-    async fn test_transfer_with_insufficient_funds() {
+    async fn transfer_with_insufficient_funds_test() {
         let mut t = TestManager::new();
         t.initialize(100, 100000).await;
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";

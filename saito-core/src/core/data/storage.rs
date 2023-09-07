@@ -291,7 +291,7 @@ mod test {
     use crate::core::data::storage::Storage;
     // use std::io::{BufRead, BufReader};
 
-    const ISSUANCE_FILE_PATH: &'static str = "../saito-rust/data/issuance/issuance";
+    const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/test/issuance";
     // part is relative to it's cargo.toml
 
     // tests if issuance file can be read
