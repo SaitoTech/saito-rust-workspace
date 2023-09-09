@@ -591,8 +591,8 @@ pub async fn get_balance_snapshot() -> WasmBalanceSnapshot {
 #[wasm_bindgen]
 pub async fn update_from_balance_snapshot(snapshot: WasmBalanceSnapshot) {
     let saito = SAITO.lock().await;
-    let mut blockchain = saito.routing_thread.blockchain.write().await;
-    blockchain.update_from_balance_snapshot(snapshot.get_snapshot());
+    let mut wallet = saito.routing_thread.wallet.write().await;
+    wallet.update_from_balance_snapshot(snapshot.get_snapshot());
 }
 
 // #[wasm_bindgen]
