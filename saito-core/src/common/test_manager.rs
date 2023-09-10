@@ -1,3 +1,4 @@
+#[cfg(test)]
 pub mod test {
     //
     // TestManager provides a set of functions to simplify the testing of dynamic
