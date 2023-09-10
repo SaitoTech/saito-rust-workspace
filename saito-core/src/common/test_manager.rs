@@ -37,7 +37,8 @@ pub mod test {
 
     use crate::common::defs::{
         push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
-        UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        UtxoSet, ISSUANCE_PUBLIC_KEY, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
     use crate::common::keep_time::KeepTime;
     use crate::common::test_io_handler::test::TestIOHandler;
@@ -134,20 +135,27 @@ pub mod test {
                         Err(_) => continue, // skip lines with invalid numbers
                     };
 
-                    let decoded = bs58::decode(parts[1])
-                        .into_vec()
-                        .expect("Failed to decode Base58");
+                    let address_key = if amount < 25000 {
+                        // Default public key when amount is less than 25000
 
-                    if decoded.len() == 33 {
+                        bs58::decode(ISSUANCE_PUBLIC_KEY)
+                            .into_vec()
+                            .expect("Failed to decode Base58")
+                    } else {
+                        bs58::decode(parts[1])
+                            .into_vec()
+                            .expect("Failed to decode Base58")
+                    };
+
+                    if address_key.len() == 33 {
                         let mut address: [u8; 33] = [0; 33];
-                        address.copy_from_slice(&decoded);
-                        issuance_map.insert(address, amount);
+                        address.copy_from_slice(&address_key);
+                        *issuance_map.entry(address).or_insert(0) += amount; // add the amount to the existing value or set it if not present
                     }
                 }
             }
             issuance_map
         }
-
         pub async fn wait_for_mining_event(&mut self) {
             self.receiver_in_miner
                 .recv()

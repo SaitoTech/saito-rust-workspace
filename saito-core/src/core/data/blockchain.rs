@@ -2209,8 +2209,8 @@ mod tests {
         // add a few transactions
         let public_keys = [
             "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
-            "s9adoFPjBX972vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
-            "s223oFPjBX97NC2bmE5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            // "s9adoFPjBX972vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            // "s223oFPjBX97NC2bmE5Kd2oHWUShuSTUuZwSB1U4wsPR",
         ];
 
         let mut last_param = 120000;

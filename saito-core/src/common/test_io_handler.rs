@@ -1,4 +1,3 @@
-#[cfg(test)]
 pub mod test {
     use std::fs;
     use std::io::Error;

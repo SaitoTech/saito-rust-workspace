@@ -7,7 +7,7 @@ use bs58;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{push_lock, SaitoPublicKey, LOCK_ORDER_MEMPOOL};
+use crate::common::defs::{push_lock, SaitoPublicKey, ISSUANCE_PUBLIC_KEY, LOCK_ORDER_MEMPOOL};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
@@ -213,7 +213,14 @@ impl Storage {
 
         let amount = result.unwrap();
 
-        let publickey_str = entries[1];
+        // Check if amount is less than 25000 and set public key if so
+
+        let publickey_str = if amount < 25000 {
+            ISSUANCE_PUBLIC_KEY
+        } else {
+            entries[1]
+        };
+
         let publickey_result = self.decode_str(publickey_str);
 
         match publickey_result {
@@ -232,7 +239,7 @@ impl Storage {
                 slip.public_key = publickey_array;
                 slip.slip_type = slip_type;
 
-                return Some(slip);
+                Some(slip)
             }
             Err(err) => {
                 debug!("error reading issuance line {:?}", err);
