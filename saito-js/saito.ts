@@ -385,8 +385,8 @@ export default class Saito {
         return Saito.getLibInstance().get_account_slips(publicKey);
     }
 
-    public async getBalanceSnapshot(): Promise<BalanceSnapshot> {
-        let snapshot = await Saito.getLibInstance().get_balance_snapshot();
+    public async getBalanceSnapshot(keys: string[]): Promise<BalanceSnapshot> {
+        let snapshot = await Saito.getLibInstance().get_balance_snapshot(keys);
         return new BalanceSnapshot(snapshot);
     }
 
