@@ -1626,19 +1626,24 @@ impl Blockchain {
             });
         slips
     }
-    pub fn get_balance_snapshot(&self) -> BalanceSnapshot {
+    pub fn get_balance_snapshot(&self, keys: Vec<SaitoPublicKey>) -> BalanceSnapshot {
         let mut snapshot = BalanceSnapshot {
             latest_block_id: self.get_latest_block_id(),
             latest_block_hash: self.get_latest_block_hash(),
             timestamp: self.last_timestamp,
             slips: vec![],
         };
+        // TODO : calling this will be a huge performance hit for the node. so need to refactor the design.
         self.utxoset
             .iter()
             .filter(|(_, value)| **value)
             .for_each(|(key, _)| {
                 let slip = Slip::parse_slip_from_utxokey(key);
-                snapshot.slips.push(slip);
+
+                // if no keys provided we get the full picture
+                if keys.is_empty() || keys.contains(&slip.public_key) {
+                    snapshot.slips.push(slip);
+                }
             });
 
         snapshot
