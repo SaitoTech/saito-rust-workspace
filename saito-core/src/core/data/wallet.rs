@@ -1,5 +1,5 @@
 use ahash::{AHashMap, AHashSet};
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
@@ -11,6 +11,7 @@ use crate::core::data::golden_ticket::GoldenTicket;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
+use crate::core::util::balance_snapshot::BalanceSnapshot;
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -170,6 +171,7 @@ impl Wallet {
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
         self.unspent_slips.insert(wallet_slip.utxokey);
+        // TODO : should this come in below if's else block to avoid double counting?
         self.available_balance += slip.amount;
         let result = self.slips.insert(wallet_slip.utxokey, wallet_slip);
         if result.is_some() {
@@ -312,6 +314,32 @@ impl Wallet {
         assert!(tx.hash_for_signature.is_some());
         self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
     }
+    pub fn update_from_balance_snapshot(&mut self, snapshot: BalanceSnapshot) {
+        // TODO : need to reset balance and slips to avoid failing integrity from forks
+
+        snapshot.slips.iter().for_each(|slip| {
+            assert_ne!(slip.utxoset_key, [0; 58]);
+            let wallet_slip = WalletSlip {
+                utxokey: slip.utxoset_key,
+                amount: slip.amount,
+                block_id: slip.block_id,
+                tx_ordinal: slip.tx_ordinal,
+                lc: true,
+                slip_index: slip.slip_index,
+                spent: false,
+            };
+            self.unspent_slips.insert(slip.utxoset_key);
+            let result = self.slips.insert(slip.utxoset_key, wallet_slip);
+            if result.is_none() {
+                self.available_balance += slip.amount;
+            } else {
+                debug!(
+                    "slip with utxo key : {:?} was already available",
+                    hex::encode(slip.utxoset_key)
+                );
+            }
+        });
+    }
 }
 
 impl WalletSlip {
@@ -331,7 +359,6 @@ impl WalletSlip {
 
 #[cfg(test)]
 mod tests {
-
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
 

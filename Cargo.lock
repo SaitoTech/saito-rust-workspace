@@ -1730,7 +1730,7 @@ checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
 
 [[package]]
 name = "saito-core"
-version = "0.1.3"
+version = "0.1.5"
 dependencies = [
  "aes",
  "ahash",
@@ -1763,7 +1763,7 @@ dependencies = [
 
 [[package]]
 name = "saito-rust"
-version = "0.1.3"
+version = "0.1.5"
 dependencies = [
  "ahash",
  "async-trait",
@@ -1814,7 +1814,7 @@ dependencies = [
 
 [[package]]
 name = "saito-wasm"
-version = "0.1.3"
+version = "0.1.5"
 dependencies = [
  "async-trait",
  "base58",
