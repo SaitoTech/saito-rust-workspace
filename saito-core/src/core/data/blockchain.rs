@@ -1666,6 +1666,7 @@ mod tests {
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
+    use crate::core::data::storage::Storage;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 
@@ -2214,7 +2215,7 @@ mod tests {
 
         let mut last_param = 120000;
         for &public_key_string in &public_keys {
-            let public_key = t.storage.decode_str(public_key_string).unwrap();
+            let public_key = Storage::decode_str(public_key_string).unwrap();
             let mut to_public_key: SaitoPublicKey = [0u8; 33];
             to_public_key.copy_from_slice(&public_key);
             t.transfer_value_to_public_key(to_public_key, 500, last_param)

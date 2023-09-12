@@ -27,7 +27,7 @@ pub mod test {
     use std::collections::HashMap;
     use std::error::Error;
     use std::fmt::{Debug, Formatter};
-    use std::ops::{Deref, DerefMut};
+    use std::ops::Deref;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -65,7 +65,7 @@ pub mod test {
             .as_millis() as Timestamp
     }
 
-    pub const TEST_ISSUANCE_FILEPATH: &'static str = "./data/issuance/test/issuance";
+    pub const TEST_ISSUANCE_FILEPATH: &'static str = "../saito-rust/data/issuance/test/issuance";
     struct TestTimeKeeper {}
 
     impl KeepTime for TestTimeKeeper {
@@ -573,6 +573,14 @@ pub mod test {
             GoldenTicket::new(block_hash, random_bytes, public_key)
         }
 
+        pub async fn get_balance(&self) -> u64 {
+            let wallet_lock = self.get_wallet_lock();
+            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let my_balance = wallet.get_available_balance();
+
+            my_balance
+        }
+
         pub fn get_mempool_lock(&self) -> Arc<RwLock<Mempool>> {
             return self.mempool_lock.clone();
         }
@@ -581,12 +589,12 @@ pub mod test {
             return self.wallet_lock.clone();
         }
 
-        pub async fn get_wallet(&self) -> tokio::sync::RwLockReadGuard<'_, Wallet> {
-            let wallet;
-            let _wallet_;
-            (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
-            return wallet;
-        }
+        // pub async fn get_wallet(&self) -> tokio::sync::RwLockReadGuard<'_, Wallet> {
+        //     let wallet;
+        //     let _wallet_;
+        //     (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+        //     // return wallet;
+        // }
 
         pub fn get_blockchain_lock(&self) -> Arc<RwLock<Blockchain>> {
             return self.blockchain_lock.clone();

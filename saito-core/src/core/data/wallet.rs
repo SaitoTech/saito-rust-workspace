@@ -400,7 +400,7 @@ mod tests {
         ];
 
         for &public_key_string in &public_keys {
-            let public_key = t.storage.decode_str(public_key_string).unwrap();
+            let public_key = Storage::decode_str(public_key_string).unwrap();
             let mut to_public_key: SaitoPublicKey = [0u8; 33];
             to_public_key.copy_from_slice(&public_key);
             t.transfer_value_to_public_key(to_public_key, 500, last_param)
@@ -413,7 +413,8 @@ mod tests {
             last_param += 120000;
         }
 
-        let my_balance = t.get_wallet().await.available_balance;
+        let my_balance = t.get_balance().await;
+
         let expected_balance = 10000000 - 500 * public_keys.len() as u64; // 500 is the amount transferred each time
         assert_eq!(expected_balance, my_balance);
     }
@@ -424,7 +425,7 @@ mod tests {
         let mut t = TestManager::new();
         t.initialize(100, 100000).await;
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
-        let public_key = t.storage.decode_str(public_key_string).unwrap();
+        let public_key = Storage::decode_str(public_key_string).unwrap();
         let mut to_public_key: SaitoPublicKey = [0u8; 33];
         to_public_key.copy_from_slice(&public_key);
 
@@ -442,7 +443,7 @@ mod tests {
         t.initialize(1, 500).await;
 
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
-        let public_key = t.storage.decode_str(public_key_string).unwrap();
+        let public_key = Storage::decode_str(public_key_string).unwrap();
         let mut to_public_key: SaitoPublicKey = [0u8; 33];
         to_public_key.copy_from_slice(&public_key);
 
@@ -454,7 +455,7 @@ mod tests {
 
         let their_balance = *balance_map.get(&to_public_key).unwrap();
         assert_eq!(500, their_balance);
-        let my_balance = t.get_wallet().await.available_balance;
+        let my_balance = t.get_balance().await;
         assert_eq!(0, my_balance);
     }
 
