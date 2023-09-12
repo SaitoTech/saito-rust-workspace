@@ -38,8 +38,8 @@ pub mod test {
 
     use crate::common::defs::{
         push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
-        UtxoSet, ISSUANCE_PUBLIC_KEY, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+        PROJECT_PUBLIC_KEY,
     };
     use crate::common::keep_time::KeepTime;
     use crate::common::test_io_handler::test::TestIOHandler;
@@ -54,7 +54,7 @@ pub mod test {
     use crate::core::data::slip::{Slip, SlipType};
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
-    use crate::core::data::wallet::{self, Wallet};
+    use crate::core::data::wallet::Wallet;
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
 
@@ -65,6 +65,7 @@ pub mod test {
             .as_millis() as Timestamp
     }
 
+    pub const TEST_ISSUANCE_FILEPATH: &'static str = "./data/issuance/test/issuance";
     struct TestTimeKeeper {}
 
     impl KeepTime for TestTimeKeeper {
@@ -139,7 +140,7 @@ pub mod test {
                     let address_key = if amount < 25000 {
                         // Default public key when amount is less than 25000
 
-                        bs58::decode(ISSUANCE_PUBLIC_KEY)
+                        bs58::decode(PROJECT_PUBLIC_KEY)
                             .into_vec()
                             .expect("Failed to decode Base58")
                     } else {

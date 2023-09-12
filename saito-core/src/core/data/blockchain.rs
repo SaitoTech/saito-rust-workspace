@@ -1662,14 +1662,13 @@ mod tests {
     use crate::common::defs::{
         push_lock, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
     };
-    use crate::common::test_manager::test;
-    use crate::common::test_manager::test::TestManager;
+    use crate::common::test_manager::test::{TestManager, TEST_ISSUANCE_FILEPATH};
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
-    const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/test/issuance";
+
     // fn init_testlog() {
     //     let _ = pretty_env_logger::try_init();
     // }
@@ -1726,7 +1725,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn initialize_blockchain_test() {
-        let mut t = test::TestManager::new();
+        let mut t = TestManager::new();
 
         // create first block, with 100 VIP txs with 1_000_000_000 NOLAN each
         t.initialize(100, 1_000_000_000).await;
@@ -2199,7 +2198,7 @@ mod tests {
         let mut t: TestManager = TestManager::new();
         let slips = t
             .storage
-            .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
             .await;
 
         // start blockchain with existing issuance and some value to my public key
@@ -2228,7 +2227,7 @@ mod tests {
         let balance_map = t.balance_map().await;
         match t
             .storage
-            .write_utxoset_to_disk_path(balance_map.clone(), 1, ISSUANCE_FILE_PATH)
+            .write_utxoset_to_disk_path(balance_map.clone(), 1, TEST_ISSUANCE_FILEPATH)
             .await
         {
             Ok(_) => {
@@ -2243,10 +2242,10 @@ mod tests {
         let mut t: TestManager = TestManager::new();
         let slips = t
             .storage
-            .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
             .await;
 
-        let issuance_hashmap = t.convert_issuance_to_hashmap(ISSUANCE_FILE_PATH).await;
+        let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
 
         // initialize from existing slips
         t.initialize_from_slips(slips.clone()).await;

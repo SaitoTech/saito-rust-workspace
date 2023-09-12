@@ -7,7 +7,7 @@ use bs58;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{push_lock, SaitoPublicKey, ISSUANCE_PUBLIC_KEY, LOCK_ORDER_MEMPOOL};
+use crate::common::defs::{push_lock, SaitoPublicKey, LOCK_ORDER_MEMPOOL, PROJECT_PUBLIC_KEY};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
@@ -216,12 +216,12 @@ impl Storage {
         // Check if amount is less than 25000 and set public key if so
 
         let publickey_str = if amount < 25000 {
-            ISSUANCE_PUBLIC_KEY
+            PROJECT_PUBLIC_KEY
         } else {
             entries[1]
         };
 
-        let publickey_result = self.decode_str(publickey_str);
+        let publickey_result = Self::decode_str(publickey_str);
 
         match publickey_result {
             Ok(val) => {
@@ -248,7 +248,7 @@ impl Storage {
         }
     }
 
-    pub fn decode_str(&self, string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
+    pub fn decode_str(string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
         return bs58::decode(string).into_vec();
     }
 
@@ -292,20 +292,21 @@ mod test {
     use log::{debug, info, trace};
 
     use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
-    use crate::common::test_manager::test::{create_timestamp, TestManager};
+    use crate::common::test_manager::test::{
+        create_timestamp, TestManager, TEST_ISSUANCE_FILEPATH,
+    };
     use crate::core::data::block::Block;
     use crate::core::data::crypto::{hash, verify};
     use crate::core::data::storage::Storage;
     // use std::io::{BufRead, BufReader};
 
-    const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/test/issuance";
     // part is relative to it's cargo.toml
 
     // tests if issuance file can be read
     #[tokio::test]
     async fn read_issuance_file_test() {
         let t = TestManager::new();
-        let read_result = t.storage.read(ISSUANCE_FILE_PATH).await;
+        let read_result = t.storage.read(TEST_ISSUANCE_FILEPATH).await;
         assert!(read_result.is_ok(), "Failed to read issuance file.");
     }
 
@@ -314,10 +315,10 @@ mod test {
     async fn issuance_hashmap_equals_balance_hashmap_test() {
         let mut t = TestManager::new();
 
-        let issuance_hashmap = t.convert_issuance_to_hashmap(ISSUANCE_FILE_PATH).await;
+        let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
         let slips = t
             .storage
-            .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
             .await;
 
         t.initialize_from_slips(slips).await;
@@ -329,10 +330,10 @@ mod test {
     // #[tokio::test]
     // async fn issuance_occurs_only_on_block_one_test() {
     //     let mut t = TestManager::new();
-    //     let issuance_hashmap = t.convert_issuance_to_hashmap(ISSUANCE_FILE_PATH).await;
+    //     let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
     //     let slips = t
     //         .storage
-    //         .get_token_supply_slips_from_disk_path(ISSUANCE_FILE_PATH)
+    //         .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
     //         .await;
     //     t.initialize_from_slips(slips).await;
     //     dbg!();

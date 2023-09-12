@@ -155,10 +155,9 @@ impl Transaction {
         mut with_fee: Currency,
         _force_merge: bool,
     ) -> Result<Transaction, Error> {
-        dbg!(
+        debug!(
             "generating transaction : payment = {:?}, fee = {:?}",
-            with_payment,
-            with_fee
+            with_payment, with_fee
         );
 
         let available_balance = wallet.get_available_balance();

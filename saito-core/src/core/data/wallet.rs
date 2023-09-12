@@ -366,13 +366,12 @@ mod tests {
     use tokio::time::Sleep;
     use tracing_subscriber::field::debug;
 
+    use super::*;
     use crate::common::defs::LOCK_ORDER_WALLET;
     use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
     use crate::lock_for_read;
-    const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/test/issuance";
-    use super::*;
 
     #[test]
     fn wallet_new_test() {
