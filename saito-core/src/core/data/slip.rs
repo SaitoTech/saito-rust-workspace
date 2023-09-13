@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{debug, error, trace};
+use log::{debug, error};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
