@@ -1,22 +1,29 @@
-use js_sys::JsString;
-use log::error;
-
 use std::sync::Arc;
+
+use js_sys::JsString;
+use log::{error, warn};
 use tokio::sync::RwLock;
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
+use saito_core::core::data::slip::Slip;
 use saito_core::core::data::storage::Storage;
-use wasm_bindgen::prelude::wasm_bindgen;
+use saito_core::core::data::wallet::{Wallet, WalletSlip};
 
+use crate::saitowasm::string_to_key;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_transaction::WasmTransaction;
-use saito_core::core::data::wallet::Wallet;
 
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct WasmWallet {
     pub(crate) wallet: Arc<RwLock<Wallet>>,
+}
+
+#[wasm_bindgen]
+pub struct WasmWalletSlip {
+    slip: WalletSlip,
 }
 
 #[wasm_bindgen]
@@ -97,10 +104,102 @@ impl WasmWallet {
         }
         array
     }
+    pub async fn get_slips(&self) -> js_sys::Array {
+        let wallet = self.wallet.read().await;
+        let slips = &wallet.slips;
+
+        let array = js_sys::Array::new_with_length(slips.len() as u32);
+
+        for (index, (key, slip)) in slips.iter().enumerate() {
+            array.set(
+                index as u32,
+                JsValue::from(WasmWalletSlip::new(slip.clone())),
+            );
+        }
+        array
+    }
+    pub async fn add_slip(&mut self, slip: WasmWalletSlip) {
+        let wallet_slip = slip.slip;
+        let mut wallet = self.wallet.write().await;
+        let slip = Slip::parse_slip_from_utxokey(&wallet_slip.utxokey);
+        wallet.add_slip(slip.block_id, slip.tx_ordinal, &slip, wallet_slip.lc);
+    }
 }
 
 impl WasmWallet {
     pub fn new_from(wallet: Arc<RwLock<Wallet>>) -> WasmWallet {
         WasmWallet { wallet }
+    }
+}
+
+impl WasmWalletSlip {
+    pub fn new(slip: WalletSlip) -> WasmWalletSlip {
+        WasmWalletSlip { slip: slip }
+    }
+}
+
+#[wasm_bindgen]
+impl WasmWalletSlip {
+    pub fn get_utxokey(&self) -> js_sys::JsString {
+        let key: String = hex::encode(self.slip.utxokey);
+        key.into()
+    }
+    pub fn set_utxokey(&mut self, key: js_sys::JsString) {
+        // let key = key.as_string();
+        // if key.is_none() {
+        //     warn!("cannot parse key : {:?} as string", key);
+        //     return;
+        // }
+        // let key = key.unwrap();
+        if let Ok(key) = string_to_key(key) {
+            self.slip.utxokey = key;
+        } else {
+            warn!("failed parsing utxo key");
+        }
+    }
+    pub fn get_amount(&self) -> Currency {
+        self.slip.amount
+    }
+    pub fn set_amount(&mut self, amount: Currency) {
+        self.slip.amount = amount;
+    }
+    pub fn get_block_id(&self) -> u64 {
+        self.slip.block_id
+    }
+    pub fn set_block_id(&mut self, block_id: u64) {
+        self.slip.block_id = block_id;
+    }
+    pub fn get_tx_ordinal(&self) -> u64 {
+        self.slip.tx_ordinal
+    }
+
+    pub fn set_tx_ordinal(&mut self, ordinal: u64) {
+        self.slip.tx_ordinal = ordinal;
+    }
+
+    pub fn get_slip_index(&self) -> u8 {
+        self.slip.slip_index
+    }
+
+    pub fn set_slip_index(&mut self, index: u8) {
+        self.slip.slip_index = index;
+    }
+    pub fn is_spent(&self) -> bool {
+        self.slip.spent
+    }
+    pub fn set_spent(&mut self, spent: bool) {
+        self.slip.spent = spent;
+    }
+    pub fn is_lc(&self) -> bool {
+        self.slip.lc
+    }
+    pub fn set_lc(&mut self, lc: bool) {
+        self.slip.lc = lc;
+    }
+    #[wasm_bindgen(constructor)]
+    pub fn new_() -> WasmWalletSlip {
+        WasmWalletSlip {
+            slip: WalletSlip::new(),
+        }
     }
 }
