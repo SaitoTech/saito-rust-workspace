@@ -5,7 +5,7 @@ import Slip from "./lib/slip";
 import Block from "./lib/block";
 import Peer from "./lib/peer";
 import Factory from "./lib/factory";
-import Wallet from "./lib/wallet";
+import Wallet, {WalletSlip} from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import PeerService from "./lib/peer_service";
 import PeerServiceList from "./lib/peer_service_list";
@@ -52,6 +52,7 @@ export async function initialize(
             PeerService.Type = s.WasmPeerService;
             PeerServiceList.Type = s.WasmPeerServiceList;
             BalanceSnapshot.Type = s.WasmBalanceSnapshot;
+            WalletSlip.Type = s.WasmWalletSlip;
             // Config.Type = s.WasmConfiguration;
 
             console.log("init output = ", s);
