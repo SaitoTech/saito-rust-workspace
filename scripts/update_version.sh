@@ -30,7 +30,7 @@ update_package_json() {
 }
 
 update_saito_wasm_version_in_js() {
-    local package_json_file="../saito-js/package.json"
+    local package_json_file="./saito-js/package.json"
     if [[ -f $package_json_file ]]; then
         second_version_number=$(echo $VERSION | cut -d'.' -f2)
         updated_version=$(jq ".dependencies.\"saito-wasm\" = \"^$VERSION\"" $package_json_file)
