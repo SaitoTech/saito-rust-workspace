@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=$(cat VERSION | tr -d '\n')
+VERSION=$(cat ../VERSION | tr -d '\n')
 
 update_cargo() {
     if [[ -f $1 ]]; then
@@ -16,7 +16,7 @@ update_package_json() {
     fi
 }
 
-members=("saito-core" "saito-wasm" "saito-rust" "saito-spammer" "saito-js")
+members=("../saito-core" "../saito-wasm" "../saito-rust" "../saito-spammer" "../saito-js")
 
 for member in "${members[@]}"; do
     echo "Updating version in $member..."
