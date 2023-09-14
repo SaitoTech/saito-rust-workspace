@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Update versions
-        run: ./scripts/update_versions.sh
+        run: ./scripts/update_version.sh
         shell: bash
 
       - name: Setup Node.js
