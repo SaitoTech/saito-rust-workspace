@@ -1,6 +1,6 @@
 {
   "name": "saito-js",
-  "version": "0.1.7",
+  "version": "0.1.9",
   "description": "js wrappings around saito-core using wasm",
   "scripts": {
     "test": "env TS_NODE_PROJECT=\"tsconfig.testing.json\" mocha --require ts-node/register 'tests/**/*.ts'",
