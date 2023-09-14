@@ -1660,13 +1660,13 @@ mod tests {
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
-        push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+        push_lock, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
     };
-    use crate::common::test_manager::test;
-    use crate::common::test_manager::test::TestManager;
+    use crate::common::test_manager::test::{TestManager, TEST_ISSUANCE_FILEPATH};
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
+    use crate::core::data::storage::Storage;
     use crate::core::data::wallet::Wallet;
     use crate::{lock_for_read, lock_for_write};
 
@@ -1726,7 +1726,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn initialize_blockchain_test() {
-        let mut t = test::TestManager::new();
+        let mut t = TestManager::new();
 
         // create first block, with 100 VIP txs with 1_000_000_000 NOLAN each
         t.initialize(100, 1_000_000_000).await;
@@ -1931,6 +1931,7 @@ mod tests {
     //
     // test we do not add blocks because of insufficient mining
     //
+
     async fn insufficient_golden_tickets_test() {
         // let filter = tracing_subscriber::EnvFilter::from_default_env();
         // let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
@@ -2190,6 +2191,69 @@ mod tests {
         t.check_blockchain().await;
         t.check_utxoset().await;
         t.check_token_supply().await;
+    }
+
+    // tests if utxo hashmap persists after a blockchain reset
+    #[tokio::test]
+    async fn balance_hashmap_persists_after_blockchain_reset_test() {
+        let mut t: TestManager = TestManager::new();
+        let slips = t
+            .storage
+            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+            .await;
+
+        // start blockchain with existing issuance and some value to my public key
+        t.initialize_from_slips_and_value(slips.clone(), 100000)
+            .await;
+
+        // add a few transactions
+        let public_keys = [
+            "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            // "s9adoFPjBX972vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            // "s223oFPjBX97NC2bmE5Kd2oHWUShuSTUuZwSB1U4wsPR",
+        ];
+
+        let mut last_param = 120000;
+        for &public_key_string in &public_keys {
+            let public_key = Storage::decode_str(public_key_string).unwrap();
+            let mut to_public_key: SaitoPublicKey = [0u8; 33];
+            to_public_key.copy_from_slice(&public_key);
+            t.transfer_value_to_public_key(to_public_key, 500, last_param)
+                .await
+                .unwrap();
+            last_param += 120000;
+        }
+
+        // save utxo balance map on issuance file
+        let balance_map = t.balance_map().await;
+        match t
+            .storage
+            .write_utxoset_to_disk_path(balance_map.clone(), 1, TEST_ISSUANCE_FILEPATH)
+            .await
+        {
+            Ok(_) => {
+                debug!("store file ok");
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+            }
+        }
+
+        // reset blockchain
+        let mut t: TestManager = TestManager::new();
+        let slips = t
+            .storage
+            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+            .await;
+
+        let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
+
+        // initialize from existing slips
+        t.initialize_from_slips(slips.clone()).await;
+
+        let balance_map_after_reset = t.balance_map().await;
+
+        assert_eq!(issuance_hashmap, balance_map_after_reset);
     }
 
     // test we do not add blocks because of insufficient mining

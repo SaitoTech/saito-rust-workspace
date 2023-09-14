@@ -374,10 +374,19 @@ impl WalletSlip {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::data::crypto::generate_keys;
-    use crate::core::data::wallet::Wallet;
+
+    use std::thread;
+    use std::time::Duration;
+
+    use tokio::time::Sleep;
+    use tracing_subscriber::field::debug;
 
     use super::*;
+    use crate::common::defs::LOCK_ORDER_WALLET;
+    use crate::common::test_manager::test::{create_timestamp, TestManager};
+    use crate::core::data::crypto::generate_keys;
+    use crate::core::data::wallet::Wallet;
+    use crate::lock_for_read;
 
     #[test]
     fn wallet_new_test() {
@@ -386,6 +395,83 @@ mod tests {
         assert_ne!(wallet.public_key, [0; 33]);
         assert_ne!(wallet.private_key, [0; 32]);
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
+        use log::{debug, info, trace};
+        use std::thread;
+        use std::time::Duration;
+    }
+
+    // tests value transfer to other addresses and verifies the resulting utxo hashmap
+    #[tokio::test]
+    async fn wallet_transfer_to_address_test() {
+        let mut t = TestManager::new();
+        t.initialize(100, 100000).await;
+
+        let mut last_param = 120000;
+
+        let public_keys = [
+            "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            "s9adoFPjBX972vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            "s223oFPjBX97NC2bmE5Kd2oHWUShuSTUuZwSB1U4wsPR",
+        ];
+
+        for &public_key_string in &public_keys {
+            let public_key = Storage::decode_str(public_key_string).unwrap();
+            let mut to_public_key: SaitoPublicKey = [0u8; 33];
+            to_public_key.copy_from_slice(&public_key);
+            t.transfer_value_to_public_key(to_public_key, 500, last_param)
+                .await
+                .unwrap();
+            let balance_map = t.balance_map().await;
+            let their_balance = *balance_map.get(&to_public_key).unwrap();
+            assert_eq!(500, their_balance);
+
+            last_param += 120000;
+        }
+
+        let my_balance = t.get_balance().await;
+
+        let expected_balance = 10000000 - 500 * public_keys.len() as u64; // 500 is the amount transferred each time
+        assert_eq!(expected_balance, my_balance);
+    }
+
+    // Test if transfer is possible even with issufficient funds
+    #[tokio::test]
+    async fn transfer_with_insufficient_funds_failure_test() {
+        let mut t = TestManager::new();
+        t.initialize(100, 100000).await;
+        let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
+        let public_key = Storage::decode_str(public_key_string).unwrap();
+        let mut to_public_key: SaitoPublicKey = [0u8; 33];
+        to_public_key.copy_from_slice(&public_key);
+
+        // Try transferring more than what the wallet contains
+        let result = t
+            .transfer_value_to_public_key(to_public_key, 1000000000, 120000)
+            .await;
+        assert!(result.is_err() || !result.is_ok());
+    }
+
+    // tests transfer of exact amount
+    #[tokio::test]
+    async fn test_transfer_with_exact_funds() {
+        let mut t = TestManager::new();
+        t.initialize(1, 500).await;
+
+        let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
+        let public_key = Storage::decode_str(public_key_string).unwrap();
+        let mut to_public_key: SaitoPublicKey = [0u8; 33];
+        to_public_key.copy_from_slice(&public_key);
+
+        t.transfer_value_to_public_key(to_public_key, 500, 120000)
+            .await
+            .unwrap();
+
+        let balance_map = t.balance_map().await;
+
+        let their_balance = *balance_map.get(&to_public_key).unwrap();
+        assert_eq!(500, their_balance);
+        let my_balance = t.get_balance().await;
+        assert_eq!(0, my_balance);
     }
 
     #[test]

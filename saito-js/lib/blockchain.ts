@@ -22,7 +22,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
     return this.instance.reset();
   }
 
-  public async affixCallbacks(block: Block) {}
+  public async affixCallbacks(block: Block) { }
 
   public async runCallbacks(block_hash: string, from_blocks_back: bigint) {
     if (block_hash === DefaultEmptyBlockHash) {
@@ -160,8 +160,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
               block_id_in_which_to_delete_callbacks + BigInt(1) // because block ring starts from 1
             );
             console.log(
-              `deleting callbacks for ${
-                block_id_in_which_to_delete_callbacks + BigInt(1)
+              `deleting callbacks for ${block_id_in_which_to_delete_callbacks + BigInt(1)
               }: ${callback_block_hash}`
             );
             this.callbacks.delete(callback_block_hash);
@@ -176,9 +175,9 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
       } else {
         console.log(
           "already have processed the callbacks. last_callback_block_id = " +
-            this.last_callback_block_id +
-            " block_id = " +
-            block_id
+          this.last_callback_block_id +
+          " block_id = " +
+          block_id
         );
       }
     } catch (error) {
@@ -187,7 +186,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
     }
   }
 
-  public async onNewBlock(block: Block, lc: boolean) {}
+  public async onNewBlock(block: Block, lc: boolean) { }
 
   public async getLatestBlockId() {
     return this.instance.get_latest_block_id();

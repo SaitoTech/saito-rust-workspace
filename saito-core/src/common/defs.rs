@@ -19,6 +19,8 @@ pub type BlockId = u64;
 
 pub const NOLAN_PER_SAITO: Currency = 100_000_000;
 
+pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";
+
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 100_000;
 // prune blocks from index after N blocks

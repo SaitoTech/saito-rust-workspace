@@ -18,6 +18,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Update versions
+        run: ./scripts/update_versions.sh
+        shell: bash
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
