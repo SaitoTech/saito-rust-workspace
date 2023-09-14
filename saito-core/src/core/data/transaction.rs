@@ -167,17 +167,14 @@ impl Transaction {
         }
 
         let total_requested = with_payment + with_fee;
-        dbg!(
+        debug!(
             "in generate transaction. available: {} and payment: {} and fee: {}",
-            available_balance,
-            with_payment,
-            with_fee
+            available_balance, with_payment, with_fee
         );
         if available_balance < total_requested {
-            dbg!(
+            debug!(
                 "not enough funds to create transaction. required : {:?} available : {:?}",
-                total_requested,
-                available_balance
+                total_requested, available_balance
             );
             return Err(Error::from(ErrorKind::NotFound));
         }
@@ -1067,7 +1064,7 @@ mod tests {
         assert_eq!(tx.timestamp, 0);
         assert_eq!(tx.from, vec![]);
         assert_eq!(tx.to, vec![]);
-        // assert_eq!(tx.data, vec![]);
+        assert_eq!(tx.data, vec![]);
         assert_eq!(tx.transaction_type, TransactionType::Normal);
         assert_eq!(tx.signature, [0; 64]);
         assert_eq!(tx.hash_for_signature, None);
