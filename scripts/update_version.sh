@@ -9,9 +9,7 @@ update_cargo() {
 }
 
 update_package_json() {
-    # Check if the file exists
     if [[ -f $1 && $(jq .version $1) ]]; then
-        # Update version using jq
         jq ".version = \"$VERSION\"" $1 | sponge $1
     fi
 }
