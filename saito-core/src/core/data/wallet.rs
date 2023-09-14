@@ -1,5 +1,5 @@
 use ahash::{AHashMap, AHashSet};
-use log::{debug, info, warn};
+use log::{info, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
@@ -124,7 +124,7 @@ impl Wallet {
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        self.add_slip(block, index as u64, output, true);
+                        self.add_slip(block.id, index as u64, output, true);
                     }
                 }
             }
@@ -132,7 +132,7 @@ impl Wallet {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        self.add_slip(block, index as u64, input, true);
+                        self.add_slip(block.id, index as u64, input, true);
                     }
                 }
                 for output in tx.to.iter() {
@@ -160,34 +160,37 @@ impl Wallet {
         }
     }
 
-    pub fn add_slip(&mut self, block: &Block, tx_index: u64, slip: &Slip, lc: bool) {
+    pub fn add_slip(&mut self, block_id: u64, tx_index: u64, slip: &Slip, lc: bool) {
+        if self.slips.contains_key(&slip.get_utxoset_key()) {
+            return;
+        }
         let mut wallet_slip = WalletSlip::new();
-
-        assert_ne!(block.id, 0);
+        assert_ne!(block_id, 0);
         wallet_slip.utxokey = slip.get_utxoset_key();
         wallet_slip.amount = slip.amount;
         wallet_slip.slip_index = slip.slip_index;
-        wallet_slip.block_id = block.id;
+        wallet_slip.block_id = block_id;
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
         self.unspent_slips.insert(wallet_slip.utxokey);
-        // TODO : should this come in below if's else block to avoid double counting?
         self.available_balance += slip.amount;
-        let result = self.slips.insert(wallet_slip.utxokey, wallet_slip);
-        if result.is_some() {
-            warn!(
-                "slip : {:?} with key : {:?} is replaced",
-                result.as_ref().unwrap(),
-                hex::encode(result.as_ref().unwrap().utxokey)
-            );
-        }
+        info!(
+            "adding slip : {:?} with value : {:?} to wallet",
+            hex::encode(wallet_slip.utxokey),
+            wallet_slip.amount
+        );
+        self.slips.insert(wallet_slip.utxokey, wallet_slip);
     }
 
     pub fn delete_slip(&mut self, slip: &Slip) {
+        info!(
+            "deleting slip : {:?} with value : {:?} from wallet",
+            hex::encode(slip.utxoset_key),
+            slip.amount
+        );
         let result = self.slips.remove(&slip.utxoset_key);
         let in_unspent_list = self.unspent_slips.remove(&slip.utxoset_key);
-        if result.is_some() {
-            let removed_slip = result.unwrap();
+        if let Some(removed_slip) = result {
             if in_unspent_list {
                 self.available_balance -= removed_slip.amount;
             }
@@ -232,6 +235,11 @@ impl Wallet {
             slip.spent = true;
             self.available_balance -= slip.amount;
 
+            info!(
+                "marking slip : {:?} with value : {:?} as spent",
+                hex::encode(slip.utxokey),
+                slip.amount
+            );
             keys_to_remove.push(slip.utxokey);
         }
 
@@ -315,7 +323,10 @@ impl Wallet {
         self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
     }
     pub fn update_from_balance_snapshot(&mut self, snapshot: BalanceSnapshot) {
-        // TODO : need to reset balance and slips to avoid failing integrity from forks
+        // need to reset balance and slips to avoid failing integrity from forks
+        self.unspent_slips.clear();
+        self.slips.clear();
+        self.available_balance = 0;
 
         snapshot.slips.iter().for_each(|slip| {
             assert_ne!(slip.utxoset_key, [0; 58]);
@@ -328,12 +339,16 @@ impl Wallet {
                 slip_index: slip.slip_index,
                 spent: false,
             };
-            self.unspent_slips.insert(slip.utxoset_key);
             let result = self.slips.insert(slip.utxoset_key, wallet_slip);
             if result.is_none() {
+                self.unspent_slips.insert(slip.utxoset_key);
                 self.available_balance += slip.amount;
+                info!("slip key : {:?} with value : {:?} added to wallet from snapshot for address : {:?}",
+                    hex::encode(slip.utxoset_key),
+                    slip.amount,
+                    bs58::encode(slip.public_key).into_string());
             } else {
-                debug!(
+                info!(
                     "slip with utxo key : {:?} was already available",
                     hex::encode(slip.utxoset_key)
                 );
