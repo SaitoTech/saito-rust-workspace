@@ -155,10 +155,9 @@ impl Transaction {
         mut with_fee: Currency,
         _force_merge: bool,
     ) -> Result<Transaction, Error> {
-        trace!(
+        debug!(
             "generating transaction : payment = {:?}, fee = {:?}",
-            with_payment,
-            with_fee
+            with_payment, with_fee
         );
 
         let available_balance = wallet.get_available_balance();
@@ -168,14 +167,12 @@ impl Transaction {
         }
 
         let total_requested = with_payment + with_fee;
-        trace!(
+        debug!(
             "in generate transaction. available: {} and payment: {} and fee: {}",
-            available_balance,
-            with_payment,
-            with_fee
+            available_balance, with_payment, with_fee
         );
         if available_balance < total_requested {
-            warn!(
+            debug!(
                 "not enough funds to create transaction. required : {:?} available : {:?}",
                 total_requested, available_balance
             );
