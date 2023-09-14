@@ -1,6 +1,6 @@
 {
   "name": "saito-wasm",
-  "version": "0.1.9",
+  "version": "0.1.8",
   "description": "js wrappings around saito-core using wasm",
   "scripts": {
     "test": "./node_modules/.bin/jest",
