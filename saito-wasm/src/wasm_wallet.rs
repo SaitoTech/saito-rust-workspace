@@ -145,12 +145,6 @@ impl WasmWalletSlip {
         key.into()
     }
     pub fn set_utxokey(&mut self, key: js_sys::JsString) {
-        // let key = key.as_string();
-        // if key.is_none() {
-        //     warn!("cannot parse key : {:?} as string", key);
-        //     return;
-        // }
-        // let key = key.unwrap();
         if let Ok(key) = string_to_key(key) {
             self.slip.utxokey = key;
         } else {
