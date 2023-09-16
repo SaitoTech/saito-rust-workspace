@@ -22,7 +22,7 @@ pub struct Storage {
 }
 
 // pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
-pub const ISSUANCE_FILE_PATH: &'static str = "./src/common/issuance";
+pub const ISSUANCE_FILE_PATH: &'static str = "../saito-rust/data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
 pub const DEFAULT_FILE_PATH: &'static str = "./data/issuance/default";
 pub const UTXOSTATE_FILE_PATH: &'static str = "./data/issuance/utxodata";

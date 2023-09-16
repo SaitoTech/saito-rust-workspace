@@ -1,8 +1,8 @@
-import type {WasmBlock} from "saito-wasm/pkg/node/index";
+import type { WasmBlock } from "saito-wasm/pkg/node/index";
 import Transaction from "./transaction";
 import Saito from "../saito";
 import WasmWrapper from "./wasm_wrapper";
-import {fromBase58} from "./util";
+import { fromBase58 } from "./util";
 
 export enum BlockType {
     Ghost = 0,
@@ -17,12 +17,13 @@ export default class Block extends WasmWrapper<WasmBlock> {
     constructor(block?: WasmBlock) {
         if (!block) {
             block = new Block.Type();
+
+
         }
         super(block!);
     }
 
     public toJson(): string {
-
         try {
             return JSON.stringify({
                 id: JSON.stringify(this.id),
@@ -30,6 +31,7 @@ export default class Block extends WasmWrapper<WasmBlock> {
                 type: JSON.stringify(this.block_type),
                 previous_block_hash: this.previousBlockHash,
                 transactions: this.transactions.map((tx) => tx.toJson()),
+                stant: this.instance.cv
             })
         } catch (error) {
             console.error(error);

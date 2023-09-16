@@ -92,7 +92,7 @@ impl ConsensusValues {
             ft_index: None,
             gt_num: 0,
             gt_index: None,
-            total_fees: 0,
+            total_fees: 5000,
             expected_difficulty: 1,
             rebroadcasts: vec![],
             total_rebroadcast_slips: 0,
@@ -402,6 +402,10 @@ impl Block {
         // contextual values
         //
         let mut cv: ConsensusValues = block.generate_consensus_values(&blockchain).await;
+
+        block.cv = cv.clone();
+        block.cv.total_fees = 65000;
+        dbg!(&block.cv, "consensu");
 
         //
         // ATR transactions

@@ -3,6 +3,7 @@ mod wasm_balance_snapshot;
 mod wasm_block;
 mod wasm_blockchain;
 mod wasm_configuration;
+mod wasm_consensus_values;
 mod wasm_io_handler;
 mod wasm_peer;
 mod wasm_peer_service;

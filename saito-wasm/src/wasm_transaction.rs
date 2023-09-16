@@ -149,4 +149,5 @@ impl WasmTransaction {
     pub fn from_transaction(transaction: Transaction) -> WasmTransaction {
         WasmTransaction { tx: transaction }
     }
+    
 }
