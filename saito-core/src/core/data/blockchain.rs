@@ -419,7 +419,13 @@ impl Blockchain {
             self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
             let does_new_chain_validate = self
-                .validate(new_chain.as_slice(), old_chain.as_slice(), storage, configs)
+                .validate(
+                    new_chain.as_slice(),
+                    old_chain.as_slice(),
+                    storage,
+                    configs,
+                    network,
+                )
                 .await;
 
             if does_new_chain_validate {
@@ -474,10 +480,7 @@ impl Blockchain {
         notify_miner: bool,
     ) {
         debug!("add_block_success : {:?}", hex::encode(block_hash));
-        // trace!(
-        //     " ... blockchain.add_block_success: {:?}",
-        //     create_timestamp()
-        // );
+
         // print blockring longest_chain_block_hash infor
         if notify_miner {
             // we only print blockchain after block queue is added to reduce the clutter in logs
@@ -485,12 +488,14 @@ impl Blockchain {
         }
 
         let mut block_id = 0;
-        //
+        let mut block_type = BlockType::Pruned;
+        let mut tx_count = 0;
         // save to disk
-        //
         if network.is_some() {
             let block = self.get_mut_block(&block_hash).unwrap();
             block_id = block.id;
+            block_type = block.block_type;
+            tx_count = block.transactions.len();
             if block.block_type != BlockType::Header && !configs.is_browser() {
                 // TODO : this will have an impact when the block sizes are getting large or there are many forks. need to handle this
                 storage.write_block_to_disk(block).await;
@@ -511,7 +516,6 @@ impl Blockchain {
         //  is send_blocks_to_blockchain calling add_block or
         //  is blockchain calling mempool.on_chain_reorganization?
         //
-        //
         {
             mempool
                 .transactions
@@ -521,9 +525,7 @@ impl Blockchain {
             mempool.delete_transactions(&block.transactions);
         }
 
-        //
         // propagate block to network
-        //
         // TODO : notify other threads and propagate to other peers
 
         // {
@@ -572,7 +574,12 @@ impl Blockchain {
                     .await;
             }
         }
-        info!("block {:?} added successfully", hex::encode(block_hash));
+        info!(
+            "block {:?} added successfully. type : {:?} tx count = {:?}",
+            hex::encode(block_hash),
+            block_type,
+            tx_count
+        );
         if network.is_some() {
             network
                 .unwrap()
@@ -898,6 +905,7 @@ impl Blockchain {
         old_chain: &[SaitoHash],
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
+        network: Option<&Network>,
     ) -> bool {
         debug!("validating chains");
 
@@ -930,10 +938,11 @@ impl Blockchain {
                 false,
                 storage,
                 configs.deref(),
+                network,
             )
             .await
         } else if !new_chain.is_empty() {
-            self.unwind_chain(new_chain, old_chain, 0, true, storage, configs)
+            self.unwind_chain(new_chain, old_chain, 0, true, storage, configs, network)
                 .await
         } else {
             warn!("lengths are inappropriate");
@@ -1022,6 +1031,7 @@ impl Blockchain {
         wind_failure: bool,
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
+        network: Option<&'async_recursion Network>,
     ) -> bool {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
@@ -1093,7 +1103,7 @@ impl Blockchain {
                 // trace!(" ... wallet processing start:    {}", create_timestamp());
                 let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
-                wallet.on_chain_reorganization(block, true);
+                wallet.on_chain_reorganization(block, true, network);
 
                 // trace!(" ... wallet processing stop:     {}", create_timestamp());
             }
@@ -1106,8 +1116,15 @@ impl Blockchain {
                 block.on_chain_reorganization(&mut self.utxoset, true);
             }
 
-            self.on_chain_reorganization(block_id, block_hash.clone(), true, storage, configs)
-                .await;
+            self.on_chain_reorganization(
+                block_id,
+                block_hash.clone(),
+                true,
+                storage,
+                configs,
+                network,
+            )
+            .await;
 
             //
             // we have received the first entry in new_blocks() which means we
@@ -1134,6 +1151,7 @@ impl Blockchain {
                     false,
                     storage,
                     configs,
+                    network,
                 )
                 .await;
             res
@@ -1183,6 +1201,7 @@ impl Blockchain {
                             true,
                             storage,
                             configs,
+                            network,
                         )
                         .await;
                     res
@@ -1211,7 +1230,15 @@ impl Blockchain {
                 // unwinding starts from the BEGINNING of the vector
                 //
                 let res = self
-                    .unwind_chain(old_chain, &chain_to_unwind, 0, true, storage, configs)
+                    .unwind_chain(
+                        old_chain,
+                        &chain_to_unwind,
+                        0,
+                        true,
+                        storage,
+                        configs,
+                        network,
+                    )
                     .await;
                 res
             }
@@ -1243,6 +1270,7 @@ impl Blockchain {
         wind_failure: bool,
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
+        network: Option<&'async_recursion Network>,
     ) -> bool {
         let block_id;
         let block_hash;
@@ -1267,10 +1295,10 @@ impl Blockchain {
             // wallet update
             {
                 let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
-                wallet.on_chain_reorganization(&block, false);
+                wallet.on_chain_reorganization(&block, false, network);
             }
         }
-        self.on_chain_reorganization(block_id, block_hash, false, storage, configs)
+        self.on_chain_reorganization(block_id, block_hash, false, storage, configs, network)
             .await;
         if current_unwind_index == old_chain.len() - 1 {
             //
@@ -1293,6 +1321,7 @@ impl Blockchain {
                     wind_failure,
                     storage,
                     configs,
+                    network,
                 )
                 .await;
             res
@@ -1311,6 +1340,7 @@ impl Blockchain {
                     wind_failure,
                     storage,
                     configs,
+                    network,
                 )
                 .await;
             res
@@ -1327,6 +1357,7 @@ impl Blockchain {
         longest_chain: bool,
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
+        network: Option<&Network>,
     ) {
         trace!(
             "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
@@ -1360,7 +1391,7 @@ impl Blockchain {
             }
 
             // update genesis period, purge old data
-            self.update_genesis_period(storage).await;
+            self.update_genesis_period(storage, network).await;
 
             // generate fork_id
             let fork_id = self.generate_fork_id(block_id);
@@ -1370,7 +1401,7 @@ impl Blockchain {
         self.downgrade_blockchain_data(configs.is_browser()).await;
     }
 
-    pub async fn update_genesis_period(&mut self, storage: &Storage) {
+    pub async fn update_genesis_period(&mut self, storage: &Storage, network: Option<&Network>) {
         //
         // we need to make sure this is not a random block that is disconnected
         // from our previous genesis_id. If there is no connection between it
@@ -1395,7 +1426,7 @@ impl Blockchain {
             // lowest_block_id that we have found. we use the purge_id to
             // handle purges.
             if purge_bid > 0 {
-                self.delete_blocks(purge_bid, storage).await;
+                self.delete_blocks(purge_bid, storage, network).await;
             }
         }
 
@@ -1406,7 +1437,12 @@ impl Blockchain {
     //
     // deletes all blocks at a single block_id
     //
-    pub async fn delete_blocks(&mut self, delete_block_id: u64, storage: &Storage) {
+    pub async fn delete_blocks(
+        &mut self,
+        delete_block_id: u64,
+        storage: &Storage,
+        network: Option<&Network>,
+    ) {
         trace!(
             "removing data including from disk at id {}",
             delete_block_id
@@ -1424,7 +1460,8 @@ impl Blockchain {
         trace!("number of hashes to remove {}", block_hashes_copy.len());
 
         for hash in block_hashes_copy {
-            self.delete_block(delete_block_id, hash, storage).await;
+            self.delete_block(delete_block_id, hash, storage, network)
+                .await;
         }
     }
 
@@ -1436,6 +1473,7 @@ impl Blockchain {
         delete_block_id: u64,
         delete_block_hash: SaitoHash,
         storage: &Storage,
+        network: Option<&Network>,
     ) {
         //
         // ask block to delete itself / utxo-wise
@@ -1450,7 +1488,7 @@ impl Blockchain {
             {
                 let (mut wallet, _wallet_) = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
-                wallet.delete_block(pblock);
+                wallet.delete_block(pblock, network);
             }
             //
             // removes utxoset data
@@ -1933,7 +1971,6 @@ mod tests {
     //
     // test we do not add blocks because of insufficient mining
     //
-
     async fn insufficient_golden_tickets_test() {
         // let filter = tracing_subscriber::EnvFilter::from_default_env();
         // let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);

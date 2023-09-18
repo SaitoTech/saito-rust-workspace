@@ -29,7 +29,6 @@ use crate::core::routing_thread::RoutingEvent;
 use crate::{lock_for_read, lock_for_write};
 
 pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(100).as_millis() as u64;
-pub const SPAM_TX_PRODUCING_TIMER: u64 = Duration::from_millis(1_000).as_millis() as u64;
 
 #[derive(Debug)]
 pub enum ConsensusEvent {
@@ -82,8 +81,6 @@ pub struct ConsensusThread {
     pub sender_to_router: Sender<RoutingEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
     pub block_producing_timer: u64,
-    pub tx_producing_timer: u64,
-    pub create_test_tx: bool,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub network: Network,
     pub storage: Storage,
@@ -175,88 +172,6 @@ impl ConsensusThread {
 
         // debug!("{:?} mempool transacts", mempool.transactions);
     }
-    /// Test method to generate test transactions
-    ///
-    /// # Arguments
-    ///
-    /// * `mempool`:
-    /// * `wallet`:
-    /// * `blockchain`:
-    ///
-    /// returns: ()
-    ///
-    /// # Examples
-    ///
-    /// ```
-    ///
-    /// ```
-    async fn generate_tx(
-        mempool_lock: Arc<RwLock<Mempool>>,
-        wallet_lock: Arc<RwLock<Wallet>>,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
-    ) {
-        info!("generating mock transactions");
-        let txs_to_generate = 10;
-        let bytes_per_tx = 1024;
-        let public_key;
-        let private_key;
-
-        {
-            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
-            public_key = wallet.public_key;
-            private_key = wallet.private_key;
-        }
-
-        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
-
-        let latest_block_id = blockchain.get_latest_block_id();
-
-        let spammer_public_key: SaitoPublicKey =
-            hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
-                .unwrap()
-                .try_into()
-                .unwrap();
-
-        {
-            if latest_block_id == 0 {
-                let mut vip_transaction =
-                    Transaction::create_vip_transaction(public_key, 50_000_000);
-                vip_transaction.sign(&private_key);
-
-                mempool
-                    .add_transaction_if_validates(vip_transaction, &blockchain)
-                    .await;
-
-                let mut vip_transaction =
-                    Transaction::create_vip_transaction(spammer_public_key, 50_000_000);
-                vip_transaction.sign(&private_key);
-
-                mempool
-                    .add_transaction_if_validates(vip_transaction, &blockchain)
-                    .await;
-            }
-        }
-
-        let (mut wallet, _wallet_) = lock_for_write!(wallet_lock, LOCK_ORDER_WALLET);
-
-        for _i in 0..txs_to_generate {
-            let mut transaction;
-            transaction = Transaction::create(&mut wallet, public_key, 5000, 5000, false).unwrap();
-            // TODO : generate a message buffer which can be converted back into JSON
-            transaction.data = (0..bytes_per_tx).map(|_| rand::random::<u8>()).collect();
-            transaction.generate(&public_key, 0, 0);
-            transaction.sign(&private_key);
-
-            transaction.add_hop(&private_key, &public_key, &public_key);
-            {
-                mempool
-                    .add_transaction_if_validates(transaction, &blockchain)
-                    .await;
-            }
-        }
-        info!("generated transaction count: {:?}", txs_to_generate);
-    }
 }
 
 #[async_trait]
@@ -304,23 +219,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 // println!("{} addblock result", result)
                 self.generate_genesis_block = false;
                 return Some(());
-            }
-        }
-
-        // generate test transactions
-        if self.create_test_tx {
-            self.tx_producing_timer += duration_value;
-            if self.tx_producing_timer >= SPAM_TX_PRODUCING_TIMER {
-                // TODO : Remove this transaction generation once testing is done
-                ConsensusThread::generate_tx(
-                    self.mempool.clone(),
-                    self.wallet.clone(),
-                    self.blockchain.clone(),
-                )
-                .await;
-
-                self.tx_producing_timer = 0;
-                work_done = true;
             }
         }
 

@@ -95,7 +95,8 @@ export class WalletSlip extends WasmWrapper<WasmWalletSlip> {
       spent: this.instance.is_spent(),
       blockId: this.instance.get_block_id(),
       txIndex: this.instance.get_tx_ordinal(),
-      slipIndex: this.instance.get_slip_index()
+      slipIndex: this.instance.get_slip_index(),
+      amount: this.instance.get_amount()
     };
   }
 
@@ -106,5 +107,6 @@ export class WalletSlip extends WasmWrapper<WasmWalletSlip> {
     this.instance.set_block_id(BigInt(json.blockId));
     this.instance.set_tx_ordinal(BigInt(json.txIndex));
     this.instance.set_slip_index(json.slipIndex);
+    this.instance.set_amount(BigInt(json.amount));
   }
 }
