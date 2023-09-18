@@ -1,15 +1,10 @@
-use js_sys::{Array, JsString, Object, Uint8Array};
-use log::error;
-use num_traits::FromPrimitive;
-use saito_core::common::defs::{Currency, SaitoPublicKey, Timestamp};
-use saito_core::core::data::block::{Block, BlockPayout, BlockType, ConsensusValues};
+use js_sys::{Array, JsString};
+use saito_core::common::defs::Currency;
+use saito_core::core::data::block::{BlockPayout, ConsensusValues};
 use saito_core::core::data::transaction::Transaction;
-use serde_json::to_string;
-use serde_wasm_bindgen::{from_value, to_value};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use crate::saitowasm::string_to_key;
 use crate::wasm_transaction::WasmTransaction;
 
 #[wasm_bindgen]
@@ -77,11 +72,6 @@ impl WasmConsensusValues {
         }
     }
 
-    // #[wasm_bindgen(getter = gt_num)]
-    // pub fn gt_num(&self) -> u8 {
-    //     self.cv.gt_num
-    // }
-
     #[wasm_bindgen(getter = gt_index)]
     pub fn gt_index(&self) -> u32 {
         if let Some(gt_index) = self.cv.gt_index {
@@ -110,13 +100,6 @@ impl WasmConsensusValues {
     pub fn avg_atr_variance(&self) -> u64 {
         self.cv.avg_atr_variance
     }
-
-    // #[wasm_bindgen(getter = rebroadcasts)]
-    // pub fn rebroadcasts(&self) -> JsValue {
-    //     // assuming you can convert Vec<Transaction> to a JsValue
-    //     // this might require a method or utility to convert properly
-    //     JsValue::from_serde(&self.cv.rebroadcasts).unwrap()
-    // }
 
     #[wasm_bindgen(getter = total_rebroadcast_slips)]
     pub fn total_rebroadcast_slips(&self) -> u64 {
@@ -188,14 +171,11 @@ pub struct WasmBlockPayout {
 impl WasmBlockPayout {
     #[wasm_bindgen(getter = miner)]
     pub fn miner(&self) -> JsString {
-        // Assuming you have a way to convert SaitoPublicKey to JsString.
-        // If not, you might use hex::encode or some other mechanism.
         hex::encode(&self.block_payout.miner).into()
     }
 
     #[wasm_bindgen(getter = router)]
     pub fn router(&self) -> JsString {
-        // Assuming you have a way to convert SaitoPublicKey to JsString.
         hex::encode(&self.block_payout.router).into()
     }
 
@@ -216,7 +196,6 @@ impl WasmBlockPayout {
 
     #[wasm_bindgen(getter = random_number)]
     pub fn random_number(&self) -> JsString {
-        // Assuming you have a way to convert SaitoHash to JsString.
         hex::encode(&self.block_payout.random_number).into()
     }
 }
