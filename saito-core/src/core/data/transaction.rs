@@ -12,6 +12,7 @@ use crate::common::defs::{
 };
 use crate::core::data::crypto::{hash, sign, verify, verify_signature};
 use crate::core::data::hop::{Hop, HOP_SIZE};
+use crate::core::data::network::Network;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::wallet::Wallet;
 use crate::iterate;
@@ -154,6 +155,7 @@ impl Transaction {
         with_payment: Currency,
         mut with_fee: Currency,
         _force_merge: bool,
+        network: Option<&Network>,
     ) -> Result<Transaction, Error> {
         debug!(
             "generating transaction : payment = {:?}, fee = {:?}",
@@ -186,7 +188,8 @@ impl Transaction {
             slip.public_key = wallet.public_key;
             transaction.add_from_slip(slip);
         } else {
-            let (mut input_slips, mut output_slips) = wallet.generate_slips(total_requested);
+            let (mut input_slips, mut output_slips) =
+                wallet.generate_slips(total_requested, network);
             let input_len = input_slips.len();
             let output_len = output_slips.len();
 
