@@ -781,7 +781,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     let slip_type = "Normal";
 
     for (key, value) in &data {
-        if value > &threshold {
+        if value >= &threshold {
             let key_base58 = bs58::encode(key).into_string();
             file.write_all(format!("{}\t{}\t{}\n", value, key_base58, slip_type).as_bytes())
                 .await
