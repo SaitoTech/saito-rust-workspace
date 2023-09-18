@@ -215,7 +215,7 @@ impl Storage {
 
         // Check if amount is less than 25000 and set public key if so
 
-        let publickey_str = if amount <= 25000 {
+        let publickey_str = if amount < 25000 {
             PROJECT_PUBLIC_KEY
         } else {
             entries[1]

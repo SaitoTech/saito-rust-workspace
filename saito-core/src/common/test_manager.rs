@@ -137,7 +137,7 @@ pub mod test {
                         Err(_) => continue, // skip lines with invalid numbers
                     };
 
-                    let address_key = if amount <= 25000 {
+                    let address_key = if amount < 25000 {
                         // Default public key when amount is less than 25000
 
                         bs58::decode(PROJECT_PUBLIC_KEY)
