@@ -183,13 +183,6 @@ impl WasmBlock {
         self.block.cv.staking_treasury
     }
 
-    // #[wasm_bindgen(getter = block_payout)]
-    // pub fn block_payout(&self) -> JsValue {
-    //     // assuming you can convert Vec<BlockPayout> to a JsValue
-    //     // this might require a method or utility to convert properly
-    //     JsValue::from_serde(&self.block.cv.block_payout).unwrap()
-    // }
-
     #[wasm_bindgen(getter = avg_income)]
     pub fn avg_income(&self) -> u64 {
         self.block.cv.avg_income
