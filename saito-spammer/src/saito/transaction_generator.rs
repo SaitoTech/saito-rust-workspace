@@ -188,7 +188,8 @@ impl TransactionGenerator {
 
         let mut transaction = Transaction::default();
 
-        let (input_slips, output_slips) = wallet.generate_slips(total_nolans_requested_per_slip);
+        let (input_slips, output_slips) =
+            wallet.generate_slips(total_nolans_requested_per_slip, None);
 
         for slip in input_slips {
             transaction.add_from_slip(slip);
@@ -269,9 +270,15 @@ impl TransactionGenerator {
                         assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
-                            let mut transaction =
-                                Transaction::create(&mut wallet, public_key, payment, fee, false)
-                                    .unwrap();
+                            let mut transaction = Transaction::create(
+                                &mut wallet,
+                                public_key,
+                                payment,
+                                fee,
+                                false,
+                                None,
+                            )
+                            .unwrap();
                             transaction.generate_total_fees(0, 0);
                             if (transaction.total_in == 0 || transaction.total_out == 0)
                                 && (payment + fee != 0)

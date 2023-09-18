@@ -1,3 +1,5 @@
+use std::ops::Deref;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use js_sys::JsString;
@@ -7,6 +9,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
+use saito_core::core::data::network::Network;
 use saito_core::core::data::slip::Slip;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::data::wallet::{Wallet, WalletSlip};
@@ -19,6 +22,7 @@ use crate::wasm_transaction::WasmTransaction;
 #[derive(Clone)]
 pub struct WasmWallet {
     pub(crate) wallet: Arc<RwLock<Wallet>>,
+    pub(crate) network: Arc<Network>,
 }
 
 #[wasm_bindgen]
@@ -36,13 +40,12 @@ impl WasmWallet {
         self.wallet
             .write()
             .await
-            .reset(&mut Storage::new(Box::new(WasmIoHandler {})))
+            .reset(&mut Storage::new(Box::new(WasmIoHandler {})), None)
             .await;
     }
     pub async fn load(&mut self) {
         let mut wallet = self.wallet.write().await;
         Wallet::load(&mut wallet, Box::new(WasmIoHandler {})).await;
-        // info!("loaded public key = {:?}", hex::encode(wallet.public_key));
     }
 
     pub async fn get_public_key(&self) -> JsString {
@@ -122,13 +125,22 @@ impl WasmWallet {
         let wallet_slip = slip.slip;
         let mut wallet = self.wallet.write().await;
         let slip = Slip::parse_slip_from_utxokey(&wallet_slip.utxokey);
-        wallet.add_slip(slip.block_id, slip.tx_ordinal, &slip, wallet_slip.lc);
+        wallet.add_slip(
+            slip.block_id,
+            slip.tx_ordinal,
+            &slip,
+            wallet_slip.lc,
+            Some(self.network.deref()),
+        );
     }
 }
 
 impl WasmWallet {
-    pub fn new_from(wallet: Arc<RwLock<Wallet>>) -> WasmWallet {
-        WasmWallet { wallet }
+    pub fn new_from(wallet: Arc<RwLock<Wallet>>, network: Network) -> WasmWallet {
+        WasmWallet {
+            wallet,
+            network: Arc::new(network),
+        }
     }
 }
 

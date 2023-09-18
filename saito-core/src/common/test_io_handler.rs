@@ -68,9 +68,7 @@ pub mod test {
             let filename = key.as_str();
             let path = Path::new(filename);
             if path.parent().is_some() {
-                tokio::fs::create_dir_all(path.parent().unwrap())
-                    .await
-                    .expect("creating directory structure failed");
+                tokio::fs::create_dir_all(path.parent().unwrap()).await;
             }
             let result = File::create(filename).await;
             if result.is_err() {

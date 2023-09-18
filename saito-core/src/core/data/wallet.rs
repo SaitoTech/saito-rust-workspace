@@ -4,10 +4,11 @@ use log::{info, warn};
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
-use crate::common::interface_io::InterfaceIO;
+use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{generate_keys, hash, sign};
 use crate::core::data::golden_ticket::GoldenTicket;
+use crate::core::data::network::Network;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
@@ -77,6 +78,8 @@ impl Wallet {
             io.save_wallet(wallet).await.unwrap();
         } else {
             info!("wallet loaded");
+
+            io.send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
     pub async fn save(wallet: &mut Wallet, io: Box<dyn InterfaceIO + Send + Sync>) {
@@ -85,7 +88,7 @@ impl Wallet {
         info!("wallet saved");
     }
 
-    pub async fn reset(&mut self, _storage: &mut Storage) {
+    pub async fn reset(&mut self, _storage: &mut Storage, network: Option<&Network>) {
         info!("resetting wallet");
         let keys = generate_keys();
         self.public_key = keys.0;
@@ -94,6 +97,12 @@ impl Wallet {
         self.available_balance = 0;
         self.slips.clear();
         self.unspent_slips.clear();
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
+        }
     }
 
     /// [private_key - 32 bytes]
@@ -114,17 +123,17 @@ impl Wallet {
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
-    pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
+    pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool, network: Option<&Network>) {
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        self.delete_slip(input);
+                        self.delete_slip(input, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        self.add_slip(block.id, index as u64, output, true);
+                        self.add_slip(block.id, index as u64, output, true, None);
                     }
                 }
             }
@@ -132,35 +141,54 @@ impl Wallet {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        self.add_slip(block.id, index as u64, input, true);
+                        self.add_slip(block.id, index as u64, input, true, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        self.delete_slip(output);
+                        self.delete_slip(output, None);
                     }
                 }
             }
+        }
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
 
     //
     // removes all slips in block when pruned / deleted
     //
-    pub fn delete_block(&mut self, block: &Block) {
+    pub fn delete_block(&mut self, block: &Block, network: Option<&Network>) {
         for tx in block.transactions.iter() {
             for input in tx.from.iter() {
-                self.delete_slip(input);
+                self.delete_slip(input, None);
             }
             for output in tx.to.iter() {
                 if output.amount > 0 {
-                    self.delete_slip(output);
+                    self.delete_slip(output, None);
                 }
             }
         }
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
+        }
     }
 
-    pub fn add_slip(&mut self, block_id: u64, tx_index: u64, slip: &Slip, lc: bool) {
+    pub fn add_slip(
+        &mut self,
+        block_id: u64,
+        tx_index: u64,
+        slip: &Slip,
+        lc: bool,
+        network: Option<&Network>,
+    ) {
         if self.slips.contains_key(&slip.get_utxoset_key()) {
             return;
         }
@@ -180,9 +208,15 @@ impl Wallet {
             wallet_slip.amount
         );
         self.slips.insert(wallet_slip.utxokey, wallet_slip);
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
+        }
     }
 
-    pub fn delete_slip(&mut self, slip: &Slip) {
+    pub fn delete_slip(&mut self, slip: &Slip, network: Option<&Network>) {
         info!(
             "deleting slip : {:?} with value : {:?} from wallet",
             hex::encode(slip.utxoset_key),
@@ -194,6 +228,11 @@ impl Wallet {
             if in_unspent_list {
                 self.available_balance -= removed_slip.amount;
             }
+        }
+        if let Some(network) = network {
+            network
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
 
@@ -208,7 +247,11 @@ impl Wallet {
     // the nolan_requested is omitted from the slips created - only the change
     // address is provided as an output. so make sure that any function calling
     // this manually creates the output for its desired payment
-    pub fn generate_slips(&mut self, nolan_requested: Currency) -> (Vec<Slip>, Vec<Slip>) {
+    pub fn generate_slips(
+        &mut self,
+        nolan_requested: Currency,
+        network: Option<&Network>,
+    ) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = Vec::new();
         let mut outputs: Vec<Slip> = Vec::new();
         let mut nolan_in: Currency = 0;
@@ -275,6 +318,11 @@ impl Wallet {
             output.tx_ordinal = 0;
             outputs.push(output);
         }
+        if let Some(network) = network {
+            network
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
+        }
 
         (inputs, outputs)
     }
@@ -322,7 +370,11 @@ impl Wallet {
         assert!(tx.hash_for_signature.is_some());
         self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
     }
-    pub fn update_from_balance_snapshot(&mut self, snapshot: BalanceSnapshot) {
+    pub fn update_from_balance_snapshot(
+        &mut self,
+        snapshot: BalanceSnapshot,
+        network: Option<&Network>,
+    ) {
         // need to reset balance and slips to avoid failing integrity from forks
         self.unspent_slips.clear();
         self.slips.clear();
@@ -354,6 +406,12 @@ impl Wallet {
                 );
             }
         });
+
+        if let Some(network) = network {
+            network
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
+        }
     }
 }
 
@@ -374,19 +432,11 @@ impl WalletSlip {
 
 #[cfg(test)]
 mod tests {
-
-    use std::thread;
-    use std::time::Duration;
-
-    use tokio::time::Sleep;
-    use tracing_subscriber::field::debug;
-
-    use super::*;
-    use crate::common::defs::LOCK_ORDER_WALLET;
-    use crate::common::test_manager::test::{create_timestamp, TestManager};
+    use crate::common::test_manager::test::TestManager;
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
-    use crate::lock_for_read;
+
+    use super::*;
 
     #[test]
     fn wallet_new_test() {
@@ -395,9 +445,6 @@ mod tests {
         assert_ne!(wallet.public_key, [0; 33]);
         assert_ne!(wallet.private_key, [0; 32]);
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
-        use log::{debug, info, trace};
-        use std::thread;
-        use std::time::Duration;
     }
 
     // tests value transfer to other addresses and verifies the resulting utxo hashmap
