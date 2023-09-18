@@ -22,7 +22,7 @@ pub struct Storage {
 }
 
 // pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
-pub const ISSUANCE_FILE_PATH: &'static str = "./src/common/issuance";
+pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
 pub const DEFAULT_FILE_PATH: &'static str = "./data/issuance/default";
 pub const UTXOSTATE_FILE_PATH: &'static str = "./data/issuance/utxodata";
@@ -203,7 +203,7 @@ impl Storage {
 
     /// convert an issuance expression to slip
     fn convert_issuance_into_slip(&self, line: &str) -> Option<Slip> {
-        let entries: Vec<&str> = line.split("\t").collect();
+        let entries: Vec<&str> = line.split('\t').collect();
 
         let result = entries[0].parse::<u64>();
 
