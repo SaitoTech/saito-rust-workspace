@@ -1,8 +1,8 @@
-import type {WasmBlock} from "saito-wasm/pkg/node/index";
+import type { WasmBlock } from "saito-wasm/pkg/node/index";
 import Transaction from "./transaction";
 import Saito from "../saito";
 import WasmWrapper from "./wasm_wrapper";
-import {fromBase58} from "./util";
+import { fromBase58 } from "./util";
 
 export enum BlockType {
     Ghost = 0,
@@ -17,12 +17,13 @@ export default class Block extends WasmWrapper<WasmBlock> {
     constructor(block?: WasmBlock) {
         if (!block) {
             block = new Block.Type();
+
+
         }
         super(block!);
     }
 
     public toJson(): string {
-
         try {
             return JSON.stringify({
                 id: JSON.stringify(this.id),
@@ -30,6 +31,33 @@ export default class Block extends WasmWrapper<WasmBlock> {
                 type: JSON.stringify(this.block_type),
                 previous_block_hash: this.previousBlockHash,
                 transactions: this.transactions.map((tx) => tx.toJson()),
+                cv: this.instance.cv,
+                it_index: this.instance.it_index,
+                fee_transaction: this.instance.fee_transaction,
+                it_num: this.instance.it_num,
+                block_payout: this.instance.block_payout,
+                ft_num: this.instance.ft_num,
+                ft_index: this.instance.ft_index,
+                gt_index: this.instance.gt_index,
+                total_fees: this.instance.total_fees,
+                expected_difficulty: this.instance.expected_difficulty,
+                avg_atr_income: this.instance.avg_atr_income,
+                avg_atr_variance: this.instance.avg_atr_variance,
+                total_rebroadcast_slips: this.instance.total_rebroadcast_slips,
+                total_rebroadcast_nolan: this.instance.total_rebroadcast_nolan,
+                total_rebroadcast_fees_nolan: this.instance.total_rebroadcast_fees_nolan,
+                total_rebroadcast_staking_payouts_nolan: this.instance.total_rebroadcast_staking_payouts_nolan,
+                rebroadcast_hash: this.instance.rebroadcast_hash,
+                nolan_falling_off_chain: this.instance.nolan_falling_off_chain,
+                staking_treasury: this.instance.staking_treasury,
+                avg_income: this.instance.avg_income,
+                avg_variance: this.instance.avg_variance,
+                timestamp: this.instance.timestamp,
+                creator: this.instance.creator,
+                file_name: this.instance.file_name,
+                has_keylist_txs: this.instance.has_keylist_txs
+
+
             })
         } catch (error) {
             console.error(error);
