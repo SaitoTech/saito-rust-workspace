@@ -130,12 +130,21 @@ impl WasmBlock {
         self.block.cv.avg_atr_variance
     }
 
-    // #[wasm_bindgen(getter = rebroadcasts)]
-    // pub fn rebroadcasts(&self) -> JsValue {
-    //     // assuming you can convert Vec<Transaction> to a JsValue
-    //     // this might require a method or utility to convert properly
-    //     JsValue::from_serde(&self.block.cv.rebroadcasts).unwrap()
-    // }
+    #[wasm_bindgen(getter = rebroadcasts)]
+    pub fn rebroadcasts(&self) -> Array {
+        let mut txs: Vec<WasmTransaction> = self
+            .block
+            .cv
+            .rebroadcasts
+            .iter()
+            .map(|tx| WasmTransaction::from_transaction(tx.clone()))
+            .collect();
+        let array = js_sys::Array::new_with_length(txs.len() as u32);
+        for (i, tx) in txs.drain(..).enumerate() {
+            array.set(i as u32, JsValue::from(tx));
+        }
+        array
+    }
 
     #[wasm_bindgen(getter = total_rebroadcast_slips)]
     pub fn total_rebroadcast_slips(&self) -> u64 {

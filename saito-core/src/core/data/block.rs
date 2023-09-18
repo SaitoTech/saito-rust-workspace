@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;
-use std::{default, i128, mem};
+use std::{i128, mem};
 
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
@@ -99,7 +99,6 @@ impl ConsensusValues {
             total_rebroadcast_nolan: 0,
             total_rebroadcast_fees_nolan: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
-            // must be initialized zeroed-out for proper hashing
             rebroadcast_hash: [0; 32],
             nolan_falling_off_chain: 0,
             staking_treasury: 0,
@@ -126,7 +125,6 @@ impl ConsensusValues {
             total_rebroadcast_nolan: 0,
             total_rebroadcast_fees_nolan: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
-            // must be initialized zeroed-out for proper hashing
             rebroadcast_hash: [0; 32],
             nolan_falling_off_chain: 0,
             staking_treasury: 0,
@@ -404,8 +402,6 @@ impl Block {
         let mut cv: ConsensusValues = block.generate_consensus_values(&blockchain).await;
 
         block.cv = cv.clone();
-        block.cv.total_fees = 65000;
-        dbg!(&block.cv, "consensu");
 
         //
         // ATR transactions

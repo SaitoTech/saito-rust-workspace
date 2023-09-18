@@ -130,7 +130,6 @@ impl Blockchain {
             block.transactions.len()
         );
 
-        dbg!(&block.cv, "block with genrated");
         // trace!("block : {:?}", block);
 
         // start by extracting some variables that we will use
