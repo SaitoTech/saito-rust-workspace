@@ -491,9 +491,15 @@ pub mod test {
                     let (mut wallet, _wallet_) =
                         lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
 
-                    transaction =
-                        Transaction::create(&mut wallet, public_key, txs_amount, txs_fee, false)
-                            .unwrap();
+                    transaction = Transaction::create(
+                        &mut wallet,
+                        public_key,
+                        txs_amount,
+                        txs_fee,
+                        false,
+                        None,
+                    )
+                    .unwrap();
                 }
 
                 transaction.sign(&private_key);
@@ -904,8 +910,14 @@ pub mod test {
                 (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
                 from_public_key = wallet.public_key;
                 private_key = wallet.private_key;
-                let mut tx =
-                    Transaction::create(&mut wallet.clone(), to_public_key, amount, 0, false)?;
+                let mut tx = Transaction::create(
+                    &mut wallet.clone(),
+                    to_public_key,
+                    amount,
+                    0,
+                    false,
+                    None,
+                )?;
                 tx.sign(&private_key);
                 block.add_transaction(tx);
             }

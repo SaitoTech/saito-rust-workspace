@@ -33,6 +33,8 @@ export default interface SharedMethods {
 
   sendBlockSuccess(hash: String, blockId: bigint): void;
 
+  sendWalletUpdate(): void;
+
   saveWallet(wallet: Wallet): void;
 
   loadWallet(wallet: Wallet): void;

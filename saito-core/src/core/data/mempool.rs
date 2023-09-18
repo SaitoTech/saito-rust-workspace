@@ -403,7 +403,7 @@ mod tests {
             {
                 let (mut wallet, _wallet_) = lock_for_write!(wallet_lock, LOCK_ORDER_WALLET);
 
-                let (inputs, outputs) = wallet.generate_slips(720_000);
+                let (inputs, outputs) = wallet.generate_slips(720_000, None);
                 tx.from = inputs;
                 tx.to = outputs;
                 // _i prevents sig from being identical during test

@@ -279,8 +279,6 @@ async fn run_consensus_event_processor(
             Box::new(TimeKeeper {}),
         ),
         block_producing_timer: 0,
-        tx_producing_timer: 0,
-        create_test_tx,
         storage: Storage::new(Box::new(RustIOHandler::new(
             sender_to_network_controller.clone(),
             CONSENSUS_EVENT_PROCESSOR_ID,

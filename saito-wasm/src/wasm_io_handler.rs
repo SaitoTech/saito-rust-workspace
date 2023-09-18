@@ -193,6 +193,9 @@ impl InterfaceIO for WasmIoHandler {
             InterfaceEvent::BlockAddSuccess(hash, block_id) => {
                 MsgHandler::send_block_success(hex::encode(hash), block_id);
             }
+            InterfaceEvent::WalletUpdate() => {
+                MsgHandler::send_wallet_update();
+            }
         }
     }
 
@@ -309,6 +312,9 @@ extern "C" {
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn send_block_success(hash: String, block_id: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn send_wallet_update();
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn save_wallet();
