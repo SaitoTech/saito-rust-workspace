@@ -358,7 +358,7 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
 
 #[wasm_bindgen]
 pub async fn process_new_peer(index: u64, peer_config: JsValue) {
-    info!("process_new_peer : {:?}", index);
+    debug!("process_new_peer : {:?}", index);
     let mut saito = SAITO.lock().await;
 
     let mut peer_details = None;
@@ -425,7 +425,7 @@ pub async fn process_fetched_block(
     hash: js_sys::Uint8Array,
     peer_index: u64,
 ) {
-    info!("process_fetched_block : {:?}", peer_index);
+    debug!("process_fetched_block : {:?}", peer_index);
     let mut saito = SAITO.lock().await;
     saito
         .routing_thread

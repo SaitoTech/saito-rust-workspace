@@ -32,7 +32,7 @@ pub const BLOCK_HEADER_SIZE: usize = 245;
 // information that is created selectively according to the transaction fees
 // and the optional outbound payments.
 //
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct ConsensusValues {
     // expected transaction containing outbound payments
     pub fee_transaction: Option<Transaction>,
@@ -69,6 +69,7 @@ pub struct ConsensusValues {
     // staker treasury -> amount to add
     pub staking_treasury: Currency,
     // block payout
+    #[serde(skip)]
     pub block_payout: Vec<BlockPayout>,
     // average income
     pub avg_income: Currency,
@@ -91,6 +92,32 @@ impl ConsensusValues {
             ft_index: None,
             gt_num: 0,
             gt_index: None,
+            total_fees: 5000,
+            expected_difficulty: 1,
+            rebroadcasts: vec![],
+            total_rebroadcast_slips: 0,
+            total_rebroadcast_nolan: 0,
+            total_rebroadcast_fees_nolan: 0,
+            total_rebroadcast_staking_payouts_nolan: 0,
+            rebroadcast_hash: [0; 32],
+            nolan_falling_off_chain: 0,
+            staking_treasury: 0,
+            block_payout: vec![],
+            avg_income: 0,
+            avg_variance: 0,
+            avg_atr_income: 0,
+            avg_atr_variance: 0,
+        }
+    }
+    pub fn default() -> ConsensusValues {
+        ConsensusValues {
+            fee_transaction: None,
+            it_num: 0,
+            it_index: None,
+            ft_num: 0,
+            ft_index: None,
+            gt_num: 0,
+            gt_index: None,
             total_fees: 0,
             expected_difficulty: 1,
             rebroadcasts: vec![],
@@ -98,7 +125,6 @@ impl ConsensusValues {
             total_rebroadcast_nolan: 0,
             total_rebroadcast_fees_nolan: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
-            // must be initialized zeroed-out for proper hashing
             rebroadcast_hash: [0; 32],
             nolan_falling_off_chain: 0,
             staking_treasury: 0,
@@ -212,6 +238,8 @@ pub struct Block {
     pub rebroadcast_hash: [u8; 32],
     // the state of the block w/ pruning etc
     pub block_type: BlockType,
+
+    pub cv: ConsensusValues,
     // vector of staker slips spent this block - used to prevent withdrawals and payouts same block
     #[serde(skip)]
     pub slips_spent_this_block: AHashMap<SaitoUTXOSetKey, u64>,
@@ -267,6 +295,7 @@ impl Block {
             created_hashmap_of_slips_spent_this_block: false,
             source_connection_id: None,
             transaction_map: Default::default(),
+            cv: ConsensusValues::default(),
             force_loaded: false,
         }
     }
@@ -371,6 +400,8 @@ impl Block {
         // contextual values
         //
         let mut cv: ConsensusValues = block.generate_consensus_values(&blockchain).await;
+
+        block.cv = cv.clone();
 
         //
         // ATR transactions
@@ -1431,7 +1462,7 @@ impl Block {
     }
 
     pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
-        info!(
+        debug!(
             "generating lite block for keys : {:?}",
             keylist.iter().map(hex::encode).collect::<Vec<String>>()
         );
@@ -1499,6 +1530,8 @@ impl Block {
         block.avg_atr_variance = self.avg_atr_variance;
 
         block.transactions = pruned_txs;
+
+        block.generate();
 
         block
     }
