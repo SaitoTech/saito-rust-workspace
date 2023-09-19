@@ -255,7 +255,7 @@ impl Network {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
             peer.initiate_handshake(&self.io_interface).await.unwrap();
         } else {
-            info!(
+            debug!(
                 "removing static peer config : {:?}",
                 peer.static_peer_config.as_ref().unwrap()
             );
@@ -266,9 +266,9 @@ impl Network {
             });
         }
 
-        info!("new peer added : {:?}", peer_index);
+        debug!("new peer added : {:?}", peer_index);
         peers.index_to_peers.insert(peer_index, peer);
-        info!("current peer count = {:?}", peers.index_to_peers.len());
+        debug!("current peer count = {:?}", peers.index_to_peers.len());
     }
     pub async fn handle_handshake_challenge(
         &self,

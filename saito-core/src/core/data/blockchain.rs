@@ -121,12 +121,18 @@ impl Blockchain {
         // block.generate_hash();
         block.generate();
 
+        let non_spv_txs = block
+            .transactions
+            .iter()
+            .filter(|tx| tx.transaction_type != TransactionType::SPV)
+            .count();
         debug!(
-            "add_block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count : {:?}",
+            "add_block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count : {:?}/{:?}",
             hex::encode(block.hash),
             block.block_type,
             block.id,
             self.get_latest_block_id(),
+            non_spv_txs,
             block.transactions.len()
         );
 
@@ -573,7 +579,7 @@ impl Blockchain {
                     .await;
             }
         }
-        info!(
+        debug!(
             "block {:?} added successfully. type : {:?} tx count = {:?}",
             hex::encode(block_hash),
             block_type,
