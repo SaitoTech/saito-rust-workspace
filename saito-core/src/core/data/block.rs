@@ -1531,6 +1531,8 @@ impl Block {
 
         block.transactions = pruned_txs;
 
+        block.generate();
+
         block
     }
 
