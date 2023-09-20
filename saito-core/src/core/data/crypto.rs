@@ -139,7 +139,6 @@ pub fn verify_signature(
 
 #[cfg(test)]
 mod tests {
-    
 
     use hex::FromHex;
 

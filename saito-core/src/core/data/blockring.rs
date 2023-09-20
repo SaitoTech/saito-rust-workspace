@@ -1,4 +1,4 @@
-use log::{trace};
+use log::trace;
 
 use crate::common::defs::{SaitoHash, GENESIS_PERIOD};
 use crate::core::data::block::Block;

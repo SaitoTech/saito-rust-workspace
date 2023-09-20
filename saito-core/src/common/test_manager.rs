@@ -24,7 +24,7 @@ pub mod test {
     //
     //
     use std::borrow::BorrowMut;
-    
+
     use std::error::Error;
     use std::fmt::{Debug, Formatter};
     use std::ops::Deref;
@@ -51,7 +51,7 @@ pub mod test {
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
     use crate::core::data::peer_collection::PeerCollection;
-    use crate::core::data::slip::{Slip};
+    use crate::core::data::slip::Slip;
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;

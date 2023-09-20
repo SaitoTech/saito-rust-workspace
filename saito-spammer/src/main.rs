@@ -36,7 +36,7 @@ use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::{lock_for_read};
+use saito_core::lock_for_read;
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
 
