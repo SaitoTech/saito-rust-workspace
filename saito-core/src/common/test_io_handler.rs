@@ -180,11 +180,11 @@ pub mod test {
 
         fn send_interface_event(&self, _event: InterfaceEvent) {}
 
-        async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
+        async fn save_wallet(&self, _wallet: &mut Wallet) -> Result<(), Error> {
             todo!()
         }
 
-        async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
+        async fn load_wallet(&self, _wallet: &mut Wallet) -> Result<(), Error> {
             todo!()
         }
 

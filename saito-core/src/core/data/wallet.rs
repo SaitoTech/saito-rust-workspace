@@ -1,5 +1,5 @@
 use ahash::{AHashMap, AHashSet};
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
@@ -78,14 +78,13 @@ impl Wallet {
             io.save_wallet(wallet).await.unwrap();
         } else {
             info!("wallet loaded");
-
             io.send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
     pub async fn save(wallet: &mut Wallet, io: Box<dyn InterfaceIO + Send + Sync>) {
-        info!("saving wallet");
+        debug!("saving wallet");
         io.save_wallet(wallet).await.unwrap();
-        info!("wallet saved");
+        debug!("wallet saved");
     }
 
     pub async fn reset(&mut self, _storage: &mut Storage, network: Option<&Network>) {

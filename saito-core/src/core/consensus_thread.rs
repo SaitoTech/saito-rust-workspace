@@ -203,7 +203,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
                     println!(" block ider {:?}", &block.transactions);
 
-                    let res = blockchain
+                    let _res = blockchain
                         .add_block(
                             block,
                             Some(&self.network),
@@ -272,7 +272,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             }
             if block.is_some() {
                 let block = block.unwrap();
-                info!(
+                debug!(
                     "adding bundled block : {:?} with id : {:?} to mempool",
                     hex::encode(block.hash),
                     block.id

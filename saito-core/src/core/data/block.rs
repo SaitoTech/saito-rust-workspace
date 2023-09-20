@@ -644,7 +644,7 @@ impl Block {
     pub async fn downgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
-        is_browser: bool,
+        _is_browser: bool,
     ) -> bool {
         debug!(
             "downgrading BLOCK_ID {:?} to type : {:?}",
@@ -1462,7 +1462,7 @@ impl Block {
     }
 
     pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
-        info!(
+        debug!(
             "generating lite block for keys : {:?}",
             keylist.iter().map(hex::encode).collect::<Vec<String>>()
         );
@@ -1530,6 +1530,8 @@ impl Block {
         block.avg_atr_variance = self.avg_atr_variance;
 
         block.transactions = pruned_txs;
+
+        block.generate();
 
         block
     }

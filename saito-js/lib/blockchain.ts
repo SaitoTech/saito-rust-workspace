@@ -22,7 +22,8 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
     return this.instance.reset();
   }
 
-  public async affixCallbacks(block: Block) { }
+  public async affixCallbacks(block: Block) {
+  }
 
   public async runCallbacks(block_hash: string, from_blocks_back: bigint) {
     if (block_hash === DefaultEmptyBlockHash) {
@@ -87,7 +88,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
   }
 
   public async onAddBlockSuccess(block_id: number, hash: string) {
-    console.log("onAddBlockSuccess : " + hash + " at id : " + block_id);
+    // console.log("onAddBlockSuccess : " + hash + " at id : " + block_id);
     // TODO : there's currently no way of calling this method from saito-js itself. need to refactor the design related to onConfirmation() calls so a single place will handle all the callback functionality
     let already_processed_callbacks = false;
     if (block_id <= this.last_callback_block_id) {
@@ -159,17 +160,17 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
             let callback_block_hash = await this.instance.get_longest_chain_hash_at(
               block_id_in_which_to_delete_callbacks + BigInt(1) // because block ring starts from 1
             );
-            console.log(
-              `deleting callbacks for ${block_id_in_which_to_delete_callbacks + BigInt(1)
-              }: ${callback_block_hash}`
-            );
+            // console.debug(
+            //   `deleting callbacks for ${block_id_in_which_to_delete_callbacks + BigInt(1)
+            //   }: ${callback_block_hash}`
+            // );
             this.callbacks.delete(callback_block_hash);
             this.callbackIndices.delete(callback_block_hash);
             // this.confirmations.delete(callback_block_hash);
           }
         }
 
-        console.log("moving into onNewBlock : " + block.hash + " -- id : " + block.id);
+        // console.debug("moving into onNewBlock : " + block.hash + " -- id : " + block.id);
 
         await this.onNewBlock(block, block.instance.in_longest_chain);
       } else {
@@ -186,7 +187,8 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
     }
   }
 
-  public async onNewBlock(block: Block, lc: boolean) { }
+  public async onNewBlock(block: Block, lc: boolean) {
+  }
 
   public async getLatestBlockId() {
     return this.instance.get_latest_block_id();
