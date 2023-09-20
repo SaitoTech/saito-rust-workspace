@@ -234,7 +234,7 @@ impl MerkleTree {
         prune_func: &impl Fn(usize) -> bool,
     ) -> bool {
         return if node.is_some() {
-            let mut node = node.unwrap();
+            let node = node.unwrap();
             match &mut node.node_type {
                 NodeType::Node { left, right } => {
                     let mut prune = MerkleTree::prune_node(left.as_mut(), prune_func);

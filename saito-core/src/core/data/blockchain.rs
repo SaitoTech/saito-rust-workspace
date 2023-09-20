@@ -16,7 +16,7 @@ use crate::common::defs::{
     LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
     MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
-use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
+use crate::common::interface_io::InterfaceEvent;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockring::BlockRing;
 use crate::core::data::configuration::Configuration;
@@ -447,7 +447,7 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
                 if notify_miner {
-                    info!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
+                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
                     sender_to_miner
                         .send(MiningEvent::LongestChainBlockAdded {
                             hash: block_hash,
@@ -786,7 +786,7 @@ impl Blockchain {
         if latest_block_id > count {
             min_id = latest_block_id - count;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
         while current_id > 0 && current_id >= min_id {
             let hash = self
                 .blockring
@@ -794,7 +794,7 @@ impl Blockchain {
             if hash == [0; 32] {
                 break;
             }
-            info!(
+            debug!(
                 "{} - {:?}",
                 current_id,
                 hex::encode(
@@ -804,7 +804,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {

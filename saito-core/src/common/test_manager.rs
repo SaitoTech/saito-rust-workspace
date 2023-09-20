@@ -24,7 +24,7 @@ pub mod test {
     //
     //
     use std::borrow::BorrowMut;
-    use std::collections::HashMap;
+
     use std::error::Error;
     use std::fmt::{Debug, Formatter};
     use std::ops::Deref;
@@ -51,7 +51,7 @@ pub mod test {
     use crate::core::data::mempool::Mempool;
     use crate::core::data::network::Network;
     use crate::core::data::peer_collection::PeerCollection;
-    use crate::core::data::slip::{Slip, SlipType};
+    use crate::core::data::slip::Slip;
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -824,7 +824,7 @@ pub mod test {
             let genblock: Block = mempool
                 .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
                 .await;
-            let res = blockchain
+            let _res = blockchain
                 .add_block(
                     genblock,
                     Some(&self.network),
@@ -839,7 +839,7 @@ pub mod test {
 
         //convenience function assuming longest chain
         pub async fn balance_map(&mut self) -> AHashMap<SaitoPublicKey, u64> {
-            let (mut blockchain, _blockchain_) =
+            let (blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             let mut utxo_balances: AHashMap<SaitoPublicKey, u64> = AHashMap::new();
@@ -881,7 +881,7 @@ pub mod test {
             let latest_block_hash = self.get_latest_block_hash().await;
             // dbg!(latest_block_hash);
             {
-                let (blockchain, _blockchain_) =
+                let (_blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
                 // dbg!(blockchain.get_latest_block());

@@ -289,16 +289,14 @@ impl Storage {
 
 #[cfg(test)]
 mod test {
-    use log::{debug, info, trace};
+    use log::{info, trace};
 
-    use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
+    use crate::common::defs::SaitoHash;
     use crate::common::test_manager::test::{
         create_timestamp, TestManager, TEST_ISSUANCE_FILEPATH,
     };
     use crate::core::data::block::Block;
     use crate::core::data::crypto::{hash, verify};
-    use crate::core::data::storage::Storage;
-    // use std::io::{BufRead, BufReader};
 
     // part is relative to it's cargo.toml
 

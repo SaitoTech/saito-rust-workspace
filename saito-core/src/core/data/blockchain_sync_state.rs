@@ -291,7 +291,6 @@ impl BlockchainSyncState {
 mod tests {
     use crate::common::defs::BlockId;
     use crate::core::data::blockchain_sync_state::BlockchainSyncState;
-    use log::info;
 
     #[test]
     fn single_peer_window_test() {
