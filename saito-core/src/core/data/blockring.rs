@@ -1,4 +1,4 @@
-use log::{debug, trace};
+use log::trace;
 
 use crate::common::defs::{SaitoHash, GENESIS_PERIOD};
 use crate::core::data::block::Block;
@@ -45,12 +45,12 @@ impl BlockRing {
             hex::encode(block.hash),
             insert_pos
         );
-        self.ring[(insert_pos as usize)].add_block(block.id, block.hash);
+        self.ring[insert_pos as usize].add_block(block.id, block.hash);
     }
 
     pub fn contains_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
-        self.ring[(insert_pos as usize)].contains_block_hash(block_hash)
+        self.ring[insert_pos as usize].contains_block_hash(block_hash)
     }
 
     pub fn get_latest_block_hash(&self) -> SaitoHash {
@@ -106,8 +106,8 @@ impl BlockRing {
 
     pub fn is_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
-        for i in 0..self.ring[(insert_pos as usize)].block_hashes.len() {
-            if self.ring[(insert_pos as usize)].block_hashes[i] == block_hash {
+        for i in 0..self.ring[insert_pos as usize].block_hashes.len() {
+            if self.ring[insert_pos as usize].block_hashes[i] == block_hash {
                 return true;
             }
         }
@@ -120,15 +120,15 @@ impl BlockRing {
 
     pub fn delete_block(&mut self, block_id: u64, block_hash: SaitoHash) {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
-        self.ring[(insert_pos as usize)].delete_block(block_id, block_hash);
+        self.ring[insert_pos as usize].delete_block(block_id, block_hash);
     }
 
     pub fn get_block_hashes_at_block_id(&self, block_id: u64) -> Vec<SaitoHash> {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         let mut v: Vec<SaitoHash> = vec![];
-        for i in 0..self.ring[(insert_pos as usize)].block_hashes.len() {
-            if self.ring[(insert_pos as usize)].block_ids[i] == block_id {
-                v.push(self.ring[(insert_pos as usize)].block_hashes[i]);
+        for i in 0..self.ring[insert_pos as usize].block_hashes.len() {
+            if self.ring[insert_pos as usize].block_ids[i] == block_id {
+                v.push(self.ring[insert_pos as usize].block_hashes[i]);
             }
         }
         v
@@ -141,7 +141,7 @@ impl BlockRing {
             hex::encode(hash)
         );
         let insert_pos = block_id % RING_BUFFER_LENGTH;
-        if !self.ring[(insert_pos as usize)].on_chain_reorganization(hash, lc) {
+        if !self.ring[insert_pos as usize].on_chain_reorganization(hash, lc) {
             return false;
         }
         if lc {
@@ -158,13 +158,11 @@ impl BlockRing {
             //
             if let Some(lc_pos) = self.lc_pos {
                 if lc_pos == insert_pos as usize {
-                    let previous_block_index;
-
-                    if lc_pos > 0 {
-                        previous_block_index = lc_pos - 1;
+                    let previous_block_index: usize = if lc_pos > 0 {
+                        lc_pos - 1
                     } else {
-                        previous_block_index = RING_BUFFER_LENGTH as usize - 1;
-                    }
+                        RING_BUFFER_LENGTH as usize - 1
+                    };
 
                     // reset to lc_pos to unknown
                     self.lc_pos = None;
@@ -193,7 +191,7 @@ impl BlockRing {
 
     pub fn print_lc(&self) {
         for i in 0..GENESIS_PERIOD {
-            if !self.ring[(i as usize)].block_hashes.is_empty() {
+            if !self.ring[i as usize].block_hashes.is_empty() {
                 trace!(
                     "Block {:?}: {:?}",
                     i,

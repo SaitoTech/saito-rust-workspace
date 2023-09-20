@@ -13,6 +13,7 @@ pub enum InterfaceEvent {
     PeerConnectionDropped(PeerIndex),
     PeerConnected(PeerIndex),
     BlockAddSuccess(SaitoHash, u64),
+    WalletUpdate(),
 }
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way

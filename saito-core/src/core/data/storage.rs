@@ -7,7 +7,7 @@ use bs58;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{push_lock, SaitoPublicKey, LOCK_ORDER_MEMPOOL};
+use crate::common::defs::{push_lock, SaitoPublicKey, LOCK_ORDER_MEMPOOL, PROJECT_PUBLIC_KEY};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
@@ -21,6 +21,7 @@ pub struct Storage {
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
 
+// pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
 pub const DEFAULT_FILE_PATH: &'static str = "./data/issuance/default";
@@ -108,7 +109,7 @@ impl Storage {
                     );
                     continue;
                 }
-                info!("file : {:?} loaded", file_name);
+                debug!("file : {:?} loaded", file_name);
                 let buffer: Vec<u8> = result.unwrap();
                 let buffer_len = buffer.len();
                 let result = Block::deserialize_from_net(buffer);
@@ -123,7 +124,7 @@ impl Storage {
                 let mut block: Block = result.unwrap();
                 block.force_loaded = true;
                 block.generate();
-                info!("block : {:?} loaded from disk", hex::encode(block.hash));
+                debug!("block : {:?} loaded from disk", hex::encode(block.hash));
                 let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
                 mempool.add_block(block);
             }
@@ -202,7 +203,7 @@ impl Storage {
 
     /// convert an issuance expression to slip
     fn convert_issuance_into_slip(&self, line: &str) -> Option<Slip> {
-        let entries: Vec<&str> = line.split("\t").collect();
+        let entries: Vec<&str> = line.split('\t').collect();
 
         let result = entries[0].parse::<u64>();
 
@@ -212,7 +213,14 @@ impl Storage {
 
         let amount = result.unwrap();
 
-        let publickey_str = entries[1];
+        // Check if amount is less than 25000 and set public key if so
+
+        let publickey_str = if amount < 25000 {
+            PROJECT_PUBLIC_KEY
+        } else {
+            entries[1]
+        };
+
         let publickey_result = Self::decode_str(publickey_str);
 
         match publickey_result {
@@ -231,7 +239,7 @@ impl Storage {
                 slip.public_key = publickey_array;
                 slip.slip_type = slip_type;
 
-                return Some(slip);
+                Some(slip)
             }
             Err(err) => {
                 debug!("error reading issuance line {:?}", err);
@@ -240,7 +248,7 @@ impl Storage {
         }
     }
 
-    fn decode_str(string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
+    pub fn decode_str(string: &str) -> Result<Vec<u8>, bs58::decode::Error> {
         return bs58::decode(string).into_vec();
     }
 
@@ -283,26 +291,53 @@ impl Storage {
 mod test {
     use log::{info, trace};
 
-    use crate::common::defs::{SaitoHash, MAX_TOKEN_SUPPLY};
-    use crate::common::test_manager::test::{create_timestamp, TestManager};
+    use crate::common::defs::SaitoHash;
+    use crate::common::test_manager::test::{
+        create_timestamp, TestManager, TEST_ISSUANCE_FILEPATH,
+    };
     use crate::core::data::block::Block;
     use crate::core::data::crypto::{hash, verify};
 
-    #[ignore]
+    // part is relative to it's cargo.toml
+
+    // tests if issuance file can be read
     #[tokio::test]
     async fn read_issuance_file_test() {
-        let mut t = TestManager::new();
-        t.initialize(100, 100_000_000).await;
-
-        let slips = t.storage.get_token_supply_slips_from_disk().await;
-        let mut total_issuance = 0;
-
-        for i in 0..slips.len() {
-            total_issuance += slips[i].amount;
-        }
-
-        assert_eq!(total_issuance, MAX_TOKEN_SUPPLY);
+        let t = TestManager::new();
+        let read_result = t.storage.read(TEST_ISSUANCE_FILEPATH).await;
+        assert!(read_result.is_ok(), "Failed to read issuance file.");
     }
+
+    // test if issuance file utxo is equal to the resultant balance map on created blockchain
+    #[tokio::test]
+    async fn issuance_hashmap_equals_balance_hashmap_test() {
+        let mut t = TestManager::new();
+
+        let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
+        let slips = t
+            .storage
+            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+            .await;
+
+        t.initialize_from_slips(slips).await;
+        let balance_map = t.balance_map().await;
+        assert_eq!(issuance_hashmap, balance_map);
+    }
+
+    // // check if issuance occurs on block one
+    // #[tokio::test]
+    // async fn issuance_occurs_only_on_block_one_test() {
+    //     let mut t = TestManager::new();
+    //     let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
+    //     let slips = t
+    //         .storage
+    //         .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+    //         .await;
+    //     t.initialize_from_slips(slips).await;
+    //     dbg!();
+
+    //     assert_eq!(t.get_latest_block_id().await, 1);
+    // }
 
     #[tokio::test]
     #[serial_test::serial]

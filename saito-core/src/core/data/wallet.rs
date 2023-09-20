@@ -1,16 +1,18 @@
 use ahash::{AHashMap, AHashSet};
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use crate::common::defs::{
     Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
 };
-use crate::common::interface_io::InterfaceIO;
+use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{generate_keys, hash, sign};
 use crate::core::data::golden_ticket::GoldenTicket;
+use crate::core::data::network::Network;
 use crate::core::data::slip::Slip;
 use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
+use crate::core::util::balance_snapshot::BalanceSnapshot;
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -76,15 +78,16 @@ impl Wallet {
             io.save_wallet(wallet).await.unwrap();
         } else {
             info!("wallet loaded");
+            io.send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
     pub async fn save(wallet: &mut Wallet, io: Box<dyn InterfaceIO + Send + Sync>) {
-        info!("saving wallet");
+        debug!("saving wallet");
         io.save_wallet(wallet).await.unwrap();
-        info!("wallet saved");
+        debug!("wallet saved");
     }
 
-    pub async fn reset(&mut self, _storage: &mut Storage) {
+    pub async fn reset(&mut self, _storage: &mut Storage, network: Option<&Network>) {
         info!("resetting wallet");
         let keys = generate_keys();
         self.public_key = keys.0;
@@ -93,6 +96,12 @@ impl Wallet {
         self.available_balance = 0;
         self.slips.clear();
         self.unspent_slips.clear();
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
+        }
     }
 
     /// [private_key - 32 bytes]
@@ -113,17 +122,17 @@ impl Wallet {
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
-    pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) {
+    pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool, network: Option<&Network>) {
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        self.delete_slip(input);
+                        self.delete_slip(input, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        self.add_slip(block, index as u64, output, true);
+                        self.add_slip(block.id, index as u64, output, true, None);
                     }
                 }
             }
@@ -131,64 +140,98 @@ impl Wallet {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        self.add_slip(block, index as u64, input, true);
+                        self.add_slip(block.id, index as u64, input, true, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        self.delete_slip(output);
+                        self.delete_slip(output, None);
                     }
                 }
             }
+        }
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
 
     //
     // removes all slips in block when pruned / deleted
     //
-    pub fn delete_block(&mut self, block: &Block) {
+    pub fn delete_block(&mut self, block: &Block, network: Option<&Network>) {
         for tx in block.transactions.iter() {
             for input in tx.from.iter() {
-                self.delete_slip(input);
+                self.delete_slip(input, None);
             }
             for output in tx.to.iter() {
                 if output.amount > 0 {
-                    self.delete_slip(output);
+                    self.delete_slip(output, None);
                 }
             }
         }
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
+        }
     }
 
-    pub fn add_slip(&mut self, block: &Block, tx_index: u64, slip: &Slip, lc: bool) {
+    pub fn add_slip(
+        &mut self,
+        block_id: u64,
+        tx_index: u64,
+        slip: &Slip,
+        lc: bool,
+        network: Option<&Network>,
+    ) {
+        if self.slips.contains_key(&slip.get_utxoset_key()) {
+            return;
+        }
         let mut wallet_slip = WalletSlip::new();
-
-        assert_ne!(block.id, 0);
+        assert_ne!(block_id, 0);
         wallet_slip.utxokey = slip.get_utxoset_key();
         wallet_slip.amount = slip.amount;
         wallet_slip.slip_index = slip.slip_index;
-        wallet_slip.block_id = block.id;
+        wallet_slip.block_id = block_id;
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
         self.unspent_slips.insert(wallet_slip.utxokey);
         self.available_balance += slip.amount;
-        let result = self.slips.insert(wallet_slip.utxokey, wallet_slip);
-        if result.is_some() {
-            warn!(
-                "slip : {:?} with key : {:?} is replaced",
-                result.as_ref().unwrap(),
-                hex::encode(result.as_ref().unwrap().utxokey)
-            );
+        info!(
+            "adding slip : {:?} with value : {:?} to wallet",
+            hex::encode(wallet_slip.utxokey),
+            wallet_slip.amount
+        );
+        self.slips.insert(wallet_slip.utxokey, wallet_slip);
+        if network.is_some() {
+            network
+                .unwrap()
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
 
-    pub fn delete_slip(&mut self, slip: &Slip) {
+    pub fn delete_slip(&mut self, slip: &Slip, network: Option<&Network>) {
+        info!(
+            "deleting slip : {:?} with value : {:?} from wallet",
+            hex::encode(slip.utxoset_key),
+            slip.amount
+        );
         let result = self.slips.remove(&slip.utxoset_key);
         let in_unspent_list = self.unspent_slips.remove(&slip.utxoset_key);
-        if result.is_some() {
-            let removed_slip = result.unwrap();
+        if let Some(removed_slip) = result {
             if in_unspent_list {
                 self.available_balance -= removed_slip.amount;
             }
+        }
+        if let Some(network) = network {
+            network
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
 
@@ -203,7 +246,11 @@ impl Wallet {
     // the nolan_requested is omitted from the slips created - only the change
     // address is provided as an output. so make sure that any function calling
     // this manually creates the output for its desired payment
-    pub fn generate_slips(&mut self, nolan_requested: Currency) -> (Vec<Slip>, Vec<Slip>) {
+    pub fn generate_slips(
+        &mut self,
+        nolan_requested: Currency,
+        network: Option<&Network>,
+    ) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = Vec::new();
         let mut outputs: Vec<Slip> = Vec::new();
         let mut nolan_in: Currency = 0;
@@ -230,6 +277,11 @@ impl Wallet {
             slip.spent = true;
             self.available_balance -= slip.amount;
 
+            info!(
+                "marking slip : {:?} with value : {:?} as spent",
+                hex::encode(slip.utxokey),
+                slip.amount
+            );
             keys_to_remove.push(slip.utxokey);
         }
 
@@ -264,6 +316,11 @@ impl Wallet {
             output.block_id = 0;
             output.tx_ordinal = 0;
             outputs.push(output);
+        }
+        if let Some(network) = network {
+            network
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
         }
 
         (inputs, outputs)
@@ -312,6 +369,49 @@ impl Wallet {
         assert!(tx.hash_for_signature.is_some());
         self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
     }
+    pub fn update_from_balance_snapshot(
+        &mut self,
+        snapshot: BalanceSnapshot,
+        network: Option<&Network>,
+    ) {
+        // need to reset balance and slips to avoid failing integrity from forks
+        self.unspent_slips.clear();
+        self.slips.clear();
+        self.available_balance = 0;
+
+        snapshot.slips.iter().for_each(|slip| {
+            assert_ne!(slip.utxoset_key, [0; 58]);
+            let wallet_slip = WalletSlip {
+                utxokey: slip.utxoset_key,
+                amount: slip.amount,
+                block_id: slip.block_id,
+                tx_ordinal: slip.tx_ordinal,
+                lc: true,
+                slip_index: slip.slip_index,
+                spent: false,
+            };
+            let result = self.slips.insert(slip.utxoset_key, wallet_slip);
+            if result.is_none() {
+                self.unspent_slips.insert(slip.utxoset_key);
+                self.available_balance += slip.amount;
+                info!("slip key : {:?} with value : {:?} added to wallet from snapshot for address : {:?}",
+                    hex::encode(slip.utxoset_key),
+                    slip.amount,
+                    bs58::encode(slip.public_key).into_string());
+            } else {
+                info!(
+                    "slip with utxo key : {:?} was already available",
+                    hex::encode(slip.utxoset_key)
+                );
+            }
+        });
+
+        if let Some(network) = network {
+            network
+                .io_interface
+                .send_interface_event(InterfaceEvent::WalletUpdate());
+        }
+    }
 }
 
 impl WalletSlip {
@@ -331,7 +431,7 @@ impl WalletSlip {
 
 #[cfg(test)]
 mod tests {
-
+    use crate::common::test_manager::test::TestManager;
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::wallet::Wallet;
 
@@ -344,6 +444,80 @@ mod tests {
         assert_ne!(wallet.public_key, [0; 33]);
         assert_ne!(wallet.private_key, [0; 32]);
         assert_eq!(wallet.serialize_for_disk().len(), WALLET_SIZE);
+    }
+
+    // tests value transfer to other addresses and verifies the resulting utxo hashmap
+    #[tokio::test]
+    async fn wallet_transfer_to_address_test() {
+        let mut t = TestManager::new();
+        t.initialize(100, 100000).await;
+
+        let mut last_param = 120000;
+
+        let public_keys = [
+            "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            "s9adoFPjBX972vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR",
+            "s223oFPjBX97NC2bmE5Kd2oHWUShuSTUuZwSB1U4wsPR",
+        ];
+
+        for &public_key_string in &public_keys {
+            let public_key = Storage::decode_str(public_key_string).unwrap();
+            let mut to_public_key: SaitoPublicKey = [0u8; 33];
+            to_public_key.copy_from_slice(&public_key);
+            t.transfer_value_to_public_key(to_public_key, 500, last_param)
+                .await
+                .unwrap();
+            let balance_map = t.balance_map().await;
+            let their_balance = *balance_map.get(&to_public_key).unwrap();
+            assert_eq!(500, their_balance);
+
+            last_param += 120000;
+        }
+
+        let my_balance = t.get_balance().await;
+
+        let expected_balance = 10000000 - 500 * public_keys.len() as u64; // 500 is the amount transferred each time
+        assert_eq!(expected_balance, my_balance);
+    }
+
+    // Test if transfer is possible even with issufficient funds
+    #[tokio::test]
+    async fn transfer_with_insufficient_funds_failure_test() {
+        let mut t = TestManager::new();
+        t.initialize(100, 100000).await;
+        let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
+        let public_key = Storage::decode_str(public_key_string).unwrap();
+        let mut to_public_key: SaitoPublicKey = [0u8; 33];
+        to_public_key.copy_from_slice(&public_key);
+
+        // Try transferring more than what the wallet contains
+        let result = t
+            .transfer_value_to_public_key(to_public_key, 1000000000, 120000)
+            .await;
+        assert!(result.is_err() || !result.is_ok());
+    }
+
+    // tests transfer of exact amount
+    #[tokio::test]
+    async fn test_transfer_with_exact_funds() {
+        let mut t = TestManager::new();
+        t.initialize(1, 500).await;
+
+        let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
+        let public_key = Storage::decode_str(public_key_string).unwrap();
+        let mut to_public_key: SaitoPublicKey = [0u8; 33];
+        to_public_key.copy_from_slice(&public_key);
+
+        t.transfer_value_to_public_key(to_public_key, 500, 120000)
+            .await
+            .unwrap();
+
+        let balance_map = t.balance_map().await;
+
+        let their_balance = *balance_map.get(&to_public_key).unwrap();
+        assert_eq!(500, their_balance);
+        let my_balance = t.get_balance().await;
+        assert_eq!(0, my_balance);
     }
 
     #[test]

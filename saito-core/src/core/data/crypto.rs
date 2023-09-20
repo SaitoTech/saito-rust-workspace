@@ -1,5 +1,4 @@
 use aes::Aes128;
-use base58::ToBase58;
 use blake3::Hasher;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
@@ -43,7 +42,7 @@ pub const PARALLEL_HASH_BYTE_THRESHOLD: usize = 128_000;
 pub fn generate_keys() -> (SaitoPublicKey, SaitoPrivateKey) {
     let (mut secret_key, mut public_key) =
         SECP256K1.generate_keypair(&mut secp256k1::rand::thread_rng());
-    while public_key.serialize().to_base58().len() != 44 {
+    while bs58::encode(public_key.serialize()).into_string().len() != 44 {
         // sometimes secp256k1 address is too big to store in 44 base-58 digits
         let keypair_tuple = SECP256K1.generate_keypair(&mut secp256k1::rand::thread_rng());
         secret_key = keypair_tuple.0;
@@ -140,7 +139,6 @@ pub fn verify_signature(
 
 #[cfg(test)]
 mod tests {
-    use std::str;
 
     use hex::FromHex;
 

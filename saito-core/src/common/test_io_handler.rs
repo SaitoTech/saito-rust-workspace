@@ -68,9 +68,7 @@ pub mod test {
             let filename = key.as_str();
             let path = Path::new(filename);
             if path.parent().is_some() {
-                tokio::fs::create_dir_all(path.parent().unwrap())
-                    .await
-                    .expect("creating directory structure failed");
+                tokio::fs::create_dir_all(path.parent().unwrap()).await;
             }
             let result = File::create(filename).await;
             if result.is_err() {
@@ -182,11 +180,11 @@ pub mod test {
 
         fn send_interface_event(&self, _event: InterfaceEvent) {}
 
-        async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
+        async fn save_wallet(&self, _wallet: &mut Wallet) -> Result<(), Error> {
             todo!()
         }
 
-        async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
+        async fn load_wallet(&self, _wallet: &mut Wallet) -> Result<(), Error> {
             todo!()
         }
 

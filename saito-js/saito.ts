@@ -3,28 +3,11 @@ import Transaction from "./lib/transaction";
 import Block from "./lib/block";
 import Factory from "./lib/factory";
 import Peer from "./lib/peer";
-import Wallet, {DefaultEmptyPrivateKey} from "./lib/wallet";
+import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
-import {fromBase58, toBase58} from "./lib/util";
+import { fromBase58, toBase58 } from "./lib/util";
+import BalanceSnapshot from "./lib/balance_snapshot";
 
-// export enum MessageType {
-//     HandshakeChallenge = 1,
-//     HandshakeResponse,
-//     //HandshakeCompletion,
-//     ApplicationMessage = 4,
-//     Block,
-//     Transaction,
-//     BlockchainRequest,
-//     BlockHeaderHash,
-//     Ping,
-//     SPVChain,
-//     Services,
-//     GhostChain,
-//     GhostChainRequest,
-//     Result,
-//     Error,
-//     ApplicationTransaction,
-// }
 
 export enum LogLevel {
   Error = 0,
@@ -86,13 +69,14 @@ export default class Saito {
         return sharedMethods.disconnectFromPeer(peer_index);
       },
       fetch_block_from_peer: (hash: Uint8Array, peer_index: bigint, url: string) => {
-        console.log("fetching block : " + url);
+        // console.log("fetching block : " + url);
         sharedMethods.fetchBlockFromPeer(url).then((buffer: Uint8Array) => {
           Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
         });
       },
       process_api_call: (buffer: Uint8Array, msgIndex: number, peerIndex: bigint) => {
-        return sharedMethods.processApiCall(buffer, msgIndex, peerIndex).then(() => {});
+        return sharedMethods.processApiCall(buffer, msgIndex, peerIndex).then(() => {
+        });
       },
       process_api_success: (buffer: Uint8Array, msgIndex: number, peerIndex: bigint) => {
         return sharedMethods.processApiSuccess(buffer, msgIndex, peerIndex);
@@ -105,6 +89,9 @@ export default class Saito {
       },
       send_block_success: (hash: string, blockId: bigint) => {
         return sharedMethods.sendBlockSuccess(hash, blockId);
+      },
+      send_wallet_update: () => {
+        return sharedMethods.sendWalletUpdate();
       },
       save_wallet: (wallet: any) => {
         return sharedMethods.saveWallet(wallet);
@@ -120,7 +107,7 @@ export default class Saito {
       },
       get_my_services: () => {
         return sharedMethods.getMyServices().instance;
-      },
+      }
     };
     if (privateKey === "") {
       privateKey = DefaultEmptyPrivateKey;
@@ -210,13 +197,6 @@ export default class Saito {
     }
   }
 
-  // public async getPublicKey(): Promise<string> {
-  //     return Saito.getLibInstance().get_public_key();
-  // }
-  //
-  // public async getPrivateKey(): Promise<string> {
-  //     return Saito.getLibInstance().get_private_key();
-  // }
 
   public async processNewPeer(index: bigint, peer_config: any): Promise<void> {
     return Saito.getLibInstance().process_new_peer(index, peer_config);
@@ -310,7 +290,7 @@ export default class Saito {
       return new Promise((resolve, reject) => {
         this.promises.set(callbackIndex, {
           resolve,
-          reject,
+          reject
         });
         Saito.getLibInstance().send_api_call(buffer, callbackIndex, peerIndex);
       });
@@ -370,7 +350,7 @@ export default class Saito {
     let tx = await this.createTransaction(publicKey, BigInt(0), BigInt(0));
     tx.msg = {
       request: message,
-      data: data,
+      data: data
     };
     tx.packData();
     return this.sendTransactionWithCallback(
@@ -404,15 +384,16 @@ export default class Saito {
     return Saito.getLibInstance().get_mempool_txs();
   }
 
-  // public async loadWallet() {
-  //     return Saito.getLibInstance().load_wallet();
-  // }
-  //
-  // public async saveWallet() {
-  //     return Saito.getLibInstance().save_wallet();
-  // }
-  //
-  // public async resetWallet() {
-  //     return Saito.getLibInstance().reset_wallet();
-  // }
+  public async getAccountSlips(publicKey: string) {
+    return Saito.getLibInstance().get_account_slips(publicKey);
+  }
+
+  public async getBalanceSnapshot(keys: string[]): Promise<BalanceSnapshot> {
+    let snapshot = await Saito.getLibInstance().get_balance_snapshot(keys);
+    return new BalanceSnapshot(snapshot);
+  }
+
+  public async updateBalanceFrom(snapshot: BalanceSnapshot) {
+    await Saito.getLibInstance().update_from_balance_snapshot(snapshot.instance);
+  }
 }

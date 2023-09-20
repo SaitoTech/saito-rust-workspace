@@ -17,8 +17,7 @@ use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
 };
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
@@ -27,7 +26,7 @@ use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::data::configuration::Configuration;
 use saito_core::core::data::context::Context;
-use saito_core::core::data::crypto::generate_keys;
+
 use saito_core::core::data::network::Network;
 use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::storage::Storage;
@@ -37,7 +36,7 @@ use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::{lock_for_read, lock_for_write};
+use saito_core::lock_for_read;
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
 
@@ -208,8 +207,6 @@ async fn run_consensus_event_processor(
             Box::new(TimeKeeper {}),
         ),
         block_producing_timer: 0,
-        tx_producing_timer: 0,
-        create_test_tx,
         storage: Storage::new(Box::new(RustIOHandler::new(
             sender_to_network_controller.clone(),
             CONSENSUS_EVENT_PROCESSOR_ID,

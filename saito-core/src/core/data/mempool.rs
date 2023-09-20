@@ -71,7 +71,7 @@ impl Mempool {
     }
     pub async fn add_golden_ticket(&mut self, golden_ticket: Transaction) {
         let gt = GoldenTicket::deserialize_from_net(&golden_ticket.data);
-        info!(
+        debug!(
             "adding golden ticket : {:?} target : {:?} public_key : {:?}",
             hex::encode(hash(&golden_ticket.serialize_for_net())),
             hex::encode(gt.target),
@@ -88,7 +88,7 @@ impl Mempool {
         self.golden_tickets
             .insert(gt.target, (golden_ticket, false));
 
-        info!("golden ticket added to mempool");
+        debug!("golden ticket added to mempool");
     }
     pub async fn add_transaction_if_validates(
         &mut self,
@@ -185,7 +185,7 @@ impl Mempool {
         )
         .await;
         block.generate();
-        info!(
+        debug!(
             "block generated with work : {:?} and burnfee : {:?}",
             block.total_work, block.burnfee
         );
@@ -403,7 +403,7 @@ mod tests {
             {
                 let (mut wallet, _wallet_) = lock_for_write!(wallet_lock, LOCK_ORDER_WALLET);
 
-                let (inputs, outputs) = wallet.generate_slips(720_000);
+                let (inputs, outputs) = wallet.generate_slips(720_000, None);
                 tx.from = inputs;
                 tx.to = outputs;
                 // _i prevents sig from being identical during test

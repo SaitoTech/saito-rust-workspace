@@ -3,6 +3,10 @@ import Saito from "../../saito";
 import PeerServiceList from "../peer_service_list";
 
 export default class CustomSharedMethods implements SharedMethods {
+  sendWalletUpdate(): void {
+    throw new Error("Method not implemented.");
+  }
+
   sendBlockSuccess(hash: String, blockId: bigint): void {
     throw new Error("Method not implemented.");
   }

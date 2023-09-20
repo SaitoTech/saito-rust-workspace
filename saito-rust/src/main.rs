@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::fmt::Error;
 use std::ops::Deref;
 use std::panic;
 use std::path::Path;
@@ -280,8 +279,6 @@ async fn run_consensus_event_processor(
             Box::new(TimeKeeper {}),
         ),
         block_producing_timer: 0,
-        tx_producing_timer: 0,
-        create_test_tx,
         storage: Storage::new(Box::new(RustIOHandler::new(
             sender_to_network_controller.clone(),
             CONSENSUS_EVENT_PROCESSOR_ID,
@@ -706,8 +703,8 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     );
 }
 
-pub async fn run_utxo_to_issuance_converter() {
-    let (sender_to_network_controller, receiver_in_network_controller) =
+pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
+    let (sender_to_network_controller, _receiver_in_network_controller) =
         tokio::sync::mpsc::channel::<IoEvent>(100);
 
     info!("running saito controllers");
@@ -741,9 +738,9 @@ pub async fn run_utxo_to_issuance_converter() {
     )));
     storage.load_blocks_from_disk(context.mempool.clone()).await;
 
-    let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
+    let _peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
-    let (sender_to_miner, receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(100);
+    let (sender_to_miner, _receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(100);
 
     let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
@@ -762,7 +759,6 @@ pub async fn run_utxo_to_issuance_converter() {
 
     info!("{:?} entries to write to file", data.len());
     let issuance_path: String = "./data/issuance.file".to_string();
-    let threshold: Currency = 0;
     info!("opening file : {:?}", issuance_path);
 
     let path = Path::new(issuance_path.as_str());
@@ -782,12 +778,12 @@ pub async fn run_utxo_to_issuance_converter() {
     }
     let mut file = file.unwrap();
 
-    let txtype = "Normal";
+    let slip_type = "Normal";
 
     for (key, value) in &data {
-        if value > &threshold {
+        if value >= &threshold {
             let key_base58 = bs58::encode(key).into_string();
-            file.write_all(format!("{}\t{}\t{}\n", value, key_base58, txtype).as_bytes())
+            file.write_all(format!("{}\t{}\t{}\n", value, key_base58, slip_type).as_bytes())
                 .await
                 .expect("failed writing to issuance file");
         }
@@ -817,10 +813,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Sets the mode for execution")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("utxo_threshold")
+                .long("threshold")
+                .value_name("UTXO_THRESHOLD")
+                .help("Threshold for selecting utxo for issuance file")
+                .takes_value(true),
+        )
         .get_matches();
-
-    // config.json as default
-    let config_file = matches.value_of("config").unwrap_or("configs/config.json");
 
     let program_mode = matches.value_of("mode").unwrap_or("node");
 
@@ -829,6 +829,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_hook();
 
     if program_mode == "node" {
+        let config_file = matches.value_of("config").unwrap_or("configs/config.json");
         info!("Using config file: {}", config_file.to_string());
         let configs = ConfigHandler::load_configs(config_file.to_string());
         if configs.is_err() {
@@ -841,9 +842,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         run_node(configs).await;
     } else if program_mode == "utxo-issuance" {
-        info!("running the program in utxo to issuance converter mode");
+        let threshold_str = matches.value_of("utxo_threshold");
+        let mut threshold: Currency = 25_000;
+        if threshold_str.is_some() {
+            let result = String::from(threshold_str.unwrap()).parse();
+            if result.is_err() {
+                error!("cannot parse threshold : {:?}", threshold_str);
+            } else {
+                threshold = result.unwrap();
+            }
+        }
+        info!(
+            "running the program in utxo to issuance converter mode with threshold : {:?}",
+            threshold
+        );
 
-        run_utxo_to_issuance_converter().await;
+        run_utxo_to_issuance_converter(threshold).await;
     }
 
     Ok(())

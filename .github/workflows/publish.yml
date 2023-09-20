@@ -2,7 +2,7 @@ name: publish
 
 on:
   push:
-    branches: [ prod ]
+    branches: [ prod, master ]
 #  pull_request:
 #    branches: [ develop ]
 #  workflow_run:
@@ -18,6 +18,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Install moreutils for sponge
+        run: sudo apt-get install -y moreutils
+        
+      - name: Update versions
+        run: ./scripts/update_version.sh
+        shell: bash
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -26,20 +33,20 @@ jobs:
           cache: npm
           cache-dependency-path: saito-wasm/package-lock.json
 
-      - name: get latest version
+      - name: get latest saito-wasm version
         run: |
-          echo latest_saito_wasm_version=$(npm show saito-wasm version) >> $GITHUB_ENV
-          echo current_saito_wasm_version=$(npm pkg get version) >> $GITHUB_ENV
+          echo published_saito_wasm_version=$(npm show saito-wasm version) >> $GITHUB_ENV
+          echo current_saito_wasm_version=$(npm pkg get version | tr -d '"') >> $GITHUB_ENV
           echo "current saito-wasm node package version : ${{ env.current_saito_wasm_version }}"
-          echo "published saito-wasm node package version : ${{ env.latest_saito_wasm_version }}"
+          echo "published saito-wasm node package version : ${{ env.published_saito_wasm_version }}"
         working-directory: saito-wasm
 
-      - name: version check
-        if: ${{ env.latest_saito_wasm_version == env.current_saito_wasm_version }}
+      - name: version check for saito-wasm
+        if: ${{ env.published_saito_wasm_version == env.current_saito_wasm_version }}
         run: |
           echo "same saito-wasm npm package version is already published"
           echo "current npm package version : ${{ env.current_saito_wasm_version }}"
-          echo "published npm package version : ${{ env.latest_saito_wasm_version }}"
+          echo "published npm package version : ${{ env.published_saito_wasm_version }}"
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -66,7 +73,7 @@ jobs:
         shell: bash
 
       - name: Install npm packages for saito-wasm
-        run: npm ci
+        run: npm install
         working-directory: saito-wasm
 
       - name: Wasm Build
@@ -74,12 +81,12 @@ jobs:
         working-directory: saito-wasm
 
       - name: Remove gitignore files in saito-wasm
-        if: ${{ env.latest_saito_wasm_version != env.current_saito_wasm_version }}
+        if: ${{ env.published_saito_wasm_version != env.current_saito_wasm_version }}
         run: rm -rf pkg/web/.gitignore pkg/node/.gitignore
         working-directory: saito-wasm
 
       - name: Publish saito-wasm package
-        if: ${{ env.latest_saito_wasm_version != env.current_saito_wasm_version }}
+        if: ${{ env.published_saito_wasm_version != env.current_saito_wasm_version }}
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -102,34 +109,34 @@ jobs:
 
       - name: get latest saito-js version
         run: |
-          echo latest_saito_js_version=$(npm show saito-js version) >> $GITHUB_ENV
-          echo current_saito_js_version=$(npm pkg get version) >> $GITHUB_ENV
+          echo published_saito_js_version=$(npm show saito-js version) >> $GITHUB_ENV
+          echo current_saito_js_version=$(npm pkg get version | tr -d '"') >> $GITHUB_ENV
         working-directory: saito-js
 
       - name: version check saito-js
-        if: ${{ env.latest_saito_js_version == env.current_saito_js_version }}
+        if: ${{ env.published_saito_js_version == env.current_saito_js_version }}
         run: |
           echo "same saito-js version is already published"
           echo "current saito-js version : ${{ env.current_saito_js_version }}"
-          echo "published saito-js version : ${{ env.latest_saito_js_version }}"
+          echo "published saito-js version : ${{ env.published_saito_js_version }}"
 
       - name: Install npm packages for saito-js
-        if: ${{ env.latest_saito_js_version != env.current_saito_js_version }}
-        run: npm ci
+        if: ${{ env.published_saito_js_version != env.current_saito_js_version }}
+        run: npm install
         working-directory: saito-js
 
       - name: Update saito-wasm package
-        if: ${{ env.latest_saito_js_version != env.current_saito_js_version }}
+        if: ${{ env.published_saito_js_version != env.current_saito_js_version }}
         run: npm update saito-wasm
         working-directory: saito-js
 
       - name: build saito-js
-        if: ${{ env.latest_saito_js_version != env.current_saito_js_version }}
+        if: ${{ env.published_saito_js_version != env.current_saito_js_version }}
         run: npm run build
         working-directory: saito-js
 
       - name: copying saito-js
-        if: ${{ env.latest_saito_js_version != env.current_saito_js_version }}
+        if: ${{ env.published_saito_js_version != env.current_saito_js_version }}
         run: |
           cp package.json dist
           cp package-lock.json dist
@@ -138,7 +145,7 @@ jobs:
         working-directory: saito-js
 
       - name: Publish saito-js package
-        if: ${{ env.latest_saito_js_version != env.current_saito_js_version }}
+        if: ${{ env.published_saito_js_version != env.current_saito_js_version }}
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
