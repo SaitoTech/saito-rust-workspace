@@ -1,5 +1,4 @@
 
-
 # Mac (M1) Specific Installations
 This guide provides a detailed walkthrough on how to link the saito-lite-rust repository to the saito-wasm locally via the saito-js wrapper. This process leverages the npm link command.
 
@@ -66,22 +65,25 @@ npm link
 #### 1. Navigate to the saito-js directory
 
 
-#### 2 Installation  
+#### 2. Installation  
 ```
 npm install
 ```
-#### 3 linking with saito-wasm
+#### 3. linking with saito-wasm
 ```
 npm link saito-wasm
 ```
-#### 4 build
+#### 4. build
 ```
 npm run build
 ```
-#### 5 create a symbolic link for saito-js
+#### 5. create a symbolic link for saito-js
+- Navigate into the dist folder in the saito-js directory
+- Run link command 
 ```
 npm link
 ```
+
 
 ## Step 3: Link SLR to saito-js
 
