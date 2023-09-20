@@ -115,8 +115,8 @@ export default class WebSharedMethods extends CustomSharedMethods {
   }
 
   sendMessageToAll(buffer: Uint8Array, exceptions: Array<bigint>): void {
-    //console.info(' --- Sending to All ---')
     // console.debug("sending message to  all with size : " + buffer.byteLength);
+    // console.info(' --- Sending to All ---')
     Saito.getInstance().sockets.forEach((socket, key) => {
       if (exceptions.includes(key)) {
         return;
