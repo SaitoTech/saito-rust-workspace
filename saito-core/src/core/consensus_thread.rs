@@ -203,7 +203,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
                     println!(" block ider {:?}", &block.transactions);
 
-                    let res = blockchain
+                    let _res = blockchain
                         .add_block(
                             block,
                             Some(&self.network),

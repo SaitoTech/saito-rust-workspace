@@ -1,5 +1,5 @@
 use std::ops::Deref;
-use std::rc::Rc;
+
 use std::sync::Arc;
 
 use js_sys::JsString;
@@ -113,7 +113,7 @@ impl WasmWallet {
 
         let array = js_sys::Array::new_with_length(slips.len() as u32);
 
-        for (index, (key, slip)) in slips.iter().enumerate() {
+        for (index, (_key, slip)) in slips.iter().enumerate() {
             array.set(
                 index as u32,
                 JsValue::from(WasmWalletSlip::new(slip.clone())),

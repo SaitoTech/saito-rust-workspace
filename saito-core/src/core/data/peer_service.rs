@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{error, info, warn};
+use log::{error, warn};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -644,7 +644,7 @@ impl Block {
     pub async fn downgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
-        is_browser: bool,
+        _is_browser: bool,
     ) -> bool {
         debug!(
             "downgrading BLOCK_ID {:?} to type : {:?}",

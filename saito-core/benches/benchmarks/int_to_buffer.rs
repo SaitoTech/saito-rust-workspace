@@ -3,7 +3,7 @@ use criterion::{black_box, criterion_group, Criterion};
 use byteorder::{BigEndian, ByteOrder};
 
 fn u64_std_test() {
-    black_box(for i in 0..100000 {
+    black_box(for _i in 0..100000 {
         let number: u64 = 10000;
         let buffer = number.to_be_bytes();
         assert_eq!(buffer.len(), 8);
@@ -13,7 +13,7 @@ fn u64_std_test() {
 }
 
 fn u64_byteorder_test() {
-    for i in 0..100 {
+    for _i in 0..100 {
         let number: u64 = 10000;
         let mut buf = [0; 8];
         BigEndian::write_u64(&mut buf, number);

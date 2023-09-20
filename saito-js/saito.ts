@@ -69,7 +69,7 @@ export default class Saito {
         return sharedMethods.disconnectFromPeer(peer_index);
       },
       fetch_block_from_peer: (hash: Uint8Array, peer_index: bigint, url: string) => {
-        console.log("fetching block : " + url);
+        // console.log("fetching block : " + url);
         sharedMethods.fetchBlockFromPeer(url).then((buffer: Uint8Array) => {
           Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
         });

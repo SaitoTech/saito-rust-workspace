@@ -199,13 +199,13 @@ impl InterfaceIO for WasmIoHandler {
         }
     }
 
-    async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
+    async fn save_wallet(&self, _wallet: &mut Wallet) -> Result<(), Error> {
         MsgHandler::save_wallet();
         // TODO : return error state
         Ok(())
     }
 
-    async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
+    async fn load_wallet(&self, _wallet: &mut Wallet) -> Result<(), Error> {
         MsgHandler::load_wallet();
         // TODO : return error state
         Ok(())

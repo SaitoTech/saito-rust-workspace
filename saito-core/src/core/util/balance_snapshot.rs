@@ -178,7 +178,7 @@ impl TryFrom<String> for BalanceSnapshot {
         let mut file_name = "".to_string();
         reader
             .read_line(&mut file_name)
-            .map_err(|err| "failed reading file name from balance snapshot")?;
+            .map_err(|_err| "failed reading file name from balance snapshot")?;
         file_name.pop();
 
         let mut rows = vec![];
