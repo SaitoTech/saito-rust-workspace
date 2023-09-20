@@ -541,11 +541,11 @@ pub async fn get_peers() -> Array {
     let valid_peer_count = peers
         .index_to_peers
         .iter()
-        .filter(|(index, peer)| peer.public_key.is_some())
+        .filter(|(_index, peer)| peer.public_key.is_some())
         .count();
     let array = Array::new_with_length(valid_peer_count as u32);
     let mut array_index = 0;
-    for (i, (_peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
+    for (_i, (_peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
         if peer.public_key.is_none() {
             continue;
         }

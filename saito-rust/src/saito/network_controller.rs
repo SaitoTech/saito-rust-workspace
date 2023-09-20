@@ -192,9 +192,9 @@ impl NetworkController {
     }
 
     pub async fn disconnect_from_peer(
-        event_id: u64,
-        io_controller: Arc<RwLock<NetworkController>>,
-        peer_id: u64,
+        _event_id: u64,
+        _io_controller: Arc<RwLock<NetworkController>>,
+        _peer_id: u64,
     ) {
         info!("TODO : handle disconnect_from_peer")
     }

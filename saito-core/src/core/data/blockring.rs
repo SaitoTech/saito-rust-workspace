@@ -1,4 +1,4 @@
-use log::{debug, trace};
+use log::{trace};
 
 use crate::common::defs::{SaitoHash, GENESIS_PERIOD};
 use crate::core::data::block::Block;
@@ -106,8 +106,8 @@ impl BlockRing {
 
     pub fn is_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
-        for i in 0..self.ring[(insert_pos as usize)].block_hashes.len() {
-            if self.ring[(insert_pos as usize)].block_hashes[i] == block_hash {
+        for i in 0..self.ring[insert_pos as usize].block_hashes.len() {
+            if self.ring[insert_pos as usize].block_hashes[i] == block_hash {
                 return true;
             }
         }
@@ -120,14 +120,14 @@ impl BlockRing {
 
     pub fn delete_block(&mut self, block_id: u64, block_hash: SaitoHash) {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
-        self.ring[(insert_pos as usize)].delete_block(block_id, block_hash);
+        self.ring[insert_pos as usize].delete_block(block_id, block_hash);
     }
 
     pub fn get_block_hashes_at_block_id(&self, block_id: u64) -> Vec<SaitoHash> {
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         let mut v: Vec<SaitoHash> = vec![];
         for i in 0..self.ring[insert_pos as usize].block_hashes.len() {
-            if self.ring[(insert_pos as usize)].block_ids[i] == block_id {
+            if self.ring[insert_pos as usize].block_ids[i] == block_id {
                 v.push(self.ring[insert_pos as usize].block_hashes[i]);
             }
         }
@@ -191,7 +191,7 @@ impl BlockRing {
 
     pub fn print_lc(&self) {
         for i in 0..GENESIS_PERIOD {
-            if !self.ring[(i as usize)].block_hashes.is_empty() {
+            if !self.ring[i as usize].block_hashes.is_empty() {
                 trace!(
                     "Block {:?}: {:?}",
                     i,

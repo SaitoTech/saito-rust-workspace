@@ -289,7 +289,7 @@ impl Storage {
 
 #[cfg(test)]
 mod test {
-    use log::{debug, info, trace};
+    use log::{info, trace};
 
     use crate::common::defs::SaitoHash;
     use crate::common::test_manager::test::{

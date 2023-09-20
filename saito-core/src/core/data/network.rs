@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -261,7 +261,7 @@ impl Network {
             );
             let data = peer.static_peer_config.as_ref().unwrap();
 
-            self.static_peer_configs.retain(|(config, reconnect_time)| {
+            self.static_peer_configs.retain(|(config, _reconnect_time)| {
                 config.host != data.host || config.port != data.port
             });
         }

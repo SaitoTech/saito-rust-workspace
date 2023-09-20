@@ -2,21 +2,21 @@ use std::fmt::{Debug, Formatter};
 use std::fs;
 use std::io::Error;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, error, warn};
+use log::{debug, error};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
+
 
 use crate::saito::io_event::IoEvent;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-use saito_core::core::data::blockchain::Blockchain;
+
 use saito_core::core::data::configuration::PeerConfig;
 use saito_core::core::data::peer_service::PeerService;
 use saito_core::core::data::wallet::Wallet;
@@ -259,7 +259,7 @@ impl InterfaceIO for RustIOHandler {
         todo!()
     }
 
-    fn send_interface_event(&self, event: InterfaceEvent) {
+    fn send_interface_event(&self, _event: InterfaceEvent) {
         // no one is listening to these events in rust node
     }
 
@@ -291,7 +291,7 @@ mod tests {
     #[tokio::test]
     async fn test_write_value() {
         let (sender, mut _receiver) = tokio::sync::mpsc::channel(10);
-        let mut io_handler = RustIOHandler::new(sender, 0);
+        let io_handler = RustIOHandler::new(sender, 0);
 
         let result = io_handler
             .write_value("./data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())

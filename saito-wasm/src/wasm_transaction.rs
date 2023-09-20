@@ -1,5 +1,5 @@
 use js_sys::{Array, JsString, Uint8Array};
-use log::info;
+
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
