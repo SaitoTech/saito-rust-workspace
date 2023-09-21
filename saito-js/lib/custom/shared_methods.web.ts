@@ -123,11 +123,9 @@ export default class WebSharedMethods extends CustomSharedMethods {
       }
       try {
         if (socket.readyState !== socket.OPEN) {
-          socket.onopen = () => socket.send(buffer);
-          //console.info('Socket Send on Open')
+          console.error('Blocked Socket Send Before Open')
         } else {
           socket.send(buffer);
-          //console.info('Socket Send')
         }
       } catch(err) {
         console.error('Socket Send Error: ' + err)
