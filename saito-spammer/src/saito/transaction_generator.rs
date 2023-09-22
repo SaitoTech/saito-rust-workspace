@@ -2,11 +2,11 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
+use log::{debug, info, trace};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use log::{debug, info, trace};
 use saito_core::common::defs::{
     push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN,
     LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
@@ -18,7 +18,7 @@ use saito_core::core::data::peer_collection::PeerCollection;
 use saito_core::core::data::slip::{Slip, SLIP_SIZE};
 use saito_core::core::data::transaction::Transaction;
 use saito_core::core::data::wallet::Wallet;
-use saito_core::{lock_for_read, lock_for_write};
+use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_rust::saito::time_keeper::TimeKeeper;
 
 use crate::SpammerConfigs;
@@ -317,9 +317,7 @@ impl TransactionGenerator {
             let sender = self.sender.clone();
             let tx_size = self.tx_size;
 
-            let txs: VecDeque<Transaction> = transactions
-                .par_drain(..)
-                .with_min_len(100)
+            let txs: VecDeque<Transaction> = drain!(transactions, 100)
                 .map(|mut transaction| {
                     transaction.data = vec![0; tx_size as usize]; //;generate_random_bytes(tx_size as u64);
                     transaction.timestamp = time_keeper.get_timestamp_in_ms();

@@ -186,6 +186,21 @@ macro_rules! iterate_mut {
     }};
 }
 
+#[macro_export]
+macro_rules! drain {
+    ($collection:expr, $min:expr) => {{
+        #[cfg(feature = "with-rayon")]
+        {
+            $collection.par_drain(..).with_min_len($min)
+        }
+
+        #[cfg(not(feature = "with-rayon"))]
+        {
+            $collection.drain(..)
+        }
+    }};
+}
+
 #[derive(Clone, Debug)]
 pub struct StatVariable {
     pub total: u64,

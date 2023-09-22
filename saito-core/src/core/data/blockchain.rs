@@ -28,7 +28,7 @@ use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
-use crate::{iterate, lock_for_read, lock_for_write};
+use crate::{drain, iterate, lock_for_read, lock_for_write};
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
     ((top as u64) << 32) + (bottom as u64)
@@ -597,7 +597,17 @@ impl Blockchain {
         info!("add block failed : {:?}", hex::encode(block_hash));
 
         mempool.delete_block(block_hash);
-        let mut block = self.blocks.remove(block_hash).unwrap();
+        let block = self.blocks.remove(block_hash);
+
+        if block.is_none() {
+            error!(
+                "block : {:?} is not found in blocks collection. couldn't handle block failure.",
+                hex::encode(block_hash)
+            );
+            return;
+        }
+
+        let mut block = block.unwrap();
         let public_key;
         {
             let (wallet, _wallet_) = lock_for_read!(mempool.wallet, LOCK_ORDER_WALLET);
@@ -606,16 +616,14 @@ impl Blockchain {
         if block.creator == public_key {
             let transactions = &mut block.transactions;
             let prev_count = transactions.len();
-            let transactions: Vec<Transaction> = transactions
-                .par_drain(..)
-                .with_min_len(10)
+            let transactions: Vec<Transaction> = drain!(transactions, 10)
                 .filter(|tx| {
                     // TODO : what other types should be added back to the mempool
                     if tx.transaction_type == TransactionType::Normal {
                         // TODO : is there a way to not validate these again ?
                         return tx.validate(&self.utxoset);
                     }
-                    return false;
+                    false
                 })
                 .collect();
             // transactions.retain(|tx| tx.validate(&self.utxoset));

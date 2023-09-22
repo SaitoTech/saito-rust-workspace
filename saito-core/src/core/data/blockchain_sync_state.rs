@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::VecDeque;
 
 use ahash::HashMap;
-use log::{debug, trace};
+use log::trace;
 
 use crate::common::defs::{BlockId, PeerIndex, SaitoHash};
 
@@ -31,7 +31,7 @@ impl BlockchainSyncState {
         }
     }
     pub(crate) fn build_peer_block_picture(&mut self) {
-        // debug!("building peer block picture");
+        trace!("building peer block picture");
         // for every block picture received from a peer, we sort and create a list of sequential hashes to fetch from peers
         for (peer_index, received_picture) in self.received_block_picture.iter_mut() {
             if received_picture.is_empty() {
@@ -54,7 +54,7 @@ impl BlockchainSyncState {
                 let (id, hash) = received_picture
                     .pop_front()
                     .expect("received picture should not be empty");
-                debug!(
+                trace!(
                     "adding new block hash : {:?} for peer : {:?} since nothing found",
                     hex::encode(hash),
                     peer_index
@@ -94,7 +94,7 @@ impl BlockchainSyncState {
     }
 
     pub fn request_blocks_from_waitlist(&mut self) -> HashMap<PeerIndex, Vec<SaitoHash>> {
-        debug!("requesting blocks from waiting list");
+        trace!("requesting blocks from waiting list");
         let mut result: HashMap<u64, Vec<SaitoHash>> = Default::default();
 
         // for each peer check if we can fetch block
@@ -106,7 +106,7 @@ impl BlockchainSyncState {
                     .get_mut(i)
                     .expect("entry should exist since we are checking the length");
                 if *block_id > self.block_ceiling {
-                    debug!(
+                    trace!(
                         "block : {:?} - {:?} is above the ceiling : {:?}",
                         block_id,
                         hex::encode(hash),
@@ -115,7 +115,7 @@ impl BlockchainSyncState {
                     break;
                 }
                 if let BlockStatus::Queued = status {
-                    debug!(
+                    trace!(
                         "block : {:?} : {:?} to be fetched from peer : {:?}",
                         block_id,
                         hex::encode(*hash),
@@ -123,7 +123,7 @@ impl BlockchainSyncState {
                     );
                     result.entry(*peer_index).or_default().push(*hash);
                 } else {
-                    debug!(
+                    trace!(
                         "block {:?} - {:?} status = {:?}",
                         block_id,
                         hex::encode(hash),
@@ -136,7 +136,7 @@ impl BlockchainSyncState {
         result
     }
     pub fn mark_as_fetching(&mut self, entries: Vec<(PeerIndex, SaitoHash)>) {
-        debug!("marking as fetching : {:?}", entries.len());
+        trace!("marking as fetching : {:?}", entries.len());
         for (peer_index, hash) in entries.iter() {
             let res = self.blocks_to_fetch.get_mut(peer_index);
             if res.is_none() {
@@ -146,7 +146,7 @@ impl BlockchainSyncState {
             for (block_hash, status, _) in res {
                 if hash.eq(block_hash) {
                     *status = BlockStatus::Fetching;
-                    debug!("block : {:?} marked as fetching", hex::encode(block_hash));
+                    trace!("block : {:?} marked as fetching", hex::encode(block_hash));
                     break;
                 }
             }
@@ -155,7 +155,7 @@ impl BlockchainSyncState {
     pub fn mark_as_fetched(&mut self, peer_index: PeerIndex, hash: SaitoHash) {
         let res = self.blocks_to_fetch.get_mut(&peer_index);
         if res.is_none() {
-            debug!(
+            trace!(
                 "block : {:?} for peer : {:?} not found to mark as fetched",
                 hex::encode(hash),
                 peer_index
@@ -166,7 +166,7 @@ impl BlockchainSyncState {
         for (block_hash, status, _) in res {
             if hash.eq(block_hash) {
                 *status = BlockStatus::Fetched;
-                debug!(
+                trace!(
                     "block : {:?} marked as fetched from peer : {:?}",
                     hex::encode(block_hash),
                     peer_index
@@ -177,14 +177,14 @@ impl BlockchainSyncState {
         self.clean_fetched(peer_index);
     }
     fn clean_fetched(&mut self, peer_index: PeerIndex) {
-        debug!("cleaning fetched : {:?}", peer_index);
+        trace!("cleaning fetched : {:?}", peer_index);
         if let Some(res) = self.blocks_to_fetch.get_mut(&peer_index) {
             while let Some((hash, status, id)) = res.front() {
                 if let BlockStatus::Fetched = status {
                 } else {
                     break;
                 }
-                debug!(
+                trace!(
                     "removing hash : {:?} - {:?} from peer : {:?}",
                     hex::encode(hash),
                     id,
@@ -196,7 +196,7 @@ impl BlockchainSyncState {
         self.blocks_to_fetch.retain(|_, map| !map.is_empty());
     }
     pub fn add_entry(&mut self, block_hash: SaitoHash, block_id: BlockId, peer_index: PeerIndex) {
-        debug!(
+        trace!(
             "add entry : {:?} - {:?} from {:?}",
             hex::encode(block_hash),
             block_id,
@@ -225,7 +225,7 @@ impl BlockchainSyncState {
     ///
     /// ```
     pub fn remove_entry(&mut self, block_hash: SaitoHash, peer_index: PeerIndex) {
-        debug!(
+        trace!(
             "removing entry : {:?} from peer : {:?}",
             hex::encode(block_hash),
             peer_index
@@ -280,9 +280,10 @@ impl BlockchainSyncState {
         // TODO : batch size should be larger than the fork length diff which can change the current fork.
         // otherwise we won't fetch the blocks for new longest fork until current fork adds new blocks
         self.block_ceiling = id + self.batch_size as BlockId;
-        debug!(
+        trace!(
             "setting latest blockchain id : {:?} and ceiling : {:?}",
-            id, self.block_ceiling
+            id,
+            self.block_ceiling
         );
     }
 }
