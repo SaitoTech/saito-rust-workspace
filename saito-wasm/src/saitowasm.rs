@@ -276,7 +276,9 @@ pub async fn initialize(
     }
 
     let mut saito = SAITO.lock().await;
-    let private_key: SaitoPrivateKey = string_to_key(private_key).unwrap();
+    let private_key: SaitoPrivateKey = string_to_key(private_key).or(Err(JsValue::from(
+        "Failed parsing private key string to key",
+    )))?;
     {
         let mut wallet = saito.context.wallet.write().await;
         if private_key != [0; 32] {
@@ -303,14 +305,13 @@ pub async fn create_transaction(
     debug!("create_transaction");
     let saito = SAITO.lock().await;
     let mut wallet = saito.context.wallet.write().await;
-    let key = string_to_key(public_key);
-    if key.is_err() {
-        error!("failed parsing public key : {:?}", key.err().unwrap());
-        return Err(JsValue::from("failed parsing public key"));
-    }
+    let key = string_to_key(public_key).or(Err(JsValue::from(
+        "Failed parsing public key string to key",
+    )))?;
+
     let transaction = Transaction::create(
         &mut wallet,
-        key.unwrap(),
+        key,
         amount,
         fee,
         force_merge,
@@ -334,13 +335,9 @@ pub async fn get_latest_block_hash() -> JsString {
 #[wasm_bindgen]
 pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
     // debug!("get_block");
-    let block_hash = string_to_key(block_hash);
-    if block_hash.is_err() {
-        error!("block hash string is invalid");
-        return Err(JsValue::from("block hash string is invalid"));
-    }
-
-    let block_hash = block_hash.unwrap();
+    let block_hash = string_to_key(block_hash).or(Err(JsValue::from(
+        "Failed parsing block hash string to key",
+    )))?;
 
     let saito = SAITO.lock().await;
     let blockchain = saito.routing_thread.blockchain.read().await;
@@ -500,19 +497,15 @@ pub fn hash(buffer: Uint8Array) -> JsString {
 }
 
 #[wasm_bindgen]
-pub fn sign_buffer(buffer: Uint8Array, private_key: JsString) -> JsString {
+pub fn sign_buffer(buffer: Uint8Array, private_key: JsString) -> Result<JsString, JsValue> {
     let buffer = buffer.to_vec();
-    let key = string_to_key(private_key);
-    if key.is_err() {
-        error!("key couldn't be parsed : {:?}", key.err().unwrap());
-        return "".into();
-    }
-    let key: SaitoPrivateKey = key.unwrap();
-
+    let key = string_to_key(private_key).or(Err(JsValue::from(
+        "Failed parsing private key string to key",
+    )))?;
     let result = sign(&buffer, &key);
 
     let signature = hex::encode(result);
-    signature.into()
+    Ok(signature.into())
 }
 
 #[wasm_bindgen]
@@ -525,13 +518,15 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
     let sig = sig.unwrap();
     let key = string_to_key(public_key);
     if key.is_err() {
-        error!("key is invalid");
+        error!(
+            "failed parsing public key from string. {:?}",
+            key.err().unwrap()
+        );
         return false;
     }
-    let key = key.unwrap();
     let buffer = buffer.to_vec();
     let h = saito_core::core::data::crypto::hash(&buffer);
-    saito_core::core::data::crypto::verify_signature(&h, &sig, &key)
+    saito_core::core::data::crypto::verify_signature(&h, &sig, &key.unwrap())
 }
 
 #[wasm_bindgen]
@@ -573,15 +568,13 @@ pub async fn get_peer(peer_index: u64) -> Option<WasmPeer> {
 }
 
 #[wasm_bindgen]
-pub async fn get_account_slips(public_key: JsString) -> Array {
+pub async fn get_account_slips(public_key: JsString) -> Result<Array, JsValue> {
     let saito = SAITO.lock().await;
     let blockchain = saito.routing_thread.blockchain.read().await;
-    let key = string_to_key(public_key);
-    if key.is_err() {
-        error!("error {:?}", key.err().unwrap());
-        return js_sys::Array::new_with_length(0);
-    }
-    let mut slips = blockchain.get_slips_for(key.unwrap());
+    let key = string_to_key(public_key).or(Err(JsValue::from(
+        "Failed parsing public key string to key",
+    )))?;
+    let mut slips = blockchain.get_slips_for(key);
     let array = js_sys::Array::new_with_length(slips.len() as u32);
 
     for (index, slip) in slips.drain(..).enumerate() {
@@ -589,7 +582,7 @@ pub async fn get_account_slips(public_key: JsString) -> Array {
         array.set(index as u32, JsValue::from(wasm_slip));
     }
 
-    array
+    Ok(array)
 }
 
 #[wasm_bindgen]
@@ -677,11 +670,13 @@ pub fn generate_private_key() -> JsString {
 }
 
 #[wasm_bindgen]
-pub fn generate_public_key(private_key: JsString) -> JsString {
+pub fn generate_public_key(private_key: JsString) -> Result<JsString, JsValue> {
     info!("generate_public_key");
-    let private_key: SaitoPrivateKey = string_to_key(private_key).unwrap();
+    let private_key: SaitoPrivateKey = string_to_key(private_key).or(Err(JsValue::from(
+        "Failed parsing private key string to key",
+    )))?;
     let (public_key, _) = generate_keypair_from_private_key(&private_key);
-    hex::encode(public_key).into()
+    Ok(hex::encode(public_key).into())
 }
 
 #[wasm_bindgen]
@@ -841,21 +836,56 @@ where
 {
     let str = key.as_string();
     if str.is_none() {
-        error!("cannot create key from empty string");
+        error!("cannot convert wasm string to rust string");
         return Err(Error::from(ErrorKind::InvalidInput));
     }
+
     let str = str.unwrap();
-    let key = hex::decode(str);
+    if str.is_empty() {
+        debug!("cannot convert empty string to key");
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+
+    let key = hex::decode(str.as_str());
     if key.is_err() {
-        error!("{:?}", key.err().unwrap());
+        error!(
+            "failed parsing key : {:?}. str : {:?}",
+            key.err().unwrap(),
+            str
+        );
         return Err(Error::from(ErrorKind::InvalidInput));
     }
     let key = key.unwrap();
-    let key = key.try_into();
-    if key.is_err() {
-        error!("{:?}", key.err().unwrap());
+    let len = key.len();
+    let key2 = key.try_into();
+    if key2.is_err() {
+        error!(
+            "failed parsing key : {:?}. length : {:?}",
+            key2.err().unwrap(),
+            len
+        );
         return Err(Error::from(ErrorKind::InvalidInput));
     }
-    let key = key.unwrap();
+    let key = key2.unwrap();
     Ok(key)
 }
+
+// #[cfg(test)]
+// mod test {
+//     use js_sys::JsString;
+//     use saito_core::common::defs::SaitoPublicKey;
+//
+//     use crate::saitowasm::string_to_key;
+//
+//     #[test]
+//     fn string_to_key_test() {
+//         let empty_key = [
+//             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//             0, 0, 0, 0,
+//         ];
+//         let key = string_to_key(JsString::from(""));
+//         assert!(key.is_ok());
+//         let key: SaitoPublicKey = key.unwrap();
+//         assert_eq!(key, empty_key);
+//     }
+// }

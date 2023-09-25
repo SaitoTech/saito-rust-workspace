@@ -1,8 +1,9 @@
 use js_sys::JsString;
+use log::warn;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use num_traits::FromPrimitive;
-use saito_core::common::defs::{Currency, SaitoUTXOSetKey};
+use saito_core::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey};
 use saito_core::core::data::slip::{Slip, SlipType};
 
 use crate::saitowasm::string_to_key;
@@ -38,9 +39,12 @@ impl WasmSlip {
     }
     #[wasm_bindgen(setter=public_key)]
     pub fn set_public_key(&mut self, key: JsString) {
-        let key = string_to_key(key).unwrap();
-
-        self.slip.public_key = key;
+        let key2 = string_to_key(key);
+        if key2.is_err() {
+            warn!("cannot parse key . {:?}", key2.err().unwrap());
+            return;
+        }
+        self.slip.public_key = key2.unwrap();
     }
     #[wasm_bindgen(getter=slip_index)]
     pub fn slip_index(&self) -> u8 {

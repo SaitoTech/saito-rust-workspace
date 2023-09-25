@@ -116,11 +116,20 @@ export default class WebSharedMethods extends CustomSharedMethods {
 
   sendMessageToAll(buffer: Uint8Array, exceptions: Array<bigint>): void {
     // console.debug("sending message to  all with size : " + buffer.byteLength);
+    // console.info(' --- Sending to All ---')
     Saito.getInstance().sockets.forEach((socket, key) => {
       if (exceptions.includes(key)) {
         return;
       }
-      socket.send(buffer);
+      try {
+        if (socket.readyState !== socket.OPEN) {
+          console.error('Blocked Socket Send Before Open')
+        } else {
+          socket.send(buffer);
+        }
+      } catch(err) {
+        console.error('Socket Send Error: ' + err)
+      }
     });
   }
 

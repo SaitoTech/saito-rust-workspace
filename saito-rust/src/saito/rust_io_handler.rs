@@ -10,14 +10,14 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
-use crate::saito::io_event::IoEvent;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-
 use saito_core::core::data::configuration::PeerConfig;
 use saito_core::core::data::peer_service::PeerService;
 use saito_core::core::data::wallet::Wallet;
+
+use crate::saito::io_event::IoEvent;
 
 // use crate::saito::io_context::IoContext;
 
@@ -245,17 +245,12 @@ impl InterfaceIO for RustIOHandler {
         BLOCKS_DIR_PATH.to_string()
     }
 
-    async fn process_api_call(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
-        todo!()
-    }
+    async fn process_api_call(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {}
 
     async fn process_api_success(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
-        todo!()
     }
 
-    async fn process_api_error(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
-        todo!()
-    }
+    async fn process_api_error(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {}
 
     fn send_interface_event(&self, _event: InterfaceEvent) {
         // no one is listening to these events in rust node

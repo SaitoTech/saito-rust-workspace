@@ -1,6 +1,7 @@
 import type { WasmSlip } from "saito-wasm/pkg/node/index";
 import WasmWrapper from "./wasm_wrapper";
 import { fromBase58, toBase58 } from "./util";
+import { DefaultEmptyPublicKey } from "./wallet";
 
 export enum SlipType {
   Normal = 0,
@@ -56,7 +57,7 @@ export default class Slip extends WasmWrapper<WasmSlip> {
   }
 
   public get publicKey(): string {
-    if (this.instance.public_key == "") {
+    if (this.instance.public_key == DefaultEmptyPublicKey) {
       return "";
     }
     return toBase58(this.instance.public_key);
@@ -64,7 +65,7 @@ export default class Slip extends WasmWrapper<WasmSlip> {
 
   public set publicKey(key: string) {
     if (key === "") {
-      this.instance.public_key = "";
+      this.instance.public_key = DefaultEmptyPublicKey;
     }
     this.instance.public_key = fromBase58(key);
   }
@@ -117,7 +118,7 @@ export default class Slip extends WasmWrapper<WasmSlip> {
       index: this.index,
       blockId: this.blockId,
       txOrdinal: this.txOrdinal,
-      utxoKey: this.utxoKey,
+      utxoKey: this.utxoKey
     };
   }
 

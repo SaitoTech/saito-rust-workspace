@@ -19,7 +19,7 @@ use crate::core::data::blockchain::Blockchain;
 use crate::core::data::peer_collection::PeerCollection;
 use crate::core::data::transaction::Transaction;
 use crate::core::data::wallet::Wallet;
-use crate::lock_for_read;
+use crate::{drain, lock_for_read};
 
 #[derive(Debug)]
 pub enum VerifyRequest {
@@ -82,10 +82,7 @@ impl VerificationThread {
                 let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
                 public_key = wallet.public_key;
             }
-            txs = transactions
-                .par_drain(..)
-                .with_min_len(10)
-                // .with_max_len(1000)
+            txs = drain!(transactions, 10)
                 .filter_map(|mut transaction| {
                     transaction.generate(&public_key, 0, 0);
 
