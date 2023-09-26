@@ -779,21 +779,39 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     let mut file = file.unwrap();
 
     let slip_type = "Normal";
-
+    let mut aggregated_value = 0;
     for (key, value) in &data {
-        let key_base58 = if threshold < 25000 {
-            PROJECT_PUBLIC_KEY.to_string()
+        if threshold < 25000 {
+            // PROJECT_PUBLIC_KEY.to_string()
+            aggregated_value += value;
         } else {
-            bs58::encode(key).into_string()
-        };
-        file.write_all(format!("{}\t{}\t{}\n", value, key_base58, slip_type).as_bytes())
-            .await
-            .expect("failed writing to issuance file");
+            let key_base58 = bs58::encode(key).into_string();
+            file.write_all(format!("{}\t{}\t{}\n", value, key_base58, slip_type).as_bytes())
+                .await
+                .expect("failed writing to issuance file");
 
-        file.flush()
-            .await
-            .expect("failed flushing issuance file data");
+            file.flush()
+                .await
+                .expect("failed flushing issuance file data");
+        };
     }
+
+    // add remaining value
+    file.write_all(
+        format!(
+            "{}\t{}\t{}\n",
+            aggregated_value,
+            PROJECT_PUBLIC_KEY.to_string(),
+            slip_type
+        )
+        .as_bytes(),
+    )
+    .await
+    .expect("failed writing to issuance file");
+
+    file.flush()
+        .await
+        .expect("failed flushing issuance file data");
 }
 #[tokio::main(flavor = "multi_thread")]
 // #[tokio::main]
