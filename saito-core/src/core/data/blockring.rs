@@ -1,6 +1,6 @@
 use log::trace;
 
-use crate::common::defs::{SaitoHash, GENESIS_PERIOD};
+use crate::common::defs::{PrintForLog, SaitoHash, GENESIS_PERIOD};
 use crate::core::data::block::Block;
 use crate::core::data::ringitem::RingItem;
 
@@ -42,7 +42,7 @@ impl BlockRing {
         let insert_pos = block.id % RING_BUFFER_LENGTH;
         trace!(
             "blockring.add_block : {:?} at pos = {:?}",
-            hex::encode(block.hash),
+            block.hash.to_hex(),
             insert_pos
         );
         self.ring[insert_pos as usize].add_block(block.id, block.hash);
@@ -138,7 +138,7 @@ impl BlockRing {
         trace!(
             "blockring.on_chain_reorg : block_id = {:?}, hash = {:?}",
             block_id,
-            hex::encode(hash)
+            hash.to_hex()
         );
         let insert_pos = block_id % RING_BUFFER_LENGTH;
         if !self.ring[insert_pos as usize].on_chain_reorganization(hash, lc) {

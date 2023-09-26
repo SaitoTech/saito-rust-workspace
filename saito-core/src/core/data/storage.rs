@@ -7,7 +7,9 @@ use bs58;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{push_lock, SaitoPublicKey, LOCK_ORDER_MEMPOOL, PROJECT_PUBLIC_KEY};
+use crate::common::defs::{
+    push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_MEMPOOL, PROJECT_PUBLIC_KEY,
+};
 use crate::common::interface_io::InterfaceIO;
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::mempool::Mempool;
@@ -124,7 +126,7 @@ impl Storage {
                 let mut block: Block = result.unwrap();
                 block.force_loaded = true;
                 block.generate();
-                debug!("block : {:?} loaded from disk", hex::encode(block.hash));
+                debug!("block : {:?} loaded from disk", block.hash.to_hex());
                 let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
                 mempool.add_block(block);
             }
@@ -268,7 +270,7 @@ impl Storage {
 
         for (key, value) in &balance_map {
             if value > &threshold {
-                let key_base58 = bs58::encode(key).into_string();
+                let key_base58 = key.to_base58();
                 writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
             }
         }
@@ -291,7 +293,7 @@ impl Storage {
 mod test {
     use log::{info, trace};
 
-    use crate::common::defs::SaitoHash;
+    use crate::common::defs::{PrintForLog, SaitoHash};
     use crate::common::test_manager::test::{
         create_timestamp, TestManager, TEST_ISSUANCE_FILEPATH,
     };
@@ -379,19 +381,12 @@ mod test {
 
         info!(
             "prehash = {:?},  prev : {:?}",
-            hex::encode(block.pre_hash),
-            hex::encode(block.previous_block_hash),
+            block.pre_hash.to_hex(),
+            block.previous_block_hash.to_hex(),
         );
-        // assert_eq!(
-        //     "11bc1529b4bcdbfbdbd6582b9033e4156681e5b8777fcc5bcc0d69eb7238d133",
-        //     hex::encode(block.pre_hash)
-        // );
-        // assert_eq!(
-        //     "bcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
-        //     hex::encode(block.previous_block_hash)
-        // );
+
         assert_eq!(
-            hex::encode(block.hash),
+            block.hash.to_hex(),
             "f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda"
         );
         assert_ne!(block.timestamp, 0);
@@ -399,10 +394,10 @@ mod test {
         let hex = hash(&block.pre_hash.to_vec());
         info!(
             "prehash = {:?}, hex = {:?}, signature : {:?}, creator = {:?}",
-            hex::encode(block.pre_hash),
-            hex::encode(hex),
-            hex::encode(block.signature),
-            hex::encode(block.creator)
+            block.pre_hash.to_hex(),
+            hex.to_hex(),
+            block.signature.to_hex(),
+            block.creator.to_base58()
         );
         // assert_eq!("000000000000000a0000017d26dd628abcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bdcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bccccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000000000000000000000000000000002faf08000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         //     hex::encode(block.serialize_for_signature()));
@@ -440,7 +435,7 @@ mod test {
 
         let hash = hash(&h3);
         assert_eq!(
-            hex::encode(hash),
+            hash.to_hex(),
             "de0cdde5db8fd4489f2038aca5224c18983f6676aebcb2561f5089e12ea2eedf"
         );
     }

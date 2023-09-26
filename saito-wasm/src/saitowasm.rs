@@ -18,7 +18,7 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    PeerIndex, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+    PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -329,7 +329,7 @@ pub async fn get_latest_block_hash() -> JsString {
     let blockchain = saito.context.blockchain.read().await;
     let hash = blockchain.get_latest_block_hash();
 
-    hex::encode(hash).into()
+    hash.to_hex().into()
 }
 
 #[wasm_bindgen]
@@ -345,7 +345,7 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
     let result = blockchain.get_block(&block_hash);
 
     if result.is_none() {
-        warn!("block {:?} not found", hex::encode(block_hash));
+        warn!("block {:?} not found", block_hash);
         return Err(JsValue::from("block not found"));
     }
     let block = result.cloned().unwrap();
@@ -491,7 +491,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
 pub fn hash(buffer: Uint8Array) -> JsString {
     let buffer: Vec<u8> = buffer.to_vec();
     let hash = hash_fn(&buffer);
-    let str = hex::encode(hash);
+    let str = hash.to_hex();
     let str: js_sys::JsString = str.into();
     str
 }
@@ -504,7 +504,7 @@ pub fn sign_buffer(buffer: Uint8Array, private_key: JsString) -> Result<JsString
     )))?;
     let result = sign(&buffer, &key);
 
-    let signature = hex::encode(result);
+    let signature = result.to_hex();
     Ok(signature.into())
 }
 
@@ -596,12 +596,7 @@ pub async fn get_balance_snapshot(keys: js_sys::Array) -> WasmBalanceSnapshot {
                 return None;
             }
             let key: String = key.unwrap();
-            let key = bs58::decode(key).into_vec();
-            if key.is_err() {
-                return None;
-            }
-            let key: Vec<u8> = key.unwrap();
-            let key = key.try_into();
+            let key = SaitoPublicKey::from_base58(key.as_str());
             if key.is_err() {
                 return None;
             }
@@ -625,48 +620,11 @@ pub async fn update_from_balance_snapshot(snapshot: WasmBalanceSnapshot) {
         .update_from_balance_snapshot(snapshot.get_snapshot(), Some(&saito.routing_thread.network));
 }
 
-// #[wasm_bindgen]
-// pub async fn get_public_key() -> JsString {
-//     let saito = SAITO.lock().await;
-//     let wallet = saito.context.wallet.read().await;
-//     let key = hex::encode(wallet.public_key);
-//     JsString::from(key)
-// }
-//
-// #[wasm_bindgen]
-// pub async fn get_private_key() -> JsString {
-//     info!("get_private_key");
-//     let saito = SAITO.lock().await;
-//     let wallet = saito.context.wallet.read().await;
-//     let key = hex::encode(wallet.private_key);
-//     JsString::from(key)
-// }
-
-// #[wasm_bindgen]
-// pub async fn get_pending_txs() -> js_sys::Array {
-//     let saito = SAITO.lock().await;
-//     let wallet = saito.context.wallet.read().await;
-//     let array = js_sys::Array::new_with_length(wallet.pending_txs.len() as u32);
-//     for (i, tx) in wallet.pending_txs.values().enumerate() {
-//         let t = WasmTransaction::from_transaction(tx.clone());
-//         array.set(i as u32, JsValue::from(t));
-//     }
-//     array
-// }
-
-// #[wasm_bindgen]
-// pub async fn get_balance(_ticker: JsString) -> Currency {
-//     info!("get_balance");
-//     let saito = SAITO.lock().await;
-//     let wallet = saito.context.wallet.read().await;
-//     wallet.get_available_balance()
-// }
-
 #[wasm_bindgen]
 pub fn generate_private_key() -> JsString {
     info!("generate_private_key");
     let (_, private_key) = generate_keys_wasm();
-    hex::encode(private_key).into()
+    private_key.to_hex().into()
 }
 
 #[wasm_bindgen]
@@ -676,7 +634,7 @@ pub fn generate_public_key(private_key: JsString) -> Result<JsString, JsValue> {
         "Failed parsing private key string to key",
     )))?;
     let (public_key, _) = generate_keypair_from_private_key(&private_key);
-    Ok(hex::encode(public_key).into())
+    Ok(public_key.to_hex().into())
 }
 
 #[wasm_bindgen]
@@ -817,7 +775,7 @@ pub async fn get_mempool_txs() -> js_sys::Array {
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
     let (mut secret_key, mut public_key) =
         SECP256K1.generate_keypair(&mut rand::rngs::OsRng::default());
-    while bs58::encode(public_key.serialize()).into_string().len() != 44 {
+    while public_key.serialize().to_base58().len() != 44 {
         // sometimes secp256k1 address is too big to store in 44 base-58 digits
         let keypair_tuple = SECP256K1.generate_keypair(&mut rand::rngs::OsRng::default());
         secret_key = keypair_tuple.0;

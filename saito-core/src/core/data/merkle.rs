@@ -72,12 +72,6 @@ impl MerkleTree {
         let mut leaves: LinkedList<Box<MerkleTreeNode>> = Default::default();
 
         for index in 0..transactions.len() {
-            // trace!(
-            //     "Tx[{:?}] = {:?}, hash = {:?}",
-            //     index,
-            //     hex::encode(transactions[index].serialize_for_signature()),
-            //     hex::encode(transactions[index].hash_for_signature.unwrap())
-            // );
             leaves.push_back(Box::new(MerkleTreeNode::new(
                 NodeType::Transaction { index },
                 transactions[index].hash_for_signature,

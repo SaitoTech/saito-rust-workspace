@@ -23,8 +23,8 @@ use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
+    push_lock, Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
 };
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
@@ -782,7 +782,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     for (key, value) in &data {
         if value >= &threshold {
-            let key_base58 = bs58::encode(key).into_string();
+            let key_base58 = key.to_base58();
             file.write_all(format!("{}\t{}\t{}\n", value, key_base58, slip_type).as_bytes())
                 .await
                 .expect("failed writing to issuance file");

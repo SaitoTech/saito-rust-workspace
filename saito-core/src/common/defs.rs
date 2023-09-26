@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use ahash::AHashMap;
+use log::error;
 use tokio::sync::mpsc::Sender;
 
 pub type Currency = u64;
@@ -285,3 +286,73 @@ impl StatVariable {
         )
     }
 }
+
+pub trait PrintForLog<T: TryFrom<Vec<u8>>> {
+    fn to_base58(&self) -> String;
+    fn to_hex(&self) -> String;
+    fn from_hex(str: &str) -> Result<T, String>;
+
+    fn from_base58(str: &str) -> Result<T, String>;
+}
+
+#[macro_export]
+macro_rules! impl_print {
+    ($st:ident) => {
+        impl PrintForLog<$st> for $st {
+            fn to_base58(&self) -> String {
+                bs58::encode(self).into_string()
+            }
+
+            fn to_hex(&self) -> String {
+                hex::encode(self)
+            }
+
+            fn from_hex(str: &str) -> Result<$st, String> {
+                let result = hex::decode(str);
+                if result.is_err() {
+                    return Err(format!(
+                        "couldn't convert string : {:?} to hex type. {:?}",
+                        str,
+                        result.err().unwrap()
+                    ));
+                }
+                let result = result.unwrap();
+                let result = result.try_into();
+                if result.is_err() {
+                    return Err(format!(
+                        "couldn't convert : {:?} with length : {:?} to hex type. {:?}",
+                        str,
+                        str.len(),
+                        result.err().unwrap()
+                    ));
+                }
+                Ok(result.unwrap())
+            }
+            fn from_base58(str: &str) -> Result<$st, String> {
+                let result = bs58::decode(str).into_vec();
+                if result.is_err() {
+                    return Err(format!(
+                        "couldn't convert string : {:?} to base58. {:?}",
+                        str,
+                        result.err().unwrap()
+                    ));
+                }
+                let result = result.unwrap();
+                let result = result.try_into();
+                if result.is_err() {
+                    return Err(format!(
+                        "couldn't convert : {:?} with length : {:?} to base58. {:?}",
+                        str,
+                        str.len(),
+                        result.err().unwrap()
+                    ));
+                }
+                Ok(result.unwrap())
+            }
+        }
+    };
+}
+impl_print!(SaitoHash);
+impl_print!(SaitoPublicKey);
+impl_print!(SaitoSignature);
+impl_print!(SaitoUTXOSetKey);

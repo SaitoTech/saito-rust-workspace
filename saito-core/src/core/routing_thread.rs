@@ -8,8 +8,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, BlockId, PeerIndex, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_PEERS, STAT_BIN_COUNT,
+    push_lock, BlockId, PeerIndex, PrintForLog, SaitoHash, StatVariable, Timestamp,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -155,7 +155,7 @@ impl RoutingThread {
             Message::Transaction(transaction) => {
                 trace!(
                     "received transaction : {:?}",
-                    hex::encode(transaction.signature)
+                    transaction.signature.to_hex()
                 );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
@@ -216,8 +216,8 @@ impl RoutingThread {
         debug!("processing ghost chain request from peer : {:?}. block_id : {:?} block_hash: {:?} fork_id: {:?}",
             peer_index,
             block_id,
-            hex::encode(block_hash),
-            hex::encode(fork_id)
+           block_hash.to_hex(),
+            fork_id.to_hex()
         );
         let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
         let peer_public_key;
@@ -253,7 +253,7 @@ impl RoutingThread {
         let latest_block_id = blockchain.blockring.get_latest_block_id();
         debug!("latest_block_id : {:?}", latest_block_id);
         debug!("last_shared_ancestor : {:?}", last_shared_ancestor);
-        debug!("start : {:?}", hex::encode(start));
+        debug!("start : {:?}", start.to_hex());
         for i in (last_shared_ancestor + 1)..=latest_block_id {
             let hash = blockchain
                 .blockring
@@ -264,7 +264,7 @@ impl RoutingThread {
                     let block = block.unwrap();
                     debug!(
                         "pushing block : {:?} at index : {:?}",
-                        hex::encode(block.hash),
+                        block.hash.to_hex(),
                         i
                     );
                     ghost.gts.push(block.has_golden_ticket);
@@ -278,7 +278,7 @@ impl RoutingThread {
         }
 
         debug!("sending ghost chain to peer : {:?}", peer_index);
-        debug!("ghost : {:?}", ghost);
+        trace!("ghost : {:?}", ghost);
         let buffer = Message::GhostChain(ghost).serialize();
         self.network
             .io_interface
@@ -309,8 +309,8 @@ impl RoutingThread {
         info!(
             "processing incoming blockchain request : {:?}-{:?}-{:?} from peer : {:?}",
             request.latest_block_id,
-            hex::encode(request.latest_block_hash),
-            hex::encode(request.fork_id),
+            request.latest_block_hash.to_hex(),
+            request.fork_id.to_hex(),
             peer_index
         );
         // TODO : can we ignore the functionality if it's a lite node ?
@@ -329,7 +329,7 @@ impl RoutingThread {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
             }
-            debug!("sending block header for : {:?}", hex::encode(block_hash));
+            debug!("sending block header for : {:?}", block_hash.to_hex());
             let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
@@ -346,7 +346,7 @@ impl RoutingThread {
     ) {
         debug!(
             "processing incoming block hash : {:?} from peer : {:?}",
-            hex::encode(block_hash),
+            block_hash.to_hex(),
             peer_index
         );
 
@@ -440,7 +440,7 @@ impl RoutingThread {
             ]
             .concat();
             let block_hash = hash(&buf);
-            debug!("block_hash : {:?}", hex::encode(block_hash));
+            debug!("block_hash : {:?}", block_hash.to_hex());
             if chain.txs[i] {
                 self.network
                     .fetch_missing_block(block_hash, &peer_key)
@@ -542,7 +542,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 peer_index,
                 buffer,
             } => {
-                debug!("block received : {:?}", hex::encode(block_hash));
+                debug!("block received : {:?}", block_hash.to_hex());
 
                 self.send_to_verification_thread(VerifyRequest::Block(buffer, peer_index))
                     .await;

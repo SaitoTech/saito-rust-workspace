@@ -17,7 +17,8 @@ use tracing_subscriber::Layer;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
+    push_lock, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS,
+    STAT_BIN_COUNT,
 };
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
@@ -476,8 +477,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .try_into()
             .unwrap();
 
-    println!("Public Key : {:?}", hex::encode(public_key));
-    println!("Private Key : {:?}", hex::encode(private_key));
+    println!("Public Key : {:?}", public_key.to_base58());
+    println!("Private Key : {:?}", private_key.to_hex());
 
     let config = ConfigHandler::load_configs("configs/config.json".to_string())
         .expect("loading configs failed");

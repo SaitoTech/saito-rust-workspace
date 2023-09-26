@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use ahash::HashMap;
 use log::trace;
 
-use crate::common::defs::{BlockId, PeerIndex, SaitoHash};
+use crate::common::defs::{BlockId, PeerIndex, PrintForLog, SaitoHash};
 
 #[derive(Debug)]
 enum BlockStatus {
@@ -56,7 +56,7 @@ impl BlockchainSyncState {
                     .expect("received picture should not be empty");
                 trace!(
                     "adding new block hash : {:?} for peer : {:?} since nothing found",
-                    hex::encode(hash),
+                    hash.to_hex(),
                     peer_index
                 );
                 let mut deq = VecDeque::new();
@@ -109,7 +109,7 @@ impl BlockchainSyncState {
                     trace!(
                         "block : {:?} - {:?} is above the ceiling : {:?}",
                         block_id,
-                        hex::encode(hash),
+                        hash.to_hex(),
                         self.block_ceiling
                     );
                     break;
@@ -118,7 +118,7 @@ impl BlockchainSyncState {
                     trace!(
                         "block : {:?} : {:?} to be fetched from peer : {:?}",
                         block_id,
-                        hex::encode(*hash),
+                        hash.to_hex(),
                         peer_index
                     );
                     result.entry(*peer_index).or_default().push(*hash);
@@ -126,7 +126,7 @@ impl BlockchainSyncState {
                     trace!(
                         "block {:?} - {:?} status = {:?}",
                         block_id,
-                        hex::encode(hash),
+                        hash.to_hex(),
                         status
                     );
                 }
@@ -146,7 +146,7 @@ impl BlockchainSyncState {
             for (block_hash, status, _) in res {
                 if hash.eq(block_hash) {
                     *status = BlockStatus::Fetching;
-                    trace!("block : {:?} marked as fetching", hex::encode(block_hash));
+                    trace!("block : {:?} marked as fetching", block_hash.to_hex());
                     break;
                 }
             }
@@ -157,7 +157,7 @@ impl BlockchainSyncState {
         if res.is_none() {
             trace!(
                 "block : {:?} for peer : {:?} not found to mark as fetched",
-                hex::encode(hash),
+                hash.to_hex(),
                 peer_index
             );
             return;
@@ -168,7 +168,7 @@ impl BlockchainSyncState {
                 *status = BlockStatus::Fetched;
                 trace!(
                     "block : {:?} marked as fetched from peer : {:?}",
-                    hex::encode(block_hash),
+                    block_hash.to_hex(),
                     peer_index
                 );
                 break;
@@ -186,7 +186,7 @@ impl BlockchainSyncState {
                 }
                 trace!(
                     "removing hash : {:?} - {:?} from peer : {:?}",
-                    hex::encode(hash),
+                    hash.to_hex(),
                     id,
                     peer_index
                 );
@@ -198,7 +198,7 @@ impl BlockchainSyncState {
     pub fn add_entry(&mut self, block_hash: SaitoHash, block_id: BlockId, peer_index: PeerIndex) {
         trace!(
             "add entry : {:?} - {:?} from {:?}",
-            hex::encode(block_hash),
+            block_hash.to_hex(),
             block_id,
             peer_index
         );
@@ -227,7 +227,7 @@ impl BlockchainSyncState {
     pub fn remove_entry(&mut self, block_hash: SaitoHash, peer_index: PeerIndex) {
         trace!(
             "removing entry : {:?} from peer : {:?}",
-            hex::encode(block_hash),
+            block_hash,
             peer_index
         );
         if let Some(hashes) = self.blocks_to_fetch.get_mut(&peer_index) {
