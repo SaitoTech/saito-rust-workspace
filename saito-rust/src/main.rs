@@ -781,7 +781,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     let slip_type = "Normal";
     let mut aggregated_value = 0;
     for (key, value) in &data {
-        if threshold < 25000 {
+        if value < &threshold {
             // PROJECT_PUBLIC_KEY.to_string()
             aggregated_value += value;
         } else {
@@ -789,25 +789,23 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
             file.write_all(format!("{}\t{}\t{}\n", value, key_base58, slip_type).as_bytes())
                 .await
                 .expect("failed writing to issuance file");
-
-            file.flush()
-                .await
-                .expect("failed flushing issuance file data");
         };
     }
 
     // add remaining value
-    file.write_all(
-        format!(
-            "{}\t{}\t{}\n",
-            aggregated_value,
-            PROJECT_PUBLIC_KEY.to_string(),
-            slip_type
+    if aggregated_value > 0 {
+        file.write_all(
+            format!(
+                "{}\t{}\t{}\n",
+                aggregated_value,
+                PROJECT_PUBLIC_KEY.to_string(),
+                slip_type
+            )
+            .as_bytes(),
         )
-        .as_bytes(),
-    )
-    .await
-    .expect("failed writing to issuance file");
+        .await
+        .expect("failed writing to issuance file");
+    }
 
     file.flush()
         .await
