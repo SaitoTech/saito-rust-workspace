@@ -7,7 +7,7 @@ use saito_core::core::data::transaction::Transaction;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use crate::saitowasm::string_to_key;
+use crate::saitowasm::{string_to_hex, string_to_key};
 use crate::wasm_consensus_values::{WasmBlockPayout, WasmConsensusValues};
 use crate::wasm_transaction::WasmTransaction;
 
@@ -215,7 +215,7 @@ impl WasmBlock {
     }
     #[wasm_bindgen(setter = previous_block_hash)]
     pub fn set_previous_block_hash(&mut self, hash: JsString) {
-        self.block.previous_block_hash = string_to_key(hash).unwrap();
+        self.block.previous_block_hash = string_to_hex(hash).unwrap();
     }
     #[wasm_bindgen(setter = creator)]
     pub fn set_creator(&mut self, key: JsString) {

@@ -5,7 +5,6 @@ import Factory from "./lib/factory";
 import Peer from "./lib/peer";
 import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
-import { fromBase58, toBase58 } from "./lib/util";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
 
@@ -231,7 +230,7 @@ export default class Saito {
   }
 
   public verifySignature(buffer: Uint8Array, signature: string, publicKey: string): boolean {
-    return Saito.getLibInstance().verify_signature(buffer, signature, fromBase58(publicKey));
+    return Saito.getLibInstance().verify_signature(buffer, signature, publicKey);
   }
 
   public async createTransaction<T extends Transaction>(
@@ -241,7 +240,7 @@ export default class Saito {
     force_merge = false
   ): Promise<T> {
     let wasmTx = await Saito.getLibInstance().create_transaction(
-      fromBase58(publickey),
+      publickey,
       amount,
       fee,
       force_merge
@@ -272,7 +271,7 @@ export default class Saito {
 
   public generatePublicKey(privateKey: string): string {
     let key = Saito.getLibInstance().generate_public_key(privateKey);
-    return toBase58(key);
+    return key;
   }
 
   public async propagateTransaction(tx: Transaction) {
