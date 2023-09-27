@@ -1,5 +1,4 @@
 use std::ops::Deref;
-
 use std::sync::Arc;
 
 use js_sys::JsString;
@@ -14,7 +13,7 @@ use saito_core::core::data::slip::Slip;
 use saito_core::core::data::storage::Storage;
 use saito_core::core::data::wallet::{Wallet, WalletSlip};
 
-use crate::saitowasm::string_to_key;
+use crate::saitowasm::string_to_hex;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_transaction::WasmTransaction;
 
@@ -157,7 +156,7 @@ impl WasmWalletSlip {
         key.into()
     }
     pub fn set_utxokey(&mut self, key: js_sys::JsString) {
-        if let Ok(key) = string_to_key(key) {
+        if let Ok(key) = string_to_hex(key) {
             self.slip.utxokey = key;
         } else {
             warn!("failed parsing utxo key");
