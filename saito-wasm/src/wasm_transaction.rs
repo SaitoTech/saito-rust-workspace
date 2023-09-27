@@ -7,7 +7,7 @@ use wasm_bindgen::JsValue;
 use saito_core::common::defs::{Currency, PrintForLog, SaitoPublicKey, Timestamp};
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 
-use crate::saitowasm::{string_to_key, SAITO};
+use crate::saitowasm::{string_to_hex, string_to_key, SAITO};
 use crate::wasm_slip::WasmSlip;
 
 #[wasm_bindgen]
@@ -30,7 +30,7 @@ impl WasmTransaction {
     }
     #[wasm_bindgen(setter = signature)]
     pub fn set_signature(&mut self, signature: JsString) {
-        self.tx.signature = string_to_key(signature).unwrap();
+        self.tx.signature = string_to_hex(signature).unwrap();
     }
 
     pub fn add_to_slip(&mut self, slip: WasmSlip) {

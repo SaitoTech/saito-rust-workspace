@@ -2,7 +2,6 @@ import type { WasmBlock } from "saito-wasm/pkg/node/index";
 import Transaction from "./transaction";
 import Saito from "../saito";
 import WasmWrapper from "./wasm_wrapper";
-import { fromBase58 } from "./util";
 
 export enum BlockType {
   Ghost = 0,
@@ -102,13 +101,11 @@ export default class Block extends WasmWrapper<WasmBlock> {
   }
 
   public hasKeylistTxs(keylist: Array<string>): boolean {
-    let keys = keylist.map((key) => fromBase58(key));
-    return this.instance.has_keylist_txs(keys);
+    return this.instance.has_keylist_txs(keylist);
   }
 
   public generateLiteBlock(keylist: Array<string>): Block {
-    let keys = keylist.map((key) => fromBase58(key));
-    let block = this.instance.generate_lite_block(keys);
+    let block = this.instance.generate_lite_block(keylist);
     console.assert(block.hash === this.hash, `this block's hash : ${this.hash} does not match with generated lite block's hash : ${block.hash}`);
 
     return Saito.getInstance().factory.createBlock(block);

@@ -276,7 +276,7 @@ pub async fn initialize(
     }
 
     let mut saito = SAITO.lock().await;
-    let private_key: SaitoPrivateKey = string_to_key(private_key).or(Err(JsValue::from(
+    let private_key: SaitoPrivateKey = string_to_hex(private_key).or(Err(JsValue::from(
         "Failed parsing private key string to key",
     )))?;
     {
@@ -302,7 +302,7 @@ pub async fn create_transaction(
     fee: u64,
     force_merge: bool,
 ) -> Result<WasmTransaction, JsValue> {
-    debug!("create_transaction");
+    debug!("create_transaction : {:?}", public_key.to_string());
     let saito = SAITO.lock().await;
     let mut wallet = saito.context.wallet.write().await;
     let key = string_to_key(public_key).or(Err(JsValue::from(
@@ -335,7 +335,7 @@ pub async fn get_latest_block_hash() -> JsString {
 #[wasm_bindgen]
 pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
     // debug!("get_block");
-    let block_hash = string_to_key(block_hash).or(Err(JsValue::from(
+    let block_hash = string_to_hex(block_hash).or(Err(JsValue::from(
         "Failed parsing block hash string to key",
     )))?;
 
@@ -499,7 +499,7 @@ pub fn hash(buffer: Uint8Array) -> JsString {
 #[wasm_bindgen]
 pub fn sign_buffer(buffer: Uint8Array, private_key: JsString) -> Result<JsString, JsValue> {
     let buffer = buffer.to_vec();
-    let key = string_to_key(private_key).or(Err(JsValue::from(
+    let key = string_to_hex(private_key).or(Err(JsValue::from(
         "Failed parsing private key string to key",
     )))?;
     let result = sign(&buffer, &key);
@@ -510,7 +510,7 @@ pub fn sign_buffer(buffer: Uint8Array, private_key: JsString) -> Result<JsString
 
 #[wasm_bindgen]
 pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsString) -> bool {
-    let sig = string_to_key(signature);
+    let sig = string_to_hex(signature);
     if sig.is_err() {
         error!("signature is invalid");
         return false;
@@ -630,7 +630,7 @@ pub fn generate_private_key() -> JsString {
 #[wasm_bindgen]
 pub fn generate_public_key(private_key: JsString) -> Result<JsString, JsValue> {
     info!("generate_public_key");
-    let private_key: SaitoPrivateKey = string_to_key(private_key).or(Err(JsValue::from(
+    let private_key: SaitoPrivateKey = string_to_hex(private_key).or(Err(JsValue::from(
         "Failed parsing private key string to key",
     )))?;
     let (public_key, _) = generate_keypair_from_private_key(&private_key);
@@ -788,7 +788,7 @@ pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
     (public_key.serialize(), secret_bytes)
 }
 
-pub fn string_to_key<T: TryFrom<Vec<u8>>>(key: JsString) -> Result<T, std::io::Error>
+pub fn string_to_key<T: TryFrom<Vec<u8>> + PrintForLog<T>>(key: JsString) -> Result<T, Error>
 where
     <T as TryFrom<Vec<u8>>>::Error: std::fmt::Debug,
 {
@@ -804,7 +804,7 @@ where
         return Err(Error::from(ErrorKind::InvalidInput));
     }
 
-    let key = hex::decode(str.as_str());
+    let key = T::from_base58(str.as_str());
     if key.is_err() {
         error!(
             "failed parsing key : {:?}. str : {:?}",
@@ -814,17 +814,35 @@ where
         return Err(Error::from(ErrorKind::InvalidInput));
     }
     let key = key.unwrap();
-    let len = key.len();
-    let key2 = key.try_into();
-    if key2.is_err() {
+    Ok(key)
+}
+
+pub fn string_to_hex<T: TryFrom<Vec<u8>> + PrintForLog<T>>(key: JsString) -> Result<T, Error>
+where
+    <T as TryFrom<Vec<u8>>>::Error: std::fmt::Debug,
+{
+    let str = key.as_string();
+    if str.is_none() {
+        error!("cannot convert wasm string to rust string");
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+
+    let str = str.unwrap();
+    if str.is_empty() {
+        debug!("cannot convert empty string to hex");
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+
+    let key = T::from_hex(str.as_str());
+    if key.is_err() {
         error!(
-            "failed parsing key : {:?}. length : {:?}",
-            key2.err().unwrap(),
-            len
+            "failed parsing hex : {:?}. str : {:?}",
+            key.err().unwrap(),
+            str
         );
         return Err(Error::from(ErrorKind::InvalidInput));
     }
-    let key = key2.unwrap();
+    let key = key.unwrap();
     Ok(key)
 }
 
