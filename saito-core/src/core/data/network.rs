@@ -5,7 +5,7 @@ use log::{debug, error, info, trace};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, PeerIndex, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    push_lock, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
     LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
     PEER_RECONNECT_WAIT_PERIOD,
 };
@@ -57,7 +57,7 @@ impl Network {
         block: &Block,
         configs: &(dyn Configuration + Send + Sync),
     ) {
-        debug!("propagating block : {:?}", hex::encode(block.hash));
+        debug!("propagating block : {:?}", block.hash.to_hex());
         if configs.is_browser() {
             trace!("not propagating block since we are in browser");
             return;
@@ -85,7 +85,7 @@ impl Network {
             }
         }
 
-        debug!("sending block : {:?} to peers", hex::encode(block.hash));
+        debug!("sending block : {:?} to peers", block.hash.to_hex());
         let message = Message::BlockHeaderHash(block.hash, block.id);
         self.io_interface
             .send_message_to_all(message.serialize(), excluded_peers)
@@ -101,7 +101,7 @@ impl Network {
 
         trace!(
             "propagating transaction : {:?} peers : {:?}",
-            hex::encode(transaction.signature),
+            transaction.signature.to_hex(),
             peers.index_to_peers.len()
         );
 
@@ -148,8 +148,8 @@ impl Network {
     ) -> Result<(), Error> {
         debug!(
             "fetch missing block : block : {:?} from : {:?}",
-            hex::encode(block_hash),
-            hex::encode(public_key)
+            block_hash.to_hex(),
+            public_key.to_base58()
         );
         let peer_index;
         let url;
@@ -167,8 +167,8 @@ impl Network {
                 debug!("peer count = {:?}", peers.address_to_peers.len());
                 error!(
                     "peer : {:?} not found to fetch missing block : {:?}",
-                    hex::encode(public_key),
-                    hex::encode(block_hash)
+                    public_key.to_base58(),
+                    block_hash.to_hex()
                 );
                 return Err(Error::from(ErrorKind::NotFound));
             }
@@ -176,7 +176,7 @@ impl Network {
             if peer.block_fetch_url.is_empty() {
                 debug!(
                     "won't fetch block : {:?} from peer : {:?} since no url found",
-                    hex::encode(block_hash),
+                    block_hash.to_hex(),
                     peer.index
                 );
                 return Err(Error::from(ErrorKind::AddrNotAvailable));
@@ -231,7 +231,7 @@ impl Network {
                     .push((peer.static_peer_config.as_ref().unwrap().clone(), 0));
             } else if peer.public_key.is_some() {
                 info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
-                peer.index, hex::encode(peer.public_key.as_ref().unwrap()));
+                peer.index, peer.public_key.as_ref().unwrap().to_base58());
             }
 
             if public_key.is_some() {
@@ -334,7 +334,7 @@ impl Network {
         debug!(
             "peer : {:?} handshake successful for peer : {:?}",
             peer.index,
-            hex::encode(peer.public_key.as_ref().unwrap())
+            peer.public_key.as_ref().unwrap().to_base58()
         );
         self.io_interface
             .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
@@ -371,8 +371,8 @@ impl Network {
                     debug!(
                         "blockchain request 1 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
                         blockchain.last_block_id,
-                        hex::encode(blockchain.last_block_hash),
-                        hex::encode(fork_id)
+                        blockchain.last_block_hash.to_hex(),
+                        fork_id.to_hex()
                     );
                     request = BlockchainRequest {
                         latest_block_id: blockchain.last_block_id,
@@ -383,8 +383,8 @@ impl Network {
                     debug!(
                         "blockchain request 2 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
                         blockchain.get_latest_block_id(),
-                        hex::encode(blockchain.get_latest_block_hash()),
-                        hex::encode(fork_id)
+                        blockchain.get_latest_block_hash().to_hex(),
+                        fork_id.to_hex()
                     );
                     request = BlockchainRequest {
                         latest_block_id: blockchain.get_latest_block_id(),
@@ -457,13 +457,17 @@ impl Network {
             if peer.block_fetch_url.is_empty() {
                 debug!(
                     "won't fetch block : {:?} from peer : {:?} since no url found",
-                    hex::encode(block_hash),
+                    block_hash.to_hex(),
                     peer_index
                 );
                 return None;
             }
             url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
         }
+        debug!(
+            "fetching block for incoming hash : {:?}",
+            block_hash.to_hex()
+        );
         self.io_interface
             .fetch_block_from_peer(block_hash, peer_index, url)
             .await

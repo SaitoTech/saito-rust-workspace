@@ -3,7 +3,7 @@ use std::io::{BufRead, BufReader};
 
 use log::{debug, info};
 
-use crate::common::defs::{BlockId, SaitoHash, SaitoPublicKey, Timestamp};
+use crate::common::defs::{BlockId, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp};
 use crate::core::data::slip::{Slip, SlipType};
 
 pub type BalanceFileRowType = (String, String, String, String);
@@ -47,14 +47,14 @@ impl BalanceSnapshot {
             + "-"
             + self.latest_block_id.to_string().as_str()
             + "-"
-            + hex::encode(self.latest_block_hash).as_str()
+            + self.latest_block_hash.to_hex().as_str()
             + ".snap"
     }
     pub fn get_rows(&self) -> Vec<String> {
         self.slips
             .iter()
             .map(|slip| {
-                let key = bs58::encode(slip.public_key).into_string();
+                let key = slip.public_key.to_base58();
                 let entry = format!(
                     "{} {:?} {:?} {:?} {:?}",
                     key, slip.block_id, slip.tx_ordinal, slip.slip_index, slip.amount
@@ -89,9 +89,7 @@ impl BalanceSnapshot {
         let block_id: u64 = block_id
             .parse()
             .map_err(|err| format!("failed parsing block id : {:?}. {:?}", block_id, err))?;
-        let block_hash: SaitoHash = hex::decode(block_hash)
-            .map_err(|err| format!("failed parsing block hash : {:?}. {:?}", block_hash, err))?
-            .try_into()
+        let block_hash = SaitoHash::from_hex(block_hash)
             .map_err(|err| format!("failed parsing block hash : {:?}. {:?}", block_hash, err))?;
 
         let mut snapshot = BalanceSnapshot {
@@ -119,10 +117,7 @@ impl BalanceSnapshot {
                 .ok_or("cannot find slip id in row".to_string())?;
             let amount = cols.get(4).ok_or("cannot find amount in row".to_string())?;
 
-            let key: SaitoPublicKey = bs58::decode(key)
-                .into_vec()
-                .or(Err(format!("failed parsing key : {:?}", key)))?
-                .try_into()
+            let key: SaitoPublicKey = SaitoPublicKey::from_base58(key)
                 .or(Err(format!("failed parsing key : {:?}", key)))?;
             let block_id = block_id
                 .parse()
@@ -203,6 +198,7 @@ impl TryFrom<String> for BalanceSnapshot {
 
 #[cfg(test)]
 mod tests {
+    use crate::common::defs::PrintForLog;
     use log::info;
 
     use crate::core::data::slip::{Slip, SlipType};
@@ -252,7 +248,7 @@ mod tests {
             + "-"
             + snapshot.latest_block_id.to_string().as_str()
             + "-"
-            + hex::encode(snapshot.latest_block_hash).as_str()
+            + snapshot.latest_block_hash.to_hex().as_str()
             + ".snap";
         assert_eq!(file_name, expected_file_name);
 
@@ -261,7 +257,7 @@ mod tests {
             let slip = snapshot.slips.get(index);
             assert!(slip.is_some());
             let slip = slip.unwrap();
-            let key = bs58::encode(slip.public_key).into_string();
+            let key = slip.public_key.to_base58();
             info!("key = {:?}", key);
             let expected_str = format!(
                 "{} {:?} {:?} {:?} {:?}",

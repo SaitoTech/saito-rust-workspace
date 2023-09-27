@@ -10,7 +10,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    push_lock, PrintForLog, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET,
 };
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
@@ -55,7 +56,7 @@ impl VerificationThread {
             if !transaction.validate(&blockchain.utxoset) {
                 debug!(
                     "transaction : {:?} not valid",
-                    hex::encode(transaction.signature)
+                    transaction.signature.to_hex()
                 );
                 self.processed_txs.increment();
                 return;
@@ -89,7 +90,7 @@ impl VerificationThread {
                     if !transaction.validate(&blockchain.utxoset) {
                         debug!(
                             "transaction : {:?} not valid",
-                            hex::encode(transaction.signature)
+                            transaction.signature.to_hex()
                         );
 
                         return None;

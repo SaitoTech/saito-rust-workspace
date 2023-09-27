@@ -5,7 +5,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
+use crate::common::defs::{Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
 /// The size of a serialized slip in bytes.
 pub const SLIP_SIZE: usize = 59;
@@ -128,7 +128,7 @@ impl Slip {
         if self.amount > 0 {
             debug!(
                 "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?}",
-                hex::encode(self.utxoset_key),
+                self.utxoset_key.to_base58(),
                 spendable,
                 self.block_id,
                 self.tx_ordinal,
@@ -202,7 +202,7 @@ impl Slip {
                         debug!(
                             "in utxoset but invalid: value is {} at {:?}, block : {:?} tx : {:?} index : {:?}",
                             *value,
-                            hex::encode(self.utxoset_key),
+                            self.utxoset_key.to_hex(),
                             self.block_id,
                             self.tx_ordinal,
                             self.slip_index
@@ -214,7 +214,7 @@ impl Slip {
                     // debug!() since method is used to check when cleaning up mempool
                     debug!(
                         "not in utxoset so invalid. value is returned false: {:?} w/ type {:?} block : {:?} tx: {:?} index : {:?} and amount {:?}",
-                        hex::encode(self.utxoset_key),
+                        self.utxoset_key.to_hex(),
                         self.slip_type,
                         self.block_id,
                         self.tx_ordinal,

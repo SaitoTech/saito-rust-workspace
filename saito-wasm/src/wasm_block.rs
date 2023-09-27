@@ -1,7 +1,7 @@
 use js_sys::{Array, JsString, Uint8Array};
 use log::error;
 use num_traits::FromPrimitive;
-use saito_core::common::defs::{SaitoPublicKey, Timestamp};
+use saito_core::common::defs::{PrintForLog, SaitoPublicKey, Timestamp};
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::transaction::Transaction;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -170,7 +170,7 @@ impl WasmBlock {
     pub fn rebroadcast_hash(&self) -> JsString {
         // Convert the byte array to a JsValue
         // JsValue::from_serde(&self.block.cv.rebroadcast_hash).unwrap()
-        hex::encode(self.block.cv.rebroadcast_hash).into()
+        self.block.cv.rebroadcast_hash.to_hex().into()
     }
 
     #[wasm_bindgen(getter = nolan_falling_off_chain)]
@@ -211,7 +211,7 @@ impl WasmBlock {
     }
     #[wasm_bindgen(getter = previous_block_hash)]
     pub fn get_previous_block_hash(&self) -> JsString {
-        hex::encode(self.block.previous_block_hash).into()
+        self.block.previous_block_hash.to_hex().into()
     }
     #[wasm_bindgen(setter = previous_block_hash)]
     pub fn set_previous_block_hash(&mut self, hash: JsString) {
@@ -223,7 +223,7 @@ impl WasmBlock {
     }
     #[wasm_bindgen(getter = creator)]
     pub fn get_creator(&self) -> JsString {
-        hex::encode(self.block.creator).into()
+        self.block.creator.to_base58().into()
     }
     #[wasm_bindgen(getter = type)]
     pub fn get_type(&self) -> u8 {
@@ -235,7 +235,7 @@ impl WasmBlock {
     }
     #[wasm_bindgen(getter = hash)]
     pub fn get_hash(&self) -> JsString {
-        hex::encode(self.block.hash).into()
+        self.block.hash.to_hex().into()
     }
 
     #[wasm_bindgen(getter = in_longest_chain)]

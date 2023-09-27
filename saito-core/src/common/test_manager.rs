@@ -24,7 +24,6 @@ pub mod test {
     //
     //
     use std::borrow::BorrowMut;
-
     use std::error::Error;
     use std::fmt::{Debug, Formatter};
     use std::ops::Deref;
@@ -37,9 +36,9 @@ pub mod test {
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
-        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
-        UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
-        PROJECT_PUBLIC_KEY,
+        push_lock, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey,
+        SaitoSignature, Timestamp, UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, PROJECT_PUBLIC_KEY,
     };
     use crate::common::keep_time::KeepTime;
     use crate::common::test_io_handler::test::TestIOHandler;
@@ -66,6 +65,7 @@ pub mod test {
     }
 
     pub const TEST_ISSUANCE_FILEPATH: &'static str = "../saito-rust/data/issuance/test/issuance";
+
     struct TestTimeKeeper {}
 
     impl KeepTime for TestTimeKeeper {
@@ -140,13 +140,10 @@ pub mod test {
                     let address_key = if amount < 25000 {
                         // Default public key when amount is less than 25000
 
-                        bs58::decode(PROJECT_PUBLIC_KEY)
-                            .into_vec()
+                        SaitoPublicKey::from_base58(PROJECT_PUBLIC_KEY)
                             .expect("Failed to decode Base58")
                     } else {
-                        bs58::decode(parts[1])
-                            .into_vec()
-                            .expect("Failed to decode Base58")
+                        SaitoPublicKey::from_base58(parts[1]).expect("Failed to decode Base58")
                     };
 
                     if address_key.len() == 33 {
@@ -248,7 +245,7 @@ pub mod test {
                 info!(
                     "WINDING ID HASH - {} {:?} with txs : {:?} block_type : {:?}",
                     block.id,
-                    hex::encode(block_hash),
+                    block_hash.to_hex(),
                     block.transactions.len(),
                     block.block_type
                 );
@@ -299,7 +296,7 @@ pub mod test {
                         // but rather set to an unspendable value. These entries will be
                         // removed on purge, although we can look at deleting them on unwind
                         // as well if that is reasonably efficient.
-                        assert!(!*value, "utxoset value should be false for key : {:?}. generated utxo size : {:?}. current utxo size : {:?}", hex::encode(key), utxoset.len(), blockchain.utxoset.len());
+                        assert!(!*value, "utxoset value should be false for key : {:?}. generated utxo size : {:?}. current utxo size : {:?}", key.to_hex(), utxoset.len(), blockchain.utxoset.len());
                         // if *value == true {
                         //     //info!("Value does not exist in actual blockchain!");
                         //     //info!("comparing {:?} with on-chain value {}", key, value);
@@ -639,12 +636,9 @@ pub mod test {
                 let (wallet, _wallet_) = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
                 private_key = wallet.private_key;
                 my_public_key = wallet.public_key;
-                // dbg!(hex::encode(my_public_key));
             }
 
-            //
             // create first block
-            //
             let timestamp = create_timestamp();
             let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
@@ -873,7 +867,6 @@ pub mod test {
 
         pub async fn transfer_value_to_public_key(
             &mut self,
-
             to_public_key: SaitoPublicKey,
             amount: u64,
             timestamp_addition: u64,
