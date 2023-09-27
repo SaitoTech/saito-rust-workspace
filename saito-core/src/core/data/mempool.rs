@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, Currency, SaitoHash, SaitoSignature, Timestamp, LOCK_ORDER_WALLET,
+    push_lock, Currency, PrintForLog, SaitoHash, SaitoSignature, Timestamp, LOCK_ORDER_WALLET,
 };
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
@@ -61,7 +61,7 @@ impl Mempool {
     }
 
     pub fn add_block(&mut self, block: Block) {
-        debug!("mempool add block : {:?}", hex::encode(block.hash));
+        debug!("mempool add block : {:?}", block.hash.to_hex());
         let hash_to_insert = block.hash;
         if !iterate!(self.blocks_queue, 100).any(|block| block.hash == hash_to_insert) {
             self.blocks_queue.push_back(block);
@@ -73,15 +73,15 @@ impl Mempool {
         let gt = GoldenTicket::deserialize_from_net(&golden_ticket.data);
         debug!(
             "adding golden ticket : {:?} target : {:?} public_key : {:?}",
-            hex::encode(hash(&golden_ticket.serialize_for_net())),
-            hex::encode(gt.target),
-            hex::encode(gt.public_key)
+            hash(&golden_ticket.serialize_for_net()).to_hex(),
+            gt.target.to_hex(),
+            gt.public_key.to_base58()
         );
         // TODO : should we replace others' GT with our GT if targets are similar ?
         if self.golden_tickets.contains_key(&gt.target) {
             debug!(
                 "similar golden ticket already exists : {:?}",
-                hex::encode(gt.target)
+                gt.target.to_hex()
             );
             return;
         }
@@ -97,7 +97,7 @@ impl Mempool {
     ) {
         trace!(
             "add transaction if validates : {:?}",
-            hex::encode(transaction.signature)
+            transaction.signature.to_hex()
         );
         let public_key;
         {
@@ -110,13 +110,16 @@ impl Mempool {
         if transaction.validate(&blockchain.utxoset) {
             self.add_transaction(transaction).await;
         } else {
-            debug!("transaction not valid : {:?}", transaction.signature);
+            debug!(
+                "transaction not valid : {:?}",
+                transaction.signature.to_hex()
+            );
         }
     }
     pub async fn add_transaction(&mut self, transaction: Transaction) {
         trace!(
             "add_transaction {:?} : type = {:?}",
-            hex::encode(transaction.signature),
+            transaction.signature.to_hex(),
             transaction.transaction_type
         );
 
@@ -134,7 +137,7 @@ impl Mempool {
 
         if !self.transactions.contains_key(&transaction.signature) {
             self.routing_work_in_mempool += transaction.total_work_for_me;
-            debug!(
+            trace!(
                 "routing work available in mempool : {:?} after adding work : {:?} from tx with fees : {:?}",
                 self.routing_work_in_mempool, transaction.total_work_for_me, transaction.total_fees
             );
@@ -293,10 +296,7 @@ impl Mempool {
     }
 
     pub fn delete_block(&mut self, block_hash: &SaitoHash) {
-        debug!(
-            "deleting block from mempool : {:?}",
-            hex::encode(block_hash)
-        );
+        debug!("deleting block from mempool : {:?}", block_hash.to_hex());
 
         self.golden_tickets.remove(block_hash);
         // self.blocks_queue.retain(|block| !block.hash.eq(block_hash));

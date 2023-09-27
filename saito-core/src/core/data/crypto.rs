@@ -7,7 +7,9 @@ use rand::{thread_rng, Rng};
 use secp256k1::ecdsa;
 pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
 
-use crate::common::defs::{SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
+use crate::common::defs::{
+    PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+};
 
 type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
@@ -42,7 +44,7 @@ pub const PARALLEL_HASH_BYTE_THRESHOLD: usize = 128_000;
 pub fn generate_keys() -> (SaitoPublicKey, SaitoPrivateKey) {
     let (mut secret_key, mut public_key) =
         SECP256K1.generate_keypair(&mut secp256k1::rand::thread_rng());
-    while bs58::encode(public_key.serialize()).into_string().len() != 44 {
+    while public_key.serialize().to_base58().len() != 44 {
         // sometimes secp256k1 address is too big to store in 44 base-58 digits
         let keypair_tuple = SECP256K1.generate_keypair(&mut secp256k1::rand::thread_rng());
         secret_key = keypair_tuple.0;
@@ -140,7 +142,7 @@ pub fn verify_signature(
 #[cfg(test)]
 mod tests {
 
-    use hex::FromHex;
+    use crate::common::defs::PrintForLog;
 
     use super::*;
 
@@ -173,7 +175,7 @@ mod tests {
 
         let hex = hash(msg.as_slice());
 
-        let hex_str = hex::encode(hex);
+        let hex_str = hex.to_hex();
         assert_eq!(
             hex_str,
             "f8b1f22222bdbd2e0bce06707a51f5fffa0753b11483c330e3bfddaf5bacabd6"
@@ -188,7 +190,7 @@ mod tests {
 
         let signature = sign(&msg, &private_key);
         assert_eq!(signature.len(), 64);
-        let hex_str = hex::encode(signature);
+        let hex_str = signature.to_hex();
         assert_eq!(hex_str, "11c0e19856726c42c8ac3ec8e469057f5f8a882f7206377525db00899835b03f6ec3010d19534a5703dd9b1004b4f0e31d19582cdd5aec794541d0d0f339db7c");
 
         let result = verify(&msg, &signature, &public);

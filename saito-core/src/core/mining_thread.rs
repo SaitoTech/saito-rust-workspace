@@ -8,7 +8,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+    push_lock, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_WALLET,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -51,7 +52,7 @@ impl MiningThread {
                 return;
             }
             self.public_key = wallet.public_key;
-            info!("node public key = {:?}", hex::encode(self.public_key));
+            info!("node public key = {:?}", self.public_key.to_base58());
         }
 
         let random_bytes = hash(&generate_random_bytes(32));
@@ -61,10 +62,10 @@ impl MiningThread {
         if gt.validate(self.difficulty) {
             info!(
                 "golden ticket found. sending to mempool. previous block : {:?} random : {:?} key : {:?} solution : {:?} for difficulty : {:?}",
-                hex::encode(gt.target),
-                hex::encode(gt.random),
-                hex::encode(gt.public_key),
-                hex::encode(hash(&gt.serialize_for_net())),
+                gt.target.to_hex(),
+                gt.random.to_hex(),
+                gt.public_key.to_base58(),
+                hash(&gt.serialize_for_net()).to_hex(),
                 self.difficulty
             );
             self.miner_active = false;
@@ -103,7 +104,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
             MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
                 info!(
                     "Activating miner with hash : {:?} and difficulty : {:?}",
-                    hex::encode(hash),
+                    hash.to_hex(),
                     difficulty
                 );
                 self.difficulty = difficulty;
@@ -121,7 +122,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         info!("miner is enabled");
         let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
         self.public_key = wallet.public_key;
-        info!("node public key = {:?}", hex::encode(self.public_key));
+        info!("node public key = {:?}", self.public_key.to_base58());
     }
 
     async fn on_stat_interval(&mut self, _current_time: Timestamp) {
@@ -133,7 +134,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
                            self.mined_golden_tickets,
                            self.difficulty,
                            self.miner_active,
-                           hex::encode(self.target));
+                           self.target.to_hex());
         self.stat_sender.send(stat).await.unwrap();
     }
 }

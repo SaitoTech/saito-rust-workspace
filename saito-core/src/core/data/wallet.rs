@@ -2,7 +2,8 @@ use ahash::{AHashMap, AHashSet};
 use log::{debug, info, trace, warn};
 
 use crate::common::defs::{
-    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
+    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    SaitoUTXOSetKey,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data::block::Block;
@@ -203,7 +204,7 @@ impl Wallet {
         self.available_balance += slip.amount;
         info!(
             "adding slip : {:?} with value : {:?} to wallet",
-            hex::encode(wallet_slip.utxokey),
+            wallet_slip.utxokey.to_hex(),
             wallet_slip.amount
         );
         self.slips.insert(wallet_slip.utxokey, wallet_slip);
@@ -218,7 +219,7 @@ impl Wallet {
     pub fn delete_slip(&mut self, slip: &Slip, network: Option<&Network>) {
         info!(
             "deleting slip : {:?} with value : {:?} from wallet",
-            hex::encode(slip.utxoset_key),
+            slip.utxoset_key.to_hex(),
             slip.amount
         );
         let result = self.slips.remove(&slip.utxoset_key);
@@ -279,7 +280,7 @@ impl Wallet {
 
             info!(
                 "marking slip : {:?} with value : {:?} as spent",
-                hex::encode(slip.utxokey),
+                slip.utxokey.to_hex(),
                 slip.amount
             );
             keys_to_remove.push(slip.utxokey);
@@ -395,13 +396,13 @@ impl Wallet {
                 self.unspent_slips.insert(slip.utxoset_key);
                 self.available_balance += slip.amount;
                 info!("slip key : {:?} with value : {:?} added to wallet from snapshot for address : {:?}",
-                    hex::encode(slip.utxoset_key),
+                    slip.utxoset_key.to_hex(),
                     slip.amount,
-                    bs58::encode(slip.public_key).into_string());
+                    slip.public_key.to_base58());
             } else {
                 info!(
                     "slip with utxo key : {:?} was already available",
-                    hex::encode(slip.utxoset_key)
+                    slip.utxoset_key.to_hex()
                 );
             }
         });

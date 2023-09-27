@@ -1,5 +1,5 @@
 use js_sys::{Array, JsString};
-use saito_core::common::defs::Currency;
+use saito_core::common::defs::{Currency, PrintForLog};
 use saito_core::core::data::block::{BlockPayout, ConsensusValues};
 use saito_core::core::data::transaction::Transaction;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -125,7 +125,7 @@ impl WasmConsensusValues {
     pub fn rebroadcast_hash(&self) -> JsString {
         // Convert the byte array to a JsValue
         // JsValue::from_serde(&self.cv.rebroadcast_hash).unwrap()
-        hex::encode(self.cv.rebroadcast_hash).into()
+        self.cv.rebroadcast_hash.to_hex().into()
     }
 
     #[wasm_bindgen(getter = nolan_falling_off_chain)]
@@ -171,12 +171,12 @@ pub struct WasmBlockPayout {
 impl WasmBlockPayout {
     #[wasm_bindgen(getter = miner)]
     pub fn miner(&self) -> JsString {
-        hex::encode(&self.block_payout.miner).into()
+        self.block_payout.miner.to_base58().into()
     }
 
     #[wasm_bindgen(getter = router)]
     pub fn router(&self) -> JsString {
-        hex::encode(&self.block_payout.router).into()
+        self.block_payout.router.to_base58().into()
     }
 
     #[wasm_bindgen(getter = miner_payout)]
@@ -196,7 +196,7 @@ impl WasmBlockPayout {
 
     #[wasm_bindgen(getter = random_number)]
     pub fn random_number(&self) -> JsString {
-        hex::encode(&self.block_payout.random_number).into()
+        self.block_payout.random_number.to_hex().into()
     }
 }
 
