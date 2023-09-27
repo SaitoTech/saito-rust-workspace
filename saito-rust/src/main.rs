@@ -24,7 +24,7 @@ use tracing_subscriber::Layer;
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
     push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
+    LOCK_ORDER_CONFIGS, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
 use saito_core::common::keep_time::KeepTime;
 use saito_core::common::process_event::ProcessEvent;
@@ -779,20 +779,38 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     let mut file = file.unwrap();
 
     let slip_type = "Normal";
-
+    let mut aggregated_value = 0;
     for (key, value) in &data {
-        if value >= &threshold {
+        if value < &threshold {
+            // PROJECT_PUBLIC_KEY.to_string()
+            aggregated_value += value;
+        } else {
             let key_base58 = bs58::encode(key).into_string();
             file.write_all(format!("{}\t{}\t{}\n", value, key_base58, slip_type).as_bytes())
                 .await
                 .expect("failed writing to issuance file");
-        }
+        };
     }
+
+    // add remaining value
+    if aggregated_value > 0 {
+        file.write_all(
+            format!(
+                "{}\t{}\t{}\n",
+                aggregated_value,
+                PROJECT_PUBLIC_KEY.to_string(),
+                slip_type
+            )
+            .as_bytes(),
+        )
+        .await
+        .expect("failed writing to issuance file");
+    }
+
     file.flush()
         .await
         .expect("failed flushing issuance file data");
 }
-
 #[tokio::main(flavor = "multi_thread")]
 // #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
