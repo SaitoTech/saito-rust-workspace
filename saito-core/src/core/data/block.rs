@@ -1951,14 +1951,10 @@ impl Block {
 #[cfg(test)]
 mod tests {
     use ahash::AHashMap;
-    use futures::executor::block_on;
     use futures::future::join_all;
     use hex::FromHex;
 
-    use crate::common::defs::{
-        push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
-        LOCK_ORDER_WALLET,
-    };
+    use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_WALLET};
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::{generate_keys, verify_signature};
@@ -1966,7 +1962,7 @@ mod tests {
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
-    use crate::{lock_for_read, lock_for_write};
+    use crate::lock_for_read;
 
     #[test]
     fn block_new_test() {
