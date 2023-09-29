@@ -1463,7 +1463,7 @@ impl Block {
     }
 
     pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
-        debug!(
+        dbg!(
             "generating lite block for keys : {:?}",
             keylist.iter().map(hex::encode).collect::<Vec<String>>()
         );
@@ -1951,17 +1951,22 @@ impl Block {
 #[cfg(test)]
 mod tests {
     use ahash::AHashMap;
+    use futures::executor::block_on;
     use futures::future::join_all;
     use hex::FromHex;
 
-    use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_WALLET};
+    use crate::common::defs::{
+        push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
+        LOCK_ORDER_WALLET,
+    };
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::{generate_keys, verify_signature};
     use crate::core::data::slip::Slip;
+    use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
-    use crate::lock_for_read;
+    use crate::{lock_for_read, lock_for_write};
 
     #[test]
     fn block_new_test() {
@@ -2220,5 +2225,52 @@ mod tests {
             serialized_full_block,
             block.serialize_for_net(BlockType::Full)
         );
+    }
+    #[tokio::test]
+    async fn generate_lite_block_test() {
+        let mut t = TestManager::new();
+
+        // test blocks with transactions
+        // Block 1
+        // perform transaction to wallet public key
+        t.initialize(100, 100000).await;
+        let block1 = t.get_latest_block().await;
+        let public_key: SaitoPublicKey;
+        {
+            let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+            public_key = wallet.public_key;
+        }
+        let lite_block = block1.generate_lite_block(vec![public_key]);
+        assert_eq!(lite_block.signature, block1.signature);
+
+        // Second Block
+        // perform a transaction to public key
+        let public_key =
+            Storage::decode_str("s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR").unwrap();
+        let mut to_public_key: SaitoPublicKey = [0u8; 33];
+        to_public_key.copy_from_slice(&public_key);
+        let to_public_key: SaitoPublicKey = [0u8; 33];
+        t.transfer_value_to_public_key(to_public_key.clone(), 500, block1.timestamp + 120000)
+            .await
+            .unwrap();
+        let block2 = t.get_latest_block().await;
+        let lite_block2 = block2.generate_lite_block(vec![to_public_key]);
+        assert_eq!(lite_block2.signature, block2.clone().signature);
+
+        // block 3
+        // Perform no transacton
+        let block2_hash = block2.hash;
+        let mut block3 = t
+            .create_block(
+                block2_hash,               // hash of parent block
+                block2.timestamp + 120000, // timestamp
+                0,                         // num transactions
+                0,                         // amount
+                0,                         // fee
+                true,                      // mine golden ticket
+            )
+            .await;
+        block3.generate(); // generate hashes
+        dbg!(block3.id);
     }
 }
