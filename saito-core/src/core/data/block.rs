@@ -1463,7 +1463,7 @@ impl Block {
     }
 
     pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
-        dbg!(
+        debug!(
             "generating lite block for keys : {:?}",
             keylist.iter().map(hex::encode).collect::<Vec<String>>()
         );
