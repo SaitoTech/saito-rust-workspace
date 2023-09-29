@@ -3,7 +3,7 @@ use log::warn;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use num_traits::FromPrimitive;
-use saito_core::common::defs::{Currency, SaitoPublicKey, SaitoUTXOSetKey};
+use saito_core::common::defs::{Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey};
 use saito_core::core::data::slip::{Slip, SlipType};
 
 use crate::saitowasm::string_to_key;
@@ -34,7 +34,7 @@ impl WasmSlip {
     }
     #[wasm_bindgen(getter=public_key)]
     pub fn public_key(&self) -> JsString {
-        let key = hex::encode(self.slip.public_key);
+        let key = self.slip.public_key.to_base58();
         key.into()
     }
     #[wasm_bindgen(setter=public_key)]
@@ -77,7 +77,7 @@ impl WasmSlip {
     }
     #[wasm_bindgen(getter=utxo_key)]
     pub fn utxo_key(&self) -> JsString {
-        let key = hex::encode(self.slip.utxoset_key);
+        let key = self.slip.utxoset_key.to_hex();
         key.into()
     }
 

@@ -10,8 +10,9 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{
-    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey,
-    Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD, MAX_STAKER_RECURSION,
+    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
+    MAX_STAKER_RECURSION,
 };
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
@@ -319,7 +320,7 @@ impl Block {
     ) -> Block {
         debug!(
             "Block::create : previous block hash : {:?}",
-            hex::encode(previous_block_hash)
+            previous_block_hash.to_hex()
         );
 
         let mut previous_block_id = 0;
@@ -761,7 +762,7 @@ impl Block {
 
         trace!(
             "generating block data : {:?} of type : {:?}",
-            hex::encode(self.hash),
+            self.hash.to_hex(),
             self.block_type
         );
 
@@ -903,7 +904,7 @@ impl Block {
         debug!(
             "generated the merkle root, Tx Count: {:?}, root = {:?}",
             self.transactions.len(),
-            hex::encode(merkle_root_hash)
+            merkle_root_hash.to_hex()
         );
 
         return merkle_root_hash;
@@ -1267,7 +1268,7 @@ impl Block {
         debug!(
             "block : on chain reorg : {:?} - {:?}",
             self.id,
-            hex::encode(self.hash)
+            self.hash.to_hex()
         );
         for tx in &self.transactions {
             tx.on_chain_reorganization(utxoset, longest_chain);
@@ -1411,7 +1412,7 @@ impl Block {
     ) -> bool {
         debug!(
             "upgrading block : {:?} of type : {:?} to type : {:?}",
-            hex::encode(self.hash),
+            self.hash.to_hex(),
             self.block_type,
             block_type
         );
@@ -1439,7 +1440,7 @@ impl Block {
             if new_block.is_err() {
                 error!(
                     "block not found in disk to upgrade : {:?}",
-                    hex::encode(self.hash)
+                    self.hash.to_hex()
                 );
                 return false;
             }
@@ -1749,18 +1750,18 @@ impl Block {
                 if !gt.validate(previous_block.difficulty) {
                     error!(
                         "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}",
-                        hex::encode(previous_block.hash),
+                        previous_block.hash.to_hex(),
                         previous_block.difficulty,
-                        hex::encode(gt.random),
-                        hex::encode(gt.public_key),
-                        hex::encode(gt.target)
+                        gt.random.to_hex(),
+                        gt.public_key.to_base58(),
+                        gt.target.to_hex()
                     );
                     let solution = hash(&gt.serialize_for_net());
                     let solution_num = primitive_types::U256::from_big_endian(&solution);
 
                     error!(
                         "solution : {:?} leading zeros : {:?}",
-                        hex::encode(solution),
+                        solution.to_hex(),
                         solution_num.leading_zeros()
                     );
                     return false;
@@ -1943,7 +1944,7 @@ impl Block {
         let timestamp = self.timestamp;
         let block_hash = self.hash;
 
-        timestamp.to_string() + "-" + hex::encode(block_hash).as_str() + BLOCK_FILE_EXTENSION
+        timestamp.to_string() + "-" + block_hash.to_hex().as_str() + BLOCK_FILE_EXTENSION
     }
 }
 

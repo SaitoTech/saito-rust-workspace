@@ -9,8 +9,9 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    push_lock, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
+    STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -108,11 +109,10 @@ impl ConsensusThread {
         let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
         let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
 
-        let spammer_public_key: SaitoPublicKey =
-            hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
-                .unwrap()
-                .try_into()
-                .unwrap();
+        let spammer_public_key: SaitoPublicKey = SaitoPublicKey::from_hex(
+            "03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849",
+        )
+        .unwrap();
 
         {
             // let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
@@ -131,7 +131,7 @@ impl ConsensusThread {
                 .await;
             info!(
                 "added spammer init tx for : {:?}",
-                hex::encode(spammer_public_key)
+                spammer_public_key.to_base58()
             );
         }
     }
@@ -150,7 +150,7 @@ impl ConsensusThread {
         }
         let mut txs: Vec<Transaction> = vec![];
         for slip in slips {
-            debug!("{:?} slip public key", hex::encode(slip.public_key));
+            debug!("{:?} slip public key", slip.public_key.to_base58());
             let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
             tx.sign(&private_key);
             txs.push(tx);
@@ -164,10 +164,7 @@ impl ConsensusThread {
             mempool
                 .add_transaction_if_validates(tx.clone(), &blockchain)
                 .await;
-            info!(
-                "added issuance init tx for : {:?}",
-                hex::encode(tx.signature)
-            );
+            info!("added issuance init tx for : {:?}", tx.signature.to_hex());
         }
 
         // debug!("{:?} mempool transacts", mempool.transactions);
@@ -274,7 +271,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let block = block.unwrap();
                 debug!(
                     "adding bundled block : {:?} with id : {:?} to mempool",
-                    hex::encode(block.hash),
+                    block.hash.to_hex(),
                     block.id
                 );
                 trace!(
@@ -319,7 +316,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         .await;
                     debug!(
                         "propagating gt : {:?} to peers",
-                        hex::encode(hash(&gt_result.unwrap().serialize_for_net()))
+                        hash(&gt_result.unwrap().serialize_for_net()).to_hex()
                     );
                     let (_, propagated) = mempool
                         .golden_tickets
@@ -341,7 +338,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
                     "received new golden ticket : {:?}",
-                    hex::encode(golden_ticket.target)
+                    golden_ticket.target.to_hex()
                 );
 
                 let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
@@ -369,12 +366,12 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
                 {
-                    debug!("block : {:?} fetched from peer", hex::encode(block.hash));
+                    debug!("block : {:?} fetched from peer", block.hash.to_hex());
 
                     if blockchain.blocks.contains_key(&block.hash) {
                         debug!(
                             "fetched block : {:?} already in blockchain",
-                            hex::encode(block.hash)
+                            block.hash.to_hex()
                         );
                         return Some(());
                     }
@@ -412,8 +409,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
                 trace!(
                     "tx received with sig: {:?} hash : {:?}",
-                    hex::encode(transaction.signature),
-                    hex::encode(hash(&transaction.serialize_for_net()))
+                    transaction.signature.to_hex(),
+                    hash(&transaction.serialize_for_net()).to_hex()
                 );
                 if let TransactionType::GoldenTicket = transaction.transaction_type {
                     let (mut mempool, _mempool_) =
@@ -462,10 +459,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "loading blockchain state from configs : {:?}",
                     blockchain_configs
                 );
-                blockchain.last_block_hash = hex::decode(blockchain_configs.last_block_hash)
-                    .expect("last block hash cannot be parsed")
-                    .try_into()
-                    .unwrap();
+                blockchain.last_block_hash =
+                    SaitoHash::from_hex(blockchain_configs.last_block_hash.as_str())
+                        .expect("last block hash cannot be parsed");
                 blockchain.last_block_id = blockchain_configs.last_block_id;
                 blockchain.last_timestamp = blockchain_configs.last_timestamp;
                 blockchain.genesis_block_id = blockchain_configs.genesis_block_id;
@@ -473,10 +469,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 blockchain.lowest_acceptable_timestamp =
                     blockchain_configs.lowest_acceptable_timestamp;
                 blockchain.lowest_acceptable_block_hash =
-                    hex::decode(blockchain_configs.lowest_acceptable_block_hash)
-                        .expect("lowest block hash cannot be parsed")
-                        .try_into()
-                        .unwrap();
+                    SaitoHash::from_hex(blockchain_configs.lowest_acceptable_block_hash.as_str())
+                        .expect("lowest block hash cannot be parsed");
                 blockchain.lowest_acceptable_block_id =
                     blockchain_configs.lowest_acceptable_block_id;
             } else {

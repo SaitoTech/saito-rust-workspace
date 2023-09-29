@@ -8,7 +8,8 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::common::defs::{
-    Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp, UtxoSet,
+    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+    UtxoSet,
 };
 use crate::core::data::crypto::{hash, sign, verify, verify_signature};
 use crate::core::data::hop::{Hop, HOP_SIZE};
@@ -531,7 +532,7 @@ impl Transaction {
         self.generate_hash_for_signature();
         trace!(
             "generating total fees for tx : {:?}",
-            hex::encode(self.hash_for_signature.unwrap())
+            self.hash_for_signature.unwrap().to_hex()
         );
 
         // calculate nolan in / out, fees
@@ -597,7 +598,7 @@ impl Transaction {
             self.total_work_for_me = 0;
             warn!(
                 "tx : {:?} last hop is not current node",
-                hex::encode(self.signature)
+                self.signature.to_hex()
             );
             return;
         }
@@ -615,9 +616,9 @@ impl Transaction {
                 self.total_work_for_me = 0;
                 warn!(
                     "tx : {:?} from and to not matching. to : {:?} from : {:?}",
-                    hex::encode(self.signature),
-                    hex::encode(self.path[i - 1].to),
-                    hex::encode(self.path[i].from)
+                    self.signature.to_hex(),
+                    self.path[i - 1].to.to_hex(),
+                    self.path[i].from.to_hex()
                 );
                 return;
             }
@@ -631,7 +632,7 @@ impl Transaction {
         trace!(
             "total work : {:?} for tx : {:?}. total fees : {:?} total in : {:?} total_out : {:?}",
             self.total_work_for_me,
-            hex::encode(self.signature),
+            self.signature.to_hex(),
             self.total_fees,
             self.total_in,
             self.total_out
@@ -893,9 +894,9 @@ impl Transaction {
                 if !verify_signature(hash_for_signature, &sig, &public_key) {
                     error!(
                         "tx verification failed : hash = {:?}, sig = {:?}, pub_key = {:?}",
-                        hex::encode(hash_for_signature),
-                        hex::encode(sig),
-                        hex::encode(public_key)
+                        hash_for_signature.to_hex(),
+                        sig.to_hex(),
+                        public_key.to_base58()
                     );
                     return false;
                 }
@@ -1017,17 +1018,13 @@ impl Transaction {
                 warn!(
                     "from {:?}: {:?} not matching with previous to {:?}: {:?}. path length = {:?}",
                     index,
-                    hex::encode(hop.from),
+                    hop.from.to_hex(),
                     index - 1,
-                    hex::encode(self.path[index - 1].to),
+                    self.path[index - 1].to.to_hex(),
                     self.path.len()
                 );
                 for hop in self.path.iter() {
-                    info!(
-                        "hop : {:?} --> {:?}",
-                        hex::encode(hop.from),
-                        hex::encode(hop.to)
-                    );
+                    info!("hop : {:?} --> {:?}", hop.from.to_hex(), hop.to.to_hex());
                 }
                 return false;
             }
@@ -1055,7 +1052,7 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
-    use hex::FromHex;
+    use crate::common::defs::PrintForLog;
 
     use crate::core::data::crypto::generate_keys;
 
@@ -1158,7 +1155,7 @@ mod tests {
         ];
 
         let mut input_slip = Slip::default();
-        input_slip.public_key = <SaitoPublicKey>::from_hex(
+        input_slip.public_key = SaitoPublicKey::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
@@ -1169,7 +1166,7 @@ mod tests {
         input_slip.slip_type = SlipType::ATR;
 
         let mut output_slip = Slip::default();
-        output_slip.public_key = <SaitoPublicKey>::from_hex(
+        output_slip.public_key = SaitoPublicKey::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
         .unwrap();
@@ -1183,7 +1180,7 @@ mod tests {
         tx.to.push(output_slip);
 
         tx.sign(
-            &<[u8; 32]>::from_hex(
+            &SaitoPrivateKey::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
             .unwrap(),
@@ -1245,10 +1242,10 @@ mod tests {
         assert_eq!(tx.timestamp, 1637034582);
         assert_eq!(tx.transaction_type, TransactionType::ATR);
 
-        assert_eq!(hex::encode(tx.signature), "dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec");
+        assert_eq!(tx.signature.to_hex(), "dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec");
         let public_key: SaitoPublicKey = tx.from[0].public_key;
         assert_eq!(
-            hex::encode(public_key),
+            public_key.to_hex(),
             "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
         );
         tx.generate(&public_key, 0, 0);

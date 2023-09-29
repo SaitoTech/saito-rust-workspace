@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use crate::wasm_peer_service::WasmPeerService;
-use saito_core::common::defs::PeerIndex;
+use saito_core::common::defs::{PeerIndex, PrintForLog};
 use saito_core::core::data::peer::Peer;
 
 #[wasm_bindgen]
@@ -19,15 +19,15 @@ impl WasmPeer {
     pub fn get_public_key(&self) -> JsString {
         if self.peer.public_key.is_none() {
             warn!("peer : {:?} public key is not set", self.peer.index);
-            return JsString::from(hex::encode([0; 33]));
+            return JsString::from([0; 33].to_base58());
         }
-        hex::encode(self.peer.public_key.unwrap()).into()
+        self.peer.public_key.unwrap().to_base58().into()
     }
     #[wasm_bindgen(getter = key_list)]
     pub fn get_key_list(&self) -> Array {
         let array = Array::new_with_length(self.peer.key_list.len() as u32);
         for (i, key) in self.peer.key_list.iter().enumerate() {
-            array.set(i as u32, JsValue::from(hex::encode(key)));
+            array.set(i as u32, JsValue::from(key.to_base58()));
         }
         array
     }

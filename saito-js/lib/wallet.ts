@@ -2,13 +2,13 @@ import type { WasmWallet } from "saito-wasm/pkg/node/index";
 import { WasmWalletSlip } from "saito-wasm/pkg/node/index";
 import Saito from "../saito";
 import WasmWrapper from "./wasm_wrapper";
-import { fromBase58, toBase58 } from "./util";
+import { toBase58 } from "./util";
 
 export const DefaultEmptyPrivateKey =
   "0000000000000000000000000000000000000000000000000000000000000000";
 
 export const DefaultEmptyPublicKey =
-  "000000000000000000000000000000000000000000000000000000000000000000";
+  toBase58("000000000000000000000000000000000000000000000000000000000000000000");
 
 export const DefaultEmptyBlockHash =
   "0000000000000000000000000000000000000000000000000000000000000000";
@@ -34,14 +34,14 @@ export default class Wallet extends WasmWrapper<WasmWallet> {
 
   public async getPublicKey() {
     let key = await this.instance.get_public_key();
-    return key === DefaultEmptyPublicKey ? "" : toBase58(key);
+    return key === DefaultEmptyPublicKey ? "" : key;
   }
 
   public async setPublicKey(key: string) {
     if (key === "") {
       key = DefaultEmptyPublicKey;
     }
-    return this.instance.set_public_key(fromBase58(key));
+    return this.instance.set_public_key(key);
   }
 
   public async getPrivateKey() {

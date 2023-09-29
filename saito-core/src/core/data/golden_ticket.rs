@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::common::defs::{PrintForLog, SaitoHash, SaitoPublicKey};
 use crate::core::data::crypto::hash;
 
 #[serde_with::serde_as]
@@ -66,7 +66,7 @@ impl GoldenTicket {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::defs::SaitoHash;
+    use crate::common::defs::{PrintForLog, SaitoHash, SaitoPublicKey};
     use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash};
     use crate::core::data::golden_ticket::GoldenTicket;
     use crate::core::data::wallet::Wallet;
@@ -120,15 +120,15 @@ mod tests {
 
         let result = GoldenTicket::deserialize_from_net(&buffer);
         assert_eq!(
-            hex::encode(result.target),
+            result.target.to_hex(),
             "844702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235e"
         );
         assert_eq!(
-            hex::encode(result.random),
+            result.random.to_hex(),
             "03bf1a4714cfc7ae33d3f6e860c23191ddea07bcb1bfa6c85bc124151ad8d4ce"
         );
         assert_eq!(
-            hex::encode(result.public_key),
+            result.public_key.to_hex(),
             "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
         );
 
@@ -141,8 +141,9 @@ mod tests {
 
         assert_eq!(primitive_types::U256::one().leading_zeros(), 255);
         assert_eq!(primitive_types::U256::zero().leading_zeros(), 256);
-        let sol = hex::decode("4523d0eb05233434b42de74a99049decb6c4347da2e7cde9fb49330e905da1e2")
-            .unwrap();
+        let sol =
+            SaitoHash::from_hex("4523d0eb05233434b42de74a99049decb6c4347da2e7cde9fb49330e905da1e2")
+                .unwrap();
         info!("sss = {:?}", sol);
         assert_eq!(
             primitive_types::U256::from_big_endian(sol.as_ref()).leading_zeros(),
@@ -150,22 +151,17 @@ mod tests {
         );
 
         let gt = GoldenTicket {
-            target: hex::decode("6bc717fdd325b39383923e21c00aedf04efbc2d8ae6ba092e86b984ba45daf5f")
-                .unwrap()
-                .to_vec()
-                .try_into()
-                .unwrap(),
-            random: hex::decode("e41eed52c0d1b261654bd7bc7c15996276714e79bf837e129b022f9c04a97e49")
-                .unwrap()
-                .to_vec()
-                .try_into()
-                .unwrap(),
-            public_key: hex::decode(
+            target: SaitoHash::from_hex(
+                "6bc717fdd325b39383923e21c00aedf04efbc2d8ae6ba092e86b984ba45daf5f",
+            )
+            .unwrap(),
+            random: SaitoHash::from_hex(
+                "e41eed52c0d1b261654bd7bc7c15996276714e79bf837e129b022f9c04a97e49",
+            )
+            .unwrap(),
+            public_key: SaitoPublicKey::from_hex(
                 "02262b7491f6599ed3f4f60315d9345e9ef02767973663b9764b52842306da461c",
             )
-            .unwrap()
-            .to_vec()
-            .try_into()
             .unwrap(),
         };
 

@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
+use saito_core::common::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::data::network::Network;
 use saito_core::core::data::slip::Slip;
 use saito_core::core::data::storage::Storage;
@@ -50,7 +50,7 @@ impl WasmWallet {
 
     pub async fn get_public_key(&self) -> JsString {
         let wallet = self.wallet.read().await;
-        JsString::from(hex::encode(wallet.public_key))
+        JsString::from(wallet.public_key.to_base58())
     }
     pub async fn set_public_key(&mut self, key: JsString) {
         let str: String = key.into();
@@ -73,7 +73,7 @@ impl WasmWallet {
     }
     pub async fn get_private_key(&self) -> JsString {
         let wallet = self.wallet.read().await;
-        JsString::from(hex::encode(wallet.private_key))
+        JsString::from(wallet.private_key.to_hex())
     }
     pub async fn set_private_key(&mut self, key: JsString) {
         let str: String = key.into();
@@ -153,7 +153,7 @@ impl WasmWalletSlip {
 #[wasm_bindgen]
 impl WasmWalletSlip {
     pub fn get_utxokey(&self) -> js_sys::JsString {
-        let key: String = hex::encode(self.slip.utxokey);
+        let key: String = self.slip.utxokey.to_hex();
         key.into()
     }
     pub fn set_utxokey(&mut self, key: js_sys::JsString) {

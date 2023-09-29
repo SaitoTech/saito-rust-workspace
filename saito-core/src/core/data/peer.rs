@@ -5,8 +5,8 @@ use log::{debug, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
-    WS_KEEP_ALIVE_PERIOD,
+    push_lock, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_WALLET, WS_KEEP_ALIVE_PERIOD,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::data;
@@ -113,7 +113,7 @@ impl Peer {
         debug!(
             "handling handshake response :{:?} with address : {:?}",
             self.index,
-            hex::encode(response.public_key)
+            response.public_key.to_base58()
         );
         if self.challenge_for_peer.is_none() {
             warn!(
@@ -128,9 +128,9 @@ impl Peer {
         if !result {
             warn!(
                 "handshake failed. signature is not valid. sig : {:?} challenge : {:?} key : {:?}",
-                hex::encode(sent_challenge),
-                hex::encode(response.signature),
-                hex::encode(response.public_key)
+                sent_challenge.to_hex(),
+                response.signature.to_hex(),
+                response.public_key.to_base58()
             );
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -175,7 +175,7 @@ impl Peer {
         } else {
             info!(
                 "handshake completed for peer : {:?}",
-                hex::encode(self.public_key.as_ref().unwrap())
+                self.public_key.as_ref().unwrap().to_base58()
             );
         }
         io_handler.send_interface_event(InterfaceEvent::PeerHandshakeComplete(self.index));
@@ -205,11 +205,11 @@ impl Peer {
         if lite {
             self.block_fetch_url.to_string()
                 + "/lite-block/"
-                + hex::encode(block_hash).as_str()
+                + block_hash.to_hex().as_str()
                 + "/"
-                + hex::encode(my_public_key).as_str()
+                + my_public_key.to_base58().as_str()
         } else {
-            self.block_fetch_url.to_string() + "/block/" + hex::encode(block_hash).as_str()
+            self.block_fetch_url.to_string() + "/block/" + block_hash.to_hex().as_str()
         }
     }
     pub async fn send_ping(

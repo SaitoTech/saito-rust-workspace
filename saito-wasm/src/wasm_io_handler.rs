@@ -7,7 +7,7 @@ use log::{error, trace};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{PeerIndex, SaitoHash};
+use saito_core::common::defs::{PeerIndex, PrintForLog, SaitoHash};
 use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::data::configuration::PeerConfig;
 use saito_core::core::data::peer_service::PeerService;
@@ -191,7 +191,7 @@ impl InterfaceIO for WasmIoHandler {
                 MsgHandler::send_interface_event("peer_connect".to_string(), index);
             }
             InterfaceEvent::BlockAddSuccess(hash, block_id) => {
-                MsgHandler::send_block_success(hex::encode(hash), block_id);
+                MsgHandler::send_block_success(hash.to_hex(), block_id);
             }
             InterfaceEvent::WalletUpdate() => {
                 MsgHandler::send_wallet_update();

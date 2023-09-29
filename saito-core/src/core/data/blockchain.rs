@@ -12,9 +12,9 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, Currency, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
-    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
+    push_lock, Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet,
+    GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION,
+    MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
 use crate::common::interface_io::InterfaceEvent;
 use crate::core::data::block::{Block, BlockType};
@@ -128,7 +128,7 @@ impl Blockchain {
             .count();
         debug!(
             "add_block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count : {:?}/{:?}",
-            hex::encode(block.hash),
+            block.hash.to_hex(),
             block.block_type,
             block.id,
             self.get_latest_block_id(),
@@ -150,7 +150,7 @@ impl Blockchain {
         if self.blocks.contains_key(&block_hash) {
             error!(
                 "block already exists in blockchain {:?}. not adding",
-                &hex::encode(&block.hash)
+                block.hash.to_hex()
             );
             return AddBlockResult::BlockAlreadyExists;
         }
@@ -167,7 +167,7 @@ impl Blockchain {
             if block.previous_block_hash == [0; 32] {
                 trace!(
                     "hash is empty for parent of block : {:?}",
-                    hex::encode(block.hash)
+                    block.hash.to_hex()
                 );
             } else if block.source_connection_id.is_some() {
                 let block_hash = block.previous_block_hash;
@@ -187,33 +187,33 @@ impl Blockchain {
                     if result.is_err() {
                         warn!(
                             "couldn't fetch parent block : {:?} for block : {:?}",
-                            hex::encode(block.previous_block_hash),
-                            hex::encode(block.hash)
+                            block.previous_block_hash.to_hex(),
+                            block.hash.to_hex()
                         );
                     }
                 } else {
                     debug!(
                         "previous block : {:?} is in the mempool. not fetching",
-                        hex::encode(block_hash)
+                        block_hash.to_hex()
                     );
                 }
 
                 debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
-                                    hex::encode(block.hash),
-                                    hex::encode(block.previous_block_hash));
+                                    block.hash.to_hex(),
+                                    block.previous_block_hash.to_hex());
                 // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
                 mempool.add_block(block);
                 return AddBlockResult::FailedButRetry;
             } else {
                 debug!(
                     "block : {:?} source connection id not set",
-                    hex::encode(block.hash)
+                    block.hash.to_hex()
                 );
             }
         } else {
             debug!(
                 "previous block : {:?} exists in blockchain",
-                hex::encode(block.previous_block_hash)
+                block.previous_block_hash.to_hex()
             );
         }
 
@@ -259,7 +259,7 @@ impl Blockchain {
         } else {
             // error!(
             //     "block : {:?} is already in blockring. therefore not adding",
-            //     hex::encode(block.hash)
+            //     block.hash..to_hex()
             // );
             // return AddBlockResult::BlockAlreadyExists;
         }
@@ -273,7 +273,7 @@ impl Blockchain {
         } else {
             error!(
                 "BLOCK IS ALREADY IN THE BLOCKCHAIN, WHY ARE WE ADDING IT????? {:?}",
-                block.hash
+                block.hash.to_hex()
             );
             return AddBlockResult::BlockAlreadyExists;
         }
@@ -289,14 +289,11 @@ impl Blockchain {
         let mut am_i_the_longest_chain = false;
 
         while !shared_ancestor_found {
-            trace!(
-                "checking new chain hash : {:?}",
-                hex::encode(new_chain_hash)
-            );
+            trace!("checking new chain hash : {:?}", new_chain_hash.to_hex());
             if let Some(block) = self.blocks.get(&new_chain_hash) {
                 if block.in_longest_chain {
                     shared_ancestor_found = true;
-                    trace!("shared ancestor found : {:?}", hex::encode(new_chain_hash));
+                    trace!("shared ancestor found : {:?}", new_chain_hash.to_hex());
                     break;
                 } else if new_chain_hash == [0; 32] {
                     break;
@@ -334,8 +331,8 @@ impl Blockchain {
         } else {
             debug!(
                 "block without parent. block : {:?}, latest : {:?}",
-                hex::encode(block_hash),
-                hex::encode(previous_block_hash)
+                block_hash.to_hex(),
+                previous_block_hash.to_hex()
             );
 
             //
@@ -447,7 +444,7 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
                 if notify_miner {
-                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", hex::encode(block_hash), difficulty);
+                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", block_hash.to_hex(), difficulty);
                     sender_to_miner
                         .send(MiningEvent::LongestChainBlockAdded {
                             hash: block_hash,
@@ -461,7 +458,7 @@ impl Blockchain {
             } else {
                 warn!(
                     "new chain doesn't validate with hash : {:?}",
-                    hex::encode(block_hash)
+                    block_hash.to_hex()
                 );
                 self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = false;
                 self.add_block_failure(&block_hash, mempool).await;
@@ -484,7 +481,7 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
         notify_miner: bool,
     ) {
-        debug!("add_block_success : {:?}", hex::encode(block_hash));
+        debug!("add_block_success : {:?}", block_hash.to_hex());
 
         // print blockring longest_chain_block_hash infor
         if notify_miner {
@@ -507,7 +504,7 @@ impl Blockchain {
             } else if block.block_type == BlockType::Header {
                 debug!(
                     "block : {:?} not written to disk as type : {:?}",
-                    hex::encode(block.hash),
+                    block.hash.to_hex(),
                     block.block_type
                 );
             }
@@ -581,7 +578,7 @@ impl Blockchain {
         }
         debug!(
             "block {:?} added successfully. type : {:?} tx count = {:?}",
-            hex::encode(block_hash),
+            block_hash.to_hex(),
             block_type,
             tx_count
         );
@@ -594,7 +591,7 @@ impl Blockchain {
     }
 
     pub async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
-        info!("add block failed : {:?}", hex::encode(block_hash));
+        info!("add block failed : {:?}", block_hash.to_hex());
 
         mempool.delete_block(block_hash);
         let block = self.blocks.remove(block_hash);
@@ -602,7 +599,7 @@ impl Blockchain {
         if block.is_none() {
             error!(
                 "block : {:?} is not found in blocks collection. couldn't handle block failure.",
-                hex::encode(block_hash)
+                block_hash.to_hex()
             );
             return;
         }
@@ -694,7 +691,7 @@ impl Blockchain {
         debug!(
             "generate last shared ancestor : peer_latest_id : {:?}, fork_id : {:?} my_latest_id : {:?}",
             peer_latest_block_id,
-            hex::encode(fork_id),
+            fork_id.to_hex(),
             my_latest_block_id
         );
         let weights = vec![
@@ -805,10 +802,9 @@ impl Blockchain {
             debug!(
                 "{} - {:?}",
                 current_id,
-                hex::encode(
-                    self.blockring
-                        .get_longest_chain_block_hash_at_block_id(current_id)
-                )
+                self.blockring
+                    .get_longest_chain_block_hash_at_block_id(current_id)
+                    .to_hex()
             );
             current_id -= 1;
         }
@@ -1181,7 +1177,7 @@ impl Blockchain {
             //
             error!(
                 "ERROR: this block : {:?} does not validate!",
-                hex::encode(block.hash)
+                block.hash.to_hex()
             );
             if current_wind_index == new_chain.len() - 1 {
                 //
@@ -1375,7 +1371,7 @@ impl Blockchain {
         trace!(
             "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
             block_id,
-            hex::encode(block_hash)
+            block_hash.to_hex()
         );
         // skip out if earlier than we need to be vis-a-vis last_block_id
         if self.last_block_id >= block_id {
@@ -1400,7 +1396,7 @@ impl Blockchain {
                     self.lowest_acceptable_timestamp = block.timestamp;
                 }
             } else {
-                warn!("block not found for hash : {:?}", hex::encode(block_hash));
+                warn!("block not found for hash : {:?}", block_hash.to_hex());
             }
 
             // update genesis period, purge old data
@@ -1560,7 +1556,7 @@ impl Blockchain {
                         .downgrade_block_to_block_type(BlockType::Pruned, is_browser)
                         .await;
                 } else {
-                    warn!("block : {:?} not found to downgrade", hex::encode(hash));
+                    warn!("block : {:?} not found to downgrade", hash.to_hex());
                 }
             }
         }
@@ -1627,7 +1623,7 @@ impl Blockchain {
         block.block_type = BlockType::Ghost;
 
         if self.is_block_indexed(hash) {
-            warn!("block :{:?} exists in blockchain", hex::encode(hash));
+            warn!("block :{:?} exists in blockchain", hash.to_hex());
             return;
         }
         if !self.blockring.contains_block_hash_at_block_id(id, hash) {
@@ -1713,7 +1709,8 @@ mod tests {
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
-        push_lock, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+        push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_WALLET,
     };
     use crate::common::test_manager::test::{TestManager, TEST_ISSUANCE_FILEPATH};
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
@@ -2180,18 +2177,18 @@ mod tests {
             assert_ne!(blockchain.get_latest_block_hash(), block2_hash);
             assert_ne!(blockchain.get_latest_block_id(), block2_id);
             assert_ne!(
-                hex::encode(blockchain.get_latest_block_hash()),
-                hex::encode(block3_hash)
+                blockchain.get_latest_block_hash().to_hex(),
+                block3_hash.to_hex()
             );
             assert_ne!(blockchain.get_latest_block_id(), block3_id);
             assert_ne!(
-                hex::encode(blockchain.get_latest_block_hash()),
-                hex::encode(block4_hash)
+                blockchain.get_latest_block_hash().to_hex(),
+                block4_hash.to_hex()
             );
             assert_ne!(blockchain.get_latest_block_id(), block4_id);
             assert_ne!(
-                hex::encode(blockchain.get_latest_block_hash()),
-                hex::encode(block5_hash)
+                blockchain.get_latest_block_hash().to_hex(),
+                block5_hash.to_hex()
             );
             assert_ne!(blockchain.get_latest_block_id(), block5_id);
             assert_eq!(blockchain.get_latest_block_hash(), block6_hash);
