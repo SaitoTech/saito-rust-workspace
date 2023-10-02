@@ -1,4 +1,4 @@
-use js_sys::{Array, JsString, Uint8Array};
+use js_sys::{Array, JsString, Object, Uint8Array};
 
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -27,6 +27,20 @@ impl WasmTransaction {
     #[wasm_bindgen(getter = signature)]
     pub fn signature(&self) -> js_sys::JsString {
         self.tx.signature.to_hex().into()
+    }
+
+    #[wasm_bindgen(getter = routing_path)]
+    pub fn get_routing_path(&self) -> Array {
+        let array = Array::new();
+        for hop in &self.tx.path {
+            let obj = Object::new();
+            js_sys::Reflect::set(&obj, &"from".into(), &hex::encode(&hop.from).into()).unwrap();
+            js_sys::Reflect::set(&obj, &"to".into(), &hex::encode(&hop.to).into()).unwrap();
+            js_sys::Reflect::set(&obj, &"sig".into(), &hex::encode(&hop.sig).into()).unwrap();
+
+            array.push(&obj);
+        }
+        array
     }
     #[wasm_bindgen(setter = signature)]
     pub fn set_signature(&mut self, signature: JsString) {

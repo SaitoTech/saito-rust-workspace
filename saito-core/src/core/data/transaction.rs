@@ -48,7 +48,7 @@ pub struct Transaction {
     pub txs_replacements: u32,
     #[serde_as(as = "[_; 64]")]
     pub signature: SaitoSignature,
-    pub(crate) path: Vec<Hop>,
+    pub path: Vec<Hop>,
 
     // hash used for merkle_root (does not include signature)
     pub hash_for_signature: Option<SaitoHash>,
