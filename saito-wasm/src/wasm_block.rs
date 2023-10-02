@@ -1,11 +1,12 @@
 use js_sys::{Array, JsString, Uint8Array};
-use log::error;
+use log::{error, info};
 use num_traits::FromPrimitive;
+use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsValue;
+
 use saito_core::common::defs::{PrintForLog, SaitoPublicKey, Timestamp};
 use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::transaction::Transaction;
-use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsValue;
 
 use crate::saitowasm::{string_to_hex, string_to_key};
 use crate::wasm_consensus_values::{WasmBlockPayout, WasmConsensusValues};
@@ -275,13 +276,12 @@ impl WasmBlock {
         Ok(JsValue::from(""))
     }
     pub fn has_keylist_txs(&self, keylist: Array) -> bool {
-        return self.block.has_keylist_txs(Self::convert_keylist(keylist));
+        let keylist = Self::convert_keylist(keylist);
+        return self.block.has_keylist_txs(keylist);
     }
     pub fn generate_lite_block(&self, keylist: Array) -> WasmBlock {
         let keylist = Self::convert_keylist(keylist);
-
         let block = self.block.generate_lite_block(keylist);
-
         WasmBlock::from_block(block)
     }
 }
@@ -295,9 +295,17 @@ impl WasmBlock {
         let mut keys = vec![];
         for i in 0..(keylist.length() as u32) {
             // TODO : check data types/lengths before this to avoid attacks
-            let key = string_to_key(JsString::from(keylist.get(i)));
+            let key = keylist.get(i).as_string();
+            if key.is_none() {
+                // error!("couldn't convert value : {:?} to string", keylist.get(i));
+                return vec![];
+                // continue;
+            }
+            let key = key.unwrap();
+            let key = SaitoPublicKey::from_base58(key.as_str());
 
             if key.is_err() {
+                error!("key : {:?}", keylist.get(i));
                 error!("error decoding key list : {:?}", key.err().unwrap());
                 return vec![];
             }

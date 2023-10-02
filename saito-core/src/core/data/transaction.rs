@@ -158,9 +158,10 @@ impl Transaction {
         _force_merge: bool,
         network: Option<&Network>,
     ) -> Result<Transaction, Error> {
-        debug!(
+        trace!(
             "generating transaction : payment = {:?}, fee = {:?}",
-            with_payment, with_fee
+            with_payment,
+            with_fee
         );
 
         let available_balance = wallet.get_available_balance();
@@ -170,9 +171,11 @@ impl Transaction {
         }
 
         let total_requested = with_payment + with_fee;
-        debug!(
+        trace!(
             "in generate transaction. available: {} and payment: {} and fee: {}",
-            available_balance, with_payment, with_fee
+            available_balance,
+            with_payment,
+            with_fee
         );
         if available_balance < total_requested {
             debug!(
@@ -302,7 +305,7 @@ impl Transaction {
         to_public_key: SaitoPublicKey,
         with_amount: Currency,
     ) -> Transaction {
-        debug!("generate vip transaction : amount = {:?}", with_amount);
+        trace!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Vip;
         let mut output = Slip::default();
@@ -1053,7 +1056,6 @@ impl Transaction {
 #[cfg(test)]
 mod tests {
     use crate::common::defs::PrintForLog;
-
     use crate::core::data::crypto::generate_keys;
 
     use super::*;

@@ -81,12 +81,18 @@ impl WasmTransaction {
     }
 
     pub fn is_from(&self, key: JsString) -> bool {
-        let key: SaitoPublicKey = string_to_key(key).unwrap();
-        return self.tx.is_from(&key);
+        let key = string_to_key(key);
+        if key.is_err() {
+            return false;
+        }
+        return self.tx.is_from(&key.unwrap());
     }
     pub fn is_to(&self, key: JsString) -> bool {
-        let key: SaitoPublicKey = string_to_key(key).unwrap();
-        return self.tx.is_to(&key);
+        let key = string_to_key(key);
+        if key.is_err() {
+            return false;
+        }
+        return self.tx.is_to(&key.unwrap());
     }
 
     #[wasm_bindgen(getter = data)]

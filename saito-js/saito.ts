@@ -115,6 +115,10 @@ export default class Saito {
     let configStr = JSON.stringify(configs);
     await Saito.getLibInstance().initialize(configStr, privateKey, logLevel);
 
+    let blockchain = await Saito.getInstance().getBlockchain();
+    console.log("last callback block id set as : " + configs.blockchain.last_block_id);
+    blockchain.last_callback_block_id = configs.blockchain.last_block_id;
+
     console.log("saito initialized");
   }
 
