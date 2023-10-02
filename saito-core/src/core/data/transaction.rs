@@ -305,7 +305,7 @@ impl Transaction {
         to_public_key: SaitoPublicKey,
         with_amount: Currency,
     ) -> Transaction {
-        trace!("generate vip transaction : amount = {:?}", with_amount);
+        debug!("generate vip transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Vip;
         let mut output = Slip::default();
