@@ -583,11 +583,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_event(&mut self, event: RoutingEvent) -> Option<()> {
         match event {
             RoutingEvent::BlockchainUpdated => {
-                debug!("received blockchain update event");
+                trace!("received blockchain update event");
                 self.fetch_next_blocks().await;
             }
             RoutingEvent::StartBlockIdUpdated(block_id) => {
-                debug!("start block id received as : {:?}", block_id);
+                trace!("start block id received as : {:?}", block_id);
                 self.blockchain_sync_state
                     .set_latest_blockchain_id(block_id);
             }

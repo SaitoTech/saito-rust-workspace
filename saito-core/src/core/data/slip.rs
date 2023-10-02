@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind};
 
-use log::{debug, error};
+use log::{debug, error, trace};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -126,7 +126,7 @@ impl Slip {
 
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, spendable: bool) {
         if self.amount > 0 {
-            debug!(
+            trace!(
                 "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?}",
                 self.utxoset_key.to_base58(),
                 spendable,

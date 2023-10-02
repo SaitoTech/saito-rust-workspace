@@ -271,7 +271,7 @@ impl Storage {
         for (key, value) in &balance_map {
             if value > &threshold {
                 let key_base58 = key.to_base58();
-                writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
+                let _ = writeln!(file, "{}\t{}\t{}", value, key_base58, txtype);
             }
         }
         debug!("written {} records", balance_map.len());
@@ -284,7 +284,8 @@ impl Storage {
         balance_map: AHashMap<SaitoPublicKey, u64>,
         threshold: u64,
     ) {
-        self.write_utxoset_to_disk_path(balance_map, threshold, UTXOSTATE_FILE_PATH)
+        let _ = self
+            .write_utxoset_to_disk_path(balance_map, threshold, UTXOSTATE_FILE_PATH)
             .await;
     }
 }
