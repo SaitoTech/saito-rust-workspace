@@ -2,3 +2,4 @@
 *.sai
 /test/*
 /issuance/issuance
+/issuance/test/
