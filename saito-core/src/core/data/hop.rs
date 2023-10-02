@@ -12,11 +12,11 @@ pub const HOP_SIZE: usize = 130;
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Hop {
     #[serde_as(as = "[_; 33]")]
-    pub(crate) from: SaitoPublicKey,
+    pub from: SaitoPublicKey,
     #[serde_as(as = "[_; 33]")]
-    pub(crate) to: SaitoPublicKey,
+    pub to: SaitoPublicKey,
     #[serde_as(as = "[_; 64]")]
-    pub(crate) sig: SaitoSignature,
+    pub sig: SaitoSignature,
 }
 
 impl Default for Hop {
