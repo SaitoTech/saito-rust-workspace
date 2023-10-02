@@ -302,7 +302,7 @@ pub async fn create_transaction(
     fee: u64,
     force_merge: bool,
 ) -> Result<WasmTransaction, JsValue> {
-    debug!("create_transaction : {:?}", public_key.to_string());
+    trace!("create_transaction : {:?}", public_key.to_string());
     let saito = SAITO.lock().await;
     let mut wallet = saito.context.wallet.write().await;
     let key = string_to_key(public_key).or(Err(JsValue::from(
@@ -405,11 +405,7 @@ pub async fn process_peer_disconnection(peer_index: u64) {
 pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index: u64) {
     let mut saito = SAITO.lock().await;
     let buffer = buffer.to_vec();
-    // trace!(
-    //     "process_msg_buffer_from_peer : {:?} length = {:?}",
-    //     peer_index,
-    //     buffer.len()
-    // );
+
     saito
         .routing_thread
         .process_network_event(NetworkEvent::IncomingNetworkMessage { peer_index, buffer })
@@ -422,7 +418,6 @@ pub async fn process_fetched_block(
     hash: js_sys::Uint8Array,
     peer_index: u64,
 ) {
-    debug!("process_fetched_block : {:?}", peer_index);
     let mut saito = SAITO.lock().await;
     saito
         .routing_thread
@@ -436,7 +431,6 @@ pub async fn process_fetched_block(
 
 #[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
-    // trace!("process_timer_event. duration : {:?}", duration_in_ms);
     let mut saito = SAITO.lock().await;
 
     let duration = Duration::from_millis(duration_in_ms);

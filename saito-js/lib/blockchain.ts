@@ -10,7 +10,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
   public callbacks = new Map<string, Array<(_1: Block, _2: Transaction, _3: number) => {}>>();
   public callbackIndices = new Map<string, Array<number>>();
   public confirmations = new Map<string, bigint>();
-  last_callback_block_id: number = 0;
+  public last_callback_block_id: number = 0;
   callback_limit: number = 2;
   prune_after_blocks: number = 6;
 
@@ -106,6 +106,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
       }
       if (!already_processed_callbacks) {
         // this block is initialized with zero-confs processed
+        console.log(`affix callbacks : ${block.id} with hash : ${block.hash}`);
         await this.affixCallbacks(block);
 
         //

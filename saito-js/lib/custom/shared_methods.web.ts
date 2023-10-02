@@ -52,6 +52,7 @@ export default class WebSharedMethods extends CustomSharedMethods {
   }
 
   fetchBlockFromPeer(url: string): Promise<Uint8Array> {
+    console.log("fetching block from url : " + url);
     return fetch(url)
       .then((res: any) => {
         return res.arrayBuffer();
@@ -123,12 +124,12 @@ export default class WebSharedMethods extends CustomSharedMethods {
       }
       try {
         if (socket.readyState !== socket.OPEN) {
-          console.error('Blocked Socket Send Before Open')
+          console.error("Blocked Socket Send Before Open");
         } else {
           socket.send(buffer);
         }
-      } catch(err) {
-        console.error('Socket Send Error: ' + err)
+      } catch (err) {
+        console.error("Socket Send Error: " + err);
       }
     });
   }

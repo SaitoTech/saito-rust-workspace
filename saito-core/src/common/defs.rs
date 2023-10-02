@@ -3,7 +3,6 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use ahash::AHashMap;
-use log::error;
 use tokio::sync::mpsc::Sender;
 
 pub type Currency = u64;

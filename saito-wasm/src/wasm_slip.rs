@@ -6,7 +6,7 @@ use num_traits::FromPrimitive;
 use saito_core::common::defs::{Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey};
 use saito_core::core::data::slip::{Slip, SlipType};
 
-use crate::saitowasm::string_to_key;
+use crate::saitowasm::{string_to_hex, string_to_key};
 
 // #[derive(Serialize, Deserialize)]
 #[wasm_bindgen]
@@ -72,7 +72,7 @@ impl WasmSlip {
     }
     #[wasm_bindgen(setter=utxo_key)]
     pub fn set_utxo_key(&mut self, key: JsString) {
-        let key: SaitoUTXOSetKey = string_to_key(key).unwrap();
+        let key: SaitoUTXOSetKey = string_to_hex(key).unwrap();
         self.slip.utxoset_key = key;
     }
     #[wasm_bindgen(getter=utxo_key)]

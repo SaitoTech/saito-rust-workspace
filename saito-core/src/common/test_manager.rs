@@ -684,9 +684,9 @@ pub mod test {
             //
             // reset data dirs
             //
-            tokio::fs::remove_dir_all("data/blocks").await;
+            let _ = tokio::fs::remove_dir_all("data/blocks").await;
             tokio::fs::create_dir_all("data/blocks").await.unwrap();
-            tokio::fs::remove_dir_all("data/wallets").await;
+            let _ = tokio::fs::remove_dir_all("data/wallets").await;
             tokio::fs::create_dir_all("data/wallets").await.unwrap();
 
             //
@@ -745,9 +745,9 @@ pub mod test {
             //
             // reset data dirs
             //
-            tokio::fs::remove_dir_all("data/blocks").await;
+            let _ = tokio::fs::remove_dir_all("data/blocks").await;
             tokio::fs::create_dir_all("data/blocks").await.unwrap();
-            tokio::fs::remove_dir_all("data/wallets").await;
+            let _ = tokio::fs::remove_dir_all("data/wallets").await;
             tokio::fs::create_dir_all("data/wallets").await.unwrap();
 
             //

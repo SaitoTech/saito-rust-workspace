@@ -165,31 +165,34 @@ impl Blockchain {
         //
         if !self.blockring.is_empty() && self.get_block(&block.previous_block_hash).is_none() {
             if block.previous_block_hash == [0; 32] {
-                trace!(
+                info!(
                     "hash is empty for parent of block : {:?}",
                     block.hash.to_hex()
                 );
             } else if block.source_connection_id.is_some() {
                 let block_hash = block.previous_block_hash;
-                let block_in_mempool_queue;
+                let previous_is_in_queue;
                 {
-                    block_in_mempool_queue =
+                    previous_is_in_queue =
                         iterate!(mempool.blocks_queue, 100).any(|b| block_hash == b.hash);
                 }
-                if !block_in_mempool_queue && network.is_some() {
-                    let result = network
-                        .unwrap()
-                        .fetch_missing_block(
-                            block_hash,
-                            block.source_connection_id.as_ref().unwrap(),
-                        )
-                        .await;
-                    if result.is_err() {
-                        warn!(
-                            "couldn't fetch parent block : {:?} for block : {:?}",
-                            block.previous_block_hash.to_hex(),
-                            block.hash.to_hex()
-                        );
+                if !previous_is_in_queue {
+                    info!("fetching missing block : {:?}", block_hash.to_hex());
+                    if network.is_some() {
+                        let result = network
+                            .unwrap()
+                            .fetch_missing_block(
+                                block_hash,
+                                block.source_connection_id.as_ref().unwrap(),
+                            )
+                            .await;
+                        if result.is_err() {
+                            warn!(
+                                "couldn't fetch parent block : {:?} for block : {:?}",
+                                block.previous_block_hash.to_hex(),
+                                block.hash.to_hex()
+                            );
+                        }
                     }
                 } else {
                     debug!(
@@ -311,7 +314,7 @@ impl Blockchain {
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
-            debug!("shared ancestor found");
+            trace!("shared ancestor found");
 
             while new_chain_hash != old_chain_hash {
                 if self.blocks.contains_key(&old_chain_hash) {
@@ -856,7 +859,7 @@ impl Blockchain {
         new_chain: &[SaitoHash],
         old_chain: &[SaitoHash],
     ) -> bool {
-        debug!("checking for longest chain");
+        trace!("checking for longest chain");
         if self.blockring.is_empty() {
             return true;
         }
@@ -1705,7 +1708,7 @@ mod tests {
     use std::ops::Deref;
     use std::sync::Arc;
 
-    use log::{debug, error};
+    use log::{debug, error, info};
     use tokio::sync::RwLock;
 
     use crate::common::defs::{
@@ -2980,6 +2983,76 @@ mod tests {
         //TODO more tests on slips
 
         //clean up the testing file
-        fs::remove_file(filepath);
+        let _ = fs::remove_file(filepath);
+    }
+
+    #[ignore]
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn add_block_from_mempool_test() {
+        // pretty_env_logger::init();
+        let mut t = TestManager::new();
+        let block1;
+        let mut parent_block_hash;
+        let mut parent_block_id;
+        let mut ts;
+
+        // block 1
+        t.initialize(100, 1_000_000_000).await;
+
+        {
+            let (blockchain, _blockchain_) =
+                lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            block1 = blockchain.get_latest_block().unwrap();
+            parent_block_hash = block1.hash;
+            parent_block_id = block1.id;
+            ts = block1.timestamp;
+        }
+
+        for i in 0..50 {
+            // block 2
+            let mut block2 = t
+                .create_block(
+                    parent_block_hash, // hash of parent block
+                    ts + 120000,       // timestamp
+                    10,                // num transactions
+                    0,                 // amount
+                    0,                 // fee
+                    false,             // mine golden ticket
+                )
+                .await;
+            block2.id = parent_block_id + 1;
+            info!("block generate : {:?}", block2.id);
+            block2.generate(); // generate hashes
+            block2.sign(&t.wallet_lock.read().await.private_key);
+            parent_block_hash = block2.hash;
+            parent_block_id = block2.id;
+            ts = block2.timestamp;
+
+            let mut mempool = t.mempool_lock.write().await;
+            mempool.add_block(block2);
+        }
+
+        {
+            let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
+            let (mut blockchain, _blockchain_) =
+                lock_for_write!(t.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+
+            blockchain
+                .add_blocks_from_mempool(
+                    t.mempool_lock.clone(),
+                    Some(&t.network),
+                    &mut t.storage,
+                    t.sender_to_miner.clone(),
+                    configs.deref(),
+                )
+                .await;
+        }
+
+        {
+            let blockchain = t.blockchain_lock.read().await;
+            assert_eq!(blockchain.blocks.len(), 6);
+        }
     }
 }
