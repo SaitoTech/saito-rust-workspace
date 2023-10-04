@@ -35,7 +35,6 @@ impl WasmTransaction {
         for hop in &self.tx.path {
             let obj = Object::new();
 
-            // Helper to encapsulate the repeated pattern
             let handle_encode_and_set = |field_name: &str, field_value: &[u8]| {
                 let encoded_value = hex::encode(field_value);
                 if let Err(e) =
