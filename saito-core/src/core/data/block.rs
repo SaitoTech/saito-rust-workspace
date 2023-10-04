@@ -1514,6 +1514,30 @@ impl Block {
 
         // TODO : prune transactions here
 
+        let mut i = 0;
+        while i < pruned_txs.len() - 1 {
+            if pruned_txs[i].transaction_type == TransactionType::SPV
+                && pruned_txs[i + 1].transaction_type == TransactionType::SPV
+                && pruned_txs[i].txs_replacements == pruned_txs[i + 1].txs_replacements
+            {
+                // Double the replacement count for next transaction
+                pruned_txs[i + 1].txs_replacements *= 2;
+
+                pruned_txs[i + 1].signature = [
+                    pruned_txs[i].signature.as_slice(),
+                    pruned_txs[i + 1].signature.as_slice(),
+                ]
+                .concat()
+                .try_into()
+                .unwrap();
+
+                // Remove current SPV transaction
+                pruned_txs.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+
         let mut block = Block::new();
         block.id = self.id;
         block.timestamp = self.timestamp;
