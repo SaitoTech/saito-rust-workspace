@@ -83,9 +83,15 @@ impl InterfaceIO for WasmIoHandler {
     ) -> Result<(), Error> {
         let hash = js_sys::Uint8Array::new_with_length(32);
         hash.copy_from(block_hash.as_slice());
-        MsgHandler::fetch_block_from_peer(&hash, BigInt::from(peer_index), url);
-
-        drop(hash);
+        let result = MsgHandler::fetch_block_from_peer(&hash, BigInt::from(peer_index), url);
+        if result.is_err() {
+            error!(
+                "failed fetching block : {:?} from peer. {:?}",
+                block_hash.to_hex(),
+                result.err().unwrap()
+            );
+            return Err(Error::from(ErrorKind::Other));
+        }
 
         Ok(())
     }
