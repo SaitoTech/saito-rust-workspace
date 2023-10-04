@@ -1515,14 +1515,12 @@ impl Block {
         let mut no_simplification_needed = false;
         while !no_simplification_needed {
             let mut action_taken = false;
-            let mut i = 1; // starting from 1, so we can safely check i-1
+            let mut i = 1;
             while i < pruned_txs.len() {
-                // Check if current and previous transactions are both SPVs with same replacement value
                 if pruned_txs[i].transaction_type == TransactionType::SPV
                     && pruned_txs[i - 1].transaction_type == TransactionType::SPV
                     && pruned_txs[i].txs_replacements == pruned_txs[i - 1].txs_replacements
                 {
-                    // Double the replacement count for current transaction
                     pruned_txs[i].txs_replacements *= 2;
 
                     let mut sig1 = pruned_txs[i - 1].signature.to_vec().clone();
@@ -1534,11 +1532,9 @@ impl Block {
                     pruned_txs[i].signature = hash(&combined_signature);
 
                     hash(&combined_signatures);
-                    // Remove previous SPV transaction
                     pruned_txs.remove(i - 1);
                     action_taken = true;
 
-                    // No increment, so we re-check the next transaction
                     continue;
                 }
                 i += 1;
