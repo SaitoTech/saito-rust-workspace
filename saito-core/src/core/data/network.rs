@@ -1,7 +1,8 @@
+use ahash::HashSet;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
@@ -151,6 +152,7 @@ impl Network {
             block_hash.to_hex(),
             public_key.to_base58()
         );
+
         let peer_index;
         let url;
         let my_public_key;
@@ -174,7 +176,7 @@ impl Network {
             }
             let peer = peer.unwrap();
             if peer.block_fetch_url.is_empty() {
-                debug!(
+                warn!(
                     "won't fetch block : {:?} from peer : {:?} since no url found",
                     block_hash.to_hex(),
                     peer.index
@@ -184,7 +186,6 @@ impl Network {
             url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
             peer_index = peer.index;
         }
-
         self.io_interface
             .fetch_block_from_peer(block_hash, peer_index, url)
             .await
@@ -425,7 +426,7 @@ impl Network {
         }
     }
     pub async fn process_incoming_block_hash(
-        &self,
+        &mut self,
         block_hash: SaitoHash,
         peer_index: PeerIndex,
         blockchain_lock: Arc<RwLock<Blockchain>>,
@@ -468,10 +469,17 @@ impl Network {
             "fetching block for incoming hash : {:?}",
             block_hash.to_hex()
         );
-        self.io_interface
+        let (mut blockchain, _blockchain_) =
+            lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        blockchain.mark_as_fetching(block_hash);
+        let result = self
+            .io_interface
             .fetch_block_from_peer(block_hash, peer_index, url)
-            .await
-            .unwrap();
+            .await;
+        if result.is_err() {
+            // failed fetching block from peer
+            blockchain.unmark_as_fetching(&block_hash);
+        }
         Some(())
     }
 

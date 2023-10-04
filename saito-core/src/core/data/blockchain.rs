@@ -4,7 +4,7 @@ use std::io::Error;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ahash::{AHashMap, HashMap};
+use ahash::{AHashMap, HashMap, HashSet};
 use async_recursion::async_recursion;
 use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
@@ -68,7 +68,7 @@ pub struct Blockchain {
     pub lowest_acceptable_block_hash: SaitoHash,
     pub lowest_acceptable_block_id: u64,
 
-    last_callback_block_id: u64,
+    blocks_fetching: HashSet<SaitoHash>,
 }
 
 impl Blockchain {
@@ -90,7 +90,7 @@ impl Blockchain {
             lowest_acceptable_timestamp: 0,
             lowest_acceptable_block_hash: [0; 32],
             lowest_acceptable_block_id: 0,
-            last_callback_block_id: 0,
+            blocks_fetching: Default::default(),
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -136,6 +136,9 @@ impl Blockchain {
             block.transactions.len()
         );
 
+        // since we already have the block we unset the fetching state
+        self.unmark_as_fetching(&block.hash);
+
         // trace!("block : {:?}", block);
 
         // start by extracting some variables that we will use
@@ -171,14 +174,20 @@ impl Blockchain {
                 );
             } else if block.source_connection_id.is_some() {
                 let block_hash = block.previous_block_hash;
+
                 let previous_is_in_queue;
                 {
                     previous_is_in_queue =
                         iterate!(mempool.blocks_queue, 100).any(|b| block_hash == b.hash);
                 }
                 if !previous_is_in_queue {
-                    info!("fetching missing block : {:?}", block_hash.to_hex());
-                    if network.is_some() {
+                    if network.is_some() && !self.is_block_fetching(&block_hash) {
+                        info!(
+                            "fetching missing block : {:?} before adding block : {:?}",
+                            block_hash.to_hex(),
+                            block.hash.to_hex()
+                        );
+                        self.mark_as_fetching(block_hash);
                         let result = network
                             .unwrap()
                             .fetch_missing_block(
@@ -192,6 +201,7 @@ impl Blockchain {
                                 block.previous_block_hash.to_hex(),
                                 block.hash.to_hex()
                             );
+                            self.unmark_as_fetching(&block_hash);
                         }
                     }
                 } else {
@@ -1121,22 +1131,14 @@ impl Blockchain {
             }
             let block_id = block.id;
             // let block_hash = block.hash;
-            drop(block);
             // utxoset update
             {
                 let block = self.blocks.get_mut(block_hash).unwrap();
                 block.on_chain_reorganization(&mut self.utxoset, true);
             }
 
-            self.on_chain_reorganization(
-                block_id,
-                block_hash.clone(),
-                true,
-                storage,
-                configs,
-                network,
-            )
-            .await;
+            self.on_chain_reorganization(block_id, *block_hash, true, storage, configs, network)
+                .await;
 
             //
             // we have received the first entry in new_blocks() which means we
@@ -1699,6 +1701,15 @@ impl Blockchain {
             });
 
         snapshot
+    }
+    pub fn mark_as_fetching(&mut self, block_hash: SaitoHash) {
+        self.blocks_fetching.insert(block_hash);
+    }
+    pub fn unmark_as_fetching(&mut self, block_hash: &SaitoHash) {
+        self.blocks_fetching.remove(block_hash);
+    }
+    pub fn is_block_fetching(&self, block_hash: &SaitoHash) -> bool {
+        self.blocks_fetching.contains(block_hash)
     }
 }
 
@@ -2566,7 +2577,6 @@ mod tests {
     async fn basic_longest_chain_reorg_test() {
         let mut t = TestManager::new();
         let block1;
-        let block1_id;
         let block1_hash;
         let ts;
 
@@ -2581,7 +2591,6 @@ mod tests {
 
             block1 = blockchain.get_latest_block().unwrap();
             block1_hash = block1.hash;
-            block1_id = block1.id;
             ts = block1.timestamp;
         }
 

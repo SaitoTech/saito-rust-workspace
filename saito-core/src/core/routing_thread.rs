@@ -442,10 +442,18 @@ impl RoutingThread {
             let block_hash = hash(&buf);
             debug!("block_hash : {:?}", block_hash.to_hex());
             if chain.txs[i] {
-                self.network
-                    .fetch_missing_block(block_hash, &peer_key)
-                    .await
-                    .unwrap();
+                let (mut blockchain, _blockchain_) =
+                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                if !blockchain.is_block_fetching(&block_hash) {
+                    blockchain.mark_as_fetching(block_hash);
+                    let result = self
+                        .network
+                        .fetch_missing_block(block_hash, &peer_key)
+                        .await;
+                    if result.is_err() {
+                        blockchain.unmark_as_fetching(&block_hash);
+                    }
+                }
             } else {
                 // TODO : lock should be taken out of for loop
                 let (mut blockchain, _blockchain_) =
@@ -553,6 +561,12 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 self.fetch_next_blocks().await;
 
                 return Some(());
+            }
+            NetworkEvent::BlockFetchFailed { block_hash } => {
+                debug!("block fetch failed : {:?}", block_hash.to_hex());
+                let (mut blockchain, _blockchain_) =
+                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                blockchain.unmark_as_fetching(&block_hash);
             }
             NetworkEvent::DisconnectFromPeer { .. } => {
                 todo!()
