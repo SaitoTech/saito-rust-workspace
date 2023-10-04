@@ -34,9 +34,20 @@ impl WasmTransaction {
         let array = Array::new();
         for hop in &self.tx.path {
             let obj = Object::new();
-            js_sys::Reflect::set(&obj, &"from".into(), &hex::encode(&hop.from).into()).unwrap();
-            js_sys::Reflect::set(&obj, &"to".into(), &hex::encode(&hop.to).into()).unwrap();
-            js_sys::Reflect::set(&obj, &"sig".into(), &hex::encode(&hop.sig).into()).unwrap();
+
+            // Helper to encapsulate the repeated pattern
+            let handle_encode_and_set = |field_name: &str, field_value: &[u8]| {
+                let encoded_value = hex::encode(field_value);
+                if let Err(e) =
+                    js_sys::Reflect::set(&obj, &field_name.into(), &encoded_value.into())
+                {
+                    dbg!("Error setting field '{}': {:?}", field_name, e);
+                }
+            };
+
+            handle_encode_and_set("from", &hop.from);
+            handle_encode_and_set("to", &hop.to);
+            handle_encode_and_set("sig", &hop.sig);
 
             array.push(&obj);
         }
