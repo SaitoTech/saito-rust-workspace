@@ -248,12 +248,28 @@ impl NetworkController {
         if result.is_err() {
             // TODO : should we retry here?
             warn!("failed fetching : {:?}", url);
+            sender_to_core
+                .send(IoEvent {
+                    event_processor_id: 1,
+                    event_id,
+                    event: NetworkEvent::BlockFetchFailed { block_hash },
+                })
+                .await
+                .unwrap();
             return;
         }
         let response = result.unwrap();
         let result = response.bytes().await;
         if result.is_err() {
             warn!("failed getting byte buffer from fetching block : {:?}", url);
+            sender_to_core
+                .send(IoEvent {
+                    event_processor_id: 1,
+                    event_id,
+                    event: NetworkEvent::BlockFetchFailed { block_hash },
+                })
+                .await
+                .unwrap();
             return;
         }
         let result = result.unwrap();
@@ -579,6 +595,9 @@ pub async fn run_network_controller(
                         });
                     }
                     NetworkEvent::BlockFetched { .. } => {
+                        unreachable!()
+                    }
+                    NetworkEvent::BlockFetchFailed { .. } => {
                         unreachable!()
                     }
                     NetworkEvent::DisconnectFromPeer { peer_index } => {

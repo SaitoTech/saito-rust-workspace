@@ -430,6 +430,14 @@ pub async fn process_fetched_block(
 }
 
 #[wasm_bindgen]
+pub async fn process_failed_block_fetch(hash: js_sys::Uint8Array) {
+    let mut saito = SAITO.lock().await;
+    let mut blockchain = saito.routing_thread.blockchain.write().await;
+
+    blockchain.unmark_as_fetching(&hash.to_vec().try_into().unwrap());
+}
+
+#[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
     let mut saito = SAITO.lock().await;
 
@@ -628,7 +636,7 @@ pub fn generate_public_key(private_key: JsString) -> Result<JsString, JsValue> {
         "Failed parsing private key string to key",
     )))?;
     let (public_key, _) = generate_keypair_from_private_key(&private_key);
-    Ok(public_key.to_hex().into())
+    Ok(public_key.to_base58().into())
 }
 
 #[wasm_bindgen]

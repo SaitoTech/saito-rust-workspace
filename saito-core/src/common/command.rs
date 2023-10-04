@@ -38,4 +38,7 @@ pub enum NetworkEvent {
         peer_index: u64,
         buffer: Vec<u8>,
     },
+    BlockFetchFailed {
+        block_hash: SaitoHash,
+    },
 }
