@@ -636,7 +636,7 @@ pub fn generate_public_key(private_key: JsString) -> Result<JsString, JsValue> {
         "Failed parsing private key string to key",
     )))?;
     let (public_key, _) = generate_keypair_from_private_key(&private_key);
-    Ok(public_key.to_hex().into())
+    Ok(public_key.to_base58().into())
 }
 
 #[wasm_bindgen]
