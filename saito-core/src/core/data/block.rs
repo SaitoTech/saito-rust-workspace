@@ -1522,16 +1522,13 @@ impl Block {
                     && pruned_txs[i].txs_replacements == pruned_txs[i - 1].txs_replacements
                 {
                     pruned_txs[i].txs_replacements *= 2;
+                    // Assuming each signature is of type [u8; 32]
+                    let sig1 = pruned_txs[i - 1].signature;
+                    let sig2 = pruned_txs[i].signature;
 
-                    let mut sig1 = pruned_txs[i - 1].signature.to_vec().clone();
-                    let sig2 = pruned_txs[i].signature.to_vec().clone();
-                    sig1.to_vec().append(&mut sig2.clone());
+                    // let mut combined: [u8; 64] = [sig1, sig2].concat().try_into().unwrap();
+                    // pruned_txs[i].signature = hash(&sig1);
 
-                    let combined_signatures: [u8; 64] = sig1.try_into().expect("");
-
-                    pruned_txs[i].signature = hash(&combined_signature);
-
-                    hash(&combined_signatures);
                     pruned_txs.remove(i - 1);
                     action_taken = true;
 
