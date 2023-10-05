@@ -8,6 +8,7 @@ use saito_core::common::defs::{Currency, PrintForLog, SaitoPublicKey, Timestamp}
 use saito_core::core::data::transaction::{Transaction, TransactionType};
 
 use crate::saitowasm::{string_to_hex, string_to_key, SAITO};
+use crate::wasm_hop::WasmHop;
 use crate::wasm_slip::WasmSlip;
 
 #[wasm_bindgen]
@@ -33,25 +34,17 @@ impl WasmTransaction {
     pub fn get_routing_path(&self) -> Array {
         let array = Array::new();
         for hop in &self.tx.path {
-            let obj = Object::new();
-
-            let handle_encode_and_set = |field_name: &str, field_value: &[u8]| {
-                let encoded_value = hex::encode(field_value);
-                if let Err(e) =
-                    js_sys::Reflect::set(&obj, &field_name.into(), &encoded_value.into())
-                {
-                    dbg!("Error setting field '{}': {:?}", field_name, e);
+            let wasm_hop = WasmHop::from_hop(hop.clone());
+            match wasm_hop.to_js_object() {
+                Ok(obj) => {
+                    array.push(&obj);
                 }
-            };
-
-            handle_encode_and_set("from", &hop.from);
-            handle_encode_and_set("to", &hop.to);
-            handle_encode_and_set("sig", &hop.sig);
-
-            array.push(&obj);
+                Err(e) => (),
+            }
         }
         array
     }
+
     #[wasm_bindgen(setter = signature)]
     pub fn set_signature(&mut self, signature: JsString) {
         self.tx.signature = string_to_hex(signature).unwrap();
