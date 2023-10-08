@@ -35,12 +35,7 @@ impl WasmTransaction {
         let array = Array::new();
         for hop in &self.tx.path {
             let wasm_hop = WasmHop::from_hop(hop.clone());
-            match wasm_hop.to_js_object() {
-                Ok(obj) => {
-                    array.push(&obj);
-                }
-                Err(e) => (),
-            }
+            array.push(&JsValue::from(wasm_hop));
         }
         array
     }
