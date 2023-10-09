@@ -129,7 +129,8 @@ export default class Transaction extends WasmWrapper<WasmTransaction> {
       signature: this.signature,
       buffer: Buffer.from(this.data).toString("base64"),
       txs_replacements: this.txs_replacements,
-      total_fees: this.total_fees
+      total_fees: this.total_fees,
+      routing_path: this.instance.routing_path
     };
   }
 
