@@ -1,6 +1,6 @@
 [package]
 name = "saito-wasm"
-version = "0.1.7"
+version = "0.1.17"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,26 +9,26 @@ crate-type = ["cdylib"]
 
 [dependencies]
 saito-core = { path = "../saito-core" }
-wasm-bindgen = { version = "0.2.86" }
-wasm-bindgen-futures = "0.4.36"
-serde = { version = "1.0.163", features = ["derive"] }
-serde-wasm-bindgen = { version = "0.5.0" }
-web-sys = "0.3.63"
-async-trait = "0.1.68"
+wasm-bindgen = { version = "0.2.87" }
+wasm-bindgen-futures = "0.4.37"
+serde = { version = "1.0.188", features = ["derive"] }
+serde-wasm-bindgen = { version = "0.6.0" }
+web-sys = "0.3.64"
+async-trait = "0.1.73"
 hex = "0.4.3"
 tokio = "1.24.2"
-js-sys = { version = "0.3.63" }
+js-sys = { version = "0.3.64" }
 lazy_static = "1.4.0"
 console_log = { version = "0.2.2", features = ["color"] }
-log = "0.4.17"
-getrandom = { version = "0.2.8", features = ["js", "std"] }
+log = "0.4.20"
+getrandom = { version = "0.2.10", features = ["js", "std"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
-secp256k1 = { version = "0.27.0", features = ["bitcoin_hashes", "global-context", "serde"] }
+secp256k1 = { version = "0.28.0", features = ["hashes", "global-context", "serde"] }
 bs58 = "0.5.0"
-figment = { version = "0.10.8", features = ["json"] }
-serde_json = { version = "1.0.96" }
-num-derive = { version = "0.3.3" }
-num-traits = { version = "0.2.15" }
+figment = { version = "0.10.11", features = ["json"] }
+serde_json = { version = "1.0.107" }
+num-derive = { version = "0.4.1" }
+num-traits = { version = "0.2.17" }
 wee_alloc = "0.4.5"
 
 [package.metadata.wasm-pack.profile.release]

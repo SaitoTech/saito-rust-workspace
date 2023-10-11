@@ -912,12 +912,15 @@ impl Block {
 
     // generate dynamic consensus values
     pub async fn generate_consensus_values(&self, blockchain: &Blockchain) -> ConsensusValues {
-        debug!("generate consensus values");
+        debug!(
+            "generate consensus values for {:?} from : {:?} txs",
+            self.hash.to_hex(),
+            self.transactions.len()
+        );
         let mut cv = ConsensusValues::new();
 
-        //
+        trace!("calculating total fees");
         // calculate total fees
-        //
         for (index, transaction) in self.transactions.iter().enumerate() {
             if !transaction.is_fee_transaction() {
                 cv.total_fees += transaction.total_fees;
@@ -935,10 +938,9 @@ impl Block {
             }
         }
 
-        //
         // calculate automatic transaction rebroadcasts / ATR / atr
-        //
         if self.id > GENESIS_PERIOD + 1 {
+            trace!("calculating ATR");
             let pruned_block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
@@ -1008,9 +1010,8 @@ impl Block {
             }
         }
 
-        //
         // burn fee, difficulty and avg_income figures
-        //
+        trace!("calculating burn fee,difficulty,etc...");
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
             cv.avg_income = previous_block.avg_income;
             cv.avg_variance = previous_block.avg_variance;
@@ -1072,9 +1073,8 @@ impl Block {
             cv.avg_atr_variance = self.avg_atr_variance;
         }
 
-        //
         // calculate payments to miners / routers / stakers
-        //
+        trace!("calculating payments...");
         if let Some(gt_index) = cv.gt_index {
             let golden_ticket: GoldenTicket =
                 GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
@@ -1215,7 +1215,6 @@ impl Block {
             cv.fee_transaction = Some(transaction);
         }
 
-        //
         // if there is no golden ticket AND there is no golden ticket before the MAX
         // blocks we recurse to collect NOLAN we have to add the amount of the unpaid
         // block to the amount of NOLAN that is falling off our chain.
@@ -1224,7 +1223,7 @@ impl Block {
         // run into, but it is good to collect the SAITO into a variable that we track
         // so that we can confirm the soundness of monetary policy by monitoring the
         // blockchain.
-        //
+        trace!("checking for golden tickets");
         if cv.gt_num == 0 {
             for i in 1..=MAX_STAKER_RECURSION {
                 if i >= self.id {
@@ -2222,6 +2221,7 @@ mod tests {
             block.serialize_for_net(BlockType::Full)
         );
     }
+
     #[tokio::test]
     async fn generate_lite_block_test() {
         let mut t = TestManager::new();

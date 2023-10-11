@@ -111,10 +111,9 @@ impl Blockchain {
         mut block: Block,
         network: Option<&Network>,
         storage: &mut Storage,
-        sender_to_miner: Sender<MiningEvent>,
+        sender_to_miner: Option<Sender<MiningEvent>>,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
-        notify_miner: bool,
     ) -> AddBlockResult {
         // confirm hash first
         // block.generate_pre_hash();
@@ -450,15 +449,16 @@ impl Blockchain {
                     storage,
                     mempool,
                     configs,
-                    notify_miner,
+                    sender_to_miner.is_some(),
                 )
                 .await;
 
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
-                if notify_miner {
+                if sender_to_miner.is_some() {
                     debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", block_hash.to_hex(), difficulty);
                     sender_to_miner
+                        .unwrap()
                         .send(MiningEvent::LongestChainBlockAdded {
                             hash: block_hash,
                             difficulty,
@@ -479,8 +479,15 @@ impl Blockchain {
             }
         } else {
             debug!("this is not the longest chain");
-            self.add_block_success(block_hash, network, storage, mempool, configs, notify_miner)
-                .await;
+            self.add_block_success(
+                block_hash,
+                network,
+                storage,
+                mempool,
+                configs,
+                sender_to_miner.is_some(),
+            )
+            .await;
             AddBlockResult::BlockAdded
         };
     }
@@ -1373,7 +1380,7 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
         network: Option<&Network>,
     ) {
-        trace!(
+        debug!(
             "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
             block_id,
             block_hash.to_hex()
@@ -1571,7 +1578,7 @@ impl Blockchain {
         mempool_lock: Arc<RwLock<Mempool>>,
         network: Option<&Network>,
         storage: &mut Storage,
-        sender_to_miner: Sender<MiningEvent>,
+        sender_to_miner: Option<Sender<MiningEvent>>,
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         debug!("adding blocks from mempool to blockchain");
@@ -1592,8 +1599,6 @@ impl Blockchain {
                     sender_to_miner.clone(),
                     &mut mempool,
                     configs.deref(),
-                    // notify miner once all the blocks are added
-                    blocks.is_empty(),
                 )
                 .await;
             if !blockchain_updated {
