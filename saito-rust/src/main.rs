@@ -736,7 +736,10 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
         sender_to_network_controller.clone(),
         0,
     )));
-    storage.load_blocks_from_disk(context.mempool.clone()).await;
+    let list = storage.load_block_name_list().await.unwrap();
+    storage
+        .load_blocks_from_disk(list, context.mempool.clone())
+        .await;
 
     let _peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
@@ -750,7 +753,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
             context.mempool.clone(),
             None,
             &mut storage,
-            sender_to_miner.clone(),
+            Some(sender_to_miner.clone()),
             configs.deref(),
         )
         .await;

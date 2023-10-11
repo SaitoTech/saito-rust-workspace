@@ -180,10 +180,9 @@ pub mod test {
                         block,
                         Some(&mut self.network),
                         &mut self.storage,
-                        self.sender_to_miner.clone(),
+                        Some(self.sender_to_miner.clone()),
                         &mut mempool,
                         configs.deref(),
-                        true,
                     )
                     .await;
 
@@ -823,10 +822,9 @@ pub mod test {
                     genblock,
                     Some(&self.network),
                     &mut self.storage,
-                    self.sender_to_miner.clone(),
+                    Some(self.sender_to_miner.clone()),
                     &mut mempool,
                     configs.deref(),
-                    true,
                 )
                 .await;
         }

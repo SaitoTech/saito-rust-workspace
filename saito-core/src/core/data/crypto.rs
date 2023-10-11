@@ -2,6 +2,7 @@ use aes::Aes128;
 use blake3::Hasher;
 use block_modes::block_padding::Pkcs7;
 use block_modes::{BlockMode, Cbc};
+use log::trace;
 pub use merkle::MerkleTree;
 use rand::{thread_rng, Rng};
 use secp256k1::ecdsa;
@@ -127,12 +128,18 @@ pub fn verify_signature(
     sig: &SaitoSignature,
     public_key: &SaitoPublicKey,
 ) -> bool {
+    trace!("111 : {:?}", hash.to_hex());
     let m = Message::from_slice(hash);
+    trace!("222 : {:?}", public_key.to_hex());
     let p = PublicKey::from_slice(public_key);
+    trace!("333 : {:?}", sig.to_hex());
     let s = ecdsa::Signature::from_compact(sig);
+    trace!("444");
     if m.is_err() || p.is_err() || s.is_err() {
+        trace!("555");
         false
     } else {
+        trace!("666");
         SECP256K1
             .verify_ecdsa(&m.unwrap(), &s.unwrap(), &p.unwrap())
             .is_ok()
