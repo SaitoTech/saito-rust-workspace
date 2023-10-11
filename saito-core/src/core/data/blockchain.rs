@@ -1391,6 +1391,7 @@ impl Blockchain {
                 "last block id : {:?} is later than this block id : {:?}. skipping reorg",
                 self.last_block_id, block_id
             );
+            self.downgrade_blockchain_data(configs.is_browser()).await;
             return;
         }
 
@@ -2842,8 +2843,9 @@ mod tests {
 
         t.add_block(block2).await;
 
+        let list = t2.storage.load_block_name_list().await.unwrap();
         t2.storage
-            .load_blocks_from_disk(t2.mempool_lock.clone())
+            .load_blocks_from_disk(list, t2.mempool_lock.clone())
             .await;
         {
             let (configs, _configs_) = lock_for_read!(t2.configs, LOCK_ORDER_CONFIGS);
@@ -2855,7 +2857,7 @@ mod tests {
                     t2.mempool_lock.clone(),
                     Some(&t2.network),
                     &mut t2.storage,
-                    t2.sender_to_miner.clone(),
+                    Some(t2.sender_to_miner.clone()),
                     configs.deref(),
                 )
                 .await;
@@ -3058,7 +3060,7 @@ mod tests {
                     t.mempool_lock.clone(),
                     Some(&t.network),
                     &mut t.storage,
-                    t.sender_to_miner.clone(),
+                    Some(t.sender_to_miner.clone()),
                     configs.deref(),
                 )
                 .await;
