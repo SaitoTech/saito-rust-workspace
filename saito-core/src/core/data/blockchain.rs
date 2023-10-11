@@ -1559,9 +1559,7 @@ impl Blockchain {
         }
 
         for hash in block_hashes_copy {
-            //
             // ask the block to remove its transactions
-            //
             {
                 let block = self.get_mut_block(&hash);
                 if let Some(block) = block {
