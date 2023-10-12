@@ -493,7 +493,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             info!("loading {:?} blocks from disk", list.len());
             while !list.is_empty() {
-                let file_names = list.drain(..100).collect();
+                let file_names = list.drain(..std::cmp::min(100, list.len())).collect();
                 self.storage
                     .load_blocks_from_disk(file_names, self.mempool.clone())
                     .await;
