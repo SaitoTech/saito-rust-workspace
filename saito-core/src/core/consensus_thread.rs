@@ -205,10 +205,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                             block,
                             Some(&self.network),
                             &mut self.storage,
-                            self.sender_to_miner.clone(),
+                            Some(self.sender_to_miner.clone()),
                             &mut mempool,
                             configs.deref(),
-                            true,
                         )
                         .await;
                 }
@@ -289,7 +288,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         self.mempool.clone(),
                         Some(&self.network),
                         &mut self.storage,
-                        self.sender_to_miner.clone(),
+                        Some(self.sender_to_miner.clone()),
                         configs.deref(),
                     )
                     .await;
@@ -386,7 +385,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         self.mempool.clone(),
                         Some(&self.network),
                         &mut self.storage,
-                        self.sender_to_miner.clone(),
+                        Some(self.sender_to_miner.clone()),
                         configs.deref(),
                     )
                     .await;
@@ -478,30 +477,43 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             }
         }
 
-        self.storage
-            .load_blocks_from_disk(self.mempool.clone())
-            .await;
-
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let (mut blockchain, _blockchain_) =
             lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-
         {
-            let (mempool, _mempool_) = lock_for_read!(self.mempool, LOCK_ORDER_MEMPOOL);
-            if configs.get_peer_configs().is_empty() && mempool.blocks_queue.is_empty() {
+            let mut list = self
+                .storage
+                .load_block_name_list()
+                .await
+                .expect("cannot load block file list");
+            // let (mempool, _mempool_) = lock_for_read!(self.mempool, LOCK_ORDER_MEMPOOL);
+            if configs.get_peer_configs().is_empty() && list.is_empty() {
                 self.generate_genesis_block = true;
             }
-        }
 
-        blockchain
-            .add_blocks_from_mempool(
-                self.mempool.clone(),
-                Some(&self.network),
-                &mut self.storage,
-                self.sender_to_miner.clone(),
-                configs.deref(),
-            )
-            .await;
+            info!("loading {:?} blocks from disk", list.len());
+            while !list.is_empty() {
+                let file_names = list.drain(..100).collect();
+                self.storage
+                    .load_blocks_from_disk(file_names, self.mempool.clone())
+                    .await;
+                let sender = if list.is_empty() {
+                    Some(self.sender_to_miner.clone())
+                } else {
+                    None
+                };
+
+                blockchain
+                    .add_blocks_from_mempool(
+                        self.mempool.clone(),
+                        Some(&self.network),
+                        &mut self.storage,
+                        sender,
+                        configs.deref(),
+                    )
+                    .await;
+            }
+        }
 
         debug!(
             "sending block id update as : {:?}",

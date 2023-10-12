@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use bs58;
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, warn};
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
@@ -87,53 +87,60 @@ impl Storage {
         filename
     }
 
-    pub async fn load_blocks_from_disk(&mut self, mempool_lock: Arc<RwLock<Mempool>>) {
-        info!("loading blocks from disk");
-        let file_names = self.io_interface.load_block_file_list().await;
-
-        if file_names.is_err() {
-            panic!("failed loading blocks . {:?}", file_names.err().unwrap());
+    pub async fn load_block_name_list(&self) -> Result<Vec<String>, Error> {
+        let list = self.io_interface.load_block_file_list().await;
+        if list.is_err() {
+            error!(
+                "failed loading block list from disk : {:?}",
+                list.err().unwrap()
+            );
+            return Err(Error::from(ErrorKind::InvalidData));
         }
+        let mut list = list.unwrap();
+        list.sort();
+        Ok(list)
+    }
 
-        let mut file_names = file_names.unwrap();
-        {
-            file_names.sort();
-            trace!("loading files...");
-            for file_name in file_names {
-                let result = self
-                    .io_interface
-                    .read_value(self.io_interface.get_block_dir() + file_name.as_str())
-                    .await;
-                if result.is_err() {
-                    error!(
-                        "failed loading block from disk : {:?}",
-                        result.err().unwrap()
-                    );
-                    continue;
-                }
-                debug!("file : {:?} loaded", file_name);
-                let buffer: Vec<u8> = result.unwrap();
-                let buffer_len = buffer.len();
-                let result = Block::deserialize_from_net(buffer);
-                if result.is_err() {
-                    // ideally this shouldn't happen since we only write blocks which are valid to disk
-                    warn!(
-                        "failed deserializing block with buffer length : {:?}",
-                        buffer_len
-                    );
-                    continue;
-                }
-                let mut block: Block = result.unwrap();
-                block.force_loaded = true;
-                block.generate();
-                debug!("block : {:?} loaded from disk", block.hash.to_hex());
-                let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
-                mempool.add_block(block);
+    pub async fn load_blocks_from_disk(
+        &mut self,
+        file_names: Vec<String>,
+        mempool_lock: Arc<RwLock<Mempool>>,
+    ) {
+        debug!("loading  {:?} blocks from disk", file_names.len());
+
+        for file_name in file_names {
+            let result = self
+                .io_interface
+                .read_value(self.io_interface.get_block_dir() + file_name.as_str())
+                .await;
+            if result.is_err() {
+                error!(
+                    "failed loading block from disk : {:?}",
+                    result.err().unwrap()
+                );
+                continue;
             }
-            trace!("block file loading finished");
-
-            info!("loading blocks to mempool completed");
+            debug!("file : {:?} loaded", file_name);
+            let buffer: Vec<u8> = result.unwrap();
+            let buffer_len = buffer.len();
+            let result = Block::deserialize_from_net(buffer);
+            if result.is_err() {
+                // ideally this shouldn't happen since we only write blocks which are valid to disk
+                warn!(
+                    "failed deserializing block with buffer length : {:?}",
+                    buffer_len
+                );
+                continue;
+            }
+            let mut block: Block = result.unwrap();
+            block.force_loaded = true;
+            block.generate();
+            debug!("block : {:?} loaded from disk", block.hash.to_hex());
+            let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
+            mempool.add_block(block);
         }
+
+        debug!("blocks loaded to mempool");
     }
 
     pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
