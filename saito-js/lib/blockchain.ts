@@ -55,7 +55,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
                 callbackIndices[j] !== undefined &&
                 txs !== undefined
               ) {
-                console.log(`run callback : ${j} for block : ${block.hash} with id : ${block.id} with confirmation : ${i} `);
+                // console.log(`run callback : ${j} for block : ${block.hash} with id : ${block.id} with confirmation : ${i} `);
                 if (txs[callbackIndices[j]]) {
                   await callbacks[j](block, txs[callbackIndices[j]], i);
                 } else {
