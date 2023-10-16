@@ -30,9 +30,9 @@ bs58 = "0.5.0"
 clap = "3.2.25"
 
 [dev-dependencies]
-serial_test = "0.10.0"
+serial_test = "2.0.0"
 ctor = "0.2.5"
-criterion = "0.4.0"
+criterion = "0.5.1"
 
 [profile.dev]
 panic = "unwind"

@@ -1,4 +1,3 @@
-use ahash::HashSet;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -432,6 +431,11 @@ impl Network {
         blockchain_lock: Arc<RwLock<Blockchain>>,
         mempool_lock: Arc<RwLock<Mempool>>,
     ) -> Option<()> {
+        trace!(
+            "processing incoming block hash : {:?} from peer : {:?}",
+            block_hash.to_hex(),
+            peer_index
+        );
         let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let block_exists;
         let my_public_key;
@@ -445,26 +449,32 @@ impl Network {
             my_public_key = wallet.public_key;
         }
         if block_exists {
+            debug!(
+                "block : {:?} already exists in chain. not fetching",
+                block_hash.to_hex()
+            );
             return None;
         }
         let url;
         {
             let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
-            let peer = peers
-                .index_to_peers
-                .get(&peer_index)
-                .expect("peer not found");
-            if peer.block_fetch_url.is_empty() {
-                debug!(
-                    "won't fetch block : {:?} from peer : {:?} since no url found",
-                    block_hash.to_hex(),
-                    peer_index
-                );
+            if let Some(peer) = peers.index_to_peers.get(&peer_index) {
+                if peer.block_fetch_url.is_empty() {
+                    debug!(
+                        "won't fetch block : {:?} from peer : {:?} since no url found",
+                        block_hash.to_hex(),
+                        peer_index
+                    );
+                    return None;
+                }
+                url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
+            } else {
+                warn!("peer : {:?} is not in peer list", peer_index);
                 return None;
             }
-            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
         }
+
         debug!(
             "fetching block for incoming hash : {:?}",
             block_hash.to_hex()
@@ -472,12 +482,17 @@ impl Network {
         let (mut blockchain, _blockchain_) =
             lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
         blockchain.mark_as_fetching(block_hash);
-        let result = self
+        if self
             .io_interface
             .fetch_block_from_peer(block_hash, peer_index, url)
-            .await;
-        if result.is_err() {
+            .await
+            .is_err()
+        {
             // failed fetching block from peer
+            warn!(
+                "failed fetching block : {:?} for block hash. so unmarking block as fetching",
+                block_hash.to_hex()
+            );
             blockchain.unmark_as_fetching(&block_hash);
         }
         Some(())

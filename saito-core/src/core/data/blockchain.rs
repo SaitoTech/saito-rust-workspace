@@ -196,7 +196,7 @@ impl Blockchain {
                             .await;
                         if result.is_err() {
                             warn!(
-                                "couldn't fetch parent block : {:?} for block : {:?}",
+                                "couldn't fetch parent block : {:?} for block : {:?}. unmarking the block",
                                 block.previous_block_hash.to_hex(),
                                 block.hash.to_hex()
                             );
@@ -1707,9 +1707,11 @@ impl Blockchain {
         snapshot
     }
     pub fn mark_as_fetching(&mut self, block_hash: SaitoHash) {
+        debug!("marking block : {:?} as fetching", block_hash.to_hex());
         self.blocks_fetching.insert(block_hash);
     }
     pub fn unmark_as_fetching(&mut self, block_hash: &SaitoHash) {
+        debug!("unmarking block : {:?} as fetching", block_hash.to_hex());
         self.blocks_fetching.remove(block_hash);
     }
     pub fn is_block_fetching(&self, block_hash: &SaitoHash) -> bool {

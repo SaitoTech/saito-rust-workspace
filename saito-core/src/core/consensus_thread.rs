@@ -498,7 +498,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     .load_blocks_from_disk(file_names, self.mempool.clone())
                     .await;
                 let sender = if list.is_empty() {
-                    Some(self.sender_to_miner.clone())
+                    // Some(self.sender_to_miner.clone())
+                    // since we are loading the blocks from disk, we aren't mining for latest block
+                    None
                 } else {
                     None
                 };
