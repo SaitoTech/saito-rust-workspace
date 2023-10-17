@@ -18,7 +18,8 @@ use wasm_bindgen::prelude::*;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+    PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, StatVariable,
+    STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -433,8 +434,8 @@ pub async fn process_fetched_block(
 pub async fn process_failed_block_fetch(hash: js_sys::Uint8Array) {
     let mut saito = SAITO.lock().await;
     let mut blockchain = saito.routing_thread.blockchain.write().await;
-
-    blockchain.unmark_as_fetching(&hash.to_vec().try_into().unwrap());
+    let hash: SaitoHash = hash.to_vec().try_into().unwrap();
+    blockchain.unmark_as_fetching(&hash);
 }
 
 #[wasm_bindgen]

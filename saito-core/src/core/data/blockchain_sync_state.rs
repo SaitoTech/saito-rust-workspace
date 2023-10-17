@@ -71,10 +71,20 @@ impl BlockchainSyncState {
                 if result.is_none() {
                     break;
                 }
-                let fetching_list = result.unwrap();
+                let fetching_list = result.expect("fetching list should exist");
 
-                let (_, _, block_id) = fetching_list.back().unwrap();
-                let (id, _) = received_picture.front().unwrap();
+                if fetching_list.is_empty() {
+                    break;
+                }
+                let (_, _, block_id) = fetching_list
+                    .back()
+                    .expect("failed getting back item from fetching list");
+                if received_picture.is_empty() {
+                    break;
+                }
+                let (id, _) = received_picture
+                    .front()
+                    .expect("failed getting front item from received picture");
                 trace!(
                     "for peer : {:?} last at fetching list : {:?}, first at received list : {:?}",
                     peer_index,
@@ -85,7 +95,9 @@ impl BlockchainSyncState {
                     // if first entry in the received pic is not next in sequence (either has next block id or same block id for forks) we break
                     break;
                 }
-                let (id, hash) = received_picture.pop_front().unwrap();
+                let (id, hash) = received_picture
+                    .pop_front()
+                    .expect("failed popping front from received picture");
                 fetching_list.push_back((hash, BlockStatus::Queued, id));
             }
         }

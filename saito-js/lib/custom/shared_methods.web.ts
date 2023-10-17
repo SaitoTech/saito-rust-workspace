@@ -59,7 +59,8 @@ export default class WebSharedMethods extends CustomSharedMethods {
       })
       .then((buffer: ArrayBuffer) => {
         return new Uint8Array(buffer);
-      }).catch((err) => {
+      })
+      .catch((err) => {
         console.error("failed fetching block : ", err);
         throw err;
       });

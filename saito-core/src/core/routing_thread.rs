@@ -356,15 +356,6 @@ impl RoutingThread {
         self.fetch_next_blocks().await;
     }
     async fn fetch_next_blocks(&mut self) {
-        // trace!("fetching next blocks");
-
-        // {
-        //     let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-        //
-        //     self.blockchain_sync_state
-        //         .set_latest_blockchain_id(blockchain.get_latest_block_id());
-        // }
-
         self.blockchain_sync_state.build_peer_block_picture();
 
         let map = self.blockchain_sync_state.request_blocks_from_waitlist();
@@ -451,6 +442,7 @@ impl RoutingThread {
                         .fetch_missing_block(block_hash, &peer_key)
                         .await;
                     if result.is_err() {
+                        warn!("failed fetching block : {:?}. so unmarking block as fetching for ghost chain",block_hash.to_hex());
                         blockchain.unmark_as_fetching(&block_hash);
                     }
                 }
@@ -566,6 +558,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 debug!("block fetch failed : {:?}", block_hash.to_hex());
                 let (mut blockchain, _blockchain_) =
                     lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                warn!("failed fetching block : {:?} from network thread. so unmarking block as fetching",block_hash.to_hex());
+
                 blockchain.unmark_as_fetching(&block_hash);
             }
             NetworkEvent::DisconnectFromPeer { .. } => {

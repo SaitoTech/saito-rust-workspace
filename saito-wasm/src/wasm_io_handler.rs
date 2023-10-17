@@ -302,7 +302,7 @@ extern "C" {
         hash: &Uint8Array,
         peer_index: BigInt,
         url: String,
-    ) -> Result<JsValue, js_sys::Error>;
+    ) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn process_api_call(buffer: Uint8Array, msg_index: u32, peer_index: u64);
