@@ -58,8 +58,10 @@ export default class WebSharedMethods extends CustomSharedMethods {
         return res.arrayBuffer();
       })
       .then((buffer: ArrayBuffer) => {
+        // return Saito.getInstance().processFetchedBlock(new Uint8Array(buffer), hash, peer_index);
         return new Uint8Array(buffer);
-      }).catch((err) => {
+      })
+      .catch((err) => {
         console.error("failed fetching block : ", err);
         throw err;
       });

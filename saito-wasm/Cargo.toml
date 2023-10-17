@@ -14,9 +14,9 @@ wasm-bindgen-futures = "0.4.37"
 serde = { version = "1.0.189", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.6.0" }
 web-sys = "0.3.64"
-async-trait = "0.1.73"
+async-trait = "0.1.74"
 hex = "0.4.3"
-tokio = "1.24.2"
+tokio = "1.33.0"
 js-sys = { version = "0.3.64" }
 lazy_static = "1.4.0"
 console_log = { version = "1.0.0", features = ["color"] }

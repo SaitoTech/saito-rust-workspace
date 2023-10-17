@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.24.2", features = ["sync", "tokio-macros", "test-util", "macros", "tracing"] }
+tokio = { version = "1.33.0", features = ["sync", "tokio-macros", "test-util", "macros", "tracing"] }
 secp256k1 = { version = "0.28.0", features = ["rand", "hashes", "global-context", "serde"] }
 getrandom = { version = "0.2.10", features = ["js"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
@@ -32,7 +32,7 @@ bs58 = "0.5.0"
 
 [dev-dependencies]
 serial_test = "2.0.0"
-tokio = { version = "1.24.2", features = ["full"] }
+tokio = { version = "1.33.0", features = ["full"] }
 criterion = { version = "0.5.1", features = ["default", "html_reports"] }
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 

@@ -76,9 +76,8 @@ export default class Saito {
           .catch((error: any) => {
             console.log("failed fetching block for url : " + url + " from peer : " + peer_index);
             console.error(error);
-            throw error;
-          })
-        ;
+            return Saito.getLibInstance().process_failed_block_fetch(hash);
+          });
       },
       process_api_call: (buffer: Uint8Array, msgIndex: number, peerIndex: bigint) => {
         return sharedMethods.processApiCall(buffer, msgIndex, peerIndex).then(() => {
