@@ -443,47 +443,60 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     let mut saito = SAITO.lock().await;
 
     let duration = Duration::from_millis(duration_in_ms);
+    const EVENT_LIMIT: u32 = 100;
+    let mut event_counter = 0;
 
-    // blockchain controller
-    // TODO : update to recv().await
-    let result = saito.receiver_for_router.try_recv();
-    if result.is_ok() {
-        let event = result.unwrap();
+    while let Ok(event) = saito.receiver_for_router.try_recv() {
         let _result = saito.routing_thread.process_event(event).await;
+        event_counter += 1;
+        if event_counter >= EVENT_LIMIT {
+            break;
+        }
     }
+    event_counter = 0;
+
     saito
         .routing_thread
         .process_timer_event(duration.clone())
         .await;
-    // mempool controller
-    // TODO : update to recv().await
-    let result = saito.receiver_for_consensus.try_recv();
-    if result.is_ok() {
-        let event = result.unwrap();
+
+    while let Ok(event) = saito.receiver_for_consensus.try_recv() {
         let _result = saito.consensus_thread.process_event(event).await;
+        event_counter += 1;
+        if event_counter >= EVENT_LIMIT {
+            break;
+        }
     }
+    event_counter = 0;
+
     saito
         .consensus_thread
         .process_timer_event(duration.clone())
         .await;
 
-    // verification thread
-    let result = saito.receiver_for_verification.try_recv();
-    if result.is_ok() {
-        let event = result.unwrap();
+    while let Ok(event) = saito.receiver_for_verification.try_recv() {
         let _result = saito.verification_thread.process_event(event).await;
+        event_counter += 1;
+        if event_counter >= EVENT_LIMIT {
+            break;
+        }
     }
+    event_counter = 0;
+
     saito
         .verification_thread
         .process_timer_event(duration.clone())
         .await;
 
-    // miner controller
-    let result = saito.receiver_for_miner.try_recv();
-    if result.is_ok() {
-        let event = result.unwrap();
+    while let Ok(event) = saito.receiver_for_miner.try_recv() {
         let _result = saito.mining_thread.process_event(event).await;
+        event_counter += 1;
+        if event_counter >= EVENT_LIMIT {
+            break;
+        }
     }
+    event_counter = 0;
+
     saito
         .mining_thread
         .process_timer_event(duration.clone())
