@@ -179,6 +179,7 @@ pub fn new() -> SaitoWasm {
             stat_sender: sender_to_stat.clone(),
             configs: configuration.clone(),
             enabled: true,
+            mining_iterations: 1000,
         },
         verification_thread: VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),

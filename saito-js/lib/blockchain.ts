@@ -88,7 +88,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
   }
 
   public async onAddBlockSuccess(block_id: number, hash: string) {
-    // console.log("onAddBlockSuccess : " + hash + " at id : " + block_id);
+    console.log("onAddBlockSuccess : " + hash + " at id : " + block_id);
     // TODO : there's currently no way of calling this method from saito-js itself. need to refactor the design related to onConfirmation() calls so a single place will handle all the callback functionality
     let already_processed_callbacks = false;
     if (block_id <= this.last_callback_block_id) {
@@ -186,6 +186,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
       console.error("failed running callbacks");
       console.error(error);
     }
+    console.log("onAddBlockSuccess complete");
   }
 
   public async onNewBlock(block: Block, lc: boolean) {

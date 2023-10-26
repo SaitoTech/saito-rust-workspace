@@ -1,13 +1,16 @@
 use std::collections::vec_deque::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 
 use ahash::AHashMap;
 use log::{debug, info, trace, warn};
+use primitive_types::U256;
 use rayon::prelude::*;
 use tokio::sync::RwLock;
 
 use crate::common::defs::{
-    push_lock, Currency, PrintForLog, SaitoHash, SaitoSignature, Timestamp, LOCK_ORDER_WALLET,
+    push_lock, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
+    LOCK_ORDER_WALLET,
 };
 use crate::core::data::block::Block;
 use crate::core::data::blockchain::Blockchain;
@@ -157,15 +160,6 @@ impl Mempool {
         gt_tx: Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),
     ) -> Option<Block> {
-        let mempool_work = self
-            .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs)
-            .await?;
-        info!(
-            "bundling block with {:?} txs with work : {:?}",
-            self.transactions.len(),
-            mempool_work
-        );
-
         let previous_block_hash: SaitoHash;
         let public_key;
         let private_key;
@@ -175,7 +169,14 @@ impl Mempool {
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
-
+        let mempool_work = self
+            .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs, &public_key)
+            .await?;
+        info!(
+            "bundling block with {:?} txs with work : {:?}",
+            self.transactions.len(),
+            mempool_work
+        );
         let mut block = Block::create(
             &mut self.transactions,
             previous_block_hash,
@@ -237,6 +238,7 @@ impl Mempool {
         current_timestamp: Timestamp,
         gt_tx: &Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),
+        public_key: &SaitoPublicKey,
     ) -> Option<Currency> {
         // if self.transactions.is_empty() {
         //     return false;
@@ -273,6 +275,19 @@ impl Mempool {
                 previous_block.timestamp,
             );
             let time_elapsed = current_timestamp - previous_block.timestamp;
+
+            let mut h: Vec<u8> = vec![];
+            h.append(&mut public_key.to_vec());
+            h.append(&mut previous_block.hash.to_vec());
+            let h = hash(h.as_slice());
+            let value = U256::from(h);
+            let value: Timestamp =
+                (value.low_u128() % Duration::from_secs(20).as_millis()) as Timestamp;
+            // random hack to make sure nodes are not generating forks when fees are zero
+            if current_timestamp < previous_block.timestamp + value {
+                return None;
+            }
+            // info!("aaaa value = {:?}", value);
 
             let result = work_available >= work_needed;
             if result {
@@ -428,7 +443,13 @@ mod tests {
         // );
 
         assert!(mempool
-            .can_bundle_block(&blockchain, ts + 120000, &None, configs.deref())
+            .can_bundle_block(
+                &blockchain,
+                ts + 120000,
+                &None,
+                configs.deref(),
+                &public_key
+            )
             .await
             .is_some());
     }
