@@ -152,6 +152,7 @@ async fn run_mining_event_processor(
         stat_sender: sender_to_stat.clone(),
         configs,
         enabled: false,
+        mining_iterations: 100,
     };
     debug!("running miner thread");
     let miner_handle = run_thread(

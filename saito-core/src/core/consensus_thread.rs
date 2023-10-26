@@ -29,7 +29,7 @@ use crate::core::mining_thread::MiningEvent;
 use crate::core::routing_thread::RoutingEvent;
 use crate::{lock_for_read, lock_for_write};
 
-pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(100).as_millis() as u64;
+pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_millis() as u64;
 
 #[derive(Debug)]
 pub enum ConsensusEvent {
@@ -266,8 +266,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     )
                     .await;
             }
-            if block.is_some() {
-                let block = block.unwrap();
+            if let Some(block) = block {
                 debug!(
                     "adding bundled block : {:?} with id : {:?} to mempool",
                     block.hash.to_hex(),

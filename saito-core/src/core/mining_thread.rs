@@ -39,17 +39,18 @@ pub struct MiningThread {
     pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     // todo : make this private and init using configs
     pub enabled: bool,
+    pub mining_iterations: u32,
 }
 
 impl MiningThread {
-    async fn mine(&mut self) {
+    async fn mine(&mut self) -> bool {
         assert!(self.miner_active);
 
         if self.public_key == [0; 33] {
             let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
             if wallet.public_key == [0; 33] {
                 // wallet not initialized yet
-                return;
+                return false;
             }
             self.public_key = wallet.public_key;
             info!("node public key = {:?}", self.public_key.to_base58());
@@ -74,7 +75,9 @@ impl MiningThread {
                 .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
                 .await
                 .expect("sending to mempool failed");
+            return true;
         }
+        false
     }
 }
 
@@ -89,7 +92,11 @@ impl ProcessEvent<MiningEvent> for MiningThread {
             return None;
         }
         if self.enabled && self.miner_active {
-            self.mine().await;
+            for _ in 0..self.mining_iterations {
+                if self.mine().await {
+                    return Some(());
+                }
+            }
             return Some(());
         }
 

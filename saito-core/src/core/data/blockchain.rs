@@ -1022,7 +1022,7 @@ impl Blockchain {
         if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
             && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
         {
-            debug!(
+            info!(
                 "not enough golden tickets : found = {:?} depth = {:?}",
                 golden_tickets_found, search_depth_index
             );
