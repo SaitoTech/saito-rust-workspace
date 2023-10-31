@@ -856,6 +856,10 @@ impl Transaction {
             return true;
         }
 
+        if self.transaction_type == TransactionType::SPV {
+            return true;
+        }
+
         //
         // User-Sent Transactions
         //
