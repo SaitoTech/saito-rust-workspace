@@ -1,13 +1,13 @@
-use std::convert::TryInto;
-use std::io::{Error, ErrorKind};
-use std::ops::Rem;
-use std::{i128, mem};
-
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::convert::TryInto;
+use std::io::{Error, ErrorKind};
+use std::ops::Rem;
+use std::{i128, mem};
 
 use crate::common::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
@@ -1926,7 +1926,11 @@ impl Block {
         // as to determine spendability.
         //
 
-        let transactions_valid = iterate!(self.transactions, 100).all(|tx| tx.validate(utxoset));
+        let transactions_valid =
+            iterate!(self.transactions, 100).all(|tx| match tx.transaction_type {
+                TransactionType::SPV => self.validate_spv_transaction(tx),
+                _ => tx.validate(utxoset),
+            });
 
         // let mut transactions_valid = true;
         // for tx in self.transactions.iter() {
@@ -1946,6 +1950,42 @@ impl Block {
 
         transactions_valid
     }
+
+    pub fn validate_spv_transaction(&self, spv_tx: &Transaction) -> bool {
+        if spv_tx.transaction_type != TransactionType::SPV {
+            return false;
+        }
+        let computed_merkle_root = self.compute_merkle_root_from_spv(spv_tx);
+
+        if computed_merkle_root != self.merkle_root {
+            error!("ERROR: Computed Merkle root does not match block's Merkle root");
+            return false;
+        }
+
+        true
+    }
+
+    pub fn hash_twice(data1: &[u8; 32], data2: &[u8; 32]) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(data1);
+        hasher.update(data2);
+        let first_hash = hasher.finalize_reset();
+        hasher.update(&first_hash);
+        let second_hash = hasher.finalize();
+        let second_hash_array: [u8; 32] = second_hash.try_into().expect("Wrong length");
+        second_hash_array
+    }
+
+    pub fn compute_merkle_root_from_spv(&self, spv_tx: &Transaction) -> [u8; 32] {
+        let mut current_hash = spv_tx.hash_for_signature.unwrap();
+        for hop in &spv_tx.path {
+            let concatenated_data = [&hop.from[..], &hop.to[..], &hop.sig[..]].concat();
+            let concatenated_slice: [u8; 32] = concatenated_data[0..32].try_into().unwrap();
+            current_hash = Self::hash_twice(&current_hash, &concatenated_slice);
+        }
+        current_hash
+    }
+
     pub fn generate_transaction_hashmap(&mut self) {
         if !self.transaction_map.is_empty() {
             return;
