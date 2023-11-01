@@ -2020,10 +2020,14 @@ mod tests {
     use futures::future::join_all;
     use hex::FromHex;
 
-    use crate::common::defs::{push_lock, SaitoHash, SaitoPublicKey, LOCK_ORDER_WALLET};
+    use crate::common::defs::{
+        push_lock, SaitoHash, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_WALLET,
+    };
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::{generate_keys, verify_signature};
+    use crate::core::data::merkle::{MerkleTree, MerkleTreeNode};
     use crate::core::data::slip::Slip;
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
@@ -2336,4 +2340,122 @@ mod tests {
         block3.generate(); // generate hashes
         dbg!(block3.id);
     }
+
+    // #[tokio::test]
+    // async fn verify_spv_transaction_in_lite_block_test() {
+    //     let mut t = TestManager::new();
+
+    //     t.initialize(100, 100000).await;
+
+    //     let public_key: SaitoPublicKey;
+    //     {
+    //         let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+    //         public_key = wallet.public_key;
+    //     }
+    //     // let lite_block = block1.generate_lite_block(vec![]);
+
+    //     let public_key =
+    //         Storage::decode_str("s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR").unwrap();
+    //     let mut to_public_key: SaitoPublicKey = [0u8; 33];
+    //     to_public_key.copy_from_slice(&public_key);
+    //     let other_public_key =
+    //         Storage::decode_str("s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPU").unwrap();
+    //     let mut public_key2: SaitoPublicKey = [0u8; 33];
+    //     public_key2.copy_from_slice(&other_public_key);
+
+    //     // t.transfer_value_to_public_key(to_public_key.clone(), 500, block1.timestamp + 120000)
+    //     //     .await
+    //     //     .unwrap();
+
+    //     // t.transfer_value_to_public_key(public_key2.clone(), 500, block1.timestamp + 240000)
+    //     //     .await
+    //     //     .unwrap();
+
+    //     let block = t.get_latest_block().await;
+    //     let lite_block = block.generate_lite_block(vec![]);
+
+    //
+
+    // return;
+
+    // let mut block = t.create_block([0; 32], 120000, 0, 0, 0, false).await;
+
+    // let private_key: SaitoPrivateKey;
+    // let public_key: SaitoPublicKey;
+    // {
+    //     let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+
+    //     public_key = wallet.public_key;
+    //     private_key = wallet.private_key;
+    // }
+
+    // for _ in 0..50 {
+    //     let random_public_key = TestManager::generate_random_public_key();
+    //     let mut tx = Transaction::create_vip_transaction(random_public_key, 0);
+    //     tx.generate(&random_public_key, 0, 0);
+    //     tx.sign(&private_key);
+    //     block.add_transaction(tx);
+    // }
+
+    // for _i in 0..50 {
+    //     let mut tx = Transaction::create_vip_transaction(public_key, 0);
+    //     tx.generate(&public_key, 0, 0);
+    //     tx.sign(&private_key);
+    //     block.add_transaction(tx);
+    // }
+    // {
+    //     let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
+    //     // we have added VIP, so need to regenerate the merkle-root
+    //     block.merkle_root =
+    //         block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+    // }
+    // block.generate();
+    // block.sign(&private_key);
+
+    // assert!(verify_signature(
+    //     &block.pre_hash,
+    //     &block.signature,
+    //     &block.creator,
+    // ));
+
+    // // and add first block to blockchain
+    // t.add_block(block).await;
+
+    // let block1 = t.get_latest_block().await;
+    // dbg!(block1.transactions.len());
+    // let lite_block1 = block1.generate_lite_block(vec![]);
+    // dbg!(&lite_block1.transactions.len(), "length");
+
+    // Generate a Merkle Tree based on the block's transactions
+    // let merkle_tree =
+    //     MerkleTree::generate(&block1.transactions).expect("Failed to generate Merkle tree");
+
+    // // Extract an SPV transaction from the lite block's transactions
+    // let spv_tx = block1
+    //     .transactions
+    //     .iter()
+    //     .find(|&tx| tx.transaction_type == TransactionType::SPV)
+    //     .cloned()
+    //     .expect("No SPV transaction found");
+
+    // Obtain the Merkle path for the SPV transaction in the generated Merkle tree
+    // let merkle_path = merkle_tree
+    //     .get_merkle_path_for_transaction(&spv_tx)
+    //     .expect("Failed to get Merkle path");
+
+    // dbg!(
+    //     &merkle_path,
+    //     merkle_tree.get_root_hash(),
+    //     spv_tx.hash_for_signature
+    // );
+    // Verify the Merkle path
+    // assert!(
+    //     MerkleTree::verify_merkle_path(
+    //         &merkle_tree.get_root_hash(),
+    //         &spv_tx.hash_for_signature.unwrap(),
+    //         &merkle_path
+    //     ),
+    //     "SPV transaction is not in the lite block!"
+    // );
+    // }
 }

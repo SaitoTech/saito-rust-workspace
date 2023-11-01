@@ -233,6 +233,7 @@ impl MerkleTree {
                 },
                 node.as_ref().unwrap().hash,
                 node.as_ref().unwrap().count,
+                node.as_ref().unwrap().is_spv,
             )))
         } else {
             None
@@ -267,6 +268,105 @@ impl MerkleTree {
         } else {
             true
         };
+    }
+    // Get Merkle path for a specific transaction in the tree
+    pub fn get_merkle_path(&self, target_tx_hash: &SaitoHash) -> Option<Vec<SaitoHash>> {
+        let mut path = Vec::new();
+        if self.retrieve_merkle_path(&self.root, target_tx_hash, &mut path) {
+            return Some(path);
+        } else {
+            return None;
+        }
+    }
+
+    /// Recursive helper function to retrieve a Merkle path for a specific transaction
+    fn retrieve_merkle_path(
+        &self,
+        node: &MerkleTreeNode,
+        target_tx_hash: &SaitoHash,
+        path: &mut Vec<SaitoHash>,
+    ) -> bool {
+        match &node.node_type {
+            NodeType::Transaction { .. } => node.hash.as_ref() == Some(target_tx_hash),
+            NodeType::Node { left, right } => {
+                if self.retrieve_merkle_path(left.as_ref().unwrap(), target_tx_hash, path) {
+                    if let Some(hash) = &right.as_ref().unwrap().hash {
+                        path.push(hash.clone());
+                    }
+                    return true;
+                } else if self.retrieve_merkle_path(right.as_ref().unwrap(), target_tx_hash, path) {
+                    if let Some(hash) = &left.as_ref().unwrap().hash {
+                        path.push(hash.clone());
+                    }
+                    return true;
+                }
+                false
+            }
+        }
+    }
+
+    /// Verify a transaction using a Merkle path
+    pub fn verify_merkle_path(
+        merkle_root: &SaitoHash,
+        tx_hash: &SaitoHash,
+        merkle_path: &[SaitoHash],
+    ) -> bool {
+        let mut current_hash = tx_hash.clone();
+        for path_hash in merkle_path {
+            let mut combined = current_hash.to_vec();
+            combined.extend_from_slice(path_hash);
+            current_hash = hash(&combined);
+        }
+        &current_hash == merkle_root
+    }
+    pub fn get_merkle_path_for_transaction(&self, tx: &Transaction) -> Option<Vec<SaitoHash>> {
+        let mut path = Vec::new();
+        if self.find_path(&self.root, &tx.hash_for_signature.unwrap(), &mut path) {
+            Some(path)
+        } else {
+            None
+        }
+    }
+
+    fn find_path(
+        &self,
+        node: &Box<MerkleTreeNode>,
+        target_hash: &SaitoHash,
+        path: &mut Vec<SaitoHash>,
+    ) -> bool {
+        match &node.node_type {
+            NodeType::Transaction { .. } => &node.hash.unwrap() == target_hash,
+            NodeType::Node { left, right } => {
+                // If left branch contains the target hash
+                if left.is_some() && self.is_hash_present(&left.as_ref().unwrap(), target_hash) {
+                    if let Some(right_node) = &right {
+                        path.push(right_node.hash.unwrap());
+                    }
+                    return self.find_path(&left.as_ref().unwrap(), target_hash, path);
+                }
+
+                // If right branch contains the target hash
+                if right.is_some() && self.is_hash_present(&right.as_ref().unwrap(), target_hash) {
+                    if let Some(left_node) = &left {
+                        path.push(left_node.hash.unwrap());
+                    }
+                    return self.find_path(&right.as_ref().unwrap(), target_hash, path);
+                }
+
+                false
+            }
+        }
+    }
+
+    fn is_hash_present(&self, node: &Box<MerkleTreeNode>, target_hash: &SaitoHash) -> bool {
+        match &node.node_type {
+            NodeType::Transaction { .. } => &node.hash.unwrap() == target_hash,
+            NodeType::Node { left, right } => {
+                (left.is_some() && self.is_hash_present(&left.as_ref().unwrap(), target_hash))
+                    || (right.is_some()
+                        && self.is_hash_present(&right.as_ref().unwrap(), target_hash))
+            }
+        }
     }
 }
 
