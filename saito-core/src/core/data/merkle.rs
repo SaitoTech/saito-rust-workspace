@@ -28,19 +28,31 @@ pub struct MerkleTreeNode {
     node_type: NodeType,
     hash: Option<SaitoHash>,
     count: usize,
+    is_spv: bool, // New field indicating if this node is an SPV node
 }
 
 impl MerkleTreeNode {
-    fn new(node_type: NodeType, hash: Option<SaitoHash>, count: usize) -> MerkleTreeNode {
+    fn new(
+        node_type: NodeType,
+        hash: Option<SaitoHash>,
+        count: usize,
+        is_spv: bool,
+    ) -> MerkleTreeNode {
         MerkleTreeNode {
             node_type,
             hash,
             count,
+            is_spv, // Initialize the new field with the provided value
         }
     }
 
     pub fn get_hash(&self) -> Option<SaitoHash> {
         return self.hash;
+    }
+
+    // New method to check if this node is an SPV node
+    pub fn is_spv_node(&self) -> bool {
+        return self.is_spv;
     }
 }
 
@@ -64,22 +76,27 @@ impl MerkleTree {
 
         debug!("Generating merkle tree");
 
-        // Logic: a single node will be created per two leaves, each node will generate
-        // a hash by combining the hashes of the two leaves, in the next loop
-        // those node hashes will used as the leaves for the next set of nodes,
-        // i.e. leaf count is reduced by half on each loop, eventually ending up in 1
-
         let mut leaves: LinkedList<Box<MerkleTreeNode>> = Default::default();
 
         for index in 0..transactions.len() {
-            leaves.push_back(Box::new(MerkleTreeNode::new(
-                NodeType::Transaction { index },
-                transactions[index].hash_for_signature,
-                1 as usize,
-            )));
+            if transactions[index].txs_replacements > 1 {
+                for _ in 0..transactions[index].txs_replacements {
+                    leaves.push_back(Box::new(MerkleTreeNode::new(
+                        NodeType::Transaction { index },
+                        Some([0; 32]), // Placeholder hash for SPV nodes
+                        1 as usize,
+                        true, // is_spv
+                    )));
+                }
+            } else {
+                leaves.push_back(Box::new(MerkleTreeNode::new(
+                    NodeType::Transaction { index },
+                    transactions[index].hash_for_signature,
+                    1 as usize,
+                    false, // is_spv
+                )));
+            }
         }
-
-        // trace!("---------------------");
 
         while leaves.len() > 1 {
             let mut nodes: LinkedList<MerkleTreeNode> = Default::default();
@@ -87,7 +104,7 @@ impl MerkleTree {
             // Create a node per two leaves
             while !leaves.is_empty() {
                 let left = leaves.pop_front();
-                let right = leaves.pop_front(); //Can be None, this is expected
+                let right = leaves.pop_front();
                 let count = MerkleTree::calculate_child_count(&left, &right);
 
                 if right.is_some() {
@@ -95,6 +112,7 @@ impl MerkleTree {
                         NodeType::Node { left, right },
                         None,
                         count,
+                        false, // Nodes are typically not SPV nodes
                     ));
                 } else {
                     let hash = left.as_ref().unwrap().get_hash();
@@ -102,21 +120,19 @@ impl MerkleTree {
                         NodeType::Node { left, right },
                         hash,
                         count,
+                        false, // Nodes are typically not SPV nodes
                     ));
                 }
             }
 
             // Compute the node hashes in parallel
             iterate_mut!(nodes).all(|node| MerkleTree::generate_hash(node));
-            // Collect the next set of leaves for the computation
-            leaves.clear();
 
+            leaves.clear();
             while !nodes.is_empty() {
                 let node = nodes.pop_front().unwrap();
                 leaves.push_back(Box::new(node));
             }
-
-            // trace!("---------------------");
         }
 
         return Some(Box::new(MerkleTree {
