@@ -98,6 +98,7 @@ impl Blockchain {
     }
 
     pub fn set_fork_id(&mut self, fork_id: SaitoHash) {
+        debug!("setting fork id as : {:?}", fork_id.to_hex());
         self.fork_id = fork_id;
     }
 
@@ -660,30 +661,22 @@ impl Blockchain {
         let mut fork_id = [0; 32];
         let mut current_block_id = block_id;
 
-        //
         // roll back to last even 10 blocks
-        // TODO : don't need the for loop just get the last 10's multiple [current_block_id = current_block_id - (current_block_id % 10)]
-        for i in 0..10 {
-            if (current_block_id - i) % 10 == 0 {
-                current_block_id -= i;
-                break;
-            }
-        }
+        current_block_id = current_block_id - (current_block_id % 10);
         let weights = [
             0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
         ];
 
         // loop backwards through blockchain
-        for i in 0..weights.len() {
-            if current_block_id <= weights[i] {
+        for (i, weight) in weights.iter().enumerate() {
+            if current_block_id <= *weight {
+                debug!(
+                    "current_id : {:?} is less than weight : {:?}",
+                    current_block_id, weight
+                );
                 break;
             }
-            current_block_id -= weights[i];
-
-            // do not loop around if block id < 0
-            if current_block_id > block_id || current_block_id == 0 {
-                break;
-            }
+            current_block_id -= weight;
 
             // index to update
             let index = 2 * i;
@@ -691,8 +684,10 @@ impl Blockchain {
             let block_hash = self
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(current_block_id);
-            fork_id[index] = block_hash[index];
-            fork_id[index + 1] = block_hash[index + 1];
+            if block_hash != [0; 32] {
+                fork_id[index] = block_hash[index];
+                fork_id[index + 1] = block_hash[index + 1];
+            }
         }
 
         fork_id
@@ -714,13 +709,16 @@ impl Blockchain {
             fork_id.to_hex(),
             my_latest_block_id
         );
-        let weights = vec![
+        let weights = [
             0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
         ];
         if peer_latest_block_id >= my_latest_block_id {
             // roll back to last even 10 blocks
             peer_block_id = peer_block_id - (peer_block_id % 10);
-            debug!("peer_block_id : {:?}", peer_block_id);
+            debug!(
+                "peer_block_id : {:?}, my_block_id : {:?}",
+                peer_block_id, my_latest_block_id
+            );
 
             // their fork id
             for (index, weight) in weights.iter().enumerate() {
@@ -733,12 +731,8 @@ impl Blockchain {
                 }
                 peer_block_id -= weight;
 
-                // do not loop around if block id < 0
-                if peer_block_id > peer_latest_block_id {
-                    return 0;
-                }
                 if peer_block_id >= my_block_id {
-                    return 0;
+                    continue;
                 }
 
                 // index in fork_id hash
@@ -769,19 +763,12 @@ impl Blockchain {
                 my_block_id -= weight;
 
                 // do not loop around if block id < 0
-                if my_block_id > my_latest_block_id {
+                if my_block_id > peer_latest_block_id {
                     debug!(
-                        "my_block_id {:?} > my_latest_block_id : {:?}",
-                        my_block_id, my_latest_block_id
+                        "my_block_id {:?} > peer_latest_block_id : {:?}",
+                        my_block_id, peer_latest_block_id
                     );
-                    return 0;
-                }
-                if peer_block_id > my_block_id {
-                    debug!(
-                        "peer_block_id {:?} > my_block_id {:?}",
-                        peer_block_id, my_block_id
-                    );
-                    return 0;
+                    continue;
                 }
 
                 // index in fork_id hash

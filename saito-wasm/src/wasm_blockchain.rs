@@ -66,11 +66,16 @@ impl WasmBlockchain {
         let blockchain = self.blockchain.read().await;
         blockchain.lowest_acceptable_block_id
     }
-
     pub async fn get_latest_block_id(&self) -> u64 {
         let blockchain = self.blockchain.read().await;
         return blockchain.get_latest_block_id();
     }
+
+    pub async fn get_fork_id(&self) -> JsString {
+        let blockchain = self.blockchain.read().await;
+        blockchain.fork_id.to_hex().into()
+    }
+
     pub async fn get_longest_chain_hash_at_id(&self, block_id: u64) -> JsString {
         let blockchain = self.blockchain.read().await;
         let hash = blockchain

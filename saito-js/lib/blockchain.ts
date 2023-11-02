@@ -203,4 +203,8 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
   public async getHashesAtId(blockId: bigint) {
     return this.instance.get_hashes_at_id(blockId);
   }
+
+  public async getForkId(){
+    return this.instance.get_fork_id();
+  }
 }

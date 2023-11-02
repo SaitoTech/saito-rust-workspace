@@ -46,6 +46,7 @@ pub struct BlockchainConfig {
     pub lowest_acceptable_timestamp: u64,
     pub lowest_acceptable_block_hash: String,
     pub lowest_acceptable_block_id: u64,
+    pub fork_id: String,
 }
 
 pub trait Configuration: Debug {

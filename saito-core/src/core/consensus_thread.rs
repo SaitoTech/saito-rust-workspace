@@ -471,6 +471,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         .expect("lowest block hash cannot be parsed");
                 blockchain.lowest_acceptable_block_id =
                     blockchain_configs.lowest_acceptable_block_id;
+                blockchain.fork_id = SaitoHash::from_hex(blockchain_configs.fork_id.as_str())
+                    .expect("fork id cannot be parsed");
             } else {
                 info!("blockchain state is not loaded");
             }

@@ -1,6 +1,6 @@
-use crate::common::defs::{SaitoHash, Timestamp};
+use crate::common::defs::{PrintForLog, SaitoHash, Timestamp};
+use std::fmt::{Debug, Formatter};
 
-#[derive(Debug)]
 pub struct GhostChainSync {
     pub start: SaitoHash,
     pub prehashes: Vec<SaitoHash>,
@@ -94,6 +94,34 @@ impl GhostChainSync {
             txs,
             gts,
         }
+    }
+}
+
+impl Debug for GhostChainSync {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GhostChainSync")
+            .field("start", &self.start.to_hex())
+            .field(
+                "prehashes",
+                &self
+                    .prehashes
+                    .iter()
+                    .map(|h| h.to_hex())
+                    .collect::<Vec<String>>(),
+            )
+            .field(
+                "prev_block_hashes",
+                &self
+                    .previous_block_hashes
+                    .iter()
+                    .map(|h| h.to_hex())
+                    .collect::<Vec<String>>(),
+            )
+            .field("block_ids", &self.block_ids)
+            .field("block_ts", &self.block_ts)
+            .field("txs", &self.txs)
+            .field("gts", &self.gts)
+            .finish()
     }
 }
 
