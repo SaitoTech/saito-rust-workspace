@@ -1482,21 +1482,20 @@ impl Block {
                 selected_txs += 1;
             } else {
                 let spv = Transaction {
-                    // Preserve the necessary fields for the SPV transaction
                     timestamp: tx.timestamp,
-                    from: vec![], // SPV does not necessarily need input slips
-                    to: vec![],   // SPV does not necessarily need output slips
-                    data: vec![], // Depending on the context, data may be empty for an SPV transaction
-                    transaction_type: TransactionType::SPV, // Set the transaction type to SPV
-                    txs_replacements: 1, // This indicates that there are no replacements
+                    from: vec![],
+                    to: vec![],
+                    data: vec![],
+                    transaction_type: TransactionType::SPV,
+                    txs_replacements: 1,
                     signature: tx.signature,
-                    path: vec![], // The path might be empty if not needed for SPV validation
-                    hash_for_signature: tx.hash_for_signature, // Hash used for the Merkle Tree, cloned from the original transaction
-                    total_in: 0,          // Total input for SPV could be set to 0
-                    total_out: 0,         // Total output for SPV could be set to 0
-                    total_fees: 0,        // Total fees for SPV could be set to 0
-                    total_work_for_me: 0, // Total work could be set to 0 for an SPV transaction
-                    cumulative_fees: 0, // Cumulative fees for this SPV transaction could be set to 0
+                    path: vec![],
+                    hash_for_signature: tx.hash_for_signature,
+                    total_in: 0,
+                    total_out: 0,
+                    total_fees: 0,
+                    total_work_for_me: 0,
+                    cumulative_fees: 0,
                 };
 
                 pruned_txs.push(spv);
@@ -1543,10 +1542,11 @@ impl Block {
         }
 
         let mut block = Block::new();
+
+        block.transactions = pruned_txs;
         block.id = self.id;
         block.timestamp = self.timestamp;
         block.previous_block_hash = self.previous_block_hash.clone();
-        block.merkle_root = self.merkle_root.clone();
         block.creator = self.creator.clone();
         block.burnfee = self.burnfee;
         block.difficulty = self.difficulty;
@@ -1558,11 +1558,7 @@ impl Block {
         block.avg_atr_income = self.avg_atr_income;
         block.avg_atr_variance = self.avg_atr_variance;
 
-        // Set the transactions to the pruned list
-        block.transactions = pruned_txs;
-
-        // Presuming generate() prepares the block for use
-        block.generate();
+        block.merkle_root = self.generate_merkle_root(false, false);
 
         block
     }
@@ -2403,38 +2399,13 @@ mod tests {
             .expect("No SPV transaction found")
             .clone();
 
-        // Generate the Merkle root for the lite block
-        // let lite_block_merkle_root: [u8; 32] = lite_block.generate_merkle_root(false, false);
-
         // Generate a Merkle tree from the block transactions
         let merkle_tree = MerkleTree::generate(&lite_block.transactions)
             .expect("Failed to generate Merkle tree for block");
 
-        // // Obtain the Merkle path for the SPV transaction
-        // let merkle_path = merkle_tree
-        //     .get_merkle_path(&spv_tx.hash_for_signature.unwrap())
-        //     .expect("Failed to get Merkle path");
-
-        // dbg!(merkle_path, merkle_tree.get_root_hash());
-
-        // // // Verify the SPV transaction using its Merkle path and the lite block's Merkle root
-        // dbg!(merkle_path, lite_block.merkle_root);
-        // dbg!(merkle_tree.construct_merkle_proof(&spv_tx.hash_for_signature.unwrap()));
-        // dbg!(merkle_tree.get_root_hash());
-        // assert!(
-        //     MerkleTree::verify_merkle_path(
-        //         &lite_block.merkle_root,
-        //         &spv_tx
-        //             .hash_for_signature
-        //             .expect("SPV transaction must have a signature hash"),
-        //         &merkle_tree
-        //             .construct_merkle_proof(&spv_tx.hash_for_signature.unwrap())
-        //             .unwrap()
-        //     ),
-        //     "SPV transaction is not verifiable by the lite block!"
-        // );
-
-        // Additional debugging information if needed
-        // dbg!(lite_block.transactions.len());
+        dbg!(
+            lite_block.generate_merkle_root(false, false),
+            merkle_tree.get_root_hash()
+        );
     }
 }
