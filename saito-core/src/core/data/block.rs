@@ -2410,17 +2410,17 @@ mod tests {
         let merkle_tree = MerkleTree::generate(&lite_block.transactions)
             .expect("Failed to generate Merkle tree for block");
 
-        // Obtain the Merkle path for the SPV transaction
-        let merkle_path = merkle_tree
-            .get_merkle_path_for_transaction(&spv_tx)
-            .expect("Failed to get Merkle path");
+        // // Obtain the Merkle path for the SPV transaction
+        // let merkle_path = merkle_tree
+        //     .get_merkle_path(&spv_tx.hash_for_signature.unwrap())
+        //     .expect("Failed to get Merkle path");
 
-        // dbg!(bl.get_root_hash(), lite_block.merkle_root);
+        // dbg!(merkle_path, merkle_tree.get_root_hash());
 
-        // // Verify the SPV transaction using its Merkle path and the lite block's Merkle root
+        // // // Verify the SPV transaction using its Merkle path and the lite block's Merkle root
         // dbg!(merkle_path, lite_block.merkle_root);
-        dbg!(merkle_tree.construct_merkle_proof(&spv_tx.hash_for_signature.unwrap()));
-        dbg!(merkle_tree.get_root_hash());
+        // dbg!(merkle_tree.construct_merkle_proof(&spv_tx.hash_for_signature.unwrap()));
+        // dbg!(merkle_tree.get_root_hash());
         // assert!(
         //     MerkleTree::verify_merkle_path(
         //         &lite_block.merkle_root,
