@@ -260,8 +260,7 @@ impl RoutingThread {
                 .get_longest_chain_block_hash_at_block_id(i);
             if hash != [0; 32] {
                 let block = blockchain.get_block(&hash);
-                if block.is_some() {
-                    let block = block.unwrap();
+                if let Some(block) = block {
                     debug!(
                         "pushing block : {:?} at index : {:?}",
                         block.hash.to_hex(),
@@ -272,13 +271,15 @@ impl RoutingThread {
                     ghost.prehashes.push(block.pre_hash);
                     ghost.previous_block_hashes.push(block.previous_block_hash);
                     ghost.block_ids.push(block.id);
+
+                    // TODO : shouldn't this check for whole key list instead of peer's key?
                     ghost.txs.push(block.has_keylist_txs(vec![peer_public_key]));
                 }
             }
         }
 
         debug!("sending ghost chain to peer : {:?}", peer_index);
-        trace!("ghost : {:?}", ghost);
+        debug!("ghost : {:?}", ghost);
         let buffer = Message::GhostChain(ghost).serialize();
         self.network
             .io_interface
@@ -424,6 +425,8 @@ impl RoutingThread {
                 .public_key
                 .unwrap();
         }
+        let (mut blockchain, _blockchain_) =
+            lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
         for i in 0..chain.prehashes.len() {
             let buf = [
                 previous_block_hash.as_slice(),
@@ -431,10 +434,11 @@ impl RoutingThread {
             ]
             .concat();
             let block_hash = hash(&buf);
-            debug!("block_hash : {:?}", block_hash.to_hex());
             if chain.txs[i] {
-                let (mut blockchain, _blockchain_) =
-                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                debug!(
+                    "ghost block : {:?} has txs for me. fetching",
+                    block_hash.to_hex()
+                );
                 if !blockchain.is_block_fetching(&block_hash) {
                     blockchain.mark_as_fetching(block_hash);
                     let result = self
@@ -447,9 +451,10 @@ impl RoutingThread {
                     }
                 }
             } else {
-                // TODO : lock should be taken out of for loop
-                let (mut blockchain, _blockchain_) =
-                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                debug!(
+                    "ghost block : {:?} doesn't have txs for me. not fetching",
+                    block_hash.to_hex()
+                );
                 blockchain.add_ghost_block(
                     chain.block_ids[i],
                     chain.previous_block_hashes[i],
