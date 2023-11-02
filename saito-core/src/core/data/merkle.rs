@@ -68,7 +68,6 @@ impl MerkleTree {
     pub fn get_root_hash(&self) -> SaitoHash {
         return self.root.hash.unwrap();
     }
-
     pub fn generate(transactions: &Vec<Transaction>) -> Option<Box<MerkleTree>> {
         if transactions.is_empty() {
             return None;
@@ -76,68 +75,88 @@ impl MerkleTree {
 
         debug!("Generating merkle tree");
 
-        let mut leaves: LinkedList<Box<MerkleTreeNode>> = Default::default();
+        let mut leaves: LinkedList<Box<MerkleTreeNode>> = LinkedList::new();
 
+        // Handle the creation of leaves, including SPV leaves.
         for index in 0..transactions.len() {
             if transactions[index].txs_replacements > 1 {
+                // For SPV transactions, add the appropriate number of ghost leaves.
                 for _ in 0..transactions[index].txs_replacements {
                     leaves.push_back(Box::new(MerkleTreeNode::new(
-                        NodeType::Transaction { index },
-                        Some([0; 32]), // Placeholder hash for SPV nodes
-                        1 as usize,
+                        NodeType::Transaction { index }, // Representing an SPV transaction
+                        Some(transactions[index].hash_for_signature.unwrap_or([0; 32])), // Use the SPV transaction's hash
+                        1,
                         true, // is_spv
                     )));
                 }
             } else {
+                // For non-SPV transactions, add a single leaf with its hash.
                 leaves.push_back(Box::new(MerkleTreeNode::new(
                     NodeType::Transaction { index },
                     transactions[index].hash_for_signature,
-                    1 as usize,
+                    1,
                     false, // is_spv
                 )));
             }
         }
 
+        // Build the tree layer by layer.
         while leaves.len() > 1 {
-            let mut nodes: LinkedList<MerkleTreeNode> = Default::default();
+            let mut nodes: LinkedList<Box<MerkleTreeNode>> = LinkedList::new();
 
-            // Create a node per two leaves
-            while !leaves.is_empty() {
-                let left = leaves.pop_front();
-                let right = leaves.pop_front();
-                let count = MerkleTree::calculate_child_count(&left, &right);
+            // Combine leaves into nodes.
+            while leaves.len() > 1 {
+                let left_leaf = leaves.pop_front().unwrap();
+                let right_leaf = leaves.pop_front().unwrap();
 
-                if right.is_some() {
-                    nodes.push_back(MerkleTreeNode::new(
-                        NodeType::Node { left, right },
-                        None,
-                        count,
-                        false, // Nodes are typically not SPV nodes
-                    ));
+                // Determine if the new node is an SPV node.
+                let is_spv = left_leaf.is_spv && right_leaf.is_spv;
+                let combined_hash = if is_spv {
+                    // If both are SPV, we do not need to hash them again.
+                    left_leaf.get_hash()
                 } else {
-                    let hash = left.as_ref().unwrap().get_hash();
-                    nodes.push_back(MerkleTreeNode::new(
-                        NodeType::Node { left, right },
-                        hash,
-                        count,
-                        false, // Nodes are typically not SPV nodes
-                    ));
-                }
+                    // If not, compute the hash for the new node.
+                    // You would call your hash function here with left and right leaf hashes.
+                    Some(Self::compute_combined_hash(
+                        left_leaf.get_hash(),
+                        right_leaf.get_hash(),
+                    ))
+                };
+
+                // Create the new node with combined children and hash.
+                nodes.push_back(Box::new(MerkleTreeNode::new(
+                    NodeType::Node {
+                        left: Some(left_leaf),
+                        right: Some(right_leaf),
+                    },
+                    combined_hash,
+                    2, // Count is always 2 for a combined node
+                    is_spv,
+                )));
             }
 
-            // Compute the node hashes in parallel
-            iterate_mut!(nodes).all(|node| MerkleTree::generate_hash(node));
-
-            leaves.clear();
-            while !nodes.is_empty() {
-                let node = nodes.pop_front().unwrap();
-                leaves.push_back(Box::new(node));
+            // If there's an odd number of leaves, the last one gets moved up without a pair.
+            if let Some(leaf) = leaves.pop_front() {
+                nodes.push_back(leaf);
             }
+
+            // The newly created nodes become the leaves for the next iteration.
+            leaves = nodes;
         }
 
-        return Some(Box::new(MerkleTree {
+        Some(Box::new(MerkleTree {
             root: leaves.pop_front().unwrap(),
-        }));
+        }))
+    }
+
+    fn compute_combined_hash(
+        left_hash: Option<[u8; 32]>,
+        right_hash: Option<[u8; 32]>,
+    ) -> [u8; 32] {
+        let mut vbytes: Vec<u8> = vec![];
+        vbytes.extend(left_hash.unwrap());
+        vbytes.extend(right_hash.unwrap());
+        hash(&vbytes)
     }
 
     pub fn traverse(&self, mode: TraverseMode, read_func: impl Fn(&MerkleTreeNode)) {
@@ -199,28 +218,42 @@ impl MerkleTree {
         node: &MerkleTreeNode,
         read_func: &impl Fn(&MerkleTreeNode),
     ) {
-        if *mode == TraverseMode::BreadthFirst {
-            read_func(node);
-        }
+        match mode {
+            TraverseMode::DepthFist => {
+                // For pre-order traversal, process the node before its children.
+                read_func(node);
 
-        match &node.node_type {
-            NodeType::Node { left, right } => {
-                if left.is_some() {
-                    MerkleTree::traverse_node(mode, &left.as_ref().unwrap(), read_func);
+                if let NodeType::Node { left, right } = &node.node_type {
+                    if let Some(left_node) = left {
+                        MerkleTree::traverse_node(mode, left_node, read_func);
+                    }
+                    if let Some(right_node) = right {
+                        MerkleTree::traverse_node(mode, right_node, read_func);
+                    }
                 }
 
-                if right.is_some() {
-                    MerkleTree::traverse_node(mode, &right.as_ref().unwrap(), read_func);
+                // For in-order or post-order traversal, process the node here.
+            }
+            TraverseMode::BreadthFirst => {
+                // Using a queue for the breadth-first traversal.
+                let mut queue = std::collections::VecDeque::new();
+                queue.push_back(node);
+
+                while let Some(current_node) = queue.pop_front() {
+                    read_func(current_node);
+
+                    if let NodeType::Node { left, right } = &current_node.node_type {
+                        if let Some(left_node) = left {
+                            queue.push_back(left_node);
+                        }
+                        if let Some(right_node) = right {
+                            queue.push_back(right_node);
+                        }
+                    }
                 }
             }
-            NodeType::Transaction { .. } => {}
-        }
-
-        if *mode == TraverseMode::DepthFist {
-            read_func(node);
         }
     }
-
     fn clone_node(node: Option<&Box<MerkleTreeNode>>) -> Option<Box<MerkleTreeNode>> {
         if node.is_some() {
             Some(Box::new(MerkleTreeNode::new(
@@ -273,9 +306,9 @@ impl MerkleTree {
     pub fn get_merkle_path(&self, target_tx_hash: &SaitoHash) -> Option<Vec<SaitoHash>> {
         let mut path = Vec::new();
         if self.retrieve_merkle_path(&self.root, target_tx_hash, &mut path) {
-            return Some(path);
+            Some(path)
         } else {
-            return None;
+            None
         }
     }
 
@@ -289,16 +322,25 @@ impl MerkleTree {
         match &node.node_type {
             NodeType::Transaction { .. } => node.hash.as_ref() == Some(target_tx_hash),
             NodeType::Node { left, right } => {
-                if self.retrieve_merkle_path(left.as_ref().unwrap(), target_tx_hash, path) {
-                    if let Some(hash) = &right.as_ref().unwrap().hash {
-                        path.push(hash.clone());
+                if let Some(left_node) = left {
+                    if self.retrieve_merkle_path(left_node, target_tx_hash, path) {
+                        if let Some(right_node) = right {
+                            if let Some(hash) = &right_node.hash {
+                                path.push(*hash);
+                            }
+                        }
+                        return true;
                     }
-                    return true;
-                } else if self.retrieve_merkle_path(right.as_ref().unwrap(), target_tx_hash, path) {
-                    if let Some(hash) = &left.as_ref().unwrap().hash {
-                        path.push(hash.clone());
+                }
+                if let Some(right_node) = right {
+                    if self.retrieve_merkle_path(right_node, target_tx_hash, path) {
+                        if let Some(left_node) = left {
+                            if let Some(hash) = &left_node.hash {
+                                path.push(*hash);
+                            }
+                        }
+                        return true;
                     }
-                    return true;
                 }
                 false
             }
@@ -324,6 +366,7 @@ impl MerkleTree {
         if self.find_path(&self.root, &tx.hash_for_signature.unwrap(), &mut path) {
             Some(path)
         } else {
+            dbg!("None");
             None
         }
     }
@@ -335,22 +378,32 @@ impl MerkleTree {
         path: &mut Vec<SaitoHash>,
     ) -> bool {
         match &node.node_type {
-            NodeType::Transaction { .. } => &node.hash.unwrap() == target_hash,
+            NodeType::Transaction { .. } => node.hash.as_ref() == Some(target_hash),
             NodeType::Node { left, right } => {
-                // If left branch contains the target hash
-                if left.is_some() && self.is_hash_present(&left.as_ref().unwrap(), target_hash) {
-                    if let Some(right_node) = &right {
-                        path.push(right_node.hash.unwrap());
+                // Check the left child for the presence of the target hash
+                if let Some(left_node) = left {
+                    if self.is_hash_present(&left_node, target_hash) {
+                        // Push the right sibling's hash if it's not an SPV node or the target
+                        if let Some(right_node) = right {
+                            if !right_node.is_spv && right_node.hash.as_ref() != Some(target_hash) {
+                                path.push(right_node.hash.expect("Right node must have a hash"));
+                            }
+                        }
+                        return self.find_path(left_node, target_hash, path);
                     }
-                    return self.find_path(&left.as_ref().unwrap(), target_hash, path);
                 }
 
-                // If right branch contains the target hash
-                if right.is_some() && self.is_hash_present(&right.as_ref().unwrap(), target_hash) {
-                    if let Some(left_node) = &left {
-                        path.push(left_node.hash.unwrap());
+                // Check the right child for the presence of the target hash
+                if let Some(right_node) = right {
+                    if self.is_hash_present(&right_node, target_hash) {
+                        // Push the left sibling's hash if it's not an SPV node or the target
+                        if let Some(left_node) = left {
+                            if !left_node.is_spv && left_node.hash.as_ref() != Some(target_hash) {
+                                path.push(left_node.hash.expect("Left node must have a hash"));
+                            }
+                        }
+                        return self.find_path(right_node, target_hash, path);
                     }
-                    return self.find_path(&right.as_ref().unwrap(), target_hash, path);
                 }
 
                 false
@@ -360,19 +413,71 @@ impl MerkleTree {
 
     fn is_hash_present(&self, node: &Box<MerkleTreeNode>, target_hash: &SaitoHash) -> bool {
         match &node.node_type {
-            NodeType::Transaction { .. } => &node.hash.unwrap() == target_hash,
+            NodeType::Transaction { .. } => node.hash.as_ref() == Some(target_hash),
             NodeType::Node { left, right } => {
-                (left.is_some() && self.is_hash_present(&left.as_ref().unwrap(), target_hash))
-                    || (right.is_some()
-                        && self.is_hash_present(&right.as_ref().unwrap(), target_hash))
+                // Check if the target_hash is present in the left subtree
+                left.as_ref().map_or(false, |ln| self.is_hash_present(ln, target_hash)) ||
+                // Check if the target_hash is present in the right subtree
+                right.as_ref().map_or(false, |rn| self.is_hash_present(rn, target_hash))
             }
+        }
+    }
+
+    pub fn construct_merkle_proof(&self, target_hash: &SaitoHash) -> Option<Vec<SaitoHash>> {
+        let mut path = Vec::new();
+        if !self.is_hash_present(&self.root, target_hash) {
+            return None; // The target hash is not in this tree.
+        }
+
+        // Recursive function to walk the tree and build the path.
+        fn build_path(
+            node: &Box<MerkleTreeNode>,
+            target_hash: &SaitoHash,
+            path: &mut Vec<SaitoHash>,
+        ) -> bool {
+            match &node.node_type {
+                NodeType::Transaction { .. } => {
+                    // Leaf node, check if this is the transaction we're building the proof for.
+                    node.hash.unwrap() == *target_hash
+                }
+                NodeType::Node { left, right } => {
+                    // Internal node, recursively search for the transaction.
+                    if let Some(left) = left {
+                        if build_path(left, target_hash, path) {
+                            // The transaction is in the left subtree, add the right hash to the path.
+                            if let Some(right) = right {
+                                path.push(right.hash.unwrap());
+                            }
+                            return true;
+                        }
+                    }
+                    if let Some(right) = right {
+                        if build_path(right, target_hash, path) {
+                            // The transaction is in the right subtree, add the left hash to the path.
+                            if let Some(left) = left {
+                                path.push(left.hash.unwrap());
+                            }
+                            return true;
+                        }
+                    }
+                    false
+                }
+            }
+        }
+
+        // Initiate the recursive search.
+        if build_path(&self.root, target_hash, &mut path) {
+            Some(path)
+        } else {
+            None // No path found, which should not happen if is_hash_present returned true.
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::data::crypto::generate_keys;
+    use crate::common::defs::SaitoHash;
+    use crate::core::data::crypto::{generate_keys, hash};
     use crate::core::data::merkle::MerkleTree;
     use crate::core::data::transaction::Transaction;
     use crate::core::data::wallet::Wallet;

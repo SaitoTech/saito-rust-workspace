@@ -1466,9 +1466,11 @@ impl Block {
             "generating lite block for keys : {:?}",
             keylist.iter().map(hex::encode).collect::<Vec<String>>()
         );
+
         let mut pruned_txs = vec![];
         let mut selected_txs = 0;
-        for tx in self.transactions.iter() {
+
+        for tx in &self.transactions {
             if tx
                 .from
                 .iter()
@@ -1480,87 +1482,86 @@ impl Block {
                 selected_txs += 1;
             } else {
                 let spv = Transaction {
+                    // Preserve the necessary fields for the SPV transaction
                     timestamp: tx.timestamp,
-                    from: vec![],
-                    to: vec![],
-                    data: vec![],
-                    transaction_type: TransactionType::SPV,
-                    txs_replacements: 1,
-                    signature: [
-                        tx.hash_for_signature.as_ref().unwrap().as_slice(),
-                        [0; 32].as_slice(),
-                    ]
-                    .concat()
-                    .try_into()
-                    .unwrap(),
-                    path: vec![],
-                    hash_for_signature: tx.hash_for_signature,
-                    total_in: 0,
-                    total_out: 0,
-                    total_fees: 0,
-                    total_work_for_me: 0,
-                    cumulative_fees: 0,
+                    from: vec![], // SPV does not necessarily need input slips
+                    to: vec![],   // SPV does not necessarily need output slips
+                    data: vec![], // Depending on the context, data may be empty for an SPV transaction
+                    transaction_type: TransactionType::SPV, // Set the transaction type to SPV
+                    txs_replacements: 1, // This indicates that there are no replacements
+                    signature: tx.signature,
+                    path: vec![], // The path might be empty if not needed for SPV validation
+                    hash_for_signature: tx.hash_for_signature, // Hash used for the Merkle Tree, cloned from the original transaction
+                    total_in: 0,          // Total input for SPV could be set to 0
+                    total_out: 0,         // Total output for SPV could be set to 0
+                    total_fees: 0,        // Total fees for SPV could be set to 0
+                    total_work_for_me: 0, // Total work could be set to 0 for an SPV transaction
+                    cumulative_fees: 0, // Cumulative fees for this SPV transaction could be set to 0
                 };
 
                 pruned_txs.push(spv);
             }
         }
+
         debug!(
-            "selected txs : {:?} out of {:?}",
+            "selected txs : {} out of {}",
             selected_txs,
             self.transactions.len()
         );
 
         let mut i = 0;
         let mut no_simplification_needed = false;
+
         while !no_simplification_needed {
             let mut action_taken = false;
-            let mut i = 1;
+            i = 1;
+
             while i < pruned_txs.len() {
                 if pruned_txs[i].transaction_type == TransactionType::SPV
                     && pruned_txs[i - 1].transaction_type == TransactionType::SPV
                     && pruned_txs[i].txs_replacements == pruned_txs[i - 1].txs_replacements
                 {
                     pruned_txs[i].txs_replacements *= 2;
-                    let sig1 = pruned_txs[i - 1].signature;
-                    let sig2 = pruned_txs[i].signature;
-
-                    let mut combined: [u8; 64] = [0; 64];
-                    combined[..32].copy_from_slice(&sig1);
-                    combined[32..].copy_from_slice(&sig2);
-                    // pruned_txs[i].signature = hash(&combined);
-                    let hash_result = hash(&combined);
-                    pruned_txs[i].signature[..32].copy_from_slice(&hash_result);
+                    let combined_hash = hash(
+                        &[
+                            pruned_txs[i - 1].hash_for_signature.clone().unwrap(),
+                            pruned_txs[i].hash_for_signature.clone().unwrap(),
+                        ]
+                        .concat(),
+                    );
+                    pruned_txs[i].hash_for_signature = Some(combined_hash);
                     pruned_txs.remove(i - 1);
                     action_taken = true;
-
-                    continue;
+                } else {
+                    i += 1;
                 }
-                i += 1;
             }
 
             if !action_taken {
                 no_simplification_needed = true;
             }
         }
+
         let mut block = Block::new();
         block.id = self.id;
         block.timestamp = self.timestamp;
-        block.previous_block_hash = self.previous_block_hash;
-        block.merkle_root = self.merkle_root;
-        block.creator = self.creator;
+        block.previous_block_hash = self.previous_block_hash.clone();
+        block.merkle_root = self.merkle_root.clone();
+        block.creator = self.creator.clone();
         block.burnfee = self.burnfee;
         block.difficulty = self.difficulty;
         block.treasury = self.treasury;
         block.staking_treasury = self.staking_treasury;
-        block.signature = self.signature;
+        block.signature = self.signature.clone();
         block.avg_income = self.avg_income;
         block.avg_variance = self.avg_variance;
         block.avg_atr_income = self.avg_atr_income;
         block.avg_atr_variance = self.avg_atr_variance;
 
+        // Set the transactions to the pruned list
         block.transactions = pruned_txs;
 
+        // Presuming generate() prepares the block for use
         block.generate();
 
         block
@@ -2028,7 +2029,7 @@ mod tests {
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::{generate_keys, verify_signature};
     use crate::core::data::merkle::{MerkleTree, MerkleTreeNode};
-    use crate::core::data::slip::Slip;
+    use crate::core::data::slip::{Slip, SlipType};
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
     use crate::core::data::wallet::Wallet;
@@ -2316,7 +2317,6 @@ mod tests {
             Storage::decode_str("s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR").unwrap();
         let mut to_public_key: SaitoPublicKey = [0u8; 33];
         to_public_key.copy_from_slice(&public_key);
-        let to_public_key: SaitoPublicKey = [0u8; 33];
         t.transfer_value_to_public_key(to_public_key.clone(), 500, block1.timestamp + 120000)
             .await
             .unwrap();
@@ -2341,121 +2341,100 @@ mod tests {
         dbg!(block3.id);
     }
 
-    // #[tokio::test]
-    // async fn verify_spv_transaction_in_lite_block_test() {
-    //     let mut t = TestManager::new();
+    #[tokio::test]
+    async fn verify_spv_transaction_in_lite_block_test() {
+        let mut t = TestManager::new();
 
-    //     t.initialize(100, 100000).await;
+        // Initialize the test manager
+        t.initialize(100, 100000).await;
 
-    //     let public_key: SaitoPublicKey;
-    //     {
-    //         let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
-    //         public_key = wallet.public_key;
-    //     }
-    //     // let lite_block = block1.generate_lite_block(vec![]);
+        // Retrieve the latest block
+        let mut block = t.get_latest_block().await;
 
-    //     let public_key =
-    //         Storage::decode_str("s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR").unwrap();
-    //     let mut to_public_key: SaitoPublicKey = [0u8; 33];
-    //     to_public_key.copy_from_slice(&public_key);
-    //     let other_public_key =
-    //         Storage::decode_str("s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPU").unwrap();
-    //     let mut public_key2: SaitoPublicKey = [0u8; 33];
-    //     public_key2.copy_from_slice(&other_public_key);
+        // Get the wallet's keys
+        let private_key: SaitoPrivateKey;
+        let public_key: SaitoPublicKey;
+        {
+            let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
 
-    //     // t.transfer_value_to_public_key(to_public_key.clone(), 500, block1.timestamp + 120000)
-    //     //     .await
-    //     //     .unwrap();
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
+        }
 
-    //     // t.transfer_value_to_public_key(public_key2.clone(), 500, block1.timestamp + 240000)
-    //     //     .await
-    //     //     .unwrap();
+        // Set up the recipient's public key
+        let _public_key = "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC";
+        let mut to_public_key: SaitoPublicKey = [0u8; 33];
 
-    //     let block = t.get_latest_block().await;
-    //     let lite_block = block.generate_lite_block(vec![]);
+        // Create VIP transactions
+        for _ in 0..50 {
+            let public_key_ = Storage::decode_str(&_public_key).unwrap();
+            to_public_key.copy_from_slice(&public_key_);
+            let mut tx = Transaction::default();
+            tx.transaction_type = TransactionType::Normal;
+            let mut output = Slip::default();
+            output.public_key = to_public_key;
+            output.amount = 0;
+            output.slip_type = SlipType::Normal;
+            tx.add_to_slip(output);
+            tx.generate(&public_key, 0, 0);
+            tx.sign(&private_key);
+            // dbg!(&tx.hash_for_signature);
+            block.add_transaction(tx);
+        }
 
-    //
+        {
+            let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
+            block.merkle_root =
+                block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
+        }
 
-    // return;
+        // Generate and sign the block
+        block.generate();
+        block.sign(&private_key);
 
-    // let mut block = t.create_block([0; 32], 120000, 0, 0, 0, false).await;
+        // Generate a lite block from the full block, using the public keys for SPV transactions
+        let lite_block = block.generate_lite_block(vec![public_key]);
 
-    // let private_key: SaitoPrivateKey;
-    // let public_key: SaitoPublicKey;
-    // {
-    //     let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+        // Find the SPV transaction in the lite block
+        let spv_tx = lite_block
+            .transactions
+            .iter()
+            .find(|&tx| tx.transaction_type == TransactionType::SPV)
+            .expect("No SPV transaction found")
+            .clone();
 
-    //     public_key = wallet.public_key;
-    //     private_key = wallet.private_key;
-    // }
+        // Generate the Merkle root for the lite block
+        // let lite_block_merkle_root: [u8; 32] = lite_block.generate_merkle_root(false, false);
 
-    // for _ in 0..50 {
-    //     let random_public_key = TestManager::generate_random_public_key();
-    //     let mut tx = Transaction::create_vip_transaction(random_public_key, 0);
-    //     tx.generate(&random_public_key, 0, 0);
-    //     tx.sign(&private_key);
-    //     block.add_transaction(tx);
-    // }
+        // Generate a Merkle tree from the block transactions
+        let merkle_tree = MerkleTree::generate(&lite_block.transactions)
+            .expect("Failed to generate Merkle tree for block");
 
-    // for _i in 0..50 {
-    //     let mut tx = Transaction::create_vip_transaction(public_key, 0);
-    //     tx.generate(&public_key, 0, 0);
-    //     tx.sign(&private_key);
-    //     block.add_transaction(tx);
-    // }
-    // {
-    //     let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
-    //     // we have added VIP, so need to regenerate the merkle-root
-    //     block.merkle_root =
-    //         block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
-    // }
-    // block.generate();
-    // block.sign(&private_key);
+        // Obtain the Merkle path for the SPV transaction
+        let merkle_path = merkle_tree
+            .get_merkle_path_for_transaction(&spv_tx)
+            .expect("Failed to get Merkle path");
 
-    // assert!(verify_signature(
-    //     &block.pre_hash,
-    //     &block.signature,
-    //     &block.creator,
-    // ));
+        // dbg!(bl.get_root_hash(), lite_block.merkle_root);
 
-    // // and add first block to blockchain
-    // t.add_block(block).await;
+        // // Verify the SPV transaction using its Merkle path and the lite block's Merkle root
+        // dbg!(merkle_path, lite_block.merkle_root);
+        dbg!(merkle_tree.construct_merkle_proof(&spv_tx.hash_for_signature.unwrap()));
+        dbg!(merkle_tree.get_root_hash());
+        // assert!(
+        //     MerkleTree::verify_merkle_path(
+        //         &lite_block.merkle_root,
+        //         &spv_tx
+        //             .hash_for_signature
+        //             .expect("SPV transaction must have a signature hash"),
+        //         &merkle_tree
+        //             .construct_merkle_proof(&spv_tx.hash_for_signature.unwrap())
+        //             .unwrap()
+        //     ),
+        //     "SPV transaction is not verifiable by the lite block!"
+        // );
 
-    // let block1 = t.get_latest_block().await;
-    // dbg!(block1.transactions.len());
-    // let lite_block1 = block1.generate_lite_block(vec![]);
-    // dbg!(&lite_block1.transactions.len(), "length");
-
-    // Generate a Merkle Tree based on the block's transactions
-    // let merkle_tree =
-    //     MerkleTree::generate(&block1.transactions).expect("Failed to generate Merkle tree");
-
-    // // Extract an SPV transaction from the lite block's transactions
-    // let spv_tx = block1
-    //     .transactions
-    //     .iter()
-    //     .find(|&tx| tx.transaction_type == TransactionType::SPV)
-    //     .cloned()
-    //     .expect("No SPV transaction found");
-
-    // Obtain the Merkle path for the SPV transaction in the generated Merkle tree
-    // let merkle_path = merkle_tree
-    //     .get_merkle_path_for_transaction(&spv_tx)
-    //     .expect("Failed to get Merkle path");
-
-    // dbg!(
-    //     &merkle_path,
-    //     merkle_tree.get_root_hash(),
-    //     spv_tx.hash_for_signature
-    // );
-    // Verify the Merkle path
-    // assert!(
-    //     MerkleTree::verify_merkle_path(
-    //         &merkle_tree.get_root_hash(),
-    //         &spv_tx.hash_for_signature.unwrap(),
-    //         &merkle_path
-    //     ),
-    //     "SPV transaction is not in the lite block!"
-    // );
-    // }
+        // Additional debugging information if needed
+        // dbg!(lite_block.transactions.len());
+    }
 }
