@@ -266,15 +266,11 @@ pub async fn initialize(
 
         if config.is_err() {
             error!("failed parsing configs. {:?}", config.err().unwrap());
-            return Ok(JsValue::from("failed parsing configs"));
+        } else {
+            let config = config.unwrap();
+            info!("config : {:?}", config);
+            configs.replace(&config);
         }
-        let config = config.unwrap();
-
-        info!("config : {:?}", config);
-        info!("config.is_browser 1: {:?}", config.is_browser());
-
-        configs.replace(&config);
-        info!("config.is_browser 2: {:?}", configs.is_browser());
     }
 
     let mut saito = SAITO.lock().await;
