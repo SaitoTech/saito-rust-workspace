@@ -459,7 +459,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 );
                 blockchain.last_block_hash =
                     SaitoHash::from_hex(blockchain_configs.last_block_hash.as_str())
-                        .expect("last block hash cannot be parsed");
+                        .unwrap_or([0; 32]);
                 blockchain.last_block_id = blockchain_configs.last_block_id;
                 blockchain.last_timestamp = blockchain_configs.last_timestamp;
                 blockchain.genesis_block_id = blockchain_configs.genesis_block_id;
@@ -468,11 +468,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     blockchain_configs.lowest_acceptable_timestamp;
                 blockchain.lowest_acceptable_block_hash =
                     SaitoHash::from_hex(blockchain_configs.lowest_acceptable_block_hash.as_str())
-                        .expect("lowest block hash cannot be parsed");
+                        .unwrap_or([0; 32]);
                 blockchain.lowest_acceptable_block_id =
                     blockchain_configs.lowest_acceptable_block_id;
-                blockchain.fork_id = SaitoHash::from_hex(blockchain_configs.fork_id.as_str())
-                    .expect("fork id cannot be parsed");
+                blockchain.fork_id =
+                    SaitoHash::from_hex(blockchain_configs.fork_id.as_str()).unwrap_or([0; 32]);
             } else {
                 info!("blockchain state is not loaded");
             }
