@@ -857,14 +857,8 @@ impl Transaction {
         }
 
         if self.transaction_type == TransactionType::SPV {
-            // Check if hash_for_signature contains the placeholder hash
-            if let Some(hash) = &self.hash_for_signature {
-                if *hash != [0; 32] {
-                    error!("ERROR: SPV transaction contains invalid hash");
-                    return false;
-                }
-            } else {
-                error!("ERROR: SPV transaction lacks hash_for_signature");
+            if self.total_fees > 0 {
+                error!("ERROR: SPV transaction contains invalid hash");
                 return false;
             }
 

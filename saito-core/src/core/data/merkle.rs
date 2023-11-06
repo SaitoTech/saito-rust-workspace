@@ -179,7 +179,7 @@ impl MerkleTree {
 
     fn generate_hash(node: &mut MerkleTreeNode) -> bool {
         if node.hash.is_some() {
-            return true;
+        return true;
         }
 
         match &node.node_type {
