@@ -160,35 +160,45 @@ impl MerkleTree {
         }
 
         // Combine leaves into nodes to form the tree
+
         while leaves.len() > 1 {
-            let mut nodes: LinkedList<Box<MerkleTreeNode>> = LinkedList::new();
+            let mut nodes: LinkedList<MerkleTreeNode> = Default::default();
 
-            while leaves.len() > 0 {
-                let left_leaf = leaves.pop_front().unwrap();
-                let right_leaf = if leaves.len() > 0 {
-                    leaves.pop_front().unwrap()
+            // Create a node per two leaves
+            while !leaves.is_empty() {
+                let left = leaves.pop_front();
+                let right = leaves.pop_front(); //Can be None, this is expected
+                let count = MerkleTree::calculate_child_count(&left, &right);
+
+                if right.is_some() {
+                    nodes.push_back(MerkleTreeNode::new(
+                        NodeType::Node { left, right },
+                        None,
+                        count,
+                        false,
+                    ));
                 } else {
-                    // If there is an odd number of leaves, duplicate the last leaf
-                    left_leaf.clone()
-                };
-
-                let combined_hash = Some(Self::compute_combined_hash(
-                    left_leaf.get_hash(),
-                    right_leaf.get_hash(),
-                ));
-
-                nodes.push_back(Box::new(MerkleTreeNode::new(
-                    NodeType::Node {
-                        left: Some(left_leaf),
-                        right: Some(right_leaf),
-                    },
-                    combined_hash,
-                    left_leaf.txs_replacements + right_leaf.txs_replacements,
-                    false, // Nodes created from combining are not SPV
-                )));
+                    let hash = left.as_ref().unwrap().get_hash();
+                    nodes.push_back(MerkleTreeNode::new(
+                        NodeType::Node { left, right },
+                        hash,
+                        count,
+                        false,
+                    ));
+                }
             }
 
-            leaves = nodes;
+            // Compute the node hashes in parallel
+            iterate_mut!(nodes).all(|node| MerkleTree::generate_hash(node));
+            // Collect the next set of leaves for the computation
+            leaves.clear();
+
+            while !nodes.is_empty() {
+                let node = nodes.pop_front().unwrap();
+                leaves.push_back(Box::new(node));
+            }
+
+            // trace!("---------------------");
         }
 
         Some(Box::new(MerkleTree {
@@ -442,65 +452,114 @@ mod tests {
         let keys = generate_keys();
         let wallet = Wallet::new(keys.1, keys.0);
 
+        // Step 1: Create 5 normal transactions and sign them
         let mut transactions = Vec::new();
+        for _ in 0..5 {
+            let mut tx = Transaction::default();
+            tx.sign(&wallet.private_key);
+            transactions.push(tx);
+        }
 
-        let mut normal_tx1 = Transaction::default();
-        normal_tx1.sign(&wallet.private_key);
-        transactions.push(normal_tx1.clone());
+        // Generate the Merkle tree from the original transactions
+        let merkle_tree_original = MerkleTree::generate(&transactions).unwrap();
+        let root_original = merkle_tree_original.get_root_hash();
 
-        let mut normal_tx2 = Transaction::default();
-        normal_tx2.sign(&wallet.private_key);
-        transactions.push(normal_tx2.clone());
+        // Step 2: Replace second transaction with an SPV transaction (b becomes b(SPV))
+        let mut transactions_with_spv_b = transactions.clone();
+        transactions_with_spv_b[1] = create_spv_transaction(&wallet, transactions[1].clone(), 1);
+        let merkle_tree_spv_b = MerkleTree::generate(&transactions_with_spv_b).unwrap();
+        assert_eq!(
+            root_original,
+            merkle_tree_spv_b.get_root_hash(),
+            "Merkle roots should be equal after replacing b with b(SPV)."
+        );
 
-        let mut normal_tx3 = Transaction::default();
-        normal_tx3.sign(&wallet.private_key);
-        transactions.push(normal_tx3.clone());
-
-        let mut normal_tx4 = Transaction::default();
-        normal_tx4.sign(&wallet.private_key);
-        transactions.push(normal_tx4.clone());
-
-        let mut normal_tx5 = Transaction::default();
-        normal_tx5.sign(&wallet.private_key);
-        transactions.push(normal_tx5.clone());
-
-        let merkle_tree0 = MerkleTree::generate(&transactions).unwrap();
-
-        transactions[1] = create_spv_transaction(wallet, transactions[1].clone());
-
-        let merkle_tree1 = MerkleTree::generate(&transactions).unwrap();
-        dbg!(merkle_tree0.get_root_hash(), merkle_tree1.get_root_hash());
-
-        let mut tx = Transaction::default();
-
-        // transactions.push(&mut spv_tx);
-
-        let expected_leaves: u32 = transactions
+        // Step 3: Replace all transactions with SPV transactions
+        let transactions_all_spv = transactions
             .iter()
-            .map(|tx| std::cmp::max(1, tx.txs_replacements))
-            .sum();
+            .map(|tx| create_spv_transaction(&wallet, tx.clone(), 1))
+            .collect::<Vec<Transaction>>();
+        let merkle_tree_all_spv = MerkleTree::generate(&transactions_all_spv).unwrap();
+        assert_eq!(
+            root_original,
+            merkle_tree_all_spv.get_root_hash(),
+            "Merkle roots should be equal after replacing all with SPV transactions."
+        );
 
-        // assert_eq!(expected_leaves, 6);
+        // Step 4: Combine c and d into a single SPV transaction (cd becomes cd(SPV))
+        // and combine their hashes
+        let mut transactions_cd_spv = transactions.clone();
+        let combined_tx3_tx4 =
+            combine_transactions_into_spv(&wallet, &transactions[2], &transactions[3]);
+        transactions_cd_spv.splice(2..4, std::iter::once(combined_tx3_tx4));
+        let merkle_tree_cd_spv = MerkleTree::generate(&transactions_cd_spv).unwrap();
+        assert_eq!(
+            root_original,
+            merkle_tree_cd_spv.get_root_hash(),
+            "Merkle roots should be equal after replacing cd with combined cd(SPV)."
+        );
+
+        // // Step 5: Various SPV transactions (b and cd are SPV, e is SPV)
+        // let mut transactions_mixed_spv = transactions.clone();
+        // transactions_mixed_spv[1] = create_spv_transaction(&wallet, transactions[1].clone(), 1);
+        // transactions_mixed_spv.splice(
+        //     2..4,
+        //     std::iter::once(create_spv_transaction(&wallet, transactions[2].clone(), 2)),
+        // );
+        // transactions_mixed_spv[4] = create_spv_transaction(&wallet, transactions[4].clone(), 1);
+        // let merkle_tree_mixed_spv = MerkleTree::generate(&transactions_mixed_spv).unwrap();
+        // assert_eq!(
+        //     root_original,
+        //     merkle_tree_mixed_spv.get_root_hash(),
+        //     "Merkle roots should be equal after various SPV replacements."
+        // );
+
+        // // Step 6: Break it by changing txs_replacements value somewhere
+        // let mut transactions_broken_spv = transactions_mixed_spv.clone();
+        // transactions_broken_spv[1].txs_replacements = 3; // Change b(SPV) replacements
+        // let merkle_tree_broken_spv = MerkleTree::generate(&transactions_broken_spv).unwrap();
+        // assert_ne!(
+        //     root_original,
+        //     merkle_tree_broken_spv.get_root_hash(),
+        //     "Merkle root should differ due to changed SPV tx replacements."
+        // );
     }
 
-    fn create_spv_transaction(wallet: Wallet, mut tx: Transaction) -> Transaction {
+    fn create_spv_transaction(
+        wallet: &Wallet,
+        mut tx: Transaction,
+        txs_replacements: u32,
+    ) -> Transaction {
         tx.sign(&wallet.private_key);
-        let spv_tx = Transaction {
+        Transaction {
             timestamp: tx.timestamp,
-            from: tx.from.clone(),
-            to: tx.to.clone(),
-            data: tx.data.clone(),
+            from: tx.from,
+            to: tx.to,
+            data: tx.data,
             transaction_type: TransactionType::SPV,
-            txs_replacements: 5,
-            signature: tx.signature.clone(),
-            path: tx.path.clone(),
-            hash_for_signature: tx.hash_for_signature.clone(),
+            txs_replacements, // Set the number of transactions this SPV transaction represents
+            signature: tx.signature,
+            path: tx.path,
+            hash_for_signature: tx.hash_for_signature,
             total_in: tx.total_in,
             total_out: tx.total_out,
             total_fees: tx.total_fees,
             total_work_for_me: tx.total_work_for_me,
             cumulative_fees: tx.cumulative_fees,
-        };
+        }
+    }
+    fn combine_transactions_into_spv(
+        wallet: &Wallet,
+        tx1: &Transaction,
+        tx2: &Transaction,
+    ) -> Transaction {
+        let combined_hash =
+            MerkleTree::compute_combined_hash(tx1.hash_for_signature, tx2.hash_for_signature);
+        let mut spv_tx = Transaction::default();
+        spv_tx.transaction_type = TransactionType::SPV;
+        spv_tx.txs_replacements = 2; // Represents the combination of two transactions
+        spv_tx.hash_for_signature = Some(combined_hash);
+        spv_tx.sign(&wallet.private_key);
         spv_tx
     }
 }
