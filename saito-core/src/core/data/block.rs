@@ -1609,7 +1609,6 @@ impl Block {
             self.transactions.len()
         );
 
-        // New logic for combining SPV transactions
         let mut i = 0;
         while i < pruned_txs.len() - 1 {
             if pruned_txs[i].transaction_type == TransactionType::SPV

@@ -461,7 +461,7 @@ mod tests {
 
         // Break it by changing txs_replacements value somewhere
         let mut transactions_broken_spv = transactions_mixed_spv.clone();
-        transactions_broken_spv[1].txs_replacements = 3; // Change b(SPV) replacements
+        transactions_broken_spv[1].txs_replacements = 3;
         let merkle_tree_broken_spv = MerkleTree::generate(&transactions_broken_spv).unwrap();
         assert_ne!(
             root_original,
