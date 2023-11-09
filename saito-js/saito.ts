@@ -327,6 +327,7 @@ export default class Saito {
     //   "saito.sendTransactionWithCallback : peer = " + peerIndex + " sig = " + transaction.signature
     // );
     let buffer = transaction.wasmTransaction.serialize();
+    transaction.free();
 
     await this.sendApiCall(buffer, peerIndex || BigInt(0), !!callback)
       .then((buffer: Uint8Array) => {

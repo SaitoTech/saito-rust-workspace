@@ -186,7 +186,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
       console.error("failed running callbacks");
       console.error(error);
     }
-    console.log("onAddBlockSuccess complete");
+    console.log(`onAddBlockSuccess : ${hash} complete`);
   }
 
   public async onNewBlock(block: Block, lc: boolean) {
@@ -204,7 +204,7 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
     return this.instance.get_hashes_at_id(blockId);
   }
 
-  public async getForkId(){
+  public async getForkId() {
     return this.instance.get_fork_id();
   }
 }
