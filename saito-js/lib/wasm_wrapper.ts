@@ -4,4 +4,9 @@ export default class WasmWrapper<T> {
   constructor(instance: T) {
     this.instance = instance;
   }
+
+  free() {
+    // @ts-ignore
+    this.instance.free();
+  }
 }

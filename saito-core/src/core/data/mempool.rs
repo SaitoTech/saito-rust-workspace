@@ -282,7 +282,7 @@ impl Mempool {
             let h = hash(h.as_slice());
             let value = U256::from(h);
             let value: Timestamp =
-                (value.low_u128() % Duration::from_secs(20).as_millis()) as Timestamp;
+                (value.low_u128() % Duration::from_secs(5).as_millis()) as Timestamp;
             // random hack to make sure nodes are not generating forks when fees are zero
             if current_timestamp < previous_block.timestamp + value {
                 return None;

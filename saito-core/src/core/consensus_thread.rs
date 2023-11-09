@@ -15,7 +15,7 @@ use crate::common::defs::{
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::data::block::Block;
+use crate::core::data::block::{Block, BlockType};
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
@@ -555,11 +555,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         {
             let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
             let stat = format!(
-                "{} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?}",
+                "{} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?} full_block_count : {:?} txs_in_blocks : {:?}",
                 format!("{:width$}", "blockchain::state", width = 40),
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
-                blockchain.get_latest_block_id()
+                blockchain.get_latest_block_id(),
+                blockchain.blocks.iter().filter(|(hash,block)|{block.block_type==BlockType::Full}).count(),
+                blockchain.blocks.iter().map(|(hash,block)|{block.transactions.len()}).sum::<usize>()
             );
             self.stat_sender.send(stat).await.unwrap();
         }
