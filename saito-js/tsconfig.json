@@ -115,5 +115,10 @@
 ////      "es2020.full",
 ////      "es2021.weakref"
 //    ]
+    "lib": [
+      "es2020",
+      "es2021.weakref",
+      "dom"
+    ]
   }
 }
