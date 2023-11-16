@@ -644,7 +644,8 @@ pub mod test {
             let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
             for slip in slips {
-                let mut tx: Transaction = Transaction::create_vip_transaction(slip.public_key, slip.amount);
+                let mut tx: Transaction =
+                    Transaction::create_vip_transaction(slip.public_key, slip.amount);
                 tx.generate(&slip.public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
