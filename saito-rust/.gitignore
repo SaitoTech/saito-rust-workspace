@@ -6,4 +6,5 @@ perf.data.old
 data/saito.stats
 data/issuance/issuance
 data/issuance.file
+data/issuance/test/issuance
 data/issuance/test/*
