@@ -641,7 +641,6 @@ impl Block {
     //
     // downgrade block
     //
-    #[ignore]
     pub async fn downgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
