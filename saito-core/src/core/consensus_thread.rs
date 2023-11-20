@@ -498,24 +498,20 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 self.storage
                     .load_blocks_from_disk(file_names, self.mempool.clone())
                     .await;
-                let sender = if list.is_empty() {
-                    // Some(self.sender_to_miner.clone())
-                    // since we are loading the blocks from disk, we aren't mining for latest block
-                    None
-                } else {
-                    None
-                };
 
                 blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
                         Some(&self.network),
                         &mut self.storage,
-                        sender,
+                        None,
                         configs.deref(),
                     )
                     .await;
+
+                info!("{:?} blocks remaining to be loaded", list.len());
             }
+            info!("{:?} total blocks in blockchain", blockchain.blocks.len());
         }
 
         debug!(
@@ -560,8 +556,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
                 blockchain.get_latest_block_id(),
-                blockchain.blocks.iter().filter(|(hash,block)|{block.block_type==BlockType::Full}).count(),
-                blockchain.blocks.iter().map(|(hash,block)|{block.transactions.len()}).sum::<usize>()
+                blockchain.blocks.iter().filter(|(hash, block)| { block.block_type == BlockType::Full }).count(),
+                blockchain.blocks.iter().map(|(hash, block)| { block.transactions.len() }).sum::<usize>()
             );
             self.stat_sender.send(stat).await.unwrap();
         }
