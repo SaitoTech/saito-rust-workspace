@@ -56,6 +56,8 @@ pub mod test {
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
+    use rand::rngs::OsRng;
+    use secp256k1::{Secp256k1, SecretKey};
 
     pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
@@ -642,7 +644,8 @@ pub mod test {
             let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
             for slip in slips {
-                let mut tx = Transaction::create_vip_transaction(slip.public_key, slip.amount);
+                let mut tx: Transaction =
+                    Transaction::create_vip_transaction(slip.public_key, slip.amount);
                 tx.generate(&slip.public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
@@ -931,6 +934,13 @@ pub mod test {
             self.add_block(block).await;
 
             Ok(())
+        }
+
+        pub fn generate_random_public_key() -> SaitoPublicKey {
+            let secp = Secp256k1::new();
+            let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+            let serialized_key: SaitoPublicKey = public_key.serialize();
+            serialized_key
         }
     }
 

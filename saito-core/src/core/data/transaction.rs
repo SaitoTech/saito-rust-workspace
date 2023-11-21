@@ -856,6 +856,15 @@ impl Transaction {
             return true;
         }
 
+        if self.transaction_type == TransactionType::SPV {
+            if self.total_fees > 0 {
+                error!("ERROR: SPV transaction contains invalid hash");
+                return false;
+            }
+
+            return true;
+        }
+
         //
         // User-Sent Transactions
         //
