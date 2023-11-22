@@ -192,8 +192,6 @@ impl MerkleTree {
                 vbytes.extend(left.as_ref().unwrap().hash.unwrap());
                 vbytes.extend(right.as_ref().unwrap().hash.unwrap());
 
-                dbg!(hash(&vbytes));
-
                 // dbg!(hash(&vbytes));
                 node.hash = Some(hash(&vbytes));
                 // trace!(

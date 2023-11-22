@@ -1516,8 +1516,8 @@ impl Block {
                 pruned_txs[i].txs_replacements *= 2;
                 let combined_hash = hash(
                     &[
-                        pruned_txs[i].hash_for_signature.clone().unwrap(),
-                        pruned_txs[i + 1].hash_for_signature.clone().unwrap(),
+                        pruned_txs[i].hash_for_signature.unwrap(),
+                        pruned_txs[i + 1].hash_for_signature.unwrap(),
                     ]
                     .concat(),
                 );
@@ -1534,17 +1534,18 @@ impl Block {
         block.transactions = pruned_txs;
         block.id = self.id;
         block.timestamp = self.timestamp;
-        block.previous_block_hash = self.previous_block_hash.clone();
-        block.creator = self.creator.clone();
+        block.previous_block_hash = self.previous_block_hash;
+        block.creator = self.creator;
         block.burnfee = self.burnfee;
         block.difficulty = self.difficulty;
         block.treasury = self.treasury;
         block.staking_treasury = self.staking_treasury;
-        block.signature = self.signature.clone();
+        block.signature = self.signature;
         block.avg_income = self.avg_income;
         block.avg_variance = self.avg_variance;
         block.avg_atr_income = self.avg_atr_income;
         block.avg_atr_variance = self.avg_atr_variance;
+        block.hash = self.hash;
 
         block.merkle_root = self.generate_merkle_root(false, false);
 
