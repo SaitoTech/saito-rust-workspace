@@ -2823,7 +2823,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block2.generate(); // generate hashes
+        // block2.generate(); // generate hashes
 
         let block2_hash = block2.hash;
         let _block2_id = block2.id;
