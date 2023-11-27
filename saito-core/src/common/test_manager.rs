@@ -631,6 +631,14 @@ pub mod test {
         // initialize chain from slips and add some amount my public key
         //
         pub async fn initialize_from_slips_and_value(&mut self, slips: Vec<Slip>, amount: u64) {
+            //
+            // reset data dirs
+            //
+            let _ = tokio::fs::remove_dir_all("data/blocks").await;
+            tokio::fs::create_dir_all("data/blocks").await.unwrap();
+            let _ = tokio::fs::remove_dir_all("data/wallets").await;
+            tokio::fs::create_dir_all("data/wallets").await.unwrap();
+
             let private_key: SaitoPrivateKey;
             let my_public_key: SaitoPublicKey;
             {
