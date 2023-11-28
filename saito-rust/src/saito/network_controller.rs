@@ -874,7 +874,6 @@ fn run_websocket_server(
                     let mut block = block.unwrap();
 
                     block.generate();
-                    dbg!(&block.transactions.len());
                     let block = block.generate_lite_block(keylist);
                     let buffer = block.serialize_for_net(BlockType::Full);
                     let buffer_len = buffer.len();
