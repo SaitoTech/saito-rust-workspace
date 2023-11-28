@@ -871,7 +871,10 @@ fn run_websocket_server(
                         error!("failed parsing buffer into a block");
                         return Err(warp::reject::not_found());
                     }
-                    let block = block.unwrap();
+                    let mut block = block.unwrap();
+
+                    block.generate();
+                    dbg!(&block.transactions.len());
                     let block = block.generate_lite_block(keylist);
                     let buffer = block.serialize_for_net(BlockType::Full);
                     let buffer_len = buffer.len();
