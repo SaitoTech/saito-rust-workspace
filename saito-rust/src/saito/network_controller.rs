@@ -22,7 +22,7 @@ use warp::Filter;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
-    push_lock, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
+    push_lock, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
     LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
     LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
@@ -760,6 +760,7 @@ fn run_websocket_server(
             debug!("served block with : {:?} length", buffer_len);
             return result;
         });
+
         // TODO : review this code
         let opt = warp::path::param::<String>()
             .map(Some)
@@ -777,10 +778,6 @@ fn run_websocket_server(
                     let mut key1 = String::from("");
                     if key.is_some() {
                         key1 = key.unwrap();
-                        if key1.len() != 64 {
-                            warn!("key : {:?} is not valid", key1);
-                            return Err(warp::reject::reject());
-                        }
                     } else {
                         warn!("key is not set to request lite blocks");
                         return Err(warp::reject::reject());
@@ -790,11 +787,21 @@ fn run_websocket_server(
                     if key1.is_empty() {
                         key = public_key.clone();
                     } else {
-                        let result = hex::decode(key1.as_str());
-                        if result.is_err() {
-                            warn!("key : {:?} couldn't be decoded", key1);
-                            return Err(warp::reject::reject());
+                        let result;
+                        if key1.len() == 66 {
+                            result = SaitoPublicKey::from_hex(key1.as_str());
+                            if result.is_err() {
+                                warn!("key : {:?} couldn't be decoded", key1);
+                                return Err(warp::reject::reject());
+                            }
+                        } else {
+                            result = SaitoPublicKey::from_base58(key1.as_str());
+                            if result.is_err() {
+                                warn!("key : {:?} couldn't be decoded", key1);
+                                return Err(warp::reject::reject());
+                            }
                         }
+
                         let result = result.unwrap();
                         if result.len() != 33 {
                             warn!("key length : {:?} is not for public key", result.len());
@@ -864,7 +871,8 @@ fn run_websocket_server(
                         error!("failed parsing buffer into a block");
                         return Err(warp::reject::not_found());
                     }
-                    let block = block.unwrap();
+                    let mut block = block.unwrap();
+                    block.generate();
                     let block = block.generate_lite_block(keylist);
                     let buffer = block.serialize_for_net(BlockType::Full);
                     let buffer_len = buffer.len();

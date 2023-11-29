@@ -1,5 +1,5 @@
 *.block
 *.sai
-/test/*
+/test/
 /issuance/issuance
-/issuance/test/
+/issuance/test/issuance

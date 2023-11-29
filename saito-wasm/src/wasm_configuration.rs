@@ -26,11 +26,11 @@ impl WasmConfiguration {
     pub fn new() -> WasmConfiguration {
         WasmConfiguration {
             server: Option::Some(Server {
-                host: "127.0.0.1".to_string(),
+                host: "localhost".to_string(),
                 port: 12100,
                 protocol: "http".to_string(),
                 endpoint: Endpoint {
-                    host: "127.0.0.1".to_string(),
+                    host: "localhost".to_string(),
                     port: 12101,
                     protocol: "http".to_string(),
                 },
