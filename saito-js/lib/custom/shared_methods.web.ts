@@ -58,6 +58,7 @@ export default class WebSharedMethods extends CustomSharedMethods {
         return res.arrayBuffer();
       })
       .then((buffer: ArrayBuffer) => {
+        console.log("block fetched from : " + url + "with size : " + buffer.byteLength);
         return new Uint8Array(buffer);
       })
       .catch((err) => {
