@@ -9,6 +9,7 @@ use crate::common::defs::{
     LOCK_ORDER_WALLET, WS_KEEP_ALIVE_PERIOD,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
+use crate::common::version::Version;
 use crate::core::data;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
@@ -92,6 +93,7 @@ impl Peer {
             is_lite,
             block_fetch_url,
             services: io_handler.get_my_services(),
+            version: Default::default(),
         };
 
         self.challenge_for_peer = Some(response.challenge);
@@ -166,6 +168,7 @@ impl Peer {
                 block_fetch_url: block_fetch_url.to_string(),
                 challenge: generate_random_bytes(32).try_into().unwrap(),
                 services: io_handler.get_my_services(),
+                version: Default::default(),
             };
             io_handler
                 .send_message(self.index, Message::HandshakeResponse(response).serialize())
