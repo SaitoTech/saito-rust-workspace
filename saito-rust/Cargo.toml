@@ -18,13 +18,13 @@ futures = { version = "0.3.29", default-features = false }
 rand = "0.8.5"
 rayon = "1.8.0"
 ahash = "0.8.6"
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 hex = "0.4.3"
 warp = "0.3.6"
 reqwest = "0.11.22"
 base64 = "0.21.5"
 ctrlc = { version = "3.4.1", features = ["termination"] }
-serde = { version = "1.0.192", features = ["derive"] }
+serde = { version = "1.0.193", features = ["derive"] }
 log = "0.4.20"
 bs58 = "0.5.0"
 clap = "3.2.25"
