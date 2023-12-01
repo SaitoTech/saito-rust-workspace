@@ -1,7 +1,7 @@
+use js_sys::JsString;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use js_sys::JsString;
 use log::{error, warn};
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -42,6 +42,7 @@ impl WasmWallet {
             .reset(&mut Storage::new(Box::new(WasmIoHandler {})), None)
             .await;
     }
+
     pub async fn load(&mut self) {
         let mut wallet = self.wallet.write().await;
         Wallet::load(&mut wallet, Box::new(WasmIoHandler {})).await;

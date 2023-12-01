@@ -100,4 +100,9 @@ export default class CustomSharedMethods implements SharedMethods {
   loadBlockchain(): void {
     throw new Error("Method not implemented.");
   }
+
+  sendNewVersionAlert(major: number, minor: number, patch: number, peerIndex: bigint): void {
+    throw new Error("Method not implemented");
+  }
+
 }

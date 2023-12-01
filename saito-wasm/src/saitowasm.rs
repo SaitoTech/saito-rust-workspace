@@ -22,6 +22,7 @@ use saito_core::common::defs::{
     STAT_BIN_COUNT,
 };
 use saito_core::common::process_event::ProcessEvent;
+use saito_core::common::version::Version;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::data::blockchain::Blockchain;
 use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
@@ -783,6 +784,17 @@ pub async fn get_mempool_txs() -> js_sys::Array {
     }
 
     txs
+}
+
+#[wasm_bindgen]
+pub async fn set_wallet_version(major: u8, minor: u8, patch: u16) {
+    let saito = SAITO.lock().await;
+    let mut wallet = saito.wallet.wallet.write().await;
+    wallet.version = Version {
+        major,
+        minor,
+        patch,
+    };
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {

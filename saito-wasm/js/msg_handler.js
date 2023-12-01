@@ -83,6 +83,10 @@ class MsgHandler {
   static send_wallet_update() {
     return global.shared_methods.send_wallet_update();
   }
+
+  static send_new_version_alert(major, minor, patch, peerIndex) {
+    return global.shared_methods.send_new_version_alert(major, minor, patch, peerIndex);
+  }
 }
 
 try {

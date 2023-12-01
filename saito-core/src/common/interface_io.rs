@@ -4,6 +4,7 @@ use std::io::Error;
 use async_trait::async_trait;
 
 use crate::common::defs::{PeerIndex, SaitoHash};
+use crate::common::version::Version;
 use crate::core::data;
 use crate::core::data::peer_service::PeerService;
 use crate::core::data::wallet::Wallet;
@@ -14,6 +15,7 @@ pub enum InterfaceEvent {
     PeerConnected(PeerIndex),
     BlockAddSuccess(SaitoHash, u64),
     WalletUpdate(),
+    NewVersionDetected(PeerIndex, Version),
 }
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
