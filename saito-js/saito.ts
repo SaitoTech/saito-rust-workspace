@@ -112,6 +112,9 @@ export default class Saito {
       },
       get_my_services: () => {
         return sharedMethods.getMyServices().instance;
+      },
+      send_new_version_alert: (major: number, minor: number, patch: number, peerIndex: bigint) => {
+        return sharedMethods.sendNewVersionAlert(major, minor, patch, peerIndex);
       }
     };
     if (privateKey === "") {
@@ -404,5 +407,9 @@ export default class Saito {
 
   public async updateBalanceFrom(snapshot: BalanceSnapshot) {
     await Saito.getLibInstance().update_from_balance_snapshot(snapshot.instance);
+  }
+
+  public async setWalletVersion(major: number, minor: number, patch: number) {
+    await Saito.getLibInstance().set_wallet_version(major, minor, patch);
   }
 }

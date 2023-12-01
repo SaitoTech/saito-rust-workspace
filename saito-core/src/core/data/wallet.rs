@@ -6,6 +6,7 @@ use crate::common::defs::{
     SaitoUTXOSetKey,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
+use crate::common::version::Version;
 use crate::core::data::block::Block;
 use crate::core::data::crypto::{generate_keys, hash, sign};
 use crate::core::data::golden_ticket::GoldenTicket;
@@ -51,6 +52,8 @@ pub struct Wallet {
     pub filepass: String,
     available_balance: Currency,
     pub pending_txs: AHashMap<SaitoHash, Transaction>,
+    // TODO : this version should be removed. only added as a temporary hack to allow SLR app version to be easily upgraded in browsers
+    pub version: Version,
 }
 
 impl Wallet {
@@ -67,6 +70,7 @@ impl Wallet {
             filepass: "password".to_string(),
             available_balance: 0,
             pending_txs: Default::default(),
+            version: Default::default(),
         }
     }
 
@@ -97,9 +101,8 @@ impl Wallet {
         self.available_balance = 0;
         self.slips.clear();
         self.unspent_slips.clear();
-        if network.is_some() {
+        if let Some(network) = network {
             network
-                .unwrap()
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }

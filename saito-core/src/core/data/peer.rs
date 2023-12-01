@@ -9,7 +9,6 @@ use crate::common::defs::{
     LOCK_ORDER_WALLET, WS_KEEP_ALIVE_PERIOD,
 };
 use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
-use crate::common::version::Version;
 use crate::core::data;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::{generate_random_bytes, sign, verify};
@@ -93,7 +92,7 @@ impl Peer {
             is_lite,
             block_fetch_url,
             services: io_handler.get_my_services(),
-            version: Default::default(),
+            version: wallet.version.clone(),
         };
 
         self.challenge_for_peer = Some(response.challenge);
@@ -156,6 +155,17 @@ impl Peer {
 
         let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
+        info!(
+            "my version : {:?} peer version : {:?}",
+            wallet.version, response.version
+        );
+        if wallet.version < response.version {
+            io_handler.send_interface_event(InterfaceEvent::NewVersionDetected(
+                self.index,
+                response.version,
+            ));
+        }
+
         if self.static_peer_config.is_none() {
             // this is only called in initiator's side.
             // [1. A:challenge -> 2. B:response -> 3. A : response|B verified -> 4. B: A verified]
@@ -168,7 +178,7 @@ impl Peer {
                 block_fetch_url: block_fetch_url.to_string(),
                 challenge: generate_random_bytes(32).try_into().unwrap(),
                 services: io_handler.get_my_services(),
-                version: Default::default(),
+                version: wallet.version.clone(),
             };
             io_handler
                 .send_message(self.index, Message::HandshakeResponse(response).serialize())

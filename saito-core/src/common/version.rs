@@ -5,11 +5,11 @@ use std::io::{Error, ErrorKind};
 
 const VERSION_SIZE: u8 = 4;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Version {
-    pub(crate) major: u8,
-    pub(crate) minor: u8,
-    pub(crate) patch: u16,
+    pub major: u8,
+    pub minor: u8,
+    pub patch: u16,
 }
 
 impl Serialize<Self> for Version {
