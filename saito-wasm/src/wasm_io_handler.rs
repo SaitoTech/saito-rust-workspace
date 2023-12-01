@@ -202,6 +202,16 @@ impl InterfaceIO for WasmIoHandler {
             InterfaceEvent::WalletUpdate() => {
                 MsgHandler::send_wallet_update();
             }
+            InterfaceEvent::NewVersionDetected(index, version) => {
+                MsgHandler::send_new_version_alert(
+                    format!(
+                        "{:?}.{:?}.{:?}",
+                        version.major, version.minor, version.patch
+                    )
+                    .to_string(),
+                    index,
+                );
+            }
         }
     }
 
@@ -334,4 +344,7 @@ extern "C" {
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn get_my_services() -> WasmPeerServiceList;
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn send_new_version_alert(version: String, peer_index: u64);
 }

@@ -8,6 +8,7 @@ pub struct PeerService {
     pub service: String,
     pub domain: String,
     pub name: String,
+    // TODO: add versioning info here for application services for #622
 }
 
 impl TryFrom<String> for PeerService {
