@@ -9,7 +9,6 @@ export default class WebSharedMethods extends CustomSharedMethods {
       protocol = "wss";
     }
     let url = protocol + "://" + peerData.host + ":" + peerData.port + "/wsopen";
-
     try {
       console.log("connecting to " + url + "....");
       let socket = new WebSocket(url);
@@ -23,7 +22,6 @@ export default class WebSharedMethods extends CustomSharedMethods {
           console.error(error);
         }
       };
-
       socket.onopen = () => {
         try {
           Saito.getLibInstance().process_new_peer(index, peerData);
@@ -150,5 +148,5 @@ export default class WebSharedMethods extends CustomSharedMethods {
   sendInterfaceEvent(event: String, peerIndex: bigint) {
     throw new Error("Method not implemented.");
   }
- 
+
 }

@@ -61,6 +61,8 @@ impl Peer {
             .unwrap();
         debug!("handshake challenge sent for peer: {:?}", self.index);
 
+        dbg!("davik is initiating handshake");
+
         Ok(())
     }
     pub async fn handle_handshake_challenge(

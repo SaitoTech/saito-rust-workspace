@@ -335,7 +335,6 @@ export default class Saito {
       .then((buffer: Uint8Array) => {
         if (callback) {
           // console.log("sendTransactionWithCallback. buffer length = " + buffer.byteLength);
-
           let tx = this.factory.createTransaction();
           tx.data = buffer;
           tx.unpackData();
