@@ -21,10 +21,8 @@ pub struct WasmIoHandler {}
 impl InterfaceIO for WasmIoHandler {
     async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
         trace!("WasmIoHandler::send_message : {:?}", peer_index);
-
         let array = js_sys::Uint8Array::new_with_length(buffer.len() as u32);
         array.copy_from(buffer.as_slice());
-
         // let async_fn =
         MsgHandler::send_message(js_sys::BigInt::from(peer_index), &array);
         // let promise = js_sys::Promise::resolve(async_fn);

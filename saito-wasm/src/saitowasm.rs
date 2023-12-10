@@ -673,7 +673,7 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
         data: buffer.to_vec(),
     };
     let message = Message::ApplicationMessage(api_message);
-    let buffer = message.serialize();
+    let buffer: Vec<u8> = message.serialize();
     if peer_index == 0 {
         saito
             .routing_thread
