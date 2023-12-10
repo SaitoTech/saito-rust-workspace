@@ -158,7 +158,7 @@ impl Peer {
         let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
         info!(
-            "my version : {:?} peer version : {:?}",
+            "my versioner : {:?} peer version : {:?}",
             wallet.version, response.version
         );
         if wallet.version < response.version {
