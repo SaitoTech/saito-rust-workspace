@@ -149,4 +149,15 @@ export default class WebSharedMethods extends CustomSharedMethods {
     throw new Error("Method not implemented.");
   }
 
+
+  // pollConfigFile(peerIndex: bigint): void {
+
+  // }
+
+  // updateSoftware(peerIndex: bigint, version: bigint): void {
+
+  // }
+
+
+
 }

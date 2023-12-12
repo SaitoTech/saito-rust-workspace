@@ -1,11 +1,11 @@
-import Saito, {LogLevel} from "./saito";
+import Saito, { LogLevel } from "./saito";
 import SharedMethods from "./shared_methods";
 import Transaction from "./lib/transaction";
 import Slip from "./lib/slip";
 import Block from "./lib/block";
 import Peer from "./lib/peer";
 import Factory from "./lib/factory";
-import Wallet, {WalletSlip} from "./lib/wallet";
+import Wallet, { WalletSlip } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import PeerService from "./lib/peer_service";
 import PeerServiceList from "./lib/peer_service_list";
@@ -26,12 +26,14 @@ if (NODE_MAJOR_VERSION < 19) {
  * @param privateKey
  * @param logLevel
  */
+
+
 export async function initialize(
     configs: any,
     sharedMethods: SharedMethods,
     factory: Factory,
     privateKey: string,
-    logLevel: LogLevel = LogLevel.Info
+    logLevel: LogLevel = LogLevel.Info,
 ) {
     if (Saito.getLibInstance()) {
         console.error("saito already initialized");

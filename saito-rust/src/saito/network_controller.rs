@@ -606,8 +606,12 @@ pub async fn run_network_controller(
                             network_controller_lock.clone(),
                             peer_index,
                         )
-                        .await
+                        .await;
                     }
+                    NetworkEvent::SoftwareUpdate {
+                        peer_index,
+                        version: u64,
+                    } => {}
                 }
             }
 

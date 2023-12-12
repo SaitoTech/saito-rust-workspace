@@ -341,8 +341,11 @@ impl Network {
         let public_key = peer.public_key.unwrap();
         peers.address_to_peers.insert(public_key, peer_index);
         // start block syncing here
+
         self.request_blockchain_from_peer(peer_index, blockchain.clone())
             .await;
+
+        // listen for changes in config/options
     }
 
     async fn request_blockchain_from_peer(

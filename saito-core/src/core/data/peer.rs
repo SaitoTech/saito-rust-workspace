@@ -61,8 +61,6 @@ impl Peer {
             .unwrap();
         debug!("handshake challenge sent for peer: {:?}", self.index);
 
-        dbg!("davik is initiating handshake");
-
         Ok(())
     }
     pub async fn handle_handshake_challenge(
@@ -125,6 +123,8 @@ impl Peer {
             );
             return Err(Error::from(ErrorKind::InvalidInput));
         }
+
+        dbg!(&response, "peer connect response ");
         // TODO : validate block fetch URL
         let sent_challenge = self.challenge_for_peer.unwrap();
         let result = verify(&sent_challenge, &response.signature, &response.public_key);
@@ -158,7 +158,7 @@ impl Peer {
         let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
         info!(
-            "my versioner : {:?} peer version : {:?}",
+            "my version : {:?} peer version : {:?}",
             wallet.version, response.version
         );
         if wallet.version < response.version {
@@ -194,6 +194,7 @@ impl Peer {
             );
         }
         io_handler.send_interface_event(InterfaceEvent::PeerHandshakeComplete(self.index));
+        io_handler.poll_config_file(self.index).await;
 
         Ok(())
     }

@@ -4,6 +4,7 @@ use std::io::{Error, ErrorKind};
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{error, trace};
+use rand::seq::index;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -104,6 +105,16 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
+    async fn poll_config_file(&self, peer_index: PeerIndex) {
+        MsgHandler::poll_config_file(peer_index);
+    }
+
+    async fn update_software(&self, buffer: Vec<u8>) {
+        let array = js_sys::Uint8Array::new_with_length(buffer.len() as u32);
+        array.copy_from(&buffer.as_slice());
+        MsgHandler::update_software(array);
+    }
+
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         let result = MsgHandler::read_value(key.clone());
         if result.is_err() {
@@ -199,6 +210,9 @@ impl InterfaceIO for WasmIoHandler {
             }
             InterfaceEvent::WalletUpdate() => {
                 MsgHandler::send_wallet_update();
+            }
+            InterfaceEvent::NewSoftwareVersionDetected(index, version) => {
+                // MsgHandler::update_software(index, version);
             }
             InterfaceEvent::NewVersionDetected(index, version) => {
                 MsgHandler::send_new_version_alert(
@@ -345,4 +359,10 @@ extern "C" {
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn send_new_version_alert(version: String, peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn poll_config_file(peer_index: u64);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn update_software(buffer: Uint8Array);
 }

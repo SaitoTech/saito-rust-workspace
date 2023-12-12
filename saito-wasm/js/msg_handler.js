@@ -43,9 +43,12 @@ class MsgHandler {
     return global.shared_methods.process_api_call(buffer, msgIndex, peerIndex);
   }
 
-
   static process_api_success(buffer, msgIndex, peerIndex) {
-    return global.shared_methods.process_api_success(buffer, msgIndex, peerIndex);
+    return global.shared_methods.process_api_success(
+      buffer,
+      msgIndex,
+      peerIndex
+    );
   }
 
   static process_api_error(buffer, msgIndex, peerIndex) {
@@ -85,8 +88,24 @@ class MsgHandler {
   }
 
   static send_new_version_alert(major, minor, patch, peerIndex) {
-    return global.shared_methods.send_new_version_alert(major, minor, patch, peerIndex);
+    return global.shared_methods.send_new_version_alert(
+      major,
+      minor,
+      patch,
+      peerIndex
+    );
   }
+
+  static poll_config_file(peer_index) {
+    return global.shared_methods.poll_config_file(peer_index);
+  }
+  static update_software(version) {
+    return global.shared_methods.update_software(version);
+  }
+
+  // static send_software_update(peer_index, version){
+  //   return global.shared_methods.update_software(version);
+  // }
 }
 
 try {

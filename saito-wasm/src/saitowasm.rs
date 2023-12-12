@@ -12,6 +12,8 @@ use figment::Figment;
 use js_sys::{Array, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
+use saito_core::common::interface_io::InterfaceEvent;
+
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -274,7 +276,7 @@ pub async fn initialize(
         }
     }
 
-    let mut saito = SAITO.lock().await;
+    let mut saito: tokio::sync::MutexGuard<'_, SaitoWasm> = SAITO.lock().await;
     let private_key: SaitoPrivateKey = string_to_hex(private_key).or(Err(JsValue::from(
         "Failed parsing private key string to key",
     )))?;
@@ -438,7 +440,7 @@ pub async fn process_failed_block_fetch(hash: js_sys::Uint8Array) {
 
 #[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
-    let mut saito = SAITO.lock().await;
+    let mut saito: tokio::sync::MutexGuard<'_, SaitoWasm> = SAITO.lock().await;
 
     let duration = Duration::from_millis(duration_in_ms);
     const EVENT_LIMIT: u32 = 100;
@@ -672,7 +674,7 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
         msg_index,
         data: buffer.to_vec(),
     };
-    let message = Message::ApplicationMessage(api_message);
+    let message: Message = Message::ApplicationMessage(api_message);
     let buffer: Vec<u8> = message.serialize();
     if peer_index == 0 {
         saito
@@ -696,7 +698,7 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
 #[wasm_bindgen]
 pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: PeerIndex) {
     trace!("send_api_success : {:?}", peer_index);
-    let saito = SAITO.lock().await;
+    let saito: tokio::sync::MutexGuard<'_, SaitoWasm> = SAITO.lock().await;
     let api_message = ApiMessage {
         msg_index,
         data: buffer.to_vec(),

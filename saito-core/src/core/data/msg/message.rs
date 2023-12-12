@@ -2,12 +2,13 @@ use std::io::{Error, ErrorKind};
 
 use log::{error, trace, warn};
 
-use crate::common::defs::SaitoHash;
+use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::core::data::block::{Block, BlockType};
 use crate::core::data::msg::api_message::ApiMessage;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
+
 use crate::core::data::peer_service::PeerService;
 use crate::core::data::serialize::Serialize;
 use crate::core::data::transaction::Transaction;

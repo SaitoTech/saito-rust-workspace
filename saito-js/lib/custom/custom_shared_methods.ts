@@ -105,4 +105,11 @@ export default class CustomSharedMethods implements SharedMethods {
     throw new Error("Method not implemented");
   }
 
+  pollConfigFile(peerIndex: BigInt) {
+    throw new Error("Method not implemented");
+  }
+  updateSoftware(buffer: Uint8Array): void {
+    throw new Error("Method not implemented");
+  }
+
 }

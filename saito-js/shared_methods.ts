@@ -33,6 +33,7 @@ export default interface SharedMethods {
 
   sendNewVersionAlert(major: number, minor: number, patch: number, peerIndex: bigint): void;
 
+
   sendBlockSuccess(hash: String, blockId: bigint): void;
 
   sendWalletUpdate(): void;
@@ -46,4 +47,7 @@ export default interface SharedMethods {
   loadBlockchain(blockchain: Blockchain): void;
 
   getMyServices(): PeerServiceList;
+
+  pollConfigFile(peerIndex: bigint): void;
+
 }

@@ -3,6 +3,8 @@ use std::io::Error;
 
 use async_trait::async_trait;
 
+use std::time::Duration;
+
 use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::common::version::Version;
 use crate::core::data;
@@ -16,6 +18,7 @@ pub enum InterfaceEvent {
     BlockAddSuccess(SaitoHash, u64),
     WalletUpdate(),
     NewVersionDetected(PeerIndex, Version),
+    NewSoftwareVersionDetected(PeerIndex, u64),
 }
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
@@ -133,6 +136,10 @@ pub trait InterfaceIO: Debug {
     // async fn load_blockchain(&self) -> Result<(), Error>;
 
     fn get_my_services(&self) -> Vec<PeerService>;
+
+    async fn poll_config_file(&self, peer_index: PeerIndex);
+
+    async fn update_software(&self, buffer: Vec<u8>);
 }
 
 // impl Debug for dyn InterfaceIO {

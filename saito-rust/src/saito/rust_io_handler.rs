@@ -1,11 +1,10 @@
+use async_trait::async_trait;
+use lazy_static::lazy_static;
+use log::{debug, error, info};
 use std::fmt::{Debug, Formatter};
 use std::fs;
 use std::io::Error;
 use std::path::Path;
-
-use async_trait::async_trait;
-use lazy_static::lazy_static;
-use log::{debug, error};
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
@@ -18,6 +17,9 @@ use saito_core::core::data::peer_service::PeerService;
 use saito_core::core::data::wallet::Wallet;
 
 use crate::saito::io_event::IoEvent;
+
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 // use crate::saito::io_context::IoContext;
 
@@ -273,6 +275,10 @@ impl InterfaceIO for RustIOHandler {
     fn get_my_services(&self) -> Vec<PeerService> {
         vec![]
     }
+
+    async fn poll_config_file(&self, peer_index: u64) {}
+
+    async fn update_software(&self, buffer: Vec<u8>) {}
 }
 
 #[cfg(test)]

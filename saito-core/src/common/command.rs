@@ -41,4 +41,8 @@ pub enum NetworkEvent {
     BlockFetchFailed {
         block_hash: SaitoHash,
     },
+    SoftwareUpdate {
+        peer_index: u64,
+        version: u64,
+    },
 }

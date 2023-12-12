@@ -8,6 +8,8 @@ import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
 
+
+
 export enum LogLevel {
   Error = 0,
   Warn,
@@ -33,7 +35,8 @@ export default class Saito {
     sharedMethods: SharedMethods,
     factory = new Factory(),
     privateKey: string,
-    logLevel: LogLevel
+    logLevel: LogLevel,
+
   ) {
     console.log("initializing saito lib");
     Saito.instance = new Saito(factory);
@@ -113,9 +116,11 @@ export default class Saito {
       get_my_services: () => {
         return sharedMethods.getMyServices().instance;
       },
-      send_new_version_alert: (major: number, minor: number, patch: number, peerIndex: bigint) => {
-        return sharedMethods.sendNewVersionAlert(major, minor, patch, peerIndex);
-      }
+
+      poll_config_file: (peerIndex: bigint) => {
+        return sharedMethods.pollConfigFile(peerIndex);
+      },
+
     };
     if (privateKey === "") {
       privateKey = DefaultEmptyPrivateKey;
@@ -291,6 +296,12 @@ export default class Saito {
     return Saito.getLibInstance().propagate_transaction(tx.wasmTransaction);
   }
 
+
+  public async sendSoftwareUpdate(peer_index: bigint, build_number: bigint) {
+    let data = { peer_index, build_number };
+    await this.sendRequest("software-update", data, () => { }, peer_index);
+  }
+
   public async sendApiCall(
     buffer: Uint8Array,
     peerIndex: bigint,
@@ -374,6 +385,8 @@ export default class Saito {
       peerIndex
     );
   }
+
+
 
   public async getWallet() {
     if (!this.wallet) {
