@@ -1508,7 +1508,7 @@ impl Block {
         );
 
         let mut i = 0;
-        while i < pruned_txs.len() - 1 {
+        while i + 1 < pruned_txs.len() {
             if pruned_txs[i].transaction_type == TransactionType::SPV
                 && pruned_txs[i + 1].transaction_type == TransactionType::SPV
                 && pruned_txs[i].txs_replacements == pruned_txs[i + 1].txs_replacements
