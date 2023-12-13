@@ -199,5 +199,9 @@ pub mod test {
         fn get_my_services(&self) -> Vec<PeerService> {
             todo!()
         }
+
+        async fn poll_config_file(&self, peer_index: PeerIndex) {}
+
+        async fn update_software(&self, buffer: Vec<u8>) {}
     }
 }
