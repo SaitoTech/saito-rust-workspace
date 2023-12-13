@@ -16,7 +16,6 @@ pub enum InterfaceEvent {
     BlockAddSuccess(SaitoHash, u64),
     WalletUpdate(),
     NewVersionDetected(PeerIndex, Version),
-    NewSoftwareVersionDetected(PeerIndex, u64),
 }
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way

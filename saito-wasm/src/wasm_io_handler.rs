@@ -211,9 +211,6 @@ impl InterfaceIO for WasmIoHandler {
             InterfaceEvent::WalletUpdate() => {
                 MsgHandler::send_wallet_update();
             }
-            InterfaceEvent::NewSoftwareVersionDetected(index, version) => {
-                // MsgHandler::update_software(index, version);
-            }
             InterfaceEvent::NewVersionDetected(index, version) => {
                 MsgHandler::send_new_version_alert(
                     format!(
