@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::fmt::{Debug, Formatter};
 use std::fs;
 use std::io::Error;
@@ -17,9 +17,6 @@ use saito_core::core::data::peer_service::PeerService;
 use saito_core::core::data::wallet::Wallet;
 
 use crate::saito::io_event::IoEvent;
-
-use std::thread;
-use std::time::{Duration, SystemTime};
 
 // use crate::saito::io_context::IoContext;
 

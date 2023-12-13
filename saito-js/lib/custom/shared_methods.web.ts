@@ -150,14 +150,4 @@ export default class WebSharedMethods extends CustomSharedMethods {
   }
 
 
-  // pollConfigFile(peerIndex: bigint): void {
-
-  // }
-
-  // updateSoftware(peerIndex: bigint, version: bigint): void {
-
-  // }
-
-
-
 }

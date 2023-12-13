@@ -608,10 +608,6 @@ pub async fn run_network_controller(
                         )
                         .await;
                     }
-                    NetworkEvent::SoftwareUpdate {
-                        peer_index,
-                        version: u64,
-                    } => {}
                 }
             }
 

@@ -124,7 +124,6 @@ impl Peer {
             return Err(Error::from(ErrorKind::InvalidInput));
         }
 
-        dbg!(&response, "peer connect response ");
         // TODO : validate block fetch URL
         let sent_challenge = self.challenge_for_peer.unwrap();
         let result = verify(&sent_challenge, &response.signature, &response.public_key);

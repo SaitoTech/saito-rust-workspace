@@ -20,7 +20,6 @@ use crate::core::data::blockchain_sync_state::BlockchainSyncState;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
 use crate::core::data::mempool::Mempool;
-use crate::core::data::msg::api_message;
 use crate::core::data::msg::block_request::BlockchainRequest;
 use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::data::msg::message::Message;
@@ -305,13 +304,6 @@ impl RoutingThread {
         self.network.handle_peer_disconnect(peer_index).await;
     }
 
-    // async fn handle_software_update(&mut self, peer_index: PeerIndex, version: u64) {
-    //     info!("handling software update");
-    //     let _ = self
-    //         .network
-    //         .io_interface
-    //         .update_software(buffer)
-    // }
     pub async fn process_incoming_blockchain_request(
         &self,
         request: BlockchainRequest,
@@ -576,13 +568,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 warn!("failed fetching block : {:?} from network thread. so unmarking block as fetching",block_hash.to_hex());
 
                 blockchain.unmark_as_fetching(&block_hash);
-            }
-            NetworkEvent::SoftwareUpdate {
-                peer_index,
-                version,
-            } => {
-                // self.handle_software_update(peer_index, version).await;
-                return Some(());
             }
             NetworkEvent::DisconnectFromPeer { .. } => {
                 todo!()

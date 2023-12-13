@@ -3,8 +3,6 @@ use std::io::Error;
 
 use async_trait::async_trait;
 
-use std::time::Duration;
-
 use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::common::version::Version;
 use crate::core::data;
