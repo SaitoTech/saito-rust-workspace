@@ -117,6 +117,10 @@ export default class Saito {
         return sharedMethods.getMyServices().instance;
       },
 
+      send_new_version_alert: (major: any, minor: any, patch: any, peerIndex: any) => {
+        return sharedMethods.sendNewVersionAlert(major, minor, patch, peerIndex)
+      },
+
       poll_config_file: (peerIndex: bigint) => {
         return sharedMethods.pollConfigFile(peerIndex);
       },
