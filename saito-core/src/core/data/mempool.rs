@@ -127,15 +127,12 @@ impl Mempool {
         );
 
         debug_assert!(transaction.hash_for_signature.is_some());
-        //
         // this assigns the amount of routing work that this transaction
         // contains to us, which is why we need to provide our public_key
         // so that we can calculate routing work.
         //
 
-        //
         // generates hashes, total fees, routing work for me, etc.
-        //
         // transaction.generate(&self.public_key, 0, 0);
 
         if !self.transactions.contains_key(&transaction.signature) {
