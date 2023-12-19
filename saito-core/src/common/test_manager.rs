@@ -164,9 +164,7 @@ pub mod test {
                 .expect("mining event receive failed");
         }
 
-        //
-        // add block to blockchain
-        //
+        /// add block to blockchain
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
 
@@ -192,7 +190,6 @@ pub mod test {
             }
         }
 
-        //
         // check that the blockchain connects properly
         //
         pub async fn check_blockchain(&self) {
@@ -226,7 +223,6 @@ pub mod test {
             }
         }
 
-        //
         // check that everything spendable in the main UTXOSET is spendable on the longest
         // chain and vice-versa.
         //
@@ -460,9 +456,7 @@ pub mod test {
             }
         }
 
-        //
         // create block
-        //
         pub async fn create_block(
             &mut self,
             parent_hash: SaitoHash,
@@ -534,9 +528,8 @@ pub mod test {
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            //
+
             // create block
-            //
             let mut block = Block::create(
                 &mut transactions,
                 parent_hash,
@@ -627,7 +620,6 @@ pub mod test {
                 .await;
         }
 
-        //
         // initialize chain from slips and add some amount my public key
         //
         pub async fn initialize_from_slips_and_value(&mut self, slips: Vec<Slip>, amount: u64) {
@@ -684,7 +676,6 @@ pub mod test {
             self.add_block(block).await;
         }
 
-        //
         // initialize chain from just slips properties
         pub async fn initialize_from_slips(&mut self, slips: Vec<Slip>) {
             //
@@ -752,17 +743,13 @@ pub mod test {
             // initialize timestamp
             //
 
-            //
             // reset data dirs
-            //
             let _ = tokio::fs::remove_dir_all("data/blocks").await;
             tokio::fs::create_dir_all("data/blocks").await.unwrap();
             let _ = tokio::fs::remove_dir_all("data/wallets").await;
             tokio::fs::create_dir_all("data/wallets").await.unwrap();
 
-            //
             // create initial transactions
-            //
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
             {
@@ -772,14 +759,10 @@ pub mod test {
                 private_key = wallet.private_key;
             }
 
-            //
             // create first block
-            //
             let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
-            //
             // generate UTXO-carrying VIP transactions
-            //
             for _i in 0..vip_transactions {
                 let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
                 tx.generate(&public_key, 0, 0);

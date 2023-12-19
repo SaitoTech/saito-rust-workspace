@@ -1,12 +1,13 @@
+use std::convert::TryInto;
+use std::io::{Error, ErrorKind};
+use std::ops::Rem;
+use std::{i128, mem};
+
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
-use std::io::{Error, ErrorKind};
-use std::ops::Rem;
-use std::{i128, mem};
 
 use crate::common::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
@@ -79,6 +80,7 @@ pub struct ConsensusValues {
     pub avg_atr_income: Currency,
     // average atr variance
     pub avg_atr_variance: Currency,
+    pub avg_fee_per_byte: Currency,
 }
 
 impl ConsensusValues {
@@ -107,6 +109,7 @@ impl ConsensusValues {
             avg_variance: 0,
             avg_atr_income: 0,
             avg_atr_variance: 0,
+            avg_fee_per_byte: 0,
         }
     }
     pub fn default() -> ConsensusValues {
@@ -133,6 +136,7 @@ impl ConsensusValues {
             avg_variance: 0,
             avg_atr_income: 0,
             avg_atr_variance: 0,
+            avg_fee_per_byte: 0,
         }
     }
 }
@@ -206,6 +210,7 @@ pub struct Block {
     pub avg_variance: Currency,
     pub avg_atr_income: Currency,
     pub avg_atr_variance: Currency,
+    pub avg_fee_per_byte: Currency,
     /// Transactions
     pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
@@ -272,6 +277,7 @@ impl Block {
             avg_variance: 0,
             avg_atr_income: 0,
             avg_atr_variance: 0,
+            avg_fee_per_byte: 0,
             transactions: vec![],
             pre_hash: [0; 32],
             hash: [0; 32],
@@ -368,13 +374,11 @@ impl Block {
         // block.transactions = transactions.drain().collect();
         transactions.clear();
 
-        //
         // update slips_spent_this_block so that we have a record of
         // how many times input slips are spent in this block. we will
         // use this later to ensure there are no duplicates. this include
         // during the fee transaction, so that we cannot pay a staker
         // that is also paid this block otherwise.
-        //
         // this will not include the fee transaction or the ATR txs
         // because they have not been added to teh block yet, but they
         // permit us to avoid paying out StakerWithdrawal slips when we
@@ -396,28 +400,24 @@ impl Block {
             }
         }
 
-        //
         // contextual values
         //
-        let mut cv: ConsensusValues = block.generate_consensus_values(&blockchain).await;
+        let mut cv: ConsensusValues = block.generate_consensus_values(blockchain).await;
 
         block.cv = cv.clone();
 
-        //
         // ATR transactions
-        //
         let rlen = cv.rebroadcasts.len();
         // TODO -- figure out if there is a more efficient solution
         // than iterating through the entire transaction set here.
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
             .iter_mut()
             .enumerate()
-            .all(|(index, tx)| tx.generate(&public_key, index as u64, block.id));
+            .all(|(index, tx)| tx.generate(public_key, index as u64, block.id));
         if rlen > 0 {
             block.transactions.append(&mut cv.rebroadcasts);
         }
 
-        //
         // fee transactions
         //
         // if a golden ticket is included in THIS block Saito uses the randomness
@@ -438,7 +438,6 @@ impl Block {
             block.add_transaction(fee_tx);
         }
 
-        //
         // update slips_spent_this_block so that we have a record of
         // how many times input slips are spent in this block. we will
         // use this later to ensure there are no duplicates. this include
@@ -458,7 +457,6 @@ impl Block {
         }
         block.created_hashmap_of_slips_spent_this_block = true;
 
-        //
         // set difficulty
         //
         block.difficulty = cv.expected_difficulty;
@@ -488,7 +486,6 @@ impl Block {
             block.staking_treasury = adjusted_staking_treasury;
         }
 
-        //
         // generate merkle root
         //
         let block_merkle_root =
@@ -499,13 +496,12 @@ impl Block {
         block.avg_variance = cv.avg_variance;
         block.avg_atr_income = cv.avg_atr_income;
         block.avg_atr_variance = cv.avg_atr_variance;
+        block.avg_fee_per_byte = cv.avg_fee_per_byte;
 
         block.generate_pre_hash();
         block.sign(private_key);
 
-        //
         // hash includes pre-hash and sig, so update
-        //
         // block.generate_hash();
         block.generate();
 
@@ -598,7 +594,7 @@ impl Block {
                 + TRANSACTION_SIZE
                 + ((inputs_len + outputs_len) as usize * SLIP_SIZE)
                 + message_len
-                + path_len as usize * HOP_SIZE;
+                + path_len * HOP_SIZE;
 
             if bytes.len() < end_of_transaction_data {
                 warn!(
@@ -655,7 +651,6 @@ impl Block {
             return true;
         }
 
-        //
         // if the block type needed is full and we are not,
         // load the block if it exists on disk.
         //
@@ -674,17 +669,14 @@ impl Block {
     pub fn find_winning_router(&self, random_number: SaitoHash) -> SaitoPublicKey {
         let winner_pubkey: SaitoPublicKey;
 
-        //
         // find winning nolan
         //
         let x = primitive_types::U256::from_big_endian(&random_number);
-        //
         // fee calculation should be the same used in block when
         // generating the fee transaction.
         //
         let y = self.total_fees;
 
-        //
         // if there are no fees, payout to burn address
         //
         if y == 0 {
@@ -700,7 +692,6 @@ impl Block {
         let winning_tx_placeholder: Transaction;
         let mut winning_tx: &Transaction;
 
-        //
         // winning TX contains the winning nolan
         //
         // either a fee-paying transaction or an ATR transaction
@@ -713,7 +704,6 @@ impl Block {
             winning_tx = &transaction;
         }
 
-        //
         // if winner is atr, we take inside TX
         //
         if winning_tx.transaction_type == TransactionType::ATR {
@@ -723,7 +713,6 @@ impl Block {
             winning_tx = &winning_tx_placeholder;
         }
 
-        //
         // hash random number to pick routing node
         //
         winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
@@ -747,7 +736,6 @@ impl Block {
     pub fn generate(&mut self) -> bool {
         // trace!(" ... block.prevalid - pre hash:  {:?}", create_timestamp());
 
-        //
         // if we are generating the metadata for a block, we use the
         // public_key of the block creator when we calculate the fees
         // and the routing work.
@@ -775,7 +763,6 @@ impl Block {
 
         // trace!(" ... block.prevalid - pst hash:  {:?}", create_timestamp());
 
-        //
         // we need to calculate the cumulative figures AFTER the
         // original figures.
         //
@@ -789,7 +776,6 @@ impl Block {
         let mut golden_ticket_index = 0;
         let mut fee_transaction_index = 0;
 
-        //
         // we have to do a single sweep through all of the transactions in
         // non-parallel to do things like generate the cumulative order of the
         // transactions in the block for things like work and fee calculations
@@ -865,7 +851,6 @@ impl Block {
         self.golden_ticket_index = golden_ticket_index;
         self.issuance_transaction_index = issuance_transaction_index;
 
-        //
         // update block with total fees
         //
         self.total_fees = cumulative_fees;
@@ -919,6 +904,8 @@ impl Block {
         let mut cv = ConsensusValues::new();
 
         trace!("calculating total fees");
+        let mut total_tx_size: usize = 0;
+        let mut total_fees_in_new_txs = 0;
         // calculate total fees
         for (index, transaction) in self.transactions.iter().enumerate() {
             if !transaction.is_fee_transaction() {
@@ -927,6 +914,13 @@ impl Block {
                 cv.ft_num += 1;
                 cv.ft_index = Some(index);
             }
+            if matches!(transaction.transaction_type, TransactionType::Normal)
+                || matches!(transaction.transaction_type, TransactionType::GoldenTicket)
+            {
+                total_tx_size += transaction.serialize_for_net().len();
+                total_fees_in_new_txs += transaction.total_fees;
+            }
+
             if transaction.is_golden_ticket() {
                 cv.gt_num += 1;
                 cv.gt_index = Some(index);
@@ -937,6 +931,10 @@ impl Block {
             }
         }
 
+        if total_tx_size > 0 {
+            cv.avg_fee_per_byte = total_fees_in_new_txs / total_tx_size as Currency;
+        }
+
         // calculate automatic transaction rebroadcasts / ATR / atr
         if self.id > GENESIS_PERIOD + 1 {
             trace!("calculating ATR");
@@ -944,26 +942,19 @@ impl Block {
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
 
-            //
             // generate metadata should have prepared us with a pre-prune block
             // that contains all of the transactions and is ready to have its
             // ATR rebroadcasts calculated.
-            //
             if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
-                //
                 // identify all unspent transactions
-                //
                 for transaction in &pruned_block.transactions {
                     for output in transaction.to.iter() {
-                        //
                         // these need to be calculated dynamically based on the
                         // value of the UTXO and the byte-size of the transaction
-                        //
                         let rebroadcast_fee = 200_000_000;
                         let staking_subsidy = 100_000_000;
                         let utxo_adjustment = rebroadcast_fee - staking_subsidy;
 
-                        //
                         // valid means spendable and non-zero
                         //HACK
                         if output.validate(&blockchain.utxoset) {
@@ -1632,6 +1623,10 @@ impl Block {
             error!("block is mis-reporting its average atr variance");
             return false;
         }
+        if cv.avg_fee_per_byte != self.avg_fee_per_byte {
+            error!("block is mis-reporting its average fee per byte");
+            return false;
+        }
 
         //
         // only block #1 can have an issuance transaction
@@ -1970,15 +1965,16 @@ mod tests {
     use ahash::AHashMap;
     use futures::future::join_all;
     use hex::FromHex;
+    use log::{debug, info};
 
     use crate::common::defs::{
-        push_lock, SaitoHash, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_CONFIGS,
+        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_CONFIGS,
         LOCK_ORDER_WALLET,
     };
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
     use crate::core::data::crypto::{generate_keys, verify_signature};
-    use crate::core::data::merkle::{MerkleTree, MerkleTreeNode};
+    use crate::core::data::merkle::MerkleTree;
     use crate::core::data::slip::{Slip, SlipType};
     use crate::core::data::storage::Storage;
     use crate::core::data::transaction::{Transaction, TransactionType};
@@ -2361,5 +2357,79 @@ mod tests {
             lite_block.generate_merkle_root(false, false),
             block.generate_merkle_root(false, false)
         );
+    }
+
+    #[tokio::test]
+    async fn avg_fee_per_byte_test() {
+        pretty_env_logger::init();
+        let mut t = TestManager::new();
+
+        // Initialize the test manager
+        t.initialize(5_000, 10_000_000).await;
+
+        let latest_block = t.get_latest_block().await;
+
+        let mut block = t
+            .create_block(
+                latest_block.hash,
+                latest_block.timestamp + 40000,
+                100,
+                1000,
+                1_000_000,
+                true,
+            )
+            .await;
+
+        block.generate();
+
+        let mut tx_size = 0;
+        let mut total_fees = 0;
+
+        for tx in &block.transactions {
+            if !tx.is_fee_transaction() {
+                tx_size += tx.serialize_for_net().len();
+                total_fees += tx.total_fees;
+            }
+        }
+
+        info!(
+            "avg fee per byte 1: {:?} total fees = {:?} tx size = {:?} tx count = {:?}",
+            block.avg_fee_per_byte,
+            total_fees,
+            tx_size,
+            block.transactions.len()
+        );
+        assert_eq!(block.avg_fee_per_byte, total_fees / tx_size as Currency);
+
+        let mut block = t
+            .create_block(
+                latest_block.hash,
+                latest_block.timestamp + 140000,
+                100,
+                1000,
+                1_000_000,
+                false,
+            )
+            .await;
+
+        block.generate();
+
+        let mut tx_size = 0;
+        let mut total_fees = 0;
+
+        for tx in &block.transactions {
+            if !tx.is_fee_transaction() {
+                tx_size += tx.serialize_for_net().len();
+                total_fees += tx.total_fees;
+            }
+        }
+        info!(
+            "avg fee per byte 2: {:?} total fees = {:?} tx size = {:?} tx count = {:?}",
+            block.avg_fee_per_byte,
+            total_fees,
+            tx_size,
+            block.transactions.len()
+        );
+        assert_eq!(block.avg_fee_per_byte, total_fees / tx_size as Currency);
     }
 }

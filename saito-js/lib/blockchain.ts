@@ -109,7 +109,6 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
         console.log(`affix callbacks : ${block.id} with hash : ${block.hash}`);
         await this.affixCallbacks(block);
 
-        //
         // don't run callbacks if reloading (force!)
         //
         if (block.instance.in_longest_chain && !block.instance.force_loaded) {
