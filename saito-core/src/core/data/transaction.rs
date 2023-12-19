@@ -212,7 +212,6 @@ impl Transaction {
         transaction.add_to_slip(output);
 
         Ok(transaction)
-        //
         // if available_balance >= total_requested {
         //
         //
@@ -668,7 +667,6 @@ impl Transaction {
             }
         }
 
-        //
         // no winning transaction should have no fees unless the
         // entire block has no fees, in which case we have a block
         // without any fee-paying transactions.

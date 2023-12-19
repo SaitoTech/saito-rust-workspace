@@ -36,7 +36,6 @@ impl BurnFee {
         current_block_timestamp_in_ms: Timestamp,
         previous_block_timestamp_in_ms: Timestamp,
     ) -> Currency {
-        //
         // impossible if times misordered
         //
         if previous_block_timestamp_in_ms >= current_block_timestamp_in_ms {
@@ -74,7 +73,6 @@ impl BurnFee {
         current_block_timestamp_in_ms: Timestamp,
         previous_block_timestamp_in_ms: Timestamp,
     ) -> Currency {
-        //
         // impossible if times misordered
         //
         if previous_block_timestamp_in_ms >= current_block_timestamp_in_ms {

@@ -166,7 +166,6 @@ impl Blockchain {
             return AddBlockResult::BlockAlreadyExists;
         }
 
-        //
         // TODO -- david review -- should be no need for recursive fetch
         // as each block will fetch the parent on arrival and processing
         // and we may want to tag and use the degree of distance to impose
@@ -238,7 +237,6 @@ impl Blockchain {
             );
         }
 
-        //
         // pre-validation
         //
         // this would be a great place to put in a prevalidation check
@@ -248,7 +246,6 @@ impl Blockchain {
         // this block for consensus.
         //
 
-        //
         // save block to disk
         //
         // we have traditionally saved blocks to disk AFTER validating them
@@ -259,7 +256,6 @@ impl Blockchain {
         // optimization exercise.
         //
 
-        //
         // insert block into hashmap and index
         //
         // the blockring is a BlockRing which lets us know which blocks (at which depth)
@@ -284,7 +280,6 @@ impl Blockchain {
             // );
             // return AddBlockResult::BlockAlreadyExists;
         }
-        //
         // blocks are stored in a hashmap indexed by the block_hash. we expect all
         // all block_hashes to be unique, so simply insert blocks one-by-one on
         // arrival if they do not exist.
@@ -299,7 +294,6 @@ impl Blockchain {
             return AddBlockResult::BlockAlreadyExists;
         }
 
-        //
         // find shared ancestor of new_block with old_chain
         //
         let mut new_chain: Vec<[u8; 32]> = Vec::new();
@@ -415,7 +409,6 @@ impl Blockchain {
             am_i_the_longest_chain = true;
         }
 
-        //
         // now update blockring so it is not empty
         //
         // we do this down here instead of automatically on
@@ -427,7 +420,6 @@ impl Blockchain {
         //
         self.blockring.empty = false;
 
-        //
         // validate
         //
         // blockchain validate "validates" the new_chain by unwinding the old
@@ -540,7 +532,6 @@ impl Blockchain {
             network.unwrap().propagate_block(block, configs).await;
         }
 
-        //
         // TODO: clean up mempool - I think we shouldn't cleanup mempool here.
         //  because that's already happening in send_blocks_to_blockchain
         //  So who is in charge here?
@@ -569,7 +560,6 @@ impl Blockchain {
         //     .expect("error: BlockchainSavedBlock message failed to send");
         // trace!(" ... block save done:            {:?}", create_timestamp());
 
-        //
         // update_genesis_period and prune old data - MOVED to on_chain_reorganization()
         //
         // self.update_genesis_period().await;
@@ -580,7 +570,6 @@ impl Blockchain {
         // let fork_id = self.generate_fork_id(block_id);
         // self.set_fork_id(fork_id);
 
-        //
         // ensure pruning of next block OK will have the right CVs
         //
         if self.get_latest_block_id() > GENESIS_PERIOD {
@@ -902,7 +891,6 @@ impl Blockchain {
             }
             //new_bf += self.blocks.get(hash).unwrap().get_burnfee();
         }
-        //
         // new chain must have more accumulated work AND be longer
         //
         old_chain.len() < new_chain.len() && old_bf <= new_bf
@@ -940,7 +928,6 @@ impl Blockchain {
             previous_block_hash = block.previous_block_hash;
             has_gt = block.has_golden_ticket;
         }
-        //
         // ensure new chain has adequate mining support to be considered as
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
@@ -1418,7 +1405,6 @@ impl Blockchain {
     }
 
     pub async fn update_genesis_period(&mut self, storage: &Storage, network: Option<&Network>) {
-        //
         // we need to make sure this is not a random block that is disconnected
         // from our previous genesis_id. If there is no connection between it
         // and us, then we cannot delete anything as otherwise the provision of

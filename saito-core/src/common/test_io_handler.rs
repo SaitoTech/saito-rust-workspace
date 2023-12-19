@@ -191,7 +191,6 @@ pub mod test {
         // async fn save_blockchain(&self) -> Result<(), Error> {
         //     todo!()
         // }
-        //
         // async fn load_blockchain(&self) -> Result<(), Error> {
         //     todo!()
         // }
