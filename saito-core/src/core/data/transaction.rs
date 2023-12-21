@@ -348,26 +348,14 @@ impl Transaction {
     /// ```
     pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
-        output_slip_to_rebroadcast: &Slip,
-        with_fee: Currency,
-        with_staking_subsidy: Currency,
+        output_slips: Vec<Slip>,
+        // with_fee: Currency,
+        // with_staking_subsidy: Currency,
     ) -> Transaction {
         let mut transaction = Transaction::default();
-        let mut output_payment = 0;
-        if output_slip_to_rebroadcast.amount > with_fee {
-            output_payment = output_slip_to_rebroadcast.amount - with_fee + with_staking_subsidy;
-        }
 
         transaction.transaction_type = TransactionType::ATR;
 
-        let mut output = Slip::default();
-        output.public_key = output_slip_to_rebroadcast.public_key;
-        output.amount = output_payment;
-        output.slip_type = SlipType::ATR;
-        output.block_id = output_slip_to_rebroadcast.block_id;
-        output.tx_ordinal = output_slip_to_rebroadcast.tx_ordinal;
-
-        //
         // if this is the FIRST time we are rebroadcasting, we copy the
         // original transaction into the message field in serialized
         // form. this preserves the original message and its signature
@@ -377,20 +365,20 @@ impl Transaction {
         // copy the ATR tx (no need for a meta-tx) and rather just update
         // the message field with the original transaction (which is
         // by definition already in the previous TX message space.
-        //
-        if output_slip_to_rebroadcast.slip_type == SlipType::ATR {
+        if transaction_to_rebroadcast.transaction_type == TransactionType::ATR {
             transaction.data = transaction_to_rebroadcast.data.to_vec();
         } else {
             transaction.data = transaction_to_rebroadcast.serialize_for_net().to_vec();
         }
 
-        transaction.add_to_slip(output);
+        for slip in output_slips {
+            assert_eq!(slip.slip_type, SlipType::ATR);
+            transaction.add_to_slip(slip);
+        }
 
-        //
         // signature is the ORIGINAL signature. this transaction
         // will fail its signature check and then get analysed as
         // a rebroadcast transaction because of its transaction type.
-        //
         transaction.signature = transaction_to_rebroadcast.signature;
 
         transaction
