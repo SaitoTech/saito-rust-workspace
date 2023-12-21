@@ -25,7 +25,7 @@ export default class Block extends WasmWrapper<WasmBlock> {
   public toJson(): string {
     try {
       return JSON.stringify({
-        id: JSON.stringify(this.id),
+        id: this.id,
         hash: this.hash,
         type: JSON.stringify(this.block_type),
         previous_block_hash: this.previousBlockHash,
