@@ -83,7 +83,7 @@ pub struct ConsensusValues {
     // average fee per byte
     pub avg_fee_per_byte: Currency,
     // average nolan rebroadcast per block
-    pub avg_saito_rebroadcast_per_block: Currency,
+    pub avg_nolan_rebroadcast_per_block: Currency,
 }
 
 impl ConsensusValues {
@@ -113,7 +113,7 @@ impl ConsensusValues {
             avg_atr_income: 0,
             avg_atr_variance: 0,
             avg_fee_per_byte: 0,
-            avg_saito_rebroadcast_per_block: 0,
+            avg_nolan_rebroadcast_per_block: 0,
         }
     }
     pub fn default() -> ConsensusValues {
@@ -141,7 +141,7 @@ impl ConsensusValues {
             avg_atr_income: 0,
             avg_atr_variance: 0,
             avg_fee_per_byte: 0,
-            avg_saito_rebroadcast_per_block: 0,
+            avg_nolan_rebroadcast_per_block: 0,
         }
     }
 }
@@ -216,7 +216,7 @@ pub struct Block {
     pub avg_atr_income: Currency,
     pub avg_atr_variance: Currency,
     pub avg_fee_per_byte: Currency,
-    pub avg_saito_rebroadcast_per_block: Currency,
+    pub avg_nolan_rebroadcast_per_block: Currency,
     /// Transactions
     pub transactions: Vec<Transaction>,
     /// Self-Calculated / Validated
@@ -284,7 +284,7 @@ impl Block {
             avg_atr_income: 0,
             avg_atr_variance: 0,
             avg_fee_per_byte: 0,
-            avg_saito_rebroadcast_per_block: 0,
+            avg_nolan_rebroadcast_per_block: 0,
             transactions: vec![],
             pre_hash: [0; 32],
             hash: [0; 32],
@@ -504,7 +504,7 @@ impl Block {
         block.avg_atr_income = cv.avg_atr_income;
         block.avg_atr_variance = cv.avg_atr_variance;
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
-        block.avg_saito_rebroadcast_per_block = cv.avg_saito_rebroadcast_per_block;
+        block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
         block.generate_pre_hash();
         block.sign(private_key);
@@ -569,7 +569,7 @@ impl Block {
             Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
         let avg_fee_per_byte: Currency =
             Currency::from_be_bytes(bytes[245..253].try_into().unwrap());
-        let avg_saito_rebroadcast_per_block: Currency =
+        let avg_nolan_rebroadcast_per_block: Currency =
             Currency::from_be_bytes(bytes[253..261].try_into().unwrap());
 
         let mut transactions = vec![];
@@ -638,7 +638,7 @@ impl Block {
         block.avg_atr_income = avg_atr_income;
         block.avg_atr_variance = avg_atr_variance;
         block.avg_fee_per_byte = avg_fee_per_byte;
-        block.avg_saito_rebroadcast_per_block = avg_saito_rebroadcast_per_block;
+        block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
         block.transactions = transactions.to_vec();
 
         debug!("block.deserialize tx length = {:?}", transactions_len);
@@ -952,7 +952,7 @@ impl Block {
 	//
         // burn fee, difficulty and avg_income figures
 	//
-	// this sets avg_saito_rebroadcast_per_block, but does not update it to reflect the current
+	// this sets avg_nolan_rebroadcast_per_block, but does not update it to reflect the current
 	// new status. this permits us to use the value to calculate the ATR payouts in the next
 	// step.
 	//
@@ -962,7 +962,7 @@ impl Block {
             cv.avg_variance = previous_block.avg_variance;
             cv.avg_atr_income = previous_block.avg_atr_income;
             cv.avg_atr_variance = previous_block.avg_atr_variance;
-            cv.avg_saito_rebroadcast_per_block = previous_block.avg_saito_rebroadcast_per_block;
+            cv.avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
 
             if previous_block.avg_income > cv.total_fees {
                 let adjustment = (previous_block.avg_income as i128 - cv.total_fees as i128)
@@ -1039,17 +1039,14 @@ impl Block {
 
 		//
 		// utxos are given a subsidy of their expected share of the rebroadcast
-		// utxo / nolan set, adjusted by the average number of SAITO that are 
-		// rebroadcast each block. note that self.avg_saito_rebroadcast_per_block
-		// is currently set at the level it was in the PREVIOUS BLOCK since we have 
-		// not factored in THIS BLOCK'S ATR rebroadcasts.
+		// utxo / nolan set. this will be a figure >= 1 by which we should multiply
+		// the existing utxo value to determine its subsidy amount.
 		//
-		// we calculate this value using an avg of SAITO not Nolan in order to avoid
-		// data-limits, since 0.00000001 NOLAN is not going to have a storable amount
-		// of payout in the same size int.
-		//
-                let avg_payout_per_saito = (self.staking_treasury / GENESIS_PERIOD) / self.avg_saito_rebroadcast_per_block;
 		
+                let expected_utxo_staked = (GENESIS_PERIOD * self.avg_nolan_rebroadcast_per_block);
+                let expected_utxo_payout = (self.staking_treasury / expected_utxo_staked);
+		let expected_atr_multiplier = expected_utxo_payout;
+
 		//
                 // identify all unspent transactions
 		//
@@ -1076,7 +1073,6 @@ impl Block {
 
 		    }
 
-
 		    //
 		    // if we should rebroadcast, we figure out how much the transaction should
 		    // receive in payment and pay in fees before we actually generate the atr
@@ -1094,7 +1090,7 @@ impl Block {
 		        //
 		        // needs adjusting so that we do not run into issues with int sizes, etc. 
 		        //
-		        let atr_payout = (total_to_rebroadcast * (avg_payout_per_saito/10000000));
+		        let atr_payout = total_to_rebroadcast * expected_atr_multiplier;
 		        let atr_fee = tx_size * self.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
                         let net_adjustment_to_utxo_value = atr_payout - atr_fee;
 
