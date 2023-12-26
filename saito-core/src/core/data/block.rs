@@ -964,38 +964,9 @@ impl Block {
             cv.avg_atr_variance = previous_block.avg_atr_variance;
             cv.avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
 
-            if previous_block.avg_income > cv.total_fees {
-                let adjustment = (previous_block.avg_income as i128 - cv.total_fees as i128)
-                    / GENESIS_PERIOD as i128;
-                if adjustment > 0 {
-                    cv.avg_income -= adjustment as Currency;
-                }
-            }
-            if previous_block.avg_income < cv.total_fees {
-                let adjustment = (cv.total_fees as i128 - previous_block.avg_income as i128)
-                    / GENESIS_PERIOD as i128;
-                if adjustment > 0 {
-                    cv.avg_income += adjustment as Currency;
-                }
-            }
-
-            //
-            // average atr income and variance adjusts slowly.
-            //
-            if previous_block.avg_atr_income > cv.total_rebroadcast_nolan {
-                let adjustment = (previous_block.avg_atr_income - cv.total_rebroadcast_nolan)
-                    / GENESIS_PERIOD as Currency;
-                if adjustment > 0 {
-                    cv.avg_atr_income -= adjustment;
-                }
-            }
-            if previous_block.avg_atr_income < cv.total_rebroadcast_nolan {
-                let adjustment = (cv.total_rebroadcast_nolan - previous_block.avg_atr_income)
-                    / GENESIS_PERIOD as Currency;
-                if adjustment > 0 {
-                    cv.avg_atr_income += adjustment;
-                }
-            }
+            let adjustment = (previous_block.avg_income as i128 - cv.total_fees as i128)
+                / GENESIS_PERIOD as i128;
+            cv.avg_income = (cv.avg_income as i128 - adjustment) as Currency;
 
             let difficulty = previous_block.difficulty;
             if previous_block.has_golden_ticket && cv.gt_num == 0 {
@@ -1124,6 +1095,15 @@ impl Block {
                 } // tx loop
             } // if block to rebroadcast exists
         } // if 1 genesis period deep
+
+        if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+            // average atr income and variance adjusts slowly.
+            // we do it here since total_rebroadcast_nolan is calculated in ATR calculations
+            let adjustment = (previous_block.avg_atr_income as i128
+                - cv.total_rebroadcast_nolan as i128)
+                / GENESIS_PERIOD as i128;
+            cv.avg_atr_income = (cv.avg_atr_income as i128 - adjustment) as Currency;
+        }
 
         //
         // calculate payments to miners / routers / stakers
