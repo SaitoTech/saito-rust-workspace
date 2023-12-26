@@ -919,6 +919,7 @@ impl Block {
         trace!("calculating total fees");
         let mut total_tx_size: usize = 0;
         let mut total_fees_in_new_txs = 0;
+
         // calculate total fees
         for (index, transaction) in self.transactions.iter().enumerate() {
             if !transaction.is_fee_transaction() {
@@ -1100,9 +1101,8 @@ impl Block {
 			// to all of the UTXO transactions individually for ease-of-implementation..
 			//
                         for output in transaction.to.iter() {
-                            if (output.amount + new_adjustment_to_utxo_value) > 0 {
+                            if (output.amount + net_adjustment_to_utxo_value) > 0 {
 
-                                total_amount_from_selected_slips += output.amount;
                                 cv.total_rebroadcast_nolan += output.amount;
                                 cv.total_rebroadcast_slips += 1;
 
