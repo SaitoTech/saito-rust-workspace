@@ -940,7 +940,7 @@ impl Blockchain {
                 new_chain.len() - 1,
                 false,
                 storage,
-                configs.deref(),
+                configs,
                 network,
             )
             .await
@@ -1570,7 +1570,7 @@ impl Blockchain {
                     storage,
                     sender_to_miner.clone(),
                     &mut mempool,
-                    configs.deref(),
+                    configs,
                 )
                 .await;
             if !blockchain_updated {
