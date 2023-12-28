@@ -1015,8 +1015,6 @@ impl Block {
                 // identify all unspent transactions
                 for transaction in &pruned_block.transactions {
                     let mut outputs = vec![];
-                    let mut total_to_rebroadcast = 0;
-                    let mut should_rebroadcast = false;
 
                     // we want to avoid calculating the size of the transaction or anything more
                     // complicated until we know that we have a transaction that requires
@@ -1024,38 +1022,34 @@ impl Block {
                     for output in transaction.to.iter() {
                         // valid means unspent and non-zero amount -- THEN REBROADCAST!
                         if output.validate(&blockchain.utxoset) {
-                            total_to_rebroadcast += output.amount;
-                            should_rebroadcast = true;
+                            outputs.push(output);
                         }
                     }
 
                     // if we should rebroadcast, we figure out how much the transaction should
                     // receive in payment and pay in fees before we actually generate the atr
                     // transaction.
-                    if should_rebroadcast {
+                    if !outputs.is_empty() {
                         // atr payout is
                         let tx_size = transaction.serialize_for_net().len() as u64;
 
-                        // no need to upgrade types as payout and fee should be less than MAX SUPPLY
-                        let atr_payout = total_to_rebroadcast * expected_atr_multiplier;
                         let atr_fee = tx_size * self.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
-                        let net_adjustment_to_utxo_value = atr_payout as i128 - atr_fee as i128;
+                        let mut selected_slips = vec![];
 
                         // in the future we can divide the amount of fees charged to the ATR tx
                         // among the various UTXO, but for now we will simply charge the fee
                         // to all of the UTXO transactions individually for ease-of-implementation..
-                        for output in transaction.to.iter() {
-                            if (output.amount as i128 + net_adjustment_to_utxo_value) > 0 {
+                        for output in outputs {
+                            let atr_payout_for_slip = output.amount * expected_atr_multiplier;
+                            // using whole atr_fee because we don't know the slip count "yet" to divide it.
+                            // so choosing the larger value for safety.
+                            if output.amount + atr_payout_for_slip > atr_fee {
                                 cv.total_rebroadcast_nolan += output.amount;
                                 cv.total_rebroadcast_slips += 1;
 
                                 let mut slip = output.clone();
                                 slip.slip_type = SlipType::ATR;
-                                // TODO : divide payout and fee appropriately
-                                slip.amount = (slip.amount as i128 + net_adjustment_to_utxo_value)
-                                    as Currency;
-                                cv.total_rebroadcast_staking_payouts_nolan += atr_payout;
-                                outputs.push(slip);
+                                selected_slips.push(slip);
                             } else {
                                 // rebroadcast dust is either collected into the treasury or
                                 // distributed as a fee for the next block producer. for now
@@ -1066,10 +1060,29 @@ impl Block {
                             }
                         }
 
-                        cv.total_rebroadcast_fees_nolan += atr_fee;
+                        let slip_count = selected_slips.len() as Currency;
+                        for slip in selected_slips.iter_mut() {
+                            let atr_payout_for_slip = slip.amount * expected_atr_multiplier;
+                            // since we know the slip_count now, we can calculate the correct fee.
+                            let mut atr_fee_for_slip = atr_fee / slip_count;
+                            if atr_fee % slip_count > 0 {
+                                // to make sure the total atr fee is reduced from slips
+                                atr_fee_for_slip += 1;
+                            }
+                            assert!(
+                                slip.amount + atr_payout_for_slip > atr_fee_for_slip,
+                                "slip amount should be positive after ATR calculation"
+                            );
+                            slip.amount = slip.amount + atr_payout_for_slip - atr_fee_for_slip;
+                            cv.total_rebroadcast_staking_payouts_nolan += atr_payout_for_slip;
+                            cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
+                        }
 
-                        let rebroadcast_tx =
-                            Transaction::create_rebroadcast_transaction(transaction, outputs);
+                        let rebroadcast_tx = Transaction::create_rebroadcast_transaction(
+                            transaction,
+                            selected_slips,
+                        );
+
                         // update cryptographic hash of all ATRs
                         let mut vbytes: Vec<u8> = vec![];
                         vbytes.extend(&cv.rebroadcast_hash);
