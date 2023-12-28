@@ -949,13 +949,11 @@ impl Block {
             cv.avg_fee_per_byte = total_fees_in_normal_txs / total_tx_size as Currency;
         }
 
-        //
         // burn fee, difficulty and avg_income figures
         //
         // this sets avg_nolan_rebroadcast_per_block, but does not update it to reflect the current
         // new status. this permits us to use the value to calculate the ATR payouts in the next
         // step.
-        //
         trace!("calculating burn fee,difficulty,etc...");
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
             cv.avg_income = previous_block.avg_income;
@@ -979,11 +977,9 @@ impl Block {
                 cv.expected_difficulty = difficulty;
             }
         } else {
-            //
             // if there is no previous block, the burn fee is not adjusted. validation
             // rules will cause the block to fail unless it is the first block. average
             // income is set to whatever the block avg_income is set to.
-            //
             cv.avg_income = self.avg_income;
             cv.avg_variance = self.avg_variance;
             cv.avg_atr_income = self.avg_atr_income;
@@ -1030,10 +1026,8 @@ impl Block {
                     // receive in payment and pay in fees before we actually generate the atr
                     // transaction.
                     if !outputs.is_empty() {
-                        // atr payout is
                         let tx_size = transaction.serialize_for_net().len() as u64;
-
-                        let atr_fee = tx_size * self.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
+                        let atr_fee = tx_size * cv.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
                         let mut selected_slips = vec![];
 
                         // in the future we can divide the amount of fees charged to the ATR tx
@@ -1066,7 +1060,7 @@ impl Block {
                             // since we know the slip_count now, we can calculate the correct fee.
                             let mut atr_fee_for_slip = atr_fee / slip_count;
                             if atr_fee % slip_count > 0 {
-                                // to make sure the total atr fee is reduced from slips
+                                // to make sure 'at minimum' the total atr fee is reduced from all the slips combined
                                 atr_fee_for_slip += 1;
                             }
                             assert!(
@@ -1077,18 +1071,20 @@ impl Block {
                             cv.total_rebroadcast_staking_payouts_nolan += atr_payout_for_slip;
                             cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
                         }
+                        // if there aren't any selected slips, no point in creating the transaction
+                        if !selected_slips.is_empty() {
+                            let rebroadcast_tx = Transaction::create_rebroadcast_transaction(
+                                transaction,
+                                selected_slips,
+                            );
 
-                        let rebroadcast_tx = Transaction::create_rebroadcast_transaction(
-                            transaction,
-                            selected_slips,
-                        );
-
-                        // update cryptographic hash of all ATRs
-                        let mut vbytes: Vec<u8> = vec![];
-                        vbytes.extend(&cv.rebroadcast_hash);
-                        vbytes.extend(&rebroadcast_tx.serialize_for_signature());
-                        cv.rebroadcast_hash = hash(&vbytes);
-                        cv.rebroadcasts.push(rebroadcast_tx);
+                            // update cryptographic hash of all ATRs
+                            let mut vbytes: Vec<u8> = vec![];
+                            vbytes.extend(&cv.rebroadcast_hash);
+                            vbytes.extend(&rebroadcast_tx.serialize_for_signature());
+                            cv.rebroadcast_hash = hash(&vbytes);
+                            cv.rebroadcasts.push(rebroadcast_tx);
+                        }
                     } // should rebroadcast
                 } // tx loop
             } // if block to rebroadcast exists
