@@ -931,6 +931,7 @@ impl Block {
             if matches!(transaction.transaction_type, TransactionType::Normal)
                 || matches!(transaction.transaction_type, TransactionType::GoldenTicket)
             {
+                // TODO : serialize the whole block instead of tx by tx
                 total_tx_size += transaction.serialize_for_net().len();
                 total_fees_in_normal_txs += transaction.total_fees;
             }
