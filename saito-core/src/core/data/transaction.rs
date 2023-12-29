@@ -432,14 +432,14 @@ impl Transaction {
         let start_of_path = start_of_message + message_len;
         let mut inputs: Vec<Slip> = vec![];
         for n in 0..inputs_len {
-            let start_of_data: usize = start_of_inputs as usize + n as usize * SLIP_SIZE;
+            let start_of_data: usize = start_of_inputs + n as usize * SLIP_SIZE;
             let end_of_data: usize = start_of_data + SLIP_SIZE;
             let input = Slip::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             inputs.push(input);
         }
         let mut outputs: Vec<Slip> = vec![];
         for n in 0..outputs_len {
-            let start_of_data: usize = start_of_outputs as usize + n as usize * SLIP_SIZE;
+            let start_of_data: usize = start_of_outputs + n as usize * SLIP_SIZE;
             let end_of_data: usize = start_of_data + SLIP_SIZE;
             let output = Slip::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             outputs.push(output);
@@ -449,7 +449,7 @@ impl Transaction {
             .unwrap();
         let mut path: Vec<Hop> = vec![];
         for n in 0..path_len {
-            let start_of_data: usize = start_of_path as usize + n as usize * HOP_SIZE;
+            let start_of_data: usize = start_of_path + n * HOP_SIZE;
             let end_of_data: usize = start_of_data + HOP_SIZE;
             let hop = Hop::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             path.push(hop);
@@ -513,9 +513,7 @@ impl Transaction {
         self.cumulative_fees
     }
 
-    //
     // calculate total fees in block
-    //
     pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
         // TODO - remove for uuid work
         // generate tx signature hash
@@ -565,9 +563,7 @@ impl Transaction {
             self.total_fees = nolan_in - nolan_out;
         }
     }
-    //
-    // calculate cumulative routing work in block
-    //
+    /// calculate cumulative routing work in block
     pub fn generate_total_work(&mut self, public_key: &SaitoPublicKey) {
         //
         // if there is no routing path, then the transaction contains
@@ -580,9 +576,7 @@ impl Transaction {
             return;
         }
 
-        //
         // something is wrong if we are not the last routing node
-        //
         let last_hop = &self.path[self.path.len() - 1];
         if last_hop.to.ne(public_key) {
             self.total_work_for_me = 0;
@@ -784,6 +778,15 @@ impl Transaction {
             buffer.extend(opt_hop.unwrap().serialize_for_net());
         }
         buffer
+    }
+
+    /// Returns the size of the serialized transaction buffer without serializing
+    pub fn get_serialized_size(&self) -> usize {
+        TRANSACTION_SIZE
+            + (SLIP_SIZE * self.from.len())
+            + (SLIP_SIZE * self.to.len())
+            + (HOP_SIZE * self.path.len())
+            + self.data.len()
     }
 
     pub fn serialize_for_signature(&self) -> Vec<u8> {
