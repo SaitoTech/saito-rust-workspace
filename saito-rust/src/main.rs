@@ -754,14 +754,14 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
             context.mempool.clone(),
             None,
             &mut storage,
-            Some(sender_to_miner.clone()),
+            None,
             configs.deref(),
         )
         .await;
 
     let data = blockchain.get_utxoset_data();
 
-    info!("{:?} entries to write to file", data.len());
+    info!("{:?} entries in utxo to write to file", data.len());
     let issuance_path: String = "./data/issuance.file".to_string();
     info!("opening file : {:?}", issuance_path);
 
@@ -784,11 +784,13 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     let slip_type = "Normal";
     let mut aggregated_value = 0;
+    let mut total_written_lines = 0;
     for (key, value) in &data {
         if value < &threshold {
             // PROJECT_PUBLIC_KEY.to_string()
             aggregated_value += value;
         } else {
+            total_written_lines += 1;
             let key_base58 = key.to_base58();
 
             file.write_all(format!("{}\t{}\t{}\n", value, key_base58, slip_type).as_bytes())
@@ -799,6 +801,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     // add remaining value
     if aggregated_value > 0 {
+        total_written_lines += 1;
         file.write_all(
             format!(
                 "{}\t{}\t{}\n",
@@ -815,6 +818,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     file.flush()
         .await
         .expect("failed flushing issuance file data");
+
+    info!("total written lines : {:?}", total_written_lines);
 }
 #[tokio::main(flavor = "multi_thread")]
 // #[tokio::main]

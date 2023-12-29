@@ -457,7 +457,7 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
                 if sender_to_miner.is_some() {
-                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", block_hash.to_hex(), difficulty);
+                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?} channel_capacity : {:?}", block_hash.to_hex(), difficulty,sender_to_miner.as_ref().unwrap().capacity());
                     sender_to_miner
                         .unwrap()
                         .send(MiningEvent::LongestChainBlockAdded {
