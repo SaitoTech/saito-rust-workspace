@@ -1,5 +1,5 @@
 use js_sys::{Array, JsString, Uint8Array};
-use log::{error, info};
+use log::error;
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
@@ -119,16 +119,6 @@ impl WasmBlock {
     #[wasm_bindgen(getter = expected_difficulty)]
     pub fn expected_difficulty(&self) -> u64 {
         self.block.cv.expected_difficulty
-    }
-
-    #[wasm_bindgen(getter = avg_atr_income)]
-    pub fn avg_atr_income(&self) -> u64 {
-        self.block.cv.avg_atr_income
-    }
-
-    #[wasm_bindgen(getter = avg_atr_variance)]
-    pub fn avg_atr_variance(&self) -> u64 {
-        self.block.cv.avg_atr_variance
     }
 
     #[wasm_bindgen(getter = rebroadcasts)]
