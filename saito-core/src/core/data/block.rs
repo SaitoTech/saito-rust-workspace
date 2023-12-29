@@ -931,8 +931,7 @@ impl Block {
             if matches!(transaction.transaction_type, TransactionType::Normal)
                 || matches!(transaction.transaction_type, TransactionType::GoldenTicket)
             {
-                // TODO : serialize the whole block instead of tx by tx
-                total_tx_size += transaction.serialize_for_net().len();
+                total_tx_size += transaction.get_serialized_size();
                 total_fees_in_normal_txs += transaction.total_fees;
             }
 
@@ -948,6 +947,8 @@ impl Block {
 
         if total_tx_size > 0 {
             cv.avg_fee_per_byte = total_fees_in_normal_txs / total_tx_size as Currency;
+        } else {
+            cv.avg_fee_per_byte = 0;
         }
 
         // burn fee, difficulty and avg_income figures
@@ -1027,7 +1028,7 @@ impl Block {
                     // receive in payment and pay in fees before we actually generate the atr
                     // transaction.
                     if !outputs.is_empty() {
-                        let tx_size = transaction.serialize_for_net().len() as u64;
+                        let tx_size = transaction.get_serialized_size() as u64;
                         let atr_fee = tx_size * cv.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
                         let mut selected_slips = vec![];
 
