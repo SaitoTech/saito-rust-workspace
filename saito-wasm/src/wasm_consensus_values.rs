@@ -91,16 +91,6 @@ impl WasmConsensusValues {
         self.cv.expected_difficulty
     }
 
-    #[wasm_bindgen(getter = avg_atr_income)]
-    pub fn avg_atr_income(&self) -> u64 {
-        self.cv.avg_atr_income
-    }
-
-    #[wasm_bindgen(getter = avg_atr_variance)]
-    pub fn avg_atr_variance(&self) -> u64 {
-        self.cv.avg_atr_variance
-    }
-
     #[wasm_bindgen(getter = total_rebroadcast_slips)]
     pub fn total_rebroadcast_slips(&self) -> u64 {
         self.cv.total_rebroadcast_slips

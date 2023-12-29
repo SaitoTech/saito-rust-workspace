@@ -26,7 +26,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 261;
+pub const BLOCK_HEADER_SIZE: usize = 245;
 
 //
 // object used when generating and validation transactions, containing the
@@ -76,10 +76,6 @@ pub struct ConsensusValues {
     pub avg_income: Currency,
     // average variance
     pub avg_variance: Currency,
-    // average atr income
-    pub avg_atr_income: Currency,
-    // average atr variance
-    pub avg_atr_variance: Currency,
     // average fee per byte
     pub avg_fee_per_byte: Currency,
     // average nolan rebroadcast per block
@@ -110,8 +106,6 @@ impl ConsensusValues {
             block_payout: vec![],
             avg_income: 0,
             avg_variance: 0,
-            avg_atr_income: 0,
-            avg_atr_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
         }
@@ -138,8 +132,6 @@ impl ConsensusValues {
             block_payout: vec![],
             avg_income: 0,
             avg_variance: 0,
-            avg_atr_income: 0,
-            avg_atr_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
         }
@@ -213,8 +205,6 @@ pub struct Block {
     pub staking_treasury: Currency,
     pub avg_income: Currency,
     pub avg_variance: Currency,
-    pub avg_atr_income: Currency,
-    pub avg_atr_variance: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
     /// Transactions
@@ -249,7 +239,6 @@ pub struct Block {
     pub rebroadcast_hash: [u8; 32],
     // the state of the block w/ pruning etc
     pub block_type: BlockType,
-
     pub cv: ConsensusValues,
     // vector of staker slips spent this block - used to prevent withdrawals and payouts same block
     #[serde(skip)]
@@ -281,8 +270,6 @@ impl Block {
             staking_treasury: 0,
             avg_income: 0,
             avg_variance: 0,
-            avg_atr_income: 0,
-            avg_atr_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
             transactions: vec![],
@@ -501,8 +488,6 @@ impl Block {
 
         block.avg_income = cv.avg_income;
         block.avg_variance = cv.avg_variance;
-        block.avg_atr_income = cv.avg_atr_income;
-        block.avg_atr_variance = cv.avg_atr_variance;
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
@@ -564,13 +549,10 @@ impl Block {
 
         let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
         let avg_variance: Currency = Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
-        let avg_atr_income: Currency = Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
-        let avg_atr_variance: Currency =
-            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
         let avg_fee_per_byte: Currency =
-            Currency::from_be_bytes(bytes[245..253].try_into().unwrap());
+            Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
         let avg_nolan_rebroadcast_per_block: Currency =
-            Currency::from_be_bytes(bytes[253..261].try_into().unwrap());
+            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -635,8 +617,6 @@ impl Block {
         block.staking_treasury = staking_treasury;
         block.avg_income = avg_income;
         block.avg_variance = avg_variance;
-        block.avg_atr_income = avg_atr_income;
-        block.avg_atr_variance = avg_atr_variance;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
         block.transactions = transactions.to_vec();
@@ -960,8 +940,6 @@ impl Block {
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
             cv.avg_income = previous_block.avg_income;
             cv.avg_variance = previous_block.avg_variance;
-            cv.avg_atr_income = previous_block.avg_atr_income;
-            cv.avg_atr_variance = previous_block.avg_atr_variance;
             cv.avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
 
             let adjustment = (previous_block.avg_income as i128 - cv.total_fees as i128)
@@ -984,8 +962,6 @@ impl Block {
             // income is set to whatever the block avg_income is set to.
             cv.avg_income = self.avg_income;
             cv.avg_variance = self.avg_variance;
-            cv.avg_atr_income = self.avg_atr_income;
-            cv.avg_atr_variance = self.avg_atr_variance;
         }
         //
         // calculate automatic transaction rebroadcasts / ATR / atr
@@ -1097,18 +1073,7 @@ impl Block {
         cv.avg_nolan_rebroadcast_per_block =
             (cv.avg_nolan_rebroadcast_per_block - adjustment) as Currency;
 
-        if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-            // average atr income and variance adjusts slowly.
-            // we do it here since total_rebroadcast_nolan is calculated in ATR calculations
-            let adjustment = (previous_block.avg_atr_income as i128
-                - cv.total_rebroadcast_nolan as i128)
-                / GENESIS_PERIOD as i128;
-            cv.avg_atr_income = (cv.avg_atr_income as i128 - adjustment) as Currency;
-        }
-
-        //
         // calculate payments to miners / routers / stakers
-        //
         trace!("calculating payments...");
         if let Some(gt_index) = cv.gt_index {
             let golden_ticket: GoldenTicket =
@@ -1347,8 +1312,6 @@ impl Block {
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
             self.avg_variance.to_be_bytes().as_slice(),
-            self.avg_atr_income.to_be_bytes().as_slice(),
-            self.avg_atr_variance.to_be_bytes().as_slice(),
         ]
         .concat()
     }
@@ -1401,8 +1364,6 @@ impl Block {
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
             self.avg_variance.to_be_bytes().as_slice(),
-            self.avg_atr_income.to_be_bytes().as_slice(),
-            self.avg_atr_variance.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
             tx_buf.as_slice(),
         ]
@@ -1580,8 +1541,6 @@ impl Block {
         block.signature = self.signature;
         block.avg_income = self.avg_income;
         block.avg_variance = self.avg_variance;
-        block.avg_atr_income = self.avg_atr_income;
-        block.avg_atr_variance = self.avg_atr_variance;
         block.hash = self.hash;
 
         block.merkle_root = self.generate_merkle_root(false, false);
@@ -1658,17 +1617,7 @@ impl Block {
             );
             return false;
         }
-        if cv.avg_atr_income != self.avg_atr_income {
-            error!(
-                "block is mis-reporting its average atr income. current : {:?} expected : {:?}",
-                self.avg_atr_income, cv.avg_atr_income
-            );
-            return false;
-        }
-        if cv.avg_atr_variance != self.avg_atr_variance {
-            error!("block is mis-reporting its average atr variance");
-            return false;
-        }
+
         if cv.avg_fee_per_byte != self.avg_fee_per_byte {
             error!("block is mis-reporting its average fee per byte");
             return false;
