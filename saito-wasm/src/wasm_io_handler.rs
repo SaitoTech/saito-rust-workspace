@@ -153,7 +153,7 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn remove_value(&self, key: String) -> Result<(), Error> {
-        MsgHandler::remove_value(key);
+        let _ = MsgHandler::remove_value(key);
 
         Ok(())
     }
