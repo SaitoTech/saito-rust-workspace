@@ -559,8 +559,9 @@ impl Block {
         for _n in 0..transactions_len {
             if bytes.len() < start_of_transaction_data + 16 {
                 warn!(
-                    "block buffer is invalid to read transaction metadata. length : {:?}",
-                    bytes.len()
+                    "block buffer is invalid to read transaction metadata. length : {:?}, end_of_tx_data : {:?}",
+                    bytes.len(),
+                    start_of_transaction_data+16
                 );
                 return Err(Error::from(ErrorKind::InvalidData));
             }
@@ -592,8 +593,8 @@ impl Block {
 
             if bytes.len() < end_of_transaction_data {
                 warn!(
-                    "block buffer is invalid to read transaction data. length : {:?}",
-                    bytes.len()
+                    "block buffer is invalid to read transaction data. length : {:?}, end of tx data : {:?}, tx_count : {:?}",
+                    bytes.len(), end_of_transaction_data, transactions_len
                 );
                 return Err(Error::from(ErrorKind::InvalidData));
             }
@@ -628,9 +629,8 @@ impl Block {
 
         Ok(block)
     }
-    //
-    // downgrade block
-    //
+
+    /// downgrade block
     pub async fn downgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
@@ -1312,6 +1312,10 @@ impl Block {
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
             self.avg_variance.to_be_bytes().as_slice(),
+            self.avg_fee_per_byte.to_be_bytes().as_slice(),
+            self.avg_nolan_rebroadcast_per_block
+                .to_be_bytes()
+                .as_slice(),
         ]
         .concat()
     }
@@ -1330,17 +1334,15 @@ impl Block {
     /// [difficulty - 8 bytes - u64]
     /// [avg_income - 8 bytes - u64]
     /// [avg_variance - 8 bytes - u64]
-    /// [avg_atr_income - 8 bytes - u64]
-    /// [avg_atr_variance - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
-        let mut buffer: Vec<u8> = vec![];
+        let mut tx_len_buffer: Vec<u8> = vec![];
 
         // block headers do not get tx data
         if block_type == BlockType::Header {
-            buffer.extend(&0_u32.to_be_bytes());
+            tx_len_buffer.extend(&0_u32.to_be_bytes());
         } else {
-            buffer.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
+            tx_len_buffer.extend(&(self.transactions.iter().len() as u32).to_be_bytes());
         }
         let mut tx_buf = vec![];
         if block_type != BlockType::Header {
@@ -1351,7 +1353,7 @@ impl Block {
                 .concat();
         }
         let buffer = [
-            buffer.as_slice(),
+            tx_len_buffer.as_slice(),
             self.id.to_be_bytes().as_slice(),
             self.timestamp.to_be_bytes().as_slice(),
             self.previous_block_hash.as_slice(),
@@ -1365,6 +1367,9 @@ impl Block {
             self.avg_income.to_be_bytes().as_slice(),
             self.avg_variance.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
+            self.avg_nolan_rebroadcast_per_block
+                .to_be_bytes()
+                .as_slice(),
             tx_buf.as_slice(),
         ]
         .concat();
@@ -2076,6 +2081,7 @@ mod tests {
 
     #[test]
     fn block_serialization_and_deserialization_test() {
+        // pretty_env_logger::init();
         let mock_input = Slip::default();
         let mock_output = Slip::default();
 
@@ -2356,7 +2362,7 @@ mod tests {
 
     #[tokio::test]
     async fn avg_fee_per_byte_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         let mut t = TestManager::new();
 
         // Initialize the test manager

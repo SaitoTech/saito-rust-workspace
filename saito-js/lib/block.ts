@@ -40,8 +40,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
         gt_index: this.instance.gt_index,
         total_fees: this.instance.total_fees,
         expected_difficulty: this.instance.expected_difficulty,
-        avg_atr_income: this.instance.avg_atr_income,
-        avg_atr_variance: this.instance.avg_atr_variance,
         total_rebroadcast_slips: this.instance.total_rebroadcast_slips,
         total_rebroadcast_nolan: this.instance.total_rebroadcast_nolan,
         total_rebroadcast_fees_nolan: this.instance.total_rebroadcast_fees_nolan,
