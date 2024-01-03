@@ -302,9 +302,7 @@ mod test {
     use log::{info, trace};
 
     use crate::common::defs::{PrintForLog, SaitoHash};
-    use crate::common::test_manager::test::{
-        create_timestamp, TestManager, TEST_ISSUANCE_FILEPATH,
-    };
+    use crate::common::test_manager::test::{create_timestamp, TestManager};
     use crate::core::data::block::Block;
     use crate::core::data::crypto::{hash, verify};
 
@@ -314,7 +312,7 @@ mod test {
     #[tokio::test]
     async fn read_issuance_file_test() {
         let t = TestManager::new();
-        let read_result = t.storage.read(TEST_ISSUANCE_FILEPATH).await;
+        let read_result = t.storage.read(t.issuance_path).await;
         assert!(read_result.is_ok(), "Failed to read issuance file.");
     }
 
@@ -323,10 +321,10 @@ mod test {
     async fn issuance_hashmap_equals_balance_hashmap_test() {
         let mut t = TestManager::new();
 
-        let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
+        let issuance_hashmap = t.convert_issuance_to_hashmap(t.issuance_path).await;
         let slips = t
             .storage
-            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+            .get_token_supply_slips_from_disk_path(t.issuance_path)
             .await;
 
         t.initialize_from_slips(slips).await;
