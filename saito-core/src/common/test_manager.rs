@@ -228,7 +228,6 @@ pub mod test {
         }
 
         // check that the blockchain connects properly
-        //
         pub async fn check_blockchain(&self) {
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
@@ -340,9 +339,7 @@ pub mod test {
                 }
             }
 
-            //
             // check longest-chain matches utxoset
-            //
             for (key, value) in &utxoset {
                 //info!("{:?} / {}", key, value);
                 match blockchain.utxoset.get(key) {
@@ -467,9 +464,7 @@ pub mod test {
                             unpaid_but_uncollected -= block_outputs;
                             unpaid_but_uncollected -= total_fees_paid;
 
-                            //
                             // treasury increases must come here uncollected
-                            //
                             if current_block_treasury > previous_block_treasury {
                                 unpaid_but_uncollected -=
                                     current_block_treasury - previous_block_treasury;
