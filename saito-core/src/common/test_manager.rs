@@ -26,7 +26,9 @@ pub mod test {
     use std::borrow::BorrowMut;
     use std::error::Error;
     use std::fmt::{Debug, Formatter};
+    use std::fs;
     use std::ops::Deref;
+    use std::path::{Path, PathBuf};
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -56,6 +58,8 @@ pub mod test {
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
+    use std::io::{self, BufReader, Read, Write};
+
     use rand::rngs::OsRng;
     use secp256k1::{Secp256k1, SecretKey};
 
@@ -87,6 +91,7 @@ pub mod test {
         pub sender_to_miner: Sender<MiningEvent>,
         pub receiver_in_miner: Receiver<MiningEvent>,
         pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        pub issuance_path: &'static str,
     }
 
     impl TestManager {
@@ -101,6 +106,8 @@ pub mod test {
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
             let configs = Arc::new(RwLock::new(TestConfiguration {}));
+
+            let issuance_path = TestManager::get_test_issuance_file().unwrap();
 
             Self {
                 wallet_lock: wallet_lock.clone(),
@@ -119,10 +126,40 @@ pub mod test {
                 sender_to_miner: sender_to_miner.clone(),
                 receiver_in_miner,
                 configs,
+                issuance_path,
             }
         }
 
-        // generates utxo hashmap from an issuance file
+        pub fn get_test_issuance_file() -> Result<&'static str, std::io::Error> {
+            let temp_dir = Path::new("./temp_test_directory").to_path_buf();
+            fs::create_dir_all(&temp_dir)?;
+            let source_path = Path::new(TEST_ISSUANCE_FILEPATH);
+            // Read the existing counter from the file or initialize it to 1 if the file doesn't exist
+            let issuance_counter_path = temp_dir.join("issuance_counter.txt");
+            let mut counter = if issuance_counter_path.exists() {
+                let mut file = BufReader::new(fs::File::open(&issuance_counter_path)?);
+                let mut buffer = String::new();
+                file.read_to_string(&mut buffer)?;
+                buffer.trim().parse::<usize>().unwrap_or(1)
+            } else {
+                1
+            };
+            let target_filename = format!("issuance-{}.txt", counter);
+            let target_path = temp_dir.join(target_filename);
+            fs::copy(&source_path, &target_path)?;
+            // Update the counter in the file for the next instance
+            let mut file = fs::File::create(&issuance_counter_path)?;
+            writeln!(file, "{}", counter + 1)?;
+
+            let target_path_str = target_path
+                .to_str()
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Invalid path"))?;
+
+            let static_str: &'static str = Box::leak(target_path_str.to_string().into_boxed_str());
+
+            Ok(static_str)
+        }
+
         pub async fn convert_issuance_to_hashmap(
             &self,
             filepath: &'static str,
@@ -952,6 +989,14 @@ pub mod test {
         }
     }
 
+    impl Drop for TestManager {
+        fn drop(&mut self) {
+            // Cleanup: Remove the temporary directory and its contents
+            if let Err(err) = fs::remove_dir_all("./temp_test_directory") {
+                eprintln!("Error cleaning up: {}", err);
+            }
+        }
+    }
     struct TestConfiguration {}
 
     impl Debug for TestConfiguration {

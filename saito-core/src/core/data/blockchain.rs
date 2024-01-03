@@ -1719,7 +1719,7 @@ mod tests {
         push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
         LOCK_ORDER_WALLET,
     };
-    use crate::common::test_manager::test::{TestManager, TEST_ISSUANCE_FILEPATH};
+    use crate::common::test_manager::test::TestManager;
     use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::data::crypto::generate_keys;
     use crate::core::data::slip::Slip;
@@ -2253,9 +2253,10 @@ mod tests {
     #[tokio::test]
     async fn balance_hashmap_persists_after_blockchain_reset_test() {
         let mut t: TestManager = TestManager::new();
+        let file_path = t.issuance_path;
         let slips = t
             .storage
-            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+            .get_token_supply_slips_from_disk_path(file_path)
             .await;
 
         // start blockchain with existing issuance and some value to my public key
@@ -2284,7 +2285,7 @@ mod tests {
         let balance_map = t.balance_map().await;
         match t
             .storage
-            .write_utxoset_to_disk_path(balance_map.clone(), 1, TEST_ISSUANCE_FILEPATH)
+            .write_utxoset_to_disk_path(balance_map.clone(), 1, file_path)
             .await
         {
             Ok(_) => {
@@ -2299,10 +2300,10 @@ mod tests {
         let mut t: TestManager = TestManager::new();
         let slips = t
             .storage
-            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+            .get_token_supply_slips_from_disk_path(t.issuance_path)
             .await;
 
-        let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
+        let issuance_hashmap = t.convert_issuance_to_hashmap(t.issuance_path).await;
 
         // initialize from existing slips
         t.initialize_from_slips(slips.clone()).await;
