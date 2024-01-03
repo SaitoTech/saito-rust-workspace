@@ -347,7 +347,6 @@ impl Block {
                 previous_block_timestamp,
             );
 
-        assert!(current_timestamp > 0);
         block.id = previous_block_id + 1;
         block.previous_block_hash = previous_block_hash;
         block.burnfee = current_burnfee;
@@ -360,6 +359,7 @@ impl Block {
             debug!("golden ticket found. adding to block.");
             block.transactions.push(golden_ticket.unwrap());
         }
+        debug!("adding {:?} transactions to the block", transactions.len());
         block.transactions.reserve(transactions.len());
         let iter = transactions.drain().map(|(_, tx)| tx);
 
@@ -380,8 +380,8 @@ impl Block {
         //
         // note -- no need to have an exception for the FEE TX here as
         // we have not added it yet.
-        //
         if !block.created_hashmap_of_slips_spent_this_block {
+            debug!("creating hashmap of slips spent this block...");
             for transaction in &block.transactions {
                 for input in transaction.from.iter() {
                     block
@@ -395,7 +395,6 @@ impl Block {
         }
 
         // contextual values
-        //
         let mut cv: ConsensusValues = block.generate_consensus_values(blockchain).await;
 
         block.cv = cv.clone();
@@ -417,18 +416,14 @@ impl Block {
         // if a golden ticket is included in THIS block Saito uses the randomness
         // associated with that golden ticket to create a fair output for the
         // previous block.
-        //
         if cv.fee_transaction.is_some() {
-            //
+            debug!("adding fee transaction");
             // creator signs fee transaction
-            //
             let mut fee_tx = cv.fee_transaction.unwrap();
             let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
             fee_tx.hash_for_signature = Some(hash_for_signature);
             fee_tx.sign(private_key);
-            //
             // and we add it to the block
-            //
             block.add_transaction(fee_tx);
         }
 
@@ -437,7 +432,6 @@ impl Block {
         // use this later to ensure there are no duplicates. this include
         // during the fee transaction, so that we cannot pay a staker
         // that is also paid this block otherwise.
-        //
         for transaction in &block.transactions {
             if transaction.transaction_type != TransactionType::Fee {
                 for input in transaction.from.iter() {
@@ -462,6 +456,7 @@ impl Block {
 
         // set staking treasury
         if cv.staking_treasury != 0 {
+            debug!("setting staking treasury : {:?}", cv.staking_treasury);
             let mut adjusted_staking_treasury = previous_block_staking_treasury;
             if cv.staking_treasury < 0 {
                 let x: i128 = cv.staking_treasury as i128 * -1;
@@ -473,15 +468,14 @@ impl Block {
             } else {
                 adjusted_staking_treasury += cv.staking_treasury as Currency;
             }
-            // info!(
-            //     "adjusted staking treasury written into block {}",
-            //     adjusted_staking_treasury
-            // );
+            info!(
+                "adjusted staking treasury written into block {:?}",
+                adjusted_staking_treasury
+            );
             block.staking_treasury = adjusted_staking_treasury;
         }
 
         // generate merkle root
-        //
         let block_merkle_root =
             block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
         block.merkle_root = block_merkle_root;
@@ -865,7 +859,7 @@ impl Block {
     }
 
     pub fn generate_merkle_root(&self, is_browser: bool, is_spv: bool) -> SaitoHash {
-        debug!("generating the merkle root 1");
+        debug!("generating the merkle root");
 
         if self.transactions.is_empty() && (is_browser || is_spv) {
             return self.merkle_root;
@@ -983,11 +977,21 @@ impl Block {
                 // utxo / nolan set. this will be a figure >= 1 by which we should multiply
                 // the existing utxo value to determine its subsidy amount.
                 let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
-                let expected_utxo_payout = self.staking_treasury / expected_utxo_staked;
+                trace!("expected_utxo_staked : {:?}", expected_utxo_staked);
+
+                let expected_utxo_payout = if expected_utxo_staked > 0 {
+                    self.staking_treasury / expected_utxo_staked
+                } else {
+                    0
+                };
+                trace!("expected_utxo_payout : {:?}", expected_utxo_payout);
+
                 let expected_atr_multiplier = expected_utxo_payout;
 
+                trace!("identifying all unspent txs");
                 // identify all unspent transactions
                 for transaction in &pruned_block.transactions {
+                    trace!("checking tx : {:?}", transaction.signature.to_hex());
                     let mut outputs = vec![];
 
                     // we want to avoid calculating the size of the transaction or anything more
@@ -1031,6 +1035,10 @@ impl Block {
                                 cv.total_rebroadcast_fees_nolan += output.amount;
                             }
                         }
+                        trace!(
+                            "selected {:?} slips with enough funds to rebroadcast",
+                            selected_slips.len()
+                        );
 
                         let slip_count = selected_slips.len() as Currency;
                         for slip in selected_slips.iter_mut() {
@@ -1051,6 +1059,7 @@ impl Block {
                         }
                         // if there aren't any selected slips, no point in creating the transaction
                         if !selected_slips.is_empty() {
+                            trace!("creating rebroadcast tx for tx");
                             let rebroadcast_tx = Transaction::create_rebroadcast_transaction(
                                 transaction,
                                 selected_slips,
@@ -1072,6 +1081,10 @@ impl Block {
             (cv.avg_nolan_rebroadcast_per_block - cv.total_rebroadcast_nolan) / GENESIS_PERIOD;
         cv.avg_nolan_rebroadcast_per_block =
             (cv.avg_nolan_rebroadcast_per_block - adjustment) as Currency;
+        trace!(
+            "avg_nolan_rebroadcast_per_block : {:?}",
+            cv.avg_nolan_rebroadcast_per_block
+        );
 
         // calculate payments to miners / routers / stakers
         trace!("calculating payments...");
@@ -2432,5 +2445,23 @@ mod tests {
             block.transactions.len()
         );
         assert_eq!(block.avg_fee_per_byte, total_fees / tx_size as Currency);
+    }
+
+    #[tokio::test]
+    async fn atr_test() {
+        // create test manager
+        let mut t = TestManager::new();
+
+        t.initialize(100, 100000).await;
+
+        // check if epoch length is 10
+
+        // create 10 blocks
+
+        // check consensus values for 10th block
+
+        // add 11th block
+
+        // check consensus values for 11th block
     }
 }
