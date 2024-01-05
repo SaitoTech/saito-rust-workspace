@@ -452,6 +452,7 @@ mod tests {
 
     // tests value transfer to other addresses and verifies the resulting utxo hashmap
     #[tokio::test]
+    #[serial_test::serial]
     async fn wallet_transfer_to_address_test() {
         let mut t = TestManager::new();
         t.initialize(100, 100000).await;
@@ -486,6 +487,7 @@ mod tests {
 
     // Test if transfer is possible even with issufficient funds
     #[tokio::test]
+    #[serial_test::serial]
     async fn transfer_with_insufficient_funds_failure_test() {
         let mut t = TestManager::new();
         t.initialize(100, 100000).await;
@@ -503,6 +505,7 @@ mod tests {
 
     // tests transfer of exact amount
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_transfer_with_exact_funds() {
         let mut t = TestManager::new();
         t.initialize(1, 500).await;

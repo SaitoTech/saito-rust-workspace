@@ -217,7 +217,9 @@ impl Storage {
         let result = entries[0].parse::<u64>();
 
         if result.is_err() {
-            panic!("{:?}", result.err().unwrap());
+            error!("couldn't parse line : {:?}", line);
+            error!("{:?}", result.err().unwrap());
+            return None;
         }
 
         let amount = result.unwrap();
