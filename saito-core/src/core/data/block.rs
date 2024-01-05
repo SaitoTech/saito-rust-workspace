@@ -986,7 +986,7 @@ impl Block {
                 };
                 trace!("expected_utxo_payout : {:?}", expected_utxo_payout);
 
-                let expected_atr_multiplier = expected_utxo_payout;
+                let expected_atr_multiplier = 1 + expected_utxo_payout;
 
                 trace!("identifying all unspent txs");
                 // identify all unspent transactions
@@ -1891,7 +1891,7 @@ impl Block {
         //
         if cv.expected_difficulty != self.difficulty {
             error!(
-                "ERROR 202392: difficulty is invalid {} vs {}",
+                "ERROR 202392: difficulty is invalid. expected: {:?} vs actual : {:?}",
                 cv.expected_difficulty, self.difficulty
             );
             return false;
@@ -2255,6 +2255,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn generate_lite_block_test() {
         let mut t = TestManager::new();
 
@@ -2302,6 +2303,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn verify_spv_transaction_in_lite_block_test() {
         let mut t = TestManager::new();
 
@@ -2374,6 +2376,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn avg_fee_per_byte_test() {
         // pretty_env_logger::init();
         let mut t = TestManager::new();
@@ -2448,6 +2451,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn atr_test() {
         // create test manager
         let mut t = TestManager::new();

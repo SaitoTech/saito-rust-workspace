@@ -21,13 +21,8 @@ pub const NOLAN_PER_SAITO: Currency = 100_000_000;
 
 pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";
 
-#[cfg(test)]
 // length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 10;
-
-#[cfg(not(test))]
-pub const GENESIS_PERIOD: u64 = 100_000;
-
 // prune blocks from index after N blocks
 pub const PRUNE_AFTER_BLOCKS: u64 = 8;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
@@ -273,16 +268,15 @@ impl StatVariable {
         }
         #[cfg(feature = "with-stats")]
         self.sender
-            .send(self.print(current_time_in_ms))
+            .send(self.print())
             .await
             .expect("failed sending stat update");
     }
 
-    fn print(&self, current_time_in_ms: Timestamp) -> String {
+    fn print(&self) -> String {
         format!(
             // target : "saito_stats",
-            "{} - {} - total : {:?}, current_rate : {:.2}, max_rate : {:.2}, min_rate : {:.2}",
-            current_time_in_ms,
+            "{} - total : {:?}, current_rate : {:.2}, max_rate : {:.2}, min_rate : {:.2}",
             format!("{:width$}", self.name, width = 40),
             self.total,
             self.avg,
