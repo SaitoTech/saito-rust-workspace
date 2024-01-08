@@ -127,24 +127,22 @@ impl Slip {
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, spendable: bool) {
         if self.amount > 0 {
             trace!(
-                "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?}",
+                "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?} utxo_size : {:?}",
                 self.utxoset_key.to_base58(),
                 spendable,
                 self.block_id,
                 self.tx_ordinal,
-                self.slip_index
+                self.slip_index,
+                utxoset.len()
             );
-            utxoset.insert(self.utxoset_key, spendable);
-            // if utxoset.contains_key(&self.utxoset_key) {
-            //     utxoset.insert(self.utxoset_key, spendable);
-            // } else {
-            //     utxoset.entry(self.utxoset_key).or_insert(spendable);
-            // }
-            // if spendable {
-            //     utxoset.insert(self.utxoset_key, spendable);
-            // } else {
-            //     utxoset.remove(&self.utxoset_key);
-            // }
+            if spendable {
+                utxoset.insert(self.utxoset_key, spendable);
+                // assert_eq!(*utxoset.get(&self.utxoset_key).unwrap(), spendable);
+            } else {
+                utxoset.remove(&self.utxoset_key);
+            }
+
+            trace!("utxo size : {:?}", utxoset.len());
         } else {
             // trace!(
             //     "not updating slip : {:?} as amount is 0",

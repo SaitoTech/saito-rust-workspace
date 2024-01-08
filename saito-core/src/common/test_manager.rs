@@ -32,6 +32,8 @@ pub mod test {
 
     use ahash::AHashMap;
     use log::{debug, info};
+    use rand::rngs::OsRng;
+    use secp256k1::Secp256k1;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
@@ -42,7 +44,7 @@ pub mod test {
     };
     use crate::common::keep_time::KeepTime;
     use crate::common::test_io_handler::test::TestIOHandler;
-    use crate::core::data::block::Block;
+    use crate::core::data::block::{Block, BlockType};
     use crate::core::data::blockchain::Blockchain;
     use crate::core::data::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
@@ -56,8 +58,6 @@ pub mod test {
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
-    use rand::rngs::OsRng;
-    use secp256k1::{Secp256k1, SecretKey};
 
     pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
@@ -175,16 +175,18 @@ pub mod test {
                 let (mut mempool, _mempool_) =
                     lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
 
-                blockchain
+                let _ = blockchain
                     .add_block(
                         block,
-                        Some(&mut self.network),
+                        Some(&self.network),
                         &mut self.storage,
-                        Some(self.sender_to_miner.clone()),
+                        None,
                         &mut mempool,
                         configs.deref(),
                     )
                     .await;
+
+                self.latest_block_hash = blockchain.last_block_hash;
 
                 dbg!("block added to test manager blockchain");
             }
@@ -224,22 +226,25 @@ pub mod test {
 
         // check that everything spendable in the main UTXOSET is spendable on the longest
         // chain and vice-versa.
-        //
         pub async fn check_utxoset(&self) {
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             let mut utxoset: UtxoSet = AHashMap::new();
             let latest_block_id = blockchain.get_latest_block_id();
+            // let first_block_id = latest_block_id - GENESIS_PERIOD + 1;
 
             info!("---- check utxoset ");
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
                     .get_longest_chain_block_hash_at_block_id(i);
-                let block = blockchain.get_block(&block_hash).unwrap();
+                let mut block = blockchain.get_block(&block_hash).unwrap().clone();
+                block
+                    .upgrade_block_to_block_type(BlockType::Full, &self.storage, false)
+                    .await;
                 info!(
-                    "WINDING ID HASH - {} {:?} with txs : {:?} block_type : {:?}",
+                    "WINDING ID HASH - {:?} {:?} with txs : {:?} block_type : {:?}",
                     block.id,
                     block_hash.to_hex(),
                     block.transactions.len(),
@@ -257,47 +262,23 @@ pub mod test {
                 }
             }
 
-            //
             // check main utxoset matches longest-chain
-            //
             for (key, value) in &blockchain.utxoset {
+                assert!(*value);
                 match utxoset.get(key) {
                     Some(value2) => {
-                        //
                         // everything spendable in blockchain.utxoset should be spendable on longest-chain
-                        //
-                        if *value == true {
-                            //info!("for key: {:?}", key);
-                            //info!("comparing {} and {}", value, value2);
-                            assert_eq!(value, value2);
-                        } else {
-                            //
-                            // everything spent in blockchain.utxoset should be spent on longest-chain
-                            //
-                            // if *value > 1 {
-                            //info!("comparing key: {:?}", key);
-                            //info!("comparing blkchn {} and sanitycheck {}", value, value2);
-                            // assert_eq!(value, value2);
-                            // } else {
-                            //
-                            // unspendable (0) does not need to exist
-                            //
-                            // }
-                        }
+                        assert!(*value);
+                        assert_eq!(*value, *value2);
                     }
                     None => {
-                        //
-                        // if the value is 0, the token is unspendable on the main chain and
-                        // it may still be in the UTXOSET simply because it was not removed
-                        // but rather set to an unspendable value. These entries will be
-                        // removed on purge, although we can look at deleting them on unwind
-                        // as well if that is reasonably efficient.
-                        assert!(!*value, "utxoset value should be false for key : {:?}. generated utxo size : {:?}. current utxo size : {:?}", key.to_hex(), utxoset.len(), blockchain.utxoset.len());
-                        // if *value == true {
-                        //     //info!("Value does not exist in actual blockchain!");
-                        //     //info!("comparing {:?} with on-chain value {}", key, value);
-                        //     assert_eq!(1, 2);
-                        // }
+                        let slip = Slip::parse_slip_from_utxokey(key);
+                        info!(
+                            "block : {:?} tx : {:?} amount : {:?} type : {:?}",
+                            slip.block_id, slip.tx_ordinal, slip.amount, slip.slip_type
+                        );
+                        panic!("utxoset value should be false for key : {:?}. generated utxo size : {:?}. current utxo size : {:?}",
+                               key.to_hex(), utxoset.len(), blockchain.utxoset.len());
                     }
                 }
             }
@@ -307,9 +288,7 @@ pub mod test {
                 //info!("{:?} / {}", key, value);
                 match blockchain.utxoset.get(key) {
                     Some(value2) => {
-                        //
                         // everything spendable in longest-chain should be spendable on blockchain.utxoset
-                        //
                         if *value == true {
                             //                        info!("comparing {} and {}", value, value2);
                             assert_eq!(value, value2);
@@ -456,7 +435,7 @@ pub mod test {
             &mut self,
             parent_hash: SaitoHash,
             timestamp: Timestamp,
-            txs_number: usize,
+            txs_count: usize,
             txs_amount: Currency,
             txs_fee: Currency,
             include_valid_golden_ticket: bool,
@@ -472,7 +451,7 @@ pub mod test {
                 private_key = wallet.private_key;
             }
 
-            for _i in 0..txs_number {
+            for _i in 0..txs_count {
                 let mut transaction;
                 {
                     let (mut wallet, _wallet_) =
@@ -498,7 +477,9 @@ pub mod test {
                 let (blockchain, _blockchain_) =
                     lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-                let block = blockchain.get_block(&parent_hash).unwrap();
+                let block = blockchain.get_block(&parent_hash).expect(
+                    format!("couldn't find block for hash : {:?}", parent_hash.to_hex()).as_str(),
+                );
                 let golden_ticket: GoldenTicket = Self::create_golden_ticket(
                     self.wallet_lock.clone(),
                     parent_hash,
@@ -601,7 +582,7 @@ pub mod test {
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             let block = blockchain.get_latest_block().unwrap().clone();
-            return block;
+            block
         }
         pub async fn get_latest_block_id(&self) -> u64 {
             let (blockchain, _blockchain_) =

@@ -162,9 +162,7 @@ impl Wallet {
         }
     }
 
-    //
     // removes all slips in block when pruned / deleted
-    //
     pub fn delete_block(&mut self, block: &Block, network: Option<&Network>) {
         for tx in block.transactions.iter() {
             for input in tx.from.iter() {
@@ -176,9 +174,8 @@ impl Wallet {
                 }
             }
         }
-        if network.is_some() {
+        if let Some(network) = network {
             network
-                .unwrap()
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }
@@ -211,9 +208,8 @@ impl Wallet {
             wallet_slip.amount
         );
         self.slips.insert(wallet_slip.utxokey, wallet_slip);
-        if network.is_some() {
+        if let Some(network) = network {
             network
-                .unwrap()
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }

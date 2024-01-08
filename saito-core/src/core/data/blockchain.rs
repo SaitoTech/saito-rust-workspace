@@ -825,13 +825,10 @@ impl Blockchain {
     }
 
     pub fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
-        //
-
         self.blocks.get(block_hash)
     }
 
     pub fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {
-        //
         self.blocks.get_mut(block_hash)
     }
 
@@ -1773,7 +1770,7 @@ mod tests {
 
         // create first block, with 100 VIP txs with 1_000_000_000 NOLAN each
         t.initialize(100, 1_000_000_000).await;
-        t.wait_for_mining_event().await;
+        // t.wait_for_mining_event().await;
 
         {
             let (blockchain, _blockchain_) =
