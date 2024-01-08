@@ -1981,8 +1981,8 @@ mod tests {
     use log::info;
 
     use crate::common::defs::{
-        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_WALLET,
+        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
+        LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
     };
     use crate::common::test_manager::test::TestManager;
     use crate::core::data::block::{Block, BlockType};
@@ -2453,19 +2453,64 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test() {
+        // pretty_env_logger::init();
+
         // create test manager
         let mut t = TestManager::new();
 
         t.initialize(100, 100000).await;
 
         // check if epoch length is 10
+        assert_eq!(GENESIS_PERIOD, 10, "Genesis period is not 10");
 
         // create 10 blocks
+        for i in 0..GENESIS_PERIOD {
+            let mut block = t
+                .create_block(
+                    t.latest_block_hash,
+                    t.get_latest_block().await.timestamp + 10_000,
+                    10,
+                    100,
+                    10,
+                    true,
+                )
+                .await;
+            block.generate();
+            t.add_block(block).await;
+        }
 
         // check consensus values for 10th block
+        t.check_blockchain().await;
+        t.check_utxoset().await;
+        t.check_token_supply().await;
+
+        let latest_block = t.get_latest_block().await;
+        let cv = latest_block.cv;
+
+        println!("cv : {:?}", cv);
 
         // add 11th block
+        let mut block = t
+            .create_block(
+                t.latest_block_hash,
+                t.get_latest_block().await.timestamp + 10_000,
+                10,
+                100,
+                10,
+                true,
+            )
+            .await;
+        block.generate();
+        t.add_block(block).await;
 
         // check consensus values for 11th block
+        t.check_blockchain().await;
+        t.check_utxoset().await;
+        t.check_token_supply().await;
+
+        let latest_block = t.get_latest_block().await;
+        let cv = latest_block.cv;
+
+        println!("cv2 : {:?}", cv);
     }
 }
