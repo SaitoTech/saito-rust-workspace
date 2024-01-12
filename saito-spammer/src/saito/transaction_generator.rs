@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::{debug, info, trace};
+use log::{debug, error, info, trace};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -107,6 +107,7 @@ impl TransactionGenerator {
     }
 
     async fn create_slips(&mut self) {
+        trace!("creating slips for spammer");
         let output_slips_per_input_slip: u8 = 100;
         let unspent_slip_count;
         let available_balance;
@@ -170,6 +171,13 @@ impl TransactionGenerator {
             info!(
                 "New slips created, current = {:?}, target = {:?}",
                 total_output_slips_created, self.tx_count
+            );
+        } else {
+            trace!(
+                "not enough slips. unspent slip count : {:?} tx count : {:?} expected slips : {:?}",
+                unspent_slip_count,
+                self.tx_count,
+                self.expected_slip_count
             );
         }
     }
@@ -270,15 +278,18 @@ impl TransactionGenerator {
                         assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
-                            let mut transaction = Transaction::create(
+                            let transaction = Transaction::create(
                                 &mut wallet,
                                 public_key,
                                 payment,
                                 fee,
                                 false,
                                 None,
-                            )
-                            .unwrap();
+                            );
+                            if transaction.is_err() {
+                                break;
+                            }
+                            let mut transaction = transaction.unwrap();
                             transaction.generate_total_fees(0, 0);
                             if (transaction.total_in == 0 || transaction.total_out == 0)
                                 && (payment + fee != 0)

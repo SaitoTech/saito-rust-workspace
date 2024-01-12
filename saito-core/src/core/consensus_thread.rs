@@ -198,8 +198,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
                         .await;
 
-                    println!(" block ider {:?}", &block.transactions);
-
                     let _res = blockchain
                         .add_block(
                             block,

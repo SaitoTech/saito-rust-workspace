@@ -484,6 +484,7 @@ impl Block {
         block.avg_variance = cv.avg_variance;
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
+        block.total_fees = cv.total_fees;
 
         block.generate_pre_hash();
         block.sign(private_key);
@@ -1093,15 +1094,10 @@ impl Block {
                 GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
             // generate input hash for router
             let mut next_random_number = hash(golden_ticket.random.as_ref());
-            let _miner_public_key = golden_ticket.public_key;
 
-            //
             // miner payout is fees from previous block, no staking treasury
-            //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-                //
                 // limit previous block payout to avg income
-                //
                 let mut previous_block_payout = previous_block.total_fees;
                 if previous_block_payout > (previous_block.avg_income as f64 * 1.25) as Currency
                     && previous_block_payout > 50
@@ -1112,9 +1108,7 @@ impl Block {
                 let miner_payment = previous_block_payout / 2;
                 let router_payment = previous_block_payout - miner_payment;
 
-                //
                 // calculate miner and router payments
-                //
                 let router_public_key = previous_block.find_winning_router(next_random_number);
 
                 let mut payout = BlockPayout::new();
@@ -1124,44 +1118,34 @@ impl Block {
                 payout.router_payout = router_payment;
                 cv.block_payout.push(payout);
 
-                //
                 // these two from find_winning_router - 3, 4
-                //
                 next_random_number = hash(next_random_number.as_ref());
                 next_random_number = hash(next_random_number.as_ref());
 
-                //
                 // loop backwards until MAX recursion OR golden ticket
-                //
                 let mut cont = 1;
                 let mut loop_index = 0;
                 let mut did_the_block_before_our_staking_block_have_a_golden_ticket =
                     previous_block.has_golden_ticket;
-                //
+
                 // staking block hash is 3 back, pre
-                //
                 let mut staking_block_hash = previous_block.previous_block_hash;
 
                 while cont == 1 {
                     loop_index += 1;
 
-                    //
                     // we start with the second block, so once loop_IDX hits the same
                     // number as MAX_STAKER_RECURSION we have processed N blocks where
                     // N is MAX_STAKER_RECURSION.
-                    //
                     if loop_index >= MAX_STAKER_RECURSION {
                         cont = 0;
                     } else if let Some(staking_block) = blockchain.blocks.get(&staking_block_hash) {
                         staking_block_hash = staking_block.previous_block_hash;
                         if !did_the_block_before_our_staking_block_have_a_golden_ticket {
-                            //
                             // update with this block info in case of next loop
-                            //
                             did_the_block_before_our_staking_block_have_a_golden_ticket =
                                 staking_block.has_golden_ticket;
 
-                            //
                             // calculate staker and router payments
                             //
                             // the staker payout is contained in the slip of the winner. this is
@@ -1169,7 +1153,6 @@ impl Block {
                             // the payment for the router requires calculating the amount that will
                             // be withheld for the staker treasury, which is what previous_staker_
                             // payment is measuring.
-                            //
                             let mut previous_staking_block_payout = staking_block.total_fees;
                             if previous_staking_block_payout
                                 > (staking_block.avg_income as f64 * 1.25) as Currency
@@ -1197,9 +1180,7 @@ impl Block {
                 }
             }
 
-            //
             // now create fee transaction using the block payout data
-            //
             let mut slip_index = 0;
             let mut transaction = Transaction::default();
             transaction.transaction_type = TransactionType::Fee;

@@ -154,9 +154,8 @@ impl Wallet {
                 }
             }
         }
-        if network.is_some() {
+        if let Some(network) = network {
             network
-                .unwrap()
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }
@@ -216,7 +215,7 @@ impl Wallet {
     }
 
     pub fn delete_slip(&mut self, slip: &Slip, network: Option<&Network>) {
-        info!(
+        debug!(
             "deleting slip : {:?} with value : {:?} from wallet",
             slip.utxoset_key.to_hex(),
             slip.amount
