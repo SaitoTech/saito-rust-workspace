@@ -1085,7 +1085,6 @@ impl Block {
 
                         let tx_size = transaction.get_serialized_size() as u64;
                         let atr_fee = tx_size * cv.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
-                        let mut selected_slips = vec![];
 
 			//
                         // in the future we can use more complicated logic which attempts to divide 
@@ -1107,7 +1106,6 @@ impl Block {
 
                                 let mut slip = output.clone();
                                 slip.slip_type = SlipType::ATR;
-                                selected_slips.push(slip);
 
                                 cv.total_rebroadcast_staking_payouts_nolan += atr_payout_for_slip;
                                 cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
@@ -1117,7 +1115,7 @@ impl Block {
 				//
                                 let rebroadcast_tx = Transaction::create_rebroadcast_transaction(
                                     transaction,
-                                    selected_slips,
+                                    slip,
                                 );
 
                                 // update cryptographic hash of all ATRs
@@ -1137,11 +1135,6 @@ impl Block {
                                 cv.total_rebroadcast_fees_nolan += output.amount;
                             }
                         }
-                        trace!(
-                            "selected {:?} slips with enough funds to rebroadcast",
-                            selected_slips.len()
-                        );
-
                     } // output
                 } // tx
             } // block
