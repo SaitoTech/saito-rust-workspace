@@ -885,8 +885,10 @@ impl Block {
     //   * amount collected into staking treasury
     //   * total fees in block
     //   * difficulty (mining / payout cost)
-    //   * burn fee (block production / lockup cost)
     //   * total fees in block
+    //   * TODO - review generate() and see if we can clean-up the way we
+    //     do things so all values are calculated here and merely SET or 
+    //     confirmed in the validate/generate function.
     //
     // it returns an object from which the values are either assigned to the block
     // or checked to confirm validity.
@@ -910,7 +912,9 @@ impl Block {
         let mut total_tx_size: usize = 0;
         let mut total_fees_in_normal_txs = 0;
 
+	//
         // calculate total fees
+	//
         for (index, transaction) in self.transactions.iter().enumerate() {
             if !transaction.is_fee_transaction() {
                 cv.total_fees += transaction.total_fees;
@@ -954,7 +958,6 @@ impl Block {
         // new status. this permits us to use the value to calculate the ATR payouts in the next
         // step.
         //
-        trace!("calculating burn fee,difficulty,etc...");
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
 
 	    //
@@ -1015,8 +1018,6 @@ impl Block {
         //
         // calculate automatic transaction rebroadcasts / ATR / atr
         //
-	// 
-	//
         if self.id > GENESIS_PERIOD + 1 {
             trace!("calculating ATR");
 
@@ -1169,8 +1170,9 @@ impl Block {
 	//
 	// calculate payouts
 	//
-	// note first that every block pays out the PREVIOUS BLOCK. how payouts are handled 
-	// depend on whether the latest block contains a golden ticket.
+	// every block pays out the PREVIOUS BLOCK. how payouts are handled depends on 
+	// whether this block contains a golden ticket. it is possible for payouts to 
+	// affect the previous two blocks.
 	//
 	// if there is a golden ticket:
 	//    - 50% to miner
@@ -1196,7 +1198,8 @@ impl Block {
             // random number for picking routing winners
 	    //
             let mut next_random_number = hash(golden_ticket.random.as_ref());
-            let _miner_public_key = golden_ticket.public_key;
+	    // TODO - remove if unused
+            //let _miner_public_key = golden_ticket.public_key;
 
             //
             // miner payout is fees from previous block, no staking treasury
