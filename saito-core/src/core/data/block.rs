@@ -1330,6 +1330,10 @@ impl Block {
             slip_index += 1;
         }
 
+	cv.fee_transaction = Some(transaction);
+	cv.staking_treasury = staking_treasury;
+
+
 	//
 	// TODO - perhaps put any missing NOLAN here, section removed
 	// as it is now handled during the staking payout.
