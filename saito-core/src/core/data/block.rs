@@ -71,7 +71,6 @@ pub struct ConsensusValues {
     pub staking_treasury: Currency,
     // block payout
     #[serde(skip)]
-    pub block_payout: Vec<BlockPayout>,
     // average income
     pub avg_income: Currency,
     // average variance
@@ -103,7 +102,6 @@ impl ConsensusValues {
             rebroadcast_hash: [0; 32],
             nolan_falling_off_chain: 0,
             staking_treasury: 0,
-            block_payout: vec![],
             avg_income: 0,
             avg_variance: 0,
             avg_fee_per_byte: 0,
@@ -129,41 +127,10 @@ impl ConsensusValues {
             rebroadcast_hash: [0; 32],
             nolan_falling_off_chain: 0,
             staking_treasury: 0,
-            block_payout: vec![],
             avg_income: 0,
             avg_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
-        }
-    }
-}
-
-//
-// The BlockPayout object is returned by each block to report who
-// receives the payment from the block. It is included in the
-// consensus_values so that the fee transaction can be generated
-// and validated.
-//
-#[derive(PartialEq, Debug, Clone)]
-pub struct BlockPayout {
-    pub miner: SaitoPublicKey,
-    pub router: SaitoPublicKey,
-    pub miner_payout: Currency,
-    pub router_payout: Currency,
-    pub staking_treasury: i64,
-    pub random_number: SaitoHash,
-}
-
-impl BlockPayout {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new() -> BlockPayout {
-        BlockPayout {
-            miner: [0; 33],
-            router: [0; 33],
-            miner_payout: 0,
-            router_payout: 0,
-            staking_treasury: 0,
-            random_number: [0; 32],
         }
     }
 }
@@ -1163,216 +1130,215 @@ impl Block {
 	//
 	// calculate payouts
 	//
-	// every block pays out the PREVIOUS BLOCK. how payouts are handled depends on 
-	// whether this block contains a golden ticket. it is possible for payouts to 
-	// affect the previous two blocks.
+	// every block pays out the PREVIOUS BLOCK(S). how payouts are handled depends
+	// on whether this block contains a golden ticket (triggering a payout) and then
+	// whether the previous one did or not.
 	//
-	// if there is a golden ticket:
-	//    - 50% to miner
-	//    - 50% to routing node
-	// 
-	//    if previous block does not have a golden ticket
-	//	- 50% to routing node
+	// [ previous-previous block ] - [ previous block ] - [ this block ]
 	//
-	// if there is not a golden ticket:
-	//    - 50% to staking treasury
-	//    - 50% to [routing node]
+	// if this block contains a golden ticket:
+	//
+	//    - 50% of previous block to miner
+	//    - 50% of previous block to routing node
 	// 
-	//    if previous block does not have a golden ticket
-	//	- 50% to staking treasury
+	//    if previous block contains a golden ticket:
+	//
+	//	  - do nothing (previous previous block already paid out)
+	//
+	//    if previous block does not contain a golden ticket:
+	//
+	//	  - 50% of previous previous block to staking treasury
+	//    	  - 50% of previous previous block to routing node
+	//
+	// if this block does not contain a golden ticket:
+	// 
+	//    if previous block contains a golden ticket:
+	//
+	//	  - do nothing
+	// 
+	//    if previous block does not contain a golden ticket
+	// 
+	//        - 50% of previous previous block to staking treasury
+	//        - 50% of previous previous block to staking treasury
+	//
+	// note that all payouts are capped at 150% of the long-term average block fees
+	// collected by the network. this is done in order to prevent attackers from 
+	// gaming the payout lottery in an edge-case attack on the proportionality of 
+	// payouts to work.
 	//
         trace!("calculating payments...");
+
+	//
+	// calculating the payouts means filling in this information based on the block
+	// content. we use the following section to fill in these values, and then
+	// create the block payouts based on the information we recover.
+	//
+	let mut miner_publickey:SaitoPublicKey = [0;33];
+	let mut miner_payout:Currency  = 0;
+	let mut router1_payout:Currency = 0;
+	let mut router1_publickey:SaitoPublicKey = [0;33];
+	let mut router2_payout:Currency = 0;
+	let mut router2_publickey:SaitoPublicKey = [0;33];
+	let mut staking_treasury:Currency    = 0;
+
+
+	//
+	// if there is a golden ticket
+	//
         if let Some(gt_index) = cv.gt_index {
 
-            let golden_ticket: GoldenTicket =
-                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
-
 	    //
-            // random number for picking routing winners
+            // we fetch the random number for determining the payouts from the golden ticket
+	    // in our current block (this block). we will then continually hash it to generate
+	    // a series of other numbers that can be used to calculate subsequent payouts.
 	    //
+            let golden_ticket: GoldenTicket = GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
             let mut next_random_number = hash(golden_ticket.random.as_ref());
-	    // TODO - remove if unused
-            //let _miner_public_key = golden_ticket.public_key;
 
             //
-            // miner payout is fees from previous block, no staking treasury
+            // load the previous block
             //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-                //
-                // limit previous block payout to avg income
-                //
-                let mut previous_block_payout = previous_block.total_fees;
-                if previous_block_payout > (previous_block.avg_income as f64 * 1.25) as Currency
-                    && previous_block_payout > 50
-                {
-                    previous_block_payout = (previous_block.avg_income as f64 * 1.24) as Currency;
-                }
 
-                let miner_payment = previous_block_payout / 2;
-                let router_payment = previous_block_payout - miner_payment;
+		//
+		// the amount of the payout depends on the fees in the block
+		// we will adjust these before creating the final transaction
+		// in order to limit against attacks on the lottery mechanism.
+		//
+                miner_payout = previous_block.total_fees / 2;
+                miner_publickey = golden_ticket.public_key;
+                router1_payout = previous_block.total_fees - miner_payout;
+                router1_publickey = previous_block.find_winning_router(next_random_number);
 
                 //
-                // calculate miner and router payments
-                //
-                let router_public_key = previous_block.find_winning_router(next_random_number);
-
-                let mut payout = BlockPayout::new();
-                payout.miner = golden_ticket.public_key;
-                payout.router = router_public_key;
-                payout.miner_payout = miner_payment;
-                payout.router_payout = router_payment;
-                cv.block_payout.push(payout);
-
-                //
-                // these two from find_winning_router - 3, 4
+                // iterate our hash 2 times to accomodate for the iteration that was
+		// done in order to find the previous winning router.
                 //
                 next_random_number = hash(next_random_number.as_ref());
                 next_random_number = hash(next_random_number.as_ref());
 
-                //
-                // loop backwards until MAX recursion OR golden ticket
-                //
-                let mut cont = 1;
-                let mut loop_index = 0;
-                let mut did_the_block_before_our_staking_block_have_a_golden_ticket =
-                    previous_block.has_golden_ticket;
-                //
-                // staking block hash is 3 back, pre
-                //
-                let mut staking_block_hash = previous_block.previous_block_hash;
+		
+		//
+		// if the previous block did NOT contain a golden ticket, we recurse
+		// backwards a single block and issue the payouts for that block 
+		// as well.
+		//
+                if previous_block.has_golden_ticket {
 
-                while cont == 1 {
-                    loop_index += 1;
+		    //
+		    // do nothing
+		    //
 
-                    //
-                    // we start with the second block, so once loop_IDX hits the same
-                    // number as MAX_STAKER_RECURSION we have processed N blocks where
-                    // N is MAX_STAKER_RECURSION.
-                    //
-                    if loop_index >= MAX_STAKER_RECURSION {
-                        cont = 0;
-                    } else if let Some(staking_block) = blockchain.blocks.get(&staking_block_hash) {
-                        staking_block_hash = staking_block.previous_block_hash;
-                        if !did_the_block_before_our_staking_block_have_a_golden_ticket {
-                            //
-                            // update with this block info in case of next loop
-                            //
-                            did_the_block_before_our_staking_block_have_a_golden_ticket =
-                                staking_block.has_golden_ticket;
+		} else {
 
-                            //
-                            // calculate staker and router payments
-                            //
-                            // the staker payout is contained in the slip of the winner. this is
-                            // because we calculate it afresh every time we reset the staking table
-                            // the payment for the router requires calculating the amount that will
-                            // be withheld for the staker treasury, which is what previous_staker_
-                            // payment is measuring.
-                            //
-                            let mut previous_staking_block_payout = staking_block.total_fees;
-                            if previous_staking_block_payout
-                                > (staking_block.avg_income as f64 * 1.25) as Currency
-                                && previous_staking_block_payout > 50
-                            {
-                                previous_staking_block_payout =
-                                    (staking_block.avg_income as f64 * 1.24) as Currency;
-                            }
+		    //
+		    // we want to pay out the previous_previous_block to a routing node and the staking table
+		    //
+                    if let Some(previous_previous_block) = blockchain.blocks.get(&previous_block.previous_block_hash) {
 
-                            let sp = previous_staking_block_payout / 2;
-                            let rp = previous_staking_block_payout - sp;
+                        //
+                        // calculate staker and router payments
+                        //
+                        router2_payout = previous_previous_block.total_fees / 2;
+                        router2_publickey = previous_previous_block.find_winning_router(next_random_number);
+		        staking_treasury = previous_previous_block.total_fees - router2_payout;
 
-                            let mut payout = BlockPayout::new();
-                            payout.router = staking_block.find_winning_router(next_random_number);
-                            payout.router_payout = rp;
-                            payout.staking_treasury = sp as i64;
+                        // finding a router consumes 2 hashes
+                        next_random_number = hash(next_random_number.as_slice());
+                        next_random_number = hash(next_random_number.as_slice());
 
-                            // router consumes 2 hashes
-                            next_random_number = hash(next_random_number.as_slice());
-                            next_random_number = hash(next_random_number.as_slice());
-
-                            cv.block_payout.push(payout);
-                        }
-                    }
-                }
+                    }	  
+	        }
             }
-
-
-            //
-            // now create fee transaction using the block payout data
-            //
-            let mut slip_index = 0;
-            let mut transaction = Transaction::default();
-            transaction.transaction_type = TransactionType::Fee;
-
-            for i in 0..cv.block_payout.len() {
-                if cv.block_payout[i].miner != [0; 33] {
-                    let mut output = Slip::default();
-                    output.public_key = cv.block_payout[i].miner;
-                    output.amount = cv.block_payout[i].miner_payout;
-                    output.slip_type = SlipType::MinerOutput;
-                    output.slip_index = slip_index;
-                    transaction.add_to_slip(output.clone());
-                    slip_index += 1;
-                }
-                if cv.block_payout[i].router != [0; 33] {
-                    let mut output = Slip::default();
-                    output.public_key = cv.block_payout[i].router;
-                    output.amount = cv.block_payout[i].router_payout;
-                    output.slip_type = SlipType::RouterOutput;
-                    output.slip_index = slip_index;
-                    transaction.add_to_slip(output.clone());
-                    slip_index += 1;
-                }
-            }
-
-            cv.fee_transaction = Some(transaction);
-        }
 
 	//
-        // if there is no golden ticket AND there is no golden ticket before the MAX
-        // blocks we recurse to collect NOLAN we have to add the amount of the unpaid
-        // block to the amount of NOLAN that is falling off our chain.
+	// if there is NOT a golden ticket
+	//
+        } else {
+
+            //
+            // check if the previous block has a golden ticket
+            //
+            if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+
+                if previous_block.has_golden_ticket {
+
+		    //
+		    // do nothing, already paid out
+		    //
+
+		} else {
+
+		    //
+		    // our previous_previous_block is about to disappear, which means
+		    // we should collect the funds that would be lost and add them to
+		    // the staking treasury.
+		    //
+                    if let Some(previous_previous_block) = blockchain.blocks.get(&previous_block.previous_block_hash) {
+		        staking_treasury = previous_previous_block.total_fees;
+		    }
+
+		}
+	    }
+	}
+
+
+	//
+	// if our total payouts are greater than 1.5x the average fee throughput
+	// of the blockchain, then we may be experiencing an edge-case attack in 
+	// which the attacker
+	//
+	// TODO - get the difference and add it to the staking payouts so that the 
+	// tokens are not lost but paid out to users.
+	//
+        //if miner_payout > (previous_block.avg_income as f64 * 1.5) { miner_payout = previous_block.avg_income as f64 * 1.5; }
+        //if router1_payout > (previous_block.avg_income as f64 * 1.5) { router1_payout = previous_block.avg_income as f64 * 1.5; }
+        //if router2_payout > (previous_block.avg_income as f64 * 1.5) { router2_payout = previous_block.avg_income as f64 * 1.5; }
+
+
         //
-        // this edge-case should be a statistical abnormality that we almost never
-        // run into, but it is good to collect the SAITO into a variable that we track
-        // so that we can confirm the soundness of monetary policy by monitoring the
-        // blockchain.
-	//
-        trace!("checking for golden tickets");
-        if cv.gt_num == 0 {
-            for i in 1..=MAX_STAKER_RECURSION {
-                if i >= self.id {
-                    break;
-                }
-
-                let bid = self.id - i;
-                let previous_block_hash = blockchain
-                    .blockring
-                    .get_longest_chain_block_hash_at_block_id(bid);
-
-                // previous block hash can be [0; 32] if there is no longest-chain block
-
-                if previous_block_hash != [0; 32] {
-                    let previous_block = blockchain.get_block(&previous_block_hash).unwrap();
-
-                    if previous_block.has_golden_ticket {
-                        break;
-                    } else {
-                        //
-                        // this is the block BEFORE from which we need to collect the nolan due to
-                        // our iterator starting at 0 for the current block. i.e. if MAX_STAKER_
-                        // RECURSION is 3, at 3 we are the fourth block back.
-                        //
-                        if i == MAX_STAKER_RECURSION {
-                            cv.nolan_falling_off_chain = previous_block.total_fees;
-                        }
-                    }
-                }
-            }
+        // now create fee transactions
+        //
+        let mut slip_index = 0;
+        let mut transaction = Transaction::default();
+        transaction.transaction_type = TransactionType::Fee;
+        if miner_publickey != [0; 33] {
+            let mut output = Slip::default();
+            output.public_key = miner_publickey;
+            output.amount = miner_payout;
+            output.slip_type = SlipType::MinerOutput;
+            output.slip_index = slip_index;
+            transaction.add_to_slip(output.clone());
+            slip_index += 1;
         }
+	if router1_publickey != [0; 33] {
+            let mut output = Slip::default();
+            output.public_key = router1_publickey;
+            output.amount = router1_payout;
+            output.slip_type = SlipType::RouterOutput;
+            output.slip_index = slip_index;
+            transaction.add_to_slip(output.clone());
+            slip_index += 1;
+        }
+	if router2_publickey != [0; 33] {
+            let mut output = Slip::default();
+            output.public_key = router2_publickey;
+            output.amount = router2_payout;
+            output.slip_type = SlipType::RouterOutput;
+            output.slip_index = slip_index;
+            transaction.add_to_slip(output.clone());
+            slip_index += 1;
+        }
+
+	//
+	// TODO - perhaps put any missing NOLAN here, section removed
+	// as it is now handled during the staking payout.
+	//
+	cv.nolan_falling_off_chain = 0;
 
         cv
     }
+
     pub fn generate_pre_hash(&mut self) {
         let hash_for_signature = hash(&self.serialize_for_signature());
         self.pre_hash = hash_for_signature;
