@@ -2306,7 +2306,6 @@ mod tests {
         let public_key: SaitoPublicKey;
         {
             let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
-
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
