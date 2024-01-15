@@ -281,7 +281,7 @@ impl Wallet {
             slip.spent = true;
             self.available_balance -= slip.amount;
 
-            info!(
+            trace!(
                 "marking slip : {:?} with value : {:?} as spent",
                 slip.utxokey.to_hex(),
                 slip.amount
