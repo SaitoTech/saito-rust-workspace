@@ -91,14 +91,14 @@ pub mod test {
                     key.to_string(),
                     result.err().unwrap()
                 );
-                todo!()
+                unreachable!();
             }
             let mut file = result.unwrap();
             let mut encoded = Vec::<u8>::new();
 
             let result = file.read_to_end(&mut encoded).await;
             if result.is_err() {
-                todo!()
+                unreachable!();
             }
             Ok(encoded)
         }
