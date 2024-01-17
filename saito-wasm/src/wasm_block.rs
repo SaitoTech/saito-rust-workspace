@@ -9,7 +9,7 @@ use saito_core::core::data::block::{Block, BlockType};
 use saito_core::core::data::transaction::Transaction;
 
 use crate::saitowasm::{string_to_hex, string_to_key};
-use crate::wasm_consensus_values::{WasmBlockPayout, WasmConsensusValues};
+use crate::wasm_consensus_values::WasmConsensusValues;
 use crate::wasm_transaction::WasmTransaction;
 
 #[wasm_bindgen]
@@ -66,22 +66,22 @@ impl WasmBlock {
         }
     }
 
-    #[wasm_bindgen(getter = block_payout)]
-    pub fn get_block_payout(&self) -> Array {
-        let mut block_payout: Vec<WasmBlockPayout> = self
-            .block
-            .cv
-            .block_payout
-            .iter()
-            .map(|bp| WasmBlockPayout::from_block_payout(bp.clone()))
-            .collect();
-        let array = js_sys::Array::new_with_length(block_payout.len() as u32);
-
-        for (i, bpo) in block_payout.drain(..).enumerate() {
-            array.set(i as u32, JsValue::from(bpo));
-        }
-        array
-    }
+    // #[wasm_bindgen(getter = block_payout)]
+    // pub fn get_block_payout(&self) -> Array {
+    //     let mut block_payout: Vec<WasmBlockPayout> = self
+    //         .block
+    //         .cv
+    //         .block_payout
+    //         .iter()
+    //         .map(|bp| WasmBlockPayout::from_block_payout(bp.clone()))
+    //         .collect();
+    //     let array = js_sys::Array::new_with_length(block_payout.len() as u32);
+    //
+    //     for (i, bpo) in block_payout.drain(..).enumerate() {
+    //         array.set(i as u32, JsValue::from(bpo));
+    //     }
+    //     array
+    // }
 
     #[wasm_bindgen(getter = ft_num)]
     pub fn ft_num(&self) -> u8 {
