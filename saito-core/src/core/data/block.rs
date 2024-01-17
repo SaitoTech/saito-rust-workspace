@@ -71,7 +71,6 @@ pub struct ConsensusValues {
     pub staking_treasury: Currency,
     // block payout
     #[serde(skip)]
-    pub block_payout: Vec<BlockPayout>,
     // average income
     pub avg_income: Currency,
     // average variance
@@ -103,7 +102,6 @@ impl ConsensusValues {
             rebroadcast_hash: [0; 32],
             nolan_falling_off_chain: 0,
             staking_treasury: 0,
-            block_payout: vec![],
             avg_income: 0,
             avg_variance: 0,
             avg_fee_per_byte: 0,
@@ -129,41 +127,10 @@ impl ConsensusValues {
             rebroadcast_hash: [0; 32],
             nolan_falling_off_chain: 0,
             staking_treasury: 0,
-            block_payout: vec![],
             avg_income: 0,
             avg_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
-        }
-    }
-}
-
-//
-// The BlockPayout object is returned by each block to report who
-// receives the payment from the block. It is included in the
-// consensus_values so that the fee transaction can be generated
-// and validated.
-//
-#[derive(PartialEq, Debug, Clone)]
-pub struct BlockPayout {
-    pub miner: SaitoPublicKey,
-    pub router: SaitoPublicKey,
-    pub miner_payout: Currency,
-    pub router_payout: Currency,
-    pub staking_treasury: i64,
-    pub random_number: SaitoHash,
-}
-
-impl BlockPayout {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new() -> BlockPayout {
-        BlockPayout {
-            miner: [0; 33],
-            router: [0; 33],
-            miner_payout: 0,
-            router_payout: 0,
-            staking_treasury: 0,
-            random_number: [0; 32],
         }
     }
 }
@@ -484,7 +451,6 @@ impl Block {
         block.avg_variance = cv.avg_variance;
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
-        block.total_fees = cv.total_fees;
 
         block.generate_pre_hash();
         block.sign(private_key);
@@ -729,18 +695,17 @@ impl Block {
         // and the routing work.
         //
 
-        // ensure hashes correct
+        //
+        // ensure block hashes correct
+        //
         self.generate_pre_hash();
         self.generate_hash();
 
         let creator_public_key = &self.creator;
 
-        trace!(
-            "generating block data : {:?} of type : {:?}",
-            self.hash.to_hex(),
-            self.block_type
-        );
-
+        //
+        // allow transactions to generate themselves
+        //
         let _transactions_pre_calculated = &self
             .transactions
             .iter_mut()
@@ -764,6 +729,7 @@ impl Block {
         let mut golden_ticket_index = 0;
         let mut fee_transaction_index = 0;
 
+        //
         // we have to do a single sweep through all of the transactions in
         // non-parallel to do things like generate the cumulative order of the
         // transactions in the block for things like work and fee calculations
@@ -844,12 +810,6 @@ impl Block {
         self.total_fees = cumulative_fees;
         self.total_work = total_work;
 
-        // trace!(
-        //     " ... block.pre_validation_done:  {:?}",
-        //     create_timestamp(),
-        //     // tracing_tracker.time_since_last();
-        // );
-
         true
     }
 
@@ -882,7 +842,23 @@ impl Block {
         merkle_root_hash
     }
 
-    // generate dynamic consensus values
+    //
+    // generate_consensus_values examines a block in the context of the blockchain
+    // in order to determine the dynamic values that need to be inserted into the
+    // block or validated. this includes:
+    //
+    //   * payouts (golden tickets)
+    //   * amount collected into staking treasury
+    //   * total fees in block
+    //   * difficulty (mining / payout cost)
+    //   * total fees in block
+    //   * TODO - review generate() and see if we can clean-up the way we
+    //     do things so all values are calculated here and merely SET or
+    //     confirmed in the validate/generate function.
+    //
+    // it returns an object from which the values are either assigned to the block
+    // or checked to confirm validity.
+    //
     pub async fn generate_consensus_values(&self, blockchain: &Blockchain) -> ConsensusValues {
         debug!(
             "generate consensus values for {:?} from : {:?} txs",
@@ -892,10 +868,19 @@ impl Block {
         let mut cv = ConsensusValues::new();
 
         trace!("calculating total fees");
+
+        //
+        // we want to minimize the number of times we need to loop through the
+        // block, so we use a single loop to add up the total fees in the block
+        // and figure out which transactions (if any) are golden ticket transactions
+        // issuance transactions (block #1 only) and fee/payout transactions.
+        //
         let mut total_tx_size: usize = 0;
         let mut total_fees_in_normal_txs = 0;
 
+        //
         // calculate total fees
+        //
         for (index, transaction) in self.transactions.iter().enumerate() {
             if !transaction.is_fee_transaction() {
                 cv.total_fees += transaction.total_fees;
@@ -914,170 +899,207 @@ impl Block {
                 cv.gt_num += 1;
                 cv.gt_index = Some(index);
             }
+
             if transaction.is_issuance_transaction() {
                 cv.it_num += 1;
                 cv.it_index = Some(index);
             }
         }
 
+        //
+        // now that we know the total fees in the block, we can calculate the avg
+        // fee per byte in the block as a whole. we need to know this in order to
+        // determine how much to charge to ATR rebroadcasting transactions.
+        //
         if total_tx_size > 0 {
             cv.avg_fee_per_byte = total_fees_in_normal_txs / total_tx_size as Currency;
         } else {
             cv.avg_fee_per_byte = 0;
         }
 
-        // burn fee, difficulty and avg_income figures
+        //
+        // adjust mining difficulty and income and variance averages
         //
         // this sets avg_nolan_rebroadcast_per_block, but does not update it to reflect the current
         // new status. this permits us to use the value to calculate the ATR payouts in the next
         // step.
-        trace!("calculating burn fee,difficulty,etc...");
+        //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+            //
+            // burn fee is "block production difficulty" (fee lockup cost)
+            //
+            // TODO - where are we setting the burn fee ?
+            //
+
+            //
+            // difficulty is "mining difficulty" (payout unlock cost)
+            //
+            // we increase difficulty if two blocks in a row have golden tickets and decrease
+            // it if two blocks in a row do not have golden ticket. this targets a difficulty
+            // that averages one golden ticket every two blocks.
+            //
+            cv.expected_difficulty = previous_block.difficulty;
+            if previous_block.has_golden_ticket {
+                if cv.gt_num > 0 {
+                    cv.expected_difficulty += 1;
+                }
+            } else if cv.gt_num > 0 && cv.expected_difficulty > 0 {
+                cv.expected_difficulty -= 1;
+            }
+
+            //
+            // average income
+            //
+            // we set these figures according to the values in the previous block,
+            // and then adjust them according to the values from this block.
+            //
             cv.avg_income = previous_block.avg_income;
+            // TODO - remove avg_variance, as no longer needed, for now just copy over
             cv.avg_variance = previous_block.avg_variance;
             cv.avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
 
+            //
+            // average income adjusts gradually over the genesis period
+            //
             let adjustment = (previous_block.avg_income as i128 - cv.total_fees as i128)
                 / GENESIS_PERIOD as i128;
             cv.avg_income = (cv.avg_income as i128 - adjustment) as Currency;
-
-            let difficulty = previous_block.difficulty;
-            if previous_block.has_golden_ticket && cv.gt_num == 0 {
-                if difficulty > 0 {
-                    cv.expected_difficulty = previous_block.difficulty - 1;
-                }
-            } else if previous_block.has_golden_ticket && cv.gt_num > 0 {
-                cv.expected_difficulty = difficulty + 1;
-            } else {
-                cv.expected_difficulty = difficulty;
-            }
         } else {
+            //
             // if there is no previous block, the burn fee is not adjusted. validation
             // rules will cause the block to fail unless it is the first block. average
             // income is set to whatever the block avg_income is set to.
+            //
             cv.avg_income = self.avg_income;
             cv.avg_variance = self.avg_variance;
         }
+
         //
         // calculate automatic transaction rebroadcasts / ATR / atr
         //
         if self.id > GENESIS_PERIOD + 1 {
             trace!("calculating ATR");
 
-            // get the block that has the transactions which may need to be rebroadcast
             //
-            // generate_metadata should have prepared us with a pre-prune block
-            // that contains all of the transactions and is ready to have its
-            // ATR rebroadcasts calculated. note that this simply loads the
-            // transactions and does not prepare their meta-data like total_out
+            // which block needs to be rebroadcast?
+            //
             let pruned_block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
-            if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
-                // utxos are given a subsidy of their expected share of the rebroadcast
-                // utxo / nolan set. this will be a figure >= 1 by which we should multiply
-                // the existing utxo value to determine its subsidy amount.
-                let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
-                trace!("expected_utxo_staked : {:?}", expected_utxo_staked);
 
+            //
+            // load that block
+            //
+            if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
+                //
+                // utxos receive their share of the staking_treasury adjusted for
+                // the value of the UTXO that are looping around the blockchain.
+                //
+                let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
                 let expected_utxo_payout = if expected_utxo_staked > 0 {
                     self.staking_treasury / expected_utxo_staked
                 } else {
                     0
                 };
+                trace!("expected_utxo_staked : {:?}", expected_utxo_staked);
                 trace!("expected_utxo_payout : {:?}", expected_utxo_payout);
 
+                //
+                // +1 gives us a figure we can multiply any UTXO by in order to
+                // determine the payout for any utxo
+                //
                 let expected_atr_multiplier = 1 + expected_utxo_payout;
 
+                //
+                // loop through the block to identify unspend transactions that are
+                // eligible for rebroadcasting.
+                //
                 trace!("identifying all unspent txs");
-                // identify all unspent transactions
                 for transaction in &pruned_block.transactions {
                     trace!("checking tx : {:?}", transaction.signature.to_hex());
                     let mut outputs = vec![];
 
+                    //
                     // we want to avoid calculating the size of the transaction or anything more
                     // complicated until we know that we have a transaction that requires
                     // rebroadcasting.
+                    //
                     for output in transaction.to.iter() {
-                        // valid means unspent and non-zero amount -- THEN REBROADCAST!
+                        //
+                        // valid means unspent and non-zero amount
+                        //
                         if output.validate(&blockchain.utxoset) {
                             outputs.push(output);
                         }
                     }
 
-                    // if we should rebroadcast, we figure out how much the transaction should
-                    // receive in payment and pay in fees before we actually generate the atr
-                    // transaction.
+                    //
+                    // if we should rebroadcast this transaction, we figure out the payout using
+                    // the multiplier we calculated above, and then deduct the ATR fee that is
+                    // deducted from the transaction on rebroadcast.
+                    //
                     if !outputs.is_empty() {
                         let tx_size = transaction.get_serialized_size() as u64;
                         let atr_fee = tx_size * cv.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
-                        let mut selected_slips = vec![];
 
-                        // in the future we can divide the amount of fees charged to the ATR tx
-                        // among the various UTXO, but for now we will simply charge the fee
-                        // to all of the UTXO transactions individually for ease-of-implementation..
+                        //
+                        // in the future we can use more complicated logic which attempts to divide
+                        // the ATR fee across the UTXO, but for ease of implementation we simply
+                        // subtract the fee from every single UTXO that is unspent.
+                        //
+                        // users who wish to minimize ATR fees should avoid creating transactions
+                        // with multiple unspent UTXO .
+                        //
                         for output in outputs {
                             let atr_payout_for_slip = output.amount * expected_atr_multiplier;
-                            // using whole atr_fee because we don't know the slip count "yet" to divide it.
-                            // so choosing the larger value for safety.
+                            let atr_fee_for_slip = atr_fee;
+
                             if output.amount + atr_payout_for_slip > atr_fee {
                                 cv.total_rebroadcast_nolan += output.amount;
                                 cv.total_rebroadcast_slips += 1;
 
                                 let mut slip = output.clone();
                                 slip.slip_type = SlipType::ATR;
-                                selected_slips.push(slip);
+                                slip.amount =
+                                    output.amount + atr_payout_for_slip - atr_fee_for_slip;
+
+                                cv.total_rebroadcast_staking_payouts_nolan += atr_payout_for_slip;
+                                cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
+
+                                // create our ATR rebroadcast transaction
+                                let rebroadcast_tx =
+                                    Transaction::create_rebroadcast_transaction(transaction, slip);
+
+                                // update cryptographic hash of all ATRs
+                                let mut vbytes: Vec<u8> = vec![];
+                                vbytes.extend(&cv.rebroadcast_hash);
+                                vbytes.extend(&rebroadcast_tx.serialize_for_signature());
+                                cv.rebroadcast_hash = hash(&vbytes);
+                                cv.rebroadcasts.push(rebroadcast_tx);
                             } else {
-                                // rebroadcast dust is either collected into the treasury or
-                                // distributed as a fee for the next block producer. for now
-                                // we will simply distribute it as a fee. we may need to
-                                // change this if the DUST becomes a significant enough amount
-                                // each block to reduce consensus security.
+                                //
+                                // this UTXO will be worth less than zero if the atr_payout is
+                                // added and then the atr_fee is deducted. so we do not rebroadcast
+                                // it but collect the dust as a fee paid to the blockchain by the
+                                // utxo with gratitude for its release.
+                                //
                                 cv.total_rebroadcast_fees_nolan += output.amount;
                             }
                         }
-                        trace!(
-                            "selected {:?} slips with enough funds to rebroadcast",
-                            selected_slips.len()
-                        );
+                    } // output
+                } // tx
+            } // block
+        } // if at least 1 genesis period deep
 
-                        let slip_count = selected_slips.len() as Currency;
-                        for slip in selected_slips.iter_mut() {
-                            let atr_payout_for_slip = slip.amount * expected_atr_multiplier;
-                            // since we know the slip_count now, we can calculate the correct fee.
-                            let mut atr_fee_for_slip = atr_fee / slip_count;
-                            if atr_fee % slip_count > 0 {
-                                // to make sure 'at minimum' the total atr fee is reduced from all the slips combined
-                                atr_fee_for_slip += 1;
-                            }
-                            assert!(
-                                slip.amount + atr_payout_for_slip > atr_fee_for_slip,
-                                "slip amount should be positive after ATR calculation"
-                            );
-                            slip.amount = slip.amount + atr_payout_for_slip - atr_fee_for_slip;
-                            cv.total_rebroadcast_staking_payouts_nolan += atr_payout_for_slip;
-                            cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
-                        }
-                        // if there aren't any selected slips, no point in creating the transaction
-                        if !selected_slips.is_empty() {
-                            trace!("creating rebroadcast tx for tx");
-                            let rebroadcast_tx = Transaction::create_rebroadcast_transaction(
-                                transaction,
-                                selected_slips,
-                            );
-
-                            // update cryptographic hash of all ATRs
-                            let mut vbytes: Vec<u8> = vec![];
-                            vbytes.extend(&cv.rebroadcast_hash);
-                            vbytes.extend(&rebroadcast_tx.serialize_for_signature());
-                            cv.rebroadcast_hash = hash(&vbytes);
-                            cv.rebroadcasts.push(rebroadcast_tx);
-                        }
-                    } // should rebroadcast
-                } // tx loop
-            } // if block to rebroadcast exists
-        } // if 1 genesis period deep
-
+        //
+        // we can now adjust the value of avg_nolan_rebroadcast_per_block since
+        // we know the total amount of fees that have been rebroadcast in this
+        // block.
+        //
+        // note that we cannot move this above the ATR section as we use the
+        // value of this variable (from the last block) to figure out what the
+        // ATR payout should be in this block.
+        //
         let adjustment =
             (cv.avg_nolan_rebroadcast_per_block - cv.total_rebroadcast_nolan) / GENESIS_PERIOD;
         cv.avg_nolan_rebroadcast_per_block =
@@ -1087,171 +1109,208 @@ impl Block {
             cv.avg_nolan_rebroadcast_per_block
         );
 
-        // calculate payments to miners / routers / stakers
+        //
+        // calculate payouts
+        //
+        // every block pays out the PREVIOUS BLOCK(S). how payouts are handled depends
+        // on whether this block contains a golden ticket (triggering a payout) and then
+        // whether the previous one did or not.
+        //
+        // [ previous-previous block ] - [ previous block ] - [ this block ]
+        //
+        // if this block contains a golden ticket:
+        //
+        //    - 50% of previous block to miner
+        //    - 50% of previous block to routing node
+        //
+        //    if previous block contains a golden ticket:
+        //
+        //	  - do nothing (previous previous block already paid out)
+        //
+        //    if previous block does not contain a golden ticket:
+        //
+        //	  - 50% of previous previous block to staking treasury
+        //    	  - 50% of previous previous block to routing node
+        //
+        // if this block does not contain a golden ticket:
+        //
+        //    if previous block contains a golden ticket:
+        //
+        //	  - do nothing
+        //
+        //    if previous block does not contain a golden ticket
+        //
+        //        - 50% of previous previous block to staking treasury
+        //        - 50% of previous previous block to staking treasury
+        //
+        // note that all payouts are capped at 150% of the long-term average block fees
+        // collected by the network. this is done in order to prevent attackers from
+        // gaming the payout lottery in an edge-case attack on the proportionality of
+        // payouts to work.
+        //
         trace!("calculating payments...");
+
+        //
+        // calculating the payouts means filling in this information based on the block
+        // content. we use the following section to fill in these values, and then
+        // create the block payouts based on the information we recover.
+        //
+        let mut miner_publickey: SaitoPublicKey = [0; 33];
+        let mut miner_payout: Currency = 0;
+        let mut router1_payout: Currency = 0;
+        let mut router1_publickey: SaitoPublicKey = [0; 33];
+        let mut router2_payout: Currency = 0;
+        let mut router2_publickey: SaitoPublicKey = [0; 33];
+        let mut staking_treasury: Currency = 0;
+
+        //
+        // if there is a golden ticket
+        //
         if let Some(gt_index) = cv.gt_index {
+            //
+            // we fetch the random number for determining the payouts from the golden ticket
+            // in our current block (this block). we will then continually hash it to generate
+            // a series of other numbers that can be used to calculate subsequent payouts.
+            //
             let golden_ticket: GoldenTicket =
                 GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
-            // generate input hash for router
             let mut next_random_number = hash(golden_ticket.random.as_ref());
 
-            // miner payout is fees from previous block, no staking treasury
+            //
+            // load the previous block
+            //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-                // limit previous block payout to avg income
-                let mut previous_block_payout = previous_block.total_fees;
-                if previous_block_payout > (previous_block.avg_income as f64 * 1.25) as Currency
-                    && previous_block_payout > 50
-                {
-                    previous_block_payout = (previous_block.avg_income as f64 * 1.24) as Currency;
-                }
+                //
+                // the amount of the payout depends on the fees in the block
+                // we will adjust these before creating the final transaction
+                // in order to limit against attacks on the lottery mechanism.
+                //
+                miner_payout = previous_block.total_fees / 2;
+                miner_publickey = golden_ticket.public_key;
+                router1_payout = previous_block.total_fees - miner_payout;
+                router1_publickey = previous_block.find_winning_router(next_random_number);
 
-                let miner_payment = previous_block_payout / 2;
-                let router_payment = previous_block_payout - miner_payment;
-
-                // calculate miner and router payments
-                let router_public_key = previous_block.find_winning_router(next_random_number);
-
-                let mut payout = BlockPayout::new();
-                payout.miner = golden_ticket.public_key;
-                payout.router = router_public_key;
-                payout.miner_payout = miner_payment;
-                payout.router_payout = router_payment;
-                cv.block_payout.push(payout);
-
-                // these two from find_winning_router - 3, 4
+                //
+                // iterate our hash 2 times to accomodate for the iteration that was
+                // done in order to find the previous winning router.
+                //
                 next_random_number = hash(next_random_number.as_ref());
                 next_random_number = hash(next_random_number.as_ref());
 
-                // loop backwards until MAX recursion OR golden ticket
-                let mut cont = 1;
-                let mut loop_index = 0;
-                let mut did_the_block_before_our_staking_block_have_a_golden_ticket =
-                    previous_block.has_golden_ticket;
+                //
+                // if the previous block did NOT contain a golden ticket, we recurse
+                // backwards a single block and issue the payouts for that block
+                // as well.
+                //
+                if previous_block.has_golden_ticket {
 
-                // staking block hash is 3 back, pre
-                let mut staking_block_hash = previous_block.previous_block_hash;
+                    //
+                    // do nothing
+                    //
+                } else {
+                    //
+                    // we want to pay out the previous_previous_block to a routing node and the staking table
+                    //
+                    if let Some(previous_previous_block) =
+                        blockchain.blocks.get(&previous_block.previous_block_hash)
+                    {
+                        //
+                        // calculate staker and router payments
+                        //
+                        router2_payout = previous_previous_block.total_fees / 2;
+                        router2_publickey =
+                            previous_previous_block.find_winning_router(next_random_number);
+                        staking_treasury = previous_previous_block.total_fees - router2_payout;
 
-                while cont == 1 {
-                    loop_index += 1;
-
-                    // we start with the second block, so once loop_IDX hits the same
-                    // number as MAX_STAKER_RECURSION we have processed N blocks where
-                    // N is MAX_STAKER_RECURSION.
-                    if loop_index >= MAX_STAKER_RECURSION {
-                        cont = 0;
-                    } else if let Some(staking_block) = blockchain.blocks.get(&staking_block_hash) {
-                        staking_block_hash = staking_block.previous_block_hash;
-                        if !did_the_block_before_our_staking_block_have_a_golden_ticket {
-                            // update with this block info in case of next loop
-                            did_the_block_before_our_staking_block_have_a_golden_ticket =
-                                staking_block.has_golden_ticket;
-
-                            // calculate staker and router payments
-                            //
-                            // the staker payout is contained in the slip of the winner. this is
-                            // because we calculate it afresh every time we reset the staking table
-                            // the payment for the router requires calculating the amount that will
-                            // be withheld for the staker treasury, which is what previous_staker_
-                            // payment is measuring.
-                            let mut previous_staking_block_payout = staking_block.total_fees;
-                            if previous_staking_block_payout
-                                > (staking_block.avg_income as f64 * 1.25) as Currency
-                                && previous_staking_block_payout > 50
-                            {
-                                previous_staking_block_payout =
-                                    (staking_block.avg_income as f64 * 1.24) as Currency;
-                            }
-
-                            let sp = previous_staking_block_payout / 2;
-                            let rp = previous_staking_block_payout - sp;
-
-                            let mut payout = BlockPayout::new();
-                            payout.router = staking_block.find_winning_router(next_random_number);
-                            payout.router_payout = rp;
-                            payout.staking_treasury = sp as i64;
-
-                            // router consumes 2 hashes
-                            next_random_number = hash(next_random_number.as_slice());
-                            next_random_number = hash(next_random_number.as_slice());
-
-                            cv.block_payout.push(payout);
-                        }
+                        // finding a router consumes 2 hashes
+                        next_random_number = hash(next_random_number.as_slice());
+                        next_random_number = hash(next_random_number.as_slice());
                     }
                 }
             }
 
-            // now create fee transaction using the block payout data
+            //
+            // if our total payouts are greater than 1.5x the average fee throughput
+            // of the blockchain, then we may be experiencing an edge-case attack in
+            // which the attacker
+            //
+            // TODO - get the difference and add it to the staking payouts so that the
+            // tokens are not lost but paid out to users.
+            //
+            //if miner_payout > (previous_block.avg_income as f64 * 1.5) { miner_payout = previous_block.avg_income as f64 * 1.5; }
+            //if router1_payout > (previous_block.avg_income as f64 * 1.5) { router1_payout = previous_block.avg_income as f64 * 1.5; }
+            //if router2_payout > (previous_block.avg_income as f64 * 1.5) { router2_payout = previous_block.avg_income as f64 * 1.5; }
+
+            //
+            // now create fee transactions
+            //
             let mut slip_index = 0;
             let mut transaction = Transaction::default();
             transaction.transaction_type = TransactionType::Fee;
-
-            for i in 0..cv.block_payout.len() {
-                if cv.block_payout[i].miner != [0; 33] {
-                    let mut output = Slip::default();
-                    output.public_key = cv.block_payout[i].miner;
-                    output.amount = cv.block_payout[i].miner_payout;
-                    output.slip_type = SlipType::MinerOutput;
-                    output.slip_index = slip_index;
-                    transaction.add_to_slip(output.clone());
-                    slip_index += 1;
-                }
-                if cv.block_payout[i].router != [0; 33] {
-                    let mut output = Slip::default();
-                    output.public_key = cv.block_payout[i].router;
-                    output.amount = cv.block_payout[i].router_payout;
-                    output.slip_type = SlipType::RouterOutput;
-                    output.slip_index = slip_index;
-                    transaction.add_to_slip(output.clone());
-                    slip_index += 1;
-                }
+            if miner_publickey != [0; 33] {
+                let mut output = Slip::default();
+                output.public_key = miner_publickey;
+                output.amount = miner_payout;
+                output.slip_type = SlipType::MinerOutput;
+                output.slip_index = slip_index;
+                transaction.add_to_slip(output.clone());
+                slip_index += 1;
+            }
+            if router1_publickey != [0; 33] {
+                let mut output = Slip::default();
+                output.public_key = router1_publickey;
+                output.amount = router1_payout;
+                output.slip_type = SlipType::RouterOutput;
+                output.slip_index = slip_index;
+                transaction.add_to_slip(output.clone());
+                slip_index += 1;
+            }
+            if router2_publickey != [0; 33] {
+                let mut output = Slip::default();
+                output.public_key = router2_publickey;
+                output.amount = router2_payout;
+                output.slip_type = SlipType::RouterOutput;
+                output.slip_index = slip_index;
+                transaction.add_to_slip(output.clone());
+                slip_index += 1;
             }
 
             cv.fee_transaction = Some(transaction);
-        }
+        } else {
+            // if there is NOT a golden ticket
+            // check if the previous block has a golden ticket
+            if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+                if previous_block.has_golden_ticket {
 
-        // if there is no golden ticket AND there is no golden ticket before the MAX
-        // blocks we recurse to collect NOLAN we have to add the amount of the unpaid
-        // block to the amount of NOLAN that is falling off our chain.
-        //
-        // this edge-case should be a statistical abnormality that we almost never
-        // run into, but it is good to collect the SAITO into a variable that we track
-        // so that we can confirm the soundness of monetary policy by monitoring the
-        // blockchain.
-        trace!("checking for golden tickets");
-        if cv.gt_num == 0 {
-            for i in 1..=MAX_STAKER_RECURSION {
-                if i >= self.id {
-                    break;
-                }
-
-                let bid = self.id - i;
-                let previous_block_hash = blockchain
-                    .blockring
-                    .get_longest_chain_block_hash_at_block_id(bid);
-
-                // previous block hash can be [0; 32] if there is no longest-chain block
-
-                if previous_block_hash != [0; 32] {
-                    let previous_block = blockchain.get_block(&previous_block_hash).unwrap();
-
-                    if previous_block.has_golden_ticket {
-                        break;
-                    } else {
-                        //
-                        // this is the block BEFORE from which we need to collect the nolan due to
-                        // our iterator starting at 0 for the current block. i.e. if MAX_STAKER_
-                        // RECURSION is 3, at 3 we are the fourth block back.
-                        //
-                        if i == MAX_STAKER_RECURSION {
-                            cv.nolan_falling_off_chain = previous_block.total_fees;
-                        }
+                    //
+                    // do nothing, already paid out
+                    //
+                } else {
+                    //
+                    // our previous_previous_block is about to disappear, which means
+                    // we should collect the funds that would be lost and add them to
+                    // the staking treasury.
+                    //
+                    if let Some(previous_previous_block) =
+                        blockchain.blocks.get(&previous_block.previous_block_hash)
+                    {
+                        staking_treasury = previous_previous_block.total_fees;
                     }
                 }
             }
         }
 
+        cv.staking_treasury = staking_treasury;
+
+        //
+        // TODO - perhaps put any missing NOLAN here, section removed
+        // as it is now handled during the staking payout.
+        //
+        cv.nolan_falling_off_chain = 0;
+
         cv
     }
+
     pub fn generate_pre_hash(&mut self) {
         let hash_for_signature = hash(&self.serialize_for_signature());
         self.pre_hash = hash_for_signature;
@@ -1575,13 +1634,8 @@ impl Block {
         }
 
         //
-        // trace!(
-        //     " ... block.validate: (burn fee)  {:?}",
-        //     create_timestamp(),
-        //     // tracing_tracker.time_since_last();
-        // );
-
         // verify signed by creator
+        //
         if !verify_signature(&self.pre_hash, &self.signature, &self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
@@ -1631,7 +1685,10 @@ impl Block {
         }
 
         //
-        // Previous Block
+        // TODO -- shouldn't these be all together in generate_consensus_values ?
+        //
+        //
+        // previous block
         //
         // many kinds of validation like the burn fee and the golden ticket solution
         // require the existence of the previous block in order to validate. we put all
@@ -2434,7 +2491,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test() {
-        // pretty_env_logger::init();
+        pretty_env_logger::init();
 
         // create test manager
         let mut t = TestManager::new();

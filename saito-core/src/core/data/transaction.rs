@@ -348,7 +348,7 @@ impl Transaction {
     /// ```
     pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
-        output_slips: Vec<Slip>,
+        slip: Slip,
         // with_fee: Currency,
         // with_staking_subsidy: Currency,
     ) -> Transaction {
@@ -371,10 +371,11 @@ impl Transaction {
             transaction.data = transaction_to_rebroadcast.serialize_for_net().to_vec();
         }
 
-        for slip in output_slips {
-            assert_eq!(slip.slip_type, SlipType::ATR);
-            transaction.add_to_slip(slip);
-        }
+	//
+	// add the output slip
+	//
+        assert_eq!(slip.slip_type, SlipType::ATR);
+        transaction.add_to_slip(slip);
 
         // signature is the ORIGINAL signature. this transaction
         // will fail its signature check and then get analysed as
