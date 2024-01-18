@@ -50,8 +50,6 @@ pub struct ConsensusValues {
     pub gt_index: Option<usize>,
     // total fees in block
     pub total_fees: Currency,
-    // expected burnfee
-    pub expected_burnfee: Currency,
     // expected difficulty
     pub expected_difficulty: u64,
     // rebroadcast txs
@@ -98,7 +96,6 @@ impl ConsensusValues {
             gt_num: 0,
             gt_index: None,
             total_fees: 5000,
-            expected_burnfee: 1,
             expected_difficulty: 1,
             rebroadcasts: vec![],
             total_rebroadcast_slips: 0,
@@ -124,7 +121,6 @@ impl ConsensusValues {
             gt_num: 0,
             gt_index: None,
             total_fees: 0,
-            expected_burnfee: 1,
             expected_difficulty: 1,
             rebroadcasts: vec![],
             total_rebroadcast_slips: 0,
@@ -164,6 +160,7 @@ pub enum BlockType {
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Block {
+
     /// Consensus Level Variables
     ///
     /// these are the variables that are serialized into the block header
@@ -198,7 +195,7 @@ pub struct Block {
 
     /// Non-Consensus Values
     ///
-    /// these values are needed when creating or validating a block but are
+    /// these values are needed when creating or validating a block but are 
     /// generated from the block-data and are not included in the block-header
     /// and must be created by running block.generate() which fills in most
     /// of these values.
@@ -452,19 +449,16 @@ impl Block {
         // exceed variance permitted and payouts are deducted downwards.
         //
         block.treasury = 0;
-
+    
         // adjust staking treasury
         if cv.staking_payout != 0 {
-            debug!(
-                "adding staking payout to treasury : {:?}",
-                cv.staking_payout
-            );
-            block.staking_treasury += cv.staking_payout;
+          debug!("adding staking payout to treasury : {:?}", cv.staking_payout);
+          block.staking_treasury += cv.staking_payout;
         }
         if cv.total_rebroadcast_staking_payouts_nolan != 0 {
-            if block.staking_treasury >= cv.total_rebroadcast_staking_payouts_nolan {
-                block.staking_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
-            }
+          if block.staking_treasury >= cv.total_rebroadcast_staking_payouts_nolan {
+            block.staking_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
+          }
         }
 
         // generate merkle root
@@ -698,6 +692,7 @@ impl Block {
         winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
         winner_pubkey
     }
+
 
     // generate ancillary data
     //
@@ -944,16 +939,12 @@ impl Block {
         // step.
         //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-
             //
             // burn fee is "block production difficulty" (fee lockup cost)
             //
-            cv.expected_burnfee = BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-              previous_block.burnfee,
-              self.timestamp,
-              previous_block.timestamp,
-            );
-            
+            // TODO - where are we setting the burn fee ?
+            //
+
             //
             // difficulty is "mining difficulty" (payout unlock cost)
             //
@@ -1299,7 +1290,9 @@ impl Block {
             }
 
             cv.fee_transaction = Some(transaction);
+
         } else {
+
             // if no golden ticket, check if previous block was paid out (has golden ticket)
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
                 if previous_block.has_golden_ticket {
@@ -1326,8 +1319,8 @@ impl Block {
 
         //
         // TODO - once we start reducing any mining/staking payouts because the fees-in-block
-        // are larger than the average, we can put the removed tokens here in order to keep
-        // track of them.
+	// are larger than the average, we can put the removed tokens here in order to keep
+	// track of them.
         //
         cv.nolan_falling_off_chain = 0;
 
@@ -1679,9 +1672,6 @@ impl Block {
         //
         let cv = self.generate_consensus_values(blockchain).await;
 
-	//
-	// the average number of fees in the block
-	//
         if cv.avg_income != self.avg_income {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
@@ -1689,51 +1679,10 @@ impl Block {
             );
             return false;
         }
-
-	//
-	// the average variance in terms of number of fees in block
-	//
         if cv.avg_variance != self.avg_variance {
             error!(
                 "block is misreporting its average variance. current : {:?} expected : {:?}",
                 self.avg_variance, cv.avg_variance
-            );
-            return false;
-        }
-
-        //
-        // validate difficulty
-        //
-        // difficulty here refers the difficulty of generating a golden ticket
-        // for any particular block. this is the difficulty of the mining
-        // puzzle that is used for releasing payments.
-        //
-        // those more familiar with POW and POS should note that "difficulty" of
-        // finding a block is represented in the burn fee variable which we have
-        // already examined and validated above. producing a block requires a
-        // certain amount of golden ticket solutions over-time, so the
-        // distinction is in practice less clean.
-        //
-        if cv.expected_difficulty != self.difficulty {
-            error!(
-                "ERROR 202392: difficulty is invalid. expected: {:?} vs actual : {:?}",
-                cv.expected_difficulty, self.difficulty
-            );
-            return false;
-        }
-
-
-        //
-        // validate burnfee
-        //
-        // this is the amount of routing work that is needed to produce a block, 
-	// as derived from the fees in the block and modified by the length of the
-	// routing path for each fee-bearing transaction.
-	//
-        if cv.expected_burnfee != self.burnfee {
-            error!(
-                "block is misreporting its burnfee. current : {:?} expected : {:?}",
-                self.burnfee, cv.expected_burnfee
             );
             return false;
         }
@@ -1750,7 +1699,7 @@ impl Block {
             return false;
         }
 
-        //
+	//
         // many kinds of validation like the burn fee and the golden ticket solution
         // require the existence of the previous block in order to validate. we put all
         // of these validation steps below so they will have access to the previous block
@@ -1768,9 +1717,9 @@ impl Block {
             let mut expected_staking_treasury = previous_block.staking_treasury;
             expected_staking_treasury += cv.staking_payout;
             if expected_staking_treasury >= cv.total_rebroadcast_staking_payouts_nolan {
-                expected_staking_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
+              expected_staking_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
             } else {
-                expected_staking_treasury = 0;
+              expected_staking_treasury = 0;
             }
 
             if self.staking_treasury != expected_staking_treasury {
@@ -1782,9 +1731,9 @@ impl Block {
             }
 
             // treasury - TODO remove if we are not going to use this. leaving it in
-            // for now as it is a good place to put any NOLAN that get removed because
-            // of deflationary pressures or attacks that push consensus into not issuing
-            // a full payout.
+	    // for now as it is a good place to put any NOLAN that get removed because
+	    // of deflationary pressures or attacks that push consensus into not issuing
+	    // a full payout.
             //
             if self.treasury != 0 {
                 error!(
@@ -1792,6 +1741,22 @@ impl Block {
                     previous_block.treasury , 0 ,
                     (previous_block.treasury + 0) ,
                     self.treasury,
+                );
+                return false;
+            }
+
+            // burn fee
+            //
+            let new_burnfee: Currency =
+                BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
+                    previous_block.burnfee,
+                    self.timestamp,
+                    previous_block.timestamp,
+                );
+            if new_burnfee != self.burnfee {
+                error!(
+                    "ERROR 182085: burn fee does not validate,current = {}, expected: {}",
+                    self.burnfee, new_burnfee
                 );
                 return false;
             }
@@ -1951,6 +1916,26 @@ impl Block {
             }
         }
 
+        //
+        // validate difficulty
+        //
+        // difficulty here refers the difficulty of generating a golden ticket
+        // for any particular block. this is the difficulty of the mining
+        // puzzle that is used for releasing payments.
+        //
+        // those more familiar with POW and POS should note that "difficulty" of
+        // finding a block is represented in the burn fee variable which we have
+        // already examined and validated above. producing a block requires a
+        // certain amount of golden ticket solutions over-time, so the
+        // distinction is in practice less clean.
+        //
+        if cv.expected_difficulty != self.difficulty {
+            error!(
+                "ERROR 202392: difficulty is invalid. expected: {:?} vs actual : {:?}",
+                cv.expected_difficulty, self.difficulty
+            );
+            return false;
+        }
 
         // trace!(" ... block.validate: (txs valid) {:?}", create_timestamp());
 
