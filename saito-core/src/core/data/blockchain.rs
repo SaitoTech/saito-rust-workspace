@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::Error;
-use std::ops::Deref;
+
 use std::sync::Arc;
 
 use ahash::{AHashMap, HashMap, HashSet};
@@ -825,13 +825,10 @@ impl Blockchain {
     }
 
     pub fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
-        //
-
         self.blocks.get(block_hash)
     }
 
     pub fn get_mut_block(&mut self, block_hash: &SaitoHash) -> Option<&mut Block> {
-        //
         self.blocks.get_mut(block_hash)
     }
 
@@ -1773,7 +1770,7 @@ mod tests {
 
         // create first block, with 100 VIP txs with 1_000_000_000 NOLAN each
         t.initialize(100, 1_000_000_000).await;
-        t.wait_for_mining_event().await;
+        // t.wait_for_mining_event().await;
 
         {
             let (blockchain, _blockchain_) =
@@ -2237,6 +2234,7 @@ mod tests {
 
     // tests if utxo hashmap persists after a blockchain reset
     #[tokio::test]
+    #[serial_test::serial]
     async fn balance_hashmap_persists_after_blockchain_reset_test() {
         let mut t: TestManager = TestManager::new();
         let file_path = t.issuance_path;

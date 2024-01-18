@@ -384,7 +384,7 @@ mod tests {
 
         {
             t.initialize(100, 720_000).await;
-            t.wait_for_mining_event().await;
+            // t.wait_for_mining_event().await;
 
             wallet_lock = t.get_wallet_lock();
             mempool_lock = t.get_mempool_lock();
