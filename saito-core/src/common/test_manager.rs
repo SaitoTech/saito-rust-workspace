@@ -28,7 +28,7 @@ pub mod test {
     use std::fmt::{Debug, Formatter};
     use std::fs;
     use std::ops::Deref;
-    use std::path::{Path, PathBuf};
+    use std::path::{Path};
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -60,7 +60,7 @@ pub mod test {
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
-    use std::io::{self, BufReader, Read, Write};
+    use std::io::{BufReader, Read, Write};
 
     pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
@@ -135,7 +135,7 @@ pub mod test {
             let source_path = Path::new(TEST_ISSUANCE_FILEPATH);
             // Read the existing counter from the file or initialize it to 1 if the file doesn't exist
             let issuance_counter_path = temp_dir.join("issuance_counter.txt");
-            let mut counter = if issuance_counter_path.exists() {
+            let counter = if issuance_counter_path.exists() {
                 let mut file = BufReader::new(fs::File::open(&issuance_counter_path)?);
                 let mut buffer = String::new();
                 file.read_to_string(&mut buffer)?;
@@ -941,7 +941,7 @@ pub mod test {
 
         pub fn generate_random_public_key() -> SaitoPublicKey {
             let secp = Secp256k1::new();
-            let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+            let (_secret_key, public_key) = secp.generate_keypair(&mut OsRng);
             let serialized_key: SaitoPublicKey = public_key.serialize();
             serialized_key
         }

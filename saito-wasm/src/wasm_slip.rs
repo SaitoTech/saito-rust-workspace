@@ -3,7 +3,7 @@ use log::warn;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use num_traits::FromPrimitive;
-use saito_core::common::defs::{Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey};
+use saito_core::common::defs::{Currency, PrintForLog, SaitoUTXOSetKey};
 use saito_core::core::data::slip::{Slip, SlipType};
 
 use crate::saitowasm::{string_to_hex, string_to_key};
