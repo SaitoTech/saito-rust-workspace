@@ -27,7 +27,7 @@ pub enum TransactionType {
     Fee = 1,
     GoldenTicket = 2,
     ATR = 3,
-    /// VIP transactions won't pay an ATR fee. (Issued to early investors)
+    /// VIP transactions deprecated on mainnet
     Vip = 4,
     SPV = 5,
     /// Issues funds for an address at the start of the network
@@ -299,22 +299,6 @@ impl Transaction {
     /// ```
     ///
     /// ```
-
-    pub fn create_vip_transaction(
-        to_public_key: SaitoPublicKey,
-        with_amount: Currency,
-    ) -> Transaction {
-        debug!("generate vip transaction : amount = {:?}", with_amount);
-        let mut transaction = Transaction::default();
-        transaction.transaction_type = TransactionType::Vip;
-        let mut output = Slip::default();
-        output.public_key = to_public_key;
-        output.amount = with_amount;
-        output.slip_type = SlipType::VipOutput;
-        transaction.add_to_slip(output);
-        transaction
-    }
-
     pub fn create_issuance_transaction(
         to_public_key: SaitoPublicKey,
         with_amount: Currency,
@@ -325,7 +309,7 @@ impl Transaction {
         let mut output = Slip::default();
         output.public_key = to_public_key;
         output.amount = with_amount;
-        output.slip_type = SlipType::VipOutput;
+        output.slip_type = SlipType::Normal;
         transaction.add_to_slip(output);
         transaction
     }
@@ -864,7 +848,6 @@ impl Transaction {
         // the block itself.
         //
         // ATR transactions
-        // VIP transactions
         // FEE transactions
         //
         // the first set of validation criteria is applied only to
@@ -876,7 +859,6 @@ impl Transaction {
         let transaction_type = self.transaction_type;
 
         if transaction_type != TransactionType::ATR
-            && transaction_type != TransactionType::Vip
             && transaction_type != TransactionType::Issuance
         {
             //
@@ -929,7 +911,6 @@ impl Transaction {
             // validate we're not creating tokens out of nothing
             if self.total_out > self.total_in
                 && self.transaction_type != TransactionType::Fee
-                && self.transaction_type != TransactionType::Vip
             {
                 warn!("{:?} in and {:?} out", self.total_in, self.total_out);
                 // for _z in self.outputs.iter() {
@@ -959,19 +940,6 @@ impl Transaction {
         // golden ticket transactions
         //
         if transaction_type == TransactionType::GoldenTicket {}
-
-        //
-        // vip transactions
-        //
-        // a special class of transactions that do not pay rebroadcasting
-        // fees. these are issued to the early supporters of the Saito
-        // project. they carried us and we're going to carry them. thanks
-        // for the faith and support.
-        //
-        if transaction_type == TransactionType::Vip {
-            // we should validate that VIP transactions are signed by the
-            // public_key associated with the Saito project.
-        }
 
         //
         // all Transactions
