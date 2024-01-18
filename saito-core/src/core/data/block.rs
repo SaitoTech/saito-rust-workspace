@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use crate::common::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
     SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
-    MAX_STAKER_RECURSION,
 };
 use crate::core::data::blockchain::Blockchain;
 use crate::core::data::burnfee::BurnFee;
@@ -2396,7 +2395,7 @@ mod tests {
         let lite_block = block.generate_lite_block(vec![public_key]);
 
         // Find the SPV transaction in the lite block
-        let spv_tx = lite_block
+        let _spv_tx = lite_block
             .transactions
             .iter()
             .find(|&tx| tx.transaction_type == TransactionType::SPV)
@@ -2404,7 +2403,7 @@ mod tests {
             .clone();
 
         // Generate a Merkle tree from the block transactions
-        let merkle_tree = MerkleTree::generate(&lite_block.transactions)
+        let _merkle_tree = MerkleTree::generate(&lite_block.transactions)
             .expect("Failed to generate Merkle tree for block");
 
         dbg!(
@@ -2502,7 +2501,7 @@ mod tests {
         assert_eq!(GENESIS_PERIOD, 10, "Genesis period is not 10");
 
         // create 10 blocks
-        for i in 0..GENESIS_PERIOD {
+        for _i in 0..GENESIS_PERIOD {
             let mut block = t
                 .create_block(
                     t.latest_block_hash,

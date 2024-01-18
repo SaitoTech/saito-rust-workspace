@@ -1,4 +1,4 @@
-use js_sys::{Array, JsString, Object, Uint8Array};
+use js_sys::{Array, JsString, Uint8Array};
 
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;

@@ -2996,7 +2996,7 @@ mod tests {
             ts = block1.timestamp;
         }
 
-        for i in 0..50 {
+        for _i in 0..50 {
             // block 2
             let mut block2 = t
                 .create_block(
