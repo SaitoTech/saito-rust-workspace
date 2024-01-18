@@ -50,6 +50,8 @@ pub struct ConsensusValues {
     pub gt_index: Option<usize>,
     // total fees in block
     pub total_fees: Currency,
+    // expected burnfee
+    pub expected_burnfee: Currency,
     // expected difficulty
     pub expected_difficulty: u64,
     // rebroadcast txs
@@ -96,6 +98,7 @@ impl ConsensusValues {
             gt_num: 0,
             gt_index: None,
             total_fees: 5000,
+            expected_burnfee: 1,
             expected_difficulty: 1,
             rebroadcasts: vec![],
             total_rebroadcast_slips: 0,
@@ -121,6 +124,7 @@ impl ConsensusValues {
             gt_num: 0,
             gt_index: None,
             total_fees: 0,
+            expected_burnfee: 1,
             expected_difficulty: 1,
             rebroadcasts: vec![],
             total_rebroadcast_slips: 0,
@@ -940,12 +944,16 @@ impl Block {
         // step.
         //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+
             //
             // burn fee is "block production difficulty" (fee lockup cost)
             //
-            // TODO - where are we setting the burn fee ?
-            //
-
+            cv.expected_burnfee = BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
+              previous_block.burnfee,
+              self.timestamp,
+              previous_block.timestamp,
+            );
+            
             //
             // difficulty is "mining difficulty" (payout unlock cost)
             //
@@ -1671,6 +1679,9 @@ impl Block {
         //
         let cv = self.generate_consensus_values(blockchain).await;
 
+	//
+	// the average number of fees in the block
+	//
         if cv.avg_income != self.avg_income {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
@@ -1678,10 +1689,51 @@ impl Block {
             );
             return false;
         }
+
+	//
+	// the average variance in terms of number of fees in block
+	//
         if cv.avg_variance != self.avg_variance {
             error!(
                 "block is misreporting its average variance. current : {:?} expected : {:?}",
                 self.avg_variance, cv.avg_variance
+            );
+            return false;
+        }
+
+        //
+        // validate difficulty
+        //
+        // difficulty here refers the difficulty of generating a golden ticket
+        // for any particular block. this is the difficulty of the mining
+        // puzzle that is used for releasing payments.
+        //
+        // those more familiar with POW and POS should note that "difficulty" of
+        // finding a block is represented in the burn fee variable which we have
+        // already examined and validated above. producing a block requires a
+        // certain amount of golden ticket solutions over-time, so the
+        // distinction is in practice less clean.
+        //
+        if cv.expected_difficulty != self.difficulty {
+            error!(
+                "ERROR 202392: difficulty is invalid. expected: {:?} vs actual : {:?}",
+                cv.expected_difficulty, self.difficulty
+            );
+            return false;
+        }
+
+
+        //
+        // validate burnfee
+        //
+        // this is the amount of routing work that is needed to produce a block, 
+	// as derived from the fees in the block and modified by the length of the
+	// routing path for each fee-bearing transaction.
+	//
+        if cv.expected_burnfee != self.burnfee {
+            error!(
+                "block is misreporting its burnfee. current : {:?} expected : {:?}",
+                self.burnfee, cv.expected_burnfee
             );
             return false;
         }
@@ -1740,22 +1792,6 @@ impl Block {
                     previous_block.treasury , 0 ,
                     (previous_block.treasury + 0) ,
                     self.treasury,
-                );
-                return false;
-            }
-
-            // burn fee
-            //
-            let new_burnfee: Currency =
-                BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-                    previous_block.burnfee,
-                    self.timestamp,
-                    previous_block.timestamp,
-                );
-            if new_burnfee != self.burnfee {
-                error!(
-                    "ERROR 182085: burn fee does not validate,current = {}, expected: {}",
-                    self.burnfee, new_burnfee
                 );
                 return false;
             }
@@ -1915,26 +1951,6 @@ impl Block {
             }
         }
 
-        //
-        // validate difficulty
-        //
-        // difficulty here refers the difficulty of generating a golden ticket
-        // for any particular block. this is the difficulty of the mining
-        // puzzle that is used for releasing payments.
-        //
-        // those more familiar with POW and POS should note that "difficulty" of
-        // finding a block is represented in the burn fee variable which we have
-        // already examined and validated above. producing a block requires a
-        // certain amount of golden ticket solutions over-time, so the
-        // distinction is in practice less clean.
-        //
-        if cv.expected_difficulty != self.difficulty {
-            error!(
-                "ERROR 202392: difficulty is invalid. expected: {:?} vs actual : {:?}",
-                cv.expected_difficulty, self.difficulty
-            );
-            return false;
-        }
 
         // trace!(" ... block.validate: (txs valid) {:?}", create_timestamp());
 
