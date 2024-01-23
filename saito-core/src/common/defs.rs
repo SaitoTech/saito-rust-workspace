@@ -78,7 +78,7 @@ impl Drop for LockGuardWatcher {
         LOCK_ORDER.with(|v| {
             let mut v = v.borrow_mut();
             let res = v.pop_back();
-            println!("releasing lock : {:?}", self.order);
+            // println!("releasing lock : {:?}", self.order);
             assert!(
                 res.is_some(),
                 "no existing locks found for lock : {:?}",
@@ -116,22 +116,22 @@ pub fn push_lock(order: u8) -> LockGuardWatcher {
 #[macro_export]
 macro_rules! lock_for_write {
     ($lock:expr, $order:expr) => {{
-        #[cfg(feature = "locking-logs")]
-        println!(
-            "waiting for lock : {:?} for writing - {:?}",
-            $order,
-            module_path!()
-        );
+        // #[cfg(feature = "locking-logs")]
+        // println!(
+        //     "waiting for lock : {:?} for writing - {:?}",
+        //     $order,
+        //     module_path!()
+        // );
 
         let l = $lock.write().await;
         let watcher = push_lock($order);
 
-        #[cfg(feature = "locking-logs")]
-        println!(
-            "acquired lock : {:?} for writing - {:?}",
-            $order,
-            module_path!()
-        );
+        // #[cfg(feature = "locking-logs")]
+        // println!(
+        //     "acquired lock : {:?} for writing - {:?}",
+        //     $order,
+        //     module_path!()
+        // );
 
         (l, watcher)
     }};
@@ -140,22 +140,22 @@ macro_rules! lock_for_write {
 #[macro_export]
 macro_rules! lock_for_read {
     ($lock:expr, $order:expr) => {{
-        #[cfg(feature = "locking-logs")]
-        println!(
-            "waiting for lock : {:?} for reading - {:?}",
-            $order,
-            module_path!()
-        );
+        // #[cfg(feature = "locking-logs")]
+        // println!(
+        //     "waiting for lock : {:?} for reading - {:?}",
+        //     $order,
+        //     module_path!()
+        // );
 
         let l = $lock.read().await;
         let watcher = push_lock($order);
 
-        #[cfg(feature = "locking-logs")]
-        println!(
-            "acquired lock : {:?} for reading - {:?}",
-            $order,
-            module_path!()
-        );
+        // #[cfg(feature = "locking-logs")]
+        // println!(
+        //     "acquired lock : {:?} for reading - {:?}",
+        //     $order,
+        //     module_path!()
+        // );
 
         (l, watcher)
     }};

@@ -223,10 +223,10 @@ impl Blockchain {
                 );
             }
         } else {
-            debug!(
-                "previous block : {:?} exists in blockchain",
-                block.previous_block_hash.to_hex()
-            );
+            // debug!(
+            //     "previous block : {:?} exists in blockchain",
+            //     block.previous_block_hash.to_hex()
+            // );
         }
 
         // pre-validation

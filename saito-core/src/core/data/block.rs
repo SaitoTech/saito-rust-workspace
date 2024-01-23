@@ -338,12 +338,11 @@ impl Block {
 
         let mut block = Block::new();
 
-        let current_burnfee: Currency =
-            BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-                previous_block_burnfee,
-                current_timestamp,
-                previous_block_timestamp,
-            );
+        let current_burnfee: Currency = BurnFee::calculate_burnfee_for_block(
+            previous_block_burnfee,
+            current_timestamp,
+            previous_block_timestamp,
+        );
 
         block.id = previous_block_id + 1;
         block.previous_block_hash = previous_block_hash;
@@ -947,12 +946,11 @@ impl Block {
             //
             // burn fee is "block production difficulty" (fee lockup cost)
             //
-            cv.expected_burnfee =
-                BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-                    previous_block.burnfee,
-                    self.timestamp,
-                    previous_block.timestamp,
-                );
+            cv.expected_burnfee = BurnFee::calculate_burnfee_for_block(
+                previous_block.burnfee,
+                self.timestamp,
+                previous_block.timestamp,
+            );
 
             //
             // difficulty is "mining difficulty" (payout unlock cost)
