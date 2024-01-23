@@ -239,7 +239,7 @@ impl Storage {
                 let mut publickey_array: SaitoPublicKey = [0u8; 33];
                 publickey_array.copy_from_slice(&val);
 
-	        // VipOutput is deprecated on mainnet
+                // VipOutput is deprecated on mainnet
                 let slip_type = match entries[2].trim_end_matches('\r') {
                     "VipOutput" => SlipType::Normal,
                     "Normal" => SlipType::Normal,
