@@ -123,11 +123,6 @@ impl WasmConsensusValues {
         self.cv.nolan_falling_off_chain
     }
 
-    #[wasm_bindgen(getter = staking_treasury)]
-    pub fn staking_treasury(&self) -> u64 {
-        self.cv.staking_treasury
-    }
-
     // #[wasm_bindgen(getter = block_payout)]
     // pub fn block_payout(&self) -> JsValue {
     //     // assuming you can convert Vec<BlockPayout> to a JsValue

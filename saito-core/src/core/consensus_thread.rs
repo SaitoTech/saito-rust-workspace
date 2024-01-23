@@ -92,49 +92,6 @@ pub struct ConsensusThread {
 }
 
 impl ConsensusThread {
-    async fn generate_spammer_init_tx(
-        mempool_lock: Arc<RwLock<Mempool>>,
-        wallet_lock: Arc<RwLock<Wallet>>,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
-    ) {
-        info!("generating spammer init transaction");
-
-        let private_key;
-
-        {
-            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
-            private_key = wallet.private_key;
-        }
-
-        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
-
-        let spammer_public_key: SaitoPublicKey = SaitoPublicKey::from_hex(
-            "03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849",
-        )
-        .unwrap();
-
-        {
-            // let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
-            // vip_transaction.sign(&private_key);
-            //
-            // mempool
-            //     .add_transaction_if_validates(vip_transaction, &blockchain)
-            //     .await;
-
-            let mut vip_transaction =
-                Transaction::create_vip_transaction(spammer_public_key, 100_000_000);
-            vip_transaction.sign(&private_key);
-
-            mempool
-                .add_transaction_if_validates(vip_transaction, &blockchain)
-                .await;
-            info!(
-                "added spammer init tx for : {:?}",
-                spammer_public_key.to_base58()
-            );
-        }
-    }
     async fn generate_issuance_tx(
         &self,
         mempool_lock: Arc<RwLock<Mempool>>,
