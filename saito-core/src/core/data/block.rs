@@ -944,16 +944,16 @@ impl Block {
         // step.
         //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-
             //
             // burn fee is "block production difficulty" (fee lockup cost)
             //
-            cv.expected_burnfee = BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-              previous_block.burnfee,
-              self.timestamp,
-              previous_block.timestamp,
-            );
-            
+            cv.expected_burnfee =
+                BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
+                    previous_block.burnfee,
+                    self.timestamp,
+                    previous_block.timestamp,
+                );
+
             //
             // difficulty is "mining difficulty" (payout unlock cost)
             //
@@ -1679,9 +1679,9 @@ impl Block {
         //
         let cv = self.generate_consensus_values(blockchain).await;
 
-	//
-	// the average number of fees in the block
-	//
+        //
+        // the average number of fees in the block
+        //
         if cv.avg_income != self.avg_income {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
@@ -1690,9 +1690,9 @@ impl Block {
             return false;
         }
 
-	//
-	// the average variance in terms of number of fees in block
-	//
+        //
+        // the average variance in terms of number of fees in block
+        //
         if cv.avg_variance != self.avg_variance {
             error!(
                 "block is misreporting its average variance. current : {:?} expected : {:?}",
@@ -1722,14 +1722,13 @@ impl Block {
             return false;
         }
 
-
         //
         // validate burnfee
         //
-        // this is the amount of routing work that is needed to produce a block, 
-	// as derived from the fees in the block and modified by the length of the
-	// routing path for each fee-bearing transaction.
-	//
+        // this is the amount of routing work that is needed to produce a block,
+        // as derived from the fees in the block and modified by the length of the
+        // routing path for each fee-bearing transaction.
+        //
         if cv.expected_burnfee != self.burnfee {
             error!(
                 "block is misreporting its burnfee. current : {:?} expected : {:?}",
@@ -1950,7 +1949,6 @@ impl Block {
                 }
             }
         }
-
 
         // trace!(" ... block.validate: (txs valid) {:?}", create_timestamp());
 
