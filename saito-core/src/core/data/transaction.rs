@@ -371,9 +371,9 @@ impl Transaction {
             transaction.data = transaction_to_rebroadcast.serialize_for_net().to_vec();
         }
 
-	//
-	// add the output slip
-	//
+        //
+        // add the output slip
+        //
         assert_eq!(slip.slip_type, SlipType::ATR);
         transaction.add_to_slip(slip);
 

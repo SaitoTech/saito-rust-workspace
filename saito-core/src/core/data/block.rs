@@ -1700,9 +1700,8 @@ impl Block {
             if let BlockType::Ghost = previous_block.block_type {
                 return true;
             }
-            //
+
             // validate treasury
-            //
             if self.treasury != previous_block.treasury + cv.nolan_falling_off_chain {
                 error!(
                     "ERROR 123243: treasury does not validate: expected : {:?} + {:?} = {:?} actual : {:?} found",
@@ -1714,12 +1713,10 @@ impl Block {
                 return false;
             }
 
-            //
             // validate staking treasury
-            //
             let mut adjusted_staking_treasury = previous_block.staking_treasury;
             if cv.staking_treasury < 0 {
-                let x: i128 = cv.staking_treasury as i128 * -1;
+                let x: i128 = -(cv.staking_treasury as i128);
                 // TODO SYNC : SLR checks the opposite for this validation, i.e adjusted_staking_treasury < x
                 if adjusted_staking_treasury > x as Currency {
                     adjusted_staking_treasury -= x as Currency;
@@ -1732,12 +1729,10 @@ impl Block {
 
             if self.staking_treasury != adjusted_staking_treasury {
                 error!(
-                    "ERROR 820391: staking treasury does not validate: {} expected versus {} found",
+                    "ERROR 820391: staking treasury does not validate. expected : {:?} vs actual : {:?}",
                     adjusted_staking_treasury, self.staking_treasury,
                 );
-                //     "ERROR: staking treasury does not validate: {} expected versus {} found",
-                //     adjusted_staking_treasury,
-                //     self.get_staking_treasury(),
+
                 return false;
             }
 
