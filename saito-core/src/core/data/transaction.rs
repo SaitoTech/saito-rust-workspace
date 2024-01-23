@@ -858,8 +858,7 @@ impl Transaction {
         //
         let transaction_type = self.transaction_type;
 
-        if transaction_type != TransactionType::ATR
-            && transaction_type != TransactionType::Issuance
+        if transaction_type != TransactionType::ATR && transaction_type != TransactionType::Issuance
         {
             //
             // validate sender exists
@@ -909,9 +908,7 @@ impl Transaction {
 
             // TODO : what happens to tokens when total_out < total_in
             // validate we're not creating tokens out of nothing
-            if self.total_out > self.total_in
-                && self.transaction_type != TransactionType::Fee
-            {
+            if self.total_out > self.total_in && self.transaction_type != TransactionType::Fee {
                 warn!("{:?} in and {:?} out", self.total_in, self.total_out);
                 // for _z in self.outputs.iter() {
                 //     // info!("{:?} --- ", z.amount);
