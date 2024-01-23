@@ -34,7 +34,7 @@ export default class Block extends WasmWrapper<WasmBlock> {
         it_index: this.instance.it_index,
         fee_transaction: this.instance.fee_transaction,
         it_num: this.instance.it_num,
-        block_payout: this.instance.block_payout,
+        // block_payout: this.instance.block_payout,
         ft_num: this.instance.ft_num,
         ft_index: this.instance.ft_index,
         gt_index: this.instance.gt_index,

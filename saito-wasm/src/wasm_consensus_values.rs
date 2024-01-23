@@ -1,5 +1,5 @@
-use js_sys::{JsString};
-use saito_core::common::defs::{PrintForLog};
+use js_sys::JsString;
+use saito_core::common::defs::PrintForLog;
 use saito_core::core::data::block::ConsensusValues;
 use saito_core::core::data::transaction::Transaction;
 use wasm_bindgen::prelude::wasm_bindgen;

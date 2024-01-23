@@ -28,7 +28,7 @@ pub mod test {
     use std::fmt::{Debug, Formatter};
     use std::fs;
     use std::ops::Deref;
-    use std::path::{Path};
+    use std::path::Path;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
