@@ -657,14 +657,14 @@ pub mod test {
 
             for slip in slips {
                 let mut tx: Transaction =
-                    Transaction::create_vip_transaction(slip.public_key, slip.amount);
+                    Transaction::create_issuance_transaction(slip.public_key, slip.amount);
                 tx.generate(&slip.public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
             }
 
             // add some value to my own public key
-            let mut tx = Transaction::create_vip_transaction(my_public_key, amount);
+            let mut tx = Transaction::create_issuance_transaction(my_public_key, amount);
 
             tx.generate(&my_public_key, 0, 0);
             tx.sign(&private_key);
@@ -721,7 +721,7 @@ pub mod test {
             // generate UTXO-carrying VIP transactions
             //
             for slip in slips {
-                let mut tx = Transaction::create_vip_transaction(slip.public_key, slip.amount);
+                let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
                 tx.generate(&slip.public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
@@ -776,7 +776,7 @@ pub mod test {
 
             // generate UTXO-carrying VIP transactions
             for _i in 0..vip_transactions {
-                let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
+                let mut tx = Transaction::create_issuance_transaction(public_key, vip_amount);
                 tx.generate(&public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);

@@ -169,11 +169,6 @@ impl WasmBlock {
         self.block.cv.nolan_falling_off_chain
     }
 
-    #[wasm_bindgen(getter = staking_treasury)]
-    pub fn staking_treasury(&self) -> u64 {
-        self.block.cv.staking_treasury
-    }
-
     #[wasm_bindgen(getter = avg_income)]
     pub fn avg_income(&self) -> u64 {
         self.block.cv.avg_income
