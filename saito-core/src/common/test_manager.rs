@@ -27,6 +27,7 @@ pub mod test {
     use std::error::Error;
     use std::fmt::{Debug, Formatter};
     use std::fs;
+    use std::io::{BufReader, Read, Write};
     use std::ops::Deref;
     use std::path::Path;
     use std::sync::Arc;
@@ -60,7 +61,6 @@ pub mod test {
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
-    use std::io::{BufReader, Read, Write};
 
     pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
@@ -617,7 +617,10 @@ pub mod test {
         pub async fn get_latest_block(&self) -> Block {
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            let block = blockchain.get_latest_block().unwrap().clone();
+            let block = blockchain
+                .get_latest_block()
+                .expect("latest block should exist")
+                .clone();
             block
         }
         pub async fn get_latest_block_id(&self) -> u64 {
@@ -626,9 +629,9 @@ pub mod test {
             blockchain.blockring.get_latest_block_id()
         }
 
-        pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: Currency) {
+        pub async fn initialize(&mut self, issuance_transactions: u64, issuance_amount: Currency) {
             let timestamp = create_timestamp();
-            self.initialize_with_timestamp(vip_transactions, vip_amount, timestamp)
+            self.initialize_with_timestamp(issuance_transactions, issuance_amount, timestamp)
                 .await;
         }
 
@@ -747,14 +750,10 @@ pub mod test {
         }
         pub async fn initialize_with_timestamp(
             &mut self,
-            vip_transactions: u64,
-            vip_amount: Currency,
+            issuance_transactions: u64,
+            issuance_amount: Currency,
             timestamp: Timestamp,
         ) {
-            //
-            // initialize timestamp
-            //
-
             // reset data dirs
             let _ = tokio::fs::remove_dir_all("data/blocks").await;
             let _ = tokio::fs::create_dir_all("data/blocks").await;
@@ -774,9 +773,9 @@ pub mod test {
             // create first block
             let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
-            // generate UTXO-carrying VIP transactions
-            for _i in 0..vip_transactions {
-                let mut tx = Transaction::create_issuance_transaction(public_key, vip_amount);
+            // generate UTXO-carrying transactions
+            for _i in 0..issuance_transactions {
+                let mut tx = Transaction::create_issuance_transaction(public_key, issuance_amount);
                 tx.generate(&public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
@@ -784,7 +783,7 @@ pub mod test {
 
             {
                 let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-                // we have added VIP, so need to regenerate the merkle-root
+                // we have added txs, so need to regenerate the merkle-root
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
@@ -955,6 +954,7 @@ pub mod test {
             }
         }
     }
+
     struct TestConfiguration {}
 
     impl Debug for TestConfiguration {

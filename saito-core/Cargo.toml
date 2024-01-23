@@ -37,6 +37,7 @@ criterion = { version = "0.5.1", features = ["default", "html_reports"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [features]
+default = []
 locking-logs = []
 with-stats = []
 with-rayon = []
