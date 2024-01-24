@@ -408,16 +408,15 @@ impl Block {
             block.transactions.append(&mut cv.rebroadcasts);
         }
 
-        // fee transaction
+
+        // fee transactions
         //
-        // MUST BE ADDED AFTER ATR TRANSACTIONS -- this is the last tx in the block
+        // the fee transaction is unsigned, and added directly into the block 
+	// without additional processing.
         //
         if cv.fee_transaction.is_some() {
             debug!("adding fee transaction");
-            let mut fee_tx = cv.fee_transaction.unwrap();
-            let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
-            fee_tx.hash_for_signature = Some(hash_for_signature);
-            fee_tx.sign(private_key);
+            let fee_tx = cv.fee_transaction.unwrap();
             block.add_transaction(fee_tx);
         }
 
@@ -880,7 +879,7 @@ impl Block {
             self.transactions.len()
         );
         let mut cv = ConsensusValues::new();
-        let mut num_non_fee_transactions = 0;
+	let mut num_non_fee_transactions = 0;
 
         trace!("calculating total fees");
 
@@ -900,14 +899,14 @@ impl Block {
             if !transaction.is_fee_transaction() {
                 cv.total_fees += transaction.total_fees;
             } else {
-                //
-                // the fee transaction is the last transaction in the block, so we
-                // count the number of non-fee transactions in order to know the
-                // tx_ordinal of the fee transaction, which is used to figure out
-                // what the slips should look like and allow us to simply compare
-                // the fee transaction with that in the actual block.
-                //
-                num_non_fee_transactions += 1;
+	        //
+	        // the fee transaction is the last transaction in the block, so we
+	        // count the number of non-fee transactions in order to know the 
+		// tx_ordinal of the fee transaction, which is used to figure out
+		// what the slips should look like and allow us to simply compare
+		// the fee transaction with that in the actual block.
+	        //
+	        num_non_fee_transactions += 1;
                 cv.ft_num += 1;
                 cv.ft_index = Some(index);
             }
@@ -948,7 +947,9 @@ impl Block {
         // step.
         //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+            //
             // burn fee is "block production difficulty" (fee lockup cost)
+            //
             cv.expected_burnfee = BurnFee::calculate_burnfee_for_block(
                 previous_block.burnfee,
                 self.timestamp,
@@ -998,10 +999,11 @@ impl Block {
             cv.avg_variance = self.avg_variance;
 
             cv.expected_burnfee = self.burnfee;
-            cv.expected_difficulty = self.difficulty;
         }
 
+        //
         // calculate automatic transaction rebroadcasts / ATR / atr
+        //
         if self.id > GENESIS_PERIOD + 1 {
             trace!("calculating ATR");
 
@@ -1192,8 +1194,9 @@ impl Block {
         // if there is a golden ticket
         //
         if let Some(gt_index) = cv.gt_index {
-            trace!("!");
-            trace!("there is a golden ticket: {:?}", cv.gt_index);
+
+trace!("!");
+trace!("there is a golden ticket: {:?}", cv.gt_index);
 
             //
             // we fetch the random number for determining the payouts from the golden ticket
@@ -1218,8 +1221,8 @@ impl Block {
                 router1_payout = previous_block.total_fees - miner_payout;
                 router1_publickey = previous_block.find_winning_router(next_random_number);
 
-                trace!("!");
-                trace!("there is a miner publickey: {:?}", miner_publickey);
+trace!("!");
+trace!("there is a miner publickey: {:?}", miner_publickey);
 
                 //
                 // iterate our hash 2 times to accomodate for the iteration that was
@@ -1284,7 +1287,7 @@ impl Block {
                 output.amount = miner_payout;
                 output.slip_type = SlipType::MinerOutput;
                 output.slip_index = slip_index;
-                output.tx_ordinal = num_non_fee_transactions + 1;
+                output.tx_ordinal = num_non_fee_transactions+1;
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
@@ -1295,7 +1298,7 @@ impl Block {
                 output.amount = router1_payout;
                 output.slip_type = SlipType::RouterOutput;
                 output.slip_index = slip_index;
-                output.tx_ordinal = num_non_fee_transactions + 1;
+                output.tx_ordinal = num_non_fee_transactions+1;
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
@@ -1306,7 +1309,7 @@ impl Block {
                 output.amount = router2_payout;
                 output.slip_type = SlipType::RouterOutput;
                 output.slip_index = slip_index;
-                output.tx_ordinal = num_non_fee_transactions + 1;
+                output.tx_ordinal = num_non_fee_transactions+1;
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
@@ -1931,9 +1934,7 @@ impl Block {
         // for the hash-comparison to work.
         //
         if cv.ft_num > 0 {
-            if let (Some(ft_index), Some(fee_transaction_expected)) =
-                (cv.ft_index, cv.fee_transaction)
-            {
+            if let (Some(ft_index), Some(mut fee_transaction)) = (cv.ft_index, cv.fee_transaction) {
                 //
                 // no golden ticket? invalid
                 //
@@ -1945,18 +1946,22 @@ impl Block {
                 }
 
                 //
-                // the fee transaction is hashed to compare it with the one in the block
+                // the fee transaction we receive from the CV needs to be updated with
+                // block-specific data in the same way that all of the transactions in
+                // the block have been. we must do this prior to comparing them.
                 //
-                let fee_transaction_in_block = self.transactions.get(ft_index).unwrap();
-                let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
-                let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
+                fee_transaction.generate(&self.creator, ft_index as u64, self.id);
+                let checked_tx = self.transactions.get(ft_index).unwrap();
+
+                let hash1 = hash(&fee_transaction.serialize_for_signature());
+                let hash2 = hash(&checked_tx.serialize_for_signature());
                 if hash1 != hash2 {
                     error!(
-                        "ERROR 892032: block {} fee transaction doesn't match cv-expected fee transaction",
+                        "ERROR 892032: block {} fee transaction doesn't match cv fee transaction",
                         self.id
                     );
-                    info!("expected = {:?}", fee_transaction_expected);
-                    info!("actual   = {:?}", fee_transaction_in_block);
+                    info!("expected = {:?}", fee_transaction);
+                    info!("actual   = {:?}", checked_tx);
                     return false;
                 }
             }
