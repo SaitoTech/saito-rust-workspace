@@ -211,6 +211,8 @@ pub mod test {
                 let (mut mempool, _mempool_) =
                     lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
 
+                dbg!("block added to test manager blockchain 1");
+
                 let _ = blockchain
                     .add_block(
                         block,
@@ -221,6 +223,8 @@ pub mod test {
                         configs.deref(),
                     )
                     .await;
+
+                dbg!("block added to test manager blockchain 2");
 
                 self.latest_block_hash = blockchain.last_block_hash;
 
