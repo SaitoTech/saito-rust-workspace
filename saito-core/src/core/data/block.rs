@@ -943,9 +943,7 @@ impl Block {
         // step.
         //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-            //
             // burn fee is "block production difficulty" (fee lockup cost)
-            //
             cv.expected_burnfee = BurnFee::calculate_burnfee_for_block(
                 previous_block.burnfee,
                 self.timestamp,
@@ -995,11 +993,10 @@ impl Block {
             cv.avg_variance = self.avg_variance;
 
             cv.expected_burnfee = self.burnfee;
+            cv.expected_difficulty = self.difficulty;
         }
 
-        //
         // calculate automatic transaction rebroadcasts / ATR / atr
-        //
         if self.id > GENESIS_PERIOD + 1 {
             trace!("calculating ATR");
 
