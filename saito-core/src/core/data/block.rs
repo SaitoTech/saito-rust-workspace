@@ -408,27 +408,22 @@ impl Block {
             block.transactions.append(&mut cv.rebroadcasts);
         }
 
+
         // fee transactions
         //
-        // if a golden ticket is included in THIS block Saito uses the randomness
-        // associated with that golden ticket to create a fair output for the
-        // previous block.
+        // the fee transaction is unsigned, and added directly into the block 
+	// without additional processing.
+        //
         if cv.fee_transaction.is_some() {
             debug!("adding fee transaction");
-            // creator signs fee transaction
-            let mut fee_tx = cv.fee_transaction.unwrap();
-            let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
-            fee_tx.hash_for_signature = Some(hash_for_signature);
-            fee_tx.sign(private_key);
-            // and we add it to the block
+            let fee_tx = cv.fee_transaction.unwrap();
             block.add_transaction(fee_tx);
         }
 
         // update slips_spent_this_block so that we have a record of
         // how many times input slips are spent in this block. we will
-        // use this later to ensure there are no duplicates. this include
-        // during the fee transaction, so that we cannot pay a staker
-        // that is also paid this block otherwise.
+        // use this later to ensure there are no duplicates.
+        //
         for transaction in &block.transactions {
             if transaction.transaction_type != TransactionType::Fee {
                 for input in transaction.from.iter() {
@@ -884,6 +879,7 @@ impl Block {
             self.transactions.len()
         );
         let mut cv = ConsensusValues::new();
+	let mut num_non_fee_transactions = 0;
 
         trace!("calculating total fees");
 
@@ -903,6 +899,14 @@ impl Block {
             if !transaction.is_fee_transaction() {
                 cv.total_fees += transaction.total_fees;
             } else {
+	        //
+	        // the fee transaction is the last transaction in the block, so we
+	        // count the number of non-fee transactions in order to know the 
+		// tx_ordinal of the fee transaction, which is used to figure out
+		// what the slips should look like and allow us to simply compare
+		// the fee transaction with that in the actual block.
+	        //
+	        num_non_fee_transactions += 1;
                 cv.ft_num += 1;
                 cv.ft_index = Some(index);
             }
@@ -1190,6 +1194,10 @@ impl Block {
         // if there is a golden ticket
         //
         if let Some(gt_index) = cv.gt_index {
+
+trace!("!");
+trace!("there is a golden ticket: {:?}", cv.gt_index);
+
             //
             // we fetch the random number for determining the payouts from the golden ticket
             // in our current block (this block). we will then continually hash it to generate
@@ -1212,6 +1220,9 @@ impl Block {
                 miner_publickey = golden_ticket.public_key;
                 router1_payout = previous_block.total_fees - miner_payout;
                 router1_publickey = previous_block.find_winning_router(next_random_number);
+
+trace!("!");
+trace!("there is a miner publickey: {:?}", miner_publickey);
 
                 //
                 // iterate our hash 2 times to accomodate for the iteration that was
@@ -1276,6 +1287,8 @@ impl Block {
                 output.amount = miner_payout;
                 output.slip_type = SlipType::MinerOutput;
                 output.slip_index = slip_index;
+                output.tx_ordinal = num_non_fee_transactions+1;
+                output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             }
@@ -1285,6 +1298,8 @@ impl Block {
                 output.amount = router1_payout;
                 output.slip_type = SlipType::RouterOutput;
                 output.slip_index = slip_index;
+                output.tx_ordinal = num_non_fee_transactions+1;
+                output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             }
@@ -1294,6 +1309,8 @@ impl Block {
                 output.amount = router2_payout;
                 output.slip_type = SlipType::RouterOutput;
                 output.slip_index = slip_index;
+                output.tx_ordinal = num_non_fee_transactions+1;
+                output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             }
