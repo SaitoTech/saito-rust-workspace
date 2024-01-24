@@ -986,6 +986,7 @@ impl Block {
                 / GENESIS_PERIOD as i128;
             cv.avg_income = (cv.avg_income as i128 - adjustment) as Currency;
         } else {
+
             //
             // if there is no previous block, the burn fee is not adjusted. validation
             // rules will cause the block to fail unless it is the first block. average
@@ -993,6 +994,10 @@ impl Block {
             //
             cv.avg_income = self.avg_income;
             cv.avg_variance = self.avg_variance;
+
+	    cv.expected_burnfee = self.burnfee;
+
+
         }
 
         //
