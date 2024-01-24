@@ -986,7 +986,6 @@ impl Block {
                 / GENESIS_PERIOD as i128;
             cv.avg_income = (cv.avg_income as i128 - adjustment) as Currency;
         } else {
-
             //
             // if there is no previous block, the burn fee is not adjusted. validation
             // rules will cause the block to fail unless it is the first block. average
@@ -995,9 +994,7 @@ impl Block {
             cv.avg_income = self.avg_income;
             cv.avg_variance = self.avg_variance;
 
-	    cv.expected_burnfee = self.burnfee;
-
-
+            cv.expected_burnfee = self.burnfee;
         }
 
         //
@@ -2438,7 +2435,7 @@ mod tests {
         let mut t = TestManager::new();
 
         // Initialize the test manager
-        t.initialize(5_000, 10_000_000).await;
+        t.initialize(250, 10_000_000).await;
 
         let latest_block = t.get_latest_block().await;
 
