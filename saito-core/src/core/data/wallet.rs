@@ -502,7 +502,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_transfer_with_exact_funds() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         let mut t = TestManager::new();
         t.initialize(1, 500).await;
 
