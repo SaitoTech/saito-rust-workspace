@@ -409,10 +409,9 @@ impl Block {
         }
 
 
-        // fee transactions
+        // fee transaction
         //
-        // the fee transaction is unsigned, and added directly into the block 
-	// without additional processing.
+        // MUST BE ADDED AFTER ATR TRANSACTIONS -- this is the last tx in the block
         //
         if cv.fee_transaction.is_some() {
             debug!("adding fee transaction");
@@ -1932,7 +1931,7 @@ trace!("there is a miner publickey: {:?}", miner_publickey);
         //
         if cv.ft_num > 0 {
 
-            if let (Some(ft_index), Some(mut fee_transaction)) = (cv.ft_index, cv.fee_transaction) {
+            if let (Some(ft_index), Some(fee_transaction_expected)) = (cv.ft_index, cv.fee_transaction) {
 
                 //
                 // no golden ticket? invalid
@@ -1947,15 +1946,16 @@ trace!("there is a miner publickey: {:?}", miner_publickey);
                 //
                 // the fee transaction is hashed to compare it with the one in the block
                 //
-                let hash1 = hash(&fee_transaction.serialize_for_signature());
-                let hash2 = hash(&checked_tx.serialize_for_signature());
+	        let fee_transaction_in_block = self.transactions.get(ft_index).unwrap();
+                let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
+                let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
                 if hash1 != hash2 {
                     error!(
-                        "ERROR 892032: block {} fee transaction doesn't match cv fee transaction",
+                        "ERROR 892032: block {} fee transaction doesn't match cv-expected fee transaction",
                         self.id
                     );
-                    info!("expected = {:?}", fee_transaction);
-                    info!("actual   = {:?}", checked_tx);
+                    info!("expected = {:?}", fee_transaction_expected);
+                    info!("actual   = {:?}", fee_transaction_in_block);
                     return false;
                 }
             }
