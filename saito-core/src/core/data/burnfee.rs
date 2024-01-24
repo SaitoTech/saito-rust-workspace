@@ -1,4 +1,4 @@
-use log::{debug, trace};
+use log::debug;
 use std::time::Duration;
 
 use crate::common::defs::{Currency, Timestamp};

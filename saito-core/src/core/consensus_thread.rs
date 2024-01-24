@@ -9,9 +9,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
-    STAT_BIN_COUNT,
+    push_lock, PrintForLog, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
