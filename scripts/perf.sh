@@ -5,7 +5,7 @@ config_file="./scripts/configs/perf_config.json"
 main_node_dir=$(jq -r '.main_node_dir' $config_file)
 spammer_node_dir=$(jq -r '.spammer_node_dir' $config_file)
 verification_threads=$(jq -r '.verification_threads' $config_file)
-tx_count=$(jq -r '.tx_count' $config_file)
+burst_count=$(jq -r '.burst_count' $config_file)
 tx_size=$(jq -r '.tx_size' $config_file)
 
 is_process_running() {
@@ -35,11 +35,11 @@ jq ".server.verification_threads = $verification_threads" $main_node_config > te
 
 
 spammer_node_config="$spammer_node_dir/configs/config.json"
-jq ".spammer.tx_count = $tx_count | .spammer.tx_size = $tx_size" $spammer_node_config > temp.json && mv temp.json $spammer_node_config
+jq ".spammer.burst_count = $burst_count | .spammer.tx_size = $tx_size" $spammer_node_config > temp.json && mv temp.json $spammer_node_config
 
 
 cd $main_node_dir
-pm2 start "RUST_LOG=debug cargo run" --name "main_node" 
+pm2 start "RUST_LOG=debug cargo run" --name "main_node" --no-autorestart
 until is_process_running "main_node"; do
     sleep 1
 done
@@ -47,7 +47,7 @@ echo "Main node is running."
 
 
 cd $spammer_node_dir
-pm2 start "RUST_LOG=debug cargo run" --name "spammer_node" 
+pm2 start "RUST_LOG=debug cargo run" --name "spammer_node" --no-autorestart
 echo "Spammer node is started."
 
 # create csv performance metrics
