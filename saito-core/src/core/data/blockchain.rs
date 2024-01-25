@@ -1817,7 +1817,6 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_id(), 1);
         }
 
-
         //
         // block 2
         //
