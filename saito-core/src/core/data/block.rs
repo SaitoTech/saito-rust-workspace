@@ -408,7 +408,6 @@ impl Block {
             block.transactions.append(&mut cv.rebroadcasts);
         }
 
-
         // fee transaction
         //
         // MUST BE ADDED AFTER ATR TRANSACTIONS -- this is the last tx in the block
@@ -878,7 +877,7 @@ impl Block {
             self.transactions.len()
         );
         let mut cv = ConsensusValues::new();
-	let mut num_non_fee_transactions = 0;
+        let mut num_non_fee_transactions = 0;
 
         trace!("calculating total fees");
 
@@ -898,14 +897,14 @@ impl Block {
             if !transaction.is_fee_transaction() {
                 cv.total_fees += transaction.total_fees;
             } else {
-	        //
-	        // the fee transaction is the last transaction in the block, so we
-	        // count the number of non-fee transactions in order to know the 
-		// tx_ordinal of the fee transaction, which is used to figure out
-		// what the slips should look like and allow us to simply compare
-		// the fee transaction with that in the actual block.
-	        //
-	        num_non_fee_transactions += 1;
+                //
+                // the fee transaction is the last transaction in the block, so we
+                // count the number of non-fee transactions in order to know the
+                // tx_ordinal of the fee transaction, which is used to figure out
+                // what the slips should look like and allow us to simply compare
+                // the fee transaction with that in the actual block.
+                //
+                num_non_fee_transactions += 1;
                 cv.ft_num += 1;
                 cv.ft_index = Some(index);
             }
@@ -1190,9 +1189,8 @@ impl Block {
         // if there is a golden ticket
         //
         if let Some(gt_index) = cv.gt_index {
-
-trace!("!");
-trace!("there is a golden ticket: {:?}", cv.gt_index);
+            trace!("!");
+            trace!("there is a golden ticket: {:?}", cv.gt_index);
 
             //
             // we fetch the random number for determining the payouts from the golden ticket
@@ -1217,8 +1215,8 @@ trace!("there is a golden ticket: {:?}", cv.gt_index);
                 router1_payout = previous_block.total_fees - miner_payout;
                 router1_publickey = previous_block.find_winning_router(next_random_number);
 
-trace!("!");
-trace!("there is a miner publickey: {:?}", miner_publickey);
+                trace!("!");
+                trace!("there is a miner publickey: {:?}", miner_publickey);
 
                 //
                 // iterate our hash 2 times to accomodate for the iteration that was
@@ -1283,7 +1281,7 @@ trace!("there is a miner publickey: {:?}", miner_publickey);
                 output.amount = miner_payout;
                 output.slip_type = SlipType::MinerOutput;
                 output.slip_index = slip_index;
-                output.tx_ordinal = num_non_fee_transactions+1;
+                output.tx_ordinal = num_non_fee_transactions + 1;
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
@@ -1294,7 +1292,7 @@ trace!("there is a miner publickey: {:?}", miner_publickey);
                 output.amount = router1_payout;
                 output.slip_type = SlipType::RouterOutput;
                 output.slip_index = slip_index;
-                output.tx_ordinal = num_non_fee_transactions+1;
+                output.tx_ordinal = num_non_fee_transactions + 1;
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
@@ -1305,7 +1303,7 @@ trace!("there is a miner publickey: {:?}", miner_publickey);
                 output.amount = router2_payout;
                 output.slip_type = SlipType::RouterOutput;
                 output.slip_index = slip_index;
-                output.tx_ordinal = num_non_fee_transactions+1;
+                output.tx_ordinal = num_non_fee_transactions + 1;
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
@@ -1930,9 +1928,9 @@ trace!("there is a miner publickey: {:?}", miner_publickey);
         // for the hash-comparison to work.
         //
         if cv.ft_num > 0 {
-
-            if let (Some(ft_index), Some(fee_transaction_expected)) = (cv.ft_index, cv.fee_transaction) {
-
+            if let (Some(ft_index), Some(fee_transaction_expected)) =
+                (cv.ft_index, cv.fee_transaction)
+            {
                 //
                 // no golden ticket? invalid
                 //
@@ -1946,7 +1944,7 @@ trace!("there is a miner publickey: {:?}", miner_publickey);
                 //
                 // the fee transaction is hashed to compare it with the one in the block
                 //
-	        let fee_transaction_in_block = self.transactions.get(ft_index).unwrap();
+                let fee_transaction_in_block = self.transactions.get(ft_index).unwrap();
                 let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
                 let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
                 if hash1 != hash2 {
