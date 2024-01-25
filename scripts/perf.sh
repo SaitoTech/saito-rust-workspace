@@ -1,6 +1,6 @@
 #!/bin/bash
 
-config_file="./configs/perf_config.json"
+config_file="./scripts/configs/perf_config.json"
 
 main_node_dir=$(jq -r '.main_node_dir' $config_file)
 spammer_node_dir=$(jq -r '.spammer_node_dir' $config_file)
