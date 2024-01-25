@@ -1,6 +1,6 @@
 {
-  "main_node_dir": "/Users/onyejivictor_1/Documents/code/2024/saito/saito-rust/saito-rust",
-  "spammer_node_dir": "/Users/onyejivictor_1/Documents/code/2024/saito/saito-rust/saito-spammer",
+  "main_node_dir": "path/to/saito-rust",
+  "spammer_node_dir": "path/to/saito-spammer",
   "verification_threads": 2,
   "tx_size": 0,
   "burst_count": 50
