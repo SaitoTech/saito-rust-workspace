@@ -124,7 +124,7 @@ impl MerkleTree {
             }
 
             // Compute the node hashes in parallel
-            iterate_mut!(nodes).all(|node| MerkleTree::generate_hash(node));
+            iterate_mut!(nodes).all(MerkleTree::generate_hash);
             // Collect the next set of leaves for the computation
             leaves.clear();
 
