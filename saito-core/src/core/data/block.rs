@@ -414,7 +414,10 @@ impl Block {
         //
         if cv.fee_transaction.is_some() {
             debug!("adding fee transaction");
-            let fee_tx = cv.fee_transaction.unwrap();
+            let mut fee_tx = cv.fee_transaction.unwrap();
+            let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
+            fee_tx.hash_for_signature = Some(hash_for_signature);
+            fee_tx.sign(private_key);
             block.add_transaction(fee_tx);
         }
 
