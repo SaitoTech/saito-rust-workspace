@@ -74,12 +74,12 @@ impl MerkleTree {
         let mut leaves: LinkedList<Box<MerkleTreeNode>> = LinkedList::new();
 
         // Create leaves for the Merkle tree
-        for index in 0..transactions.len() {
-            if transactions[index].txs_replacements > 1 {
-                for _ in 0..transactions[index].txs_replacements {
+        for (index, tx) in transactions.iter().enumerate() {
+            if tx.txs_replacements > 1 {
+                for _ in 0..tx.txs_replacements {
                     leaves.push_back(Box::new(MerkleTreeNode::new(
                         NodeType::Transaction { index },
-                        Some(transactions[index].hash_for_signature.unwrap_or([0; 32])),
+                        Some(tx.hash_for_signature.unwrap_or([0; 32])),
                         1,
                         true, // is_spv
                     )));
@@ -87,7 +87,7 @@ impl MerkleTree {
             } else {
                 leaves.push_back(Box::new(MerkleTreeNode::new(
                     NodeType::Transaction { index },
-                    transactions[index].hash_for_signature,
+                    tx.hash_for_signature,
                     1,
                     false, // is_spv
                 )));
@@ -155,9 +155,9 @@ impl MerkleTree {
     }
 
     pub fn create_clone(&self) -> Box<MerkleTree> {
-        return Box::new(MerkleTree {
+        Box::new(MerkleTree {
             root: MerkleTree::clone_node(Some(&self.root)).unwrap(),
-        });
+        })
     }
 
     pub fn prune(&mut self, prune_func: impl Fn(usize) -> bool) {
@@ -178,7 +178,7 @@ impl MerkleTree {
             count += right.as_ref().unwrap().count;
         }
 
-        return count;
+        count
     }
 
     fn generate_hash(node: &mut MerkleTreeNode) -> bool {
@@ -218,11 +218,11 @@ impl MerkleTree {
         match &node.node_type {
             NodeType::Node { left, right } => {
                 if left.is_some() {
-                    MerkleTree::traverse_node(mode, &left.as_ref().unwrap(), read_func);
+                    MerkleTree::traverse_node(mode, left.as_ref().unwrap(), read_func);
                 }
 
                 if right.is_some() {
-                    MerkleTree::traverse_node(mode, &right.as_ref().unwrap(), read_func);
+                    MerkleTree::traverse_node(mode, right.as_ref().unwrap(), read_func);
                 }
             }
             NodeType::Transaction { .. } => {}
