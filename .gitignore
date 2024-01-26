@@ -5,3 +5,4 @@ dist/
 .DS_Store
 .vscode
 configs/config.json
+/scripts/perf/perf_config.json

@@ -1,7 +1,16 @@
 {
   "main_node_dir": "absolute/path/to/saito-rust/saito-rust",
   "spammer_node_dir": "/absolute/path/to//saito-spammer",
-  "verification_threads": 2,
-  "tx_payload_size": 3,
-  "burst_count": 20
+  "perf_tests": [
+    {
+      "verification_threads": 2,
+      "tx_payload_size": 3,
+      "burst_count": 20
+    },
+    {
+      "verification_threads": 10,
+      "tx_payload_size": 5,
+      "burst_count": 15
+    }
+  ]
 }
