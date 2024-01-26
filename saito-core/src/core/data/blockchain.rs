@@ -563,23 +563,18 @@ impl Blockchain {
         // self.set_fork_id(fork_id);
 
         // ensure pruning of next block OK will have the right CVs
-        //
         if self.get_latest_block_id() > GENESIS_PERIOD {
             let pruned_block_hash = self.blockring.get_longest_chain_block_hash_at_block_id(
                 self.get_latest_block_id() - GENESIS_PERIOD,
             );
 
-            assert_ne!(pruned_block_hash, [0; 32]);
-
-            //
             // TODO
             //
             // handle this more efficiently - we should be able to prepare the block
             // in advance so that this doesn't take up time in block production. we
             // need to generate_metadata_hashes so that the slips know the utxo_key
             // to use to check the utxoset.
-            //
-            {
+            if pruned_block_hash != [0; 32] {
                 let pblock = self.get_mut_block(&pruned_block_hash).unwrap();
                 pblock
                     .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
@@ -592,9 +587,8 @@ impl Blockchain {
             block_type,
             tx_count
         );
-        if network.is_some() {
+        if let Some(network) = network {
             network
-                .unwrap()
                 .io_interface
                 .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block_id));
         }
@@ -1086,7 +1080,8 @@ impl Blockchain {
         let block = self.blocks.get(block_hash).unwrap();
         // assert_eq!(block.block_type, BlockType::Full);
 
-        let does_block_validate = block.validate(self, &self.utxoset, configs).await;
+        let does_block_validate =
+            current_wind_index == 0 || block.validate(self, &self.utxoset, configs).await;
 
         if does_block_validate {
             // blockring update

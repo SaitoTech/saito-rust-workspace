@@ -1261,6 +1261,13 @@ impl Block {
                         next_random_number = hash(next_random_number.as_slice());
                     }
                 }
+            } else {
+                info!(
+                    "previous block : {:?} not found for block : {:?} at index : {:?}",
+                    self.previous_block_hash.to_hex(),
+                    self.hash.to_hex(),
+                    self.id
+                );
             }
 
             //
@@ -1664,18 +1671,14 @@ impl Block {
             return true;
         }
 
-        //
         // verify block has at least one transaction
-        //
         if self.transactions.is_empty() && self.id != 1 && !blockchain.blocks.is_empty() {
             // we check blockchain blocks to make sure #1 block can be created without transactions
             error!("ERROR 424342: block does not validate as it has no transactions",);
             return false;
         }
 
-        //
         // verify block is signed by creator
-        //
         if !verify_signature(&self.pre_hash, &self.signature, &self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
