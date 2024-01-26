@@ -1,7 +1,0 @@
-{
-  "main_node_dir": "path/to/saito-rust",
-  "spammer_node_dir": "path/to/saito-spammer",
-  "verification_threads": 2,
-  "tx_size": 0,
-  "burst_count": 50
-}
