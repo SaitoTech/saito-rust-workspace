@@ -1,2 +1,2 @@
 tx_rate_from_spammer,tx_size,verification_thread_count,max_tx_rate_at_network_thread,max_tx_rate_at_verification_threads,total_txs,block_count,longest_chain_length,total_block_size,average_block_size,time_to_load_blocks,time_to_fetch_blocks,ram_after_initial_run,ram_after_loading_blocks,ram_after_fetching_blocks
-200,0,2,1006,49.92,99.83,3,3,136,45,N/A,N/A,N/A,N/A,N/A
+50,0,2,1006,24.99,49.98,4,4,136,34,2,2,5867.13 MB,5867.18 MB,5870.77 MB
