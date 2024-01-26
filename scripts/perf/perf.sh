@@ -55,26 +55,48 @@ while true; do
         echo "Stopping main node."
         pm2 stop main_node
 
-        # Extract and calculate values for CSV
+
         max_tx_rate_network_thread=$(grep "network::incoming_msgs" "$stats_file" | awk '{print $5}' | tr -d ',' | sort -nr | head -n 1)
         max_tx_rate_verification_threads=$(grep "verification_.*::processed_txs" "$stats_file" | awk '{print $11}' | tr -d ',' | sort -nr | head -n 1)
         total_txs=$(grep "routing::incoming_msgs" "$stats_file" | awk '{print $11}' | tr -d ',' | sort -nr | head -n 1)
         block_count=$(grep "blockchain::state" "$stats_file" | awk '{print $8}' | tr -d ',' | sort -nr | head -n 1)
         longest_chain_length=$(grep "blockchain::state" "$stats_file" | awk '{print $11}' | tr -d ',' | sort -nr | head -n 1)
 
-        # Calculate total block size in kilobytes
+
         total_block_size=$(du -ck "$main_node_dir/data/blocks/"* | grep "total" | awk '{print $1}')
         num_block_files=$(find "$main_node_dir/data/blocks/" -type f | wc -l)
         average_block_size=$(echo "$total_block_size $num_block_files" | awk '{print int($1/$2)}')
 
-        # Placeholder values
-        time_to_load_blocks="N/A"
+
+        
+        echo "Restarting main node and monitoring for block loading."
+        pm2 start "main_node"
+        start_time=$(date +%s)
+
+
+
+        output_file="$main_node_dir/main_node_output.log"
+        pm2 logs main_node > "$output_file" 2>&1 &
+
+   
+        while ! grep -m1 "0 blocks remaining to be loaded" "$output_file" > /dev/null; do
+            sleep 5 
+        done
+        end_time=$(date +%s)
+        time_to_load_blocks=$((end_time - start_time))
+
         time_to_fetch_blocks="N/A"
         ram_after_initial_run="N/A"
         ram_after_loading_blocks="N/A"
         ram_after_fetching_blocks="N/A"
 
-        # Generate CSV headers in snake_case
+
+
+
+
+
+
+
 echo "tx_rate_from_spammer,tx_size,verification_thread_count,max_tx_rate_at_network_thread,max_tx_rate_at_verification_threads,total_txs,block_count,longest_chain_length,total_block_size,average_block_size,time_to_load_blocks,time_to_fetch_blocks,ram_after_initial_run,ram_after_loading_blocks,ram_after_fetching_blocks" > "$output_csv"
 
 # Write the data in snake_case format to the CSV file
