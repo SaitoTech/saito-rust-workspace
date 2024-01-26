@@ -6,3 +6,5 @@ perf.data.old
 data/saito.stats
 data/issuance/issuance
 data/issuance.file
+perf_result.csv
+main_node_output.log 
