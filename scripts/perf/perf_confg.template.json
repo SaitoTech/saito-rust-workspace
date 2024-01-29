@@ -1,6 +1,12 @@
 {
-  "main_node_dir": "absolute/path/to/saito-rust/saito-rust",
-  "spammer_node_dir": "/absolute/path/to//saito-spammer",
+  "main_node": {
+    "ip": "",
+    "port": ""
+  },
+  "spammer_node": {
+    "ip": "",
+    "port": ""
+  },
   "perf_tests": [
     {
       "verification_threads": 2,
