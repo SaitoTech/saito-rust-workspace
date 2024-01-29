@@ -46,7 +46,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
         total_rebroadcast_staking_payouts_nolan: this.instance.total_rebroadcast_staking_payouts_nolan,
         rebroadcast_hash: this.instance.rebroadcast_hash,
         nolan_falling_off_chain: this.instance.nolan_falling_off_chain,
-        staking_treasury: this.instance.staking_treasury,
         avg_income: this.instance.avg_income,
         avg_variance: this.instance.avg_variance,
         timestamp: this.instance.timestamp,
