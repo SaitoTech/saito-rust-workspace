@@ -71,7 +71,7 @@ get_ram_usage() {
 }
 
 clear_blocks_directory() {
-    echo "$1"
+    # echo "$1"
     dir_path="$1/data/blocks"
     if [ -d "$dir_path" ]; then
         rm -rf "$dir_path"/*
@@ -101,7 +101,7 @@ start_pm2_service() {
         pm2 start "RUST_LOG=debug cargo run" --name "$service_name" --no-autorestart
     )
     
-    echo "Back to script directory: $SCRIPT_DIR"
+    # echo "Back to script directory: $SCRIPT_DIR"
 }
 
 create_or_append_issuance() {
@@ -118,6 +118,29 @@ create_or_append_issuance() {
 }
 
 
+loader() {
+    local i=0
+    local max_dots=30
+    local delay=0.5 
+
+    while true; do
+        STATUS=$(pm2 show spammer_node | grep "status" | awk '{print $4}')
+        if [ "$STATUS" = "online" ]; then
+            printf "\rProcessing " 
+            for (( j=0; j<i; j++ )); do
+                printf "."
+            done
+
+            ((i=(i+1)%max_dots))
+
+            sleep $delay
+        else
+            break
+        fi
+    done
+
+    printf "\r%s\n" "$(for (( j=0; j<max_dots; j++ )); do printf " "; done)" 
+}
 
 create_or_append_issuance "$main_node_dir"
 install_pm2
@@ -149,8 +172,11 @@ for config in $test_configs; do
     stats_file="$main_node_dir/data/saito.stats"
     output_csv="./perf_result.csv"
 
+
+
+    loader
+
     STATUS=$(pm2 show spammer_node | grep "status" | awk '{print $4}')
-    echo "processing"
 
     if [ "$STATUS" != "online" ]; then
         echo "Spammer process has stopped."
