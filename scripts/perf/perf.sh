@@ -96,7 +96,7 @@ for config in $test_configs; do
 
     if [ "$STATUS" != "online" ]; then
         echo "Spammer process has stopped."
-        echo "Stopping main node."
+        # echo "Stopping main node."
         pm2 stop main_node
 
 
@@ -113,8 +113,8 @@ for config in $test_configs; do
 
 
                  # Restart main node
-                echo "Restarting main node and monitoring for block loading."
-                pm2 start "main_node"
+                # echo "Restarting main node and monitoring for block loading."
+                pm2 restart "main_node"
                 start_time=$(date +%s)
 
                 output_file="$main_node_dir/main_node_output.log"
