@@ -1081,7 +1081,7 @@ impl Blockchain {
         // assert_eq!(block.block_type, BlockType::Full);
 
         let does_block_validate =
-            current_wind_index == 0 || block.validate(self, &self.utxoset, configs).await;
+            current_wind_index == 0 || block.validate(self, &self.utxoset, configs, storage).await;
 
         if does_block_validate {
             // blockring update

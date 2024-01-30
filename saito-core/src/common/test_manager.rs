@@ -211,8 +211,6 @@ pub mod test {
                 let (mut mempool, _mempool_) =
                     lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
 
-                dbg!("block added to test manager blockchain 1");
-
                 let _ = blockchain
                     .add_block(
                         block,
@@ -224,11 +222,7 @@ pub mod test {
                     )
                     .await;
 
-                dbg!("block added to test manager blockchain 2");
-
                 self.latest_block_hash = blockchain.last_block_hash;
-
-                dbg!("block added to test manager blockchain");
             }
         }
 
@@ -555,6 +549,7 @@ pub mod test {
                 &private_key,
                 None,
                 configs.deref(),
+                &self.storage,
             )
             .await;
             block.generate();
@@ -824,7 +819,7 @@ pub mod test {
             let timestamp = create_timestamp();
 
             let genblock: Block = mempool
-                .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                .bundle_genesis_block(&mut blockchain, timestamp, configs.deref(), &self.storage)
                 .await;
             let _res = blockchain
                 .add_block(

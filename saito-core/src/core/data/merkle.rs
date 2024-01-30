@@ -333,7 +333,7 @@ mod tests {
         for i in 0..3 {
             // Use 3 for an odd number of transactions
             let mut transaction = Transaction::default();
-            transaction.timestamp = i as u64;
+            transaction.timestamp = i;
             transaction.sign(&wallet.private_key);
             transactions.push(transaction);
         }

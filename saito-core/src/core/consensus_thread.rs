@@ -151,7 +151,12 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
                     let block = mempool
-                        .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                        .bundle_genesis_block(
+                            &mut blockchain,
+                            timestamp,
+                            configs.deref(),
+                            &self.storage,
+                        )
                         .await;
 
                     let _res = blockchain
@@ -217,6 +222,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         timestamp,
                         gt_result.clone(),
                         configs.deref(),
+                        &self.storage,
                     )
                     .await;
             }
