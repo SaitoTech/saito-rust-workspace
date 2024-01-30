@@ -27,6 +27,20 @@ is_process_running() {
     return $?
 }
 
+get_ram_usage() {
+    os_name=$(uname -s)
+    case "$os_name" in
+        Darwin) # 
+            echo $(vm_stat | awk -F': ' '/Pages (active|inactive|wired down)/ {used+=$2} END {print used * 4096 / 1048576 " MB"}')
+            ;;
+        Linux) 
+            echo $(free -m | awk '/Mem:/ {print $3 " MB"}')
+            ;;
+        *)
+            echo "Unsupported OS: $os_name"
+            ;;
+    esac
+}
 
 clear_blocks_directory() {
     echo "$1"
@@ -131,13 +145,13 @@ for config in $test_configs; do
                 time_to_load_blocks=$((end_time - start_time))
 
                 # Check RAM usage after loading blocks
-                ram_after_loading_blocks=$(vm_stat | awk -F': ' '/Pages (active|inactive|wired down)/ {used+=$2} END {print used * 4096 / 1048576 " MB"}')
+                ram_after_loading_blocks=$(get_ram_usage)
 
                 # Wait for 'starting websocket server' to measure initial RAM usage
                 while ! grep -m1 "starting websocket server" "$output_file" > /dev/null; do
                     sleep 1
                 done
-                ram_after_initial_run=$(vm_stat | awk -F': ' '/Pages (active|inactive|wired down)/ {used+=$2} END {print used * 4096 / 1048576 " MB"}')
+                ram_after_initial_run=$(get_ram_usage)
 
                 # check if main node has properly started
                 until is_process_running "main_node"; do
@@ -171,7 +185,7 @@ for config in $test_configs; do
 
                 fetch_end_time=$(date +%s)
                 time_to_fetch_blocks=$((fetch_end_time - fetch_start_time))
-                ram_after_fetching_blocks=$(vm_stat | awk -F': ' '/Pages (active|inactive|wired down)/ {used+=$2} END {print used * 4096 / 1048576 " MB"}')
+                ram_after_fetching_blocks=$(get_ram_usage)
 
 
 
