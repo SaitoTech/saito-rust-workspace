@@ -5,8 +5,6 @@ SCRIPT_DIR=$(dirname "$0")
 
 cd "$SCRIPT_DIR"
 
-
-
 config_file="./perf_config.json"
 
 get_config_value() {
@@ -15,7 +13,7 @@ get_config_value() {
 
 main_node_dir=$(get_config_value 'main_node_dir')
 spammer_node_dir=$(get_config_value 'spammer_node_dir')
-output_csv="$main_node_dir/perf_result.csv"
+output_csv="./perf_result.csv"
 
 
 echo "tx_rate_from_spammer,tx_payload_size,verification_thread_count,max_tx_rate_at_network_thread,max_tx_rate_at_verification_threads,total_txs,block_count,longest_chain_length,total_block_size,average_block_size,time_to_load_blocks,time_to_fetch_blocks,ram_after_initial_run,ram_after_loading_blocks,ram_after_fetching_blocks" > "$output_csv"
@@ -26,6 +24,36 @@ is_process_running() {
     pm2 show "$1" > /dev/null 2>&1
     return $?
 }
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$@" > /dev/null 2>&1
+}
+
+
+install_pm2() {
+    echo "Checking for PM2 installation..."
+
+    if command_exists pm2; then
+        echo "PM2 is already installed."
+    else
+        echo "PM2 not found. Installing PM2..."
+
+        if command_exists node && command_exists npm; then
+            echo "Node.js and npm are already installed."
+        else
+            echo "Installing Node.js and npm..."
+
+            curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+        fi
+
+        sudo npm install -g pm2
+
+        echo "PM2 has been installed."
+    fi
+}
+
 
 get_ram_usage() {
     os_name=$(uname -s)
@@ -75,7 +103,24 @@ start_pm2_service() {
     
     echo "Back to script directory: $SCRIPT_DIR"
 }
-# Iterate over each test configuration
+
+create_or_append_issuance() {
+    local dir="$1/data/issuance"
+    local file="$dir/issuance"
+
+    mkdir -p "$dir"
+
+    if [ -f "$file" ]; then
+        echo "100000	v4S4wiwJQVP3fNZkpYLG59PFNMXmHnNNpE4kREfCeJic	Normal" >> "$file"
+    else
+        echo "100000	v4S4wiwJQVP3fNZkpYLG59PFNMXmHnNNpE4kREfCeJic	Normal" > "$file"
+    fi
+}
+
+
+
+create_or_append_issuance "$main_node_dir"
+install_pm2
 test_configs=$(jq -c '.perf_tests[]' "$config_file")
 for config in $test_configs; do
     echo "Running test with configuration: $config"
@@ -84,7 +129,6 @@ for config in $test_configs; do
     burst_count=$(echo "$config" | jq '.burst_count')
     tx_payload_size=$(echo "$config" | jq '.tx_payload_size')
 
-    # Clear directories, update config files, and start services
     clear_blocks_directory "$main_node_dir"
     clear_blocks_directory "$spammer_node_dir"
 
@@ -103,7 +147,7 @@ for config in $test_configs; do
 
     while true; do
     stats_file="$main_node_dir/data/saito.stats"
-    output_csv="$main_node_dir/perf_result.csv"
+    output_csv="./perf_result.csv"
 
     STATUS=$(pm2 show spammer_node | grep "status" | awk '{print $4}')
     echo "processing"
