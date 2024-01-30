@@ -1,4 +1,5 @@
 use std::collections::vec_deque::VecDeque;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,6 +19,7 @@ use crate::core::data::burnfee::BurnFee;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::hash;
 use crate::core::data::golden_ticket::GoldenTicket;
+use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType};
 use crate::core::data::wallet::Wallet;
 use crate::{iterate, lock_for_read};
@@ -156,6 +158,7 @@ impl Mempool {
         current_timestamp: Timestamp,
         gt_tx: Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),
+        storage: &Storage,
     ) -> Option<Block> {
         let previous_block_hash: SaitoHash;
         let public_key;
@@ -183,6 +186,7 @@ impl Mempool {
             &private_key,
             gt_tx,
             configs,
+            storage,
         )
         .await;
         block.generate();
@@ -202,6 +206,7 @@ impl Mempool {
         blockchain: &mut Blockchain,
         current_timestamp: Timestamp,
         configs: &(dyn Configuration + Send + Sync),
+        storage: &Storage,
     ) -> Block {
         debug!("bundling genesis block...");
         let public_key;
@@ -220,6 +225,7 @@ impl Mempool {
             &private_key,
             None,
             configs,
+            storage,
         )
         .await;
         block.generate();
@@ -445,7 +451,7 @@ mod tests {
                 ts + 120000,
                 &None,
                 configs.deref(),
-                &public_key
+                &public_key,
             )
             .await
             .is_some());
