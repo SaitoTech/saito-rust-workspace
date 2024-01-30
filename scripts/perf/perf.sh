@@ -1,7 +1,13 @@
 
 #!/bin/bash
 
-config_file="./scripts/perf/perf_config.json"
+SCRIPT_DIR=$(dirname "$0")
+
+cd "$SCRIPT_DIR"
+
+
+
+config_file="./perf_config.json"
 
 get_config_value() {
     jq -r ".$1" "$config_file"
@@ -44,12 +50,16 @@ update_config_file() {
 }
 
 start_pm2_service() {
-    
     local dir="$1"
     local service_name="$2"
     echo $dir
-    cd "$dir"
-    pm2 start "RUST_LOG=debug cargo run" --name "$service_name" --no-autorestart
+
+    (
+        cd "$dir" || exit
+        pm2 start "RUST_LOG=debug cargo run" --name "$service_name" --no-autorestart
+    )
+    
+    echo "Back to script directory: $SCRIPT_DIR"
 }
 # Iterate over each test configuration
 test_configs=$(jq -c '.perf_tests[]' "$config_file")
@@ -70,6 +80,8 @@ for config in $test_configs; do
     start_pm2_service "$main_node_dir" "main_node"
     until is_process_running "main_node"; do sleep 1; done
     echo "Main node is running."
+
+
 
     start_pm2_service "$spammer_node_dir" "spammer_node"
     echo "Spammer node is started."
@@ -152,8 +164,7 @@ for config in $test_configs; do
                     exit 1
                 fi
                 search_phrase="fetching block : .*\/$block_identifier"
-                echo "Latest block name: $latest_block_name"
-                echo "Searching for phrase: $search_phrase"
+                echo "Latest block id: $latest_block_name"
                 while ! grep -m1 "$search_phrase" "$output_file_spammer_node" > /dev/null; do
                     sleep 1 
                 done

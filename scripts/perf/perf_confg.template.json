@@ -1,12 +1,6 @@
 {
-  "main_node": {
-    "ip": "",
-    "port": ""
-  },
-  "spammer_node": {
-    "ip": "",
-    "port": ""
-  },
+  "main_node_dir": "../../saito-rust",
+  "spammer_node_dir": "../../saito-spammer",
   "perf_tests": [
     {
       "verification_threads": 2,
