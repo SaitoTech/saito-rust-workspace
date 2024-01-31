@@ -558,6 +558,7 @@ fn setup_hook() {
 }
 
 async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
+
     info!("Running saito with config {:?}", configs_lock.read().await);
 
     let channel_size;
@@ -566,6 +567,10 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     let verification_thread_count;
     let fetch_batch_size;
 
+    //
+    // set variables stored in the configuration file. the configuration
+    // file is read from disk in main() and submitted above.
+    //
     {
         let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
@@ -580,14 +585,37 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         assert_ne!(fetch_batch_size, 0);
     }
 
+    //
+    // create the broadcast channels that will be used to communicate 
+    // between the individual threads that manage consensus, mining, 
+    // block and transaction verification, etc. etc.
+    //
     let (event_sender_to_loop, event_receiver_in_loop) =
         tokio::sync::mpsc::channel::<IoEvent>(channel_size);
 
     let (sender_to_network_controller, receiver_in_network_controller) =
         tokio::sync::mpsc::channel::<IoEvent>(channel_size);
 
+    let (sender_to_consensus, receiver_for_consensus) =
+        tokio::sync::mpsc::channel::<ConsensusEvent>(channel_size);
+
+    let (sender_to_routing, receiver_for_routing) =
+        tokio::sync::mpsc::channel::<RoutingEvent>(channel_size);
+
+    let (sender_to_miner, receiver_for_miner) =
+        tokio::sync::mpsc::channel::<MiningEvent>(channel_size);
+
+    let (sender_to_stat, receiver_for_stat) = 
+	tokio::sync::mpsc::channel::<String>(channel_size);
+
     info!("running saito controllers");
 
+    //
+    // the wallet is stored in the Context object so that our different
+    // threads have access to it. we create our wallet here before we 
+    // create the Context object so that we can submit it to the Context
+    // object below.
+    //
     let keys = generate_keys();
     let wallet_lock = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
     {
@@ -601,20 +629,37 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         )
         .await;
     }
+
+
+    //
+    // context manages the wallet, mempool, blockchain and configuration
+    // file. It will be submitted to each of our threads below. the 
+    // blockchain and mempool are initialized when our Context is created
+    // here.
+    //
     let context = Context::new(configs_lock.clone(), wallet_lock);
 
+    //
+    // peers_lock will regulate access to our peers across the network
+    // we create it here along with Context so that access can be given
+    // to mulitple threads.
+    //
     let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
-    let (sender_to_consensus, receiver_for_consensus) =
-        tokio::sync::mpsc::channel::<ConsensusEvent>(channel_size);
 
-    let (sender_to_routing, receiver_for_routing) =
-        tokio::sync::mpsc::channel::<RoutingEvent>(channel_size);
-
-    let (sender_to_miner, receiver_for_miner) =
-        tokio::sync::mpsc::channel::<MiningEvent>(channel_size);
-    let (sender_to_stat, receiver_for_stat) = tokio::sync::mpsc::channel::<String>(channel_size);
-
+    //
+    // now we create our four main threads:
+    //
+    //   * verification - block and transaction verification
+    //   * routing - network operations and peer management
+    //   * mining - hashing golden tickets
+    //   * consensus - tracking longest chain
+    //
+    // these threads communicate via the broadcast channels which we 
+    // have created above. each receives its own "receiver" and is provided
+    // with a reference to the "sender" to the other threads it will need
+    // to communicate with.
+    //
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
         context.blockchain.clone(),
@@ -668,6 +713,11 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         sender_to_stat.clone(),
     )
     .await;
+
+    //
+    // maintains a stat_queue which listens for events to log
+    // and periodically prints them to a log. 
+    //
     let stat_handle = run_thread(
         Box::new(StatThread::new().await),
         None,
@@ -676,6 +726,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         thread_sleep_time_in_ms,
     )
     .await;
+
     let loop_handle = run_loop_thread(
         event_receiver_in_loop,
         network_event_sender_to_routing,
@@ -693,6 +744,9 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         peers_lock.clone(),
     ));
 
+    //
+    // keep the program running until all threads have finished
+    //
     let _result = tokio::join!(
         routing_handle,
         blockchain_handle,
@@ -821,6 +875,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     info!("total written lines : {:?}", total_written_lines);
 }
+
+
 #[tokio::main(flavor = "multi_thread")]
 // #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

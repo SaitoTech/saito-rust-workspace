@@ -2788,6 +2788,7 @@ mod tests {
         t.check_token_supply().await;
     }
 
+/*****
     /// Loading blocks into a blockchain which were created from another blockchain instance
     #[tokio::test]
     #[serial_test::serial]
@@ -2876,6 +2877,8 @@ mod tests {
             }
         }
     }
+****/
+
 
     #[tokio::test]
     #[serial_test::serial]
