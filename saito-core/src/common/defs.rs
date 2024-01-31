@@ -21,8 +21,13 @@ pub const NOLAN_PER_SAITO: Currency = 100_000_000;
 
 pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";
 
+#[cfg(test)]
 // length of 1 genesis period
+pub const GENESIS_PERIOD: u64 = 10;
+
+#[cfg(not(test))]
 pub const GENESIS_PERIOD: u64 = 100_000;
+
 // prune blocks from index after N blocks
 pub const PRUNE_AFTER_BLOCKS: u64 = 8;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
@@ -73,7 +78,7 @@ impl Drop for LockGuardWatcher {
         LOCK_ORDER.with(|v| {
             let mut v = v.borrow_mut();
             let res = v.pop_back();
-            println!("releasing lock : {:?}", self.order);
+            // println!("releasing lock : {:?}", self.order);
             assert!(
                 res.is_some(),
                 "no existing locks found for lock : {:?}",
@@ -111,22 +116,22 @@ pub fn push_lock(order: u8) -> LockGuardWatcher {
 #[macro_export]
 macro_rules! lock_for_write {
     ($lock:expr, $order:expr) => {{
-        #[cfg(feature = "locking-logs")]
-        println!(
-            "waiting for lock : {:?} for writing - {:?}",
-            $order,
-            module_path!()
-        );
+        // #[cfg(feature = "locking-logs")]
+        // println!(
+        //     "waiting for lock : {:?} for writing - {:?}",
+        //     $order,
+        //     module_path!()
+        // );
 
         let l = $lock.write().await;
         let watcher = push_lock($order);
 
-        #[cfg(feature = "locking-logs")]
-        println!(
-            "acquired lock : {:?} for writing - {:?}",
-            $order,
-            module_path!()
-        );
+        // #[cfg(feature = "locking-logs")]
+        // println!(
+        //     "acquired lock : {:?} for writing - {:?}",
+        //     $order,
+        //     module_path!()
+        // );
 
         (l, watcher)
     }};
@@ -135,22 +140,22 @@ macro_rules! lock_for_write {
 #[macro_export]
 macro_rules! lock_for_read {
     ($lock:expr, $order:expr) => {{
-        #[cfg(feature = "locking-logs")]
-        println!(
-            "waiting for lock : {:?} for reading - {:?}",
-            $order,
-            module_path!()
-        );
+        // #[cfg(feature = "locking-logs")]
+        // println!(
+        //     "waiting for lock : {:?} for reading - {:?}",
+        //     $order,
+        //     module_path!()
+        // );
 
         let l = $lock.read().await;
         let watcher = push_lock($order);
 
-        #[cfg(feature = "locking-logs")]
-        println!(
-            "acquired lock : {:?} for reading - {:?}",
-            $order,
-            module_path!()
-        );
+        // #[cfg(feature = "locking-logs")]
+        // println!(
+        //     "acquired lock : {:?} for reading - {:?}",
+        //     $order,
+        //     module_path!()
+        // );
 
         (l, watcher)
     }};

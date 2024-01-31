@@ -27,7 +27,7 @@ pub enum TransactionType {
     Fee = 1,
     GoldenTicket = 2,
     ATR = 3,
-    /// VIP transactions won't pay an ATR fee. (Issued to early investors)
+    /// VIP transactions deprecated on mainnet
     Vip = 4,
     SPV = 5,
     /// Issues funds for an address at the start of the network
@@ -212,7 +212,6 @@ impl Transaction {
         transaction.add_to_slip(output);
 
         Ok(transaction)
-        //
         // if available_balance >= total_requested {
         //
         //
@@ -300,22 +299,6 @@ impl Transaction {
     /// ```
     ///
     /// ```
-
-    pub fn create_vip_transaction(
-        to_public_key: SaitoPublicKey,
-        with_amount: Currency,
-    ) -> Transaction {
-        debug!("generate vip transaction : amount = {:?}", with_amount);
-        let mut transaction = Transaction::default();
-        transaction.transaction_type = TransactionType::Vip;
-        let mut output = Slip::default();
-        output.public_key = to_public_key;
-        output.amount = with_amount;
-        output.slip_type = SlipType::VipOutput;
-        transaction.add_to_slip(output);
-        transaction
-    }
-
     pub fn create_issuance_transaction(
         to_public_key: SaitoPublicKey,
         with_amount: Currency,
@@ -326,7 +309,7 @@ impl Transaction {
         let mut output = Slip::default();
         output.public_key = to_public_key;
         output.amount = with_amount;
-        output.slip_type = SlipType::VipOutput;
+        output.slip_type = SlipType::Normal;
         transaction.add_to_slip(output);
         transaction
     }
@@ -349,26 +332,14 @@ impl Transaction {
     /// ```
     pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
-        output_slip_to_rebroadcast: &Slip,
-        with_fee: Currency,
-        with_staking_subsidy: Currency,
+        slip: Slip,
+        // with_fee: Currency,
+        // with_staking_subsidy: Currency,
     ) -> Transaction {
         let mut transaction = Transaction::default();
-        let mut output_payment = 0;
-        if output_slip_to_rebroadcast.amount > with_fee {
-            output_payment = output_slip_to_rebroadcast.amount - with_fee + with_staking_subsidy;
-        }
 
         transaction.transaction_type = TransactionType::ATR;
 
-        let mut output = Slip::default();
-        output.public_key = output_slip_to_rebroadcast.public_key;
-        output.amount = output_payment;
-        output.slip_type = SlipType::ATR;
-        output.block_id = output_slip_to_rebroadcast.block_id;
-        output.tx_ordinal = output_slip_to_rebroadcast.tx_ordinal;
-
-        //
         // if this is the FIRST time we are rebroadcasting, we copy the
         // original transaction into the message field in serialized
         // form. this preserves the original message and its signature
@@ -378,20 +349,21 @@ impl Transaction {
         // copy the ATR tx (no need for a meta-tx) and rather just update
         // the message field with the original transaction (which is
         // by definition already in the previous TX message space.
-        //
-        if output_slip_to_rebroadcast.slip_type == SlipType::ATR {
+        if transaction_to_rebroadcast.transaction_type == TransactionType::ATR {
             transaction.data = transaction_to_rebroadcast.data.to_vec();
         } else {
             transaction.data = transaction_to_rebroadcast.serialize_for_net().to_vec();
         }
 
-        transaction.add_to_slip(output);
-
         //
+        // add the output slip
+        //
+        assert_eq!(slip.slip_type, SlipType::ATR);
+        transaction.add_to_slip(slip);
+
         // signature is the ORIGINAL signature. this transaction
         // will fail its signature check and then get analysed as
         // a rebroadcast transaction because of its transaction type.
-        //
         transaction.signature = transaction_to_rebroadcast.signature;
 
         transaction
@@ -445,14 +417,14 @@ impl Transaction {
         let start_of_path = start_of_message + message_len;
         let mut inputs: Vec<Slip> = vec![];
         for n in 0..inputs_len {
-            let start_of_data: usize = start_of_inputs as usize + n as usize * SLIP_SIZE;
+            let start_of_data: usize = start_of_inputs + n as usize * SLIP_SIZE;
             let end_of_data: usize = start_of_data + SLIP_SIZE;
             let input = Slip::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             inputs.push(input);
         }
         let mut outputs: Vec<Slip> = vec![];
         for n in 0..outputs_len {
-            let start_of_data: usize = start_of_outputs as usize + n as usize * SLIP_SIZE;
+            let start_of_data: usize = start_of_outputs + n as usize * SLIP_SIZE;
             let end_of_data: usize = start_of_data + SLIP_SIZE;
             let output = Slip::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             outputs.push(output);
@@ -462,7 +434,7 @@ impl Transaction {
             .unwrap();
         let mut path: Vec<Hop> = vec![];
         for n in 0..path_len {
-            let start_of_data: usize = start_of_path as usize + n as usize * HOP_SIZE;
+            let start_of_data: usize = start_of_path + n * HOP_SIZE;
             let end_of_data: usize = start_of_data + HOP_SIZE;
             let hop = Hop::deserialize_from_net(&bytes[start_of_data..end_of_data].to_vec())?;
             path.push(hop);
@@ -526,9 +498,7 @@ impl Transaction {
         self.cumulative_fees
     }
 
-    //
     // calculate total fees in block
-    //
     pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
         // TODO - remove for uuid work
         // generate tx signature hash
@@ -578,9 +548,7 @@ impl Transaction {
             self.total_fees = nolan_in - nolan_out;
         }
     }
-    //
-    // calculate cumulative routing work in block
-    //
+    /// calculate cumulative routing work in block
     pub fn generate_total_work(&mut self, public_key: &SaitoPublicKey) {
         //
         // if there is no routing path, then the transaction contains
@@ -593,9 +561,7 @@ impl Transaction {
             return;
         }
 
-        //
         // something is wrong if we are not the last routing node
-        //
         let last_hop = &self.path[self.path.len() - 1];
         if last_hop.to.ne(public_key) {
             self.total_work_for_me = 0;
@@ -668,7 +634,6 @@ impl Transaction {
             }
         }
 
-        //
         // no winning transaction should have no fees unless the
         // entire block has no fees, in which case we have a block
         // without any fee-paying transactions.
@@ -800,6 +765,15 @@ impl Transaction {
         buffer
     }
 
+    /// Returns the size of the serialized transaction buffer without serializing
+    pub fn get_serialized_size(&self) -> usize {
+        TRANSACTION_SIZE
+            + (SLIP_SIZE * self.from.len())
+            + (SLIP_SIZE * self.to.len())
+            + (HOP_SIZE * self.path.len())
+            + self.data.len()
+    }
+
     pub fn serialize_for_signature(&self) -> Vec<u8> {
         // fastest known way that isn't bincode ??
 
@@ -874,7 +848,6 @@ impl Transaction {
         // the block itself.
         //
         // ATR transactions
-        // VIP transactions
         // FEE transactions
         //
         // the first set of validation criteria is applied only to
@@ -885,9 +858,7 @@ impl Transaction {
         //
         let transaction_type = self.transaction_type;
 
-        if transaction_type != TransactionType::ATR
-            && transaction_type != TransactionType::Vip
-            && transaction_type != TransactionType::Issuance
+        if transaction_type != TransactionType::ATR && transaction_type != TransactionType::Issuance
         {
             //
             // validate sender exists
@@ -937,10 +908,7 @@ impl Transaction {
 
             // TODO : what happens to tokens when total_out < total_in
             // validate we're not creating tokens out of nothing
-            if self.total_out > self.total_in
-                && self.transaction_type != TransactionType::Fee
-                && self.transaction_type != TransactionType::Vip
-            {
+            if self.total_out > self.total_in && self.transaction_type != TransactionType::Fee {
                 warn!("{:?} in and {:?} out", self.total_in, self.total_out);
                 // for _z in self.outputs.iter() {
                 //     // info!("{:?} --- ", z.amount);
@@ -969,19 +937,6 @@ impl Transaction {
         // golden ticket transactions
         //
         if transaction_type == TransactionType::GoldenTicket {}
-
-        //
-        // vip transactions
-        //
-        // a special class of transactions that do not pay rebroadcasting
-        // fees. these are issued to the early supporters of the Saito
-        // project. they carried us and we're going to carry them. thanks
-        // for the faith and support.
-        //
-        if transaction_type == TransactionType::Vip {
-            // we should validate that VIP transactions are signed by the
-            // public_key associated with the Saito project.
-        }
 
         //
         // all Transactions

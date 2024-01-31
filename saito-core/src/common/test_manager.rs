@@ -27,13 +27,16 @@ pub mod test {
     use std::error::Error;
     use std::fmt::{Debug, Formatter};
     use std::fs;
+    use std::io::{BufReader, Read, Write};
     use std::ops::Deref;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ahash::AHashMap;
     use log::{debug, info};
+    use rand::rngs::OsRng;
+    use secp256k1::Secp256k1;
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
@@ -44,7 +47,7 @@ pub mod test {
     };
     use crate::common::keep_time::KeepTime;
     use crate::common::test_io_handler::test::TestIOHandler;
-    use crate::core::data::block::Block;
+    use crate::core::data::block::{Block, BlockType};
     use crate::core::data::blockchain::Blockchain;
     use crate::core::data::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
@@ -58,10 +61,6 @@ pub mod test {
     use crate::core::data::wallet::Wallet;
     use crate::core::mining_thread::MiningEvent;
     use crate::{lock_for_read, lock_for_write};
-    use std::io::{self, BufReader, Read, Write};
-
-    use rand::rngs::OsRng;
-    use secp256k1::{Secp256k1, SecretKey};
 
     pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
@@ -136,7 +135,7 @@ pub mod test {
             let source_path = Path::new(TEST_ISSUANCE_FILEPATH);
             // Read the existing counter from the file or initialize it to 1 if the file doesn't exist
             let issuance_counter_path = temp_dir.join("issuance_counter.txt");
-            let mut counter = if issuance_counter_path.exists() {
+            let counter = if issuance_counter_path.exists() {
                 let mut file = BufReader::new(fs::File::open(&issuance_counter_path)?);
                 let mut buffer = String::new();
                 file.read_to_string(&mut buffer)?;
@@ -201,9 +200,7 @@ pub mod test {
                 .expect("mining event receive failed");
         }
 
-        //
-        // add block to blockchain
-        //
+        /// add block to blockchain
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
 
@@ -214,24 +211,22 @@ pub mod test {
                 let (mut mempool, _mempool_) =
                     lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
 
-                blockchain
+                let _ = blockchain
                     .add_block(
                         block,
-                        Some(&mut self.network),
+                        Some(&self.network),
                         &mut self.storage,
-                        Some(self.sender_to_miner.clone()),
+                        None,
                         &mut mempool,
                         configs.deref(),
                     )
                     .await;
 
-                dbg!("block added to test manager blockchain");
+                self.latest_block_hash = blockchain.last_block_hash;
             }
         }
 
-        //
         // check that the blockchain connects properly
-        //
         pub async fn check_blockchain(&self) {
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
@@ -263,25 +258,27 @@ pub mod test {
             }
         }
 
-        //
         // check that everything spendable in the main UTXOSET is spendable on the longest
         // chain and vice-versa.
-        //
         pub async fn check_utxoset(&self) {
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             let mut utxoset: UtxoSet = AHashMap::new();
             let latest_block_id = blockchain.get_latest_block_id();
+            // let first_block_id = latest_block_id - GENESIS_PERIOD + 1;
 
             info!("---- check utxoset ");
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
                     .get_longest_chain_block_hash_at_block_id(i);
-                let block = blockchain.get_block(&block_hash).unwrap();
+                let mut block = blockchain.get_block(&block_hash).unwrap().clone();
+                block
+                    .upgrade_block_to_block_type(BlockType::Full, &self.storage, false)
+                    .await;
                 info!(
-                    "WINDING ID HASH - {} {:?} with txs : {:?} block_type : {:?}",
+                    "WINDING ID HASH - {:?} {:?} with txs : {:?} block_type : {:?}",
                     block.id,
                     block_hash.to_hex(),
                     block.transactions.len(),
@@ -299,61 +296,33 @@ pub mod test {
                 }
             }
 
-            //
             // check main utxoset matches longest-chain
-            //
             for (key, value) in &blockchain.utxoset {
+                assert!(*value);
                 match utxoset.get(key) {
                     Some(value2) => {
-                        //
                         // everything spendable in blockchain.utxoset should be spendable on longest-chain
-                        //
-                        if *value == true {
-                            //info!("for key: {:?}", key);
-                            //info!("comparing {} and {}", value, value2);
-                            assert_eq!(value, value2);
-                        } else {
-                            //
-                            // everything spent in blockchain.utxoset should be spent on longest-chain
-                            //
-                            // if *value > 1 {
-                            //info!("comparing key: {:?}", key);
-                            //info!("comparing blkchn {} and sanitycheck {}", value, value2);
-                            // assert_eq!(value, value2);
-                            // } else {
-                            //
-                            // unspendable (0) does not need to exist
-                            //
-                            // }
-                        }
+                        assert!(*value);
+                        assert_eq!(*value, *value2);
                     }
                     None => {
-                        //
-                        // if the value is 0, the token is unspendable on the main chain and
-                        // it may still be in the UTXOSET simply because it was not removed
-                        // but rather set to an unspendable value. These entries will be
-                        // removed on purge, although we can look at deleting them on unwind
-                        // as well if that is reasonably efficient.
-                        assert!(!*value, "utxoset value should be false for key : {:?}. generated utxo size : {:?}. current utxo size : {:?}", key.to_hex(), utxoset.len(), blockchain.utxoset.len());
-                        // if *value == true {
-                        //     //info!("Value does not exist in actual blockchain!");
-                        //     //info!("comparing {:?} with on-chain value {}", key, value);
-                        //     assert_eq!(1, 2);
-                        // }
+                        let slip = Slip::parse_slip_from_utxokey(key);
+                        info!(
+                            "block : {:?} tx : {:?} amount : {:?} type : {:?}",
+                            slip.block_id, slip.tx_ordinal, slip.amount, slip.slip_type
+                        );
+                        panic!("utxoset value should be false for key : {:?}. generated utxo size : {:?}. current utxo size : {:?}",
+                               key.to_hex(), utxoset.len(), blockchain.utxoset.len());
                     }
                 }
             }
 
-            //
             // check longest-chain matches utxoset
-            //
             for (key, value) in &utxoset {
                 //info!("{:?} / {}", key, value);
                 match blockchain.utxoset.get(key) {
                     Some(value2) => {
-                        //
                         // everything spendable in longest-chain should be spendable on blockchain.utxoset
-                        //
                         if *value == true {
                             //                        info!("comparing {} and {}", value, value2);
                             assert_eq!(value, value2);
@@ -471,9 +440,7 @@ pub mod test {
                             unpaid_but_uncollected -= block_outputs;
                             unpaid_but_uncollected -= total_fees_paid;
 
-                            //
                             // treasury increases must come here uncollected
-                            //
                             if current_block_treasury > previous_block_treasury {
                                 unpaid_but_uncollected -=
                                     current_block_treasury - previous_block_treasury;
@@ -497,14 +464,12 @@ pub mod test {
             }
         }
 
-        //
         // create block
-        //
         pub async fn create_block(
             &mut self,
             parent_hash: SaitoHash,
             timestamp: Timestamp,
-            txs_number: usize,
+            txs_count: usize,
             txs_amount: Currency,
             txs_fee: Currency,
             include_valid_golden_ticket: bool,
@@ -520,7 +485,7 @@ pub mod test {
                 private_key = wallet.private_key;
             }
 
-            for _i in 0..txs_number {
+            for _i in 0..txs_count {
                 let mut transaction;
                 {
                     let (mut wallet, _wallet_) =
@@ -546,7 +511,9 @@ pub mod test {
                 let (blockchain, _blockchain_) =
                     lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-                let block = blockchain.get_block(&parent_hash).unwrap();
+                let block = blockchain.get_block(&parent_hash).expect(
+                    format!("couldn't find block for hash : {:?}", parent_hash.to_hex()).as_str(),
+                );
                 let golden_ticket: GoldenTicket = Self::create_golden_ticket(
                     self.wallet_lock.clone(),
                     parent_hash,
@@ -571,9 +538,8 @@ pub mod test {
             let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
             let (mut blockchain, _blockchain_) =
                 lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            //
+
             // create block
-            //
             let mut block = Block::create(
                 &mut transactions,
                 parent_hash,
@@ -583,6 +549,7 @@ pub mod test {
                 &private_key,
                 None,
                 configs.deref(),
+                &self.storage,
             )
             .await;
             block.generate();
@@ -649,8 +616,11 @@ pub mod test {
         pub async fn get_latest_block(&self) -> Block {
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            let block = blockchain.get_latest_block().unwrap().clone();
-            return block;
+            let block = blockchain
+                .get_latest_block()
+                .expect("latest block should exist")
+                .clone();
+            block
         }
         pub async fn get_latest_block_id(&self) -> u64 {
             let (blockchain, _blockchain_) =
@@ -658,13 +628,12 @@ pub mod test {
             blockchain.blockring.get_latest_block_id()
         }
 
-        pub async fn initialize(&mut self, vip_transactions: u64, vip_amount: Currency) {
+        pub async fn initialize(&mut self, issuance_transactions: u64, issuance_amount: Currency) {
             let timestamp = create_timestamp();
-            self.initialize_with_timestamp(vip_transactions, vip_amount, timestamp)
+            self.initialize_with_timestamp(issuance_transactions, issuance_amount, timestamp)
                 .await;
         }
 
-        //
         // initialize chain from slips and add some amount my public key
         //
         pub async fn initialize_from_slips_and_value(&mut self, slips: Vec<Slip>, amount: u64) {
@@ -690,14 +659,14 @@ pub mod test {
 
             for slip in slips {
                 let mut tx: Transaction =
-                    Transaction::create_vip_transaction(slip.public_key, slip.amount);
+                    Transaction::create_issuance_transaction(slip.public_key, slip.amount);
                 tx.generate(&slip.public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
             }
 
             // add some value to my own public key
-            let mut tx = Transaction::create_vip_transaction(my_public_key, amount);
+            let mut tx = Transaction::create_issuance_transaction(my_public_key, amount);
 
             tx.generate(&my_public_key, 0, 0);
             tx.sign(&private_key);
@@ -721,7 +690,6 @@ pub mod test {
             self.add_block(block).await;
         }
 
-        //
         // initialize chain from just slips properties
         pub async fn initialize_from_slips(&mut self, slips: Vec<Slip>) {
             //
@@ -755,7 +723,7 @@ pub mod test {
             // generate UTXO-carrying VIP transactions
             //
             for slip in slips {
-                let mut tx = Transaction::create_vip_transaction(slip.public_key, slip.amount);
+                let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
                 tx.generate(&slip.public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
@@ -781,25 +749,17 @@ pub mod test {
         }
         pub async fn initialize_with_timestamp(
             &mut self,
-            vip_transactions: u64,
-            vip_amount: Currency,
+            issuance_transactions: u64,
+            issuance_amount: Currency,
             timestamp: Timestamp,
         ) {
-            //
-            // initialize timestamp
-            //
-
-            //
             // reset data dirs
-            //
             let _ = tokio::fs::remove_dir_all("data/blocks").await;
-            tokio::fs::create_dir_all("data/blocks").await.unwrap();
+            let _ = tokio::fs::create_dir_all("data/blocks").await;
             let _ = tokio::fs::remove_dir_all("data/wallets").await;
-            tokio::fs::create_dir_all("data/wallets").await.unwrap();
+            let _ = tokio::fs::create_dir_all("data/wallets").await;
 
-            //
             // create initial transactions
-            //
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
             {
@@ -809,16 +769,12 @@ pub mod test {
                 private_key = wallet.private_key;
             }
 
-            //
             // create first block
-            //
             let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
-            //
-            // generate UTXO-carrying VIP transactions
-            //
-            for _i in 0..vip_transactions {
-                let mut tx = Transaction::create_vip_transaction(public_key, vip_amount);
+            // generate UTXO-carrying transactions
+            for _i in 0..issuance_transactions {
+                let mut tx = Transaction::create_issuance_transaction(public_key, issuance_amount);
                 tx.generate(&public_key, 0, 0);
                 tx.sign(&private_key);
                 block.add_transaction(tx);
@@ -826,7 +782,7 @@ pub mod test {
 
             {
                 let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-                // we have added VIP, so need to regenerate the merkle-root
+                // we have added txs, so need to regenerate the merkle-root
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
@@ -863,7 +819,7 @@ pub mod test {
             let timestamp = create_timestamp();
 
             let genblock: Block = mempool
-                .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                .bundle_genesis_block(&mut blockchain, timestamp, configs.deref(), &self.storage)
                 .await;
             let _res = blockchain
                 .add_block(
@@ -983,7 +939,7 @@ pub mod test {
 
         pub fn generate_random_public_key() -> SaitoPublicKey {
             let secp = Secp256k1::new();
-            let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
+            let (_secret_key, public_key) = secp.generate_keypair(&mut OsRng);
             let serialized_key: SaitoPublicKey = public_key.serialize();
             serialized_key
         }
@@ -997,6 +953,7 @@ pub mod test {
             }
         }
     }
+
     struct TestConfiguration {}
 
     impl Debug for TestConfiguration {

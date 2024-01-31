@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -110,6 +110,7 @@ impl VerificationThread {
         self.invalid_txs.increment_by(invalid_txs as u64);
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
+        trace!("verifying block buffer of size : {:?}", buffer.len());
         let buffer_len = buffer.len();
         let result = Block::deserialize_from_net(buffer);
         if result.is_err() {

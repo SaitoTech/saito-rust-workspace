@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{PrintForLog, SaitoHash, SaitoPublicKey};
+use crate::common::defs::{SaitoHash, SaitoPublicKey};
 use crate::core::data::crypto::hash;
 
 #[serde_with::serde_as]

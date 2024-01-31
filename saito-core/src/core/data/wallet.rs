@@ -154,17 +154,14 @@ impl Wallet {
                 }
             }
         }
-        if network.is_some() {
+        if let Some(network) = network {
             network
-                .unwrap()
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
 
-    //
     // removes all slips in block when pruned / deleted
-    //
     pub fn delete_block(&mut self, block: &Block, network: Option<&Network>) {
         for tx in block.transactions.iter() {
             for input in tx.from.iter() {
@@ -176,9 +173,8 @@ impl Wallet {
                 }
             }
         }
-        if network.is_some() {
+        if let Some(network) = network {
             network
-                .unwrap()
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }
@@ -205,22 +201,21 @@ impl Wallet {
         wallet_slip.lc = lc;
         self.unspent_slips.insert(wallet_slip.utxokey);
         self.available_balance += slip.amount;
-        info!(
+        debug!(
             "adding slip : {:?} with value : {:?} to wallet",
             wallet_slip.utxokey.to_hex(),
             wallet_slip.amount
         );
         self.slips.insert(wallet_slip.utxokey, wallet_slip);
-        if network.is_some() {
+        if let Some(network) = network {
             network
-                .unwrap()
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
 
     pub fn delete_slip(&mut self, slip: &Slip, network: Option<&Network>) {
-        info!(
+        debug!(
             "deleting slip : {:?} with value : {:?} from wallet",
             slip.utxoset_key.to_hex(),
             slip.amount
@@ -281,7 +276,7 @@ impl Wallet {
             slip.spent = true;
             self.available_balance -= slip.amount;
 
-            info!(
+            debug!(
                 "marking slip : {:?} with value : {:?} as spent",
                 slip.utxokey.to_hex(),
                 slip.amount
@@ -452,6 +447,7 @@ mod tests {
 
     // tests value transfer to other addresses and verifies the resulting utxo hashmap
     #[tokio::test]
+    #[serial_test::serial]
     async fn wallet_transfer_to_address_test() {
         let mut t = TestManager::new();
         t.initialize(100, 100000).await;
@@ -486,6 +482,7 @@ mod tests {
 
     // Test if transfer is possible even with issufficient funds
     #[tokio::test]
+    #[serial_test::serial]
     async fn transfer_with_insufficient_funds_failure_test() {
         let mut t = TestManager::new();
         t.initialize(100, 100000).await;
@@ -503,7 +500,9 @@ mod tests {
 
     // tests transfer of exact amount
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_transfer_with_exact_funds() {
+        // pretty_env_logger::init();
         let mut t = TestManager::new();
         t.initialize(1, 500).await;
 

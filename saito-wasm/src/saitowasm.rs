@@ -430,7 +430,7 @@ pub async fn process_fetched_block(
 
 #[wasm_bindgen]
 pub async fn process_failed_block_fetch(hash: js_sys::Uint8Array) {
-    let mut saito = SAITO.lock().await;
+    let saito = SAITO.lock().await;
     let mut blockchain = saito.routing_thread.blockchain.write().await;
     let hash: SaitoHash = hash.to_vec().try_into().unwrap();
     blockchain.unmark_as_fetching(&hash);

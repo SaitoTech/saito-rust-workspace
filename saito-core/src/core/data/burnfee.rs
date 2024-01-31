@@ -1,3 +1,4 @@
+use log::debug;
 use std::time::Duration;
 
 use crate::common::defs::{Currency, Timestamp};
@@ -36,7 +37,6 @@ impl BurnFee {
         current_block_timestamp_in_ms: Timestamp,
         previous_block_timestamp_in_ms: Timestamp,
     ) -> Currency {
-        //
         // impossible if times misordered
         //
         if previous_block_timestamp_in_ms >= current_block_timestamp_in_ms {
@@ -69,14 +69,14 @@ impl BurnFee {
     /// * `current_block_timestamp` - The timestamp of the current `Block`
     /// * `previous_block_timestamp` - The timestamp of the previous `Block`
     ///
-    pub fn return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
+    pub fn calculate_burnfee_for_block(
         burn_fee_previous_block: Currency,
         current_block_timestamp_in_ms: Timestamp,
         previous_block_timestamp_in_ms: Timestamp,
     ) -> Currency {
-        //
+        debug!("calculate burnfee : previous block burn fee = {:?} current timestamp = {:?} prev block timestamp : {:?}",
+            burn_fee_previous_block, current_block_timestamp_in_ms, previous_block_timestamp_in_ms);
         // impossible if times misordered
-        //
         if previous_block_timestamp_in_ms >= current_block_timestamp_in_ms {
             return 10_000_000_000_000_000_000;
         }
@@ -124,21 +124,11 @@ mod tests {
     #[test]
     fn burnfee_burn_fee_adjustment_test() {
         // if the difference in timestamps is equal to HEARTBEAT, our start value should not change
-        let mut new_start_burnfee =
-            BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-                100_000_000,
-                HEARTBEAT,
-                0,
-            );
+        let mut new_start_burnfee = BurnFee::calculate_burnfee_for_block(100_000_000, HEARTBEAT, 0);
         assert_eq!(new_start_burnfee, 100_000_000);
 
         // the difference should be the square root of HEARBEAT over the difference in timestamps
-        new_start_burnfee =
-            BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
-                100_000_000,
-                HEARTBEAT / 10,
-                0,
-            );
+        new_start_burnfee = BurnFee::calculate_burnfee_for_block(100_000_000, HEARTBEAT / 10, 0);
         assert_eq!(
             new_start_burnfee,
             (100_000_000.0 * (10 as f64).sqrt()).round() as Currency
@@ -151,7 +141,7 @@ mod tests {
         let current_block_timestamp: Timestamp = 1658821423;
         let previous_block_timestamp: Timestamp = 1658821412;
 
-        let burnfee = BurnFee::return_burnfee_for_block_produced_at_current_timestamp_in_nolan(
+        let burnfee = BurnFee::calculate_burnfee_for_block(
             burn_fee_previous_block,
             current_block_timestamp,
             previous_block_timestamp,

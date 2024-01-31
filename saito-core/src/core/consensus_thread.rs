@@ -9,9 +9,8 @@ use tokio::sync::RwLock;
 
 use crate::common::command::NetworkEvent;
 use crate::common::defs::{
-    push_lock, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
-    STAT_BIN_COUNT,
+    push_lock, PrintForLog, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
@@ -92,49 +91,6 @@ pub struct ConsensusThread {
 }
 
 impl ConsensusThread {
-    async fn generate_spammer_init_tx(
-        mempool_lock: Arc<RwLock<Mempool>>,
-        wallet_lock: Arc<RwLock<Wallet>>,
-        blockchain_lock: Arc<RwLock<Blockchain>>,
-    ) {
-        info!("generating spammer init transaction");
-
-        let private_key;
-
-        {
-            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
-            private_key = wallet.private_key;
-        }
-
-        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
-
-        let spammer_public_key: SaitoPublicKey = SaitoPublicKey::from_hex(
-            "03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849",
-        )
-        .unwrap();
-
-        {
-            // let mut vip_transaction = Transaction::create_vip_transaction(public_key, 50_000_000);
-            // vip_transaction.sign(&private_key);
-            //
-            // mempool
-            //     .add_transaction_if_validates(vip_transaction, &blockchain)
-            //     .await;
-
-            let mut vip_transaction =
-                Transaction::create_vip_transaction(spammer_public_key, 100_000_000);
-            vip_transaction.sign(&private_key);
-
-            mempool
-                .add_transaction_if_validates(vip_transaction, &blockchain)
-                .await;
-            info!(
-                "added spammer init tx for : {:?}",
-                spammer_public_key.to_base58()
-            );
-        }
-    }
     async fn generate_issuance_tx(
         &self,
         mempool_lock: Arc<RwLock<Mempool>>,
@@ -195,10 +151,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
                     let block = mempool
-                        .bundle_genesis_block(&mut blockchain, timestamp, configs.deref())
+                        .bundle_genesis_block(
+                            &mut blockchain,
+                            timestamp,
+                            configs.deref(),
+                            &self.storage,
+                        )
                         .await;
-
-                    println!(" block ider {:?}", &block.transactions);
 
                     let _res = blockchain
                         .add_block(
@@ -263,6 +222,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         timestamp,
                         gt_result.clone(),
                         configs.deref(),
+                        &self.storage,
                     )
                     .await;
             }
@@ -556,8 +516,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
                 blockchain.get_latest_block_id(),
-                blockchain.blocks.iter().filter(|(hash, block)| { block.block_type == BlockType::Full }).count(),
-                blockchain.blocks.iter().map(|(hash, block)| { block.transactions.len() }).sum::<usize>()
+                blockchain.blocks.iter().filter(|(_hash, block)| { block.block_type == BlockType::Full }).count(),
+                blockchain.blocks.iter().map(|(_hash, block)| { block.transactions.len() }).sum::<usize>()
             );
             self.stat_sender.send(stat).await.unwrap();
         }
