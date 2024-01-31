@@ -1,11 +1,26 @@
 {
-  "main_node_dir": "../../saito-rust",
-  "spammer_node_dir": "../../saito-spammer",
+  "main_node": {
+    "dir": "../../saito-rust",
+    "ip": "139.59.98.200",
+    "ssh_directory": "saito-rust-workspace/saito-rust",
+    "port": 80
+  },
+  "spammer_node": {
+    "dir": "../../saito-spammer",
+    "ip": "178.128.84.14",
+    "ssh_directory": "saito-rust-workspace/saito-spammer",
+    "port": 80
+  },
   "perf_tests": [
     {
       "verification_threads": 2,
       "tx_payload_size": 128,
-      "burst_count": 50000
+      "burst_count": 5000
+    },
+    {
+      "verification_threads": 2,
+      "tx_payload_size": 128,
+      "burst_count": 3000
     }
   ]
 }

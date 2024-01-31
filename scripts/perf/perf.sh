@@ -8,20 +8,39 @@ cd "$SCRIPT_DIR"
 config_file="./perf_config.json"
 
 get_config_value() {
-    jq -r ".$1" "$config_file"
+    jq -r ".$1.$2" "$config_file"
 }
 
-main_node_dir=$(get_config_value 'main_node_dir')
-spammer_node_dir=$(get_config_value 'spammer_node_dir')
-output_csv="./perf_result.csv"
+
+
+
+# Main Node Configurations
+main_node_dir=$(get_config_value 'main_node' 'dir')
+main_node_ip=$(get_config_value 'main_node' 'ip')
+main_node_port=$(get_config_value 'main_node' 'port')
+main_node_ssh_dir=$(get_config_value 'main_node' 'ssh_directory')
+
+echo $main_node_ip $main_node_ssh_dir
+
+# Spammer Node Configurations
+spammer_node_dir=$(get_config_value 'spammer_node' 'dir')
+spammer_node_ip=$(get_config_value 'spammer_node' 'ip')
+spammer_node_port=$(get_config_value 'spammer_node' 'port')
+spammer_node_ssh_dir=$(get_config_value 'spammer_node' 'ssh_directory')
 
 
 echo "tx_rate_from_spammer,tx_payload_size,verification_thread_count,max_tx_rate_at_network_thread,max_tx_rate_at_verification_threads,total_txs,block_count,longest_chain_length,total_block_size,average_block_size,time_to_load_blocks,time_to_fetch_blocks,ram_after_initial_run,ram_after_loading_blocks,ram_after_fetching_blocks" > "$output_csv"
 
 
 
-is_process_running() {
-    pm2 show "$1" > /dev/null 2>&1
+is_process_running_remote() {
+    local target_ip="$1"
+    local service_name="$2"
+    local intermediate_host="deployment.saito.network"
+
+    echo "Checking if $service_name is running on $target_ip via $intermediate_host"
+
+    ssh -t "root@$intermediate_host" "ssh -t root@$target_ip 'pgrep -f $service_name > /dev/null 2>&1'"
     return $?
 }
 
@@ -70,39 +89,64 @@ get_ram_usage() {
     esac
 }
 
-clear_blocks_directory() {
-    # echo "$1"
-    dir_path="$1/data/blocks"
-    if [ -d "$dir_path" ]; then
-        rm -rf "$dir_path"/*
-        echo "Cleared all contents in $dir_path"
-    else
-        echo "Directory $dir_path does not exist."
-    fi
+clear_blocks_directory_remote() {
+    local intermediate_host="deployment.saito.network"
+    local target_ip="$1"
+    local ssh_directory="$2"
+
+    echo "Clearing blocks directory on remote node: $target_ip via $intermediate_host"
+
+    ssh -t "root@$intermediate_host" "ssh -t root@$target_ip 'bash -l -c \"cd \\\"\$HOME/$ssh_directory\\\" && if [ -d \\\"data/blocks\\\" ]; then rm -rf data/blocks/*; echo Cleared all contents in data/blocks; else echo Directory data/blocks does not exist.; fi\"'"
 }
+
 
 get_latest_block_name() {
     ls -Art "$1/data/blocks" | tail -n 1
 }
 
-update_config_file() {
-    local config_path="$1"
-    local jq_script="$2"
-    jq "$jq_script" "$config_path" > temp.json && mv temp.json "$config_path"
+update_config_file_remote() {
+    local intermediate_host="deployment.saito.network"
+    local target_ip="$1"
+    local ssh_directory="$2"
+    local config_file="$3"
+    local jq_script="$4"
+
+    echo "Updating config file on remote node: $target_ip via $intermediate_host"
+
+    ssh -t "root@$intermediate_host" "ssh -t root@$target_ip 'bash -l -c \"cd \\\"\$HOME/$ssh_directory\\\" && jq \\\"$jq_script\\\" $config_file > temp.json && mv temp.json $config_file\"'"
 }
 
-start_pm2_service() {
-    local dir="$1"
+
+
+
+start_pm2_service_remote() {
+    local intermediate_host="deployment.saito.network"
+    local target_ip="$1"
     local service_name="$2"
-    echo $dir
+    local ssh_directory="$3"
 
-    (
-        cd "$dir" || exit
-        pm2 start "RUST_LOG=debug cargo run" --name "$service_name" --no-autorestart
-    )
-    
-    # echo "Back to script directory: $SCRIPT_DIR"
+
+    echo "dir: '$ssh_directory'"
+
+    ssh -t "root@$intermediate_host" "echo Connected to $intermediate_host"
+
+    echo "Starting PM2 service on remote node: $target_ip via $intermediate_host"
+
+ssh -t "root@$intermediate_host" "ssh -t root@$target_ip 'bash -l -c \"cd \\\"\$HOME/$ssh_directory\\\" && pm2 start \\\"RUST_LOG=debug cargo run\\\" --name \\\"$service_name\\\" --no-autorestart\"'"
+
 }
+
+stop_pm2_service_remote() {
+    local intermediate_host="deployment.saito.network"
+    local target_ip="$1"
+    local service_name="$2"
+
+    echo "Stopping PM2 service $service_name on remote node: $target_ip via $intermediate_host"
+
+    ssh -t "root@$intermediate_host" "ssh -t root@$target_ip 'pm2 stop $service_name'"
+}
+
+
 
 create_or_append_issuance() {
     local dir="$1/data/issuance"
@@ -118,13 +162,32 @@ create_or_append_issuance() {
 }
 
 
+copy_remote_stats_file_remote() {
+    local intermediate_host="deployment.saito.network"
+    local target_ip="$1"
+    local remote_directory="$2"
+    local local_directory="$3"
+
+    local stats_file_path="$remote_directory/data/saito.stats"
+
+    echo "Copying stats file from remote node: $target_ip via $intermediate_host to $local_directory"
+
+    scp -o ProxyJump="root@$intermediate_host" "root@$target_ip:$stats_file_path" "$local_directory"
+}
+
+
 loader() {
+    local intermediate_host="deployment.saito.network"
+    local target_ip="$1"  # The IP of the server where the spammer_node is running
+    local service_name="spammer_node"
     local i=0
     local max_dots=30
     local delay=0.5 
 
     while true; do
-        STATUS=$(pm2 show spammer_node | grep "status" | awk '{print $4}')
+        # Execute pm2 show command on the remote server to get the status
+        STATUS=$(ssh -t "root@$intermediate_host" "ssh -t root@$target_ip 'pm2 show $service_name | grep \"status\" | awk \"{print \$4}\"'")
+        
         if [ "$STATUS" = "online" ]; then
             printf "\rProcessing " 
             for (( j=0; j<i; j++ )); do
@@ -142,47 +205,55 @@ loader() {
     printf "\r%s\n" "$(for (( j=0; j<max_dots; j++ )); do printf " "; done)" 
 }
 
+
+
+
 create_or_append_issuance "$main_node_dir"
 install_pm2
 test_configs=$(jq -c '.perf_tests[]' "$config_file")
 for config in $test_configs; do
-    echo "Running test with configuration: $config"
+    # echo "Running test with configuration: $config"
 
     verification_threads=$(echo "$config" | jq '.verification_threads')
     burst_count=$(echo "$config" | jq '.burst_count')
     tx_payload_size=$(echo "$config" | jq '.tx_payload_size')
 
-    clear_blocks_directory "$main_node_dir"
-    clear_blocks_directory "$spammer_node_dir"
+clear_blocks_directory_remote "$main_node_ip" "$main_node_ssh_dir"
+clear_blocks_directory_remote "$spammer_node_ip" "$spammer_node_ssh_dir"
 
-    update_config_file "$main_node_dir/configs/config.json" ".server.verification_threads = $verification_threads"
-    update_config_file "$spammer_node_dir/configs/config.json" ".spammer.burst_count = $burst_count | .spammer.tx_payload_size = $tx_payload_size"
+update_config_file_remote "$main_node_ip" "$main_node_ssh_dir" "configs/config.json" ".server.verification_threads = $verification_threads"
+update_config_file_remote "$spammer_node_ip" "$spammer_node_ssh_dir" "configs/config.json" ".spammer.burst_count = $burst_count | .spammer.tx_payload_size = $tx_payload_size | .server.verification_threads = $verification_threads"
 
-    start_pm2_service "$main_node_dir" "main_node"
-    until is_process_running "main_node"; do sleep 1; done
+
+echo $main_node_ip
+   start_pm2_service_remote $main_node_ip "main_node" $main_node_ssh_dir
+    until is_process_running_remote $main_node_ip "main_node"; do sleep 1; done
     echo "Main node is running."
 
-
-
-    start_pm2_service "$spammer_node_dir" "spammer_node"
-    echo "Spammer node is started."
+     start_pm2_service_remote $spammer_node_ip "spammer_node" $spammer_node_ssh_dir
+    # echo "Spammer node is started."
 
 
     while true; do
-    stats_file="$main_node_dir/data/saito.stats"
+ 
     output_csv="./perf_result.csv"
 
-
-
     loader
+    echo "processing"
 
-    STATUS=$(pm2 show spammer_node | grep "status" | awk '{print $4}')
+    intermediate_host="deployment.saito.network"
+    STATUS=$(ssh -t "root@$intermediate_host" "ssh -t root@$target_ip 'pm2 show spammer_node | grep \"status\" | awk \"{print \$4}\"'")
+
 
     if [ "$STATUS" != "online" ]; then
         echo "Spammer process has stopped."
-        # echo "Stopping main node."
-        pm2 stop main_node
 
+        #  stop main node using ssh
+   stop_pm2_service_remote "$main_node_ip" "main_node"
+
+    copy_remote_stats_file_remote "$main_node_ip" "$main_node_ssh_dir" "."
+
+     stats_file="./saito.stats"
 
         max_tx_rate_network_thread=$(grep "network::incoming_msgs" "$stats_file" | awk '{print $5}' | tr -d ',' | sort -nr | head -n 1)
         max_tx_rate_verification_threads=$(grep "verification_.*::processed_txs" "$stats_file" | awk '{print $11}' | tr -d ',' | sort -nr | head -n 1)
