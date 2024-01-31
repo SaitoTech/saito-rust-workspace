@@ -1018,7 +1018,8 @@ impl Block {
                     );
                     error!("{:?}", result.err().unwrap());
                 } else {
-                    let atr_block = result.unwrap();
+                    let mut atr_block = result.unwrap();
+                    atr_block.generate();
                     assert_ne!(
                         atr_block.block_type,
                         BlockType::Pruned,
@@ -1112,7 +1113,7 @@ impl Block {
                     // tx
                     debug!(
                         "transactions : {:?}, rebroadcasts : {:?}",
-                        pruned_block.transactions.len(),
+                        atr_block.transactions.len(),
                         cv.rebroadcasts.len()
                     );
                 }
@@ -1126,10 +1127,14 @@ impl Block {
         // note that we cannot move this above the ATR section as we use the
         // value of this variable (from the last block) to figure out what the
         // ATR payout should be in this block.
-        let adjustment =
-            (cv.avg_nolan_rebroadcast_per_block - cv.total_rebroadcast_nolan) / GENESIS_PERIOD;
-        cv.avg_nolan_rebroadcast_per_block =
-            (cv.avg_nolan_rebroadcast_per_block - adjustment) as Currency;
+        let adjustment = (cv.avg_nolan_rebroadcast_per_block as i128
+            - cv.total_rebroadcast_nolan as i128)
+            / GENESIS_PERIOD as i128;
+        if cv.avg_nolan_rebroadcast_per_block as i128 >= adjustment {
+            cv.avg_nolan_rebroadcast_per_block =
+                (cv.avg_nolan_rebroadcast_per_block as i128 - adjustment) as Currency;
+        }
+
         debug!(
             "avg_nolan_rebroadcast_per_block : {:?} total_rebroadcast_fees_nolan : {:?} total_rebroadcast_staking_payouts_nolan : {:?} total rebroadcasts : {:?}",
          cv.avg_nolan_rebroadcast_per_block, cv.total_rebroadcast_fees_nolan, cv.total_rebroadcast_staking_payouts_nolan, cv.rebroadcasts.len()
