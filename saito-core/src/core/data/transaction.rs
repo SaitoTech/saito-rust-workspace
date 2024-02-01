@@ -469,7 +469,15 @@ impl Transaction {
     }
 
     //
-    // generates all non-cumulative
+    // generates
+    //
+    // when the block is created, block.generate() is called to fill in all of the 
+    // dynamic data related to the block creator. that function in turn calls tx.generate()
+    // to ensure that transaction data is generated properly. this includes:
+    //
+    // tx.hash -> needed to generate merkle root
+    // tx.fees -> needed to calculate payouts
+    // tx.work -> needed to confirm adequate routing work
     //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
 

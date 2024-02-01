@@ -116,9 +116,6 @@ impl Blockchain {
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
     ) -> AddBlockResult {
-        // confirm hash first
-        // block.generate_pre_hash();
-        // block.generate_hash();
         block.generate();
 
         let non_spv_txs = block
