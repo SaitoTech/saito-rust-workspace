@@ -467,9 +467,7 @@ impl Block {
 
         block.generate_pre_hash();
         block.sign(private_key);
-
-        // hash includes pre-hash and sig, so update
-        // block.generate_hash();
+	// regenerates pre-hash, etc.
         block.generate();
 
         block
