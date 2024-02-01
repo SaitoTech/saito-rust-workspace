@@ -472,20 +472,21 @@ impl Transaction {
     // generates all non-cumulative
     //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
+
+        //
+        // ensure hash exists for signing
+        //
+        self.generate_hash_for_signature();
+
         //
         // nolan_in, nolan_out, total fees
         //
         self.generate_total_fees(tx_index, block_id);
 
         //
-        // routing work for asserted public_key
+        // routing work for asserted public_key (creator)
         //
         self.generate_total_work(public_key);
-
-        //
-        // ensure hash exists for signing
-        //
-        // self.generate_hash_for_signature();
 
         true
     }
@@ -500,9 +501,7 @@ impl Transaction {
 
     // calculate total fees in block
     pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
-        // TODO - remove for uuid work
-        // generate tx signature hash
-        self.generate_hash_for_signature();
+
         trace!(
             "generating total fees for tx : {:?}",
             self.hash_for_signature.unwrap().to_hex()

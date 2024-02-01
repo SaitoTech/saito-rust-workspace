@@ -344,7 +344,6 @@ impl Block {
         block.burnfee = current_burnfee;
         block.timestamp = current_timestamp;
         block.difficulty = previous_block_difficulty;
-
         block.creator = *public_key;
 
         if golden_ticket.is_some() {
@@ -370,8 +369,9 @@ impl Block {
         // permit us to avoid paying out StakerWithdrawal slips when we
         // generate the fee payment.
         //
-        // note -- no need to have an exception for the FEE TX here as
-        // we have not added it yet.
+        // note -- the FEE TX will not have inputs, but we do not need
+	// to add an exception for it because it has not been added to the
+	// block yet.
         if !block.created_hashmap_of_slips_spent_this_block {
             debug!("creating hashmap of slips spent this block...");
             for transaction in &block.transactions {
@@ -683,7 +683,7 @@ impl Block {
         winner_pubkey
     }
 
-    // generate ancillary data
+    // generate
     //
     // this function generates all of the ancillary data needed to process or
     // validate blocks. this includes the various hashes and other dynamic
