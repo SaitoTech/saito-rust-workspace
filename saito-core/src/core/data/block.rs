@@ -25,7 +25,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 245;
+pub const BLOCK_HEADER_SIZE: usize = 237;
 
 //
 // object used when generating and validation transactions, containing the
@@ -78,8 +78,6 @@ pub struct ConsensusValues {
     #[serde(skip)]
     // average income
     pub avg_income: Currency,
-    // average variance
-    pub avg_variance: Currency,
     // average fee per byte
     pub avg_fee_per_byte: Currency,
     // average nolan rebroadcast per block
@@ -109,7 +107,6 @@ impl ConsensusValues {
             nolan_falling_off_chain: 0,
             staking_payout: 0,
             avg_income: 0,
-            avg_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
         }
@@ -135,7 +132,6 @@ impl ConsensusValues {
             nolan_falling_off_chain: 0,
             staking_payout: 0,
             avg_income: 0,
-            avg_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
         }
@@ -184,7 +180,6 @@ pub struct Block {
     pub difficulty: u64,
     pub staking_treasury: Currency,
     pub avg_income: Currency,
-    pub avg_variance: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
 
@@ -267,7 +262,6 @@ impl Block {
             difficulty: 0,
             staking_treasury: 0,
             avg_income: 0,
-            avg_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
             transactions: vec![],
@@ -468,7 +462,6 @@ impl Block {
         block.merkle_root = block_merkle_root;
 
         block.avg_income = cv.avg_income;
-        block.avg_variance = cv.avg_variance;
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
@@ -524,16 +517,13 @@ impl Block {
         let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
         let staking_treasury: Currency =
             Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
-
         let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
         let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
-
         let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
-        let avg_variance: Currency = Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
         let avg_fee_per_byte: Currency =
-            Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
+            Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
         let avg_nolan_rebroadcast_per_block: Currency =
-            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
+            Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -598,7 +588,6 @@ impl Block {
         block.difficulty = difficulty;
         block.staking_treasury = staking_treasury;
         block.avg_income = avg_income;
-        block.avg_variance = avg_variance;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
         block.transactions = transactions.to_vec();
@@ -978,8 +967,6 @@ impl Block {
             // we set these figures according to the values in the previous block,
             // and then adjust them according to the values from this block.
             cv.avg_income = previous_block.avg_income;
-            // TODO - remove avg_variance, as no longer needed, for now just copy over
-            cv.avg_variance = previous_block.avg_variance;
             cv.avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
 
             //
@@ -993,8 +980,6 @@ impl Block {
             // rules will cause the block to fail unless it is the first block. average
             // income is set to whatever the block avg_income is set to.
             cv.avg_income = self.avg_income;
-            cv.avg_variance = self.avg_variance;
-
             cv.expected_burnfee = self.burnfee;
         }
 
@@ -1393,7 +1378,6 @@ impl Block {
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
-            self.avg_variance.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
@@ -1415,7 +1399,6 @@ impl Block {
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
     /// [avg_income - 8 bytes - u64]
-    /// [avg_variance - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
         let mut tx_len_buffer: Vec<u8> = vec![];
@@ -1447,7 +1430,6 @@ impl Block {
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
-            self.avg_variance.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
@@ -1627,7 +1609,6 @@ impl Block {
         block.staking_treasury = self.staking_treasury;
         block.signature = self.signature;
         block.avg_income = self.avg_income;
-        block.avg_variance = self.avg_variance;
         block.hash = self.hash;
 
         block.merkle_root = self.generate_merkle_root(false, false);
@@ -1689,17 +1670,6 @@ impl Block {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
                 self.avg_income, cv.avg_income
-            );
-            return false;
-        }
-
-        //
-        // the average variance in terms of number of fees in block
-        //
-        if cv.avg_variance != self.avg_variance {
-            error!(
-                "block is misreporting its average variance. current : {:?} expected : {:?}",
-                self.avg_variance, cv.avg_variance
             );
             return false;
         }
