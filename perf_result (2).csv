@@ -1,0 +1,6 @@
+tx_rate_from_spammer,tx_payload_size,verification_thread_count,max_tx_rate_at_network_thread,max_tx_rate_at_verification_threads,total_txs,block_count,longest_chain_length,total_block_size,average_block_size,time_to_load_blocks,time_to_fetch_blocks,ram_after_initial_run,ram_after_loading_blocks,ram_after_fetching_blocks
+200,3,4,191.78,50.05,20012,13,13,2796,215,2,1,7620.12 MB,7620.08 MB,7633.87 MB
+500,3,4,423.66,112.50,20006,7,7,2652,378,2,1,7704.24 MB,7704.23 MB,7709 MB
+1000,3,4,741.77,199.76,20005,5,5,2524,504,2,1,7732.32 MB,7732.38 MB,7739.82 MB
+1500,3,4,992.34,262.03,20005,4,4,2424,606,3,1,7744.6 MB,7744.49 MB,7752.76 MB
+200,3,4,191.83,50.06,20011,13,13,2772,213,2,2,7744.87 MB,7744.96 MB,7761.79 MB
