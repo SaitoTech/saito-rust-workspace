@@ -172,9 +172,9 @@ for config in $test_configs; do
         max_tx_rate_network_thread=$(grep "network::incoming_msgs" "$stats_file" | awk '{print $11}' | tr -d ',' | sort -nr | head -n 1)
         max_tx_rate_verification_threads=$(grep "verification_.*::processed_txs" "$stats_file" | awk '{print $11}' | tr -d ',' | sort -nr | head -n 1)
         total_txs=$(grep "routing::incoming_msgs" "$stats_file" | awk '{print $5}' | tr -d ',' | sort -nr | head -n 1)
-        block_count=$(grep "blockchain::state" "$stats_file" | awk '{print $8}' | tr-d ',' | sort -nr | head -n 1)
+        block_count=$(grep "blockchain::state" "$stats_file" | awk '{print $8}' | tr -d ',' | sort -nr | head -n 1)
         longest_chain_length=$(grep "blockchain::state" "$stats_file" | awk '{print $11}' | tr -d ',' | sort -nr | head -n 1)
-        txs_in_blocks=$(grep "blockchain::state" "$stats_file" | awk '{print $17}' | tr -d ',' | sort -nr | head -n 1)
+        txs_in_blocks=$(grep "blockchain::state" "$stats_file" | awk '{print $17}' | tr -d ',' | tr -d '\r' |  sort -nr | head -n 1)
 
         total_block_size=$(du -ck "$main_node_dir/data/blocks/"* | grep "total" | awk '{print $1}')
         num_block_files=$(find "$main_node_dir/data/blocks/" -type f | wc -l)
