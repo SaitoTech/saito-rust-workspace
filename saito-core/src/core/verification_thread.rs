@@ -65,6 +65,7 @@ impl VerificationThread {
 
         self.processed_txs.increment();
         self.processed_msgs.increment();
+
         self.sender_to_consensus
             .send(ConsensusEvent::NewTransaction { transaction })
             .await
@@ -73,6 +74,7 @@ impl VerificationThread {
     pub async fn verify_txs(&mut self, transactions: &mut VecDeque<Transaction>) {
         self.processed_txs.increment_by(transactions.len() as u64);
         self.processed_msgs.increment_by(transactions.len() as u64);
+        dbg!("{:?} processed txs", self.processed_txs.total);
         let prev_count = transactions.len();
         let txs: Vec<Transaction>;
         {
@@ -101,6 +103,8 @@ impl VerificationThread {
         }
 
         let invalid_txs = prev_count - txs.len();
+
+        debug!("{:?}, transaction length", txs.len());
         for transaction in txs {
             self.sender_to_consensus
                 .send(ConsensusEvent::NewTransaction { transaction })

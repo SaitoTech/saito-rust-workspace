@@ -158,6 +158,10 @@ impl RoutingThread {
                     transaction.signature.to_hex()
                 );
                 self.stats.received_transactions.increment();
+                // debug!(
+                //     "received transactions routing {:?}",
+                //     &self.stats.received_transactions.total
+                // );
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;
             }
@@ -392,11 +396,10 @@ impl RoutingThread {
             trials += 1;
             self.last_verification_thread_index += 1;
             let sender_index: usize = self.last_verification_thread_index % sender_count;
-            let sender = self
+            let sender: &Sender<VerifyRequest> = self
                 .senders_to_verification
                 .get(sender_index)
                 .expect("sender should be here as we are using the modulus on index");
-
             if sender.capacity() > 0 {
                 sender.send(request).await.unwrap();
                 trace!(

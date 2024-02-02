@@ -136,6 +136,11 @@ impl Blockchain {
             block.transactions.len()
         );
 
+        debug!(
+            "{:?} mempool transaction length",
+            mempool.transactions.len()
+        );
+
         // since we already have the block we unset the fetching state
         self.unmark_as_fetching(&block.hash);
 

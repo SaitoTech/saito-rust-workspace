@@ -227,6 +227,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
             let (mut mempool, _mempool_) = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
+            debug!("{:?} transactions for mempool", self.txs_for_mempool.len());
             if !self.txs_for_mempool.is_empty() {
                 for tx in self.txs_for_mempool.iter() {
                     if let TransactionType::GoldenTicket = tx.transaction_type {
@@ -404,6 +405,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             }
             ConsensusEvent::NewTransaction { transaction } => {
                 self.stats.received_tx.increment();
+
+                debug!(
+                    "{:?} received transactions consensus",
+                    self.stats.received_tx.total
+                );
 
                 trace!(
                     "tx received with sig: {:?} hash : {:?}",

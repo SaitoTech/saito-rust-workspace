@@ -86,6 +86,7 @@ impl Spammer {
                     for tx in transactions {
                         count -= 1;
                         total_count += 1;
+                        info!("total transactions sent {:?}", &total_count);
                         sender
                             .send(IoEvent {
                                 event_processor_id: 0,

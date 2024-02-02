@@ -156,7 +156,7 @@ for config in $test_configs; do
     clear_blocks_directory "$spammer_node_dir"
 
     update_config_file "$main_node_dir/configs/config.json" ".server.verification_threads = $verification_threads"
-    update_config_file "$spammer_node_dir/configs/config.json" ".spammer.burst_count = $burst_count | .spammer.tx_size = $tx_payload_size"
+    update_config_file "$spammer_node_dir/configs/config.json" ".spammer.burst_count = $burst_count | .spammer.tx_size = $tx_payload_size | .server.verification_threads = $verification_threads"
 
     start_pm2_service "$main_node_dir" "main_node"
     until is_process_running "main_node"; do sleep 1; done
@@ -215,88 +215,6 @@ data_throughput=$(echo "scale=2; $tx_payload_size * $txs_in_blocks / 300" | bc)
 
             # Append to CSV
             echo "$burst_count,$tx_payload_size,$verification_threads,$max_tx_rate_network_thread,$max_tx_rate_verification_threads,$total_txs,$block_count,$longest_chain_length,$total_block_size,$average_block_size,$transaction_throughput,$data_throughput" >> "$output_csv"
-
-
-            # echo "$burst_count,$tx_payload_size,$verification_threads,$max_tx_rate_network_thread,$max_tx_rate_verification_threads,$total_txs,$block_count,$longest_chain_length,$total_block_size,$average_block_size" >> "$output_csv"
-
-                 # Restart main node
-                # echo "Restarting main node and monitoring for block loading."
-            #     pm2 restart "main_node"
-            #     start_time=$(date +%s)
-
-            #     output_file="$main_node_dir/main_node_output.log"
-            #     pm2 logs main_node > "$output_file" 2>&1 &
-
-            #     output_file_spammer_node="$spammer_node_dir/spammer_node_output.log"
-            #    pm2 logs spammer_node > "$output_file_spammer_node" 2>&1 &  
-
-            #     # Time taken to load blocks
-            #     while ! grep -m1 "0 blocks remaining to be loaded" "$output_file" > /dev/null; do
-            #         sleep 1 
-            #     done
-            #     end_time=$(date +%s)
-            #     time_to_load_blocks=$((end_time - start_time))
-
-            #     # Check RAM usage after loading blocks
-            #     ram_after_loading_blocks=$(get_ram_usage)
-
-            #     # Wait for 'starting websocket server' to measure initial RAM usage
-            #     while ! grep -m1 "starting websocket server" "$output_file" > /dev/null; do
-            #         sleep 1
-            #     done
-            #     ram_after_initial_run=$(get_ram_usage)
-
-            #     # check if main node has properly started
-            #     until is_process_running "main_node"; do
-            #     sleep 1
-            #     done
-
-            #     # clear blocks in spammer node directory
-            #     clear_blocks_directory "$spammer_node_dir"
-
-            #     # Start spammer node and monitor for fetching blocks
-            #     echo "Starting spammer node and monitoring for fetching blocks."
-            #     pm2 start "spammer_node"
-            #     fetch_start_time=$(date +%s)
-
-            #     latest_block_name=$(get_latest_block_name "$main_node_dir")
-            #     if [ -z "$latest_block_name" ]; then
-            #         echo "No block files found in $spammer_node_dir/data/blocks"
-            #         exit 1
-            #     fi
-
-            #     block_identifier=$(echo "$latest_block_name" | grep -oE '[^-]*\.sai$' | sed 's/\.sai$//')
-            #     if [ -z "$block_identifier" ]; then
-            #         echo "Unable to extract block identifier from $latest_block_name"
-            #         exit 1
-            #     fi
-            #     search_phrase="fetching block : .*\/$block_identifier"
-            #     echo "Latest block id: $latest_block_name"
-            #     while ! grep -m1 "$search_phrase" "$output_file_spammer_node" > /dev/null; do
-            #         sleep 1 
-            #     done
-
-            #     fetch_end_time=$(date +%s)
-            #     time_to_fetch_blocks=$((fetch_end_time - fetch_start_time))
-            #     ram_after_fetching_blocks=$(get_ram_usage)
-
-
-
-            #     echo "All blocks loaded. Time taken: $time_to_load_blocks seconds."
-            #     echo "RAM usage before initial run: $ram_after_initial_run"
-            #     echo "Time to fetch blocks : $time_to_fetch_blocks"
-            #     echo "RAM usage after fetching blocks blocks: $ram_after_fetching_blocks"
-
-
-
-
-            #     echo "$burst_count,$tx_payload_size,$verification_threads,$max_tx_rate_network_thread,$max_tx_rate_verification_threads,$total_txs,$block_count,$longest_chain_length,$total_block_size,$average_block_size,$time_to_load_blocks,$time_to_fetch_blocks,$ram_after_initial_run,$ram_after_loading_blocks,$ram_after_fetching_blocks" >> "$output_csv"
-
-
-            #     echo "CSV file created at $output_csv"
-
-            #     pm2 "kill"
-
         break
     # fi
     sleep 1

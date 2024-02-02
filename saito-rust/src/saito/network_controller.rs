@@ -357,7 +357,6 @@ impl NetworkController {
     ) {
         debug!("starting new task for reading from peer : {:?}", peer_index);
         tokio::spawn(async move {
-            debug!("new thread started for peer receiving");
             match receiver {
                 PeerReceiver::Warp(mut receiver) => loop {
                     let result = receiver.next().await;
@@ -381,6 +380,7 @@ impl NetworkController {
                             buffer.len(),
                             peer_index
                         );
+                        // debug!("new thread started for peer receiving {:?}", buffer);
                         let message = IoEvent {
                             event_processor_id: 1,
                             event_id: 0,
