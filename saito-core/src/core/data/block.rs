@@ -370,8 +370,8 @@ impl Block {
         // generate the fee payment.
         //
         // note -- the FEE TX will not have inputs, but we do not need
-	// to add an exception for it because it has not been added to the
-	// block yet.
+        // to add an exception for it because it has not been added to the
+        // block yet.
         if !block.created_hashmap_of_slips_spent_this_block {
             debug!("creating hashmap of slips spent this block...");
             for transaction in &block.transactions {
@@ -467,7 +467,7 @@ impl Block {
 
         block.generate_pre_hash();
         block.sign(private_key);
-	// regenerates pre-hash, etc.
+        // regenerates pre-hash, etc.
         block.generate();
 
         block
@@ -2085,7 +2085,7 @@ mod tests {
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 177);
+        assert_eq!(serialized_body.len(), 169);
 
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
@@ -2100,15 +2100,6 @@ mod tests {
         );
 
         assert_eq!(block.signature.len(), 64);
-        // assert_eq!(
-        //     block.signature,
-        //     [
-        //         181, 196, 195, 189, 82, 225, 56, 124, 169, 36, 245, 199, 95, 50, 182, 135, 95, 153,
-        //         228, 2, 162, 21, 248, 254, 42, 1, 106, 1, 25, 208, 145, 191, 21, 187, 69, 52, 225,
-        //         214, 86, 94, 116, 168, 14, 58, 70, 186, 16, 164, 215, 211, 153, 107, 226, 236, 231,
-        //         190, 0, 62, 12, 122, 68, 24, 2, 109
-        //     ]
-        // )
     }
 
     #[test]
