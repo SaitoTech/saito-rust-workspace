@@ -25,7 +25,7 @@ use crate::core::data::storage::Storage;
 use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 245;
+pub const BLOCK_HEADER_SIZE: usize = 237;
 
 //
 // object used when generating and validation transactions, containing the
@@ -78,8 +78,6 @@ pub struct ConsensusValues {
     #[serde(skip)]
     // average income
     pub avg_income: Currency,
-    // average variance
-    pub avg_variance: Currency,
     // average fee per byte
     pub avg_fee_per_byte: Currency,
     // average nolan rebroadcast per block
@@ -109,7 +107,6 @@ impl ConsensusValues {
             nolan_falling_off_chain: 0,
             staking_payout: 0,
             avg_income: 0,
-            avg_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
         }
@@ -135,7 +132,6 @@ impl ConsensusValues {
             nolan_falling_off_chain: 0,
             staking_payout: 0,
             avg_income: 0,
-            avg_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
         }
@@ -184,7 +180,6 @@ pub struct Block {
     pub difficulty: u64,
     pub staking_treasury: Currency,
     pub avg_income: Currency,
-    pub avg_variance: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
 
@@ -267,7 +262,6 @@ impl Block {
             difficulty: 0,
             staking_treasury: 0,
             avg_income: 0,
-            avg_variance: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
             transactions: vec![],
@@ -350,7 +344,6 @@ impl Block {
         block.burnfee = current_burnfee;
         block.timestamp = current_timestamp;
         block.difficulty = previous_block_difficulty;
-
         block.creator = *public_key;
 
         if golden_ticket.is_some() {
@@ -376,8 +369,9 @@ impl Block {
         // permit us to avoid paying out StakerWithdrawal slips when we
         // generate the fee payment.
         //
-        // note -- no need to have an exception for the FEE TX here as
-        // we have not added it yet.
+        // note -- the FEE TX will not have inputs, but we do not need
+        // to add an exception for it because it has not been added to the
+        // block yet.
         if !block.created_hashmap_of_slips_spent_this_block {
             debug!("creating hashmap of slips spent this block...");
             for transaction in &block.transactions {
@@ -468,15 +462,12 @@ impl Block {
         block.merkle_root = block_merkle_root;
 
         block.avg_income = cv.avg_income;
-        block.avg_variance = cv.avg_variance;
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
         block.generate_pre_hash();
         block.sign(private_key);
-
-        // hash includes pre-hash and sig, so update
-        // block.generate_hash();
+        // regenerates pre-hash, etc.
         block.generate();
 
         block
@@ -524,16 +515,13 @@ impl Block {
         let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
         let staking_treasury: Currency =
             Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
-
         let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
         let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
-
         let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
-        let avg_variance: Currency = Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
         let avg_fee_per_byte: Currency =
-            Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
+            Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
         let avg_nolan_rebroadcast_per_block: Currency =
-            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
+            Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -598,7 +586,6 @@ impl Block {
         block.difficulty = difficulty;
         block.staking_treasury = staking_treasury;
         block.avg_income = avg_income;
-        block.avg_variance = avg_variance;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
         block.transactions = transactions.to_vec();
@@ -694,7 +681,7 @@ impl Block {
         winner_pubkey
     }
 
-    // generate ancillary data
+    // generate
     //
     // this function generates all of the ancillary data needed to process or
     // validate blocks. this includes the various hashes and other dynamic
@@ -976,8 +963,6 @@ impl Block {
             // we set these figures according to the values in the previous block,
             // and then adjust them according to the values from this block.
             cv.avg_income = previous_block.avg_income;
-            // TODO - remove avg_variance, as no longer needed, for now just copy over
-            cv.avg_variance = previous_block.avg_variance;
             cv.avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
 
             //
@@ -991,8 +976,6 @@ impl Block {
             // rules will cause the block to fail unless it is the first block. average
             // income is set to whatever the block avg_income is set to.
             cv.avg_income = self.avg_income;
-            cv.avg_variance = self.avg_variance;
-
             cv.expected_burnfee = self.burnfee;
             cv.expected_difficulty = self.difficulty;
         }
@@ -1390,7 +1373,6 @@ impl Block {
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
-            self.avg_variance.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
@@ -1412,7 +1394,6 @@ impl Block {
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
     /// [avg_income - 8 bytes - u64]
-    /// [avg_variance - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
         let mut tx_len_buffer: Vec<u8> = vec![];
@@ -1444,7 +1425,6 @@ impl Block {
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
-            self.avg_variance.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
@@ -1624,7 +1604,6 @@ impl Block {
         block.staking_treasury = self.staking_treasury;
         block.signature = self.signature;
         block.avg_income = self.avg_income;
-        block.avg_variance = self.avg_variance;
         block.hash = self.hash;
 
         block.merkle_root = self.generate_merkle_root(false, false);
@@ -1686,17 +1665,6 @@ impl Block {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
                 self.avg_income, cv.avg_income
-            );
-            return false;
-        }
-
-        //
-        // the average variance in terms of number of fees in block
-        //
-        if cv.avg_variance != self.avg_variance {
-            error!(
-                "block is misreporting its average variance. current : {:?} expected : {:?}",
-                self.avg_variance, cv.avg_variance
             );
             return false;
         }
@@ -2117,7 +2085,7 @@ mod tests {
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 177);
+        assert_eq!(serialized_body.len(), 169);
 
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
@@ -2132,15 +2100,6 @@ mod tests {
         );
 
         assert_eq!(block.signature.len(), 64);
-        // assert_eq!(
-        //     block.signature,
-        //     [
-        //         181, 196, 195, 189, 82, 225, 56, 124, 169, 36, 245, 199, 95, 50, 182, 135, 95, 153,
-        //         228, 2, 162, 21, 248, 254, 42, 1, 106, 1, 25, 208, 145, 191, 21, 187, 69, 52, 225,
-        //         214, 86, 94, 116, 168, 14, 58, 70, 186, 16, 164, 215, 211, 153, 107, 226, 236, 231,
-        //         190, 0, 62, 12, 122, 68, 24, 2, 109
-        //     ]
-        // )
     }
 
     #[test]

@@ -174,11 +174,6 @@ impl WasmBlock {
         self.block.cv.avg_income
     }
 
-    #[wasm_bindgen(getter = avg_variance)]
-    pub fn avg_variance(&self) -> u64 {
-        self.block.cv.avg_variance
-    }
-
     #[wasm_bindgen(getter = id)]
     pub fn get_id(&self) -> u64 {
         self.block.id

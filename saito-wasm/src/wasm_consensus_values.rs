@@ -134,11 +134,6 @@ impl WasmConsensusValues {
     pub fn avg_income(&self) -> u64 {
         self.cv.avg_income
     }
-
-    #[wasm_bindgen(getter = avg_variance)]
-    pub fn avg_variance(&self) -> u64 {
-        self.cv.avg_variance
-    }
 }
 
 impl WasmConsensusValues {
