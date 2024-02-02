@@ -471,7 +471,7 @@ impl Transaction {
     //
     // generates
     //
-    // when the block is created, block.generate() is called to fill in all of the 
+    // when the block is created, block.generate() is called to fill in all of the
     // dynamic data related to the block creator. that function in turn calls tx.generate()
     // to ensure that transaction data is generated properly. this includes:
     //
@@ -480,7 +480,6 @@ impl Transaction {
     // tx.work -> needed to confirm adequate routing work
     //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
-
         //
         // ensure hash exists for signing
         //
@@ -509,7 +508,6 @@ impl Transaction {
 
     // calculate total fees in block
     pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
-
         trace!(
             "generating total fees for tx : {:?}",
             self.hash_for_signature.unwrap().to_hex()
