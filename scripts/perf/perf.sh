@@ -178,7 +178,7 @@ for config in $test_configs; do
 
     # Wait for 5 minutes
     echo "Waiting for 5 minutes to gather data..."
-    sleep 10  # Sleep for 300 seconds (5 minutes)
+    sleep 300  # Sleep for 300 seconds (5 minutes)
 
     
 
