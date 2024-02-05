@@ -150,6 +150,8 @@ impl Mempool {
                 self.transactions.insert(transaction.signature, transaction);
                 self.new_tx_added = true;
             }
+        } else {
+            debug!("transaction does not contain key");
         }
     }
 

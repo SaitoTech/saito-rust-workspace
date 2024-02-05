@@ -74,7 +74,6 @@ impl VerificationThread {
     pub async fn verify_txs(&mut self, transactions: &mut VecDeque<Transaction>) {
         self.processed_txs.increment_by(transactions.len() as u64);
         self.processed_msgs.increment_by(transactions.len() as u64);
-        dbg!("{:?} processed txs", self.processed_txs.total);
         let prev_count = transactions.len();
         let txs: Vec<Transaction>;
         {

@@ -44,6 +44,7 @@ pub struct ConsensusStats {
     pub blocks_created: StatVariable,
     pub received_tx: StatVariable,
     pub received_gts: StatVariable,
+    pub mempool_total_added: StatVariable,
 }
 
 impl ConsensusStats {
@@ -66,6 +67,11 @@ impl ConsensusStats {
             ),
             received_gts: StatVariable::new(
                 "consensus::received_gts".to_string(),
+                STAT_BIN_COUNT,
+                sender.clone(),
+            ),
+            mempool_total_added: StatVariable::new(
+                "consensus::total_mempool_added".to_string(),
                 STAT_BIN_COUNT,
                 sender.clone(),
             ),
@@ -234,16 +240,22 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         unreachable!("golden tickets shouldn't be here");
                     } else {
                         mempool.add_transaction(tx.clone()).await;
+                        self.stats.mempool_total_added.increment();
+
+                        debug!(
+                            "mempool total processed tx {:?}",
+                            self.stats.mempool_total_added.total
+                        );
                     }
                 }
             }
 
             self.block_producing_timer = 0;
 
-            // trace!(
-            //     "mempool size before bundling : {:?}",
-            //     mempool.transactions.len()
-            // );
+            trace!(
+                "mempool size before bundling : {:?}",
+                mempool.transactions.len()
+            );
             let mut gt_result = None;
             let mut gt_propagated = false;
             {
@@ -273,7 +285,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     block.hash.to_hex(),
                     block.id
                 );
-                trace!(
+                debug!(
                     "mempool size after bundling : {:?}",
                     mempool.transactions.len()
                 );
@@ -404,13 +416,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 Some(())
             }
             ConsensusEvent::NewTransaction { transaction } => {
-                self.stats.received_tx.increment();
-
-                debug!(
-                    "{:?} received transactions consensus",
-                    self.stats.received_tx.total
-                );
-
                 trace!(
                     "tx received with sig: {:?} hash : {:?}",
                     transaction.signature.to_hex(),
@@ -423,7 +428,18 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     self.stats.received_gts.increment();
                     mempool.add_golden_ticket(transaction).await;
                 } else {
+                    self.stats.received_tx.increment();
+
+                    debug!(
+                        "received transactions consensus {:?}",
+                        self.stats.received_tx.total
+                    );
                     self.txs_for_mempool.push(transaction);
+
+                    debug!(
+                        "{:?} mempool length after grabbing in consensus",
+                        self.txs_for_mempool.len()
+                    );
                 }
 
                 Some(())
@@ -432,7 +448,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 self.stats
                     .received_tx
                     .increment_by(transactions.len() as u64);
-
                 self.txs_for_mempool.reserve(transactions.len());
                 for transaction in transactions.drain(..) {
                     if let TransactionType::GoldenTicket = transaction.transaction_type {

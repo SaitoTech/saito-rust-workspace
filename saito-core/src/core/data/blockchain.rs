@@ -1600,6 +1600,11 @@ impl Blockchain {
         }
 
         debug!(
+            "{:?} mempool transactions remaining",
+            mempool.transactions.len()
+        );
+
+        debug!(
             "added blocks to blockchain. added back : {:?}",
             mempool.blocks_queue.len()
         );
