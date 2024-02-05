@@ -151,7 +151,6 @@ impl Mempool {
                 self.new_tx_added = true;
             }
         } else {
-            debug!("transaction does not contain key");
         }
     }
 
