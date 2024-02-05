@@ -315,10 +315,17 @@ pub async fn create_transaction(
         fee,
         force_merge,
         Some(&saito.consensus_thread.network),
-    )
-    .unwrap();
+    );
+    if transaction.is_err() {
+        error!(
+            "failed creating transaction. {:?}",
+            transaction.err().unwrap()
+        );
+        return Err(JsValue::from("Failed creating transaction"));
+    }
+    let transaction = transaction.unwrap();
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
-    return Ok(wasm_transaction);
+    Ok(wasm_transaction)
 }
 
 #[wasm_bindgen]
