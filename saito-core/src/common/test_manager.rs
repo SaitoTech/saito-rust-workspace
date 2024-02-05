@@ -379,13 +379,11 @@ pub mod test {
                 current_block_treasury = block.treasury;
 
                 for t in 0..block.transactions.len() {
-                    //
                     // we ignore the inputs in staking / fee transactions as they have
                     // been pulled from the staking treasury and are already technically
                     // counted in the money supply as an output from a previous slip.
                     // we only care about the difference in token supply represented by
                     // the difference in the staking_treasury.
-                    //
                     if block.transactions[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = true;
                         block_fee_tx_index = t as usize;
@@ -398,17 +396,13 @@ pub mod test {
                         }
                     }
 
-                    //
                     // block one sets circulation
-                    //
                     if i == 1 {
                         token_supply = block_outputs + block.treasury + block.staking_treasury;
                         current_supply = token_supply;
                     } else {
-                        //
                         // figure out how much is in circulation
-                        //
-                        if block_contains_fee_tx == false {
+                        if !block_contains_fee_tx {
                             current_supply -= block_inputs;
                             current_supply += block_outputs;
 
