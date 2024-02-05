@@ -285,7 +285,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     block.hash.to_hex(),
                     block.id
                 );
-                debug!(
+                trace!(
                     "mempool size after bundling : {:?}",
                     mempool.transactions.len()
                 );
@@ -435,11 +435,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         self.stats.received_tx.total
                     );
                     self.txs_for_mempool.push(transaction);
-
-                    debug!(
-                        "{:?} mempool length after grabbing in consensus",
-                        self.txs_for_mempool.len()
-                    );
                 }
 
                 Some(())
