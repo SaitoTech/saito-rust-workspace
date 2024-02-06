@@ -67,6 +67,7 @@ bash scripts/bootstrap_mac.sh
 
 ### Step 3: Configure the Application
 
+
 Change to the saito-rust directory:
 
 ```bash
