@@ -13,10 +13,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 brew update
 
-brew install llvm clang pkg-config node npm python3
-
+brew install llvm clang pkg-config node npm python3 cargo
 
 cargo install wasm-pack
-
 
 cargo build
