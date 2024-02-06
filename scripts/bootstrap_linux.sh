@@ -9,3 +9,5 @@ tset
 sudo npm install -g pm2
 cargo install wasm-pack
 cargo build
+
+# setup the saito-rust/config.json file from the template and run `cargo run`
