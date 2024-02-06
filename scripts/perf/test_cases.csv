@@ -1,0 +1,7 @@
+VerificationThreads,SpammerTxRate,PayloadSize
+2,10,0
+2,100,0
+2,1000,0
+2,10,1000
+2,100,1000
+2,1000,1000

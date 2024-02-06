@@ -53,27 +53,25 @@ run_test_case() {
 
 }
 
-read_configs(){
-  # check if config file is available
-
-  # load server data
-  # load spammer data
-
-
-}
-
-server_ip="127.0.0.1"
-spammer_ip="127.0.0.1"
-server_data_dir="~/saito-rust-workspace/saito-rust/data"
-spammer_data_dir="~/saito-rust-workspace/saito-spammer/data"
-
 test_case_count=0
 test_cases_ver_thread_count=[]
 test_cases_tx_rate_from_spammer=[]
 test_cases_tx_payload_size=[]
 
+
 run_perf_test() {
+  config_file=$1
+  test_cases_file=$2
+
+  echo "Running perf test script..."
+  echo "Config File : $config_file"
+  echo "Test Cases : $test_cases_file"
+
   # read the config file
+  source $config_file
+
+  # read the test cases
+
 
   # Prepare remote connections
 
@@ -84,12 +82,18 @@ run_perf_test() {
   # per each test case run perf tests
 
   i=test_case_count
-  while [ $i -eq 0 ]; do
+  echo "running $test_case_count test cases..."
+  while [[ $i -gt 0 ]]; do
     i=$i-1
-    run_test_case
+    run_test_case ${test_cases_ver_thread_count[$i]} ${test_cases_tx_rate_from_spammer[$i]} ${test_cases_tx_payload_size[$i]}
   done
 
+  echo "finished running test cases"
+
   # write collected data to a csv file
+  echo "writing performance data to csv file..."
+
+  echo "exiting script"
 }
 
-run_perf_test
+run_perf_test $1 $2
