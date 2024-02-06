@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Script to setup the basic requirements for running a saito rust node on macOS
+# Script to setup the basic requirements for running a saito rust node on macOS  
 
 if ! command -v brew &> /dev/null
 then
