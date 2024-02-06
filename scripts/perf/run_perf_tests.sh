@@ -58,6 +58,16 @@ test_cases_ver_thread_count=[]
 test_cases_tx_rate_from_spammer=[]
 test_cases_tx_payload_size=[]
 
+read_test_cases () {
+  echo "loading test cases..."
+
+  while read line
+  do
+    echo "Record is : $line"
+  done < <(tail -n +2 "$test_cases_file")
+
+  echo "$test_case_count test cases loaded"
+}
 
 run_perf_test() {
   config_file=$1
@@ -70,8 +80,11 @@ run_perf_test() {
   # read the config file
   source $config_file
 
-  # read the test cases
+  echo "REMOTE_SERVER_IP : $REMOTE_SERVER_IP"
+  echo "REMOTE_SPAMMER_IP : $REMOTE_SPAMMER_IP"
 
+  # read the test cases
+  read_test_cases;
 
   # Prepare remote connections
 
@@ -85,7 +98,7 @@ run_perf_test() {
   echo "running $test_case_count test cases..."
   while [[ $i -gt 0 ]]; do
     i=$i-1
-    run_test_case ${test_cases_ver_thread_count[$i]} ${test_cases_tx_rate_from_spammer[$i]} ${test_cases_tx_payload_size[$i]}
+    run_test_case "${test_cases_ver_thread_count[$i]}" "${test_cases_tx_rate_from_spammer[$i]}" "${test_cases_tx_payload_size[$i]}"
   done
 
   echo "finished running test cases"
