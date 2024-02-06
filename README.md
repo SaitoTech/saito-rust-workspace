@@ -79,6 +79,9 @@ Copy the configuration template to create your own configuration file:
 cp configs/config.template.json configs/config.json
 ````
 
+for explaination of the configuration file, click [here](https://wiki.saito.io/tech/installation/saito-rust-config)
+
+
 
 #### Step 4: Prepare Data Directories
 
