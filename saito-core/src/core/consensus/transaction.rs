@@ -378,6 +378,8 @@ impl Transaction {
         transaction.transaction_type = transaction_type;
         transaction.signature = signature;
         transaction.path = path;
+
+        debug!("{:?} deserializing from net transaction path", transaction);
         Ok(transaction)
     }
 

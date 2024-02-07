@@ -4,9 +4,10 @@ import Slip from "./slip";
 import Peer from "./peer";
 import Wallet from "./wallet";
 import Blockchain from "./blockchain";
+import Hop from "./hop";
 
 export default class Factory {
-  constructor() {}
+  constructor() { }
 
   public createBlock(data?: any): Block {
     return new Block(data);
@@ -22,6 +23,10 @@ export default class Factory {
 
   public createPeer(data?: any): Peer {
     return new Peer(data);
+  }
+
+  public createRoutingPath(data?: any): Hop {
+    return new Hop(data);
   }
 
   public createWallet(data: any): Wallet {

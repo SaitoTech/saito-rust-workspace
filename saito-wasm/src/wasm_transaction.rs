@@ -11,6 +11,20 @@ use crate::saitowasm::{string_to_hex, string_to_key, SAITO};
 use crate::wasm_hop::WasmHop;
 use crate::wasm_slip::WasmSlip;
 
+use wasm_bindgen::prelude::*;
+
+// #[wasm_bindgen]
+// extern "C" {
+//     #[wasm_bindgen(js_namespace = js_sys, js_name = Array)]
+//     pub type JsArray;
+
+//     #[wasm_bindgen(js_namespace = js_sys, js_name = Array, constructor)]
+//     fn new() -> JsArray;
+
+//     #[wasm_bindgen(method, js_name = push)]
+//     fn push(this: &JsArray, value: &JsValue);
+// }
+
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct WasmTransaction {
@@ -32,10 +46,16 @@ impl WasmTransaction {
 
     #[wasm_bindgen(getter = routing_path)]
     pub fn get_routing_path(&self) -> Array {
-        let array = Array::new();
-        for hop in &self.tx.path {
-            let wasm_hop = WasmHop::from_hop(hop.clone());
-            array.push(&JsValue::from(wasm_hop));
+        let mut paths: Vec<WasmHop> = self
+            .tx
+            .path
+            .iter()
+            .map(|path| WasmHop::from_hop(path.clone()))
+            .collect();
+
+        let array = js_sys::Array::new_with_length(paths.len() as u32);
+        for (i, hop) in paths.drain(..).enumerate() {
+            array.set(i as u32, JsValue::from(hop));
         }
         array
     }

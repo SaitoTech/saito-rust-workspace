@@ -16,8 +16,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
   constructor(block?: WasmBlock) {
     if (!block) {
       block = new Block.Type();
-
-
     }
     super(block!);
   }
@@ -29,10 +27,10 @@ export default class Block extends WasmWrapper<WasmBlock> {
         hash: this.hash,
         type: JSON.stringify(this.block_type),
         previous_block_hash: this.previousBlockHash,
-        transactions: this.transactions.map((tx) => tx.toJson()),
-        cv: this.instance.cv,
+        // transactions: this.transactions.map((tx) => tx.instance),
+        txs: this.instance.transactions,
         it_index: this.instance.it_index,
-        fee_transaction: this.instance.fee_transaction,
+        fee_transaction: this.fee_transaction,
         it_num: this.instance.it_num,
         // block_payout: this.instance.block_payout,
         ft_num: this.instance.ft_num,
@@ -40,19 +38,22 @@ export default class Block extends WasmWrapper<WasmBlock> {
         gt_index: this.instance.gt_index,
         total_fees: this.instance.total_fees,
         expected_difficulty: this.instance.expected_difficulty,
+        expected_burnfee: this.instance.expected_burnfee,
+        rebroadcasts: this.instance.rebroadcasts,
         total_rebroadcast_slips: this.instance.total_rebroadcast_slips,
         total_rebroadcast_nolan: this.instance.total_rebroadcast_nolan,
         total_rebroadcast_fees_nolan: this.instance.total_rebroadcast_fees_nolan,
         total_rebroadcast_staking_payouts_nolan: this.instance.total_rebroadcast_staking_payouts_nolan,
+        staking_payout: this.instance.staking_payout,
+        avg_fee_per_byte: this.instance.avg_fee_per_byte,
+        avg_nolan_rebroadcast_per_block: this.instance.avg_nolan_rebroadcast_per_block,
         rebroadcast_hash: this.instance.rebroadcast_hash,
         nolan_falling_off_chain: this.instance.nolan_falling_off_chain,
         avg_income: this.instance.avg_income,
-        avg_variance: this.instance.avg_variance,
         timestamp: this.instance.timestamp,
         creator: this.instance.creator,
         file_name: this.instance.file_name,
         has_keylist_txs: this.instance.has_keylist_txs
-
 
       });
     } catch (error) {
@@ -85,6 +86,11 @@ export default class Block extends WasmWrapper<WasmBlock> {
     return this.instance.type;
   }
 
+  public get fee_transaction(): Transaction {
+    return Saito.getInstance().factory.createTransaction(this.instance.fee_transaction);
+  }
+
+
   public get previousBlockHash(): string {
     return this.instance.previous_block_hash;
   }
@@ -92,6 +98,7 @@ export default class Block extends WasmWrapper<WasmBlock> {
   public serialize(): Uint8Array {
     return this.instance.serialize();
   }
+
 
   public get file_name() {
     return this.instance.file_name;
