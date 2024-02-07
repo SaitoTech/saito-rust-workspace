@@ -33,19 +33,12 @@ impl WasmTransaction {
     }
 
     #[wasm_bindgen(getter = routing_path)]
-    pub fn get_routing_path(&self) -> Array {
-        let mut paths: Vec<WasmHop> = self
-            .tx
+    pub fn get_routing_path(&self) -> js_sys::Array {
+        self.tx
             .path
             .iter()
-            .map(|path| WasmHop::from_hop(path.clone()))
-            .collect();
-
-        let array = js_sys::Array::new_with_length(paths.len() as u32);
-        for (i, hop) in paths.drain(..).enumerate() {
-            array.set(i as u32, JsValue::from(hop));
-        }
-        array
+            .map(|path| WasmHop::from_hop(path.clone()).into())
+            .collect::<js_sys::Array>()
     }
 
     #[wasm_bindgen(setter = signature)]
