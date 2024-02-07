@@ -27,7 +27,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
         hash: this.hash,
         type: JSON.stringify(this.block_type),
         previous_block_hash: this.previousBlockHash,
-        txs: this.instance.transactions,
         it_index: this.instance.it_index,
         fee_transaction: this.fee_transaction,
         it_num: this.instance.it_num,
