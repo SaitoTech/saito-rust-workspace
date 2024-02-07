@@ -13,18 +13,6 @@ use crate::wasm_slip::WasmSlip;
 
 use wasm_bindgen::prelude::*;
 
-// #[wasm_bindgen]
-// extern "C" {
-//     #[wasm_bindgen(js_namespace = js_sys, js_name = Array)]
-//     pub type JsArray;
-
-//     #[wasm_bindgen(js_namespace = js_sys, js_name = Array, constructor)]
-//     fn new() -> JsArray;
-
-//     #[wasm_bindgen(method, js_name = push)]
-//     fn push(this: &JsArray, value: &JsValue);
-// }
-
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct WasmTransaction {
