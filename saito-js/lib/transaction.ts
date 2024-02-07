@@ -2,6 +2,7 @@ import type { WasmTransaction } from "saito-wasm/pkg/node/index";
 import Slip from "./slip";
 import Saito from "../saito";
 import WasmWrapper from "./wasm_wrapper";
+import Hop from "./hop";
 
 export enum TransactionType {
   Normal = 0,
@@ -61,6 +62,13 @@ export default class Transaction extends WasmWrapper<WasmTransaction> {
       return Saito.getInstance().factory.createSlip(slip);
     });
   }
+
+  public get routing_path(): Array<Hop> {
+    return this.instance.routing_path.map(path => {
+      return Saito.getInstance().factory.createRoutingPath(path)
+    })
+  }
+
 
   public get type(): TransactionType {
     return this.instance.type as TransactionType;
@@ -130,7 +138,7 @@ export default class Transaction extends WasmWrapper<WasmTransaction> {
       buffer: Buffer.from(this.data).toString("base64"),
       txs_replacements: this.txs_replacements,
       total_fees: this.total_fees,
-      routing_path: this.instance.routing_path
+      // routing_path: this.routing_path.map(path => path)
     };
   }
 
