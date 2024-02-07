@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+ssh_execute() {
+  # execute command via ssh on a remote machine
+
+  ssh $1
+}
+
+ssh_server() {
+  ssh_execute REMOTE_SERVER_IP $1
+}
+ssh_spammer() {
+  ssh_execute REMOTE_SPAMMER_IP $1
+}
+
 run_test_case() {
   verification_thread_count=$1
   txs_rate_from_spammer=$2
@@ -8,12 +21,18 @@ run_test_case() {
   # connect to remote machine
 
   # terminate currently running saito-rust and saito-spammer processes
+  ssh_server "pkill -f saito-rust"
+  ssh_spammer "pkill -f saito-spammer"
 
   # clean data/blocks directories
+  ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
+  ssh_spammer "rm -rf $SPAMMER_DIR/saito-spammer/data/blocks/*"
 
   # start saito-rust process
+  ssh_server "$SERVER_DIR/target/release/saito-rust&"
 
   # start saito-spammer process
+  ssh_spammer "$SPAMMER_DIR/target/release/saito-spammer&"
 
   # wait till spammer dies or timeout expires
 
@@ -54,16 +73,22 @@ run_test_case() {
 }
 
 test_case_count=0
-test_cases_ver_thread_count=[]
-test_cases_tx_rate_from_spammer=[]
-test_cases_tx_payload_size=[]
+test_cases_ver_thread_count=()
+test_cases_tx_rate_from_spammer=()
+test_cases_tx_payload_size=()
 
-read_test_cases () {
+read_test_cases() {
   echo "loading test cases..."
 
-  while read line
-  do
-    echo "Record is : $line"
+  while read line; do
+    verification_thread_count=$(echo $line | cut -d, -f 1)
+    spammer_tx_rate=$(echo $line | cut -d, -f 2)
+    payload_size=$(echo $line | cut -d, -f 3)
+
+    test_cases_ver_thread_count+=(verification_thread_count)
+    test_cases_tx_rate_from_spammer+=(spammer_tx_rate)
+    test_cases_tx_payload_size+=(payload_size)
+    test_case_count=$((test_case_count + 1))
   done < <(tail -n +2 "$test_cases_file")
 
   echo "$test_case_count test cases loaded"
@@ -84,16 +109,9 @@ run_perf_test() {
   echo "REMOTE_SPAMMER_IP : $REMOTE_SPAMMER_IP"
 
   # read the test cases
-  read_test_cases;
-
-  # Prepare remote connections
-
-  # Check if remote directories are available. If not create them
-
-  # Check validity of each test case
+  read_test_cases
 
   # per each test case run perf tests
-
   i=test_case_count
   echo "running $test_case_count test cases..."
   while [[ $i -gt 0 ]]; do
