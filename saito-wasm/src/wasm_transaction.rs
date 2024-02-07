@@ -33,12 +33,12 @@ impl WasmTransaction {
     }
 
     #[wasm_bindgen(getter = routing_path)]
-    pub fn get_routing_path(&self) -> js_sys::Array {
+    pub fn get_routing_path(&self) -> Array {
         self.tx
             .path
             .iter()
-            .map(|path| WasmHop::from_hop(path.clone()).into())
-            .collect::<js_sys::Array>()
+            .map(|path| JsValue::from(WasmHop::from_hop(path.clone())))
+            .collect::<Array>()
     }
 
     #[wasm_bindgen(setter = signature)]
