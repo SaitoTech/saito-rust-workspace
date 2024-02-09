@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey};
+use crate::core::defs::{SaitoHash, SaitoPublicKey};
 use crate::core::util::crypto::hash;
 
 #[serde_with::serde_as]
@@ -66,9 +66,9 @@ impl GoldenTicket {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::defs::{PrintForLog, SaitoHash, SaitoPublicKey};
     use crate::core::consensus::golden_ticket::GoldenTicket;
     use crate::core::consensus::wallet::Wallet;
+    use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey};
     use crate::core::util::crypto::{generate_keys, generate_random_bytes, hash};
     use log::info;
 

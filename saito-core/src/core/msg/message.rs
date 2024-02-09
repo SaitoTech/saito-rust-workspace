@@ -2,10 +2,10 @@ use std::io::{Error, ErrorKind};
 
 use log::{error, trace, warn};
 
-use crate::common::defs::SaitoHash;
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::transaction::Transaction;
+use crate::core::defs::SaitoHash;
 use crate::core::msg::api_message::ApiMessage;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;

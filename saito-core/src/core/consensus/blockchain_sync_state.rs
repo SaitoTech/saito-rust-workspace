@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use ahash::HashMap;
 use log::trace;
 
-use crate::common::defs::{BlockId, PeerIndex, PrintForLog, SaitoHash};
+use crate::core::defs::{BlockId, PeerIndex, PrintForLog, SaitoHash};
 
 #[derive(Debug)]
 enum BlockStatus {
@@ -302,8 +302,8 @@ impl BlockchainSyncState {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::defs::BlockId;
     use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
+    use crate::core::defs::BlockId;
 
     #[test]
     fn single_peer_window_test() {

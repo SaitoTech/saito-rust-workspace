@@ -1,17 +1,17 @@
 use ahash::{AHashMap, AHashSet};
 use log::{debug, info, trace, warn};
 
-use crate::common::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    SaitoUTXOSetKey,
-};
-use crate::common::version::Version;
 use crate::core::consensus::block::Block;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
+use crate::core::defs::{
+    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    SaitoUTXOSetKey,
+};
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::io::network::Network;
+use crate::core::process::version::Version;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
 use crate::core::util::crypto::{generate_keys, hash, sign};
 use crate::core::util::storage::Storage;
@@ -431,6 +431,7 @@ impl WalletSlip {
 #[cfg(test)]
 mod tests {
     use crate::core::consensus::wallet::Wallet;
+    use crate::core::defs::SaitoPublicKey;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::storage::Storage;
     use crate::core::util::test::test_manager::test::TestManager;

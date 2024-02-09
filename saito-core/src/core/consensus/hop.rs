@@ -2,8 +2,8 @@ use std::io::{Error, ErrorKind};
 
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::consensus::transaction::Transaction;
+use crate::core::defs::{push_lock, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::util::crypto::sign;
 
 pub const HOP_SIZE: usize = 130;
@@ -84,9 +84,9 @@ mod tests {
 
     use tokio::sync::RwLock;
 
-    use crate::common::defs::{push_lock, LOCK_ORDER_WALLET};
     use crate::core::consensus::hop::Hop;
     use crate::core::consensus::wallet::Wallet;
+    use crate::core::defs::{SaitoPublicKey, LOCK_ORDER_WALLET};
     use crate::core::util::crypto::{generate_keys, verify};
     use crate::lock_for_read;
 

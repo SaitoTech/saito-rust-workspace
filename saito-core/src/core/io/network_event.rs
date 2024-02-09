@@ -1,4 +1,4 @@
-use crate::common::defs::SaitoHash;
+use crate::core::defs::SaitoHash;
 use crate::core::util;
 
 #[derive(Debug)]

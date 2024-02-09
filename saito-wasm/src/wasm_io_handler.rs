@@ -7,9 +7,9 @@ use log::{error, trace};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{PeerIndex, PrintForLog, SaitoHash};
 use saito_core::core::consensus::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::defs::{PeerIndex, PrintForLog, SaitoHash};
 use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::util::configuration::PeerConfig;
 

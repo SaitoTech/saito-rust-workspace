@@ -7,16 +7,16 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use saito_core::common::defs::{
-    push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
-};
-use saito_core::common::keep_time::KeepTime;
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::defs::{
+    push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+};
+use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util::crypto::generate_random_bytes;
 use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_rust::saito::time_keeper::TimeKeeper;

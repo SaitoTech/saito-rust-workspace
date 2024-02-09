@@ -9,16 +9,16 @@ use primitive_types::U256;
 use rayon::prelude::*;
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
-    push_lock, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
-    LOCK_ORDER_WALLET,
-};
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
+use crate::core::defs::{
+    push_lock, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
+    LOCK_ORDER_WALLET,
+};
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::util::storage::Storage;
@@ -353,12 +353,12 @@ mod tests {
 
     use tokio::sync::RwLock;
 
-    use crate::common::defs::{
-        push_lock, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
-    };
     use crate::core::consensus::burnfee::HEARTBEAT;
     use crate::core::consensus::wallet::Wallet;
+    use crate::core::defs::{
+        push_lock, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_MEMPOOL,
+    };
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
     use crate::{lock_for_read, lock_for_write};
 

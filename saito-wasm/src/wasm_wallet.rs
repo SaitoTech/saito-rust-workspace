@@ -7,9 +7,9 @@ use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::consensus::slip::Slip;
 use saito_core::core::consensus::wallet::{Wallet, WalletSlip};
+use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::io::network::Network;
 use saito_core::core::util::storage::Storage;
 

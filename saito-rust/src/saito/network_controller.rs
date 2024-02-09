@@ -20,16 +20,16 @@ use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
 
-use saito_core::common::defs::{
+use saito_core::core::consensus::block::{Block, BlockType};
+use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::defs::{
     push_lock, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
     LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
     LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
-use saito_core::common::keep_time::KeepTime;
-use saito_core::common::network_event::NetworkEvent;
-use saito_core::core::consensus::block::{Block, BlockType};
-use saito_core::core::consensus::blockchain::Blockchain;
-use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::io::network_event::NetworkEvent;
+use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util;
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
 use saito_core::lock_for_read;

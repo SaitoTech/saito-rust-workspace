@@ -1,6 +1,6 @@
 use log::debug;
 
-use saito_core::common::run_task::{RunTask, RunnableTask};
+use saito_core::core::process::run_task::{RunTask, RunnableTask};
 
 pub struct RustTaskRunner {}
 

@@ -11,17 +11,17 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
-    push_lock, Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet,
-    GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION,
-    MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
-};
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockring::BlockRing;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
+use crate::core::defs::{
+    push_lock, Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet,
+    GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION,
+    MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
+};
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
 use crate::core::mining_thread::MiningEvent;
@@ -1690,13 +1690,13 @@ mod tests {
     use log::{debug, error, info};
     use tokio::sync::RwLock;
 
-    use crate::common::defs::{
-        push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_WALLET,
-    };
     use crate::core::consensus::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
+    use crate::core::defs::{
+        push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_WALLET,
+    };
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::storage::Storage;
     use crate::core::util::test::test_manager::test::TestManager;

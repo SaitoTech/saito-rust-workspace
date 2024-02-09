@@ -5,8 +5,8 @@ use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{BlockId, PrintForLog};
 use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::defs::{BlockId, PrintForLog};
 
 #[wasm_bindgen]
 #[derive(Clone)]

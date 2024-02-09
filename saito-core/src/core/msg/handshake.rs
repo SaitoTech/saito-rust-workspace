@@ -2,9 +2,9 @@ use std::io::{Error, ErrorKind};
 
 use log::{trace, warn};
 
-use crate::common::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
-use crate::common::version::Version;
 use crate::core::consensus::peer_service::PeerService;
+use crate::core::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
+use crate::core::process::version::Version;
 use crate::core::util::serialize::Serialize;
 
 #[derive(Debug)]
@@ -132,8 +132,8 @@ impl Serialize<Self> for HandshakeResponse {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::version::Version;
     use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
+    use crate::core::process::version::Version;
     use crate::core::util::serialize::Serialize;
 
     #[test]

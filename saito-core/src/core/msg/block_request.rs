@@ -1,6 +1,6 @@
+use crate::core::defs::SaitoHash;
 use std::io::{Error, ErrorKind};
 
-use crate::common::defs::SaitoHash;
 use crate::core::util::serialize::Serialize;
 
 #[derive(Debug)]
