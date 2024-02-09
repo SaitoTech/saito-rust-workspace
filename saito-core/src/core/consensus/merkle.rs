@@ -4,8 +4,8 @@ use log::debug;
 use rayon::prelude::*;
 
 use crate::common::defs::SaitoHash;
-use crate::core::data::crypto::hash;
-use crate::core::data::transaction::Transaction;
+use crate::core::consensus::transaction::Transaction;
+use crate::core::util::crypto::hash;
 use crate::iterate_mut;
 
 #[derive(PartialEq)]
@@ -286,10 +286,10 @@ impl MerkleTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::data::crypto::generate_keys;
-    use crate::core::data::merkle::MerkleTree;
-    use crate::core::data::transaction::{Transaction, TransactionType};
-    use crate::core::data::wallet::Wallet;
+    use crate::core::consensus::merkle::MerkleTree;
+    use crate::core::consensus::transaction::{Transaction, TransactionType};
+    use crate::core::consensus::wallet::Wallet;
+    use crate::core::util::crypto::generate_keys;
 
     #[test]
     fn merkle_tree_generation_test() {

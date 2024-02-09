@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::Error;
-use std::ops::Deref;
+
 use std::sync::Arc;
 
 use ahash::{AHashMap, HashMap, HashSet};
@@ -16,18 +16,18 @@ use crate::common::defs::{
     GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION,
     MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
-use crate::common::interface_io::InterfaceEvent;
-use crate::core::data::block::{Block, BlockType};
-use crate::core::data::blockring::BlockRing;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::mempool::Mempool;
-use crate::core::data::network::Network;
-use crate::core::data::slip::Slip;
-use crate::core::data::storage::Storage;
-use crate::core::data::transaction::{Transaction, TransactionType};
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::block::{Block, BlockType};
+use crate::core::consensus::blockring::BlockRing;
+use crate::core::consensus::mempool::Mempool;
+use crate::core::consensus::slip::Slip;
+use crate::core::consensus::transaction::{Transaction, TransactionType};
+use crate::core::consensus::wallet::Wallet;
+use crate::core::io::interface_io::InterfaceEvent;
+use crate::core::io::network::Network;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
+use crate::core::util::configuration::Configuration;
+use crate::core::util::storage::Storage;
 use crate::{drain, iterate, lock_for_read, lock_for_write};
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
@@ -446,7 +446,7 @@ impl Blockchain {
                 let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
 
                 if sender_to_miner.is_some() {
-                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?}", block_hash.to_hex(), difficulty);
+                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?} channel_capacity : {:?}", block_hash.to_hex(), difficulty,sender_to_miner.as_ref().unwrap().capacity());
                     sender_to_miner
                         .unwrap()
                         .send(MiningEvent::LongestChainBlockAdded {
@@ -1694,12 +1694,12 @@ mod tests {
         push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
         LOCK_ORDER_WALLET,
     };
-    use crate::common::test_manager::test::{TestManager, TEST_ISSUANCE_FILEPATH};
-    use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
-    use crate::core::data::crypto::generate_keys;
-    use crate::core::data::slip::Slip;
-    use crate::core::data::storage::Storage;
-    use crate::core::data::wallet::Wallet;
+    use crate::core::consensus::blockchain::{bit_pack, bit_unpack, Blockchain};
+    use crate::core::consensus::slip::Slip;
+    use crate::core::consensus::wallet::Wallet;
+    use crate::core::util::crypto::generate_keys;
+    use crate::core::util::storage::Storage;
+    use crate::core::util::test::test_manager::test::TestManager;
     use crate::{lock_for_read, lock_for_write};
 
     // fn init_testlog() {
@@ -2226,11 +2226,13 @@ mod tests {
 
     // tests if utxo hashmap persists after a blockchain reset
     #[tokio::test]
+    #[serial_test::serial]
     async fn balance_hashmap_persists_after_blockchain_reset_test() {
         let mut t: TestManager = TestManager::new();
+        let file_path = t.issuance_path;
         let slips = t
             .storage
-            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+            .get_token_supply_slips_from_disk_path(file_path)
             .await;
 
         // start blockchain with existing issuance and some value to my public key
@@ -2259,7 +2261,7 @@ mod tests {
         let balance_map = t.balance_map().await;
         match t
             .storage
-            .write_utxoset_to_disk_path(balance_map.clone(), 1, TEST_ISSUANCE_FILEPATH)
+            .write_utxoset_to_disk_path(balance_map.clone(), 1, file_path)
             .await
         {
             Ok(_) => {
@@ -2274,10 +2276,10 @@ mod tests {
         let mut t: TestManager = TestManager::new();
         let slips = t
             .storage
-            .get_token_supply_slips_from_disk_path(TEST_ISSUANCE_FILEPATH)
+            .get_token_supply_slips_from_disk_path(t.issuance_path)
             .await;
 
-        let issuance_hashmap = t.convert_issuance_to_hashmap(TEST_ISSUANCE_FILEPATH).await;
+        let issuance_hashmap = t.convert_issuance_to_hashmap(t.issuance_path).await;
 
         // initialize from existing slips
         t.initialize_from_slips(slips.clone()).await;

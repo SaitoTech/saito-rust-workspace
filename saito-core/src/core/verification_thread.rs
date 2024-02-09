@@ -15,11 +15,11 @@ use crate::common::defs::{
 };
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::data::block::Block;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::transaction::Transaction;
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::block::Block;
+use crate::core::consensus::blockchain::Blockchain;
+use crate::core::consensus::peer_collection::PeerCollection;
+use crate::core::consensus::transaction::Transaction;
+use crate::core::consensus::wallet::Wallet;
 use crate::{drain, lock_for_read};
 
 #[derive(Debug)]

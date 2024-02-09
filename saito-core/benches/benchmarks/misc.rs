@@ -1,6 +1,6 @@
 use criterion::{criterion_group, Criterion};
 
-use saito_core::core::data::crypto::generate_random_bytes;
+use saito_core::core::util::crypto::generate_random_bytes;
 
 fn extend() {
     let buffer = [0; 33];

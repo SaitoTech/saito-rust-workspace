@@ -11,11 +11,11 @@ use crate::common::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
     UtxoSet,
 };
-use crate::core::data::crypto::{hash, sign, verify, verify_signature};
-use crate::core::data::hop::{Hop, HOP_SIZE};
-use crate::core::data::network::Network;
-use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::hop::{Hop, HOP_SIZE};
+use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
+use crate::core::consensus::wallet::Wallet;
+use crate::core::io::network::Network;
+use crate::core::util::crypto::{hash, sign, verify, verify_signature};
 use crate::iterate;
 
 pub const TRANSACTION_SIZE: usize = 93;
@@ -954,7 +954,7 @@ impl Transaction {
 #[cfg(test)]
 mod tests {
     use crate::common::defs::PrintForLog;
-    use crate::core::data::crypto::generate_keys;
+    use crate::core::util::crypto::{generate_keys, verify, verify_signature};
 
     use super::*;
 

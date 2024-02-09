@@ -13,15 +13,15 @@ use crate::common::defs::{
     push_lock, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
     LOCK_ORDER_WALLET,
 };
-use crate::core::data::block::Block;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::burnfee::BurnFee;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::crypto::hash;
-use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::storage::Storage;
-use crate::core::data::transaction::{Transaction, TransactionType};
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::block::Block;
+use crate::core::consensus::blockchain::Blockchain;
+use crate::core::consensus::burnfee::BurnFee;
+use crate::core::consensus::golden_ticket::GoldenTicket;
+use crate::core::consensus::transaction::{Transaction, TransactionType};
+use crate::core::consensus::wallet::Wallet;
+use crate::core::util::configuration::Configuration;
+use crate::core::util::crypto::hash;
+use crate::core::util::storage::Storage;
 use crate::{iterate, lock_for_read};
 
 //
@@ -357,9 +357,9 @@ mod tests {
         push_lock, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
         LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET,
     };
-    use crate::common::test_manager::test::{create_timestamp, TestManager};
-    use crate::core::data::burnfee::HEARTBEAT;
-    use crate::core::data::wallet::Wallet;
+    use crate::core::consensus::burnfee::HEARTBEAT;
+    use crate::core::consensus::wallet::Wallet;
+    use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
     use crate::{lock_for_read, lock_for_write};
 
     use super::*;

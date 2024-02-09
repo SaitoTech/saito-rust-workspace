@@ -46,20 +46,20 @@ pub mod test {
         LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, PROJECT_PUBLIC_KEY,
     };
     use crate::common::keep_time::KeepTime;
-    use crate::common::test_io_handler::test::TestIOHandler;
-    use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::blockchain::Blockchain;
-    use crate::core::data::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
-    use crate::core::data::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
-    use crate::core::data::golden_ticket::GoldenTicket;
-    use crate::core::data::mempool::Mempool;
-    use crate::core::data::network::Network;
-    use crate::core::data::peer_collection::PeerCollection;
-    use crate::core::data::slip::Slip;
-    use crate::core::data::storage::Storage;
-    use crate::core::data::transaction::{Transaction, TransactionType};
-    use crate::core::data::wallet::Wallet;
+    use crate::core::consensus::block::{Block, BlockType};
+    use crate::core::consensus::blockchain::Blockchain;
+    use crate::core::consensus::golden_ticket::GoldenTicket;
+    use crate::core::consensus::mempool::Mempool;
+    use crate::core::consensus::peer_collection::PeerCollection;
+    use crate::core::consensus::slip::Slip;
+    use crate::core::consensus::transaction::{Transaction, TransactionType};
+    use crate::core::consensus::wallet::Wallet;
+    use crate::core::io::network::Network;
     use crate::core::mining_thread::MiningEvent;
+    use crate::core::util::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
+    use crate::core::util::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
+    use crate::core::util::storage::Storage;
+    use crate::core::util::test::test_io_handler::test::TestIOHandler;
     use crate::{lock_for_read, lock_for_write};
 
     pub fn create_timestamp() -> Timestamp {

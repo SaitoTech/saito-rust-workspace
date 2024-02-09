@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::common::defs::SaitoPublicKey;
-use crate::core::data::peer::Peer;
+use crate::core::consensus::peer::Peer;
 
 #[derive(Debug, Clone)]
 pub struct PeerCollection {

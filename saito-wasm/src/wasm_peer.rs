@@ -5,7 +5,7 @@ use wasm_bindgen::JsValue;
 
 use crate::wasm_peer_service::WasmPeerService;
 use saito_core::common::defs::{PeerIndex, PrintForLog};
-use saito_core::core::data::peer::Peer;
+use saito_core::core::consensus::peer::Peer;
 
 #[wasm_bindgen]
 #[derive(Clone)]

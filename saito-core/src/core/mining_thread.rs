@@ -13,11 +13,11 @@ use crate::common::defs::{
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
+use crate::core::consensus::golden_ticket::GoldenTicket;
+use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::crypto::{generate_random_bytes, hash};
-use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::wallet::Wallet;
+use crate::core::util::configuration::Configuration;
+use crate::core::util::crypto::{generate_random_bytes, hash};
 use crate::lock_for_read;
 
 #[derive(Debug)]

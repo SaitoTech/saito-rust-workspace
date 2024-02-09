@@ -8,10 +8,10 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey};
-use saito_core::core::data::network::Network;
-use saito_core::core::data::slip::Slip;
-use saito_core::core::data::storage::Storage;
-use saito_core::core::data::wallet::{Wallet, WalletSlip};
+use saito_core::core::consensus::slip::Slip;
+use saito_core::core::consensus::wallet::{Wallet, WalletSlip};
+use saito_core::core::io::network::Network;
+use saito_core::core::util::storage::Storage;
 
 use crate::saitowasm::string_to_hex;
 use crate::wasm_io_handler::WasmIoHandler;

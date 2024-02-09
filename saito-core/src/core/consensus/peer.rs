@@ -8,14 +8,14 @@ use crate::common::defs::{
     push_lock, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS,
     LOCK_ORDER_WALLET, WS_KEEP_ALIVE_PERIOD,
 };
-use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
-use crate::core::data;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::crypto::{generate_random_bytes, sign, verify};
-use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
-use crate::core::data::msg::message::Message;
-use crate::core::data::peer_service::PeerService;
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::wallet::Wallet;
+use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
+use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
+use crate::core::msg::message::Message;
+use crate::core::util::configuration::Configuration;
+use crate::core::util::crypto::{generate_random_bytes, sign, verify};
+use crate::core::{consensus, util};
 use crate::lock_for_read;
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub struct Peer {
     pub public_key: Option<SaitoPublicKey>,
     pub block_fetch_url: String,
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
-    pub static_peer_config: Option<data::configuration::PeerConfig>,
+    pub static_peer_config: Option<util::configuration::PeerConfig>,
     pub challenge_for_peer: Option<SaitoHash>,
     pub key_list: Vec<SaitoPublicKey>,
     pub services: Vec<PeerService>,
@@ -252,7 +252,7 @@ impl Peer {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::data::peer::Peer;
+    use crate::core::consensus::peer::Peer;
 
     #[test]
     fn peer_new_test() {
