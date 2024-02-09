@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::Timestamp;
+use saito_core::common::network_event::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
 
 pub struct StatThread {

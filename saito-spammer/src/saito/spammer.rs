@@ -6,8 +6,8 @@ use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
-use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{push_lock, Currency, LOCK_ORDER_CONFIGS};
+use saito_core::common::network_event::NetworkEvent;
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::Transaction;

@@ -21,12 +21,12 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
-use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
     push_lock, Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
     LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
 use saito_core::common::keep_time::KeepTime;
+use saito_core::common::network_event::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;

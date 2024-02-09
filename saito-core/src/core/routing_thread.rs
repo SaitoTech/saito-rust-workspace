@@ -6,12 +6,12 @@ use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::NetworkEvent;
 use crate::common::defs::{
     push_lock, BlockId, PeerIndex, PrintForLog, SaitoHash, StatVariable, Timestamp,
     LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, STAT_BIN_COUNT,
 };
 use crate::common::keep_time::KeepTime;
+use crate::common::network_event::NetworkEvent;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
