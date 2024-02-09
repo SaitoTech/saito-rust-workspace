@@ -16,18 +16,18 @@ use crate::common::defs::{
     GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION,
     MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
-use crate::common::interface_io::InterfaceEvent;
-use crate::core::data::block::{Block, BlockType};
-use crate::core::data::blockring::BlockRing;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::mempool::Mempool;
-use crate::core::data::network::Network;
-use crate::core::data::slip::Slip;
-use crate::core::data::storage::Storage;
-use crate::core::data::transaction::{Transaction, TransactionType};
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::block::{Block, BlockType};
+use crate::core::consensus::blockring::BlockRing;
+use crate::core::consensus::mempool::Mempool;
+use crate::core::consensus::slip::Slip;
+use crate::core::consensus::transaction::{Transaction, TransactionType};
+use crate::core::consensus::wallet::Wallet;
+use crate::core::io::interface_io::InterfaceEvent;
+use crate::core::io::network::Network;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
+use crate::core::util::configuration::Configuration;
+use crate::core::util::storage::Storage;
 use crate::{drain, iterate, lock_for_read, lock_for_write};
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
@@ -1694,12 +1694,12 @@ mod tests {
         push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
         LOCK_ORDER_WALLET,
     };
-    use crate::common::test_manager::test::TestManager;
-    use crate::core::data::blockchain::{bit_pack, bit_unpack, Blockchain};
-    use crate::core::data::crypto::generate_keys;
-    use crate::core::data::slip::Slip;
-    use crate::core::data::storage::Storage;
-    use crate::core::data::wallet::Wallet;
+    use crate::core::consensus::blockchain::{bit_pack, bit_unpack, Blockchain};
+    use crate::core::consensus::slip::Slip;
+    use crate::core::consensus::wallet::Wallet;
+    use crate::core::util::crypto::generate_keys;
+    use crate::core::util::storage::Storage;
+    use crate::core::util::test::test_manager::test::TestManager;
     use crate::{lock_for_read, lock_for_write};
 
     // fn init_testlog() {

@@ -14,18 +14,18 @@ use crate::common::defs::{
 };
 use crate::common::keep_time::KeepTime;
 use crate::common::process_event::ProcessEvent;
-use crate::core::data::block::{Block, BlockType};
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::crypto::hash;
-use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::mempool::Mempool;
-use crate::core::data::network::Network;
-use crate::core::data::storage::Storage;
-use crate::core::data::transaction::{Transaction, TransactionType};
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::block::{Block, BlockType};
+use crate::core::consensus::blockchain::Blockchain;
+use crate::core::consensus::golden_ticket::GoldenTicket;
+use crate::core::consensus::mempool::Mempool;
+use crate::core::consensus::transaction::{Transaction, TransactionType};
+use crate::core::consensus::wallet::Wallet;
+use crate::core::io::network::Network;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::routing_thread::RoutingEvent;
+use crate::core::util::configuration::Configuration;
+use crate::core::util::crypto::hash;
+use crate::core::util::storage::Storage;
 use crate::{lock_for_read, lock_for_write};
 
 pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_millis() as u64;

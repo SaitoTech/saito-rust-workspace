@@ -303,7 +303,7 @@ impl BlockchainSyncState {
 #[cfg(test)]
 mod tests {
     use crate::common::defs::BlockId;
-    use crate::core::data::blockchain_sync_state::BlockchainSyncState;
+    use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 
     #[test]
     fn single_peer_window_test() {

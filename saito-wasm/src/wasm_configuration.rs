@@ -6,7 +6,7 @@ use log::error;
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
-use saito_core::core::data::configuration::{
+use saito_core::core::util::configuration::{
     BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
 };
 

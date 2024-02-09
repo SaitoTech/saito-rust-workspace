@@ -4,10 +4,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::common::run_task::RunTask;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::mempool::Mempool;
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::blockchain::Blockchain;
+use crate::core::consensus::mempool::Mempool;
+use crate::core::consensus::wallet::Wallet;
+use crate::core::util::configuration::Configuration;
 
 #[derive(Clone)]
 pub struct Context {

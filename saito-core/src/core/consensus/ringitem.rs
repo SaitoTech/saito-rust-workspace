@@ -70,8 +70,8 @@ impl RingItem {
 #[cfg(test)]
 mod tests {
 
-    use crate::core::data::block::Block;
-    use crate::core::data::ringitem::RingItem;
+    use crate::core::consensus::block::Block;
+    use crate::core::consensus::ringitem::RingItem;
 
     #[test]
     fn ringitem_new_test() {

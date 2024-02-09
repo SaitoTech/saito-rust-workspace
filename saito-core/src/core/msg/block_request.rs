@@ -1,7 +1,7 @@
 use std::io::{Error, ErrorKind};
 
 use crate::common::defs::SaitoHash;
-use crate::core::data::serialize::Serialize;
+use crate::core::util::serialize::Serialize;
 
 #[derive(Debug)]
 pub struct BlockchainRequest {
@@ -34,9 +34,9 @@ impl Serialize<Self> for BlockchainRequest {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::data::crypto::generate_random_bytes;
-    use crate::core::data::msg::block_request::BlockchainRequest;
-    use crate::core::data::serialize::Serialize;
+    use crate::core::msg::block_request::BlockchainRequest;
+    use crate::core::util::crypto::generate_random_bytes;
+    use crate::core::util::serialize::Serialize;
 
     #[test]
     fn test_serialize_with_full_fork_id() {

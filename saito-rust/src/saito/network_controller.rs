@@ -27,11 +27,11 @@ use saito_core::common::defs::{
     LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use saito_core::common::keep_time::KeepTime;
-use saito_core::core::data;
-use saito_core::core::data::block::{Block, BlockType};
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::configuration::{Configuration, PeerConfig};
-use saito_core::core::data::peer_collection::PeerCollection;
+use saito_core::core::consensus::block::{Block, BlockType};
+use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::util;
+use saito_core::core::util::configuration::{Configuration, PeerConfig};
 use saito_core::lock_for_read;
 
 use crate::saito::io_event::IoEvent;
@@ -135,7 +135,7 @@ impl NetworkController {
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<NetworkController>>,
-        peer: data::configuration::PeerConfig,
+        peer: util::configuration::PeerConfig,
     ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
 

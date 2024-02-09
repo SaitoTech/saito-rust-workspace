@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::common::defs::{BlockId, PrintForLog};
-use saito_core::core::data::blockchain::Blockchain;
+use saito_core::core::consensus::blockchain::Blockchain;
 
 #[wasm_bindgen]
 #[derive(Clone)]

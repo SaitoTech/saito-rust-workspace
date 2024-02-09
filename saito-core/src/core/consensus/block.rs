@@ -13,16 +13,16 @@ use crate::common::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
     SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
 };
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::burnfee::BurnFee;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::crypto::{hash, sign, verify_signature};
-use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::hop::HOP_SIZE;
-use crate::core::data::merkle::MerkleTree;
-use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
-use crate::core::data::storage::Storage;
-use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::consensus::blockchain::Blockchain;
+use crate::core::consensus::burnfee::BurnFee;
+use crate::core::consensus::golden_ticket::GoldenTicket;
+use crate::core::consensus::hop::HOP_SIZE;
+use crate::core::consensus::merkle::MerkleTree;
+use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
+use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::util::configuration::Configuration;
+use crate::core::util::crypto::{hash, sign, verify_signature};
+use crate::core::util::storage::Storage;
 use crate::iterate;
 
 pub const BLOCK_HEADER_SIZE: usize = 237;
@@ -2003,14 +2003,14 @@ mod tests {
         push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
         LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
     };
-    use crate::common::test_manager::test::TestManager;
-    use crate::core::data::block::{Block, BlockType};
-    use crate::core::data::crypto::{generate_keys, verify_signature};
-    use crate::core::data::merkle::MerkleTree;
-    use crate::core::data::slip::{Slip, SlipType};
-    use crate::core::data::storage::Storage;
-    use crate::core::data::transaction::{Transaction, TransactionType};
-    use crate::core::data::wallet::Wallet;
+    use crate::core::consensus::block::{Block, BlockType};
+    use crate::core::consensus::merkle::MerkleTree;
+    use crate::core::consensus::slip::{Slip, SlipType};
+    use crate::core::consensus::transaction::{Transaction, TransactionType};
+    use crate::core::consensus::wallet::Wallet;
+    use crate::core::util::crypto::{generate_keys, verify_signature};
+    use crate::core::util::storage::Storage;
+    use crate::core::util::test::test_manager::test::TestManager;
     use crate::lock_for_read;
 
     #[test]

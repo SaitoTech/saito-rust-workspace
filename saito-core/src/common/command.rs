@@ -1,5 +1,5 @@
 use crate::common::defs::SaitoHash;
-use crate::core::data;
+use crate::core::util;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -16,13 +16,13 @@ pub enum NetworkEvent {
         buffer: Vec<u8>,
     },
     ConnectToPeer {
-        peer_details: data::configuration::PeerConfig,
+        peer_details: util::configuration::PeerConfig,
     },
     DisconnectFromPeer {
         peer_index: u64,
     },
     PeerConnectionResult {
-        peer_details: Option<data::configuration::PeerConfig>,
+        peer_details: Option<util::configuration::PeerConfig>,
         result: Result<u64, std::io::Error>,
     },
     PeerDisconnected {

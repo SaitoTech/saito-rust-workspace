@@ -12,6 +12,7 @@ use figment::Figment;
 use js_sys::{Array, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
+use secp256k1::SECP256K1;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -23,23 +24,22 @@ use saito_core::common::defs::{
 };
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::common::version::Version;
+use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
+use saito_core::core::consensus::context::Context;
+use saito_core::core::consensus::mempool::Mempool;
+use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::transaction::Transaction;
+use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
-use saito_core::core::data::configuration::{Configuration, PeerConfig};
-use saito_core::core::data::context::Context;
-use saito_core::core::data::crypto::{generate_keypair_from_private_key, SECP256K1};
-use saito_core::core::data::crypto::{hash as hash_fn, sign};
-use saito_core::core::data::mempool::Mempool;
-use saito_core::core::data::msg::api_message::ApiMessage;
-use saito_core::core::data::msg::message::Message;
-use saito_core::core::data::network::Network;
-use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::data::storage::Storage;
-use saito_core::core::data::transaction::Transaction;
-use saito_core::core::data::wallet::Wallet;
+use saito_core::core::io::network::Network;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
+use saito_core::core::msg::api_message::ApiMessage;
+use saito_core::core::msg::message::Message;
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
+use saito_core::core::util::configuration::{Configuration, PeerConfig};
+use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
+use saito_core::core::util::storage::Storage;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 
 use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
@@ -511,7 +511,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
 #[wasm_bindgen]
 pub fn hash(buffer: Uint8Array) -> JsString {
     let buffer: Vec<u8> = buffer.to_vec();
-    let hash = hash_fn(&buffer);
+    let hash = saito_core::core::util::crypto::hash(&buffer);
     let str = hash.to_hex();
     let str: js_sys::JsString = str.into();
     str
@@ -546,8 +546,8 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
         return false;
     }
     let buffer = buffer.to_vec();
-    let h = saito_core::core::data::crypto::hash(&buffer);
-    saito_core::core::data::crypto::verify_signature(&h, &sig, &key.unwrap())
+    let h = saito_core::core::util::crypto::hash(&buffer);
+    saito_core::core::util::crypto::verify_signature(&h, &sig, &key.unwrap())
 }
 
 #[wasm_bindgen]

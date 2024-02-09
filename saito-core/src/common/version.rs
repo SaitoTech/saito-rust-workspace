@@ -1,4 +1,4 @@
-use crate::core::data::serialize::Serialize;
+use crate::core::util::serialize::Serialize;
 use log::warn;
 use std::cmp::Ordering;
 use std::io::{Error, ErrorKind};
@@ -72,7 +72,7 @@ impl Ord for Version {
 #[cfg(test)]
 mod tests {
     use crate::common::version::{Version, VERSION_SIZE};
-    use crate::core::data::serialize::Serialize;
+    use crate::core::util::serialize::Serialize;
 
     #[test]
     fn test_version_serialization() {

@@ -12,12 +12,12 @@ use saito_core::common::defs::{
     LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
 };
 use saito_core::common::keep_time::KeepTime;
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::crypto::generate_random_bytes;
-use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::data::slip::{Slip, SLIP_SIZE};
-use saito_core::core::data::transaction::Transaction;
-use saito_core::core::data::wallet::Wallet;
+use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
+use saito_core::core::consensus::transaction::Transaction;
+use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::util::crypto::generate_random_bytes;
 use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_rust::saito::time_keeper::TimeKeeper;
 

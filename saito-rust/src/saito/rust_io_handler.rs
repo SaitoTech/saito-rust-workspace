@@ -12,10 +12,10 @@ use tokio::sync::mpsc::Sender;
 
 use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
-use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-use saito_core::core::data::configuration::PeerConfig;
-use saito_core::core::data::peer_service::PeerService;
-use saito_core::core::data::wallet::Wallet;
+use saito_core::core::consensus::peer_service::PeerService;
+use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
+use saito_core::core::util::configuration::PeerConfig;
 
 use crate::saito::io_event::IoEvent;
 
@@ -277,9 +277,8 @@ impl InterfaceIO for RustIOHandler {
 
 #[cfg(test)]
 mod tests {
-    use saito_core::common::interface_io::InterfaceIO;
-
     use crate::saito::rust_io_handler::RustIOHandler;
+    use saito_core::core::io::interface_io::InterfaceIO;
 
     #[tokio::test]
     async fn test_write_value() {

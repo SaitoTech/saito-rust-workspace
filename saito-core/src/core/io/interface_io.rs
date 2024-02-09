@@ -5,9 +5,9 @@ use async_trait::async_trait;
 
 use crate::common::defs::{PeerIndex, SaitoHash};
 use crate::common::version::Version;
-use crate::core::data;
-use crate::core::data::peer_service::PeerService;
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::wallet::Wallet;
+use crate::core::util;
 
 pub enum InterfaceEvent {
     PeerHandshakeComplete(PeerIndex),
@@ -56,7 +56,7 @@ pub trait InterfaceIO: Debug {
     /// ```
     ///
     /// ```
-    async fn connect_to_peer(&mut self, peer: data::configuration::PeerConfig)
+    async fn connect_to_peer(&mut self, peer: util::configuration::PeerConfig)
         -> Result<(), Error>;
     async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error>;
 

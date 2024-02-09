@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader};
 use log::{debug, info};
 
 use crate::common::defs::{BlockId, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp};
-use crate::core::data::slip::{Slip, SlipType};
+use crate::core::consensus::slip::{Slip, SlipType};
 
 pub type BalanceFileRowType = (String, String, String, String);
 
@@ -201,7 +201,7 @@ mod tests {
     use crate::common::defs::PrintForLog;
     use log::info;
 
-    use crate::core::data::slip::{Slip, SlipType};
+    use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::util::balance_snapshot::BalanceSnapshot;
 
     #[test]

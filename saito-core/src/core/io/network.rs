@@ -9,19 +9,19 @@ use crate::common::defs::{
     LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
     PEER_RECONNECT_WAIT_PERIOD,
 };
-use crate::common::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::common::keep_time::KeepTime;
-use crate::core::data::block::Block;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::configuration::{Configuration, PeerConfig};
-use crate::core::data::mempool::Mempool;
-use crate::core::data::msg::block_request::BlockchainRequest;
-use crate::core::data::msg::handshake::{HandshakeChallenge, HandshakeResponse};
-use crate::core::data::msg::message::Message;
-use crate::core::data::peer::Peer;
-use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::transaction::{Transaction, TransactionType};
-use crate::core::data::wallet::Wallet;
+use crate::core::consensus::block::Block;
+use crate::core::consensus::blockchain::Blockchain;
+use crate::core::consensus::mempool::Mempool;
+use crate::core::consensus::peer::Peer;
+use crate::core::consensus::peer_collection::PeerCollection;
+use crate::core::consensus::transaction::{Transaction, TransactionType};
+use crate::core::consensus::wallet::Wallet;
+use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
+use crate::core::msg::block_request::BlockchainRequest;
+use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
+use crate::core::msg::message::Message;
+use crate::core::util::configuration::{Configuration, PeerConfig};
 use crate::{lock_for_read, lock_for_write};
 
 // #[derive(Debug)]
