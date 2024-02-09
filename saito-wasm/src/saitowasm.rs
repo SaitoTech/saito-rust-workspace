@@ -17,11 +17,11 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
-use saito_core::common::command::NetworkEvent;
 use saito_core::common::defs::{
     PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, StatVariable,
     STAT_BIN_COUNT,
 };
+use saito_core::common::network_event::NetworkEvent;
 use saito_core::common::process_event::ProcessEvent;
 use saito_core::common::version::Version;
 use saito_core::core::consensus::blockchain::Blockchain;

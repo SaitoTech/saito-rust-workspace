@@ -6,12 +6,12 @@ use log::info;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::NetworkEvent;
 use crate::common::defs::{
     push_lock, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS,
     LOCK_ORDER_WALLET,
 };
 use crate::common::keep_time::KeepTime;
+use crate::common::network_event::NetworkEvent;
 use crate::common::process_event::ProcessEvent;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::wallet::Wallet;

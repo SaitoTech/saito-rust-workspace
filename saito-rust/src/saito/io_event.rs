@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 use log::trace;
 
-use saito_core::common::command::NetworkEvent;
+use saito_core::common::network_event::NetworkEvent;
 
 #[derive(Debug)]
 pub struct IoEvent {
