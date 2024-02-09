@@ -1,4 +1,4 @@
-use crate::common::defs::SaitoHash;
+use crate::core::defs::SaitoHash;
 
 //
 // This is an index with shorthand information on the block_ids and hashes of the blocks

@@ -1,7 +1,7 @@
 use log::debug;
 use std::time::Duration;
 
-use crate::common::defs::{Currency, Timestamp};
+use crate::core::defs::{Currency, Timestamp};
 
 //
 // our target blocktime
@@ -105,6 +105,7 @@ impl BurnFee {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::defs::Currency;
 
     #[test]
     fn burnfee_return_work_needed_test() {

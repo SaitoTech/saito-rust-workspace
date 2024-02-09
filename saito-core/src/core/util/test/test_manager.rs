@@ -40,12 +40,6 @@ pub mod test {
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
-    use crate::common::defs::{
-        push_lock, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey,
-        SaitoSignature, Timestamp, UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, PROJECT_PUBLIC_KEY,
-    };
-    use crate::common::keep_time::KeepTime;
     use crate::core::consensus::block::{Block, BlockType};
     use crate::core::consensus::blockchain::Blockchain;
     use crate::core::consensus::golden_ticket::GoldenTicket;
@@ -54,8 +48,14 @@ pub mod test {
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
+    use crate::core::defs::{
+        push_lock, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey,
+        SaitoSignature, Timestamp, UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, PROJECT_PUBLIC_KEY,
+    };
     use crate::core::io::network::Network;
     use crate::core::mining_thread::MiningEvent;
+    use crate::core::process::keep_time::KeepTime;
     use crate::core::util::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::util::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::util::storage::Storage;

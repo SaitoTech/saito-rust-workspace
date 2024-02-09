@@ -1,4 +1,4 @@
-use crate::common::defs::{PrintForLog, SaitoHash, Timestamp};
+use crate::core::defs::{PrintForLog, SaitoHash, Timestamp};
 use std::fmt::{Debug, Formatter};
 
 pub struct GhostChainSync {

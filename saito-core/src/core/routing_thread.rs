@@ -6,24 +6,24 @@ use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
-    push_lock, BlockId, PeerIndex, PrintForLog, SaitoHash, StatVariable, Timestamp,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, STAT_BIN_COUNT,
-};
-use crate::common::keep_time::KeepTime;
-use crate::common::network_event::NetworkEvent;
-use crate::common::process_event::ProcessEvent;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
+use crate::core::defs::{
+    push_lock, BlockId, PeerIndex, PrintForLog, SaitoHash, StatVariable, Timestamp,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, STAT_BIN_COUNT,
+};
 use crate::core::io::network::Network;
+use crate::core::io::network_event::NetworkEvent;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::msg::message::Message;
+use crate::core::process::keep_time::KeepTime;
+use crate::core::process::process_event::ProcessEvent;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;

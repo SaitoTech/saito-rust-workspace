@@ -10,11 +10,11 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
-use saito_core::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
-use saito_core::common::network_event::NetworkEvent;
 use saito_core::core::consensus::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
+use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::util::configuration::PeerConfig;
 
 use crate::saito::io_event::IoEvent;

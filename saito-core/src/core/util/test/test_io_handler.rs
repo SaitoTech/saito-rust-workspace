@@ -10,10 +10,9 @@ pub mod test {
 
     use log::{debug, error, info};
 
-    use crate::common::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
-
     use crate::core::consensus::peer_service::PeerService;
     use crate::core::consensus::wallet::Wallet;
+    use crate::core::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
     use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
     use crate::core::util::configuration::PeerConfig;
 

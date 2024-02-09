@@ -1,9 +1,9 @@
 use std::time::Duration;
 
+use crate::core::defs::Timestamp;
 use async_trait::async_trait;
 
-use crate::common::defs::Timestamp;
-use crate::common::network_event::NetworkEvent;
+use crate::core::io::network_event::NetworkEvent;
 
 /// Event Processing trait for the controllers. Handles both events from actions and timer
 #[async_trait]

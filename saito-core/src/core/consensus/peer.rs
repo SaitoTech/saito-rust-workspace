@@ -4,12 +4,12 @@ use std::sync::Arc;
 use log::{debug, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
+use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::wallet::Wallet;
+use crate::core::defs::{
     push_lock, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS,
     LOCK_ORDER_WALLET, WS_KEEP_ALIVE_PERIOD,
 };
-use crate::core::consensus::peer_service::PeerService;
-use crate::core::consensus::wallet::Wallet;
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;

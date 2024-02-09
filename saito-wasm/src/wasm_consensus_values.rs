@@ -1,7 +1,7 @@
 use js_sys::JsString;
-use saito_core::common::defs::PrintForLog;
 use saito_core::core::consensus::block::ConsensusValues;
 use saito_core::core::consensus::transaction::Transaction;
+use saito_core::core::defs::PrintForLog;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 

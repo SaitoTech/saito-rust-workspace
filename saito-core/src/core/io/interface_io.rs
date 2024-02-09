@@ -3,10 +3,10 @@ use std::io::Error;
 
 use async_trait::async_trait;
 
-use crate::common::defs::{PeerIndex, SaitoHash};
-use crate::common::version::Version;
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
+use crate::core::defs::{PeerIndex, SaitoHash};
+use crate::core::process::version::Version;
 use crate::core::util;
 
 pub enum InterfaceEvent {

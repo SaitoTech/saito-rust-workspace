@@ -5,7 +5,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
+use crate::core::defs::{Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet};
 
 /// The size of a serialized slip in bytes.
 pub const SLIP_SIZE: usize = 59;
@@ -234,9 +234,9 @@ mod tests {
 
     use tokio::sync::RwLock;
 
-    use crate::common::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
     use crate::core::consensus::blockchain::Blockchain;
     use crate::core::consensus::wallet::Wallet;
+    use crate::core::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
     use crate::core::util::crypto::generate_keys;
     use crate::{lock_for_read, lock_for_write};
 

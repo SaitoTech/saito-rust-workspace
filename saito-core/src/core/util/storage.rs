@@ -7,12 +7,12 @@ use bs58;
 use log::{debug, error, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
-    push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_MEMPOOL, PROJECT_PUBLIC_KEY,
-};
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
+use crate::core::defs::{
+    push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_MEMPOOL, PROJECT_PUBLIC_KEY,
+};
 use crate::core::io::interface_io::InterfaceIO;
 use crate::lock_for_write;
 
@@ -302,8 +302,8 @@ impl Storage {
 mod test {
     use log::{info, trace};
 
-    use crate::common::defs::{PrintForLog, SaitoHash};
     use crate::core::consensus::block::Block;
+    use crate::core::defs::{PrintForLog, SaitoHash};
     use crate::core::util::crypto::{hash, verify};
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
 

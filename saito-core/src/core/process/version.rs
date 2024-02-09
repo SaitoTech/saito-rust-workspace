@@ -71,7 +71,7 @@ impl Ord for Version {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::version::{Version, VERSION_SIZE};
+    use crate::core::process::version::{Version, VERSION_SIZE};
     use crate::core::util::serialize::Serialize;
 
     #[test]

@@ -7,13 +7,13 @@ use primitive_types::U256;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::common::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
-    UtxoSet,
-};
 use crate::core::consensus::hop::{Hop, HOP_SIZE};
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::wallet::Wallet;
+use crate::core::defs::{
+    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
+    UtxoSet,
+};
 use crate::core::io::network::Network;
 use crate::core::util::crypto::{hash, sign, verify, verify_signature};
 use crate::iterate;
@@ -953,7 +953,7 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::defs::PrintForLog;
+    use crate::core::defs::{PrintForLog, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
     use crate::core::util::crypto::{generate_keys, verify, verify_signature};
 
     use super::*;

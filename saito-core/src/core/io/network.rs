@@ -4,12 +4,6 @@ use std::sync::Arc;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::common::defs::{
-    push_lock, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
-    PEER_RECONNECT_WAIT_PERIOD,
-};
-use crate::common::keep_time::KeepTime;
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::mempool::Mempool;
@@ -17,10 +11,16 @@ use crate::core::consensus::peer::Peer;
 use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
+use crate::core::defs::{
+    push_lock, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    PEER_RECONNECT_WAIT_PERIOD,
+};
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
+use crate::core::process::keep_time::KeepTime;
 use crate::core::util::configuration::{Configuration, PeerConfig};
 use crate::{lock_for_read, lock_for_write};
 

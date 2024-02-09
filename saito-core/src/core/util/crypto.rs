@@ -1,3 +1,4 @@
+use crate::core::defs::{PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use aes::Aes128;
 use blake3::Hasher;
 use block_modes::block_padding::Pkcs7;
@@ -6,10 +7,6 @@ pub use merkle::MerkleTree;
 use rand::{thread_rng, Rng};
 use secp256k1::ecdsa;
 pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
-
-use crate::common::defs::{
-    PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-};
 
 type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
@@ -142,7 +139,7 @@ pub fn verify_signature(
 #[cfg(test)]
 mod tests {
 
-    use crate::common::defs::PrintForLog;
+    use crate::core::defs::SaitoPrivateKey;
 
     use super::*;
 

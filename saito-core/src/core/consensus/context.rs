@@ -3,10 +3,10 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::common::run_task::RunTask;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::wallet::Wallet;
+use crate::core::process::run_task::RunTask;
 use crate::core::util::configuration::Configuration;
 
 #[derive(Clone)]

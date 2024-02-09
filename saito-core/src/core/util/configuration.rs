@@ -1,9 +1,8 @@
 use std::fmt::Debug;
 
+use crate::core::defs::Timestamp;
 use serde::Deserialize;
 use serde::Serialize;
-
-use crate::common::defs::Timestamp;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 pub struct PeerConfig {

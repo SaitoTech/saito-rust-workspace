@@ -3,8 +3,8 @@ use std::collections::LinkedList;
 use log::debug;
 use rayon::prelude::*;
 
-use crate::common::defs::SaitoHash;
 use crate::core::consensus::transaction::Transaction;
+use crate::core::defs::SaitoHash;
 use crate::core::util::crypto::hash;
 use crate::iterate_mut;
 

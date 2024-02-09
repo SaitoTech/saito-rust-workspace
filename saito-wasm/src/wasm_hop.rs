@@ -1,4 +1,4 @@
-use saito_core::{common::defs::PrintForLog, core::consensus::hop::Hop};
+use saito_core::{core::consensus::hop::Hop, core::defs::PrintForLog};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
