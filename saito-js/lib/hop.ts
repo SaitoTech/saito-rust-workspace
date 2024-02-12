@@ -10,33 +10,21 @@ export default class Hop extends WasmWrapper<WasmHop> {
             hop = new Hop.Type();
         }
         super(hop!);
-
-        if (json) {
-            this.from = json.from;
-            this.to = json.to
-            this.sig = json.sig
-        }
     }
 
-    public set from(value: string) {
-        this.instance.from = value;
-    }
+
 
     public get from(): string {
         return this.instance.from;
     }
 
 
-    public set to(value: string) {
-        this.instance.to = value;
-    }
+
     public get to(): string {
         return this.instance.to;
     }
 
-    public set sig(value: string) {
-        this.instance.sig = value;
-    }
+
     public get sig(): string {
         return this.instance.sig;
     }
