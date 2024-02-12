@@ -378,7 +378,6 @@ impl Transaction {
         transaction.transaction_type = transaction_type;
         transaction.signature = signature;
         transaction.path = path;
-
         Ok(transaction)
     }
 
