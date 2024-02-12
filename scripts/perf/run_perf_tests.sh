@@ -1,22 +1,30 @@
 #!/usr/bin/env bash
 
 ssh_execute() {
-  # execute command via ssh on a remote machine
+  echo "Executing: ssh $1 $2"
+ ssh "$1" "$2"
 
-  ssh $1
 }
+
+
 
 ssh_server() {
-  ssh_execute REMOTE_SERVER_IP $1
+  # printf "$REMOTE_SERVER_IP"
+
+  output=$(ssh_execute root@$REMOTE_SERVER_IP "$1" "ls -l")
+  echo "$output"
+
+
 }
 ssh_spammer() {
-  ssh_execute REMOTE_SPAMMER_IP $1
+  ssh_execute root@$REMOTE_SPAMMER_IP "$1"
 }
 
 run_test_case() {
   verification_thread_count=$1
   txs_rate_from_spammer=$2
   tx_payload_size=$3
+  
 
   # connect to remote machine
 
@@ -25,14 +33,14 @@ run_test_case() {
   ssh_spammer "pkill -f saito-spammer"
 
   # clean data/blocks directories
-  ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
+ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
   ssh_spammer "rm -rf $SPAMMER_DIR/saito-spammer/data/blocks/*"
 
   # start saito-rust process
-  ssh_server "$SERVER_DIR/target/release/saito-rust&"
+  ssh_server "$SERVER_DIR/target/debug/saito-rust&"
 
   # start saito-spammer process
-  ssh_spammer "$SPAMMER_DIR/target/release/saito-spammer&"
+  ssh_spammer "$SPAMMER_DIR/target/debug/saito-spammer-new&"
 
   # wait till spammer dies or timeout expires
 
