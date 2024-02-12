@@ -141,7 +141,6 @@ export default class Transaction extends WasmWrapper<WasmTransaction> {
       routing_path: this.routing_path.map(path => path.toJson())
     };
   }
-
   public deserialize(buffer: Uint8Array) {
     try {
       this.instance = Transaction.Type.deserialize(buffer);
