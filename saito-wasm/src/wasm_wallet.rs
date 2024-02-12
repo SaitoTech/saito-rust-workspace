@@ -11,7 +11,7 @@ use saito_core::core::consensus::slip::Slip;
 use saito_core::core::consensus::wallet::{Wallet, WalletSlip};
 use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::io::network::Network;
-use saito_core::core::util::storage::Storage;
+use saito_core::core::io::storage::Storage;
 
 use crate::saitowasm::string_to_hex;
 use crate::wasm_io_handler::WasmIoHandler;

@@ -31,6 +31,7 @@ use saito_core::core::defs::{
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
+use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::msg::api_message::ApiMessage;
 use saito_core::core::msg::message::Message;
@@ -39,7 +40,6 @@ use saito_core::core::process::version::Version;
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
 use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
-use saito_core::core::util::storage::Storage;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 
 use crate::wasm_balance_snapshot::WasmBalanceSnapshot;

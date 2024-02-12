@@ -33,6 +33,7 @@ use saito_core::core::defs::{
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
+use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::process::process_event::ProcessEvent;
@@ -41,7 +42,6 @@ use saito_core::core::routing_thread::{
 };
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
-use saito_core::core::util::storage::Storage;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::{lock_for_read, lock_for_write};
 use saito_rust::saito::config_handler::{ConfigHandler, NodeConfigurations};

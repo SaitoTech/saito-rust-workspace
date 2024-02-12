@@ -54,11 +54,11 @@ pub mod test {
         LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, PROJECT_PUBLIC_KEY,
     };
     use crate::core::io::network::Network;
+    use crate::core::io::storage::Storage;
     use crate::core::mining_thread::MiningEvent;
     use crate::core::process::keep_time::KeepTime;
     use crate::core::util::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::util::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
-    use crate::core::util::storage::Storage;
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
     use crate::{lock_for_read, lock_for_write};
 
