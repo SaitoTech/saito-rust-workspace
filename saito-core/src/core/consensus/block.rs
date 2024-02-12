@@ -16,13 +16,20 @@ use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::data::blockchain::Blockchain;
+use crate::core::data::burnfee::BurnFee;
+use crate::core::data::configuration::Configuration;
+use crate::core::data::crypto::{hash, sign, verify_signature};
+use crate::core::data::golden_ticket::GoldenTicket;
+use crate::core::data::hop::{Hop, HOP_SIZE};
+use crate::core::data::merkle::MerkleTree;
+use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
+use crate::core::data::storage::Storage;
+use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::core::defs::{
     push_lock, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
     SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
 };
-use crate::core::io::storage::Storage;
-use crate::core::util::configuration::Configuration;
-use crate::core::util::crypto::{hash, sign, verify_signature};
 use crate::iterate;
 
 pub const BLOCK_HEADER_SIZE: usize = 237;
@@ -935,9 +942,7 @@ impl Block {
         // new status. this permits us to use the value to calculate the ATR payouts in the next
         // step.
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-            //
             // burn fee is "block production difficulty" (fee lockup cost)
-            //
             cv.expected_burnfee = BurnFee::calculate_burnfee_for_block(
                 previous_block.burnfee,
                 self.timestamp,
@@ -979,11 +984,10 @@ impl Block {
             // income is set to whatever the block avg_income is set to.
             cv.avg_income = self.avg_income;
             cv.expected_burnfee = self.burnfee;
+            cv.expected_difficulty = self.difficulty;
         }
 
-        //
         // calculate automatic transaction rebroadcasts / ATR / atr
-        //
         if self.id > GENESIS_PERIOD + 1 {
             debug!("calculating ATR");
 
@@ -2011,8 +2015,8 @@ mod tests {
         push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
         LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
     };
-    use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
+    use crate::core::util::storage::Storage;
     use crate::core::util::test::test_manager::test::TestManager;
     use crate::lock_for_read;
 
