@@ -311,6 +311,7 @@ mod test {
 
     // tests if issuance file can be read
     #[tokio::test]
+    #[serial_test::serial]
     async fn read_issuance_file_test() {
         let t = TestManager::new();
         let read_result = t.storage.read(t.issuance_path).await;
@@ -319,6 +320,7 @@ mod test {
 
     // test if issuance file utxo is equal to the resultant balance map on created blockchain
     #[tokio::test]
+    #[serial_test::serial]
     async fn issuance_hashmap_equals_balance_hashmap_test() {
         let mut t = TestManager::new();
 
