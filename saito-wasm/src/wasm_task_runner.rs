@@ -1,6 +1,6 @@
 use std::pin::Pin;
 
-use saito_core::common::run_task::RunTask;
+use saito_core::core::process::run_task::RunTask;
 
 pub struct WasmTaskRunner {}
 

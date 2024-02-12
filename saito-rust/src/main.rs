@@ -21,27 +21,27 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
-use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{
+use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
+use saito_core::core::consensus::context::Context;
+use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
+use saito_core::core::defs::{
     push_lock, Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
     LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
-use saito_core::common::keep_time::KeepTime;
-use saito_core::common::process_event::ProcessEvent;
-use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
-use saito_core::core::data::configuration::Configuration;
-use saito_core::core::data::context::Context;
-use saito_core::core::data::crypto::generate_keys;
-use saito_core::core::data::network::Network;
-use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::data::storage::Storage;
-use saito_core::core::data::wallet::Wallet;
+use saito_core::core::io::network::Network;
+use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
+use saito_core::core::process::keep_time::KeepTime;
+use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
+use saito_core::core::util::configuration::Configuration;
+use saito_core::core::util::crypto::generate_keys;
+use saito_core::core::util::storage::Storage;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::{lock_for_read, lock_for_write};
 use saito_rust::saito::config_handler::{ConfigHandler, NodeConfigurations};

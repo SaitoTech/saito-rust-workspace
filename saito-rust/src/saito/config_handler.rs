@@ -5,7 +5,7 @@ use figment::Figment;
 use serde::Deserialize;
 
 use log::{debug, error};
-use saito_core::core::data::configuration::{
+use saito_core::core::util::configuration::{
     BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
 };
 
@@ -108,7 +108,7 @@ mod test {
     use std::io::ErrorKind;
 
     use crate::saito::config_handler::ConfigHandler;
-    use saito_core::core::data::configuration::Configuration;
+    use saito_core::core::util::configuration::Configuration;
 
     #[test]
     fn load_config_from_existing_file() {

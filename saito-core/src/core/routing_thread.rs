@@ -6,28 +6,28 @@ use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::NetworkEvent;
-use crate::common::defs::{
+use crate::core::consensus::blockchain::Blockchain;
+use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
+use crate::core::consensus::mempool::Mempool;
+use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::wallet::Wallet;
+use crate::core::consensus_thread::ConsensusEvent;
+use crate::core::defs::{
     push_lock, BlockId, PeerIndex, PrintForLog, SaitoHash, StatVariable, Timestamp,
     LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, STAT_BIN_COUNT,
 };
-use crate::common::keep_time::KeepTime;
-use crate::common::process_event::ProcessEvent;
-use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::data;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::blockchain_sync_state::BlockchainSyncState;
-use crate::core::data::configuration::Configuration;
-use crate::core::data::crypto::hash;
-use crate::core::data::mempool::Mempool;
-use crate::core::data::msg::block_request::BlockchainRequest;
-use crate::core::data::msg::ghost_chain_sync::GhostChainSync;
-use crate::core::data::msg::message::Message;
-use crate::core::data::network::Network;
-use crate::core::data::peer_service::PeerService;
-use crate::core::data::wallet::Wallet;
+use crate::core::io::network::Network;
+use crate::core::io::network_event::NetworkEvent;
 use crate::core::mining_thread::MiningEvent;
+use crate::core::msg::block_request::BlockchainRequest;
+use crate::core::msg::ghost_chain_sync::GhostChainSync;
+use crate::core::msg::message::Message;
+use crate::core::process::keep_time::KeepTime;
+use crate::core::process::process_event::ProcessEvent;
+use crate::core::util::configuration::Configuration;
+use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
+use crate::core::{consensus, util};
 use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ pub enum PeerState {
 }
 
 pub struct StaticPeer {
-    pub peer_details: data::configuration::PeerConfig,
+    pub peer_details: util::configuration::PeerConfig,
     pub peer_state: PeerState,
     pub peer_index: u64,
 }
@@ -290,7 +290,7 @@ impl RoutingThread {
 
     async fn handle_new_peer(
         &mut self,
-        peer_data: Option<data::configuration::PeerConfig>,
+        peer_data: Option<util::configuration::PeerConfig>,
         peer_index: u64,
     ) {
         trace!("handling new peer : {:?}", peer_index);
