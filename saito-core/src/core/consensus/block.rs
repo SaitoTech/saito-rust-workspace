@@ -2463,12 +2463,12 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
 
         // create test manager
         let mut t = TestManager::new();
 
-        t.initialize(100, 100000).await;
+        t.initialize(100, 10000).await;
 
         // check if epoch length is 10
         assert_eq!(GENESIS_PERIOD, 10, "Genesis period is not 10");
