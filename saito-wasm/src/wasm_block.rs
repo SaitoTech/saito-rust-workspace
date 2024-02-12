@@ -40,7 +40,7 @@ impl WasmBlock {
         array
     }
 
-    // #[wasm_bindgen(getter= fee_transaction)]
+    #[wasm_bindgen(getter= fee_transaction)]
     pub fn fee_transaction(&self) -> JsValue {
         if let Some(tx) = &self.block.cv.fee_transaction {
             let tx = WasmTransaction::from_transaction(tx.clone());
@@ -53,6 +53,7 @@ impl WasmBlock {
         }
     }
 
+    #[wasm_bindgen(getter = it_num)]
     pub fn it_num(&self) -> u8 {
         self.block.cv.it_num
     }
@@ -66,6 +67,11 @@ impl WasmBlock {
         }
     }
 
+    #[wasm_bindgen(getter = avg_fee_per_byte)]
+    pub fn avg_fee_per_byte(&self) -> u64 {
+        self.block.cv.avg_fee_per_byte
+    }
+
     // #[wasm_bindgen(getter = block_payout)]
     // pub fn get_block_payout(&self) -> Array {
     //     let mut block_payout: Vec<WasmBlockPayout> = self
@@ -76,12 +82,17 @@ impl WasmBlock {
     //         .map(|bp| WasmBlockPayout::from_block_payout(bp.clone()))
     //         .collect();
     //     let array = js_sys::Array::new_with_length(block_payout.len() as u32);
-    //
+
     //     for (i, bpo) in block_payout.drain(..).enumerate() {
     //         array.set(i as u32, JsValue::from(bpo));
     //     }
     //     array
     // }
+
+    #[wasm_bindgen(getter = expected_burnfee)]
+    pub fn expected_burnfee(&self) -> u64 {
+        self.block.cv.expected_burnfee
+    }
 
     #[wasm_bindgen(getter = ft_num)]
     pub fn ft_num(&self) -> u8 {
@@ -97,10 +108,10 @@ impl WasmBlock {
         }
     }
 
-    // #[wasm_bindgen(getter = gt_num)]
-    // pub fn gt_num(&self) -> u8 {
-    //     self.block.cv.gt_num
-    // }
+    #[wasm_bindgen(getter = gt_num)]
+    pub fn gt_num(&self) -> u8 {
+        self.block.cv.gt_num
+    }
 
     #[wasm_bindgen(getter = gt_index)]
     pub fn gt_index(&self) -> u32 {
@@ -155,6 +166,16 @@ impl WasmBlock {
     #[wasm_bindgen(getter = total_rebroadcast_staking_payouts_nolan)]
     pub fn total_rebroadcast_staking_payouts_nolan(&self) -> u64 {
         self.block.cv.total_rebroadcast_staking_payouts_nolan
+    }
+
+    #[wasm_bindgen(getter =  avg_nolan_rebroadcast_per_block)]
+    pub fn avg_nolan_rebroadcast_per_block(&self) -> u64 {
+        self.block.cv.avg_nolan_rebroadcast_per_block
+    }
+
+    #[wasm_bindgen(getter = staking_payout)]
+    pub fn staking_payout(&self) -> u64 {
+        self.block.cv.staking_payout
     }
 
     #[wasm_bindgen(getter = rebroadcast_hash)]

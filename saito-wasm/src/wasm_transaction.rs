@@ -11,6 +11,8 @@ use crate::saitowasm::{string_to_hex, string_to_key, SAITO};
 use crate::wasm_hop::WasmHop;
 use crate::wasm_slip::WasmSlip;
 
+use wasm_bindgen::prelude::*;
+
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct WasmTransaction {
@@ -32,12 +34,11 @@ impl WasmTransaction {
 
     #[wasm_bindgen(getter = routing_path)]
     pub fn get_routing_path(&self) -> Array {
-        let array = Array::new();
-        for hop in &self.tx.path {
-            let wasm_hop = WasmHop::from_hop(hop.clone());
-            array.push(&JsValue::from(wasm_hop));
-        }
-        array
+        self.tx
+            .path
+            .iter()
+            .map(|path| JsValue::from(WasmHop::from_hop(path.clone())))
+            .collect::<Array>()
     }
 
     #[wasm_bindgen(setter = signature)]
