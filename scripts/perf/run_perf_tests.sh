@@ -20,27 +20,52 @@ ssh_spammer() {
   ssh_execute root@$REMOTE_SPAMMER_IP "$1"
 }
 
+configure_server(){
+ config_path="$SERVER_DIR/saito-rust/configs/config.json"
+  update_cmd="sed -i '/\"verification_threads\":/c\\    \"verification_threads\": "$verification_thread_count",' $config_path"
+  ssh_server "$update_cmd"
+}
+
+configure_spammer(){
+ spammer_config_path="$SPAMMER_DIR/saito-spammer/configs/config.json"
+  ssh_spammer "sed -i '/\"burst_count\":/c\\    \"burst_count\": $txs_rate_from_spammer,' $spammer_config_path; sed -i '/\"tx_size\":/c\\    \"tx_size\": $tx_payload_size,' $spammer_config_path; sed -i '/\"verification_threads\":/c\\    \"verification_threads\": $verification_thread_count,' $spammer_config_path"
+
+}
+
 run_test_case() {
   verification_thread_count=$1
   txs_rate_from_spammer=$2
   tx_payload_size=$3
-  
 
-  # connect to remote machine
+  echo "$verification_thread_count"
+
 
   # terminate currently running saito-rust and saito-spammer processes
   ssh_server "pkill -f saito-rust"
   ssh_spammer "pkill -f saito-spammer"
 
   # clean data/blocks directories
-ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
+  ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
   ssh_spammer "rm -rf $SPAMMER_DIR/saito-spammer/data/blocks/*"
 
+
+ #configure saito-rust server
+  configure_server
+
+ #Configure saito-spammer
+  configure_spammer
+
+
+
   # start saito-rust process
-  ssh_server "$SERVER_DIR/target/debug/saito-rust&"
+  ssh_server "nohup $SERVER_DIR/target/debug/saito-rust > $SERVER_DIR/saito-rust.log 2>&1 &"
+# ssh_server "tail -f $SERVER_DIR/saito-rust.log"
+
 
   # start saito-spammer process
-  ssh_spammer "$SPAMMER_DIR/target/debug/saito-spammer-new&"
+ ssh_spammer "cd $SPAMMER_DIR/target/debug && nohup ./saito-spammer-new > $SPAMMER_DIR/saito-spammer-new.log 2>&1 &"
+
+ 
 
   # wait till spammer dies or timeout expires
 
@@ -93,9 +118,9 @@ read_test_cases() {
     spammer_tx_rate=$(echo $line | cut -d, -f 2)
     payload_size=$(echo $line | cut -d, -f 3)
 
-    test_cases_ver_thread_count+=(verification_thread_count)
-    test_cases_tx_rate_from_spammer+=(spammer_tx_rate)
-    test_cases_tx_payload_size+=(payload_size)
+    test_cases_ver_thread_count+=($verification_thread_count)
+    test_cases_tx_rate_from_spammer+=($spammer_tx_rate)
+    test_cases_tx_payload_size+=($payload_size)
     test_case_count=$((test_case_count + 1))
   done < <(tail -n +2 "$test_cases_file")
 
