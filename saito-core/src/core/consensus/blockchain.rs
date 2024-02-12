@@ -24,10 +24,10 @@ use crate::core::defs::{
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
+use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
 use crate::core::util::configuration::Configuration;
-use crate::core::util::storage::Storage;
 use crate::{drain, iterate, lock_for_read, lock_for_write};
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
@@ -1697,8 +1697,8 @@ mod tests {
         push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
         LOCK_ORDER_WALLET,
     };
+    use crate::core::io::storage::Storage;
     use crate::core::util::crypto::generate_keys;
-    use crate::core::util::storage::Storage;
     use crate::core::util::test::test_manager::test::TestManager;
     use crate::{lock_for_read, lock_for_write};
 
