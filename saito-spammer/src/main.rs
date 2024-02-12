@@ -29,13 +29,13 @@ use saito_core::core::defs::{
     PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
+use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
-use saito_core::core::util::storage::Storage;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_read;
 use saito_rust::saito::io_event::IoEvent;

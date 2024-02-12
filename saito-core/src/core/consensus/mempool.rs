@@ -19,9 +19,9 @@ use crate::core::defs::{
     push_lock, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
     LOCK_ORDER_WALLET,
 };
+use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
-use crate::core::util::storage::Storage;
 use crate::{iterate, lock_for_read};
 
 //

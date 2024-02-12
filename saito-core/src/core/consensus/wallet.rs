@@ -11,10 +11,10 @@ use crate::core::defs::{
 };
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::io::network::Network;
+use crate::core::io::storage::Storage;
 use crate::core::process::version::Version;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
 use crate::core::util::crypto::{generate_keys, hash, sign};
-use crate::core::util::storage::Storage;
 
 pub const WALLET_SIZE: usize = 65;
 
@@ -432,8 +432,8 @@ impl WalletSlip {
 mod tests {
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::SaitoPublicKey;
+    use crate::core::io::storage::Storage;
     use crate::core::util::crypto::generate_keys;
-    use crate::core::util::storage::Storage;
     use crate::core::util::test::test_manager::test::TestManager;
 
     use super::*;

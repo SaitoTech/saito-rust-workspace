@@ -19,13 +19,13 @@ use crate::core::defs::{
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
+use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::process::keep_time::KeepTime;
 use crate::core::process::process_event::ProcessEvent;
 use crate::core::routing_thread::RoutingEvent;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
-use crate::core::util::storage::Storage;
 use crate::{lock_for_read, lock_for_write};
 
 pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_millis() as u64;
