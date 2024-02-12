@@ -21,7 +21,7 @@ use crate::core::data::burnfee::BurnFee;
 use crate::core::data::configuration::Configuration;
 use crate::core::data::crypto::{hash, sign, verify_signature};
 use crate::core::data::golden_ticket::GoldenTicket;
-use crate::core::data::hop::{Hop, HOP_SIZE};
+use crate::core::data::hop::HOP_SIZE;
 use crate::core::data::merkle::MerkleTree;
 use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::data::storage::Storage;
