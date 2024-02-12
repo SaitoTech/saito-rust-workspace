@@ -16,13 +16,20 @@ use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::data::blockchain::Blockchain;
+use crate::core::data::burnfee::BurnFee;
+use crate::core::data::configuration::Configuration;
+use crate::core::data::crypto::{hash, sign, verify_signature};
+use crate::core::data::golden_ticket::GoldenTicket;
+use crate::core::data::hop::{Hop, HOP_SIZE};
+use crate::core::data::merkle::MerkleTree;
+use crate::core::data::slip::{Slip, SlipType, SLIP_SIZE};
+use crate::core::data::storage::Storage;
+use crate::core::data::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::core::defs::{
     push_lock, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
     SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
 };
-use crate::core::util::configuration::Configuration;
-use crate::core::util::crypto::{hash, sign, verify_signature};
-use crate::core::util::storage::Storage;
 use crate::iterate;
 
 pub const BLOCK_HEADER_SIZE: usize = 237;
