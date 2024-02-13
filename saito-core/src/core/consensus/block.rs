@@ -2231,10 +2231,11 @@ mod tests {
         block.generate_hash();
 
         assert_eq!(block.creator, wallet.public_key);
-        assert_eq!(
-            verify_signature(&block.pre_hash, &block.signature, &block.creator),
-            true
-        );
+        assert!(verify_signature(
+            &block.pre_hash,
+            &block.signature,
+            &block.creator,
+        ));
         assert_ne!(block.hash, [0; 32]);
         assert_ne!(block.signature, [0; 64]);
     }
@@ -2246,7 +2247,6 @@ mod tests {
         let wallet = Wallet::new(keys.1, keys.0);
 
         let transactions: Vec<Transaction> = (0..5)
-            .into_iter()
             .map(|_| {
                 let mut transaction = Transaction::default();
                 transaction.sign(&wallet.private_key);
@@ -2339,7 +2339,7 @@ mod tests {
         assert_eq!(lite_block2.signature, block2.clone().signature);
 
         // block 3
-        // Perform no transacton
+        // Perform no transaction
         let block2_hash = block2.hash;
         let mut block3 = t
             .create_block(
@@ -2507,12 +2507,12 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test() {
-        // pretty_env_logger::init();
+        pretty_env_logger::init();
 
         // create test manager
         let mut t = TestManager::new();
 
-        t.initialize(100, 10000).await;
+        t.initialize_with_timestamp(100, 10000, 0).await;
 
         // check if epoch length is 10
         assert_eq!(GENESIS_PERIOD, 10, "Genesis period is not 10");
@@ -2526,7 +2526,7 @@ mod tests {
                     10,
                     100,
                     10,
-                    true,
+                    false,
                 )
                 .await;
             block.generate();
@@ -2541,7 +2541,14 @@ mod tests {
         let latest_block = t.get_latest_block().await;
         let cv = latest_block.cv;
 
-        println!("cv : {:?}", cv);
+        println!("cv : {:?} \n", cv);
+
+        // TODO : check the values in the below asserts
+        assert_eq!(cv.avg_income, 3290);
+        assert_eq!(cv.total_fees, 5100);
+        assert_eq!(cv.expected_burnfee, 1562500);
+        assert_eq!(cv.rebroadcasts.len(), 0);
+        assert_eq!(cv.avg_nolan_rebroadcast_per_block, 0);
 
         // add 11th block
         let mut block = t
@@ -2551,7 +2558,7 @@ mod tests {
                 10,
                 100,
                 10,
-                true,
+                false,
             )
             .await;
         block.generate();
@@ -2566,5 +2573,12 @@ mod tests {
         let cv = latest_block.cv;
 
         println!("cv2 : {:?}", cv);
+
+        // TODO : check the values in the below asserts
+        assert_eq!(cv.avg_income, 3471);
+        assert_eq!(cv.total_fees, 5100);
+        assert_eq!(cv.expected_burnfee, 1104854);
+        assert_eq!(cv.rebroadcasts.len(), 2);
+        assert_eq!(cv.avg_nolan_rebroadcast_per_block, 10);
     }
 }

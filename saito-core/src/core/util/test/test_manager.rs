@@ -362,7 +362,7 @@ pub mod test {
             for i in 1..=latest_block_id {
                 let block_hash = blockchain
                     .blockring
-                    .get_longest_chain_block_hash_at_block_id(i as u64);
+                    .get_longest_chain_block_hash_at_block_id(i);
                 let block = blockchain.get_block(&block_hash).unwrap();
 
                 block_inputs = 0;
@@ -380,7 +380,7 @@ pub mod test {
                     // the difference in the staking_treasury.
                     if block.transactions[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = true;
-                        block_fee_tx_index = t as usize;
+                        block_fee_tx_index = t;
                     } else {
                         for z in 0..block.transactions[t].from.len() {
                             block_inputs += block.transactions[t].from[z].amount;
@@ -395,58 +395,48 @@ pub mod test {
                         token_supply = block_outputs + block.treasury + block.staking_treasury;
                         current_supply = token_supply;
                     } else {
+                        current_supply = (current_supply as i128 + block_outputs as i128
+                            - block_inputs as i128)
+                            as Currency;
+                        unpaid_but_uncollected =
+                            (unpaid_but_uncollected as i128 + block_inputs as i128
+                                - block_outputs as i128) as Currency;
+
                         // figure out how much is in circulation
-                        if !block_contains_fee_tx {
-                            current_supply -= block_inputs;
-                            current_supply += block_outputs;
-
-                            unpaid_but_uncollected += block_inputs;
-                            unpaid_but_uncollected -= block_outputs;
-
-                            //
-                            // treasury increases must come here uncollected
-                            //
-                            if current_block_treasury > previous_block_treasury {
-                                unpaid_but_uncollected -=
-                                    current_block_treasury - previous_block_treasury;
-                            }
-                        } else {
-                            //
+                        if block_contains_fee_tx {
                             // calculate total amount paid
-                            //
                             let mut total_fees_paid: Currency = 0;
                             let fee_transaction = &block.transactions[block_fee_tx_index];
                             for output in fee_transaction.to.iter() {
                                 total_fees_paid += output.amount;
                             }
 
-                            current_supply -= block_inputs;
-                            current_supply += block_outputs;
                             current_supply += total_fees_paid;
-
-                            unpaid_but_uncollected += block_inputs;
-                            unpaid_but_uncollected -= block_outputs;
                             unpaid_but_uncollected -= total_fees_paid;
-
-                            // treasury increases must come here uncollected
-                            if current_block_treasury > previous_block_treasury {
-                                unpaid_but_uncollected -=
-                                    current_block_treasury - previous_block_treasury;
-                            }
+                        }
+                        // treasury increases must come here uncollected
+                        if current_block_treasury > previous_block_treasury {
+                            unpaid_but_uncollected = (unpaid_but_uncollected as i128
+                                - (current_block_treasury as i128
+                                    - previous_block_treasury as i128))
+                                as Currency;
                         }
 
-                        //
                         // token supply should be constant
-                        //
                         let total_in_circulation = current_supply
                             + unpaid_but_uncollected
                             + block.treasury
                             + block.staking_treasury;
 
-                        //
                         // we check that overall token supply has not changed
-                        //
-                        assert_eq!(total_in_circulation, token_supply);
+                        assert_eq!(total_in_circulation, token_supply,
+                                   "total_in_circulation : {:?} token_supply : {:?} unpaid_but_uncollected : {:?} block.treasury : {:?} block.staking_treasury : {:?} current_supply : {:?}",
+                                   total_in_circulation,
+                                   token_supply,
+                                   unpaid_but_uncollected,
+                                   block.treasury,
+                                   block.staking_treasury,
+                                   current_supply);
                     }
                 }
             }
@@ -497,9 +487,9 @@ pub mod test {
             if include_valid_golden_ticket {
                 let blockchain = lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
-                let block = blockchain.get_block(&parent_hash).expect(
-                    format!("couldn't find block for hash : {:?}", parent_hash.to_hex()).as_str(),
-                );
+                let block = blockchain.get_block(&parent_hash).unwrap_or_else(|| {
+                    panic!("couldn't find block for hash : {:?}", parent_hash.to_hex())
+                });
                 let golden_ticket: GoldenTicket = Self::create_golden_ticket(
                     self.wallet_lock.clone(),
                     parent_hash,
