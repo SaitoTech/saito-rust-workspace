@@ -25,7 +25,7 @@ git clone git@github.com:SaitoTech/saito-rust-workspace.git
 ## Install Saito
 
 1. Navigate into the directory: `cd saito-rust-workspace/`
-2. Run `cp configs/saito.config.template.json configs/saito.config.json` and do the necessary changes in saito.config.json.
+2. Run `cp config/saito.config.template.json config/saito.config.json` and do the necessary changes in saito.config.json.
 3. run `RUST_LOG=debug cargo run`
 
 #### Environment Variables

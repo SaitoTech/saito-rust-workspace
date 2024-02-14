@@ -370,7 +370,7 @@ pub mod test {
                 block_contains_fee_tx = false;
 
                 previous_block_treasury = current_block_treasury;
-                current_block_treasury = block.treasury;
+                current_block_treasury = block.limbo;
 
                 for t in 0..block.transactions.len() {
                     // we ignore the inputs in staking / fee transactions as they have
@@ -392,7 +392,7 @@ pub mod test {
 
                     // block one sets circulation
                     if i == 1 {
-                        token_supply = block_outputs + block.treasury + block.staking_treasury;
+                        token_supply = block_outputs + block.limbo + block.treasury;
                         current_supply = token_supply;
                     } else {
                         current_supply = (current_supply as i128 + block_outputs as i128
@@ -423,10 +423,8 @@ pub mod test {
                         }
 
                         // token supply should be constant
-                        let total_in_circulation = current_supply
-                            + unpaid_but_uncollected
-                            + block.treasury
-                            + block.staking_treasury;
+                        let total_in_circulation =
+                            current_supply + unpaid_but_uncollected + block.limbo + block.treasury;
 
                         // we check that overall token supply has not changed
                         assert_eq!(total_in_circulation, token_supply,
@@ -434,8 +432,8 @@ pub mod test {
                                    total_in_circulation,
                                    token_supply,
                                    unpaid_but_uncollected,
+                                   block.limbo,
                                    block.treasury,
-                                   block.staking_treasury,
                                    current_supply);
                     }
                 }
