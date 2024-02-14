@@ -37,14 +37,13 @@ run_test_case() {
   txs_rate_from_spammer=$2
   tx_payload_size=$3
 
-  echo "$verification_thread_count"
 
 
-  # terminate currently running saito-rust and saito-spammer processes
+#   # terminate currently running saito-rust and saito-spammer processes
   ssh_server "pkill -f saito-rust"
   ssh_spammer "pkill -f saito-spammer"
 
-  # clean data/blocks directories
+#   # clean data/blocks directories
   ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
   ssh_spammer "rm -rf $SPAMMER_DIR/saito-spammer/data/blocks/*"
 
@@ -57,15 +56,20 @@ run_test_case() {
 
 
 
-  # start saito-rust process
-  ssh_server "nohup $SERVER_DIR/target/debug/saito-rust > $SERVER_DIR/saito-rust.log 2>&1 &"
-# ssh_server "tail -f $SERVER_DIR/saito-rust.log"
+
+# For saito-rust process on the rust server
+# ssh_server "cd $SERVER_DIR/saito-rust && nohup ~/.cargo/bin/cargo run --release > $SERVER_DIR/saito-rust.log 2>&1 &"
+
+ssh_server "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $SERVER_DIR/saito-rust.log 2>&1 &'"
 
 
-  # start saito-spammer process
- ssh_spammer "cd $SPAMMER_DIR/target/debug && nohup ./saito-spammer-new > $SPAMMER_DIR/saito-spammer-new.log 2>&1 &"
+# ssh_spammer "cd $SPAMMER_DIR/saito-spammer && nohup ~/.cargo/bin/cargo run --release > $SPAMMER_DIR/saito-spammer.log 2>&1 &"
 
- 
+ssh_spammer "cd $SPAMMER_DIR/saito-spammer && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $SPAMMER_DIR/saito-spammer.log 2>&1 &'"
+
+
+
+
 
   # wait till spammer dies or timeout expires
 
@@ -105,7 +109,7 @@ run_test_case() {
 
 }
 
-test_case_count=0
+test_case_count=-1
 test_cases_ver_thread_count=()
 test_cases_tx_rate_from_spammer=()
 test_cases_tx_payload_size=()
@@ -118,10 +122,14 @@ read_test_cases() {
     spammer_tx_rate=$(echo $line | cut -d, -f 2)
     payload_size=$(echo $line | cut -d, -f 3)
 
+    # echo $verification_thread_count $spammer_tx_rate $payload_size
+
     test_cases_ver_thread_count+=($verification_thread_count)
     test_cases_tx_rate_from_spammer+=($spammer_tx_rate)
     test_cases_tx_payload_size+=($payload_size)
     test_case_count=$((test_case_count + 1))
+
+    # echo  $test_cases_ver_thread_count $test_cases_tx_rate_from_spammer $test_cases_tx_payload_size $test_case_count
   done < <(tail -n +2 "$test_cases_file")
 
   echo "$test_case_count test cases loaded"
@@ -145,11 +153,12 @@ run_perf_test() {
   read_test_cases
 
   # per each test case run perf tests
-  i=test_case_count
+  i=$((test_case_count -1))
   echo "running $test_case_count test cases..."
-  while [[ $i -gt 0 ]]; do
-    i=$i-1
+  while [[ $i -ge 0 ]]; do 
     run_test_case "${test_cases_ver_thread_count[$i]}" "${test_cases_tx_rate_from_spammer[$i]}" "${test_cases_tx_payload_size[$i]}"
+    sleep 700 
+    ((i--))
   done
 
   echo "finished running test cases"

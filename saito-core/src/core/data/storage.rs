@@ -90,6 +90,7 @@ impl Storage {
     pub async fn load_block_name_list(&self) -> Result<Vec<String>, Error> {
         let list = self.io_interface.load_block_file_list().await;
         if list.is_err() {
+            dbg!(&list, "lisg");
             error!(
                 "failed loading block list from disk : {:?}",
                 list.err().unwrap()
