@@ -2268,7 +2268,7 @@ mod tests {
         let mut t = TestManager::new();
         let wallet_lock = t.wallet_lock.clone();
         let mut block = Block::new();
-        let transactions = join_all((0..5).into_iter().map(|_| async {
+        let transactions = join_all((0..5).map(|_| async {
             let mut transaction = Transaction::default();
             let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
@@ -2289,14 +2289,14 @@ mod tests {
 
         let serialized_full_block = block.serialize_for_net(BlockType::Full);
         block
-            .update_block_to_block_type(BlockType::Pruned, &mut t.storage, false)
+            .update_block_to_block_type(BlockType::Pruned, &t.storage, false)
             .await;
 
         assert_eq!(block.transactions.len(), 0);
         assert_eq!(block.block_type, BlockType::Pruned);
 
         block
-            .update_block_to_block_type(BlockType::Full, &mut t.storage, false)
+            .update_block_to_block_type(BlockType::Full, &t.storage, false)
             .await;
 
         assert_eq!(block.transactions.len(), 5);
@@ -2331,7 +2331,7 @@ mod tests {
             Storage::decode_str("s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR").unwrap();
         let mut to_public_key: SaitoPublicKey = [0u8; 33];
         to_public_key.copy_from_slice(&public_key);
-        t.transfer_value_to_public_key(to_public_key.clone(), 500, block1.timestamp + 120000)
+        t.transfer_value_to_public_key(to_public_key, 500, block1.timestamp + 120000)
             .await
             .unwrap();
         let block2 = t.get_latest_block().await;
@@ -2382,7 +2382,7 @@ mod tests {
 
         // Create VIP transactions
         for _ in 0..50 {
-            let public_key_ = Storage::decode_str(&_public_key).unwrap();
+            let public_key_ = Storage::decode_str(_public_key).unwrap();
             to_public_key.copy_from_slice(&public_key_);
             let mut tx = Transaction::default();
             tx.transaction_type = TransactionType::Normal;
