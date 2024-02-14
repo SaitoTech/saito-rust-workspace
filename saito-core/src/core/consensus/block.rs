@@ -175,10 +175,10 @@ pub struct Block {
     pub merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
     pub signature: [u8; 64],
-    pub treasury: Currency,
+    pub limbo: Currency,
     pub burnfee: Currency,
     pub difficulty: u64,
-    pub staking_treasury: Currency,
+    pub treasury: Currency,
     pub avg_income: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
@@ -257,10 +257,10 @@ impl Block {
             creator: [0; 33],
             merkle_root: [0; 32],
             signature: [0; 64],
-            treasury: 0,
+            limbo: 0,
             burnfee: 0,
             difficulty: 0,
-            staking_treasury: 0,
+            treasury: 0,
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -327,8 +327,8 @@ impl Block {
             previous_block_burnfee = previous_block.burnfee;
             previous_block_timestamp = previous_block.timestamp;
             previous_block_difficulty = previous_block.difficulty;
-            previous_block_treasury = previous_block.treasury;
-            previous_block_staking_treasury = previous_block.staking_treasury;
+            previous_block_treasury = previous_block.limbo;
+            previous_block_staking_treasury = previous_block.treasury;
         }
 
         let mut block = Block::new();
@@ -440,20 +440,20 @@ impl Block {
         // TODO - we should consider deleting the treasury, if we do not use
         // it as a catch for any tokens removed for blocks where payouts
         // exceed variance permitted and payouts are deducted downwards.
-        block.treasury = 0;
+        block.limbo = 0;
 
         // adjust staking treasury
         if cv.staking_payout != 0 {
             debug!(
                 "adding staking payout : {:?} to treasury : {:?}",
-                cv.staking_payout, block.staking_treasury
+                cv.staking_payout, block.treasury
             );
-            block.staking_treasury += cv.staking_payout;
+            block.treasury += cv.staking_payout;
         }
         if cv.total_rebroadcast_staking_payouts_nolan != 0
-            && block.staking_treasury >= cv.total_rebroadcast_staking_payouts_nolan
+            && block.treasury >= cv.total_rebroadcast_staking_payouts_nolan
         {
-            block.staking_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
+            block.treasury -= cv.total_rebroadcast_staking_payouts_nolan;
         }
 
         // generate merkle root
@@ -581,10 +581,10 @@ impl Block {
         block.creator = creator;
         block.merkle_root = merkle_root;
         block.signature = signature;
-        block.treasury = treasury;
+        block.limbo = treasury;
         block.burnfee = burnfee;
         block.difficulty = difficulty;
-        block.staking_treasury = staking_treasury;
+        block.treasury = staking_treasury;
         block.avg_income = avg_income;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
@@ -1012,7 +1012,7 @@ impl Block {
                     // the value of the UTXO that are looping around the blockchain.
                     let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
                     let expected_utxo_payout = if expected_utxo_staked > 0 {
-                        self.staking_treasury / expected_utxo_staked
+                        self.treasury / expected_utxo_staked
                     } else {
                         0
                     };
@@ -1368,8 +1368,8 @@ impl Block {
             self.previous_block_hash.as_slice(),
             self.creator.as_slice(),
             self.merkle_root.as_slice(),
+            self.limbo.to_be_bytes().as_slice(),
             self.treasury.to_be_bytes().as_slice(),
-            self.staking_treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
@@ -1420,8 +1420,8 @@ impl Block {
             self.creator.as_slice(),
             self.merkle_root.as_slice(),
             self.signature.as_slice(),
+            self.limbo.to_be_bytes().as_slice(),
             self.treasury.to_be_bytes().as_slice(),
-            self.staking_treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
@@ -1600,8 +1600,8 @@ impl Block {
         block.creator = self.creator;
         block.burnfee = self.burnfee;
         block.difficulty = self.difficulty;
+        block.limbo = self.limbo;
         block.treasury = self.treasury;
-        block.staking_treasury = self.staking_treasury;
         block.signature = self.signature;
         block.avg_income = self.avg_income;
         block.hash = self.hash;
@@ -1732,7 +1732,7 @@ impl Block {
 
             // staking treasury
             //
-            let mut expected_staking_treasury = previous_block.staking_treasury;
+            let mut expected_staking_treasury = previous_block.treasury;
             expected_staking_treasury += cv.staking_payout;
             if expected_staking_treasury >= cv.total_rebroadcast_staking_payouts_nolan {
                 expected_staking_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
@@ -1740,10 +1740,10 @@ impl Block {
                 expected_staking_treasury = 0;
             }
 
-            if self.staking_treasury != expected_staking_treasury {
+            if self.treasury != expected_staking_treasury {
                 error!(
                     "ERROR 820391: staking treasury does not validate: {} expected versus {} found",
-                    expected_staking_treasury, self.staking_treasury,
+                    expected_staking_treasury, self.treasury,
                 );
                 return false;
             }
@@ -1753,12 +1753,12 @@ impl Block {
             // of deflationary pressures or attacks that push consensus into not issuing
             // a full payout.
             //
-            if self.treasury != 0 {
+            if self.limbo != 0 {
                 error!(
                     "ERROR 123243: treasury is positive. expected : {:?} + {:?} = {:?} actual : {:?} found",
-                    previous_block.treasury , 0 ,
-                    (previous_block.treasury + 0) ,
-                    self.treasury,
+                    previous_block.limbo , 0 ,
+                    (previous_block.limbo + 0) ,
+                    self.limbo,
                 );
                 return false;
             }
@@ -2022,7 +2022,7 @@ mod tests {
         assert_eq!(block.creator, [0; 33]);
         assert_eq!(block.merkle_root, [0; 32]);
         assert_eq!(block.signature, [0; 64]);
-        assert_eq!(block.treasury, 0);
+        assert_eq!(block.limbo, 0);
         assert_eq!(block.burnfee, 0);
         assert_eq!(block.difficulty, 0);
         assert_eq!(block.transactions, vec![]);
@@ -2080,8 +2080,8 @@ mod tests {
         .unwrap();
         block.burnfee = 50000000;
         block.difficulty = 0;
+        block.limbo = 0;
         block.treasury = 0;
-        block.staking_treasury = 0;
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
@@ -2133,7 +2133,7 @@ mod tests {
         block.creator = [2; 33];
         block.merkle_root = [3; 32];
         block.signature = [4; 64];
-        block.treasury = 1_000_000;
+        block.limbo = 1_000_000;
         block.burnfee = 2;
         block.difficulty = 3;
         block.transactions = vec![mock_tx, mock_tx2];
@@ -2156,7 +2156,7 @@ mod tests {
         assert_eq!(deserialized_block.creator, [2; 33]);
         assert_eq!(deserialized_block.merkle_root, [3; 32]);
         assert_eq!(deserialized_block.signature, [4; 64]);
-        assert_eq!(deserialized_block.treasury, 1_000_000);
+        assert_eq!(deserialized_block.limbo, 1_000_000);
         assert_eq!(deserialized_block.burnfee, 2);
         assert_eq!(deserialized_block.difficulty, 3);
 
@@ -2171,7 +2171,7 @@ mod tests {
         assert_eq!(deserialized_block_header.creator, [2; 33]);
         assert_eq!(deserialized_block_header.merkle_root, [3; 32]);
         assert_eq!(deserialized_block_header.signature, [4; 64]);
-        assert_eq!(deserialized_block_header.treasury, 1_000_000);
+        assert_eq!(deserialized_block_header.limbo, 1_000_000);
         assert_eq!(deserialized_block_header.burnfee, 2);
         assert_eq!(deserialized_block_header.difficulty, 3);
     }

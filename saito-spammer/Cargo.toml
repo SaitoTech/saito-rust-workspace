@@ -1,5 +1,5 @@
 [package]
-name = "saito-spammer-new"
+name = "saito-spammer"
 version = "0.1.7"
 edition = "2021"
 
@@ -19,7 +19,7 @@ serde = { version = "1.0.163", features = ["derive"] }
 log = "0.4.17"
 
 [dev-dependencies]
-serial_test = "2.0.0"
+serial_test = "3.0.0"
 ctor = "0.2.5"
 criterion = "0.5.1"
 

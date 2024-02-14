@@ -31,7 +31,7 @@ log = "0.4.20"
 bs58 = "0.5.0"
 
 [dev-dependencies]
-serial_test = "2.0.0"
+serial_test = "3.0.0"
 tokio = { version = "1.34.0", features = ["full"] }
 criterion = { version = "0.5.1", features = ["default", "html_reports"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

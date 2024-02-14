@@ -77,7 +77,7 @@ cd saito-rust
 Copy the configuration template to create your own configuration file:
 
 ````bash
-cp configs/config.template.json configs/config.json
+cp config/config.template.json config/config.json
 ````
 
 for explaination of the configuration file, click [here](https://wiki.saito.io/tech/installation/saito-rust-config)
@@ -110,4 +110,4 @@ RUST_LOG=debug cargo run
 ````
 
 
-After completing these steps, the Saito Rust workspace should be up and running on your system. You can modify the configs/config.json file as needed to customize your setup. For further assistance, consult the official Saito documentation or reach out to the Saito community.
+After completing these steps, the Saito Rust workspace should be up and running on your system. You can modify the config/config.json file as needed to customize your setup. For further assistance, consult the official Saito documentation or reach out to the Saito community.
