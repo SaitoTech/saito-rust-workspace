@@ -72,12 +72,23 @@ ssh_spammer "cd $SPAMMER_DIR/saito-spammer && nohup sh -c 'export RUST_LOG=debug
 
 
   # wait till spammer dies or timeout expires
+  # Wait till spammer dies
+    echo "Waiting for spammer to terminate..."
+    while ssh_spammer "pgrep -f saito-spammer" > /dev/null; do
+      echo "Spammer is still running. Checking again in 10 seconds..."
+      sleep 10
+    done
+    echo "Spammer has terminated."
 
   # stop the spammer
+   ssh_spammer "pkill -f saito-spammer"
 
   # check the rust node's memory usage
+  ssh_server "ps aux | grep saito-rust | grep -v grep | awk '{print \$2, \$4}'"
+
 
   # stop the rust node
+  ssh_server "pkill -f saito-rust"
 
   # find transaction rate at the network thread
 
