@@ -171,7 +171,7 @@ run_perf_test() {
   echo "running $test_case_count test cases..."
   while [[ $i -ge 0 ]]; do 
     run_test_case "${test_cases_ver_thread_count[$i]}" "${test_cases_tx_rate_from_spammer[$i]}" "${test_cases_tx_payload_size[$i]}"
-    sleep 700 
+    # sleep 700 
     ((i--))
   done
 
