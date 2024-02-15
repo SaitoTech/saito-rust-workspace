@@ -58,21 +58,12 @@ run_test_case() {
 
 
 # For saito-rust process on the rust server
-# ssh_server "cd $SERVER_DIR/saito-rust && nohup ~/.cargo/bin/cargo run --release > $SERVER_DIR/saito-rust.log 2>&1 &"
-
 ssh_server "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $SERVER_DIR/saito-rust.log 2>&1 &'"
 
-
-# ssh_spammer "cd $SPAMMER_DIR/saito-spammer && nohup ~/.cargo/bin/cargo run --release > $SPAMMER_DIR/saito-spammer.log 2>&1 &"
-
+# For saito-rust process on the spammer server
 ssh_spammer "cd $SPAMMER_DIR/saito-spammer && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $SPAMMER_DIR/saito-spammer.log 2>&1 &'"
 
-
-
-
-
-  # wait till spammer dies or timeout expires
-  # Wait till spammer dies
+  # Wait till spammer dies or timeout expires
     echo "Waiting for spammer to terminate..."
     while ssh_spammer "pgrep -f saito-spammer" > /dev/null; do
       echo "Spammer is still running. Checking again in 10 seconds..."
@@ -80,29 +71,41 @@ ssh_spammer "cd $SPAMMER_DIR/saito-spammer && nohup sh -c 'export RUST_LOG=debug
     done
     echo "Spammer has terminated."
 
-  # stop the spammer
-   ssh_spammer "pkill -f saito-spammer"
+    # stop the spammer
+    ssh_spammer "pkill -f saito-spammer"
 
-  # check the rust node's memory usage
-  ssh_server "ps aux | grep saito-rust | grep -v grep | awk '{print \$2, \$4}'"
+    # check the rust node's memory usage
+    local memory_usage=$(ssh_server "ps aux | grep saito-rust | grep -v grep | awk '{print \$4}'")
+
+    # stop the rust node
+    ssh_server "pkill -f saito-rust"
+
+    local stats_file="$SERVER_DIR/saito-rust/data/saito.stats"
+    local blocks_dir="$SERVER_DIR/saito-rust/data/blocks"
+
+    # find transaction rate at the network thread
+    local max_tx_rate_network_thread=$(ssh_server "grep 'network::incoming_msgs' $stats_file | awk '{print \$5}' | tr -d ',' | sort -nr | head -n 1")
 
 
-  # stop the rust node
-  ssh_server "pkill -f saito-rust"
+    # find the average transaction rate at verification thread
+    local max_tx_rate_verification_threads=$(ssh_server "grep 'verification_.*::processed_txs' $stats_file | awk '{print \$11}' | tr -d ',' | sort -nr | head -n 1")
 
-  # find transaction rate at the network thread
+    # find the average size of mempool
 
-  # find the average transaction rate at verification thread
+    # find the max size of mempool
 
-  # find the average size of mempool
+    # find total block size in disk
 
-  # find the max size of mempool
+    # find the block count in disk
+  
 
-  # find total block size in disk
+    # find the longest chain length
+  
 
-  # find the block count in disk
 
-  # find the longest chain length
+
+
+
 
   # restart the rust node
 
