@@ -313,7 +313,7 @@ mod test {
     #[tokio::test]
     #[serial_test::serial]
     async fn read_issuance_file_test() {
-        let t = TestManager::new();
+        let t = TestManager::default();
         let read_result = t.storage.read(t.issuance_path).await;
         assert!(read_result.is_ok(), "Failed to read issuance file.");
     }
@@ -322,7 +322,7 @@ mod test {
     #[tokio::test]
     #[serial_test::serial]
     async fn issuance_hashmap_equals_balance_hashmap_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
 
         let issuance_hashmap = t.convert_issuance_to_hashmap(t.issuance_path).await;
         let slips = t
@@ -353,7 +353,7 @@ mod test {
     #[tokio::test]
     #[serial_test::serial]
     async fn write_read_block_to_file_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         t.initialize(100, 100_000_000).await;
 
         let current_timestamp = create_timestamp();
@@ -376,7 +376,7 @@ mod test {
     async fn block_load_test_slr() {
         // pretty_env_logger::init();
 
-        let t = TestManager::new();
+        let t = TestManager::default();
 
         info!(
             "current dir = {:?}",

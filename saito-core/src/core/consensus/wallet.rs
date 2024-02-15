@@ -451,7 +451,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn wallet_transfer_to_address_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         t.initialize(100, 100000).await;
 
         let mut last_param = 120000;
@@ -486,7 +486,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn transfer_with_insufficient_funds_failure_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         t.initialize(100, 100000).await;
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
         let public_key = Storage::decode_str(public_key_string).unwrap();
@@ -505,7 +505,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_transfer_with_exact_funds() {
         // pretty_env_logger::init();
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         t.initialize(1, 500).await;
 
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";

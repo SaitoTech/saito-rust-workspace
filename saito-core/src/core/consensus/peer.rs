@@ -13,9 +13,9 @@ use crate::core::defs::{
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
+use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use crate::core::{consensus, util};
 use crate::lock_for_read;
 
 #[derive(Debug, Clone)]

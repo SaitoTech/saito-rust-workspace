@@ -386,7 +386,7 @@ mod tests {
         let blockchain_lock: Arc<RwLock<Blockchain>>;
         let public_key: SaitoPublicKey;
         let private_key: SaitoPrivateKey;
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
 
         {
             t.initialize(100, 720_000).await;
