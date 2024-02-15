@@ -1762,7 +1762,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn initialize_blockchain_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
 
         // create first block, with 100 VIP txs with 1_000_000_000 NOLAN each
         t.initialize(100, 1_000_000_000).await;
@@ -1788,7 +1788,7 @@ mod tests {
         //
         // tracing_subscriber::registry().with(fmt_layer).init();
 
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         let block1;
         let block1_id;
         let block1_hash;
@@ -1967,7 +1967,7 @@ mod tests {
         //
         // tracing_subscriber::registry().with(fmt_layer).init();
 
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         let block1;
         let block1_id;
         let block1_hash;
@@ -2219,7 +2219,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn balance_hashmap_persists_after_blockchain_reset_test() {
-        let mut t: TestManager = TestManager::new();
+        let mut t: TestManager = TestManager::default();
         let file_path = t.issuance_path;
         let slips = t
             .storage
@@ -2264,7 +2264,7 @@ mod tests {
         }
 
         // reset blockchain
-        let mut t: TestManager = TestManager::new();
+        let mut t: TestManager = TestManager::default();
         let slips = t
             .storage
             .get_token_supply_slips_from_disk_path(t.issuance_path)
@@ -2285,7 +2285,7 @@ mod tests {
     #[serial_test::serial]
     async fn seven_blocks_with_sufficient_golden_tickets_test() {
         // pretty_env_logger::init();
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         let block1;
         let block1_id;
         let block1_hash;
@@ -2529,7 +2529,7 @@ mod tests {
     // add 6 blocks including 4 block reorg
     //
     async fn basic_longest_chain_reorg_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         let block1;
         let block1_hash;
         let ts;
@@ -2746,8 +2746,8 @@ mod tests {
     #[serial_test::serial]
     async fn load_blocks_from_another_blockchain_test() {
         // pretty_env_logger::init();
-        let mut t = TestManager::new();
-        let mut t2 = TestManager::new();
+        let mut t = TestManager::default();
+        let mut t2 = TestManager::default();
         let block1;
         let block1_id;
         let block1_hash;
@@ -2833,7 +2833,7 @@ mod tests {
     async fn fork_id_test() {
         // pretty_env_logger::init();
 
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         let mut block1;
         let mut block1_id;
         let mut block1_hash;
@@ -2891,7 +2891,7 @@ mod tests {
     async fn test_genesis_inout() {
         //init_testlog();
 
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         //generate a test genesis block
         t.create_test_gen_block(1000).await;
         {
@@ -2943,7 +2943,7 @@ mod tests {
     #[serial_test::serial]
     async fn add_block_from_mempool_test() {
         // pretty_env_logger::init();
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         let block1;
         let mut parent_block_hash;
         let mut parent_block_id;

@@ -91,9 +91,8 @@ pub mod test {
         pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
         pub issuance_path: &'static str,
     }
-
-    impl TestManager {
-        pub fn new() -> Self {
+    impl Default for TestManager {
+        fn default() -> Self {
             let keys = generate_keys();
             let wallet = Wallet::new(keys.1, keys.0);
             let _public_key = wallet.public_key.clone();
@@ -127,7 +126,9 @@ pub mod test {
                 issuance_path,
             }
         }
+    }
 
+    impl TestManager {
         pub fn get_test_issuance_file() -> Result<&'static str, std::io::Error> {
             let temp_dir = Path::new("./temp_test_directory").to_path_buf();
             fs::create_dir_all(&temp_dir)?;
@@ -421,6 +422,14 @@ pub mod test {
                                     - previous_block_treasury as i128))
                                 as Currency;
                         }
+
+                        assert_eq!(
+                            block.limbo, 0,
+                            "block.limbo should always be 0 until it's implemented"
+                        );
+
+                        println!("i : {:?} current_supply : {:?} unpaid_but_uncollected : {:?} block.limbo : {:?} block.treasury : {:?}",
+                                 i,current_supply,unpaid_but_uncollected,block.limbo,block.treasury);
 
                         // token supply should be constant
                         let total_in_circulation =
