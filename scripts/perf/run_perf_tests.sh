@@ -130,7 +130,7 @@ run_test_case() {
 
 
     # connect another rust node from another environment
-    ssh_server_second $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $server_output_file 2>&1 &'" 
+    ssh_server_second "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $server_output_file 2>&1 &'" 
 
     # find the time to sync the blockchain
 
