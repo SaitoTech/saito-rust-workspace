@@ -32,31 +32,35 @@ configure_spammer(){
 }
 
 run_test_case() {
-  verification_thread_count=$1
-  txs_rate_from_spammer=$2
-  tx_payload_size=$3
+    verification_thread_count=$1
+    txs_rate_from_spammer=$2
+    tx_payload_size=$3
 
-  server_output_file="$SERVER_DIR/saito-rust.log"
-  spammer_output_file="$SPAMMER_DIR/saito-spammer.log"
-
-
-#   # terminate currently running saito-rust and saito-spammer processes
-  ssh_server "pkill -f saito-rust"
-  ssh_spammer "pkill -f saito-spammer"
-
-#   # clean data/blocks directories
-  ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
-  ssh_spammer "rm -rf $SPAMMER_DIR/saito-spammer/data/blocks/*"
+    results_file="./test_results.csv" 
 
 
- #configure saito-rust server
-  configure_server
-
- #Configure saito-spammer
-  configure_spammer
-
+   
+    if [ ! -f "$results_file" ]; then
+    echo "verification_thread_count,burst_rate_per_second,tx_size,memory_usage_percentage,tx_rate_network_thread_per_second,tx_rate_verification_threads_per_second,block_count,longest_chain_length,total_block_size_bytes,time_to_load_blocks_seconds,time_to_sync_blocks_seconds,fetching_node_memory_usage_percentage" > "$results_file"
+    fi
 
 
+    server_output_file="$SERVER_DIR/saito-rust.log"
+    spammer_output_file="$SPAMMER_DIR/saito-spammer.log"
+
+    # terminate currently running saito-rust and saito-spammer processes
+    ssh_server "pkill -f saito-rust"
+    ssh_spammer "pkill -f saito-spammer"
+
+    # clean data/blocks directories
+    ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
+    ssh_spammer "rm -rf $SPAMMER_DIR/saito-spammer/data/blocks/*"
+
+    # configure saito-rust server
+    configure_server
+
+    # Configure saito-spammer
+    configure_spammer
 
     # For saito-rust process on the rust server
     ssh_server "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $server_output_file 2>&1 &'"
@@ -64,11 +68,11 @@ run_test_case() {
     # For saito-rust process on the spammer server
     ssh_spammer "cd $SPAMMER_DIR/saito-spammer && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $spammer_output_file 2>&1 &'"
 
-  # Wait till spammer dies or timeout expires
+    # Wait till spammer dies or timeout expires
     echo "Waiting for spammer to terminate..."
     while ssh_spammer "pgrep -f saito-spammer" > /dev/null; do
-      echo "Spammer is still running. Checking again in 10 seconds..."
-      sleep 10
+        echo "Spammer is still running. Checking again in 10 seconds..."
+        sleep 10
     done
     echo "Spammer has terminated."
 
@@ -90,11 +94,7 @@ run_test_case() {
     # find the average transaction rate at verification thread
     local tx_rate_verification_threads=$(ssh_server "grep 'verification_.*::processed_txs' $stats_file | awk '{print \$11}' | tr -d ',' | sort -nr | head -n 1")
 
-    # find the average size of mempool
-
-    # find the max size of mempool
-
-   # find total block size in disk
+    # find total block size in disk
     local total_block_size=$(ssh_server "du -ck $blocks_dir/* | grep 'total' | awk '{print \$1}'")
 
     # find the block count in disk
@@ -102,11 +102,10 @@ run_test_case() {
 
     # find the longest chain length
     local longest_chain_length=$(ssh_server "grep 'blockchain::state' $stats_file | awk '{print \$11}' | tr -d ',' | sort -nr | head -n 1")
-  
 
     # restart the rust node
-     ssh_server "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $server_output_file 2>&1 &'"
-
+     echo "Restarting rust node"
+    ssh_server "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $server_output_file 2>&1 &'"
 
     # Calculate the time taken to load blocks
     start_time=$(date +%s)
@@ -126,58 +125,48 @@ run_test_case() {
     # find the memory usage after loading blocks from disk
     local memory_usage_after_loading_from_disk=$(ssh_server "ps aux | grep saito-rust | grep -v grep | awk '{print \$4}'")
 
-
-
     # connect another rust node from another environment
-    ssh_server_second "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $server_output_file 2>&1 &'" 
+    ssh_server_second "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $server_output_file 2>&1 &'"
 
     # find the time to sync the blockchain
     fetch_start_time=$(date +%s)
     latest_block_name=$(ssh_server_second "ls -t $SERVER_DIR/saito-rust/data/blocks/*.sai | head -n 1 | xargs -n 1 basename")
     if [ -z "$latest_block_name" ]; then
-      echo "No block files found in $SERVER_DIR/saito-rust/data/blocks"
-      exit 1
+        echo "No block files found in $SERVER_DIR/saito-rust/data/blocks"
+        exit 1
     fi
     block_identifier=$(echo "$latest_block_name" | grep -oE '[^-]*\.sai$' | sed 's/\.sai$//')
-     if [ -z "$block_identifier" ]; then
-    echo "Unable to extract block identifier from $latest_block_name"
-    exit 1
+    if [ -z "$block_identifier" ]; then
+        echo "Unable to extract block identifier from $latest_block_name"
+        exit 1
     fi
     echo "Latest block id: $block_identifier"
     search_phrase="fetching block : .*\/$block_identifier"
     echo "Waiting for block $block_identifier to be fetched..."
     while ! ssh_server_second "grep -m1 '$search_phrase' $server_output_file" > /dev/null; do
-    sleep 1
+        sleep 1
     done
     fetch_end_time=$(date +%s)
     time_to_fetch_blocks=$((fetch_end_time - fetch_start_time))
 
     echo "$time_to_fetch_blocks seconds taken to sync the block."
 
-
-
     # find the memory usage of the fetching node
     local fetching_node_memory_usage=$(ssh_server_second "ps aux | grep saito-rust | grep -v grep | awk '{print \$4}'")
 
     echo "$fetching_node_memory_usage fetching node memory usage"
 
+    echo "Server memory Usage after starting node: $memory_usage %"
+    echo "Max TX Rate Network Thread: $tx_rate_network_thread"
+    echo "Max TX Rate Verification Threads: $tx_rate_verification_threads"
+    echo "Block Count: $block_count"
+    echo "Longest Chain Length: $longest_chain_length"
+    echo "Total Block Size: $total_block_size"
+    echo "Time taken to load blocks: $time_to_load_blocks"
+    echo "Memory after loading blocks $memory_usage_after_loading_from_disk"
 
 
-    # find the total transaction count sent
-
-
-
-  echo "Server memory Usage after starting node: $memory_usage %"
-  echo "Max TX Rate Network Thread: $tx_rate_network_thread"
-  echo "Max TX Rate Verification Threads: $tx_rate_verification_threads"
-  echo "Block Count: $block_count"
-  echo "Longest Chain Length: $longest_chain_length"
-  echo "Total Block Size: $total_block_size"
-  # echo "Number of Block Files: $num_block_files"
-  # echo "Average Block Size: $average_block_size"
-  echo "Time taken to load blocks: $time_to_load_blocks"
-
-  echo " memory after loading blocks $memory_usage_after_loading_from_disk"
+    echo "$verification_thread_count, $txs_rate_from_spammer, $tx_payload_size, $memory_usage,$tx_rate_network_thread,$tx_rate_verification_threads,$block_count,$longest_chain_length,$total_block_size,$time_to_load_blocks,$time_to_fetch_blocks,$fetching_node_memory_usage" >> "$results_file"
 
 }
 
