@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 ssh_execute() {
-  echo "Executing: ssh $1 $2"
  ssh "$1" "$2"
 
 }
@@ -16,7 +15,7 @@ ssh_spammer() {
 }
 
 ssh_server_second(){
-   output=$(ssh_execute root@$REMOTE_SERVER_SECOND_IP "$1" "ls -l")
+   output=$(ssh_execute root@$REMOTE_SECOND_SERVER_IP "$1" "ls -l")
   echo "$output"
 }
 
@@ -133,14 +132,42 @@ run_test_case() {
     ssh_server_second "cd $SERVER_DIR/saito-rust && nohup sh -c 'export RUST_LOG=debug; ~/.cargo/bin/cargo run --release > $server_output_file 2>&1 &'" 
 
     # find the time to sync the blockchain
+    fetch_start_time=$(date +%s)
+    latest_block_name=$(ssh_server_second "ls -t $SERVER_DIR/saito-rust/data/blocks/*.sai | head -n 1 | xargs -n 1 basename")
+    if [ -z "$latest_block_name" ]; then
+      echo "No block files found in $SERVER_DIR/saito-rust/data/blocks"
+      exit 1
+    fi
+    block_identifier=$(echo "$latest_block_name" | grep -oE '[^-]*\.sai$' | sed 's/\.sai$//')
+     if [ -z "$block_identifier" ]; then
+    echo "Unable to extract block identifier from $latest_block_name"
+    exit 1
+    fi
+    echo "Latest block id: $block_identifier"
+    search_phrase="fetching block : .*\/$block_identifier"
+    echo "Waiting for block $block_identifier to be fetched..."
+    while ! ssh_server_second "grep -m1 '$search_phrase' $server_output_file" > /dev/null; do
+    sleep 1
+    done
+    fetch_end_time=$(date +%s)
+    time_to_fetch_blocks=$((fetch_end_time - fetch_start_time))
+
+    echo "$time_to_fetch_blocks seconds taken to sync the block."
+
+
 
     # find the memory usage of the fetching node
+    local fetching_node_memory_usage=$(ssh_server_second "ps aux | grep saito-rust | grep -v grep | awk '{print \$4}'")
+
+    echo "$fetching_node_memory_usage fetching node memory usage"
+
+
 
     # find the total transaction count sent
 
 
 
-     echo "Server memory Usage after starting node: $memory_usage %"
+  echo "Server memory Usage after starting node: $memory_usage %"
   echo "Max TX Rate Network Thread: $tx_rate_network_thread"
   echo "Max TX Rate Verification Threads: $tx_rate_verification_threads"
   echo "Block Count: $block_count"
@@ -184,8 +211,6 @@ run_perf_test() {
   config_file=$1
   test_cases_file=$2
 
-  REMOTE_SERVER_SECOND_IP="206.189.152.192"
-
   echo "Running perf test script..."
   echo "Config File : $config_file"
   echo "Test Cases : $test_cases_file"
@@ -195,7 +220,7 @@ run_perf_test() {
 
   echo "REMOTE_SERVER_IP : $REMOTE_SERVER_IP"
   echo "REMOTE_SPAMMER_IP : $REMOTE_SPAMMER_IP"
-  echo "REMOTE_SERVER SECOND IP: $REMOTE_SERVER_SECOND_IP"
+  echo "REMOTE_SERVER SECOND IP: $REMOTE_SECOND_SERVER_IP"
 
   # read the test cases
   read_test_cases
@@ -205,7 +230,7 @@ run_perf_test() {
   echo "running $test_case_count test cases..."
   while [[ $i -ge 0 ]]; do 
     run_test_case "${test_cases_ver_thread_count[$i]}" "${test_cases_tx_rate_from_spammer[$i]}" "${test_cases_tx_payload_size[$i]}"
-    # sleep 700 
+    sleep 700 
     ((i--))
   done
 
