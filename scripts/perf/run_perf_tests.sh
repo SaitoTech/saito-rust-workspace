@@ -36,7 +36,7 @@ run_test_case() {
     txs_rate_from_spammer=$2
     tx_payload_size=$3
 
-    results_file="./test_results.csv" 
+    results_file="./scripts/perf/test_results.csv" 
 
 
    
@@ -93,6 +93,11 @@ run_test_case() {
 
     # find the average transaction rate at verification thread
     local tx_rate_verification_threads=$(ssh_server "grep 'verification_.*::processed_txs' $stats_file | awk '{print \$11}' | tr -d ',' | sort -nr | head -n 1")
+
+
+    # find the average size of mempool
+
+    # find the max size of mempool
 
     # find total block size in disk
     local total_block_size=$(ssh_server "du -ck $blocks_dir/* | grep 'total' | awk '{print \$1}'")
@@ -153,6 +158,9 @@ run_test_case() {
 
     # find the memory usage of the fetching node
     local fetching_node_memory_usage=$(ssh_server_second "ps aux | grep saito-rust | grep -v grep | awk '{print \$4}'")
+
+
+    # find the total transaction count sent
 
     echo "$fetching_node_memory_usage fetching node memory usage"
 
