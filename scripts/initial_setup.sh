@@ -5,7 +5,7 @@ SCRIPT_DIR=$(dirname "$0")
 
 BASE_PATH="$SCRIPT_DIR/../saito-rust" 
 
-# setup config
+# Setup config
 if [ ! -f "$BASE_PATH/configs/config.json" ]; then
   cp "$BASE_PATH/configs/config.template.json" "$BASE_PATH/configs/config.json"
   echo "config.json has been created from config.template.json."
@@ -21,7 +21,7 @@ else
   echo "blocks folder already exists. No changes made."
 fi
 
-# setup issuance
+# Setup issuance
 if [ ! -f "$BASE_PATH/data/issuance" ]; then
   cp "$BASE_PATH/data/issuance/issuance.template" "$BASE_PATH/data/issuance/issuance"
   echo "issuance file has been created from issuance.template."
@@ -30,7 +30,7 @@ else
 fi
 
 
-# install packages
+# Install packages
 chmod +x "$SCRIPT_DIR/bootstrap_mac.sh"
 chmod +x "$SCRIPT_DIR/bootstrap_linux.sh"
 OS="$(uname)"
