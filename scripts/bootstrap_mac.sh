@@ -18,3 +18,6 @@ brew install llvm clang pkg-config node npm python3
 cargo install wasm-pack
 
 cargo build
+
+
+# 
