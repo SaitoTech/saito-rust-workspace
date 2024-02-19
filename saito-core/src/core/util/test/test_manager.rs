@@ -352,21 +352,40 @@ pub mod test {
 
         pub async fn check_token_supply(&self) {
             let mut token_supply: Currency = 0;
-            let mut current_supply: Currency = 0;
             let mut block_inputs: Currency;
             let mut block_outputs: Currency;
-            let mut previous_block_treasury: Currency;
-            let mut current_block_treasury: Currency = 0;
-            let mut unpaid_but_uncollected: Currency = 0;
+            let mut collected_but_unpaid: Currency = 0;
+            let mut block_treasury = 0;
+	    let mut block_limbo = 0;
             let mut block_contains_fee_tx: bool;
             let mut block_fee_tx_index: usize = 0;
+
+            let mut previous_block_treasury: Currency;
+            let mut previous_block_limbo: Currency;
+            let mut current_block_treasury: Currency = 0;
+            let mut current_block_limbo: Currency = 0;
+            let mut current_block_supply: Currency = 0;
+            let mut previous_block_supply: Currency = 0;
 
             let (blockchain, _blockchain_) =
                 lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
             let latest_block_id = blockchain.get_latest_block_id();
 
+	    //
+	    // the total supply should be unchanged for the entire blockchain, since
+	    // it is set in block 1 and then everything should add up in every single
+	    // block for the rest of the chain. the tokens will be in the following 
+	    // places:
+	    //
+	    //  - UTXO inputs (spent in block)
+	    //  - UTXO outputs (created in block)
+	    //  - unsolved blocks (N-1, N-2) waiting for solution
+	    //  - block.treasury (the staking treasury, used to issue ATR payouts)
+	    //  - block.limbo (token graveyard, when burned tokens recorded here)
+	    //
             for i in 1..=latest_block_id {
+
                 let block_hash = blockchain
                     .blockring
                     .get_longest_chain_block_hash_at_block_id(i);
@@ -376,40 +395,106 @@ pub mod test {
                 block_outputs = 0;
                 block_contains_fee_tx = false;
 
-                previous_block_treasury = current_block_treasury;
-                current_block_treasury = block.limbo;
-
+		//
+		// calculate UTXO inputs and outputs
+		//
                 for t in 0..block.transactions.len() {
-                    // we ignore the inputs in staking / fee transactions as they have
-                    // been pulled from the staking treasury and are already technically
-                    // counted in the money supply as an output from a previous slip.
-                    // we only care about the difference in token supply represented by
-                    // the difference in the staking_treasury.
+
                     if block.transactions[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = true;
                         block_fee_tx_index = t;
-                    } else {
-                        for z in 0..block.transactions[t].from.len() {
-                            block_inputs += block.transactions[t].from[z].amount;
-                        }
-                        for z in 0..block.transactions[t].to.len() {
-                            block_outputs += block.transactions[t].to[z].amount;
-                        }
                     }
 
-                    // block one sets circulation
-                    if i == 1 {
-                        token_supply = block_outputs + block.limbo + block.treasury;
-                        current_supply = token_supply;
-                    } else {
+                    for z in 0..block.transactions[t].from.len() {
+                        block_inputs += block.transactions[t].from[z].amount;
+                    }
+                    for z in 0..block.transactions[t].to.len() {
+                        block_outputs += block.transactions[t].to[z].amount;
+                    }
+
+                }
+
+
+		//
+		// block one sets total supply
+		//
+                if i == 1 {
+
+                    token_supply = block_outputs + block.limbo + block.treasury;
+                    current_block_supply = token_supply;
+
+                } else {
+
+		    previous_block_limbo = current_block_limbo;
+		    previous_block_treasury = current_block_treasury;
+		    current_block_treasury = block.treasury;
+		    current_block_limbo = block.limbo;
+
+                    let mut net_change_in_treasury: i128 = 0;
+                    let mut net_change_in_limbo: i128 = 0;
+                    let mut net_change_in_collected_but_unpaid: i128 = 0;
+
+		    //
+		    //
+		    //
+  		    net_change_in_treasury = current_block_treasury as i128 - previous_block_treasury as i128;
+  		    net_change_in_limbo = current_block_limbo as i128 - previous_block_limbo as i128;
+
+		    //
+ 		    //
+		    //
+		    current_block_supply = previous_block_supply + net_change_in_treasury + net_change_in_limbo + block_outputs - block_inputs + net_change_in_collected_but_unpaid
+
+current_supply = block.treasury + block.limbo + block_outputs;
+
+	    //  - UTXO inputs (spent in block)
+	    //  - UTXO outputs (created in block)
+	    //  - unsolved blocks (N-1, N-2) waiting for solution
+	    //  - block.treasury (the staking treasury, used to issue ATR payouts)
+	    //  - block.limbo (token graveyard, when burned tokens recorded here)
+	    //
+
+		    //
+		    // calculate net change in staking table
+		    //
+                    let mut block_utxo_difference: i128 = 0;
+		    block_utxo_net_difference = block_inputs as i128 - block_outputs as i128;
+
+		    //
+		    //
+		    //
+		    
+  let mut collected_but_unpaid: Currency = 0;
+
+		    //
+		    // amount that is collected_but_unpaid is the difference between
+		    // the amount of fees spent in the block and the amount that this is the difference between the fees spent in the block and 
+		    // the amount that resurface in the block itself.
+		    //
+                    collected_but_unpaid = (collected_but_unpaid as i128 + block_inputs as i128 - block_outputs as i128) as Currency;
+
+		    //
+		    // any difference
+		    //
+		    any increase 
+
+
+			//
+			// supply is reduced by the amount spend, and then increased by the
+			// new amount that appears as spendable outputs. this will leave 
+			// any amount that is collected into the treasury in fees or is 
+			// pending allocation.
+			//
                         current_supply = (current_supply as i128 + block_outputs as i128
                             - block_inputs as i128)
                             as Currency;
-                        unpaid_but_uncollected =
-                            (unpaid_but_uncollected as i128 + block_inputs as i128
-                                - block_outputs as i128) as Currency;
 
+
+println!("inputs:  block_inputs : {:?} block_outputs : {:?} ", block_inputs, block_outputs);
+
+			//
                         // figure out how much is in circulation
+			//
                         if block_contains_fee_tx {
                             // calculate total amount paid
                             let mut total_fees_paid: Currency = 0;
@@ -419,11 +504,11 @@ pub mod test {
                             }
 
                             current_supply += total_fees_paid;
-                            unpaid_but_uncollected -= total_fees_paid;
+                            collected_but_unpaid -= total_fees_paid;
                         }
                         // treasury increases must come here uncollected
                         if current_block_treasury > previous_block_treasury {
-                            unpaid_but_uncollected = (unpaid_but_uncollected as i128
+                            collected_but_unpaid = (collected_but_unpaid as i128
                                 - (current_block_treasury as i128
                                     - previous_block_treasury as i128))
                                 as Currency;
@@ -434,19 +519,19 @@ pub mod test {
                             "block.limbo should always be 0 until it's implemented"
                         );
 
-                        println!("i : {:?} current_supply : {:?} unpaid_but_uncollected : {:?} block.limbo : {:?} block.treasury : {:?}",
-                                 i,current_supply,unpaid_but_uncollected,block.limbo,block.treasury);
+                        println!("i : {:?} current_supply : {:?} collected_but_unpaid : {:?} block.limbo : {:?} block.treasury : {:?}",
+                                 i, current_supply, collected_but_unpaid, block.limbo, block.treasury);
 
                         // token supply should be constant
                         let total_in_circulation =
-                            current_supply + unpaid_but_uncollected + block.limbo + block.treasury;
+                            current_supply + collected_but_unpaid + block.limbo + block.treasury;
 
                         // we check that overall token supply has not changed
                         assert_eq!(total_in_circulation, token_supply,
-                                   "total_in_circulation : {:?} token_supply : {:?} unpaid_but_uncollected : {:?} block.treasury : {:?} block.staking_treasury : {:?} current_supply : {:?}",
+                                   "total_in_circulation : {:?} token_supply : {:?} collected_but_unpaid : {:?} block.treasury : {:?} block.staking_treasury : {:?} current_supply : {:?}",
                                    total_in_circulation,
                                    token_supply,
-                                   unpaid_but_uncollected,
+                                   collected_but_unpaid,
                                    block.limbo,
                                    block.treasury,
                                    current_supply);
