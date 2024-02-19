@@ -132,11 +132,12 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         info!("node public key = {:?}", self.public_key.to_base58());
     }
 
-    async fn on_stat_interval(&mut self, _current_time: Timestamp) {
+    async fn on_stat_interval(&mut self, current_time: Timestamp) {
         if !self.enabled {
             return;
         }
-        let stat = format!("{} - total : {:?}, current difficulty : {:?}, miner_active : {:?}, current target : {:?} ",
+        let stat = format!("{} - {} - total : {:?}, current difficulty : {:?}, miner_active : {:?}, current target : {:?} ",
+                           current_time,
                            format!("{:width$}", "mining::golden_tickets", width = 40),
                            self.mined_golden_tickets,
                            self.difficulty,
