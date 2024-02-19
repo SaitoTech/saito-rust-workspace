@@ -56,3 +56,4 @@ cd "$BASE_PATH"
 
 echo "Running 'RUST_LOG=debug cargo run' in $BASE_PATH"
 env RUST_LOG=debug cargo run
+
