@@ -91,6 +91,7 @@ impl Network {
             .send_message_to_all(message.serialize(), excluded_peers)
             .await
             .unwrap();
+        trace!("block sent via io interface");
     }
 
     pub async fn propagate_transaction(&self, transaction: &Transaction) {

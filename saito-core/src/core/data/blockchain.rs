@@ -50,6 +50,14 @@ pub enum AddBlockResult {
 }
 
 #[derive(Debug)]
+pub enum WindingResult {
+    Wind(usize, bool),
+    Unwind(usize, bool, Vec<SaitoHash>),
+    FinishWithSuccess,
+    FinishWithFailure,
+}
+
+#[derive(Debug)]
 pub struct Blockchain {
     pub utxoset: UtxoSet,
     pub blockring: BlockRing,
@@ -947,19 +955,78 @@ impl Blockchain {
         }
 
         if old_chain.is_empty() {
-            self.wind_chain(
-                new_chain,
-                old_chain,
-                new_chain.len() - 1,
-                false,
-                storage,
-                configs.deref(),
-                network,
-            )
-            .await
+            let mut result: WindingResult = WindingResult::Wind(new_chain.len() - 1, false);
+            loop {
+                match result {
+                    WindingResult::Wind(current_wind_index, wind_failure) => {
+                        result = self
+                            .wind_chain(
+                                new_chain,
+                                old_chain,
+                                current_wind_index,
+                                wind_failure,
+                                storage,
+                                configs,
+                                network,
+                            )
+                            .await;
+                    }
+                    WindingResult::Unwind(current_unwind_index, wind_failure, old_chain) => {
+                        result = self
+                            .unwind_chain(
+                                new_chain,
+                                old_chain.as_slice(),
+                                current_unwind_index,
+                                wind_failure,
+                                storage,
+                                configs,
+                                network,
+                            )
+                            .await;
+                    }
+                    WindingResult::FinishWithSuccess => return true,
+                    WindingResult::FinishWithFailure => return false,
+                }
+            }
         } else if !new_chain.is_empty() {
-            self.unwind_chain(new_chain, old_chain, 0, true, storage, configs, network)
-                .await
+            let starting_index = 0;
+            let mut result = WindingResult::Unwind(0, true, old_chain.to_vec());
+            loop {
+                match result {
+                    WindingResult::Wind(current_wind_index, wind_failure) => {
+                        result = self
+                            .wind_chain(
+                                new_chain,
+                                old_chain,
+                                current_wind_index,
+                                wind_failure,
+                                storage,
+                                configs,
+                                network,
+                            )
+                            .await;
+                    }
+                    WindingResult::Unwind(current_wind_index, wind_failure, old_chain) => {
+                        result = self
+                            .unwind_chain(
+                                new_chain,
+                                old_chain.as_slice(),
+                                current_wind_index,
+                                wind_failure,
+                                storage,
+                                configs,
+                                network,
+                            )
+                            .await;
+                    }
+                    WindingResult::FinishWithSuccess => {
+                        return true;
+                    }
+                    WindingResult::FinishWithFailure => {
+                        return false;
+                    }
+                }
+            }
         } else {
             warn!("lengths are inappropriate");
             false
@@ -1038,7 +1105,6 @@ impl Blockchain {
     // position in the vector NOT the ordinal number of the block_hash
     // being processed. we start winding with current_wind_index 4 not 0.
     //
-    #[async_recursion]
     pub async fn wind_chain(
         &mut self,
         new_chain: &[SaitoHash],
@@ -1047,15 +1113,15 @@ impl Blockchain {
         wind_failure: bool,
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
-        network: Option<&'async_recursion Network>,
-    ) -> bool {
+        network: Option<&Network>,
+    ) -> WindingResult {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
         // if we are winding a non-existent chain with a wind_failure it
         // means our wind attempt failed and we should move directly into
         // add_block_failure() by returning false.
         if wind_failure && new_chain.is_empty() {
-            return false;
+            return WindingResult::FinishWithFailure;
         }
 
         // winding the chain requires us to have certain data associated
@@ -1146,23 +1212,12 @@ impl Blockchain {
             //
             if current_wind_index == 0 {
                 if wind_failure {
-                    return false;
+                    return WindingResult::FinishWithFailure;
                 }
-                return true;
+                return WindingResult::FinishWithSuccess;
             }
 
-            let res = self
-                .wind_chain(
-                    new_chain,
-                    old_chain,
-                    current_wind_index - 1,
-                    false,
-                    storage,
-                    configs,
-                    network,
-                )
-                .await;
-            res
+            return WindingResult::Wind(current_wind_index - 1, false);
         } else {
             //
             // we have had an error while winding the chain. this requires us to
@@ -1201,54 +1256,28 @@ impl Blockchain {
                 //
                 if !old_chain.is_empty() {
                     info!("old chain len: {}", old_chain.len());
-                    let res = self
-                        .wind_chain(
-                            old_chain,
-                            new_chain,
-                            old_chain.len() - 1,
-                            true,
-                            storage,
-                            configs,
-                            network,
-                        )
-                        .await;
-                    res
+                    return WindingResult::Wind(old_chain.len() - 1, true);
                 } else {
-                    false
+                    return WindingResult::FinishWithFailure;
                 }
             } else {
-                let mut chain_to_unwind: Vec<[u8; 32]> = vec![];
+                let mut chain_to_unwind: Vec<SaitoHash> = vec![];
 
-                //
                 // if we run into a problem winding our chain after we have
                 // wound any blocks, we take the subset of the blocks we have
                 // already pushed through on_chain_reorganization (i.e. not
                 // including this block!) and put them onto a new vector we
                 // will unwind in turn.
-                //
                 for i in current_wind_index + 1..new_chain.len() {
                     chain_to_unwind.push(new_chain[i]);
                 }
 
-                //
                 // chain to unwind is now something like this...
                 //
                 //  [3] [2] [1]
                 //
                 // unwinding starts from the BEGINNING of the vector
-                //
-                let res = self
-                    .unwind_chain(
-                        old_chain,
-                        &chain_to_unwind,
-                        0,
-                        true,
-                        storage,
-                        configs,
-                        network,
-                    )
-                    .await;
-                res
+                return WindingResult::Unwind(0, true, chain_to_unwind);
             }
         }
     }
@@ -1269,7 +1298,6 @@ impl Blockchain {
     // block we have to remove in the old_chain is thus at position 0, and
     // walking up the vector from there until we reach the end.
     //
-    #[async_recursion]
     pub async fn unwind_chain(
         &mut self,
         new_chain: &[SaitoHash],
@@ -1278,8 +1306,8 @@ impl Blockchain {
         wind_failure: bool,
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
-        network: Option<&'async_recursion Network>,
-    ) -> bool {
+        network: Option<&Network>,
+    ) -> WindingResult {
         let block_id;
         let block_hash;
         {
@@ -1320,38 +1348,17 @@ impl Blockchain {
             //
             // winding requires starting at the END of the vector and rolling
             // backwards until we have added block #5, etc.
-            //
-            let res = self
-                .wind_chain(
-                    new_chain,
-                    old_chain,
-                    new_chain.len() - 1,
-                    wind_failure,
-                    storage,
-                    configs,
-                    network,
-                )
-                .await;
-            res
+            return WindingResult::Wind(new_chain.len() - 1, wind_failure);
         } else {
-            //
             // continue unwinding,, which means
             //
             // unwinding requires moving FORWARD in our vector (and backwards in
             // the blockchain). So we increment our unwind index.
-            //
-            let res = self
-                .unwind_chain(
-                    new_chain,
-                    old_chain,
-                    current_unwind_index + 1,
-                    wind_failure,
-                    storage,
-                    configs,
-                    network,
-                )
-                .await;
-            res
+            return WindingResult::Unwind(
+                current_unwind_index + 1,
+                wind_failure,
+                old_chain.to_vec(),
+            );
         }
     }
 
@@ -1584,7 +1591,7 @@ impl Blockchain {
                     storage,
                     sender_to_miner.clone(),
                     &mut mempool,
-                    configs.deref(),
+                    configs,
                 )
                 .await;
             if !blockchain_updated {
@@ -1598,6 +1605,8 @@ impl Blockchain {
             "added blocks to blockchain. added back : {:?}",
             mempool.blocks_queue.len()
         );
+        std::mem::drop(mempool);
+
         blockchain_updated
     }
     pub fn add_ghost_block(

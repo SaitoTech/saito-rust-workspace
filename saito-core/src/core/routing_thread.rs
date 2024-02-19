@@ -630,7 +630,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             .await;
 
         let stat = format!(
-            "{} - capacity : {:?} / {:?}",
+            "{} - {} - capacity : {:?} / {:?}",
+            current_time,
             format!("{:width$}", "consensus::queue", width = 40),
             self.sender_to_consensus.capacity(),
             self.sender_to_consensus.max_capacity()
@@ -638,7 +639,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         self.stat_sender.send(stat).await.unwrap();
         for (index, sender) in self.senders_to_verification.iter().enumerate() {
             let stat = format!(
-                "{} - capacity : {:?} / {:?}",
+                "{} - {} - capacity : {:?} / {:?}",
+                current_time,
                 format!(
                     "{:width$}",
                     format!("verification_{:?}::queue", index),

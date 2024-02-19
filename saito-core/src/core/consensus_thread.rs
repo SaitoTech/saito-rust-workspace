@@ -502,7 +502,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
-                        Some(&self.network),
+                        None,
                         &mut self.storage,
                         None,
                         configs.deref(),
@@ -540,7 +540,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
             let stat = format!(
-                "{} - total_slips : {:?}, unspent_slips : {:?}, current_balance : {:?}",
+                "{} - {} - total_slips : {:?}, unspent_slips : {:?}, current_balance : {:?}",
+                current_time,
                 format!("{:width$}", "wallet::state", width = 40),
                 wallet.slips.len(),
                 wallet.get_unspent_slip_count(),
@@ -551,7 +552,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         {
             let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
             let stat = format!(
-                "{} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?} full_block_count : {:?} txs_in_blocks : {:?}",
+                "{} - {} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?} full_block_count : {:?} txs_in_blocks : {:?}",
+                current_time,
                 format!("{:width$}", "blockchain::state", width = 40),
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
@@ -565,7 +567,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let (mempool, _mempool_) = lock_for_read!(self.mempool, LOCK_ORDER_MEMPOOL);
 
             let stat = format!(
-                "{} - blocks_queue : {:?}, transactions : {:?}",
+                "{} - {} - blocks_queue : {:?}, transactions : {:?}",
+                current_time,
                 format!("{:width$}", "mempool:state", width = 40),
                 mempool.blocks_queue.len(),
                 mempool.transactions.len(),
