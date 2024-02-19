@@ -268,15 +268,16 @@ impl StatVariable {
         }
         #[cfg(feature = "with-stats")]
         self.sender
-            .send(self.print())
+            .send(self.print(current_time_in_ms))
             .await
             .expect("failed sending stat update");
     }
 
-    fn print(&self) -> String {
+    fn print(&self, current_time_in_ms: Timestamp) -> String {
         format!(
             // target : "saito_stats",
-            "{} - total : {:?}, current_rate : {:.2}, max_rate : {:.2}, min_rate : {:.2}",
+            "{} - {} - total : {:?}, current_rate : {:.2}, max_rate : {:.2}, min_rate : {:.2}",
+            current_time_in_ms,
             format!("{:width$}", self.name, width = 40),
             self.total,
             self.avg,
