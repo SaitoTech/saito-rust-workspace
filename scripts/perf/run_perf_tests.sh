@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 ssh_execute() {
+
  ssh "$1" "$2"
 
 }
@@ -52,9 +53,14 @@ run_test_case() {
     ssh_server "pkill -f saito-rust"
     ssh_spammer "pkill -f saito-spammer"
 
-    # clean data/blocks directories
-    ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks/*"
-    ssh_spammer "rm -rf $SPAMMER_DIR/saito-spammer/data/blocks/*"
+    # clean data/blocks directorie
+    
+    ssh_server "find $SERVER_DIR/saito-rust/data/blocks/ -mindepth 1 -delete"
+    ssh_spammer "find $SPAMMER_DIR/saito-rust/data/blocks/ -mindepth 1 -delete"
+
+
+
+
 
     # configure saito-rust server
     configure_server

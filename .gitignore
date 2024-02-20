@@ -7,3 +7,4 @@ dist/
 configs/config.json
 scripts/perf/test.csv
 scripts/perf/perf_config.template.properties
+scripts/perf/test_results.csv
