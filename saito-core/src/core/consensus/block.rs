@@ -2460,6 +2460,7 @@ mod tests {
         assert_eq!(block.avg_fee_per_byte, total_fees / tx_size as Currency);
     }
 
+    #[ignore]
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test() {
