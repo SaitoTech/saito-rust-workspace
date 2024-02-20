@@ -32,16 +32,6 @@ configure_spammer(){
 
 }
 
-spin() {
-  local -a marks=('/' '-' '\' '|')
-  while true; do
-    for mark in "${marks[@]}"; do
-      echo -ne "$mark\r"
-      sleep 0.1
-    done
-  done
-}
-
 run_test_case() {
     verification_thread_count=$1
     txs_rate_from_spammer=$2
