@@ -6,5 +6,5 @@ dist/
 .vscode
 configs/config.json
 scripts/perf/test.csv
-scripts/perf/perf_config.template.properties
+# scripts/perf/perf_config.properties
 scripts/perf/test_results.csv

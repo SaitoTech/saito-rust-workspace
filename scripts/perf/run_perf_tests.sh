@@ -53,13 +53,11 @@ run_test_case() {
     ssh_server "pkill -f saito-rust"
     ssh_spammer "pkill -f saito-spammer"
 
-    # clean data/blocks directorie
+    # clean data/blocks directories
+
     
-    ssh_server "find $SERVER_DIR/saito-rust/data/blocks/ -mindepth 1 -delete"
-    ssh_spammer "find $SPAMMER_DIR/saito-rust/data/blocks/ -mindepth 1 -delete"
-
-
-
+    ssh_server "rm -rf $SERVER_DIR/saito-rust/data/blocks && cd $SERVER_DIR/saito-rust/data && mkdir blocks "
+    ssh_spammer "rm -rf $SPAMMER_DIR/saito-spammer/data/blocks && cd $SPAMMER_DIR/saito-spammer/data && mkdir blocks"
 
 
     # configure saito-rust server
