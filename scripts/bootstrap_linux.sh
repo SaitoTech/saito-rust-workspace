@@ -13,7 +13,7 @@ ask_permission() {
     read -p "$1 [y/n]: " yn
     case $yn in
       [Yy]* ) return 0;;
-      [Nn]* ) echo "Aborting. Remaining installations: ${pending_installations[*]}"
+      [Nn]* ) echo "Aborting. The following installations were pending: ${pending_installations[*]}"
               exit 1;;
       * ) echo "Please answer yes or no.";;
     esac
