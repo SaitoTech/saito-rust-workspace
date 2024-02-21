@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# Initialize an array to keep track of pending installations
 declare -a pending_installations=("Rust and Cargo" "system packages" "wasm-pack" "project build")
 
 
@@ -23,7 +22,6 @@ ask_permission() {
 
 
 mark_as_installed() {
-
   for i in "${!pending_installations[@]}"; do
     if [[ "${pending_installations[$i]}" = "$1" ]]; then
       unset 'pending_installations[i]'
