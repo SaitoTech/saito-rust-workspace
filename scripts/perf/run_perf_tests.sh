@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
+
 ssh_execute() {
-
  ssh "$1" "$2"
-
 }
 
 ssh_server() {
@@ -33,11 +32,12 @@ configure_spammer(){
 }
 
 run_test_case() {
+  original_dir=$(pwd)
+  cd "$(dirname "$0")"
     verification_thread_count=$1
     txs_rate_from_spammer=$2
     tx_payload_size=$3
-
-
+  
     results_file="./test_results.csv" 
     if [ ! -f "$results_file" ]; then
     echo "verification_thread_count,burst_rate_per_second,tx_size,memory_usage_percentage,tx_rate_network_thread_per_second,tx_rate_verification_threads_per_second,block_count,longest_chain_length,total_block_size,time_to_load_blocks_seconds,time_to_sync_blocks_seconds,fetching_node_memory_usage_percentage" > "$results_file"
@@ -209,7 +209,7 @@ run_test_case() {
 
 
     echo "$verification_thread_count, $txs_rate_from_spammer, $tx_payload_size, $memory_usage,$tx_rate_network_thread,$tx_rate_verification_threads,$block_count,$longest_chain_length,$total_block_size,$time_to_load_blocks,$time_to_fetch_blocks,$fetching_node_memory_usage" >> "$results_file"
-
+  cd "$original_dir"
 }
 
 test_case_count=-1
