@@ -3,7 +3,7 @@
 # Get the directory where the script is located
 SCRIPT_DIR=$(dirname "$0")
 
-BASE_PATH="$SCRIPT_DIR/../saito-rust" 
+BASE_PATH="$SCRIPT_DIR/../saito-rust"
 
 # Setup config
 if [ ! -f "$BASE_PATH/configs/config.json" ]; then
@@ -29,7 +29,6 @@ else
   echo "issuance file already exists. No changes made."
 fi
 
-
 # Install packages
 chmod +x "$SCRIPT_DIR/bootstrap_mac.sh"
 chmod +x "$SCRIPT_DIR/bootstrap_linux.sh"
@@ -37,23 +36,23 @@ OS="$(uname)"
 case "$OS" in
   Darwin)
     echo "Running bootstrap_mac.sh for macOS"
-    "$SCRIPT_DIR/bootstrap_mac.sh"
+    "$SCRIPT_DIR/bootstrap_mac.sh" || { echo "Installation aborted by user. Exiting."; exit 1; }
     ;;
   Linux)
     echo "Running bootstrap_linux.sh for Linux"
-    "$SCRIPT_DIR/bootstrap_linux.sh"
+    "$SCRIPT_DIR/bootstrap_linux.sh" || { echo "Installation aborted by user. Exiting."; exit 1; }
     ;;
   *)
     echo "Unsupported operating system: $OS"
+    exit 1
     ;;
 esac
 
-source "$HOME/.cargo/env"
 
+source "$HOME/.cargo/env" 2>/dev/null
 
 # Start node
 cd "$BASE_PATH"
 
 echo "Running 'RUST_LOG=debug cargo run' in $BASE_PATH"
 env RUST_LOG=debug cargo run
-
