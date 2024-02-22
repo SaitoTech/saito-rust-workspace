@@ -120,6 +120,8 @@ pub trait InterfaceIO: Debug {
     /// Retrieve the prefix for all the keys for blocks
     fn get_block_dir(&self) -> String;
 
+    fn create_block_directory(&self) -> Result<(), Error>;
+
     async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
     async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
     async fn process_api_error(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
