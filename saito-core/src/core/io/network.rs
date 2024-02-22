@@ -345,6 +345,36 @@ impl Network {
         self.request_blockchain_from_peer(peer_index, blockchain.clone())
             .await;
     }
+    pub async fn handle_received_key_list(
+        &mut self,
+        peer_index: PeerIndex,
+        key_list: Vec<SaitoPublicKey>,
+    ) {
+        debug!(
+            "handling received keylist of length : {:?} from peer : {:?}",
+            key_list.len(),
+            peer_index
+        );
+        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+
+        let peer = peers.index_to_peers.get_mut(&peer_index);
+        if peer.is_none() {
+            error!(
+                "peer not found for index : {:?}. cannot handle handshake response",
+                peer_index
+            );
+            return;
+        }
+        let peer = peer.unwrap();
+        peer.key_list = key_list;
+    }
+    pub async fn send_key_list(&self, key_list: &Vec<SaitoPublicKey>) {
+        debug!("sending key list to all the peers");
+        self.io_interface
+            .send_message_to_all(Message::KeyListUpdate(key_list.clone()).serialize(), vec![])
+            .await
+            .unwrap();
+    }
 
     async fn request_blockchain_from_peer(
         &self,
