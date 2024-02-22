@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Formatter};
+use std::fs;
 use std::io::{Error, ErrorKind};
 
 use async_trait::async_trait;
@@ -160,6 +161,11 @@ impl InterfaceIO for WasmIoHandler {
 
     fn get_block_dir(&self) -> String {
         "data/blocks/".to_string()
+    }
+
+    fn create_block_directory(&self) -> std::io::Result<()> {
+        fs::create_dir_all("data/blocks/")?;
+        Ok(())
     }
 
     async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
