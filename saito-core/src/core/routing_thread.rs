@@ -6,6 +6,8 @@ use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use crate::{lock_for_read, lock_for_write};
+use crate::core::{consensus, util};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
@@ -13,8 +15,8 @@ use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
-    push_lock, BlockId, PeerIndex, PrintForLog, SaitoHash, StatVariable, Timestamp,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, STAT_BIN_COUNT,
+    BlockId, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, PeerIndex, PrintForLog, push_lock, SaitoHash,
+    SaitoPublicKey, STAT_BIN_COUNT, StatVariable, Timestamp,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -27,8 +29,6 @@ use crate::core::process::process_event::ProcessEvent;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
-use crate::core::{consensus, util};
-use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
 pub enum RoutingEvent {
@@ -203,6 +203,11 @@ impl RoutingThread {
                     .process_api_error(api_message.data, api_message.msg_index, peer_index)
                     .await;
             }
+            Message::KeyListUpdate(key_list) => {
+                self.network
+                    .handle_received_key_list(peer_index, key_list)
+                    .await;
+            }
         }
         trace!("incoming message processed");
     }
@@ -300,6 +305,11 @@ impl RoutingThread {
     async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
         self.network.handle_peer_disconnect(peer_index).await;
+    }
+    async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
+        let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        wallet.set_key_list(key_list);
+        self.network.send_key_list(&wallet.key_list).await;
     }
 
     pub async fn process_incoming_blockchain_request(

@@ -5,7 +5,7 @@ use log::{error, trace, warn};
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::transaction::Transaction;
-use crate::core::defs::SaitoHash;
+use crate::core::defs::{SaitoHash, SaitoPublicKey};
 use crate::core::msg::api_message::ApiMessage;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;
@@ -28,7 +28,7 @@ pub enum Message {
     ApplicationMessage(ApiMessage),
     Result(ApiMessage),
     Error(ApiMessage),
-    // ApplicationTransaction(ApiMessage),
+    KeyListUpdate(Vec<SaitoPublicKey>),
 }
 
 impl Message {
@@ -60,6 +60,7 @@ impl Message {
             Message::Services(services) => PeerService::serialize_services(services),
             Message::Result(data) => data.serialize(),
             Message::Error(data) => data.serialize(),
+            Message::KeyListUpdate(data) => data.as_slice().concat(),
             _ => {
                 error!("unhandled type : {:?}", message_type);
                 vec![]
@@ -179,7 +180,23 @@ impl Message {
                 let result = ApiMessage::deserialize(&buffer);
                 Ok(Message::Error(result))
             }
-            // 16 => Ok(Message::ApplicationTransaction(buffer)),
+            15 => {
+                if buffer.len() % 33 != 0 {
+                    warn!(
+                        "key list have invalid keys. total length : {:?}",
+                        buffer.len()
+                    );
+                    return Err(Error::from(ErrorKind::InvalidData));
+                }
+                let key_count = buffer.len() % 33;
+                let mut keylist = vec![];
+                let slice = buffer.as_slice();
+                for i in 0..key_count {
+                    let key: SaitoPublicKey = slice[i * 33..33].to_vec().try_into().unwrap();
+                    keylist.push(key);
+                }
+                Ok(Message::KeyListUpdate(keylist))
+            }
             _ => {
                 warn!("message type : {:?} not valid", message_type);
                 Err(Error::from(ErrorKind::InvalidData))
@@ -202,7 +219,7 @@ impl Message {
             Message::ApplicationMessage(_) => 12,
             Message::Result(_) => 13,
             Message::Error(_) => 14,
-            // Message::ApplicationTransaction(_) => 16,
+            Message::KeyListUpdate(_) => 15,
         }
     }
 }
