@@ -150,6 +150,11 @@ pub mod test {
             "./data/blocks/".to_string()
         }
 
+        fn create_block_directory(&self) -> std::io::Result<()> {
+            fs::create_dir_all("data/blocks/")?;
+            Ok(())
+        }
+
         async fn process_api_call(
             &self,
             _buffer: Vec<u8>,
