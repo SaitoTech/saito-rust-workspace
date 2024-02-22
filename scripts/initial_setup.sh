@@ -9,9 +9,33 @@ BASE_PATH="$SCRIPT_DIR/../saito-rust"
 if [ ! -f "$BASE_PATH/configs/config.json" ]; then
   cp "$BASE_PATH/configs/config.template.json" "$BASE_PATH/configs/config.json"
   echo "config.json has been created from config.template.json."
+
+
+  echo "Do you want to setup an isolated node (i) or a connected node (c)?"
+read -p "[i/c]: " node_type
+
+CONFIG_PATH="$BASE_PATH/configs/config.json"
+
+if [ "$node_type" == "i" ]; then
+  if grep -q '"peers": \[' "$CONFIG_PATH"; then
+    awk '
+    BEGIN {print_mode=1}
+    /"peers": \[/ {print_mode=0; print "\"peers\": []"; next}
+    /]/ {if (print_mode == 0) {print_mode=1; next}}
+    {if (print_mode == 1) print}
+    ' "$CONFIG_PATH" > temp && mv temp "$CONFIG_PATH"
+    echo "Configured as an isolated node with empty peers array."
+  fi
+elif [ "$node_type" == "c" ]; then
+  echo "Configured as a connected node. No changes to peers array."
+else
+  echo "Invalid input. No changes made to peers configuration."
+fi
 else
   echo "config.json already exists. No changes made."
 fi
+
+
 
 # Create blocks folder
 if [ ! -d "$BASE_PATH/data/blocks" ]; then
