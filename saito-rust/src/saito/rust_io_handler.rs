@@ -245,6 +245,11 @@ impl InterfaceIO for RustIOHandler {
         BLOCKS_DIR_PATH.to_string()
     }
 
+    fn create_block_directory(&self) -> std::io::Result<()> {
+        fs::create_dir_all(BLOCKS_DIR_PATH.to_string())?;
+        Ok(())
+    }
+
     async fn process_api_call(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {}
 
     async fn process_api_success(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {
