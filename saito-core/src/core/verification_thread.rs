@@ -8,7 +8,6 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::{drain, lock_for_read};
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::peer_collection::PeerCollection;
@@ -16,11 +15,12 @@ use crate::core::consensus::transaction::Transaction;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, PrintForLog, StatVariable,
-    Timestamp,
+    PrintForLog, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET,
 };
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::process_event::ProcessEvent;
+use crate::{drain, lock_for_read};
 
 #[derive(Debug)]
 pub enum VerifyRequest {
