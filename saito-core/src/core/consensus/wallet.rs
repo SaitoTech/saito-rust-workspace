@@ -118,10 +118,12 @@ impl Wallet {
         vbytes.extend(&self.private_key);
         vbytes.extend(&self.public_key);
 
+        // TODO : should we write key list here for rust nodes ?
+
         vbytes
     }
 
-    /// [private_key - 32 bytes
+    /// [private_key - 32 bytes]
     /// [public_key - 33 bytes]
     pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
         self.private_key = bytes[0..32].try_into().unwrap();
