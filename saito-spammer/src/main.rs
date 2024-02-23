@@ -4,31 +4,29 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use log::info;
 use log::{debug, error, trace};
+use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
-use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::defs::{push_lock, LOCK_ORDER_CONFIGS};
-use saito_core::core::io::network_event::NetworkEvent;
-use saito_core::core::util::configuration::Configuration;
-
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+    PrintForLog, SaitoPrivateKey, SaitoPublicKey, STAT_BIN_COUNT, StatVariable,
 };
+use saito_core::core::defs::LOCK_ORDER_CONFIGS;
 use saito_core::core::io::network::Network;
+use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::process::keep_time::KeepTime;
@@ -36,11 +34,11 @@ use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
+use saito_core::core::util::configuration::Configuration;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_read;
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
-
 use saito_rust::saito::rust_io_handler::RustIOHandler;
 use saito_rust::saito::stat_thread::StatThread;
 use saito_rust::saito::time_keeper::TimeKeeper;
@@ -62,8 +60,8 @@ async fn run_thread<T>(
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()>
-where
-    T: Send + 'static,
+    where
+        T: Send + 'static,
 {
     tokio::spawn(async move {
         info!("new thread started");
@@ -162,7 +160,7 @@ async fn run_mining_event_processor(
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
     )
-    .await;
+        .await;
     miner_handle
 }
 
@@ -184,7 +182,7 @@ async fn run_consensus_event_processor(
     }
     let generate_genesis_block: bool;
     {
-        let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
 
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
         generate_genesis_block = configs.get_peer_configs().is_empty();
@@ -227,7 +225,7 @@ async fn run_consensus_event_processor(
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
     )
-    .await;
+        .await;
 
     consensus_handle
 }
@@ -283,7 +281,7 @@ async fn run_verification_threads(
             stat_timer_in_ms,
             thread_sleep_time_in_ms,
         )
-        .await;
+            .await;
         thread_handles.push(thread_handle);
     }
 
@@ -334,7 +332,7 @@ async fn run_routing_event_processor(
         reconnection_wait_time: 0,
     };
     {
-        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -358,7 +356,7 @@ async fn run_routing_event_processor(
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
     )
-    .await;
+        .await;
 
     (interface_sender_to_routing, routing_handle)
 }
@@ -429,7 +427,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("shutting down the node");
         process::exit(0);
     })
-    .expect("Error setting Ctrl-C handler");
+        .expect("Error setting Ctrl-C handler");
 
     let orig_hook = panic::take_hook();
     panic::set_hook(Box::new(move |panic_info| {
@@ -492,7 +490,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fetch_batch_size: usize;
 
     {
-        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs
@@ -547,7 +545,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         verification_thread_count,
         sender_to_stat.clone(),
     )
-    .await;
+        .await;
 
     let (network_event_sender_to_routing, routing_handle) = run_routing_event_processor(
         sender_to_network_controller.clone(),
@@ -564,7 +562,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_stat.clone(),
         fetch_batch_size,
     )
-    .await;
+        .await;
 
     let blockchain_handle = run_consensus_event_processor(
         &context,
@@ -577,7 +575,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         thread_sleep_time_in_ms,
         sender_to_stat.clone(),
     )
-    .await;
+        .await;
 
     let miner_handle = run_mining_event_processor(
         &context,
@@ -588,7 +586,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_stat.clone(),
         configs_lock.clone(),
     )
-    .await;
+        .await;
 
     let stat_thread = Box::new(StatThread::new().await);
     let stat_handle = run_thread(
@@ -598,7 +596,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
     )
-    .await;
+        .await;
 
     let loop_handle = run_loop_thread(
         event_receiver_in_loop,

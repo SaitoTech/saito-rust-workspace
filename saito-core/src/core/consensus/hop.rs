@@ -3,7 +3,7 @@ use std::io::{Error, ErrorKind};
 use serde::{Deserialize, Serialize};
 
 use crate::core::consensus::transaction::Transaction;
-use crate::core::defs::{push_lock, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
+use crate::core::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::util::crypto::sign;
 
 pub const HOP_SIZE: usize = 130;
@@ -52,9 +52,15 @@ impl Hop {
         if bytes.len() != HOP_SIZE {
             return Err(Error::from(ErrorKind::InvalidInput));
         }
-        let from: SaitoPublicKey = bytes[..33].try_into().unwrap();
-        let to: SaitoPublicKey = bytes[33..66].try_into().unwrap();
-        let sig: SaitoSignature = bytes[66..130].try_into().unwrap();
+        let from: SaitoPublicKey = bytes[..33]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
+        let to: SaitoPublicKey = bytes[33..66]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
+        let sig: SaitoSignature = bytes[66..130]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
 
         let mut hop = Hop::default();
         hop.from = from;
@@ -86,7 +92,7 @@ mod tests {
 
     use crate::core::consensus::hop::Hop;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{SaitoPublicKey, LOCK_ORDER_WALLET};
+    use crate::core::defs::SaitoPublicKey;
     use crate::core::util::crypto::{generate_keys, verify};
     use crate::lock_for_read;
 
@@ -107,7 +113,7 @@ mod tests {
         let sender_public_key: SaitoPublicKey;
 
         {
-            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(wallet, LOCK_ORDER_WALLET);
 
             sender_public_key = wallet.public_key;
         }
@@ -115,7 +121,7 @@ mod tests {
         let tx = Transaction::default();
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+        let wallet = lock_for_read!(wallet, LOCK_ORDER_WALLET);
         let hop = Hop::generate(
             &wallet.private_key,
             &wallet.public_key,
@@ -133,12 +139,12 @@ mod tests {
         let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let mut tx = Transaction::default();
         {
-            let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(wallet, LOCK_ORDER_WALLET);
             tx.sign(&wallet.private_key);
         }
         let (receiver_public_key, _receiver_private_key) = generate_keys();
 
-        let (wallet, _wallet_) = lock_for_read!(wallet, LOCK_ORDER_WALLET);
+        let wallet = lock_for_read!(wallet, LOCK_ORDER_WALLET);
         let hop = Hop::generate(
             &wallet.private_key,
             &wallet.public_key,

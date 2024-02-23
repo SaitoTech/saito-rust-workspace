@@ -10,14 +10,14 @@ use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::defs::{push_lock, Currency, LOCK_ORDER_CONFIGS};
+use saito_core::core::defs::{Currency, LOCK_ORDER_CONFIGS};
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::msg::message::Message;
 use saito_core::lock_for_read;
 
+use crate::IoEvent;
 use crate::saito::config_handler::SpammerConfigs;
 use crate::saito::transaction_generator::{GeneratorState, TransactionGenerator};
-use crate::IoEvent;
 
 pub struct Spammer {
     sender_to_network: Sender<IoEvent>,
@@ -40,7 +40,7 @@ impl Spammer {
         let tx_payment;
         let tx_fee;
         {
-            let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+            let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
             tx_payment = configs.get_spammer_configs().tx_payment;
             tx_fee = configs.get_spammer_configs().tx_fee;
         }
@@ -59,7 +59,7 @@ impl Spammer {
                 tx_payment as Currency,
                 tx_fee as Currency,
             )
-            .await,
+                .await,
         }
     }
 
@@ -70,7 +70,7 @@ impl Spammer {
         let stop_after;
 
         {
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
 
             timer_in_milli = configs.get_spammer_configs().timer_in_milli;
             burst_count = configs.get_spammer_configs().burst_count;
@@ -144,6 +144,6 @@ pub async fn run_spammer(
         sender,
         configs_lock,
     )
-    .await;
+        .await;
     spammer.run(receiver).await;
 }

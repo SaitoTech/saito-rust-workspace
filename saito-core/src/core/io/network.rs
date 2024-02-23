@@ -4,6 +4,7 @@ use std::sync::Arc;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
+use crate::{lock_for_read, lock_for_write};
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::mempool::Mempool;
@@ -12,9 +13,9 @@ use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    push_lock, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
-    PEER_RECONNECT_WAIT_PERIOD,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, PEER_RECONNECT_WAIT_PERIOD,
+    PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey,
+    Timestamp,
 };
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::block_request::BlockchainRequest;
@@ -22,7 +23,6 @@ use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::KeepTime;
 use crate::core::util::configuration::{Configuration, PeerConfig};
-use crate::{lock_for_read, lock_for_write};
 
 // #[derive(Debug)]
 pub struct Network {
@@ -67,7 +67,7 @@ impl Network {
         // finding block sender to avoid resending the block to that node
 
         {
-            let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+            let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
             for (index, peer) in peers.index_to_peers.iter() {
                 if peer.public_key.is_none() {
                     excluded_peers.push(*index);
@@ -97,8 +97,8 @@ impl Network {
     pub async fn propagate_transaction(&self, transaction: &Transaction) {
         // TODO : return if tx is not valid
 
-        let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
-        let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+        let mut wallet = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
 
         trace!(
             "propagating transaction : {:?} peers : {:?}",
@@ -157,10 +157,10 @@ impl Network {
         let url;
         let my_public_key;
         {
-            let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+            let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
             {
-                let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
                 my_public_key = wallet.public_key;
             }
 
@@ -198,7 +198,7 @@ impl Network {
             .await
             .unwrap();
 
-        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let mut peers = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let result = peers.find_peer_by_index(peer_index);
 
@@ -246,7 +246,7 @@ impl Network {
     pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
-        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let mut peers = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let mut peer = Peer::new(peer_index);
         peer.static_peer_config = peer_data;
@@ -278,7 +278,7 @@ impl Network {
         wallet: Arc<RwLock<Wallet>>,
         configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
-        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let mut peers = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
@@ -302,7 +302,7 @@ impl Network {
         configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
         debug!("handling handshake response");
-        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let mut peers = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
@@ -355,7 +355,7 @@ impl Network {
             key_list.len(),
             peer_index
         );
-        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let mut peers = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
@@ -387,16 +387,15 @@ impl Network {
         let fork_id;
         {
             // TODO : will this create a race condition if we release the lock after reading fork id ?
-            let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
             fork_id = *blockchain.get_fork_id();
         }
 
-        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         if configs.is_spv_mode() {
             let request;
             {
-                let (blockchain, _blockchain_) =
-                    lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+                let blockchain = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
                 if blockchain.last_block_id > blockchain.get_latest_block_id() {
                     debug!(
@@ -438,8 +437,7 @@ impl Network {
         } else {
             let request;
             {
-                let (blockchain, _blockchain_) =
-                    lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+                let blockchain = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
                 request = BlockchainRequest {
                     latest_block_id: blockchain.get_latest_block_id(),
@@ -467,13 +465,13 @@ impl Network {
             block_hash.to_hex(),
             peer_index
         );
-        let (configs, _configs_) = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
         let block_exists;
         let my_public_key;
         {
-            let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            let (mempool, _mempool_) = lock_for_read!(mempool_lock, LOCK_ORDER_MEMPOOL);
-            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let blockchain = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let mempool = lock_for_read!(mempool_lock, LOCK_ORDER_MEMPOOL);
+            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
             block_exists = blockchain.is_block_indexed(block_hash)
                 || mempool.blocks_queue.iter().any(|b| b.hash == block_hash);
@@ -488,7 +486,7 @@ impl Network {
         }
         let url;
         {
-            let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+            let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
                 if peer.block_fetch_url.is_empty() {
@@ -510,8 +508,7 @@ impl Network {
             "fetching block for incoming hash : {:?}",
             block_hash.to_hex()
         );
-        let (mut blockchain, _blockchain_) =
-            lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let mut blockchain = lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
         blockchain.mark_as_fetching(block_hash);
         if self
             .io_interface
@@ -533,7 +530,7 @@ impl Network {
         &mut self,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
-        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         configs
             .get_peer_configs()
@@ -565,14 +562,14 @@ impl Network {
 
     pub async fn send_pings(&mut self) {
         let current_time = self.time_keeper.get_timestamp_in_ms();
-        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let mut peers = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
         for (_, peer) in peers.index_to_peers.iter_mut() {
             peer.send_ping(current_time, &self.io_interface).await;
         }
     }
 
     pub async fn update_peer_timer(&mut self, peer_index: PeerIndex) {
-        let (mut peers, _peers_) = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
+        let mut peers = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             return;
