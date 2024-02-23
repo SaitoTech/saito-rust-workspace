@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
-use std::fs;
 use std::io::{Error, ErrorKind};
+use std::{fs, result};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
@@ -107,6 +107,14 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
+    fn create_block_directory(&self) -> Result<(), std::io::Error> {
+        let result = MsgHandler::create_block_dir();
+        if result.is_err() {
+            return Err(Error::from(ErrorKind::Other));
+        }
+        Ok(())
+    }
+
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         let result = MsgHandler::read_value(key.clone());
         if result.is_err() {
@@ -161,11 +169,6 @@ impl InterfaceIO for WasmIoHandler {
 
     fn get_block_dir(&self) -> String {
         "data/blocks/".to_string()
-    }
-
-    fn create_block_directory(&self) -> std::io::Result<()> {
-        fs::create_dir_all("data/blocks/")?;
-        Ok(())
     }
 
     async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {
@@ -299,6 +302,9 @@ extern "C" {
     pub fn connect_to_peer(peer_data: JsValue) -> Result<JsValue, js_sys::Error>;
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn write_value(key: String, value: &Uint8Array);
+
+    #[wasm_bindgen(static_method_of = MsgHandler, catch)]
+    pub fn create_block_dir() -> Result<(), js_sys::Error>;
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn read_value(key: String) -> Result<Uint8Array, js_sys::Error>;

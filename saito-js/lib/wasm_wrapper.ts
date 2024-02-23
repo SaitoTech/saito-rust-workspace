@@ -27,3 +27,4 @@ export default class WasmWrapper<T> {
   //   this.instance.free();
   // }
 }
+

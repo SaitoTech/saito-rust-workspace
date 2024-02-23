@@ -91,7 +91,7 @@ impl Storage {
         if !Path::new(&block_dir_path).exists() {
             match self.io_interface.create_block_directory() {
                 Ok(()) => debug!("Block directory created"),
-                _ => (),
+                _ => error!("Error creating block directory not created"),
             }
         }
 
