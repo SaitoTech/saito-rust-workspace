@@ -6,6 +6,7 @@ use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use crate::{lock_for_read, lock_for_write};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
@@ -13,8 +14,8 @@ use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
-    BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, STAT_BIN_COUNT, StatVariable,
+    Timestamp,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -28,7 +29,6 @@ use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
-use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
 pub enum RoutingEvent {
