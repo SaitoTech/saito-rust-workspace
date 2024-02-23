@@ -14,10 +14,7 @@ use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::Transaction;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{
-    push_lock, PrintForLog, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET,
-};
+use crate::core::defs::{PrintForLog, StatVariable, Timestamp};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::process_event::ProcessEvent;
 use crate::{drain, lock_for_read};
@@ -45,13 +42,13 @@ impl VerificationThread {
     pub async fn verify_tx(&mut self, mut transaction: Transaction) {
         let public_key;
         {
-            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
             public_key = wallet.public_key;
         }
         {
             transaction.generate(&public_key, 0, 0);
 
-            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
             if !transaction.validate(&blockchain.utxoset) {
                 debug!(
@@ -76,11 +73,11 @@ impl VerificationThread {
         let prev_count = transactions.len();
         let txs: Vec<Transaction>;
         {
-            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
             let public_key;
             {
-                let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
                 public_key = wallet.public_key;
             }
             txs = drain!(transactions, 10)
@@ -120,7 +117,7 @@ impl VerificationThread {
             );
             return;
         }
-        let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+        let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
         let mut block = result.unwrap();
         let peer = peers.index_to_peers.get(&peer_index);

@@ -55,7 +55,7 @@ use crate::wasm_wallet::WasmWallet;
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    routing_thread: RoutingThread,
+    pub(crate) routing_thread: RoutingThread,
     consensus_thread: ConsensusThread,
     mining_thread: MiningThread,
     verification_thread: VerificationThread,
@@ -460,10 +460,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     }
     event_counter = 0;
 
-    saito
-        .routing_thread
-        .process_timer_event(duration.clone())
-        .await;
+    saito.routing_thread.process_timer_event(duration).await;
 
     while let Ok(event) = saito.receiver_for_consensus.try_recv() {
         let _result = saito.consensus_thread.process_event(event).await;
@@ -474,10 +471,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     }
     event_counter = 0;
 
-    saito
-        .consensus_thread
-        .process_timer_event(duration.clone())
-        .await;
+    saito.consensus_thread.process_timer_event(duration).await;
 
     while let Ok(event) = saito.receiver_for_verification.try_recv() {
         let _result = saito.verification_thread.process_event(event).await;
@@ -502,10 +496,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     }
     event_counter = 0;
 
-    saito
-        .mining_thread
-        .process_timer_event(duration.clone())
-        .await;
+    saito.mining_thread.process_timer_event(duration).await;
 }
 
 #[wasm_bindgen]
@@ -608,23 +599,7 @@ pub async fn get_account_slips(public_key: JsString) -> Result<Array, JsValue> {
 
 #[wasm_bindgen]
 pub async fn get_balance_snapshot(keys: js_sys::Array) -> WasmBalanceSnapshot {
-    let keys: Vec<SaitoPublicKey> = keys
-        .to_vec()
-        .drain(..)
-        .filter_map(|key| {
-            let key: Option<String> = key.as_string();
-            if key.is_none() {
-                return None;
-            }
-            let key: String = key.unwrap();
-            let key = SaitoPublicKey::from_base58(key.as_str());
-            if key.is_err() {
-                return None;
-            }
-            let key: SaitoPublicKey = key.unwrap();
-            return Some(key);
-        })
-        .collect();
+    let keys: Vec<SaitoPublicKey> = string_array_to_base58_keys(keys);
 
     let saito = SAITO.lock().await;
     let blockchain = saito.routing_thread.blockchain.read().await;
@@ -711,10 +686,6 @@ pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: Pe
     let message = Message::Result(api_message);
     let buffer = message.serialize();
 
-    // let mut tx = Transaction::default();
-    // tx.data = buffer;
-    // let buffer = Message::Transaction(tx).serialize();
-    // trace!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
         .network
@@ -735,11 +706,6 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
     let message = Message::Error(api_message);
     let buffer = message.serialize();
 
-    // let mut tx = Transaction::default();
-    // tx.data = buffer;
-    // let buffer = Message::Transaction(tx).serialize();
-
-    // info!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
         .network
@@ -876,6 +842,29 @@ where
     }
     let key = key.unwrap();
     Ok(key)
+}
+
+pub fn string_array_to_base58_keys<T: TryFrom<Vec<u8>> + PrintForLog<T>>(
+    array: js_sys::Array,
+) -> Vec<T> {
+    let array: Vec<T> = array
+        .to_vec()
+        .drain(..)
+        .filter_map(|key| {
+            let key: Option<String> = key.as_string();
+            if key.is_none() {
+                return None;
+            }
+            let key: String = key.unwrap();
+            let key = T::from_base58(key.as_str());
+            if key.is_err() {
+                return None;
+            }
+            let key: T = key.unwrap();
+            return Some(key);
+        })
+        .collect();
+    array
 }
 
 // #[cfg(test)]

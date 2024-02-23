@@ -6,16 +6,13 @@ use tokio::sync::RwLock;
 
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{
-    push_lock, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_WALLET, WS_KEEP_ALIVE_PERIOD,
-};
+use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD};
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
+use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use crate::core::{consensus, util};
 use crate::lock_for_read;
 
 #[derive(Debug, Clone)]
@@ -74,7 +71,7 @@ impl Peer {
         let block_fetch_url;
         let is_lite;
         {
-            let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+            let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
             is_lite = configs.is_browser();
             if is_lite {
@@ -84,7 +81,7 @@ impl Peer {
             }
         }
 
-        let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+        let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(challenge.challenge.as_slice(), &wallet.private_key),
@@ -139,7 +136,7 @@ impl Peer {
         let block_fetch_url;
         let is_lite;
         {
-            let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+            let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
             is_lite = configs.is_browser();
             if is_lite {
@@ -153,7 +150,7 @@ impl Peer {
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
 
-        let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+        let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
         info!(
             "my version : {:?} peer version : {:?}",

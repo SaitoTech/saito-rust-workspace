@@ -1,7 +1,7 @@
-use js_sys::JsString;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use js_sys::{Array, JsString};
 use log::{error, warn};
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -13,7 +13,7 @@ use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublic
 use saito_core::core::io::network::Network;
 use saito_core::core::io::storage::Storage;
 
-use crate::saitowasm::string_to_hex;
+use crate::saitowasm::{string_array_to_base58_keys, string_to_hex, SAITO};
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_transaction::WasmTransaction;
 
@@ -132,6 +132,21 @@ impl WasmWallet {
             wallet_slip.lc,
             Some(self.network.deref()),
         );
+    }
+
+    pub async fn get_key_list(&self) -> Array {
+        let wallet = self.wallet.read().await;
+        let array = Array::new_with_length(wallet.key_list.len() as u32);
+        for (i, key) in wallet.key_list.iter().enumerate() {
+            array.set(i as u32, JsValue::from(key.to_base58()));
+        }
+        array
+    }
+    pub async fn set_key_list(&self, key_list: js_sys::Array) {
+        let key_list: Vec<SaitoPublicKey> = string_array_to_base58_keys(key_list);
+
+        let mut saito = SAITO.lock().await;
+        saito.routing_thread.set_my_key_list(key_list).await;
     }
 }
 

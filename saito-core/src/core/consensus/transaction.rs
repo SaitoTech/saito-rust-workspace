@@ -332,14 +332,41 @@ impl Transaction {
         if bytes.len() < TRANSACTION_SIZE {
             return Err(Error::from(ErrorKind::InvalidData));
         }
-        let inputs_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
-        let outputs_len: u32 = u32::from_be_bytes(bytes[4..8].try_into().unwrap());
-        let message_len: usize = u32::from_be_bytes(bytes[8..12].try_into().unwrap()) as usize;
-        let path_len: usize = u32::from_be_bytes(bytes[12..16].try_into().unwrap()) as usize;
-        let signature: SaitoSignature = bytes[16..80].try_into().unwrap();
-        let timestamp: Timestamp = Timestamp::from_be_bytes(bytes[80..88].try_into().unwrap());
-        let replaces_txs = u32::from_be_bytes(bytes[88..92].try_into().unwrap());
-        let transaction_type: TransactionType = FromPrimitive::from_u8(bytes[92]).unwrap();
+        let inputs_len: u32 = u32::from_be_bytes(
+            bytes[0..4]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let outputs_len: u32 = u32::from_be_bytes(
+            bytes[4..8]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let message_len: usize = u32::from_be_bytes(
+            bytes[8..12]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        ) as usize;
+        let path_len: usize = u32::from_be_bytes(
+            bytes[12..16]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        ) as usize;
+        let signature: SaitoSignature = bytes[16..80]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
+        let timestamp: Timestamp = Timestamp::from_be_bytes(
+            bytes[80..88]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let replaces_txs = u32::from_be_bytes(
+            bytes[88..92]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let transaction_type: TransactionType =
+            FromPrimitive::from_u8(bytes[92]).ok_or(Error::from(ErrorKind::InvalidData))?;
         let start_of_inputs = TRANSACTION_SIZE;
         let start_of_outputs = start_of_inputs + inputs_len as usize * SLIP_SIZE;
         let start_of_message = start_of_outputs + outputs_len as usize * SLIP_SIZE;
@@ -360,7 +387,7 @@ impl Transaction {
         }
         let message = bytes[start_of_message..start_of_message + message_len]
             .try_into()
-            .unwrap();
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
         let mut path: Vec<Hop> = vec![];
         for n in 0..path_len {
             let start_of_data: usize = start_of_path + n * HOP_SIZE;

@@ -54,6 +54,7 @@ pub struct Wallet {
     pub pending_txs: AHashMap<SaitoHash, Transaction>,
     // TODO : this version should be removed. only added as a temporary hack to allow SLR app version to be easily upgraded in browsers
     pub version: Version,
+    pub key_list: Vec<SaitoPublicKey>,
 }
 
 impl Wallet {
@@ -71,6 +72,7 @@ impl Wallet {
             available_balance: 0,
             pending_txs: Default::default(),
             version: Default::default(),
+            key_list: vec![],
         }
     }
 
@@ -116,10 +118,12 @@ impl Wallet {
         vbytes.extend(&self.private_key);
         vbytes.extend(&self.public_key);
 
+        // TODO : should we write key list here for rust nodes ?
+
         vbytes
     }
 
-    /// [private_key - 32 bytes
+    /// [private_key - 32 bytes]
     /// [public_key - 33 bytes]
     pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
         self.private_key = bytes[0..32].try_into().unwrap();
@@ -410,6 +414,9 @@ impl Wallet {
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }
+    }
+    pub fn set_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
+        self.key_list = key_list;
     }
 }
 

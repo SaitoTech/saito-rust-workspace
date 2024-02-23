@@ -13,8 +13,8 @@ use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
-    push_lock, BlockId, PeerIndex, PrintForLog, SaitoHash, StatVariable, Timestamp,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, STAT_BIN_COUNT,
+    BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
+    STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -24,10 +24,10 @@ use crate::core::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::KeepTime;
 use crate::core::process::process_event::ProcessEvent;
+use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
-use crate::core::{consensus, util};
 use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
@@ -203,6 +203,11 @@ impl RoutingThread {
                     .process_api_error(api_message.data, api_message.msg_index, peer_index)
                     .await;
             }
+            Message::KeyListUpdate(key_list) => {
+                self.network
+                    .handle_received_key_list(peer_index, key_list)
+                    .await;
+            }
         }
         trace!("incoming message processed");
     }
@@ -219,10 +224,10 @@ impl RoutingThread {
            block_hash.to_hex(),
             fork_id.to_hex()
         );
-        let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
         let peer_public_key;
         {
-            let (peers, _peers_) = lock_for_read!(self.network.peers, LOCK_ORDER_PEERS);
+            let peers = lock_for_read!(self.network.peers, LOCK_ORDER_PEERS);
             peer_public_key = peers
                 .find_peer_by_index(peer_index)
                 .unwrap()
@@ -301,6 +306,11 @@ impl RoutingThread {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
         self.network.handle_peer_disconnect(peer_index).await;
     }
+    pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
+        let mut wallet = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        wallet.set_key_list(key_list);
+        self.network.send_key_list(&wallet.key_list).await;
+    }
 
     pub async fn process_incoming_blockchain_request(
         &self,
@@ -316,7 +326,7 @@ impl RoutingThread {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
@@ -418,15 +428,14 @@ impl RoutingThread {
         let mut previous_block_hash = chain.start;
         let peer_key;
         {
-            let (peers, _peers_) = lock_for_read!(self.network.peers, LOCK_ORDER_PEERS);
+            let peers = lock_for_read!(self.network.peers, LOCK_ORDER_PEERS);
             peer_key = peers
                 .find_peer_by_index(peer_index)
                 .unwrap()
                 .public_key
                 .unwrap();
         }
-        let (mut blockchain, _blockchain_) =
-            lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let mut blockchain = lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
         for i in 0..chain.prehashes.len() {
             let buf = [
                 previous_block_hash.as_slice(),
@@ -470,7 +479,7 @@ impl RoutingThread {
 
     // TODO : remove if not required
     async fn process_peer_services(&mut self, services: Vec<PeerService>, peer_index: u64) {
-        let (mut peers, _peers_) = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
+        let mut peers = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_some() {
             let peer = peer.unwrap();
@@ -561,8 +570,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             }
             NetworkEvent::BlockFetchFailed { block_hash } => {
                 debug!("block fetch failed : {:?}", block_hash.to_hex());
-                let (mut blockchain, _blockchain_) =
-                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                let mut blockchain = lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 warn!("failed fetching block : {:?} from network thread. so unmarking block as fetching",block_hash.to_hex());
 
                 blockchain.unmark_as_fetching(&block_hash);

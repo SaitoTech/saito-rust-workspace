@@ -10,9 +10,7 @@ use tokio::sync::RwLock;
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
-use crate::core::defs::{
-    push_lock, PrintForLog, SaitoPublicKey, LOCK_ORDER_MEMPOOL, PROJECT_PUBLIC_KEY,
-};
+use crate::core::defs::{PrintForLog, SaitoPublicKey, PROJECT_PUBLIC_KEY};
 use crate::core::io::interface_io::InterfaceIO;
 use crate::lock_for_write;
 
@@ -134,7 +132,7 @@ impl Storage {
             block.force_loaded = true;
             block.generate();
             debug!("block : {:?} loaded from disk", block.hash.to_hex());
-            let (mut mempool, _mempool_) = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
+            let mut mempool = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
             mempool.add_block(block);
         }
 
