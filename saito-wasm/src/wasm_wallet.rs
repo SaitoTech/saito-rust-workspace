@@ -4,8 +4,8 @@ use std::sync::Arc;
 use js_sys::{Array, JsString};
 use log::{error, warn};
 use tokio::sync::RwLock;
-use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsValue;
 
 use saito_core::core::consensus::slip::Slip;
 use saito_core::core::consensus::wallet::{Wallet, WalletSlip};
@@ -13,7 +13,7 @@ use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublic
 use saito_core::core::io::network::Network;
 use saito_core::core::io::storage::Storage;
 
-use crate::saitowasm::{SAITO, string_array_to_base58_keys, string_to_hex};
+use crate::saitowasm::{string_array_to_base58_keys, string_to_hex, SAITO};
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_transaction::WasmTransaction;
 
