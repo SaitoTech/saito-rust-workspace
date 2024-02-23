@@ -2053,8 +2053,7 @@ mod tests {
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_WALLET,
+        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
     };
     use crate::core::util::crypto::{generate_keys, verify_signature};
     use crate::core::util::storage::Storage;
