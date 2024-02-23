@@ -249,10 +249,10 @@ mod tests {
 
     use tokio::sync::RwLock;
 
-    use crate::{lock_for_read, lock_for_write};
     use crate::core::consensus::blockchain::Blockchain;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::util::crypto::generate_keys;
+    use crate::{lock_for_read, lock_for_write};
 
     use super::*;
 

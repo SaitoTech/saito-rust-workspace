@@ -7,7 +7,6 @@ use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::{lock_for_read, lock_for_write};
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::golden_ticket::GoldenTicket;
@@ -15,8 +14,8 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, PrintForLog, SaitoHash,
-    STAT_BIN_COUNT, StatVariable, Timestamp,
+    PrintForLog, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -27,6 +26,7 @@ use crate::core::process::process_event::ProcessEvent;
 use crate::core::routing_thread::RoutingEvent;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
+use crate::{lock_for_read, lock_for_write};
 
 pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_millis() as u64;
 
@@ -144,11 +144,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             {
                 let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-                let mut blockchain =
-                    lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+                let mut blockchain = lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                    let mut mempool =
-                        lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
+                    let mut mempool = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
                     let block = mempool
                         .bundle_genesis_block(
@@ -312,7 +310,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     &public_key,
                     &private_key,
                 )
-                    .await;
+                .await;
                 self.stats.received_gts.increment();
                 mempool.add_golden_ticket(transaction).await;
                 Some(())
@@ -332,8 +330,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         return Some(());
                     }
                     debug!("adding fetched block to mempool");
-                    let mut mempool =
-                        lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
+                    let mut mempool = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
                     mempool.add_block(block);
                 }
                 self.stats.blocks_fetched.increment();
@@ -369,8 +366,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     hash(&transaction.serialize_for_net()).to_hex()
                 );
                 if let TransactionType::GoldenTicket = transaction.transaction_type {
-                    let mut mempool =
-                        lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
+                    let mut mempool = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
                     self.stats.received_gts.increment();
                     mempool.add_golden_ticket(transaction).await;
@@ -388,8 +384,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 self.txs_for_mempool.reserve(transactions.len());
                 for transaction in transactions.drain(..) {
                     if let TransactionType::GoldenTicket = transaction.transaction_type {
-                        let mut mempool =
-                            lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
+                        let mut mempool = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 
                         self.stats.received_gts.increment();
                         mempool.add_golden_ticket(transaction).await;

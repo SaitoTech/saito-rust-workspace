@@ -1,7 +1,7 @@
-use std::{i128, mem};
 use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;
+use std::{i128, mem};
 
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
@@ -14,11 +14,11 @@ use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
-use crate::core::consensus::slip::{Slip, SLIP_SIZE, SlipType};
-use crate::core::consensus::transaction::{Transaction, TRANSACTION_SIZE, TransactionType};
+use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
+use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::core::defs::{
-    BLOCK_FILE_EXTENSION, Currency, GENESIS_PERIOD, PrintForLog, SaitoHash, SaitoPrivateKey,
-    SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet,
+    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -1401,7 +1401,7 @@ impl Block {
             self.previous_block_hash.as_slice(),
             self.pre_hash.as_slice(),
         ]
-            .concat();
+        .concat();
         vbytes
     }
 
@@ -1426,7 +1426,7 @@ impl Block {
                 .to_be_bytes()
                 .as_slice(),
         ]
-            .concat()
+        .concat()
     }
 
     /// Serialize a Block for transport or disk.
@@ -1479,7 +1479,7 @@ impl Block {
                 .as_slice(),
             tx_buf.as_slice(),
         ]
-            .concat();
+        .concat();
 
         buffer
     }
@@ -1629,7 +1629,7 @@ impl Block {
                         pruned_txs[i].hash_for_signature.unwrap(),
                         pruned_txs[i + 1].hash_for_signature.unwrap(),
                     ]
-                        .concat(),
+                    .concat(),
                 );
                 pruned_txs[i].hash_for_signature = Some(combined_hash);
                 pruned_txs.remove(i + 1);
@@ -1916,7 +1916,7 @@ impl Block {
         //
         if self.merkle_root == [0; 32]
             && self.merkle_root
-            != self.generate_merkle_root(configs.is_browser(), configs.is_spv_mode())
+                != self.generate_merkle_root(configs.is_browser(), configs.is_spv_mode())
         {
             error!("merkle root is unset or is invalid false 1");
             return false;
@@ -2053,8 +2053,8 @@ mod tests {
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        Currency, GENESIS_PERIOD, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET, SaitoHash, SaitoPrivateKey,
-        SaitoPublicKey,
+        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD, LOCK_ORDER_CONFIGS,
+        LOCK_ORDER_WALLET,
     };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
@@ -2117,15 +2117,15 @@ mod tests {
         block.previous_block_hash = <SaitoHash>::from_hex(
             "bcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
-            .unwrap();
+        .unwrap();
         block.merkle_root = <SaitoHash>::from_hex(
             "ccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
-            .unwrap();
+        .unwrap();
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
-            .unwrap();
+        .unwrap();
         block.burnfee = 50000000;
         block.difficulty = 0;
         block.treasury = 0;
@@ -2138,13 +2138,13 @@ mod tests {
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
-            .unwrap();
+        .unwrap();
 
         block.sign(
             &<SaitoHash>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
-                .unwrap(),
+            .unwrap(),
         );
 
         assert_eq!(block.signature.len(), 64);
@@ -2280,8 +2280,8 @@ mod tests {
             transaction.sign(&wallet.private_key);
             transaction
         }))
-            .await
-            .to_vec();
+        .await
+        .to_vec();
 
         block.transactions = transactions;
         block.generate();

@@ -15,9 +15,9 @@ use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::msg::message::Message;
 use saito_core::lock_for_read;
 
-use crate::IoEvent;
 use crate::saito::config_handler::SpammerConfigs;
 use crate::saito::transaction_generator::{GeneratorState, TransactionGenerator};
+use crate::IoEvent;
 
 pub struct Spammer {
     sender_to_network: Sender<IoEvent>,
@@ -59,7 +59,7 @@ impl Spammer {
                 tx_payment as Currency,
                 tx_fee as Currency,
             )
-                .await,
+            .await,
         }
     }
 
@@ -144,6 +144,6 @@ pub async fn run_spammer(
         sender,
         configs_lock,
     )
-        .await;
+    .await;
     spammer.run(receiver).await;
 }
