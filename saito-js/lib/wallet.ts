@@ -76,6 +76,14 @@ export default class Wallet extends WasmWrapper<WasmWallet> {
       await this.instance.add_slip(slip.instance);
     }
   }
+
+  public async getKeyList(): Promise<string[]> {
+    return this.instance.get_key_list();
+  }
+
+  public async setKeyList(keylist: string[]) {
+    await this.instance.set_key_list(keylist);
+  }
 }
 
 export class WalletSlip extends WasmWrapper<WasmWalletSlip> {

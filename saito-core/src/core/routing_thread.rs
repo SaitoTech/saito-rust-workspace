@@ -306,7 +306,7 @@ impl RoutingThread {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
         self.network.handle_peer_disconnect(peer_index).await;
     }
-    async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
+    pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
         let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
         wallet.set_key_list(key_list);
         self.network.send_key_list(&wallet.key_list).await;
@@ -442,7 +442,7 @@ impl RoutingThread {
                 previous_block_hash.as_slice(),
                 chain.prehashes[i].as_slice(),
             ]
-            .concat();
+                .concat();
             let block_hash = hash(&buf);
             if chain.txs[i] {
                 debug!(
