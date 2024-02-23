@@ -7,14 +7,14 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use std::time::Duration;
 
-use figment::Figment;
 use figment::providers::{Format, Json};
+use figment::Figment;
 use js_sys::{Array, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
 use secp256k1::SECP256K1;
-use tokio::sync::{Mutex, RwLock};
 use tokio::sync::mpsc::Receiver;
+use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
 use saito_core::core::consensus::blockchain::Blockchain;
@@ -26,8 +26,8 @@ use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, STAT_BIN_COUNT,
-    StatVariable,
+    PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, StatVariable,
+    STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
