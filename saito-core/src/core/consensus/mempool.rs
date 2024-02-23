@@ -8,6 +8,7 @@ use primitive_types::U256;
 use rayon::prelude::*;
 use tokio::sync::RwLock;
 
+use crate::{iterate, lock_for_read};
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::burnfee::BurnFee;
@@ -15,12 +16,11 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp, LOCK_ORDER_WALLET,
+    Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
-use crate::{iterate, lock_for_read};
 
 //
 // In addition to responding to global broadcast messages, the
@@ -186,7 +186,7 @@ impl Mempool {
             configs,
             storage,
         )
-        .await;
+            .await;
         block.generate();
         debug!(
             "block generated with work : {:?} and burnfee : {:?}",
@@ -225,7 +225,7 @@ impl Mempool {
             configs,
             storage,
         )
-        .await;
+            .await;
         block.generate();
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
@@ -351,15 +351,15 @@ mod tests {
 
     use tokio::sync::RwLock;
 
+    use crate::{lock_for_read, lock_for_write};
     use crate::core::consensus::burnfee::HEARTBEAT;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{SaitoPrivateKey, SaitoPublicKey};
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
-    use crate::{lock_for_read, lock_for_write};
 
     use super::*;
 
-    // #[test]
+// #[test]
     // fn mempool_new_test() {
     //     let mempool = Mempool::new([0; 33], [0; 32]);
     //     assert_eq!(mempool.blocks_queue, VecDeque::new());
