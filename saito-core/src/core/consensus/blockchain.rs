@@ -1701,7 +1701,7 @@ mod tests {
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+        PrintForLog, SaitoPublicKey,
     };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::generate_keys;

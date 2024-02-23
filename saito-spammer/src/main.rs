@@ -21,7 +21,7 @@ use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::defs::LOCK_ORDER_CONFIGS;
+
 use saito_core::core::defs::{
     PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
 };
