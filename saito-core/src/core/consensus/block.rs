@@ -2052,9 +2052,7 @@ mod tests {
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{
-        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
-    };
+    use crate::core::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
     use crate::core::util::test::test_manager::test::TestManager;

@@ -28,7 +28,8 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
+    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, PROJECT_PUBLIC_KEY,
+    STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
