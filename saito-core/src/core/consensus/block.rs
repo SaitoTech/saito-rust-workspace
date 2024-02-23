@@ -20,9 +20,9 @@ use crate::core::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
     SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
 };
+use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
-use crate::core::util::storage::Storage;
 use crate::iterate;
 
 pub const BLOCK_HEADER_SIZE: usize = 237;
@@ -2052,11 +2052,9 @@ mod tests {
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{
-        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
-    };
+    use crate::core::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD};
+    use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
-    use crate::core::util::storage::Storage;
     use crate::core::util::test::test_manager::test::TestManager;
     use crate::lock_for_read;
 

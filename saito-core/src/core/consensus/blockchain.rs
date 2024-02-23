@@ -1700,9 +1700,7 @@ mod tests {
     use crate::core::consensus::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{
-        PrintForLog, SaitoPublicKey,
-    };
+    use crate::core::defs::{PrintForLog, SaitoPublicKey};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_manager::test::TestManager;
