@@ -5,28 +5,28 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
+use futures::stream::{SplitSink, SplitStream};
 use log::{debug, error, info, trace, warn};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use warp::Filter;
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
-use warp::Filter;
 
 use saito_core::core::consensus::block::{Block, BlockType};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::defs::{
-    push_lock, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    BLOCK_FILE_EXTENSION, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET, PrintForLog, SaitoHash, SaitoPublicKey,
+    STAT_BIN_COUNT, StatVariable,
 };
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::process::keep_time::KeepTime;
@@ -156,8 +156,7 @@ impl NetworkController {
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-            let (network_controller, _network_controller_) =
-                lock_for_read!(io_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+            let network_controller = lock_for_read!(io_controller, LOCK_ORDER_NETWORK_CONTROLLER);
 
             let sender_to_controller = network_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
@@ -462,7 +461,7 @@ pub async fn run_network_controller(
     let port;
     let public_key;
     {
-        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         url = configs.get_server_configs().unwrap().host.clone()
             + ":"
@@ -475,8 +474,8 @@ pub async fn run_network_controller(
         port = configs.get_server_configs().unwrap().port;
         host = configs.get_server_configs().unwrap().host.clone();
 
-        let (blockchain, _blockchain_) = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        let (wallet, _wallet_) = lock_for_read!(blockchain.wallet_lock, LOCK_ORDER_WALLET);
+        let blockchain = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let wallet = lock_for_read!(blockchain.wallet_lock, LOCK_ORDER_WALLET);
         public_key = wallet.public_key;
     }
 
@@ -523,7 +522,7 @@ pub async fn run_network_controller(
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
                         let sockets;
                         {
-                            let (network_controller, _network_controller_) = lock_for_read!(
+                            let network_controller = lock_for_read!(
                                 network_controller_lock,
                                 LOCK_ORDER_NETWORK_CONTROLLER
                             );
@@ -539,7 +538,7 @@ pub async fn run_network_controller(
                     } => {
                         let sockets;
                         {
-                            let (network_controller, _network_controller_) = lock_for_read!(
+                            let network_controller = lock_for_read!(
                                 network_controller_lock,
                                 LOCK_ORDER_NETWORK_CONTROLLER
                             );
@@ -573,7 +572,7 @@ pub async fn run_network_controller(
                         let sender;
                         let current_queries;
                         {
-                            let (network_controller, _network_controller_) = lock_for_read!(
+                            let network_controller = lock_for_read!(
                                 network_controller_lock,
                                 LOCK_ORDER_NETWORK_CONTROLLER
                             );
@@ -613,7 +612,7 @@ pub async fn run_network_controller(
 
             #[cfg(feature = "with-stats")]
             {
-                let (configs_temp, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+                let configs_temp = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
                 if Instant::now().duration_since(last_stat_on)
                     > Duration::from_millis(
@@ -624,7 +623,7 @@ pub async fn run_network_controller(
                     outgoing_messages
                         .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
                         .await;
-                    let (network_controller, _network_controller_) =
+                    let network_controller =
                         lock_for_read!(network_controller_lock, LOCK_ORDER_NETWORK_CONTROLLER);
 
                     let stat = format!(
@@ -638,7 +637,7 @@ pub async fn run_network_controller(
             }
 
             if !work_done {
-                let (configs_temp, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+                let configs_temp = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
                 tokio::time::sleep(Duration::from_millis(
                     configs_temp
@@ -689,8 +688,7 @@ fn run_websocket_server(
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
 
-                    let (network_controller, _network_controller_) =
-                        lock_for_read!(clone, LOCK_ORDER_NETWORK_CONTROLLER);
+                    let network_controller = lock_for_read!(clone, LOCK_ORDER_NETWORK_CONTROLLER);
 
                     let peer_index;
                     {
@@ -811,7 +809,7 @@ fn run_websocket_server(
                     }
                     let mut keylist;
                     {
-                        let (peers, _peers_) = lock_for_read!(peers, LOCK_ORDER_PEERS);
+                        let peers = lock_for_read!(peers, LOCK_ORDER_PEERS);
                         let peer = peers.find_peer_by_address(&key);
                         if peer.is_none() {
                             keylist = vec![key];
@@ -821,7 +819,7 @@ fn run_websocket_server(
                         }
                     }
 
-                    // let (blockchain, _blockchain_) = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+                    // let blockchain = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
                     let mut buffer: Vec<u8> = Default::default();
                     let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());

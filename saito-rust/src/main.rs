@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
-use log::info;
 use log::{debug, error, trace};
+use log::info;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -17,10 +17,11 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
+use saito_core::{lock_for_read, lock_for_write};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
@@ -28,8 +29,8 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    push_lock, Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
+    Currency, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, PrintForLog, PROJECT_PUBLIC_KEY, SaitoPrivateKey,
+    SaitoPublicKey, STAT_BIN_COUNT, StatVariable,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -43,7 +44,6 @@ use saito_core::core::routing_thread::{
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::{lock_for_read, lock_for_write};
 use saito_rust::saito::config_handler::{ConfigHandler, NodeConfigurations};
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
@@ -254,7 +254,7 @@ async fn run_consensus_event_processor(
     }
     // let generate_genesis_block: bool;
     // {
-    //     let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
+    //     let configs = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
     //
     //     // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
     //     generate_genesis_block = configs.get_peer_configs().is_empty();
@@ -349,7 +349,7 @@ async fn run_routing_event_processor(
     };
 
     {
-        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -567,7 +567,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     let fetch_batch_size;
 
     {
-        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs
@@ -746,9 +746,9 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     let (_sender_to_miner, _receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(100);
 
-    let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+    let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
-    let (mut blockchain, _blockchain_) = lock_for_write!(context.blockchain, LOCK_ORDER_BLOCKCHAIN);
+    let mut blockchain = lock_for_write!(context.blockchain, LOCK_ORDER_BLOCKCHAIN);
     blockchain
         .add_blocks_from_mempool(
             context.mempool.clone(),
@@ -821,6 +821,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     info!("total written lines : {:?}", total_written_lines);
 }
+
 #[tokio::main(flavor = "multi_thread")]
 // #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

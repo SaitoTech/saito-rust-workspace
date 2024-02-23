@@ -1,7 +1,7 @@
+use std::{i128, mem};
 use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;
-use std::{i128, mem};
 
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
@@ -14,11 +14,11 @@ use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
-use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
-use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::consensus::slip::{Slip, SLIP_SIZE, SlipType};
+use crate::core::consensus::transaction::{Transaction, TRANSACTION_SIZE, TransactionType};
 use crate::core::defs::{
-    push_lock, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
+    BLOCK_FILE_EXTENSION, Currency, GENESIS_PERIOD, PrintForLog, SaitoHash, SaitoPrivateKey,
+    SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet,
 };
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
@@ -504,24 +504,69 @@ impl Block {
             );
             return Err(Error::from(ErrorKind::InvalidData));
         }
-        let transactions_len: u32 = u32::from_be_bytes(bytes[0..4].try_into().unwrap());
-        let id: u64 = u64::from_be_bytes(bytes[4..12].try_into().unwrap());
-        let timestamp: Timestamp = Timestamp::from_be_bytes(bytes[12..20].try_into().unwrap());
-        let previous_block_hash: SaitoHash = bytes[20..52].try_into().unwrap();
-        let creator: SaitoPublicKey = bytes[52..85].try_into().unwrap();
-        let merkle_root: SaitoHash = bytes[85..117].try_into().unwrap();
-        let signature: SaitoSignature = bytes[117..181].try_into().unwrap();
+        let transactions_len: u32 = u32::from_be_bytes(
+            bytes[0..4]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let id: u64 = u64::from_be_bytes(
+            bytes[4..12]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let timestamp: Timestamp = Timestamp::from_be_bytes(
+            bytes[12..20]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let previous_block_hash: SaitoHash = bytes[20..52]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
+        let creator: SaitoPublicKey = bytes[52..85]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
+        let merkle_root: SaitoHash = bytes[85..117]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
+        let signature: SaitoSignature = bytes[117..181]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
 
-        let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
-        let staking_treasury: Currency =
-            Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
-        let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
-        let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
-        let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
-        let avg_fee_per_byte: Currency =
-            Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
-        let avg_nolan_rebroadcast_per_block: Currency =
-            Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
+        let treasury: Currency = Currency::from_be_bytes(
+            bytes[181..189]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let staking_treasury: Currency = Currency::from_be_bytes(
+            bytes[189..197]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let burnfee: Currency = Currency::from_be_bytes(
+            bytes[197..205]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let difficulty: u64 = u64::from_be_bytes(
+            bytes[205..213]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let avg_income: Currency = Currency::from_be_bytes(
+            bytes[213..221]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let avg_fee_per_byte: Currency = Currency::from_be_bytes(
+            bytes[221..229]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let avg_nolan_rebroadcast_per_block: Currency = Currency::from_be_bytes(
+            bytes[229..237]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -537,26 +582,29 @@ impl Block {
             let inputs_len: u32 = u32::from_be_bytes(
                 bytes[start_of_transaction_data..start_of_transaction_data + 4]
                     .try_into()
-                    .unwrap(),
+                    .or(Err(Error::from(ErrorKind::InvalidData)))?,
             );
             let outputs_len: u32 = u32::from_be_bytes(
                 bytes[start_of_transaction_data + 4..start_of_transaction_data + 8]
                     .try_into()
-                    .unwrap(),
+                    .or(Err(Error::from(ErrorKind::InvalidData)))?,
             );
             let message_len: usize = u32::from_be_bytes(
                 bytes[start_of_transaction_data + 8..start_of_transaction_data + 12]
                     .try_into()
-                    .unwrap(),
+                    .or(Err(Error::from(ErrorKind::InvalidData)))?,
             ) as usize;
             let path_len: usize = u32::from_be_bytes(
                 bytes[start_of_transaction_data + 12..start_of_transaction_data + 16]
                     .try_into()
-                    .unwrap(),
+                    .or(Err(Error::from(ErrorKind::InvalidData)))?,
             ) as usize;
+            let total_len = inputs_len
+                .checked_add(outputs_len)
+                .ok_or(Error::from(ErrorKind::InvalidData))?;
             let end_of_transaction_data = start_of_transaction_data
                 + TRANSACTION_SIZE
-                + ((inputs_len + outputs_len) as usize * SLIP_SIZE)
+                + (total_len as usize * SLIP_SIZE)
                 + message_len
                 + path_len * HOP_SIZE;
 
@@ -1353,7 +1401,7 @@ impl Block {
             self.previous_block_hash.as_slice(),
             self.pre_hash.as_slice(),
         ]
-        .concat();
+            .concat();
         vbytes
     }
 
@@ -1378,7 +1426,7 @@ impl Block {
                 .to_be_bytes()
                 .as_slice(),
         ]
-        .concat()
+            .concat()
     }
 
     /// Serialize a Block for transport or disk.
@@ -1431,7 +1479,7 @@ impl Block {
                 .as_slice(),
             tx_buf.as_slice(),
         ]
-        .concat();
+            .concat();
 
         buffer
     }
@@ -1581,7 +1629,7 @@ impl Block {
                         pruned_txs[i].hash_for_signature.unwrap(),
                         pruned_txs[i + 1].hash_for_signature.unwrap(),
                     ]
-                    .concat(),
+                        .concat(),
                 );
                 pruned_txs[i].hash_for_signature = Some(combined_hash);
                 pruned_txs.remove(i + 1);
@@ -1868,7 +1916,7 @@ impl Block {
         //
         if self.merkle_root == [0; 32]
             && self.merkle_root
-                != self.generate_merkle_root(configs.is_browser(), configs.is_spv_mode())
+            != self.generate_merkle_root(configs.is_browser(), configs.is_spv_mode())
         {
             error!("merkle root is unset or is invalid false 1");
             return false;
@@ -2005,8 +2053,8 @@ mod tests {
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        push_lock, Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
-        LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+        Currency, GENESIS_PERIOD, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET, SaitoHash, SaitoPrivateKey,
+        SaitoPublicKey,
     };
     use crate::core::util::crypto::{generate_keys, verify_signature};
     use crate::core::util::storage::Storage;
@@ -2069,15 +2117,15 @@ mod tests {
         block.previous_block_hash = <SaitoHash>::from_hex(
             "bcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
-        .unwrap();
+            .unwrap();
         block.merkle_root = <SaitoHash>::from_hex(
             "ccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b",
         )
-        .unwrap();
+            .unwrap();
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
-        .unwrap();
+            .unwrap();
         block.burnfee = 50000000;
         block.difficulty = 0;
         block.treasury = 0;
@@ -2090,13 +2138,13 @@ mod tests {
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
         )
-        .unwrap();
+            .unwrap();
 
         block.sign(
             &<SaitoHash>::from_hex(
                 "854702489d49c7fb2334005b903580c7a48fe81121ff16ee6d1a528ad32f235d",
             )
-            .unwrap(),
+                .unwrap(),
         );
 
         assert_eq!(block.signature.len(), 64);
@@ -2227,13 +2275,13 @@ mod tests {
         let mut block = Block::new();
         let transactions = join_all((0..5).into_iter().map(|_| async {
             let mut transaction = Transaction::default();
-            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
             transaction.sign(&wallet.private_key);
             transaction
         }))
-        .await
-        .to_vec();
+            .await
+            .to_vec();
 
         block.transactions = transactions;
         block.generate();
@@ -2276,7 +2324,7 @@ mod tests {
         let block1 = t.get_latest_block().await;
         let public_key: SaitoPublicKey;
         {
-            let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
             public_key = wallet.public_key;
         }
         let lite_block = block1.generate_lite_block(vec![public_key]);
@@ -2327,7 +2375,7 @@ mod tests {
         let private_key: SaitoPrivateKey;
         let public_key: SaitoPublicKey;
         {
-            let (wallet, _wallet_) = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
 
             public_key = wallet.public_key;
             private_key = wallet.private_key;
@@ -2355,7 +2403,7 @@ mod tests {
         }
 
         {
-            let (configs, _configs_) = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
+            let configs = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
             block.merkle_root =
                 block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
         }

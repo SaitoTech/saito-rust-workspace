@@ -72,12 +72,27 @@ impl Slip {
         if bytes.len() != SLIP_SIZE {
             return Err(Error::from(ErrorKind::InvalidInput));
         }
-        let public_key: SaitoPublicKey = bytes[..33].try_into().unwrap();
-        let amount: Currency = Currency::from_be_bytes(bytes[33..41].try_into().unwrap());
-        let block_id: u64 = u64::from_be_bytes(bytes[41..49].try_into().unwrap());
-        let tx_ordinal: u64 = u64::from_be_bytes(bytes[49..57].try_into().unwrap());
+        let public_key: SaitoPublicKey = bytes[..33]
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidData)))?;
+        let amount: Currency = Currency::from_be_bytes(
+            bytes[33..41]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let block_id: u64 = u64::from_be_bytes(
+            bytes[41..49]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
+        let tx_ordinal: u64 = u64::from_be_bytes(
+            bytes[49..57]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidData)))?,
+        );
         let slip_index: u8 = bytes[57];
-        let slip_type: SlipType = FromPrimitive::from_u8(bytes[58]).unwrap();
+        let slip_type: SlipType =
+            FromPrimitive::from_u8(bytes[58]).ok_or(Error::from(ErrorKind::InvalidData))?;
         let mut slip = Slip::default();
 
         slip.public_key = public_key;
@@ -234,11 +249,10 @@ mod tests {
 
     use tokio::sync::RwLock;
 
+    use crate::{lock_for_read, lock_for_write};
     use crate::core::consensus::blockchain::Blockchain;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{push_lock, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
     use crate::core::util::crypto::generate_keys;
-    use crate::{lock_for_read, lock_for_write};
 
     use super::*;
 
@@ -300,15 +314,14 @@ mod tests {
         let keys = generate_keys();
         let wallet_lock = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
         let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
-        let (mut blockchain, _blockchain_) =
-            lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+        let mut blockchain = lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
 
         let mut slip = Slip::default();
         slip.amount = 100_000;
         slip.block_id = 10;
         slip.tx_ordinal = 20;
         {
-            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
             slip.public_key = wallet.public_key;
         }
         slip.generate_utxoset_key();

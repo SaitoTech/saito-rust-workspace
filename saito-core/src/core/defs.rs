@@ -94,70 +94,38 @@ impl Drop for LockGuardWatcher {
     }
 }
 
-pub fn push_lock(order: u8) -> LockGuardWatcher {
-    #[cfg(feature = "locking-logs")]
-    LOCK_ORDER.with(|v| {
-        let mut v = v.borrow_mut();
-        let res = v.back();
-        if let Some(res) = res {
-            assert!(
-                *res < order,
-                "lock : {:?} cannot be locked after : {:?}",
-                order,
-                *res
-            );
-        }
-        // println!("locking : {:?}", order);
-        v.push_back(order);
-    });
-    LockGuardWatcher { order }
-}
+// pub fn push_lock(order: u8) -> LockGuardWatcher {
+//     #[cfg(feature = "locking-logs")]
+//     LOCK_ORDER.with(|v| {
+//         let mut v = v.borrow_mut();
+//         let res = v.back();
+//         if let Some(res) = res {
+//             assert!(
+//                 *res < order,
+//                 "lock : {:?} cannot be locked after : {:?}",
+//                 order,
+//                 *res
+//             );
+//         }
+//         // println!("locking : {:?}", order);
+//         v.push_back(order);
+//     });
+//     LockGuardWatcher { order }
+// }
 
 #[macro_export]
 macro_rules! lock_for_write {
     ($lock:expr, $order:expr) => {{
-        // #[cfg(feature = "locking-logs")]
-        // println!(
-        //     "waiting for lock : {:?} for writing - {:?}",
-        //     $order,
-        //     module_path!()
-        // );
-
         let l = $lock.write().await;
-        let watcher = push_lock($order);
-
-        // #[cfg(feature = "locking-logs")]
-        // println!(
-        //     "acquired lock : {:?} for writing - {:?}",
-        //     $order,
-        //     module_path!()
-        // );
-
-        (l, watcher)
+        l
     }};
 }
 
 #[macro_export]
 macro_rules! lock_for_read {
     ($lock:expr, $order:expr) => {{
-        // #[cfg(feature = "locking-logs")]
-        // println!(
-        //     "waiting for lock : {:?} for reading - {:?}",
-        //     $order,
-        //     module_path!()
-        // );
-
         let l = $lock.read().await;
-        let watcher = push_lock($order);
-
-        // #[cfg(feature = "locking-logs")]
-        // println!(
-        //     "acquired lock : {:?} for reading - {:?}",
-        //     $order,
-        //     module_path!()
-        // );
-
-        (l, watcher)
+        l
     }};
 }
 
