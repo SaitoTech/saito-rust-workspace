@@ -858,7 +858,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if program_mode == "node" {
         let config_file: &str = matches.value_of("config").unwrap_or("configs/config.json");
-        dbg!("config", config_file);
         info!("Using config file: {}", config_file.to_string());
         let configs = ConfigHandler::load_configs(config_file.to_string());
         if configs.is_err() {

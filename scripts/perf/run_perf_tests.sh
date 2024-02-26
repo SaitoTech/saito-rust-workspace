@@ -15,7 +15,7 @@ ssh_spammer() {
 }
 
 ssh_server_second(){
-   output=$(ssh_execute root@$REMOTE_SECOND_SERVER_IP "$1" "ls -l")
+   output=$(ssh_execute root@$REMOTE_SPAMMER_IP "$1" "ls -l")
   echo "$output"
 }
 
@@ -27,7 +27,7 @@ configure_server(){
 
 configure_spammer(){
  spammer_config_path="$SPAMMER_DIR/saito-spammer/configs/config.json"
-  ssh_spammer "sed -i '/\"burst_count\":/c\\    \"burst_count\": $txs_rate_from_spammer,' $spammer_config_path; sed -i '/\"tx_size\":/c\\    \"tx_size\": $tx_payload_size,' $spammer_config_path; sed -i '/\"verification_threads\":/c\\    \"verification_threads\": $verification_thread_count,' $spammer_config_path"
+  ssh_spammer "sed -i '/\"burst_count\":/c\\    \"burst_count\": $txs_rate_from_spammer,' $spammer_config_path; sed -i '/\"tx_size\":/c\\    \"tx_size\": $tx_payload_size,' $spammer_config_path; sed -i '/\"verification_threads\":/c\\    \"verification_threads\": $verification_thread_count,' $spammer_config_path; sed -i '/\"stop_after\":/c\\    \"stop_after\": $stop_after,' $spammer_config_path "
 
 }
 
@@ -37,6 +37,10 @@ run_test_case() {
     verification_thread_count=$1
     txs_rate_from_spammer=$2
     tx_payload_size=$3
+    stop_after=$4
+
+
+    echo "running test case: verification_thread_count: $verification_thread_count | tx_rate: $txs_rate_from_spammer | payload_size: $tx_payload_size | tx_count: $stop_after "
   
     results_file="./test_results.csv" 
     if [ ! -f "$results_file" ]; then
@@ -216,6 +220,7 @@ test_case_count=-1
 test_cases_ver_thread_count=()
 test_cases_tx_rate_from_spammer=()
 test_cases_tx_payload_size=()
+test_cases_stop_after=()
 
 read_test_cases() {
   echo "loading test cases..."
@@ -224,12 +229,15 @@ read_test_cases() {
     verification_thread_count=$(echo $line | cut -d, -f 1)
     spammer_tx_rate=$(echo $line | cut -d, -f 2)
     payload_size=$(echo $line | cut -d, -f 3)
+    stop_after=$(echo $line | cut -d, -f 4)
+
 
     # echo $verification_thread_count $spammer_tx_rate $payload_size
 
     test_cases_ver_thread_count+=($verification_thread_count)
     test_cases_tx_rate_from_spammer+=($spammer_tx_rate)
     test_cases_tx_payload_size+=($payload_size)
+    test_cases_stop_after+=($stop_after)
     test_case_count=$((test_case_count + 1))
 
     # echo  $test_cases_ver_thread_count $test_cases_tx_rate_from_spammer $test_cases_tx_payload_size $test_case_count
@@ -251,7 +259,7 @@ run_perf_test() {
 
   echo "REMOTE_SERVER_IP : $REMOTE_SERVER_IP"
   echo "REMOTE_SPAMMER_IP : $REMOTE_SPAMMER_IP"
-  echo "REMOTE_SERVER SECOND IP: $REMOTE_SECOND_SERVER_IP"
+  echo "REMOTE_SERVER SECOND IP: $REMOTE_SERVER_IP"
 
   # read the test cases
   read_test_cases
@@ -260,7 +268,7 @@ run_perf_test() {
   i=$((test_case_count -1))
   echo "running $test_case_count test cases..."
   while [[ $i -ge 0 ]]; do 
-    run_test_case "${test_cases_ver_thread_count[$i]}" "${test_cases_tx_rate_from_spammer[$i]}" "${test_cases_tx_payload_size[$i]}"
+    run_test_case "${test_cases_ver_thread_count[$i]}" "${test_cases_tx_rate_from_spammer[$i]}" "${test_cases_tx_payload_size[$i]}" "${test_cases_stop_after[$i]}"
     ((i--))
   done
 
