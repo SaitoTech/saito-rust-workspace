@@ -34,6 +34,7 @@ configure_spammer(){
 run_test_case() {
   original_dir=$(pwd)
   cd "$(dirname "$0")"
+
     verification_thread_count=$1
     txs_rate_from_spammer=$2
     tx_payload_size=$3
@@ -216,7 +217,7 @@ run_test_case() {
   cd "$original_dir"
 }
 
-test_case_count=-1
+test_case_count=0
 test_cases_ver_thread_count=()
 test_cases_tx_rate_from_spammer=()
 test_cases_tx_payload_size=()
@@ -231,8 +232,8 @@ read_test_cases() {
     payload_size=$(echo $line | cut -d, -f 3)
     stop_after=$(echo $line | cut -d, -f 4)
 
+    echo "$spammer_tx_rate"
 
-    # echo $verification_thread_count $spammer_tx_rate $payload_size
 
     test_cases_ver_thread_count+=($verification_thread_count)
     test_cases_tx_rate_from_spammer+=($spammer_tx_rate)
@@ -243,7 +244,7 @@ read_test_cases() {
     # echo  $test_cases_ver_thread_count $test_cases_tx_rate_from_spammer $test_cases_tx_payload_size $test_case_count
   done < <(tail -n +2 "$test_cases_file")
 
-  echo "$test_case_count test cases loaded"
+  echo "$test_case_count  test cases loaded"
 }
 
 run_perf_test() {
