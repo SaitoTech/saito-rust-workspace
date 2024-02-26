@@ -596,7 +596,7 @@ impl Block {
         block.avg_income = avg_income;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
-        block.previous_block_unpaid = prevous_block_unpaid;
+        block.previous_block_unpaid = previous_block_unpaid;
         block.transactions = transactions.to_vec();
 
         debug!("block.deserialize tx length = {:?}", transactions_len);
@@ -1824,7 +1824,7 @@ impl Block {
 		// if there is a golden ticket, our previous_block_unpaid should be
 		// zero, as we will have issued payment in this block.
 		//
-        	if block.previous_block_unpaid != 0 {
+        	if self.previous_block_unpaid != 0 {
         	    error!("ERROR 720351: golden ticket but previous block incorrect");
         	    return false;
         	}
@@ -1856,7 +1856,7 @@ impl Block {
 		// smoothing payouts, and assists with monitoring that the total token
 		// supply has not changed.
 		//
-        	if block.previous_block_unpaid != previous_block.total_fees {
+        	if self.previous_block_unpaid != previous_block.total_fees {
         	    error!("ERROR 572983: previous_block_unpaid value incorrect");
         	    return false;
         	}
