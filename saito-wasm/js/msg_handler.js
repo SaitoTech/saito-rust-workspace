@@ -15,8 +15,8 @@ class MsgHandler {
     return global.shared_methods.write_value(key, value);
   }
 
-  static create_block_dir() {
-    return global.shared_methods.create_block_dir();
+  static ensure_block_directory_exists(path) {
+    return global.shared_methods.ensure_block_directory_exists(path);
   }
 
   static read_value(key) {

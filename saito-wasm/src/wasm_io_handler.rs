@@ -107,8 +107,8 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    fn create_block_directory(&self) -> Result<(), std::io::Error> {
-        let result = MsgHandler::create_block_dir();
+    fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), std::io::Error> {
+        let result = MsgHandler::ensure_block_directory_exists(block_dir_path);
         if result.is_err() {
             return Err(Error::from(ErrorKind::Other));
         }
@@ -304,7 +304,7 @@ extern "C" {
     pub fn write_value(key: String, value: &Uint8Array);
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
-    pub fn create_block_dir() -> Result<(), js_sys::Error>;
+    pub fn ensure_block_directory_exists(path: String) -> Result<(), js_sys::Error>;
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn read_value(key: String) -> Result<Uint8Array, js_sys::Error>;

@@ -62,8 +62,8 @@ export default class CustomSharedMethods implements SharedMethods {
   }
 
 
-  createBlockDir(): void {
-    throw (new Error("Method not implemented"))
+  ensureBlockDirExists(path: string): void {
+    throw new Error("Method not implemented")
   }
   readValue(key: string): Uint8Array {
     throw new Error("Method not implemented.");
