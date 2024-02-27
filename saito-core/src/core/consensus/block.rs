@@ -753,6 +753,7 @@ impl Block {
             let transaction = &mut self.transactions[i];
 
             cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
+
             total_work += transaction.total_work_for_me;
 
             //
@@ -818,6 +819,7 @@ impl Block {
         // update block with total fees
         //
         self.total_fees = cumulative_fees;
+  println!("updating block with total cumulative fees: {:?}", self.total_fees);
         self.total_work = total_work;
 
         true

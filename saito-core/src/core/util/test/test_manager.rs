@@ -352,6 +352,7 @@ pub mod test {
 
         pub async fn check_token_supply(&self) {
 
+
 	    //
 	    // the total supply of tokens in the network (fixed)
 	    //
@@ -422,6 +423,8 @@ pub mod test {
                 previous_block_treasury = current_block_treasury;
                 current_block_treasury = block.limbo;
 
+
+
                 for t in 0..block.transactions.len() {
 
 		    //
@@ -458,6 +461,8 @@ pub mod test {
                   
 
                 } else {
+ 
+ println!("block {:?} -> bi {:?} and bo: {:?}", i, block_inputs, block_outputs);
 
 		    //
 		    // update current variables
@@ -505,9 +510,11 @@ pub mod test {
                     println!("current_block_net_change_in_treasury : {:?}", current_block_net_change_in_treasury);
                     println!("current_block_net_change_in_limbo : {:?}", current_block_net_change_in_limbo);
                     println!("current_block_net_change_in_utxo : {:?}", current_block_net_change_in_utxo);
-                    println!("previous_block_net_change_in_treasury : {:?}", current_block_net_change_in_treasury);
-                    println!("previous_block_net_change_in_limbo : {:?}", current_block_net_change_in_limbo);
-                    println!("previous_block_net_change_in_utxo : {:?}", current_block_net_change_in_utxo);
+                    println!("current_block_previous_block_unpaid : {:?}", current_block_previous_block_unpaid);
+                    println!("previous_block_net_change_in_treasury : {:?}", previous_block_net_change_in_treasury);
+                    println!("previous_block_net_change_in_limbo : {:?}", previous_block_net_change_in_limbo);
+                    println!("previous_block_net_change_in_utxo : {:?}", previous_block_net_change_in_utxo);
+                    println!("previous_block_previous_block_unpaid : {:?}", previous_block_previous_block_unpaid);
                     println!("current block missing tokens : {:?}", current_block_missing_tokens);
                     println!("previous block missing tokens : {:?}", previous_block_missing_tokens);
                     println!("----------------------------------------");
@@ -546,6 +553,7 @@ pub mod test {
 
                 }
             }
+
         }
 
         // create block
