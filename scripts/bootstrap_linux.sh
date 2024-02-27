@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-declare -a pending_installations=("Rust and Cargo" "system packages"  "project build")
 
 
 command_exists() {
@@ -20,24 +19,29 @@ ask_permission() {
   done
 }
 
+pending_installations=()
 
-mark_as_installed() {
-  for i in "${!pending_installations[@]}"; do
-    if [[ "${pending_installations[$i]}" = "$1" ]]; then
-      unset 'pending_installations[i]'
-    fi
-  done
-}
+
+! command_exists rustc && ! command_exists cargo && pending_installations+=("Rust")
+! command_exists llvm && pending_installations+=("build-essential")
+! command_exists clang && pending_installations+=("libssl-dev")
+! command_exists pkg-config && pending_installations+=("pkg-config")
+! command_exists node && pending_installations+=("nodejs")
+! command_exists npm && pending_installations+=("npm")
+! command_exists clang && pending_installations+=("clang")
+! command_exists gcc-multilib && pending_installations+=("gcc-multilib")
+! command_exists python-is-python3 && pending_installations+=("python-is-python3")
+
+
 
 
 if command_exists rustc && command_exists cargo; then
   echo "Rust and Cargo are already installed."
-  mark_as_installed "Rust and Cargo"
 else
   ask_permission "Rust and Cargo are not installed. Install them?"
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
   source "$HOME/.cargo/env"
-  mark_as_installed "Rust and Cargo"
+ pending_installations=("${pending_installations[@]/Rust}")
 fi
 
 
@@ -51,12 +55,10 @@ for package in libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-pyt
     echo "Package $package is already installed."
   fi
 done
-mark_as_installed "system packages"
 
 
 # Build project
 ask_permission "Build project?"
 cargo build
-mark_as_installed "project build"
 
 echo "Setup completed successfully. All required installations and configurations are done."

@@ -21,7 +21,6 @@ ask_permission() {
 
 pending_installations=()
 
-
 ! command_exists brew && pending_installations+=("Homebrew")
 ! command_exists rustc && ! command_exists cargo && pending_installations+=("Rust")
 ! command_exists llvm && pending_installations+=("llvm")
