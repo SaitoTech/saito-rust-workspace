@@ -41,12 +41,7 @@ else
 fi
 
 
-# sudo apt update
-# ask_permission "Install necessary packages (build-essential, libssl-dev, pkg-config, nodejs, npm, clang, gcc-multilib, python-is-python3)?"
-# sudo NEEDRESTART_MODE=a apt install -y build-essential libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3
-# mark_as_installed "system packages"
-
-
+sudo apt update
 ask_permission "Install necessary packages (build-essential, libssl-dev, pkg-config, nodejs, npm, clang, gcc-multilib, python-is-python3)?"
 for package in libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
   if ! command_exists $package; then
