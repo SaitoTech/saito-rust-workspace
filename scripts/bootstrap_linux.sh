@@ -35,17 +35,30 @@ pending_installations=()
 
 
 
-if command_exists rustc && command_exists cargo; then
-  echo "Rust and Cargo are already installed."
-else
-  ask_permission "Rust and Cargo are not installed. Install them?"
+sudo apt update
+
+# if command_exists rustc && command_exists cargo; then
+#   echo "Rust and Cargo are already installed."
+# else
+#   ask_permission "Rust and Cargo are not installed. Install them?"
+#   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+#   source "$HOME/.cargo/env"
+#  pending_installations=("${pending_installations[@]/Rust}")
+# fi
+
+# Install Rust if not present
+if ! command_exists rustc || ! command_exists cargo; then
+  ask_permission "Rust is not installed. Install Rust?"
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
   source "$HOME/.cargo/env"
- pending_installations=("${pending_installations[@]/Rust}")
+  pending_installations=("${pending_installations[@]/Rust}")
+
+else 
+  echo "Rustup is already installed"
 fi
 
 
-sudo apt update
+
 ask_permission "Install necessary packages (build-essential, libssl-dev, pkg-config, nodejs, npm, clang, gcc-multilib, python-is-python3)?"
 for package in libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
   if ! command_exists $package; then
