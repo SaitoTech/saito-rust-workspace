@@ -30,7 +30,6 @@ pending_installations=()
 ! command_exists node && pending_installations+=("node")
 ! command_exists npm && pending_installations+=("npm")
 ! command_exists python3 && pending_installations+=("python3")
-! command_exists wasm-pack && pending_installations+=("wasm-pack")
 
 
 
@@ -66,15 +65,6 @@ for package in llvm clang pkg-config node npm python3; do
 done
 
 
-
-# Install wasm-pack if not present
-if ! command_exists wasm-pack; then
-  ask_permission "wasm-pack is not installed. Install wasm-pack?"
-  cargo install wasm-pack || exit 1
-  pending_installations=("${pending_installations[@]/wasm-pack}")
-  else
-    echo "Package wasm-pack is already installed."
-fi
 
 
  ask_permission "Build?"

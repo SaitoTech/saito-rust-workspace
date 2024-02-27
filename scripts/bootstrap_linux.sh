@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-declare -a pending_installations=("Rust and Cargo" "system packages" "wasm-pack" "project build")
+declare -a pending_installations=("Rust and Cargo" "system packages"  "project build")
 
 
 command_exists() {
@@ -41,15 +41,23 @@ else
 fi
 
 
-sudo apt update
+# sudo apt update
+# ask_permission "Install necessary packages (build-essential, libssl-dev, pkg-config, nodejs, npm, clang, gcc-multilib, python-is-python3)?"
+# sudo NEEDRESTART_MODE=a apt install -y build-essential libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3
+# mark_as_installed "system packages"
+
+
 ask_permission "Install necessary packages (build-essential, libssl-dev, pkg-config, nodejs, npm, clang, gcc-multilib, python-is-python3)?"
-sudo NEEDRESTART_MODE=a apt install -y build-essential libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3
+for package in libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
+  if ! command_exists $package; then
+    sudo NEEDRESTART_MODE=a apt install -y $package || exit 1
+    pending_installations=("${pending_installations[@]/$package}")
+  else
+    echo "Package $package is already installed."
+  fi
+done
 mark_as_installed "system packages"
 
-
-ask_permission "Install wasm-pack?"
-cargo install wasm-pack
-mark_as_installed "wasm-pack"
 
 # Build project
 ask_permission "Build project?"
