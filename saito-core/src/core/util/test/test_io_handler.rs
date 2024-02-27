@@ -150,8 +150,10 @@ pub mod test {
             "./data/blocks/".to_string()
         }
 
-        fn create_block_directory(&self) -> std::io::Result<()> {
-            fs::create_dir_all("data/blocks/")?;
+        fn ensure_block_directory_exists(&self, block_dir_path: String) -> std::io::Result<()> {
+            if !Path::new(&block_dir_path).exists() {
+                fs::create_dir_all("./data/blocks/".to_string())?;
+            }
             Ok(())
         }
 

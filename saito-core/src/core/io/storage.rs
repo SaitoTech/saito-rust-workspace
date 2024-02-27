@@ -86,11 +86,13 @@ impl Storage {
 
     pub async fn load_block_name_list(&self) -> Result<Vec<String>, Error> {
         let block_dir_path = self.io_interface.get_block_dir();
-        if !Path::new(&block_dir_path).exists() {
-            match self.io_interface.create_block_directory() {
-                Ok(()) => debug!("Block directory created"),
-                _ => error!("Error creating block directory"),
-            }
+
+        match self
+            .io_interface
+            .ensure_block_directory_exists(block_dir_path)
+        {
+            Ok(()) => debug!("Block directory created"),
+            _ => error!("Error creating block directory"),
         }
 
         let list = self.io_interface.load_block_file_list().await;
