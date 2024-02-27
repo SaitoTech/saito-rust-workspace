@@ -152,7 +152,7 @@ pub mod test {
 
         fn ensure_block_directory_exists(&self, block_dir_path: String) -> std::io::Result<()> {
             if !Path::new(&block_dir_path).exists() {
-                fs::create_dir_all("./data/blocks/".to_string())?;
+                fs::create_dir_all(block_dir_path.to_string())?;
             }
             Ok(())
         }
