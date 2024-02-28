@@ -4,19 +4,20 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+
+
 ask_permission() {
   while true; do
-    read -p "$1 [y/n]: " yn
+    read -p "$1 [Y/n]: " yn
     case $yn in
-      [Yy]* ) return 0;;
-      [Nn]* ) 
-        echo "Aborting. The following installations were pending: ${pending_installations[*]}"
-        exit 1
-        ;;
+      [Yy]* | "" ) return 0;;  # Treat empty input as Yes
+      [Nn]* ) echo "Aborting. The following installations were pending: ${pending_installations[*]}"
+              exit 1;;
       * ) echo "Please answer yes or no.";;
     esac
   done
 }
+
 
 
 pending_installations=()
