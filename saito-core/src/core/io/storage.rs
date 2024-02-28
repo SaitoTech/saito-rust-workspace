@@ -94,11 +94,10 @@ impl Storage {
             .ensure_block_directory_exists(block_dir_path)
         {
             Ok(()) => debug!("Block directory created"),
-            Err(err) => error!(
-                "Error creating block directory {:?}
-            ",
-                err
-            ),
+            Err(err) => {
+                error!("Error creating block directory {:?}", err);
+                return Err(Error::from(err));
+            }
         }
 
         let list = self.io_interface.load_block_file_list().await;
