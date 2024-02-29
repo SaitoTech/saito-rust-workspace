@@ -25,7 +25,6 @@ missing_packages=()
 
 
 ! command_exists rustc && ! command_exists cargo && missing_packages+=("Rust")
-! command_exists llvm && missing_packages+=("build-essential")
 
 
 
@@ -52,7 +51,7 @@ fi
 
 
 
-for package in build-essential libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
+for package in build-essential, libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
   if ! command_exists $package && ! linux_package_installed $package; then
     missing_packages+=("$package")
   fi
