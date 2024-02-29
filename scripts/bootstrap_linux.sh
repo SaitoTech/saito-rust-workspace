@@ -42,8 +42,6 @@ if ! command_exists rustc || ! command_exists cargo; then
   else
     echo "$HOME/.cargo/env does not exist. Attempting to directly update PATH."
   fi
-
-  # Directly update PATH as a fallback
   export PATH="$HOME/.cargo/bin:$PATH"
   echo "Updated PATH: $PATH"
   missing_packages=("${missing_packages[@]/Rust}")
@@ -54,7 +52,7 @@ fi
 
 
 
-for package in libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
+for package in build-essential libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
   if ! command_exists $package && ! linux_package_installed $package; then
     missing_packages+=("$package")
   fi
