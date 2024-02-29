@@ -5,6 +5,10 @@ command_exists() {
 }
 
 
+brew_package_installed() {
+  brew list --formula | grep -q "^$1\$"
+}
+
 
 ask_permission() {
   while true; do
@@ -21,17 +25,8 @@ ask_permission() {
 
 
 pending_installations=()
-
 ! command_exists brew && pending_installations+=("Homebrew")
 ! command_exists rustc && ! command_exists cargo && pending_installations+=("Rust")
-! command_exists llvm && pending_installations+=("llvm")
-! command_exists clang && pending_installations+=("clang")
-! command_exists pkg-config && pending_installations+=("pkg-config")
-! command_exists node && pending_installations+=("node")
-! command_exists npm && pending_installations+=("npm")
-! command_exists python3 && pending_installations+=("python3")
-
-
 
 
 if ! command_exists brew; then
@@ -52,22 +47,32 @@ else
   echo "Rustup is already installed"
 fi
 
+
 # Update Homebrew and install necessary packages
-ask_permission "Update Homebrew and install necessary packages (llvm, clang, pkg-config, node, npm, python3)?"
-brew update || exit 1
+missing_packages=()
 for package in llvm clang pkg-config node npm python3; do
-  if ! command_exists $package; then
-    brew install $package || exit 1
-    pending_installations=("${pending_installations[@]/$package}")
-  else
-    echo "Package $package is already installed."
+  if ! command_exists $package && ! brew_package_installed $package; then
+    missing_packages+=("$package")
   fi
 done
 
+if [ ${#missing_packages[@]} -gt 0 ]; then
+  ask_permission "Some required packages are missing. Update Homebrew and install missing packages (${missing_packages[*]})?"
+  brew update || exit 1
+  for package in "${missing_packages[@]}"; do
+    brew install $package || exit 1
+    missing_packages=("${missing_packages[@]/$package}")
+  done
+else
+  echo "All required packages are already installed."
+fi
 
 
 
- ask_permission "Build?"
-cargo build || exit 1
-
-echo "Setup completed successfully."
+ ask_permission "Build Project?"
+if cargo build; then
+  echo "Setup completed successfully."
+else
+  echo "Cargo build failed."
+  exit 1
+fi

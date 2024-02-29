@@ -38,14 +38,6 @@ pending_installations=()
 
 sudo apt update
 
-# if command_exists rustc && command_exists cargo; then
-#   echo "Rust and Cargo are already installed."
-# else
-#   ask_permission "Rust and Cargo are not installed. Install them?"
-#   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-#   source "$HOME/.cargo/env"
-#  pending_installations=("${pending_installations[@]/Rust}")
-# fi
 
 # Install Rust if not present
 if ! command_exists rustc || ! command_exists cargo; then
@@ -60,19 +52,26 @@ fi
 
 
 
-ask_permission "Install necessary packages (build-essential, libssl-dev, pkg-config, nodejs, npm, clang, gcc-multilib, python-is-python3)?"
-for package in libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
-  if ! command_exists $package; then
-    sudo NEEDRESTART_MODE=a apt install -y $package || exit 1
-    pending_installations=("${pending_installations[@]/$package}")
-  else
-    echo "Package $package is already installed."
-  fi
-done
+if [ ${#pending_installations[@]} -ne 0 ]; then
+  ask_permission "Install necessary packages (${pending_installations[*]})?"
+  for package in "${pending_installations[@]}"; do
+    if ! package_installed $package; then
+      sudo NEEDRESTART_MODE=a apt install -y $package || exit 1
+      echo "Installed $package."
+    else
+      echo "Package $package is already installed."
+    fi
+  done
+else
+  echo "All necessary packages are already installed."
+fi
 
 
 # Build project
-ask_permission "Build project?"
-cargo build
-
-echo "Setup completed successfully. All required installations and configurations are done."
+ ask_permission "Build Project?"
+if cargo build; then
+  echo "Setup completed successfully."
+else
+  echo "Cargo build failed."
+  exit 1
+fi
