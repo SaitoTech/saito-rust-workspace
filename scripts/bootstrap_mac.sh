@@ -15,7 +15,7 @@ ask_permission() {
     read -p "$1 [Y/n]: " yn
     case $yn in
       [Yy]* | "" ) return 0;;  # Treat empty input as Yes
-      [Nn]* ) echo "Aborting. The following installations were pending: ${pending_installations[*]}"
+      [Nn]* ) echo "Aborting. The following installations were pending: ${missing_packages[*]}"
               exit 1;;
       * ) echo "Please answer yes or no.";;
     esac
@@ -24,15 +24,15 @@ ask_permission() {
 
 
 
-pending_installations=()
-! command_exists brew && pending_installations+=("Homebrew")
-! command_exists rustc && ! command_exists cargo && pending_installations+=("Rust")
+missing_packages=()
+! command_exists brew && missing_packages+=("Homebrew")
+! command_exists rustc && ! command_exists cargo && missing_packages+=("Rust")
 
 
 if ! command_exists brew; then
   ask_permission "Homebrew is not installed. Install Homebrew?"
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || exit 1
-  pending_installations=("${pending_installations[@]/Homebrew}")
+  missing_packages=("${missing_packages[@]/Homebrew}")
 fi
 
 
@@ -41,7 +41,7 @@ if ! command_exists rustc || ! command_exists cargo; then
   ask_permission "Rust is not installed. Install Rust?"
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y || exit 1
   source "$HOME/.cargo/env"
-  pending_installations=("${pending_installations[@]/Rust}")
+  missing_packages=("${missing_packages[@]/Rust}")
 
 else 
   echo "Rustup is already installed"
@@ -49,7 +49,6 @@ fi
 
 
 # Update Homebrew and install necessary packages
-missing_packages=()
 for package in llvm clang pkg-config node npm python3; do
   if ! command_exists $package && ! brew_package_installed $package; then
     missing_packages+=("$package")

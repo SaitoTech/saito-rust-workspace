@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-
-
 command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
@@ -15,7 +13,7 @@ ask_permission() {
     read -p "$1 [Y/n]: " yn
     case $yn in
       [Yy]* | "" ) return 0;;  # Treat empty input as Yes
-      [Nn]* ) echo "Aborting. The following installations were pending: ${pending_installations[*]}"
+      [Nn]* ) echo "Aborting. The following installations were pending: ${missing_packages[*]}"
               exit 1;;
       * ) echo "Please answer yes (default) or no.";;
     esac
@@ -23,20 +21,11 @@ ask_permission() {
 }
 
 
-pending_installations=()
+missing_packages=()
 
 
-! command_exists rustc && ! command_exists cargo && pending_installations+=("Rust")
-! command_exists llvm && pending_installations+=("build-essential")
-# ! command_exists clang && pending_installations+=("libssl-dev")
-# ! command_exists pkg-config && pending_installations+=("pkg-config")
-# ! command_exists node && pending_installations+=("nodejs")
-# ! command_exists npm && pending_installations+=("npm")
-# ! command_exists clang && pending_installations+=("clang")
-# ! command_exists gcc-multilib && pending_installations+=("gcc-multilib")
-# ! command_exists python-is-python3 && pending_installations+=("python-is-python3")
-
-
+! command_exists rustc && ! command_exists cargo && missing_packages+=("Rust")
+! command_exists llvm && missing_packages+=("build-essential")
 
 
 
@@ -57,14 +46,14 @@ if ! command_exists rustc || ! command_exists cargo; then
   # Directly update PATH as a fallback
   export PATH="$HOME/.cargo/bin:$PATH"
   echo "Updated PATH: $PATH"
-  pending_installations=("${pending_installations[@]/Rust}")
+  missing_packages=("${missing_packages[@]/Rust}")
 
 else 
   echo "Rustup is already installed"
 fi
 
 
-missing_packages=()
+
 for package in libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
   if ! command_exists $package && ! linux_package_installed $package; then
     missing_packages+=("$package")
