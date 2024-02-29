@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
+use std::path::Path;
 use std::sync::Arc;
 
 use ahash::AHashMap;
@@ -84,6 +85,19 @@ impl Storage {
     }
 
     pub async fn load_block_name_list(&self) -> Result<Vec<String>, Error> {
+        let block_dir_path = self.io_interface.get_block_dir();
+
+        match self
+            .io_interface
+            .ensure_block_directory_exists(block_dir_path)
+        {
+            Ok(()) => debug!("Block directory created"),
+            Err(err) => {
+                error!("Error creating block directory {:?}", err);
+                return Err(Error::from(err));
+            }
+        }
+
         let list = self.io_interface.load_block_file_list().await;
         if list.is_err() {
             error!(

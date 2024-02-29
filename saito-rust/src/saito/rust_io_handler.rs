@@ -245,6 +245,13 @@ impl InterfaceIO for RustIOHandler {
         BLOCKS_DIR_PATH.to_string()
     }
 
+    fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), Error> {
+        if !Path::new(&block_dir_path).exists() {
+            fs::create_dir_all(BLOCKS_DIR_PATH.to_string())?;
+        }
+        Ok(())
+    }
+
     async fn process_api_call(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {}
 
     async fn process_api_success(&self, _buffer: Vec<u8>, _msg_index: u32, _peer_index: PeerIndex) {

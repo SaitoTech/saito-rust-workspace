@@ -52,6 +52,9 @@ export default class Saito {
       write_value: (key: string, value: Uint8Array) => {
         return sharedMethods.writeValue(key, value);
       },
+      ensure_block_directory_exists: (path: string) => {
+        return sharedMethods.ensureBlockDirExists(path);
+      },
       read_value: (key: string) => {
         return sharedMethods.readValue(key);
       },

@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
+use std::{fs, result};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
@@ -103,6 +104,14 @@ impl InterfaceIO for WasmIoHandler {
         MsgHandler::write_value(key, &array);
         drop(array);
 
+        Ok(())
+    }
+
+    fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), std::io::Error> {
+        let result = MsgHandler::ensure_block_directory_exists(block_dir_path);
+        if result.is_err() {
+            return Err(Error::from(ErrorKind::Other));
+        }
         Ok(())
     }
 
@@ -293,6 +302,9 @@ extern "C" {
     pub fn connect_to_peer(peer_data: JsValue) -> Result<JsValue, js_sys::Error>;
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn write_value(key: String, value: &Uint8Array);
+
+    #[wasm_bindgen(static_method_of = MsgHandler, catch)]
+    pub fn ensure_block_directory_exists(path: String) -> Result<(), js_sys::Error>;
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn read_value(key: String) -> Result<Uint8Array, js_sys::Error>;
