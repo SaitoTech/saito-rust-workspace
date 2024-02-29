@@ -39,12 +39,24 @@ pending_installations=()
 
 
 
+
 sudo apt update
+
+export PATH="$HOME/.cargo/bin:$PATH"
 # Install Rust if not present
 if ! command_exists rustc || ! command_exists cargo; then
   ask_permission "Rust is not installed. Install Rust?"
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-  source "$HOME/.cargo/env"
+    if [ -f "$HOME/.cargo/env" ]; then
+    source "$HOME/.cargo/env"
+    echo "Sourced $HOME/.cargo/env successfully."
+  else
+    echo "$HOME/.cargo/env does not exist. Attempting to directly update PATH."
+  fi
+
+  # Directly update PATH as a fallback
+  export PATH="$HOME/.cargo/bin:$PATH"
+  echo "Updated PATH: $PATH"
   pending_installations=("${pending_installations[@]/Rust}")
 
 else 
@@ -71,7 +83,6 @@ else
   echo "All necessary packages are already installed."
 fi
 
-source "$HOME/.cargo/env"
 
 
 # Build project
