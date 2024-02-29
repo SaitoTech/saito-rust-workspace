@@ -6,6 +6,9 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+linux_package_installed() {
+  dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "ok installed"
+}
 
 ask_permission() {
   while true; do
@@ -25,20 +28,18 @@ pending_installations=()
 
 ! command_exists rustc && ! command_exists cargo && pending_installations+=("Rust")
 ! command_exists llvm && pending_installations+=("build-essential")
-! command_exists clang && pending_installations+=("libssl-dev")
-! command_exists pkg-config && pending_installations+=("pkg-config")
-! command_exists node && pending_installations+=("nodejs")
-! command_exists npm && pending_installations+=("npm")
-! command_exists clang && pending_installations+=("clang")
-! command_exists gcc-multilib && pending_installations+=("gcc-multilib")
-! command_exists python-is-python3 && pending_installations+=("python-is-python3")
+# ! command_exists clang && pending_installations+=("libssl-dev")
+# ! command_exists pkg-config && pending_installations+=("pkg-config")
+# ! command_exists node && pending_installations+=("nodejs")
+# ! command_exists npm && pending_installations+=("npm")
+# ! command_exists clang && pending_installations+=("clang")
+# ! command_exists gcc-multilib && pending_installations+=("gcc-multilib")
+# ! command_exists python-is-python3 && pending_installations+=("python-is-python3")
 
 
 
 
 sudo apt update
-
-
 # Install Rust if not present
 if ! command_exists rustc || ! command_exists cargo; then
   ask_permission "Rust is not installed. Install Rust?"
@@ -51,20 +52,26 @@ else
 fi
 
 
+missing_packages=()
+for package in libssl-dev pkg-config nodejs npm clang gcc-multilib python-is-python3; do
+  if ! command_exists $package && ! linux_package_installed $package; then
+    missing_packages+=("$package")
+  fi
+done
 
-if [ ${#pending_installations[@]} -ne 0 ]; then
-  ask_permission "Install necessary packages (${pending_installations[*]})?"
-  for package in "${pending_installations[@]}"; do
-    if ! package_installed $package; then
+
+
+if [ ${#missing_packages[@]} -ne 0 ]; then
+  ask_permission "Install necessary packages (${missing_packages[*]})?"
+  for package in "${missing_packages[@]}"; do
       sudo NEEDRESTART_MODE=a apt install -y $package || exit 1
-      echo "Installed $package."
-    else
-      echo "Package $package is already installed."
-    fi
+       missing_packages=("${missing_packages[@]/$package}")
   done
 else
   echo "All necessary packages are already installed."
 fi
+
+source "$HOME/.cargo/env"
 
 
 # Build project
