@@ -161,9 +161,16 @@ impl Mempool {
         let previous_block_hash: SaitoHash;
         let public_key;
         let private_key;
+        let block_timestamp_gap;
         {
             let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
             previous_block_hash = blockchain.get_latest_block_hash();
+            let previous_block_timestamp = match blockchain.get_latest_block() {
+                None => 0,
+                Some(block) => block.timestamp,
+            };
+            block_timestamp_gap =
+                Duration::from_millis(current_timestamp - previous_block_timestamp).as_secs();
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
@@ -171,9 +178,10 @@ impl Mempool {
             .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs, &public_key)
             .await?;
         info!(
-            "bundling block with {:?} txs with work : {:?}",
+            "bundling block with {:?} txs with work : {:?} with a gap of {:?} seconds",
             self.transactions.len(),
-            mempool_work
+            mempool_work,
+            block_timestamp_gap
         );
         let mut block = Block::create(
             &mut self.transactions,

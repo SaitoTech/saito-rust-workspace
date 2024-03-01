@@ -6,6 +6,7 @@ use ahash::AHashMap;
 use tokio::sync::mpsc::Sender;
 
 pub type Currency = u64;
+/// Time in milliseconds
 pub type Timestamp = u64;
 pub type SaitoSignature = [u8; 64];
 pub type SaitoPublicKey = [u8; 33];

@@ -419,7 +419,6 @@ impl Block {
         // update slips_spent_this_block so that we have a record of
         // how many times input slips are spent in this block. we will
         // use this later to ensure there are no duplicates.
-        //
         for transaction in &block.transactions {
             if transaction.transaction_type != TransactionType::Fee {
                 for input in transaction.from.iter() {
@@ -434,7 +433,6 @@ impl Block {
         block.created_hashmap_of_slips_spent_this_block = true;
 
         // set difficulty
-        //
         block.difficulty = cv.expected_difficulty;
 
         // TODO - we should consider deleting the treasury, if we do not use
