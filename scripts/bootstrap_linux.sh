@@ -71,10 +71,12 @@ fi
 
 
 # Build project
- ask_permission "Build Project?"
-if cargo build; then
-  echo "Setup completed successfully."
-else
-  echo "Cargo build failed."
-  exit 1
-fi
+ask_permission "Build Project?" && (
+  cd "$BASE_PATH" || exit 1
+  if cargo build; then
+    echo "Setup completed successfully."
+  else
+    echo "Cargo build failed."
+    exit 1
+  fi
+)
