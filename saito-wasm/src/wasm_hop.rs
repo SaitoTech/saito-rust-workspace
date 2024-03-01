@@ -1,5 +1,4 @@
-use js_sys::Object;
-use saito_core::{common::defs::PrintForLog, core::data::hop::Hop};
+use saito_core::{core::consensus::hop::Hop, core::defs::PrintForLog};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

@@ -12,34 +12,34 @@ use figment::Figment;
 use js_sys::{Array, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
+use secp256k1::SECP256K1;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 
-use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{
+use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
+use saito_core::core::consensus::context::Context;
+use saito_core::core::consensus::mempool::Mempool;
+use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::transaction::Transaction;
+use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
+use saito_core::core::defs::{
     PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, StatVariable,
     STAT_BIN_COUNT,
 };
-use saito_core::common::process_event::ProcessEvent;
-use saito_core::common::version::Version;
-use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
-use saito_core::core::data::configuration::{Configuration, PeerConfig};
-use saito_core::core::data::context::Context;
-use saito_core::core::data::crypto::{generate_keypair_from_private_key, SECP256K1};
-use saito_core::core::data::crypto::{hash as hash_fn, sign};
-use saito_core::core::data::mempool::Mempool;
-use saito_core::core::data::msg::api_message::ApiMessage;
-use saito_core::core::data::msg::message::Message;
-use saito_core::core::data::network::Network;
-use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::data::storage::Storage;
-use saito_core::core::data::transaction::Transaction;
-use saito_core::core::data::wallet::Wallet;
+use saito_core::core::io::network::Network;
+use saito_core::core::io::network_event::NetworkEvent;
+use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
+use saito_core::core::msg::api_message::ApiMessage;
+use saito_core::core::msg::message::Message;
+use saito_core::core::process::process_event::ProcessEvent;
+use saito_core::core::process::version::Version;
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
+use saito_core::core::util::configuration::{Configuration, PeerConfig};
+use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 
 use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
@@ -55,7 +55,7 @@ use crate::wasm_wallet::WasmWallet;
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
-    routing_thread: RoutingThread,
+    pub(crate) routing_thread: RoutingThread,
     consensus_thread: ConsensusThread,
     mining_thread: MiningThread,
     verification_thread: VerificationThread,
@@ -315,10 +315,17 @@ pub async fn create_transaction(
         fee,
         force_merge,
         Some(&saito.consensus_thread.network),
-    )
-    .unwrap();
+    );
+    if transaction.is_err() {
+        error!(
+            "failed creating transaction. {:?}",
+            transaction.err().unwrap()
+        );
+        return Err(JsValue::from("Failed creating transaction"));
+    }
+    let transaction = transaction.unwrap();
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
-    return Ok(wasm_transaction);
+    Ok(wasm_transaction)
 }
 
 #[wasm_bindgen]
@@ -430,7 +437,7 @@ pub async fn process_fetched_block(
 
 #[wasm_bindgen]
 pub async fn process_failed_block_fetch(hash: js_sys::Uint8Array) {
-    let mut saito = SAITO.lock().await;
+    let saito = SAITO.lock().await;
     let mut blockchain = saito.routing_thread.blockchain.write().await;
     let hash: SaitoHash = hash.to_vec().try_into().unwrap();
     blockchain.unmark_as_fetching(&hash);
@@ -453,10 +460,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     }
     event_counter = 0;
 
-    saito
-        .routing_thread
-        .process_timer_event(duration.clone())
-        .await;
+    saito.routing_thread.process_timer_event(duration).await;
 
     while let Ok(event) = saito.receiver_for_consensus.try_recv() {
         let _result = saito.consensus_thread.process_event(event).await;
@@ -467,10 +471,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     }
     event_counter = 0;
 
-    saito
-        .consensus_thread
-        .process_timer_event(duration.clone())
-        .await;
+    saito.consensus_thread.process_timer_event(duration).await;
 
     while let Ok(event) = saito.receiver_for_verification.try_recv() {
         let _result = saito.verification_thread.process_event(event).await;
@@ -495,16 +496,13 @@ pub async fn process_timer_event(duration_in_ms: u64) {
     }
     event_counter = 0;
 
-    saito
-        .mining_thread
-        .process_timer_event(duration.clone())
-        .await;
+    saito.mining_thread.process_timer_event(duration).await;
 }
 
 #[wasm_bindgen]
 pub fn hash(buffer: Uint8Array) -> JsString {
     let buffer: Vec<u8> = buffer.to_vec();
-    let hash = hash_fn(&buffer);
+    let hash = saito_core::core::util::crypto::hash(&buffer);
     let str = hash.to_hex();
     let str: js_sys::JsString = str.into();
     str
@@ -539,8 +537,8 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
         return false;
     }
     let buffer = buffer.to_vec();
-    let h = saito_core::core::data::crypto::hash(&buffer);
-    saito_core::core::data::crypto::verify_signature(&h, &sig, &key.unwrap())
+    let h = saito_core::core::util::crypto::hash(&buffer);
+    saito_core::core::util::crypto::verify_signature(&h, &sig, &key.unwrap())
 }
 
 #[wasm_bindgen]
@@ -601,23 +599,7 @@ pub async fn get_account_slips(public_key: JsString) -> Result<Array, JsValue> {
 
 #[wasm_bindgen]
 pub async fn get_balance_snapshot(keys: js_sys::Array) -> WasmBalanceSnapshot {
-    let keys: Vec<SaitoPublicKey> = keys
-        .to_vec()
-        .drain(..)
-        .filter_map(|key| {
-            let key: Option<String> = key.as_string();
-            if key.is_none() {
-                return None;
-            }
-            let key: String = key.unwrap();
-            let key = SaitoPublicKey::from_base58(key.as_str());
-            if key.is_err() {
-                return None;
-            }
-            let key: SaitoPublicKey = key.unwrap();
-            return Some(key);
-        })
-        .collect();
+    let keys: Vec<SaitoPublicKey> = string_array_to_base58_keys(keys);
 
     let saito = SAITO.lock().await;
     let blockchain = saito.routing_thread.blockchain.read().await;
@@ -704,10 +686,6 @@ pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: Pe
     let message = Message::Result(api_message);
     let buffer = message.serialize();
 
-    // let mut tx = Transaction::default();
-    // tx.data = buffer;
-    // let buffer = Message::Transaction(tx).serialize();
-    // trace!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
         .network
@@ -728,11 +706,6 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
     let message = Message::Error(api_message);
     let buffer = message.serialize();
 
-    // let mut tx = Transaction::default();
-    // tx.data = buffer;
-    // let buffer = Message::Transaction(tx).serialize();
-
-    // info!("buffer size = {:?}", buffer.len());
     saito
         .routing_thread
         .network
@@ -869,6 +842,29 @@ where
     }
     let key = key.unwrap();
     Ok(key)
+}
+
+pub fn string_array_to_base58_keys<T: TryFrom<Vec<u8>> + PrintForLog<T>>(
+    array: js_sys::Array,
+) -> Vec<T> {
+    let array: Vec<T> = array
+        .to_vec()
+        .drain(..)
+        .filter_map(|key| {
+            let key: Option<String> = key.as_string();
+            if key.is_none() {
+                return None;
+            }
+            let key: String = key.unwrap();
+            let key = T::from_base58(key.as_str());
+            if key.is_err() {
+                return None;
+            }
+            let key: T = key.unwrap();
+            return Some(key);
+        })
+        .collect();
+    array
 }
 
 // #[cfg(test)]

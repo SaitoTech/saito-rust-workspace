@@ -3,23 +3,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::common::command::NetworkEvent;
-use crate::common::defs::{
-    push_lock, PrintForLog, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET,
-};
-use crate::common::process_event::ProcessEvent;
+use crate::core::consensus::block::Block;
+use crate::core::consensus::blockchain::Blockchain;
+use crate::core::consensus::peer_collection::PeerCollection;
+use crate::core::consensus::transaction::Transaction;
+use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::data::block::Block;
-use crate::core::data::blockchain::Blockchain;
-use crate::core::data::peer_collection::PeerCollection;
-use crate::core::data::transaction::Transaction;
-use crate::core::data::wallet::Wallet;
+use crate::core::defs::{PrintForLog, StatVariable, Timestamp};
+use crate::core::io::network_event::NetworkEvent;
+use crate::core::process::process_event::ProcessEvent;
 use crate::{drain, lock_for_read};
 
 #[derive(Debug)]
@@ -45,13 +42,13 @@ impl VerificationThread {
     pub async fn verify_tx(&mut self, mut transaction: Transaction) {
         let public_key;
         {
-            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
             public_key = wallet.public_key;
         }
         {
             transaction.generate(&public_key, 0, 0);
 
-            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
             if !transaction.validate(&blockchain.utxoset) {
                 debug!(
@@ -76,11 +73,11 @@ impl VerificationThread {
         let prev_count = transactions.len();
         let txs: Vec<Transaction>;
         {
-            let (blockchain, _blockchain_) = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
 
             let public_key;
             {
-                let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
                 public_key = wallet.public_key;
             }
             txs = drain!(transactions, 10)
@@ -110,6 +107,7 @@ impl VerificationThread {
         self.invalid_txs.increment_by(invalid_txs as u64);
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
+        trace!("verifying block buffer of size : {:?}", buffer.len());
         let buffer_len = buffer.len();
         let result = Block::deserialize_from_net(buffer);
         if result.is_err() {
@@ -119,7 +117,7 @@ impl VerificationThread {
             );
             return;
         }
-        let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+        let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
         let mut block = result.unwrap();
         let peer = peers.index_to_peers.get(&peer_index);

@@ -15,32 +15,30 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
-use saito_core::common::command::NetworkEvent;
-use saito_core::common::defs::{
-    push_lock, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS,
-    STAT_BIN_COUNT,
-};
-use saito_core::common::keep_time::KeepTime;
-use saito_core::common::process_event::ProcessEvent;
+use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
+use saito_core::core::consensus::context::Context;
+use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::blockchain_sync_state::BlockchainSyncState;
-use saito_core::core::data::configuration::Configuration;
-use saito_core::core::data::context::Context;
 
-use saito_core::core::data::network::Network;
-use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::data::storage::Storage;
-use saito_core::core::data::wallet::Wallet;
+use saito_core::core::defs::{
+    PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+};
+use saito_core::core::io::network::Network;
+use saito_core::core::io::network_event::NetworkEvent;
+use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
+use saito_core::core::process::keep_time::KeepTime;
+use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
+use saito_core::core::util::configuration::Configuration;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_read;
 use saito_rust::saito::io_event::IoEvent;
 use saito_rust::saito::network_controller::run_network_controller;
-
 use saito_rust::saito::rust_io_handler::RustIOHandler;
 use saito_rust::saito::stat_thread::StatThread;
 use saito_rust::saito::time_keeper::TimeKeeper;
@@ -184,7 +182,7 @@ async fn run_consensus_event_processor(
     }
     let generate_genesis_block: bool;
     {
-        let (configs, _configs_) = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
 
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
         generate_genesis_block = configs.get_peer_configs().is_empty();
@@ -334,7 +332,7 @@ async fn run_routing_event_processor(
         reconnection_wait_time: 0,
     };
     {
-        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -492,7 +490,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fetch_batch_size: usize;
 
     {
-        let (configs, _configs_) = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs

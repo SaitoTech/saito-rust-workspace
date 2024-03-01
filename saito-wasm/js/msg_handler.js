@@ -15,6 +15,10 @@ class MsgHandler {
     return global.shared_methods.write_value(key, value);
   }
 
+  static ensure_block_directory_exists(path) {
+    return global.shared_methods.ensure_block_directory_exists(path);
+  }
+
   static read_value(key) {
     return global.shared_methods.read_value(key);
   }
@@ -43,9 +47,12 @@ class MsgHandler {
     return global.shared_methods.process_api_call(buffer, msgIndex, peerIndex);
   }
 
-
   static process_api_success(buffer, msgIndex, peerIndex) {
-    return global.shared_methods.process_api_success(buffer, msgIndex, peerIndex);
+    return global.shared_methods.process_api_success(
+      buffer,
+      msgIndex,
+      peerIndex
+    );
   }
 
   static process_api_error(buffer, msgIndex, peerIndex) {
@@ -85,7 +92,12 @@ class MsgHandler {
   }
 
   static send_new_version_alert(major, minor, patch, peerIndex) {
-    return global.shared_methods.send_new_version_alert(major, minor, patch, peerIndex);
+    return global.shared_methods.send_new_version_alert(
+      major,
+      minor,
+      patch,
+      peerIndex
+    );
   }
 }
 

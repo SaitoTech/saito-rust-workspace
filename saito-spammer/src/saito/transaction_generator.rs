@@ -7,17 +7,14 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use saito_core::common::defs::{
-    push_lock, Currency, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
-};
-use saito_core::common::keep_time::KeepTime;
-use saito_core::core::data::blockchain::Blockchain;
-use saito_core::core::data::crypto::generate_random_bytes;
-use saito_core::core::data::peer_collection::PeerCollection;
-use saito_core::core::data::slip::{Slip, SLIP_SIZE};
-use saito_core::core::data::transaction::Transaction;
-use saito_core::core::data::wallet::Wallet;
+use saito_core::core::consensus::blockchain::Blockchain;
+use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
+use saito_core::core::consensus::transaction::Transaction;
+use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
+use saito_core::core::process::keep_time::KeepTime;
+use saito_core::core::util::crypto::generate_random_bytes;
 use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_rust::saito::time_keeper::TimeKeeper;
 
@@ -59,7 +56,7 @@ impl TransactionGenerator {
         let mut tx_size = 10;
         let tx_count;
         {
-            let (configs, _configs_) = lock_for_read!(configuration_lock, LOCK_ORDER_CONFIGS);
+            let configs = lock_for_read!(configuration_lock, LOCK_ORDER_CONFIGS);
 
             tx_size = configs.get_spammer_configs().tx_size;
             tx_count = configs.get_spammer_configs().tx_count;
@@ -81,7 +78,7 @@ impl TransactionGenerator {
             peers: peers_lock.clone(),
         };
         {
-            let (wallet, _wallet_) = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
             res.public_key = wallet.public_key;
             res.private_key = wallet.private_key;
         }
@@ -107,12 +104,13 @@ impl TransactionGenerator {
     }
 
     async fn create_slips(&mut self) {
+        trace!("creating slips for spammer");
         let output_slips_per_input_slip: u8 = 100;
         let unspent_slip_count;
         let available_balance;
 
         {
-            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
 
             unspent_slip_count = wallet.get_unspent_slip_count();
             available_balance = wallet.get_available_balance();
@@ -131,13 +129,13 @@ impl TransactionGenerator {
             let mut to_public_key = [0; 33];
 
             {
-                let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+                let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
                 for peer in peers.index_to_peers.iter() {
                     to_public_key = peer.1.public_key.clone().unwrap();
                     break;
                 }
-                assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+                assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
                 assert_ne!(to_public_key, self.public_key);
             }
             let mut txs: VecDeque<Transaction> = Default::default();
@@ -171,6 +169,13 @@ impl TransactionGenerator {
                 "New slips created, current = {:?}, target = {:?}",
                 total_output_slips_created, self.tx_count
             );
+        } else {
+            trace!(
+                "not enough slips. unspent slip count : {:?} tx count : {:?} expected slips : {:?}",
+                unspent_slip_count,
+                self.tx_count,
+                self.expected_slip_count
+            );
         }
     }
 
@@ -184,7 +189,7 @@ impl TransactionGenerator {
         let payment_amount =
             total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
 
-        let (mut wallet, _wallet_) = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        let mut wallet = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
 
         let mut transaction = Transaction::default();
 
@@ -224,7 +229,7 @@ impl TransactionGenerator {
     async fn check_blockchain_for_confirmation(&mut self) -> bool {
         let unspent_slip_count;
         {
-            let (wallet, _wallet_) = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
             unspent_slip_count = wallet.get_unspent_slip_count();
         }
 
@@ -261,24 +266,26 @@ impl TransactionGenerator {
             loop {
                 let mut work_done = false;
                 {
-                    let (blockchain, _blockchain_) =
-                        lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+                    let blockchain = lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
-                    let (mut wallet, _wallet_) = lock_for_write!(wallet, LOCK_ORDER_WALLET);
+                    let mut wallet = lock_for_write!(wallet, LOCK_ORDER_WALLET);
 
                     if wallet.get_available_balance() >= required_balance {
                         assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
-                            let mut transaction = Transaction::create(
+                            let transaction = Transaction::create(
                                 &mut wallet,
                                 public_key,
                                 payment,
                                 fee,
                                 false,
                                 None,
-                            )
-                            .unwrap();
+                            );
+                            if transaction.is_err() {
+                                break;
+                            }
+                            let mut transaction = transaction.unwrap();
                             transaction.generate_total_fees(0, 0);
                             if (transaction.total_in == 0 || transaction.total_out == 0)
                                 && (payment + fee != 0)
@@ -303,7 +310,7 @@ impl TransactionGenerator {
         let mut to_public_key = [0; 33];
 
         {
-            let (peers, _peers_) = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+            let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
             for peer in peers.index_to_peers.iter() {
                 to_public_key = peer.1.public_key.clone().unwrap();

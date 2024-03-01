@@ -1,7 +1,7 @@
-use js_sys::{Array, JsString};
-use saito_core::common::defs::{Currency, PrintForLog};
-use saito_core::core::data::block::{BlockPayout, ConsensusValues};
-use saito_core::core::data::transaction::Transaction;
+use js_sys::JsString;
+use saito_core::core::consensus::block::ConsensusValues;
+use saito_core::core::consensus::transaction::Transaction;
+use saito_core::core::defs::PrintForLog;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -42,21 +42,21 @@ impl WasmConsensusValues {
         }
     }
 
-    #[wasm_bindgen(getter = block_payout)]
-    pub fn get_block_payout(&self) -> Array {
-        let mut block_payout: Vec<WasmBlockPayout> = self
-            .cv
-            .block_payout
-            .iter()
-            .map(|bp| WasmBlockPayout::from_block_payout(bp.clone()))
-            .collect();
-        let array = js_sys::Array::new_with_length(block_payout.len() as u32);
-
-        for (i, bpo) in block_payout.drain(..).enumerate() {
-            array.set(i as u32, JsValue::from(bpo));
-        }
-        array
-    }
+    // #[wasm_bindgen(getter = block_payout)]
+    // pub fn get_block_payout(&self) -> Array {
+    //     let mut block_payout: Vec<WasmBlockPayout> = self
+    //         .cv
+    //         .block_payout
+    //         .iter()
+    //         .map(|bp| WasmBlockPayout::from_block_payout(bp.clone()))
+    //         .collect();
+    //     let array = js_sys::Array::new_with_length(block_payout.len() as u32);
+    //
+    //     for (i, bpo) in block_payout.drain(..).enumerate() {
+    //         array.set(i as u32, JsValue::from(bpo));
+    //     }
+    //     array
+    // }
 
     #[wasm_bindgen(getter = ft_num)]
     pub fn ft_num(&self) -> u8 {
@@ -91,16 +91,6 @@ impl WasmConsensusValues {
         self.cv.expected_difficulty
     }
 
-    #[wasm_bindgen(getter = avg_atr_income)]
-    pub fn avg_atr_income(&self) -> u64 {
-        self.cv.avg_atr_income
-    }
-
-    #[wasm_bindgen(getter = avg_atr_variance)]
-    pub fn avg_atr_variance(&self) -> u64 {
-        self.cv.avg_atr_variance
-    }
-
     #[wasm_bindgen(getter = total_rebroadcast_slips)]
     pub fn total_rebroadcast_slips(&self) -> u64 {
         self.cv.total_rebroadcast_slips
@@ -133,11 +123,6 @@ impl WasmConsensusValues {
         self.cv.nolan_falling_off_chain
     }
 
-    #[wasm_bindgen(getter = staking_treasury)]
-    pub fn staking_treasury(&self) -> u64 {
-        self.cv.staking_treasury
-    }
-
     // #[wasm_bindgen(getter = block_payout)]
     // pub fn block_payout(&self) -> JsValue {
     //     // assuming you can convert Vec<BlockPayout> to a JsValue
@@ -149,59 +134,10 @@ impl WasmConsensusValues {
     pub fn avg_income(&self) -> u64 {
         self.cv.avg_income
     }
-
-    #[wasm_bindgen(getter = avg_variance)]
-    pub fn avg_variance(&self) -> u64 {
-        self.cv.avg_variance
-    }
 }
 
 impl WasmConsensusValues {
     pub fn from_cv(cv: ConsensusValues) -> WasmConsensusValues {
         WasmConsensusValues { cv }
-    }
-}
-
-#[wasm_bindgen]
-pub struct WasmBlockPayout {
-    pub(crate) block_payout: BlockPayout,
-}
-
-#[wasm_bindgen]
-impl WasmBlockPayout {
-    #[wasm_bindgen(getter = miner)]
-    pub fn miner(&self) -> JsString {
-        self.block_payout.miner.to_base58().into()
-    }
-
-    #[wasm_bindgen(getter = router)]
-    pub fn router(&self) -> JsString {
-        self.block_payout.router.to_base58().into()
-    }
-
-    #[wasm_bindgen(getter = miner_payout)]
-    pub fn miner_payout(&self) -> Currency {
-        self.block_payout.miner_payout
-    }
-
-    #[wasm_bindgen(getter = router_payout)]
-    pub fn router_payout(&self) -> Currency {
-        self.block_payout.router_payout
-    }
-
-    #[wasm_bindgen(getter = staking_treasury)]
-    pub fn staking_treasury(&self) -> i64 {
-        self.block_payout.staking_treasury
-    }
-
-    #[wasm_bindgen(getter = random_number)]
-    pub fn random_number(&self) -> JsString {
-        self.block_payout.random_number.to_hex().into()
-    }
-}
-
-impl WasmBlockPayout {
-    pub fn from_block_payout(block_payout: BlockPayout) -> WasmBlockPayout {
-        WasmBlockPayout { block_payout }
     }
 }

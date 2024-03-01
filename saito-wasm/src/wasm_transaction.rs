@@ -1,11 +1,11 @@
-use js_sys::{Array, JsString, Object, Uint8Array};
+use js_sys::{Array, JsString, Uint8Array};
 
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{Currency, PrintForLog, Timestamp};
-use saito_core::core::data::transaction::{Transaction, TransactionType};
+use saito_core::core::consensus::transaction::{Transaction, TransactionType};
+use saito_core::core::defs::{Currency, PrintForLog, Timestamp};
 
 use crate::saitowasm::{string_to_hex, string_to_key, SAITO};
 use crate::wasm_hop::WasmHop;
@@ -32,12 +32,11 @@ impl WasmTransaction {
 
     #[wasm_bindgen(getter = routing_path)]
     pub fn get_routing_path(&self) -> Array {
-        let array = Array::new();
-        for hop in &self.tx.path {
-            let wasm_hop = WasmHop::from_hop(hop.clone());
-            array.push(&JsValue::from(wasm_hop));
-        }
-        array
+        self.tx
+            .path
+            .iter()
+            .map(|path| JsValue::from(WasmHop::from_hop(path.clone())))
+            .collect::<Array>()
     }
 
     #[wasm_bindgen(setter = signature)]

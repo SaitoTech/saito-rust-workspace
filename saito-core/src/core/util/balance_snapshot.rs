@@ -3,8 +3,8 @@ use std::io::{BufRead, BufReader};
 
 use log::{debug, info};
 
-use crate::common::defs::{BlockId, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp};
-use crate::core::data::slip::{Slip, SlipType};
+use crate::core::consensus::slip::{Slip, SlipType};
+use crate::core::defs::{BlockId, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp};
 
 pub type BalanceFileRowType = (String, String, String, String);
 
@@ -198,10 +198,10 @@ impl TryFrom<String> for BalanceSnapshot {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::defs::PrintForLog;
     use log::info;
 
-    use crate::core::data::slip::{Slip, SlipType};
+    use crate::core::consensus::slip::{Slip, SlipType};
+    use crate::core::defs::PrintForLog;
     use crate::core::util::balance_snapshot::BalanceSnapshot;
 
     #[test]

@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
+use std::{fs, result};
 
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
@@ -7,11 +8,11 @@ use log::{error, trace};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::common::defs::{PeerIndex, PrintForLog, SaitoHash};
-use saito_core::common::interface_io::{InterfaceEvent, InterfaceIO};
-use saito_core::core::data::configuration::PeerConfig;
-use saito_core::core::data::peer_service::PeerService;
-use saito_core::core::data::wallet::Wallet;
+use saito_core::core::consensus::peer_service::PeerService;
+use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::defs::{PeerIndex, PrintForLog, SaitoHash};
+use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
+use saito_core::core::util::configuration::PeerConfig;
 
 use crate::wasm_peer_service::{WasmPeerService, WasmPeerServiceList};
 
@@ -106,6 +107,14 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
+    fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), std::io::Error> {
+        let result = MsgHandler::ensure_block_directory_exists(block_dir_path);
+        if result.is_err() {
+            return Err(Error::from(ErrorKind::Other));
+        }
+        Ok(())
+    }
+
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         let result = MsgHandler::read_value(key.clone());
         if result.is_err() {
@@ -153,7 +162,7 @@ impl InterfaceIO for WasmIoHandler {
     }
 
     async fn remove_value(&self, key: String) -> Result<(), Error> {
-        MsgHandler::remove_value(key);
+        let _ = MsgHandler::remove_value(key);
 
         Ok(())
     }
@@ -293,6 +302,9 @@ extern "C" {
     pub fn connect_to_peer(peer_data: JsValue) -> Result<JsValue, js_sys::Error>;
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn write_value(key: String, value: &Uint8Array);
+
+    #[wasm_bindgen(static_method_of = MsgHandler, catch)]
+    pub fn ensure_block_directory_exists(path: String) -> Result<(), js_sys::Error>;
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn read_value(key: String) -> Result<Uint8Array, js_sys::Error>;
