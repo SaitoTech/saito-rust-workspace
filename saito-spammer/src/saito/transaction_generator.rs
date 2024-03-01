@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
@@ -15,7 +16,6 @@ use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util::crypto::generate_random_bytes;
-use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_rust::saito::time_keeper::TimeKeeper;
 
 use crate::SpammerConfigs;
@@ -135,7 +135,7 @@ impl TransactionGenerator {
                     to_public_key = peer.1.public_key.clone().unwrap();
                     break;
                 }
-                assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+                assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
                 assert_ne!(to_public_key, self.public_key);
             }
             let mut txs: VecDeque<Transaction> = Default::default();
