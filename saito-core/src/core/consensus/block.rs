@@ -1,7 +1,7 @@
+use std::{i128, mem};
 use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;
-use std::{i128, mem};
 
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
@@ -14,11 +14,11 @@ use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
-use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
-use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::consensus::slip::{Slip, SLIP_SIZE, SlipType};
+use crate::core::consensus::transaction::{Transaction, TRANSACTION_SIZE, TransactionType};
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
+    BLOCK_FILE_EXTENSION, Currency, GENESIS_PERIOD, PrintForLog, SaitoHash, SaitoPrivateKey,
+    SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -419,7 +419,6 @@ impl Block {
         // update slips_spent_this_block so that we have a record of
         // how many times input slips are spent in this block. we will
         // use this later to ensure there are no duplicates.
-        //
         for transaction in &block.transactions {
             if transaction.transaction_type != TransactionType::Fee {
                 for input in transaction.from.iter() {
@@ -434,7 +433,6 @@ impl Block {
         block.created_hashmap_of_slips_spent_this_block = true;
 
         // set difficulty
-        //
         block.difficulty = cv.expected_difficulty;
 
         // TODO - we should consider deleting the treasury, if we do not use
@@ -2052,7 +2050,7 @@ mod tests {
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD};
+    use crate::core::defs::{Currency, GENESIS_PERIOD, SaitoHash, SaitoPrivateKey, SaitoPublicKey};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
     use crate::core::util::test::test_manager::test::TestManager;

@@ -8,6 +8,7 @@ use primitive_types::U256;
 use rayon::prelude::*;
 use tokio::sync::RwLock;
 
+use crate::{iterate, lock_for_read};
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::burnfee::BurnFee;
@@ -20,7 +21,6 @@ use crate::core::defs::{
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
-use crate::{iterate, lock_for_read};
 
 //
 // In addition to responding to global broadcast messages, the
@@ -161,9 +161,16 @@ impl Mempool {
         let previous_block_hash: SaitoHash;
         let public_key;
         let private_key;
+        let block_timestamp_gap;
         {
             let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
             previous_block_hash = blockchain.get_latest_block_hash();
+            let previous_block_timestamp = match blockchain.get_latest_block() {
+                None => 0,
+                Some(block) => block.timestamp,
+            };
+            block_timestamp_gap =
+                Duration::from_millis(current_timestamp - previous_block_timestamp).as_secs();
             public_key = wallet.public_key;
             private_key = wallet.private_key;
         }
@@ -171,9 +178,10 @@ impl Mempool {
             .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs, &public_key)
             .await?;
         info!(
-            "bundling block with {:?} txs with work : {:?}",
+            "bundling block with {:?} txs with work : {:?} with a gap of {:?} seconds",
             self.transactions.len(),
-            mempool_work
+            mempool_work,
+            block_timestamp_gap
         );
         let mut block = Block::create(
             &mut self.transactions,
@@ -351,15 +359,15 @@ mod tests {
 
     use tokio::sync::RwLock;
 
+    use crate::{lock_for_read, lock_for_write};
     use crate::core::consensus::burnfee::HEARTBEAT;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{SaitoPrivateKey, SaitoPublicKey};
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
-    use crate::{lock_for_read, lock_for_write};
 
     use super::*;
 
-    // #[test]
+// #[test]
     // fn mempool_new_test() {
     //     let mempool = Mempool::new([0; 33], [0; 32]);
     //     assert_eq!(mempool.blocks_queue, VecDeque::new());
