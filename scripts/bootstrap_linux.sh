@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+BASE_PATH="$SCRIPT_DIR/../saito-rust"
+
 command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
