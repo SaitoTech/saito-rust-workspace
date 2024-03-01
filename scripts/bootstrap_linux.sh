@@ -24,7 +24,6 @@ ask_permission() {
 missing_packages=()
 
 
-! command_exists rustc && ! command_exists cargo && missing_packages+=("Rust")
 
 
 

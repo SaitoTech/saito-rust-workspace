@@ -676,7 +676,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         thread_sleep_time_in_ms,
     )
     .await;
-    let loop_handle = run_loop_thread(
+    let loop_handle: JoinHandle<()> = run_loop_thread(
         event_receiver_in_loop,
         network_event_sender_to_routing,
         stat_timer_in_ms,
