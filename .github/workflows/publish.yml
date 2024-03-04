@@ -96,6 +96,12 @@ jobs:
       - name: Build documentation
         run: cargo doc --no-deps
 
+      - name: Fix permissions
+        run: |
+          chmod -c -R +rX "target/doc/" | while read line; do
+            echo "::warning title=Invalid file permissions automatically fixed::$line"
+          done
+
       - name: Upload Documentation to github pages
         uses: actions/upload-pages-artifact@v3
         with:
