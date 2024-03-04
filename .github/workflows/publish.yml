@@ -96,6 +96,9 @@ jobs:
       - name: Build documentation
         run: cargo doc --no-deps
 
+      - name: Copy index.html file
+        run: cp .github/workflows/doc_index.template.html target/doc/index.html
+
       - name: Fix permissions
         run: |
           chmod -c -R +rX "target/doc/" | while read line; do
