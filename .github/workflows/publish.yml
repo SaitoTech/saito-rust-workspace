@@ -2,13 +2,8 @@ name: publish
 
 on:
   push:
-    branches: [ prod, master ]
-#  pull_request:
-#    branches: [ develop ]
-#  workflow_run:
-#    workflows: [ "Build Rust" ]
-#    types: [ completed ]
-#    branches: [ release/*** ]
+    branches: [ master ]
+
 
 jobs:
   build_and_publish:
@@ -20,7 +15,7 @@ jobs:
 
       - name: Install moreutils for sponge
         run: sudo apt-get install -y moreutils
-        
+
       - name: Update versions
         run: ./scripts/update_version.sh
         shell: bash
@@ -101,16 +96,10 @@ jobs:
       - name: Build documentation
         run: cargo doc --no-deps
 
-      - name: Upload Documentation Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: "saito-docs"
-          path: "target/doc"
-          
       - name: Upload Documentation to github pages
         uses: actions/upload-pages-artifact@v2
-        with: 
-            path: "target/doc"
+        with:
+          path: "target/doc"
 
       - name: get latest saito-js version
         run: |
@@ -155,3 +144,19 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: saito-js/dist
+  deploy_docs:
+    needs: build_and_publish
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
