@@ -189,18 +189,17 @@ impl Message {
                     );
                     return Err(Error::from(ErrorKind::InvalidData));
                 }
-                let key_count = buffer.len() / 33; // Use division here instead of modulo
+                let key_count = buffer.len() / 33;
                 let mut keylist: Vec<SaitoPublicKey> = vec![];
                 let slice = buffer.as_slice();
 
                 for i in 0..key_count {
-                    // Correct the slice range to properly iterate through each key
                     let key: SaitoPublicKey =
                         slice[i * 33..(i + 1) * 33].to_vec().try_into().unwrap();
 
                     keylist.push(key);
                 }
-                debug!("this is the buffer key  {:?}", keylist);
+                debug!("keylists  {:?}", keylist);
                 Ok(Message::KeyListUpdate(keylist))
             }
             _ => {

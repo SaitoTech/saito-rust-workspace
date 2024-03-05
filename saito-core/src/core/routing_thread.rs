@@ -208,8 +208,6 @@ impl RoutingThread {
                 for key in key_list.iter() {
                     public_keys.push(key.to_base58().to_string())
                 }
-
-                debug!("publickeys {:?}", public_keys);
                 self.network
                     .handle_received_key_list(peer_index, key_list)
                     .await;
@@ -317,7 +315,6 @@ impl RoutingThread {
             lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
 
         wallet.set_key_list(key_list);
-        debug!("this is the keylister {:?}", wallet.key_list);
         self.network.send_key_list(&wallet.key_list).await;
     }
 
