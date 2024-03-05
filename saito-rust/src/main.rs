@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
-use log::{debug, error, trace};
 use log::info;
+use log::{debug, error, trace};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -17,11 +17,10 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
-use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
-use saito_core::{lock_for_read, lock_for_write};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
@@ -29,8 +28,8 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    Currency, PrintForLog, PROJECT_PUBLIC_KEY, SaitoPrivateKey, SaitoPublicKey, STAT_BIN_COUNT,
-    StatVariable,
+    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, PROJECT_PUBLIC_KEY,
+    STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -44,6 +43,7 @@ use saito_core::core::routing_thread::{
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
+use saito_core::{lock_for_read, lock_for_write};
 use saito_rust::config_handler::{ConfigHandler, NodeConfigurations};
 use saito_rust::io_event::IoEvent;
 use saito_rust::network_controller::run_network_controller;
@@ -55,6 +55,30 @@ const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
+/// Runs a permanent thread with an event loop
+///
+/// This thread will have,
+/// 1. an event loop which processes incoming events
+/// 2. a timer functionality which fires for each iteration of the event loop
+///
+/// If any work is done in the event loop, it will immediately begin the next iteration after this one.
+/// If no work is done in the current iteration, it will go to sleep **thread_sleep_time_in_ms** amount of time
+///
+/// # Arguments
+///
+/// * `event_processor`:
+/// * `network_event_receiver`:
+/// * `event_receiver`:
+/// * `stat_timer_in_ms`:
+/// * `thread_sleep_time_in_ms`:
+///
+/// returns: JoinHandle<()>
+///
+/// # Examples
+///
+/// ```
+///
+/// ```
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
     mut network_event_receiver: Option<Receiver<NetworkEvent>>,
