@@ -1,7 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::io::{Error, ErrorKind};
 
-
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{error, trace};
