@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-BASE_PATH="$SCRIPT_DIR/../saito-rust"
+BASE_PATH="$SCRIPT_DIR/../"
+
+if [ -f "$BASE_PATH/target/debug/saito-rust" ]; then
+  exit 0
+fi
 
 
 command_exists() {

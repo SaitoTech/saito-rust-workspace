@@ -3,7 +3,10 @@
 # Get the directory where the script is located
 SCRIPT_DIR=$(dirname "$0")
 
+
 BASE_PATH="$SCRIPT_DIR/../saito-rust"
+
+echo "$BASE_PATH"
 
 # Setup config
 CONFIG_PATH="$BASE_PATH/configs/config.json"
