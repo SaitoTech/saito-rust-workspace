@@ -307,7 +307,9 @@ impl RoutingThread {
         self.network.handle_peer_disconnect(peer_index).await;
     }
     pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
-        let mut wallet = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        let mut wallet: tokio::sync::RwLockWriteGuard<'_, Wallet> =
+            lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+
         wallet.set_key_list(key_list);
         self.network.send_key_list(&wallet.key_list).await;
     }
