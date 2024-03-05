@@ -204,10 +204,6 @@ impl RoutingThread {
                     .await;
             }
             Message::KeyListUpdate(key_list) => {
-                let mut public_keys: Vec<String> = vec![];
-                for key in key_list.iter() {
-                    public_keys.push(key.to_base58().to_string())
-                }
                 self.network
                     .handle_received_key_list(peer_index, key_list)
                     .await;
