@@ -1,6 +1,7 @@
+use std::fmt::Debug;
 use std::io::{Error, ErrorKind};
 
-use log::{error, trace, warn};
+use log::{debug, error, trace, warn};
 
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::peer_service::PeerService;
@@ -188,13 +189,18 @@ impl Message {
                     );
                     return Err(Error::from(ErrorKind::InvalidData));
                 }
-                let key_count = buffer.len() % 33;
-                let mut keylist = vec![];
+                let key_count = buffer.len() / 33; // Use division here instead of modulo
+                let mut keylist: Vec<SaitoPublicKey> = vec![];
                 let slice = buffer.as_slice();
+
                 for i in 0..key_count {
-                    let key: SaitoPublicKey = slice[i * 33..33].to_vec().try_into().unwrap();
+                    // Correct the slice range to properly iterate through each key
+                    let key: SaitoPublicKey =
+                        slice[i * 33..(i + 1) * 33].to_vec().try_into().unwrap();
+
                     keylist.push(key);
                 }
+                debug!("this is the buffer key  {:?}", keylist);
                 Ok(Message::KeyListUpdate(keylist))
             }
             _ => {

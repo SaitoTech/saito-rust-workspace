@@ -364,8 +364,11 @@ impl Network {
             return;
         }
         let peer = peer.unwrap();
+
         peer.key_list = key_list;
+        debug!("peer.keylist {:?}", peer.key_list);
     }
+
     pub async fn send_key_list(&self, key_list: &Vec<SaitoPublicKey>) {
         debug!("sending key list to all the peers");
         self.io_interface

@@ -204,6 +204,12 @@ impl RoutingThread {
                     .await;
             }
             Message::KeyListUpdate(key_list) => {
+                let mut public_keys: Vec<String> = vec![];
+                for key in key_list.iter() {
+                    public_keys.push(key.to_base58().to_string())
+                }
+
+                debug!("publickeys {:?}", public_keys);
                 self.network
                     .handle_received_key_list(peer_index, key_list)
                     .await;
@@ -307,8 +313,11 @@ impl RoutingThread {
         self.network.handle_peer_disconnect(peer_index).await;
     }
     pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
-        let mut wallet = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        let mut wallet: tokio::sync::RwLockWriteGuard<'_, Wallet> =
+            lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+
         wallet.set_key_list(key_list);
+        debug!("this is the keylister {:?}", wallet.key_list);
         self.network.send_key_list(&wallet.key_list).await;
     }
 
