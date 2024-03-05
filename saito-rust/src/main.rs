@@ -44,17 +44,41 @@ use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::{lock_for_read, lock_for_write};
-use saito_rust::saito::config_handler::{ConfigHandler, NodeConfigurations};
-use saito_rust::saito::io_event::IoEvent;
-use saito_rust::saito::network_controller::run_network_controller;
-use saito_rust::saito::rust_io_handler::RustIOHandler;
-use saito_rust::saito::stat_thread::StatThread;
-use saito_rust::saito::time_keeper::TimeKeeper;
+use saito_rust::config_handler::{ConfigHandler, NodeConfigurations};
+use saito_rust::io_event::IoEvent;
+use saito_rust::network_controller::run_network_controller;
+use saito_rust::rust_io_handler::RustIOHandler;
+use saito_rust::stat_thread::StatThread;
+use saito_rust::time_keeper::TimeKeeper;
 
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
+/// Runs a permanent thread with an event loop
+///
+/// This thread will have,
+/// 1. an event loop which processes incoming events
+/// 2. a timer functionality which fires for each iteration of the event loop
+///
+/// If any work is done in the event loop, it will immediately begin the next iteration after this one.
+/// If no work is done in the current iteration, it will go to sleep **thread_sleep_time_in_ms** amount of time
+///
+/// # Arguments
+///
+/// * `event_processor`:
+/// * `network_event_receiver`:
+/// * `event_receiver`:
+/// * `stat_timer_in_ms`:
+/// * `thread_sleep_time_in_ms`:
+///
+/// returns: JoinHandle<()>
+///
+/// # Examples
+///
+/// ```
+///
+/// ```
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
     mut network_event_receiver: Option<Receiver<NetworkEvent>>,

@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
-use std::path::Path;
+
 use std::sync::Arc;
 
 use ahash::AHashMap;
