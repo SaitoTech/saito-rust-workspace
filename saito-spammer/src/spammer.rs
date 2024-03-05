@@ -14,10 +14,10 @@ use saito_core::core::defs::Currency;
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::msg::message::Message;
 use saito_core::lock_for_read;
+use saito_rust::io_event::IoEvent;
 
-use crate::saito::config_handler::SpammerConfigs;
-use crate::saito::transaction_generator::{GeneratorState, TransactionGenerator};
-use crate::IoEvent;
+use crate::config_handler::SpammerConfigs;
+use crate::transaction_generator::{GeneratorState, TransactionGenerator};
 
 pub struct Spammer {
     sender_to_network: Sender<IoEvent>,

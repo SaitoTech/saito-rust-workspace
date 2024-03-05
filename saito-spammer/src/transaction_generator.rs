@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
@@ -15,10 +16,9 @@ use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util::crypto::generate_random_bytes;
-use saito_core::{drain, lock_for_read, lock_for_write};
-use saito_rust::saito::time_keeper::TimeKeeper;
+use saito_rust::time_keeper::TimeKeeper;
 
-use crate::SpammerConfigs;
+use crate::config_handler::SpammerConfigs;
 
 #[derive(Clone, PartialEq)]
 pub enum GeneratorState {

@@ -4,16 +4,16 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use log::info;
 use log::{debug, error, trace};
+use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
@@ -21,9 +21,8 @@ use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-
 use saito_core::core::defs::{
-    PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+    PrintForLog, SaitoPrivateKey, SaitoPublicKey, STAT_BIN_COUNT, StatVariable,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -37,17 +36,13 @@ use saito_core::core::routing_thread::{
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_core::lock_for_read;
-use saito_rust::saito::io_event::IoEvent;
-use saito_rust::saito::network_controller::run_network_controller;
-use saito_rust::saito::rust_io_handler::RustIOHandler;
-use saito_rust::saito::stat_thread::StatThread;
-use saito_rust::saito::time_keeper::TimeKeeper;
-
-use crate::saito::config_handler::{ConfigHandler, SpammerConfigs};
-// use crate::saito::rust_io_handler::RustIOHandler;
-use crate::saito::spammer::run_spammer;
-
-mod saito;
+use saito_rust::io_event::IoEvent;
+use saito_rust::network_controller::run_network_controller;
+use saito_rust::rust_io_handler::RustIOHandler;
+use saito_rust::stat_thread::StatThread;
+use saito_rust::time_keeper::TimeKeeper;
+use saito_spammer::config_handler::{ConfigHandler, SpammerConfigs};
+use saito_spammer::spammer::run_spammer;
 
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;

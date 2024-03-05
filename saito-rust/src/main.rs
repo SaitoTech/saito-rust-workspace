@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
-use log::info;
 use log::{debug, error, trace};
+use log::info;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -17,10 +17,11 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
+use saito_core::{lock_for_read, lock_for_write};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
@@ -28,8 +29,8 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, PROJECT_PUBLIC_KEY,
-    STAT_BIN_COUNT,
+    Currency, PrintForLog, PROJECT_PUBLIC_KEY, SaitoPrivateKey, SaitoPublicKey, STAT_BIN_COUNT,
+    StatVariable,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -43,13 +44,12 @@ use saito_core::core::routing_thread::{
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::{lock_for_read, lock_for_write};
-use saito_rust::saito::config_handler::{ConfigHandler, NodeConfigurations};
-use saito_rust::saito::io_event::IoEvent;
-use saito_rust::saito::network_controller::run_network_controller;
-use saito_rust::saito::rust_io_handler::RustIOHandler;
-use saito_rust::saito::stat_thread::StatThread;
-use saito_rust::saito::time_keeper::TimeKeeper;
+use saito_rust::config_handler::{ConfigHandler, NodeConfigurations};
+use saito_rust::io_event::IoEvent;
+use saito_rust::network_controller::run_network_controller;
+use saito_rust::rust_io_handler::RustIOHandler;
+use saito_rust::stat_thread::StatThread;
+use saito_rust::time_keeper::TimeKeeper;
 
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
