@@ -1,7 +1,7 @@
 use std::io::{Error, ErrorKind};
 
-use figment::Figment;
 use figment::providers::{Format, Json};
+use figment::Figment;
 use log::{debug, error};
 use serde::Deserialize;
 
