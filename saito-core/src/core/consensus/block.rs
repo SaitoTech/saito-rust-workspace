@@ -1,7 +1,7 @@
+use std::{i128, mem};
 use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;
-use std::{i128, mem};
 
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
@@ -14,11 +14,11 @@ use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
-use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
-use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::consensus::slip::{Slip, SLIP_SIZE, SlipType};
+use crate::core::consensus::transaction::{Transaction, TRANSACTION_SIZE, TransactionType};
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
+    BLOCK_FILE_EXTENSION, Currency, GENESIS_PERIOD, PrintForLog, SaitoHash, SaitoPrivateKey,
+    SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -840,7 +840,10 @@ impl Block {
         // update block with total fees
         //
         self.total_fees = cumulative_fees;
-  println!("updating block with total cumulative fees: {:?}", self.total_fees);
+        println!(
+            "updating block with total cumulative fees: {:?}",
+            self.total_fees
+        );
         self.total_work = total_work;
 
         true
@@ -1406,7 +1409,9 @@ impl Block {
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
-            self.avg_nolan_rebroadcast_per_block.to_be_bytes().as_slice(),
+            self.avg_nolan_rebroadcast_per_block
+                .to_be_bytes()
+                .as_slice(),
             self.previous_block_unpaid.to_be_bytes().as_slice(),
         ]
         .concat()
@@ -1457,7 +1462,9 @@ impl Block {
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
-            self.avg_nolan_rebroadcast_per_block.to_be_bytes().as_slice(),
+            self.avg_nolan_rebroadcast_per_block
+                .to_be_bytes()
+                .as_slice(),
             self.previous_block_unpaid.to_be_bytes().as_slice(),
             tx_buf.as_slice(),
         ]
@@ -1843,14 +1850,14 @@ impl Block {
                     golden_ticket.public_key,
                 );
 
-		//
-		// if there is a golden ticket, our previous_block_unpaid should be
-		// zero, as we will have issued payment in this block.
-		//
-        	if self.previous_block_unpaid != 0 {
-        	    error!("ERROR 720351: golden ticket but previous block incorrect");
-        	    return false;
-        	}
+                //
+                // if there is a golden ticket, our previous_block_unpaid should be
+                // zero, as we will have issued payment in this block.
+                //
+                if self.previous_block_unpaid != 0 {
+                    error!("ERROR 720351: golden ticket but previous block incorrect");
+                    return false;
+                }
 
                 if !gt.validate(previous_block.difficulty) {
                     error!(
@@ -1872,20 +1879,17 @@ impl Block {
                     return false;
                 }
             } else {
-
-		//
-		// if there is no golden ticket, our previous block's total_fees will
-		// be stored in this block as previous_block_unpaid. this simplifies
-		// smoothing payouts, and assists with monitoring that the total token
-		// supply has not changed.
-		//
-        	if self.previous_block_unpaid != previous_block.total_fees {
-        	    error!("ERROR 572983: previous_block_unpaid value incorrect");
-        	    return false;
-        	}
-
-
-	    }
+                //
+                // if there is no golden ticket, our previous block's total_fees will
+                // be stored in this block as previous_block_unpaid. this simplifies
+                // smoothing payouts, and assists with monitoring that the total token
+                // supply has not changed.
+                //
+                if self.previous_block_unpaid != previous_block.total_fees {
+                    error!("ERROR 572983: previous_block_unpaid value incorrect");
+                    return false;
+                }
+            }
             // trace!(" ... golden ticket: (validated)  {:?}", create_timestamp());
         }
 
@@ -2058,7 +2062,7 @@ mod tests {
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD};
+    use crate::core::defs::{Currency, GENESIS_PERIOD, SaitoHash, SaitoPrivateKey, SaitoPublicKey};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
     use crate::core::util::test::test_manager::test::TestManager;
@@ -2136,7 +2140,7 @@ mod tests {
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 169);
+        assert_eq!(serialized_body.len(), 177);
 
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
