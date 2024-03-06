@@ -477,7 +477,7 @@ pub mod test {
 		    //
 		    // spendable supply adjusted
 		    //
-		    let mut new_spendable_supply = spendable_supply as i128 + current_block_net_change_in_utxo as i128;
+		    let new_spendable_supply = spendable_supply as i128 + current_block_net_change_in_utxo as i128;
 
 		    //
 		    // how many tokens are unaccounted for?
