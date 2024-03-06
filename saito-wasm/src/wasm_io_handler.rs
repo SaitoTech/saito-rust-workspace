@@ -4,8 +4,8 @@ use std::io::{Error, ErrorKind};
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{error, trace};
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use saito_core::core::consensus::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
@@ -109,6 +109,7 @@ impl InterfaceIO for WasmIoHandler {
     fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), std::io::Error> {
         let result = MsgHandler::ensure_block_directory_exists(block_dir_path);
         if result.is_err() {
+            error!("{:?}", result.err().unwrap());
             return Err(Error::from(ErrorKind::Other));
         }
         Ok(())
