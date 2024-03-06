@@ -4,8 +4,8 @@ use std::io::{Error, ErrorKind};
 use async_trait::async_trait;
 use js_sys::{Array, BigInt, Boolean, Uint8Array};
 use log::{error, trace};
-use wasm_bindgen::JsValue;
 use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsValue;
 
 use saito_core::core::consensus::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
