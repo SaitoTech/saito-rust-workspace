@@ -768,8 +768,6 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     let _peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
-    let (_sender_to_miner, _receiver_for_miner) = tokio::sync::mpsc::channel::<MiningEvent>(100);
-
     let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
 
     let mut blockchain = lock_for_write!(context.blockchain, LOCK_ORDER_BLOCKCHAIN);
@@ -882,7 +880,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_hook();
 
     if program_mode == "node" {
-        let config_file = matches.value_of("config").unwrap_or("configs/config.json");
+        let config_file = matches.value_of("config").unwrap_or("config/config.json");
         info!("Using config file: {}", config_file.to_string());
         let configs = ConfigHandler::load_configs(config_file.to_string());
         if configs.is_err() {
