@@ -25,7 +25,7 @@ use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 237;
+pub const BLOCK_HEADER_SIZE: usize = 245;
 
 //
 // object used when generating and validation transactions, containing the
@@ -182,6 +182,7 @@ pub struct Block {
     pub avg_income: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
+    pub previous_block_unpaid: Currency,
 
     /// Transactions
     ///
@@ -264,6 +265,7 @@ impl Block {
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
+            previous_block_unpaid: 0,
             transactions: vec![],
             pre_hash: [0; 32],
             hash: [0; 32],
@@ -321,6 +323,7 @@ impl Block {
         let mut previous_block_difficulty = 0;
         let mut previous_block_treasury = 0;
         let mut previous_block_staking_treasury = 0;
+        let mut previous_block_total_fees = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
             previous_block_id = previous_block.id;
@@ -329,6 +332,7 @@ impl Block {
             previous_block_difficulty = previous_block.difficulty;
             previous_block_treasury = previous_block.limbo;
             previous_block_staking_treasury = previous_block.treasury;
+            previous_block_total_fees = previous_block.total_fees;
         }
 
         let mut block = Block::new();
@@ -345,10 +349,12 @@ impl Block {
         block.timestamp = current_timestamp;
         block.difficulty = previous_block_difficulty;
         block.creator = *public_key;
+        block.previous_block_unpaid = previous_block_total_fees;
 
         if golden_ticket.is_some() {
             debug!("golden ticket found. adding to block.");
             block.transactions.push(golden_ticket.unwrap());
+            block.previous_block_unpaid = 0;
         }
         debug!("adding {:?} transactions to the block", transactions.len());
         block.transactions.reserve(transactions.len());
@@ -522,6 +528,8 @@ impl Block {
             Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
         let avg_nolan_rebroadcast_per_block: Currency =
             Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
+        let previous_block_unpaid: Currency = 
+            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -588,6 +596,7 @@ impl Block {
         block.avg_income = avg_income;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
+        block.previous_block_unpaid = previous_block_unpaid;
         block.transactions = transactions.to_vec();
 
         debug!("block.deserialize tx length = {:?}", transactions_len);
@@ -744,6 +753,7 @@ impl Block {
             let transaction = &mut self.transactions[i];
 
             cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
+
             total_work += transaction.total_work_for_me;
 
             //
@@ -809,6 +819,7 @@ impl Block {
         // update block with total fees
         //
         self.total_fees = cumulative_fees;
+  println!("updating block with total cumulative fees: {:?}", self.total_fees);
         self.total_work = total_work;
 
         true
@@ -1374,9 +1385,8 @@ impl Block {
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
-            self.avg_nolan_rebroadcast_per_block
-                .to_be_bytes()
-                .as_slice(),
+            self.avg_nolan_rebroadcast_per_block.to_be_bytes().as_slice(),
+            self.previous_block_unpaid.to_be_bytes().as_slice(),
         ]
         .concat()
     }
@@ -1426,9 +1436,8 @@ impl Block {
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
-            self.avg_nolan_rebroadcast_per_block
-                .to_be_bytes()
-                .as_slice(),
+            self.avg_nolan_rebroadcast_per_block.to_be_bytes().as_slice(),
+            self.previous_block_unpaid.to_be_bytes().as_slice(),
             tx_buf.as_slice(),
         ]
         .concat();
@@ -1812,6 +1821,16 @@ impl Block {
                     golden_ticket.random,
                     golden_ticket.public_key,
                 );
+
+		//
+		// if there is a golden ticket, our previous_block_unpaid should be
+		// zero, as we will have issued payment in this block.
+		//
+        	if self.previous_block_unpaid != 0 {
+        	    error!("ERROR 720351: golden ticket but previous block incorrect");
+        	    return false;
+        	}
+
                 if !gt.validate(previous_block.difficulty) {
                     error!(
                         "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}",
@@ -1831,7 +1850,21 @@ impl Block {
                     );
                     return false;
                 }
-            }
+            } else {
+
+		//
+		// if there is no golden ticket, our previous block's total_fees will 
+		// be stored in this block as previous_block_unpaid. this simplifies 
+		// smoothing payouts, and assists with monitoring that the total token
+		// supply has not changed.
+		//
+        	if self.previous_block_unpaid != previous_block.total_fees {
+        	    error!("ERROR 572983: previous_block_unpaid value incorrect");
+        	    return false;
+        	}
+
+
+	    }
             // trace!(" ... golden ticket: (validated)  {:?}", create_timestamp());
         }
 
