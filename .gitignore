@@ -4,4 +4,4 @@ target/
 dist/
 .DS_Store
 .vscode
-configs/config.json
+config/config.json

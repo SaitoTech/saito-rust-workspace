@@ -25,7 +25,7 @@ use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 237;
+pub const BLOCK_HEADER_SIZE: usize = 245;
 
 //
 // object used when generating and validation transactions, containing the
@@ -175,13 +175,14 @@ pub struct Block {
     pub merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
     pub signature: [u8; 64],
-    pub treasury: Currency,
+    pub limbo: Currency,
     pub burnfee: Currency,
     pub difficulty: u64,
-    pub staking_treasury: Currency,
+    pub treasury: Currency,
     pub avg_income: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
+    pub previous_block_unpaid: Currency,
 
     /// Transactions
     ///
@@ -257,13 +258,14 @@ impl Block {
             creator: [0; 33],
             merkle_root: [0; 32],
             signature: [0; 64],
-            treasury: 0,
+            limbo: 0,
             burnfee: 0,
             difficulty: 0,
-            staking_treasury: 0,
+            treasury: 0,
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
+            previous_block_unpaid: 0,
             transactions: vec![],
             pre_hash: [0; 32],
             hash: [0; 32],
@@ -321,14 +323,16 @@ impl Block {
         let mut previous_block_difficulty = 0;
         let mut previous_block_treasury = 0;
         let mut previous_block_staking_treasury = 0;
+        let mut previous_block_total_fees = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
             previous_block_id = previous_block.id;
             previous_block_burnfee = previous_block.burnfee;
             previous_block_timestamp = previous_block.timestamp;
             previous_block_difficulty = previous_block.difficulty;
-            previous_block_treasury = previous_block.treasury;
-            previous_block_staking_treasury = previous_block.staking_treasury;
+            previous_block_treasury = previous_block.limbo;
+            previous_block_staking_treasury = previous_block.treasury;
+            previous_block_total_fees = previous_block.total_fees;
         }
 
         let mut block = Block::new();
@@ -345,10 +349,12 @@ impl Block {
         block.timestamp = current_timestamp;
         block.difficulty = previous_block_difficulty;
         block.creator = *public_key;
+        block.previous_block_unpaid = previous_block_total_fees;
 
         if golden_ticket.is_some() {
             debug!("golden ticket found. adding to block.");
             block.transactions.push(golden_ticket.unwrap());
+            block.previous_block_unpaid = 0;
         }
         debug!("adding {:?} transactions to the block", transactions.len());
         block.transactions.reserve(transactions.len());
@@ -438,20 +444,20 @@ impl Block {
         // TODO - we should consider deleting the treasury, if we do not use
         // it as a catch for any tokens removed for blocks where payouts
         // exceed variance permitted and payouts are deducted downwards.
-        block.treasury = 0;
+        block.limbo = 0;
 
         // adjust staking treasury
         if cv.staking_payout != 0 {
             debug!(
                 "adding staking payout : {:?} to treasury : {:?}",
-                cv.staking_payout, block.staking_treasury
+                cv.staking_payout, block.treasury
             );
-            block.staking_treasury += cv.staking_payout;
+            block.treasury += cv.staking_payout;
         }
         if cv.total_rebroadcast_staking_payouts_nolan != 0
-            && block.staking_treasury >= cv.total_rebroadcast_staking_payouts_nolan
+            && block.treasury >= cv.total_rebroadcast_staking_payouts_nolan
         {
-            block.staking_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
+            block.treasury -= cv.total_rebroadcast_staking_payouts_nolan;
         }
 
         // generate merkle root
@@ -530,41 +536,18 @@ impl Block {
             .try_into()
             .or(Err(Error::from(ErrorKind::InvalidData)))?;
 
-        let treasury: Currency = Currency::from_be_bytes(
-            bytes[181..189]
-                .try_into()
-                .or(Err(Error::from(ErrorKind::InvalidData)))?,
-        );
-        let staking_treasury: Currency = Currency::from_be_bytes(
-            bytes[189..197]
-                .try_into()
-                .or(Err(Error::from(ErrorKind::InvalidData)))?,
-        );
-        let burnfee: Currency = Currency::from_be_bytes(
-            bytes[197..205]
-                .try_into()
-                .or(Err(Error::from(ErrorKind::InvalidData)))?,
-        );
-        let difficulty: u64 = u64::from_be_bytes(
-            bytes[205..213]
-                .try_into()
-                .or(Err(Error::from(ErrorKind::InvalidData)))?,
-        );
-        let avg_income: Currency = Currency::from_be_bytes(
-            bytes[213..221]
-                .try_into()
-                .or(Err(Error::from(ErrorKind::InvalidData)))?,
-        );
-        let avg_fee_per_byte: Currency = Currency::from_be_bytes(
-            bytes[221..229]
-                .try_into()
-                .or(Err(Error::from(ErrorKind::InvalidData)))?,
-        );
-        let avg_nolan_rebroadcast_per_block: Currency = Currency::from_be_bytes(
-            bytes[229..237]
-                .try_into()
-                .or(Err(Error::from(ErrorKind::InvalidData)))?,
-        );
+        let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
+        let staking_treasury: Currency =
+            Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
+        let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
+        let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
+        let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
+        let avg_fee_per_byte: Currency =
+            Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
+        let avg_nolan_rebroadcast_per_block: Currency =
+            Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
+        let previous_block_unpaid: Currency =
+            Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -627,13 +610,14 @@ impl Block {
         block.creator = creator;
         block.merkle_root = merkle_root;
         block.signature = signature;
-        block.treasury = treasury;
+        block.limbo = treasury;
         block.burnfee = burnfee;
         block.difficulty = difficulty;
-        block.staking_treasury = staking_treasury;
+        block.treasury = staking_treasury;
         block.avg_income = avg_income;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
+        block.previous_block_unpaid = previous_block_unpaid;
         block.transactions = transactions.to_vec();
 
         debug!("block.deserialize tx length = {:?}", transactions_len);
@@ -790,6 +774,7 @@ impl Block {
             let transaction = &mut self.transactions[i];
 
             cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
+
             total_work += transaction.total_work_for_me;
 
             //
@@ -855,6 +840,10 @@ impl Block {
         // update block with total fees
         //
         self.total_fees = cumulative_fees;
+        println!(
+            "updating block with total cumulative fees: {:?}",
+            self.total_fees
+        );
         self.total_work = total_work;
 
         true
@@ -1058,7 +1047,7 @@ impl Block {
                     // the value of the UTXO that are looping around the blockchain.
                     let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
                     let expected_utxo_payout = if expected_utxo_staked > 0 {
-                        self.staking_treasury / expected_utxo_staked
+                        self.treasury / expected_utxo_staked
                     } else {
                         0
                     };
@@ -1414,8 +1403,8 @@ impl Block {
             self.previous_block_hash.as_slice(),
             self.creator.as_slice(),
             self.merkle_root.as_slice(),
+            self.limbo.to_be_bytes().as_slice(),
             self.treasury.to_be_bytes().as_slice(),
-            self.staking_treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
@@ -1423,6 +1412,7 @@ impl Block {
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
                 .as_slice(),
+            self.previous_block_unpaid.to_be_bytes().as_slice(),
         ]
         .concat()
     }
@@ -1466,8 +1456,8 @@ impl Block {
             self.creator.as_slice(),
             self.merkle_root.as_slice(),
             self.signature.as_slice(),
+            self.limbo.to_be_bytes().as_slice(),
             self.treasury.to_be_bytes().as_slice(),
-            self.staking_treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
             self.avg_income.to_be_bytes().as_slice(),
@@ -1475,6 +1465,7 @@ impl Block {
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
                 .as_slice(),
+            self.previous_block_unpaid.to_be_bytes().as_slice(),
             tx_buf.as_slice(),
         ]
         .concat();
@@ -1646,8 +1637,8 @@ impl Block {
         block.creator = self.creator;
         block.burnfee = self.burnfee;
         block.difficulty = self.difficulty;
+        block.limbo = self.limbo;
         block.treasury = self.treasury;
-        block.staking_treasury = self.staking_treasury;
         block.signature = self.signature;
         block.avg_income = self.avg_income;
         block.hash = self.hash;
@@ -1778,7 +1769,7 @@ impl Block {
 
             // staking treasury
             //
-            let mut expected_staking_treasury = previous_block.staking_treasury;
+            let mut expected_staking_treasury = previous_block.treasury;
             expected_staking_treasury += cv.staking_payout;
             if expected_staking_treasury >= cv.total_rebroadcast_staking_payouts_nolan {
                 expected_staking_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
@@ -1786,10 +1777,10 @@ impl Block {
                 expected_staking_treasury = 0;
             }
 
-            if self.staking_treasury != expected_staking_treasury {
+            if self.treasury != expected_staking_treasury {
                 error!(
                     "ERROR 820391: staking treasury does not validate: {} expected versus {} found",
-                    expected_staking_treasury, self.staking_treasury,
+                    expected_staking_treasury, self.treasury,
                 );
                 return false;
             }
@@ -1799,12 +1790,12 @@ impl Block {
             // of deflationary pressures or attacks that push consensus into not issuing
             // a full payout.
             //
-            if self.treasury != 0 {
+            if self.limbo != 0 {
                 error!(
                     "ERROR 123243: treasury is positive. expected : {:?} + {:?} = {:?} actual : {:?} found",
-                    previous_block.treasury , 0 ,
-                    (previous_block.treasury + 0) ,
-                    self.treasury,
+                    previous_block.limbo , 0 ,
+                    (previous_block.limbo + 0) ,
+                    self.limbo,
                 );
                 return false;
             }
@@ -1858,6 +1849,16 @@ impl Block {
                     golden_ticket.random,
                     golden_ticket.public_key,
                 );
+
+                //
+                // if there is a golden ticket, our previous_block_unpaid should be
+                // zero, as we will have issued payment in this block.
+                //
+                if self.previous_block_unpaid != 0 {
+                    error!("ERROR 720351: golden ticket but previous block incorrect");
+                    return false;
+                }
+
                 if !gt.validate(previous_block.difficulty) {
                     error!(
                         "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}",
@@ -1875,6 +1876,17 @@ impl Block {
                         solution.to_hex(),
                         solution_num.leading_zeros()
                     );
+                    return false;
+                }
+            } else {
+                //
+                // if there is no golden ticket, our previous block's total_fees will
+                // be stored in this block as previous_block_unpaid. this simplifies
+                // smoothing payouts, and assists with monitoring that the total token
+                // supply has not changed.
+                //
+                if self.previous_block_unpaid != previous_block.total_fees {
+                    error!("ERROR 572983: previous_block_unpaid value incorrect");
                     return false;
                 }
             }
@@ -2065,7 +2077,7 @@ mod tests {
         assert_eq!(block.creator, [0; 33]);
         assert_eq!(block.merkle_root, [0; 32]);
         assert_eq!(block.signature, [0; 64]);
-        assert_eq!(block.treasury, 0);
+        assert_eq!(block.limbo, 0);
         assert_eq!(block.burnfee, 0);
         assert_eq!(block.difficulty, 0);
         assert_eq!(block.transactions, vec![]);
@@ -2123,12 +2135,12 @@ mod tests {
         .unwrap();
         block.burnfee = 50000000;
         block.difficulty = 0;
+        block.limbo = 0;
         block.treasury = 0;
-        block.staking_treasury = 0;
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 169);
+        assert_eq!(serialized_body.len(), 177);
 
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
@@ -2176,7 +2188,7 @@ mod tests {
         block.creator = [2; 33];
         block.merkle_root = [3; 32];
         block.signature = [4; 64];
-        block.treasury = 1_000_000;
+        block.limbo = 1_000_000;
         block.burnfee = 2;
         block.difficulty = 3;
         block.transactions = vec![mock_tx, mock_tx2];
@@ -2199,7 +2211,7 @@ mod tests {
         assert_eq!(deserialized_block.creator, [2; 33]);
         assert_eq!(deserialized_block.merkle_root, [3; 32]);
         assert_eq!(deserialized_block.signature, [4; 64]);
-        assert_eq!(deserialized_block.treasury, 1_000_000);
+        assert_eq!(deserialized_block.limbo, 1_000_000);
         assert_eq!(deserialized_block.burnfee, 2);
         assert_eq!(deserialized_block.difficulty, 3);
 
@@ -2214,7 +2226,7 @@ mod tests {
         assert_eq!(deserialized_block_header.creator, [2; 33]);
         assert_eq!(deserialized_block_header.merkle_root, [3; 32]);
         assert_eq!(deserialized_block_header.signature, [4; 64]);
-        assert_eq!(deserialized_block_header.treasury, 1_000_000);
+        assert_eq!(deserialized_block_header.limbo, 1_000_000);
         assert_eq!(deserialized_block_header.burnfee, 2);
         assert_eq!(deserialized_block_header.difficulty, 3);
     }
@@ -2231,10 +2243,11 @@ mod tests {
         block.generate_hash();
 
         assert_eq!(block.creator, wallet.public_key);
-        assert_eq!(
-            verify_signature(&block.pre_hash, &block.signature, &block.creator),
-            true
-        );
+        assert!(verify_signature(
+            &block.pre_hash,
+            &block.signature,
+            &block.creator,
+        ));
         assert_ne!(block.hash, [0; 32]);
         assert_ne!(block.signature, [0; 64]);
     }
@@ -2246,7 +2259,6 @@ mod tests {
         let wallet = Wallet::new(keys.1, keys.0);
 
         let transactions: Vec<Transaction> = (0..5)
-            .into_iter()
             .map(|_| {
                 let mut transaction = Transaction::default();
                 transaction.sign(&wallet.private_key);
@@ -2265,10 +2277,10 @@ mod tests {
     #[serial_test::serial]
     // downgrade and upgrade a block with transactions
     async fn block_downgrade_upgrade_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
         let wallet_lock = t.wallet_lock.clone();
         let mut block = Block::new();
-        let transactions = join_all((0..5).into_iter().map(|_| async {
+        let transactions = join_all((0..5).map(|_| async {
             let mut transaction = Transaction::default();
             let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
 
@@ -2289,14 +2301,14 @@ mod tests {
 
         let serialized_full_block = block.serialize_for_net(BlockType::Full);
         block
-            .update_block_to_block_type(BlockType::Pruned, &mut t.storage, false)
+            .update_block_to_block_type(BlockType::Pruned, &t.storage, false)
             .await;
 
         assert_eq!(block.transactions.len(), 0);
         assert_eq!(block.block_type, BlockType::Pruned);
 
         block
-            .update_block_to_block_type(BlockType::Full, &mut t.storage, false)
+            .update_block_to_block_type(BlockType::Full, &t.storage, false)
             .await;
 
         assert_eq!(block.transactions.len(), 5);
@@ -2310,7 +2322,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn generate_lite_block_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
 
         // test blocks with transactions
         // Block 1
@@ -2331,7 +2343,7 @@ mod tests {
             Storage::decode_str("s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR").unwrap();
         let mut to_public_key: SaitoPublicKey = [0u8; 33];
         to_public_key.copy_from_slice(&public_key);
-        t.transfer_value_to_public_key(to_public_key.clone(), 500, block1.timestamp + 120000)
+        t.transfer_value_to_public_key(to_public_key, 500, block1.timestamp + 120000)
             .await
             .unwrap();
         let block2 = t.get_latest_block().await;
@@ -2339,7 +2351,7 @@ mod tests {
         assert_eq!(lite_block2.signature, block2.clone().signature);
 
         // block 3
-        // Perform no transacton
+        // Perform no transaction
         let block2_hash = block2.hash;
         let mut block3 = t
             .create_block(
@@ -2358,7 +2370,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn verify_spv_transaction_in_lite_block_test() {
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
 
         // Initialize the test manager
         t.initialize(100, 100000).await;
@@ -2382,7 +2394,7 @@ mod tests {
 
         // Create VIP transactions
         for _ in 0..50 {
-            let public_key_ = Storage::decode_str(&_public_key).unwrap();
+            let public_key_ = Storage::decode_str(_public_key).unwrap();
             to_public_key.copy_from_slice(&public_key_);
             let mut tx = Transaction::default();
             tx.transaction_type = TransactionType::Normal;
@@ -2432,7 +2444,7 @@ mod tests {
     #[serial_test::serial]
     async fn avg_fee_per_byte_test() {
         // pretty_env_logger::init();
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
 
         // Initialize the test manager
         t.initialize(250, 10_000_000).await;
@@ -2507,12 +2519,12 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test() {
-        // pretty_env_logger::init();
+        pretty_env_logger::init();
 
         // create test manager
-        let mut t = TestManager::new();
+        let mut t = TestManager::default();
 
-        t.initialize(100, 10000).await;
+        t.initialize_with_timestamp(100, 10000, 0).await;
 
         // check if epoch length is 10
         assert_eq!(GENESIS_PERIOD, 10, "Genesis period is not 10");
@@ -2541,7 +2553,14 @@ mod tests {
         let latest_block = t.get_latest_block().await;
         let cv = latest_block.cv;
 
-        println!("cv : {:?}", cv);
+        println!("cv : {:?} \n", cv);
+
+        // TODO : check the values in the below asserts
+        // assert_eq!(cv.avg_income, 3290);
+        // assert_eq!(cv.total_fees, 5100);
+        // assert_eq!(cv.expected_burnfee, 1562500);
+        assert_eq!(cv.rebroadcasts.len(), 0);
+        assert_eq!(cv.avg_nolan_rebroadcast_per_block, 0);
 
         // add 11th block
         let mut block = t
@@ -2566,5 +2585,12 @@ mod tests {
         let cv = latest_block.cv;
 
         println!("cv2 : {:?}", cv);
+
+        // TODO : check the values in the below asserts
+        // assert_eq!(cv.avg_income, 3471);
+        // assert_eq!(cv.total_fees, 5100);
+        // assert_eq!(cv.expected_burnfee, 1104854);
+        assert_eq!(cv.rebroadcasts.len(), 1);
+        assert_eq!(cv.avg_nolan_rebroadcast_per_block, 10);
     }
 }
