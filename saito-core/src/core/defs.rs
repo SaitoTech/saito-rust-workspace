@@ -23,7 +23,6 @@ pub const NOLAN_PER_SAITO: Currency = 100_000_000;
 pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";
 
 #[cfg(test)]
-// length of 1 genesis period
 pub const GENESIS_PERIOD: u64 = 10;
 
 #[cfg(not(test))]
@@ -117,7 +116,9 @@ impl Drop for LockGuardWatcher {
 #[macro_export]
 macro_rules! lock_for_write {
     ($lock:expr, $order:expr) => {{
+        log::trace!("mutex : {:?} requested for write", $order);
         let l = $lock.write().await;
+        log::trace!("mutex : {:?} locked for write", $order);
         l
     }};
 }
@@ -125,7 +126,9 @@ macro_rules! lock_for_write {
 #[macro_export]
 macro_rules! lock_for_read {
     ($lock:expr, $order:expr) => {{
+        log::trace!("mutex : {:?} requested for read", $order);
         let l = $lock.read().await;
+        log::trace!("mutex : {:?} locked for read", $order);
         l
     }};
 }
@@ -246,12 +249,16 @@ impl StatVariable {
             .await
             .expect("failed sending stat update");
     }
-
+    pub fn format_timestamp(timestamp: Timestamp) -> String {
+        chrono::DateTime::from_timestamp_millis(timestamp as i64)
+            .unwrap()
+            .to_string()
+    }
     fn print(&self, current_time_in_ms: Timestamp) -> String {
         format!(
             // target : "saito_stats",
             "{} - {} - total : {:?}, current_rate : {:.2}, max_rate : {:.2}, min_rate : {:.2}",
-            current_time_in_ms,
+            Self::format_timestamp(current_time_in_ms),
             format!("{:width$}", self.name, width = 40),
             self.total,
             self.avg,

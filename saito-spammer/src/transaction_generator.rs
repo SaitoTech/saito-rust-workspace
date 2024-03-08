@@ -7,15 +7,18 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
+use saito_core::core::defs::{
+    Currency, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    SaitoPrivateKey, SaitoPublicKey,
+};
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util::crypto::generate_random_bytes;
-use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_rust::time_keeper::TimeKeeper;
 
 use crate::config_handler::SpammerConfigs;
@@ -86,7 +89,7 @@ impl TransactionGenerator {
     }
 
     pub fn get_state(&self) -> GeneratorState {
-        return self.state.clone();
+        self.state.clone()
     }
     pub async fn on_new_block(&mut self) {
         match self.state {
@@ -135,7 +138,7 @@ impl TransactionGenerator {
                     to_public_key = peer.1.public_key.clone().unwrap();
                     break;
                 }
-                assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+                // assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
                 assert_ne!(to_public_key, self.public_key);
             }
             let mut txs: VecDeque<Transaction> = Default::default();
@@ -170,12 +173,11 @@ impl TransactionGenerator {
                 total_output_slips_created, self.tx_count
             );
         } else {
-            trace!(
+            info!(
                 "not enough slips. unspent slip count : {:?} tx count : {:?} expected slips : {:?}",
-                unspent_slip_count,
-                self.tx_count,
-                self.expected_slip_count
+                unspent_slip_count, self.tx_count, self.expected_slip_count
             );
+            tokio::time::sleep(Duration::from_millis(1_000)).await;
         }
     }
 

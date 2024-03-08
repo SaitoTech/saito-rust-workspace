@@ -40,6 +40,7 @@ pub mod test {
     use tokio::sync::mpsc::{Receiver, Sender};
     use tokio::sync::RwLock;
 
+    use crate::{lock_for_read, lock_for_write};
     use crate::core::consensus::block::{Block, BlockType};
     use crate::core::consensus::blockchain::Blockchain;
     use crate::core::consensus::golden_ticket::GoldenTicket;
@@ -49,8 +50,9 @@ pub mod test {
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-        Timestamp, UtxoSet, PROJECT_PUBLIC_KEY,
+        Currency, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, PrintForLog,
+        PROJECT_PUBLIC_KEY, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+        Timestamp, UtxoSet,
     };
     use crate::core::io::network::Network;
     use crate::core::io::storage::Storage;
@@ -59,7 +61,6 @@ pub mod test {
     use crate::core::util::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::util::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
-    use crate::{lock_for_read, lock_for_write};
 
     pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
