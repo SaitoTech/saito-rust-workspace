@@ -1,5 +1,5 @@
 use ahash::{AHashMap, AHashSet};
-use log::{debug, info, trace, warn};
+use log::{info, trace, warn};
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::golden_ticket::GoldenTicket;

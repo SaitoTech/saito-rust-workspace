@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::{debug, info, trace};
+use log::{debug, info};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -14,7 +14,7 @@ use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::{
-    Currency, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    Currency, LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
     SaitoPrivateKey, SaitoPublicKey,
 };
 use saito_core::core::process::keep_time::KeepTime;
@@ -264,7 +264,7 @@ impl TransactionGenerator {
 
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet.clone();
-        let blockchain = self.blockchain.clone();
+        let _blockchain = self.blockchain.clone();
         let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
         let public_key = self.public_key;
         let count = self.tx_count;
