@@ -83,7 +83,12 @@ impl Spammer {
             let mut count = burst_count;
             loop {
                 if let Some(transactions) = receiver.recv().await {
-                    info!("received {:?} txs to be sent", transactions.len());
+                    info!(
+                        "received {:?} txs to be sent. sender capacity : {:?} / {:?}",
+                        transactions.len(),
+                        sender.capacity(),
+                        sender.max_capacity()
+                    );
                     for tx in transactions {
                         count -= 1;
                         total_count += 1;
@@ -109,8 +114,7 @@ impl Spammer {
                             std::process::exit(0);
                         }
                     }
-                } else {
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    info!("sent all the txs received from generator");
                 }
             }
         });

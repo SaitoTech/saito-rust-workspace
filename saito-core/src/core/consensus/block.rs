@@ -840,10 +840,10 @@ impl Block {
         // update block with total fees
         //
         self.total_fees = cumulative_fees;
-        println!(
-            "updating block with total cumulative fees: {:?}",
-            self.total_fees
-        );
+        // println!(
+        //     "updating block with total cumulative fees: {:?}",
+        //     self.total_fees
+        // );
         self.total_work = total_work;
 
         true
