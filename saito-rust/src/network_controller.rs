@@ -24,7 +24,9 @@ use saito_core::core::consensus::block::{Block, BlockType};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::defs::{
-    PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION, STAT_BIN_COUNT,
+    PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::process::keep_time::KeepTime;
@@ -105,9 +107,10 @@ impl NetworkController {
         buffer: Vec<u8>,
     ) {
         let buf_len = buffer.len();
-        debug!(
+        trace!(
             "sending outgoing message : peer = {:?} with size : {:?}",
-            peer_index, buf_len
+            peer_index,
+            buf_len
         );
         let mut sockets = sockets.lock().await;
         let socket = sockets.get_mut(&peer_index);
@@ -442,14 +445,34 @@ impl PeerCounter {
     }
 }
 
+///
+///
+/// # Arguments
+///
+/// * `receiver`:
+/// * `sender_to_core`:
+/// * `configs_lock`:
+/// * `blockchain_lock`:
+/// * `sender_to_stat`:
+/// * `peers_lock`:
+/// * `sender_to_network`: sender for this thread. only used for reading performance stats
+///
+/// returns: ()
+///
+/// # Examples
+///
+/// ```
+///
+/// ```
 // TODO : refactor to use ProcessEvent trait
 pub async fn run_network_controller(
     mut receiver: Receiver<IoEvent>,
-    sender: Sender<IoEvent>,
+    sender_to_core: Sender<IoEvent>,
     configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     blockchain_lock: Arc<RwLock<Blockchain>>,
     sender_to_stat: Sender<String>,
     peers_lock: Arc<RwLock<PeerCollection>>,
+    sender_to_network: Sender<IoEvent>,
 ) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -478,11 +501,11 @@ pub async fn run_network_controller(
     }
 
     info!("starting server on : {:?}", url);
-    let sender_clone = sender.clone();
+    let sender_clone = sender_to_core.clone();
 
     let network_controller_lock = Arc::new(RwLock::new(NetworkController {
         sockets: Arc::new(Mutex::new(HashMap::new())),
-        sender_to_saito_controller: sender,
+        sender_to_saito_controller: sender_to_core,
         peer_counter: peer_index_counter.clone(),
         currently_queried_urls: Arc::new(Default::default()),
     }));
@@ -503,13 +526,18 @@ pub async fn run_network_controller(
             STAT_BIN_COUNT,
             sender_to_stat.clone(),
         );
+        let stat_timer_in_ms;
+        let thread_sleep_time_in_ms;
+        {
+            let configs_temp = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+            stat_timer_in_ms = configs_temp.get_server_configs().unwrap().stat_timer_in_ms;
+            thread_sleep_time_in_ms = configs_temp
+                .get_server_configs()
+                .unwrap()
+                .thread_sleep_time_in_ms;
+        }
         let mut last_stat_on: Instant = Instant::now();
         loop {
-            // let command = Command::NetworkMessage(10, [1, 2, 3].to_vec());
-            //
-            // sender_to_saito_controller.send(command).await;
-            // info!("sending test message to saito controller");
-
             let result = receiver.recv().await;
             if result.is_some() {
                 let event = result.unwrap();
@@ -610,12 +638,8 @@ pub async fn run_network_controller(
 
             #[cfg(feature = "with-stats")]
             {
-                let configs_temp = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
-
                 if Instant::now().duration_since(last_stat_on)
-                    > Duration::from_millis(
-                        configs_temp.get_server_configs().unwrap().stat_timer_in_ms,
-                    )
+                    > Duration::from_millis(stat_timer_in_ms)
                 {
                     last_stat_on = Instant::now();
                     outgoing_messages
@@ -625,25 +649,27 @@ pub async fn run_network_controller(
                         lock_for_read!(network_controller_lock, LOCK_ORDER_NETWORK_CONTROLLER);
 
                     let stat = format!(
-                        "--- stats ------ {} - capacity : {:?} / {:?}",
-                        format!("{:width$}", "network::queue", width = 30),
+                        "{} - {} - capacity : {:?} / {:?}",
+                        StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                        format!("{:width$}", "network::queue_to_core", width = 40),
                         network_controller.sender_to_saito_controller.capacity(),
                         network_controller.sender_to_saito_controller.max_capacity()
+                    );
+                    sender_to_stat.send(stat).await.unwrap();
+
+                    let stat = format!(
+                        "{} - {} - capacity : {:?} / {:?}",
+                        StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                        format!("{:width$}", "network::queue_outgoing", width = 40),
+                        sender_to_network.capacity(),
+                        sender_to_network.max_capacity()
                     );
                     sender_to_stat.send(stat).await.unwrap();
                 }
             }
 
             if !work_done {
-                let configs_temp = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
-
-                tokio::time::sleep(Duration::from_millis(
-                    configs_temp
-                        .get_server_configs()
-                        .unwrap()
-                        .thread_sleep_time_in_ms,
-                ))
-                .await;
+                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
             }
         }
     });

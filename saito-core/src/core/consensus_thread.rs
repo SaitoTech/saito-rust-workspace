@@ -13,7 +13,10 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{PrintForLog, SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT};
+use crate::core::defs::{
+    PrintForLog, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+};
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::io::storage::Storage;
@@ -489,7 +492,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             let stat = format!(
                 "{} - {} - total_slips : {:?}, unspent_slips : {:?}, current_balance : {:?}",
-                current_time,
+                StatVariable::format_timestamp(current_time),
                 format!("{:width$}", "wallet::state", width = 40),
                 wallet.slips.len(),
                 wallet.get_unspent_slip_count(),
@@ -501,7 +504,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
             let stat = format!(
                 "{} - {} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?} full_block_count : {:?} txs_in_blocks : {:?}",
-                current_time,
+                StatVariable::format_timestamp(current_time),
                 format!("{:width$}", "blockchain::state", width = 40),
                 blockchain.utxoset.len(),
                 blockchain.blocks.len(),
@@ -516,7 +519,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             let stat = format!(
                 "{} - {} - blocks_queue : {:?}, transactions : {:?}",
-                current_time,
+                StatVariable::format_timestamp(current_time),
                 format!("{:width$}", "mempool:state", width = 40),
                 mempool.blocks_queue.len(),
                 mempool.transactions.len(),

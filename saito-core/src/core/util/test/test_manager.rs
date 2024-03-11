@@ -50,7 +50,8 @@ pub mod test {
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
         Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-        Timestamp, UtxoSet, PROJECT_PUBLIC_KEY,
+        Timestamp, UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL,
+        LOCK_ORDER_WALLET, PROJECT_PUBLIC_KEY,
     };
     use crate::core::io::network::Network;
     use crate::core::io::storage::Storage;

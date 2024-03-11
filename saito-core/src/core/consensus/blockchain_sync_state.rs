@@ -271,7 +271,7 @@ impl BlockchainSyncState {
                 .count();
             let stat = format!(
                 "{} - peer : {:?} first: {:?} fetching_count : {:?} ordered_till : {:?} waiting_to_order : {:?}",
-                format!("{:width$}", "routing:sync_state", width = 40),
+                format!("{:width$}", "routing::sync_state", width = 40),
                 peer_index,
                 first_id,
                 fetching_count,
@@ -282,7 +282,7 @@ impl BlockchainSyncState {
         }
         let stat = format!(
             "{} - block_ceiling : {:?}",
-            format!("{:width$}", "routing:sync_state", width = 40),
+            format!("{:width$}", "routing::sync_state", width = 40),
             self.block_ceiling
         );
         stats.push(stat);

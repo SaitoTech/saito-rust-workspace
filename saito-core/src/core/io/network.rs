@@ -12,7 +12,9 @@ use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, PEER_RECONNECT_WAIT_PERIOD,
+    PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    PEER_RECONNECT_WAIT_PERIOD,
 };
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::block_request::BlockchainRequest;

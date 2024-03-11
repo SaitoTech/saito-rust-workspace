@@ -1,5 +1,5 @@
 use ahash::{AHashMap, AHashSet};
-use log::{debug, info, trace, warn};
+use log::{info, trace, warn};
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::golden_ticket::GoldenTicket;
@@ -205,7 +205,7 @@ impl Wallet {
         wallet_slip.lc = lc;
         self.unspent_slips.insert(wallet_slip.utxokey);
         self.available_balance += slip.amount;
-        debug!(
+        trace!(
             "adding slip : {:?} with value : {:?} to wallet",
             wallet_slip.utxokey.to_hex(),
             wallet_slip.amount
@@ -219,7 +219,7 @@ impl Wallet {
     }
 
     pub fn delete_slip(&mut self, slip: &Slip, network: Option<&Network>) {
-        debug!(
+        trace!(
             "deleting slip : {:?} with value : {:?} from wallet",
             slip.utxoset_key.to_hex(),
             slip.amount
@@ -280,7 +280,7 @@ impl Wallet {
             slip.spent = true;
             self.available_balance -= slip.amount;
 
-            debug!(
+            trace!(
                 "marking slip : {:?} with value : {:?} as spent",
                 slip.utxokey.to_hex(),
                 slip.amount

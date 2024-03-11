@@ -9,7 +9,10 @@ use tokio::sync::RwLock;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey, Timestamp};
+use crate::core::defs::{
+    PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_CONFIGS,
+    LOCK_ORDER_WALLET,
+};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::keep_time::KeepTime;
 use crate::core::process::process_event::ProcessEvent;
@@ -134,7 +137,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
             return;
         }
         let stat = format!("{} - {} - total : {:?}, current difficulty : {:?}, miner_active : {:?}, current target : {:?} ",
-                           current_time,
+                           StatVariable::format_timestamp(current_time),
                            format!("{:width$}", "mining::golden_tickets", width = 40),
                            self.mined_golden_tickets,
                            self.difficulty,

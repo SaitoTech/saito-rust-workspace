@@ -14,7 +14,7 @@ use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
     BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
-    STAT_BIN_COUNT,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -641,7 +641,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
         let stat = format!(
             "{} - {} - capacity : {:?} / {:?}",
-            current_time,
+            StatVariable::format_timestamp(current_time),
             format!("{:width$}", "consensus::queue", width = 40),
             self.sender_to_consensus.capacity(),
             self.sender_to_consensus.max_capacity()
@@ -650,7 +650,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         for (index, sender) in self.senders_to_verification.iter().enumerate() {
             let stat = format!(
                 "{} - {} - capacity : {:?} / {:?}",
-                current_time,
+                StatVariable::format_timestamp(current_time),
                 format!(
                     "{:width$}",
                     format!("verification_{:?}::queue", index),
