@@ -10,7 +10,7 @@ use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::defs::Currency;
+use saito_core::core::defs::{Currency, LOCK_ORDER_CONFIGS};
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::msg::message::Message;
 use saito_core::lock_for_read;
@@ -83,6 +83,12 @@ impl Spammer {
             let mut count = burst_count;
             loop {
                 if let Some(transactions) = receiver.recv().await {
+                    info!(
+                        "received {:?} txs to be sent. sender capacity : {:?} / {:?}",
+                        transactions.len(),
+                        sender.capacity(),
+                        sender.max_capacity()
+                    );
                     for tx in transactions {
                         count -= 1;
                         total_count += 1;
@@ -108,6 +114,7 @@ impl Spammer {
                             std::process::exit(0);
                         }
                     }
+                    info!("sent all the txs received from generator");
                 }
             }
         });

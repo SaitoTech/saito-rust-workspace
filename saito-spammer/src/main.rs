@@ -22,7 +22,7 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+    PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -606,6 +606,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         context.blockchain.clone(),
         sender_to_stat.clone(),
         peers_lock.clone(),
+        sender_to_network_controller.clone(),
     ));
 
     let spammer_handle = tokio::spawn(run_spammer(

@@ -28,8 +28,8 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, PROJECT_PUBLIC_KEY,
-    STAT_BIN_COUNT,
+    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_BLOCKCHAIN,
+    LOCK_ORDER_CONFIGS, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -715,6 +715,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         context.blockchain.clone(),
         sender_to_stat.clone(),
         peers_lock.clone(),
+        sender_to_network_controller.clone(),
     ));
 
     let _result = tokio::join!(
@@ -845,7 +846,6 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 }
 
 #[tokio::main(flavor = "multi_thread")]
-// #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = App::new("Saito")
         .arg(

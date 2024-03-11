@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
-
 use std::sync::Arc;
 
 use ahash::AHashMap;
@@ -11,7 +10,7 @@ use tokio::sync::RwLock;
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
-use crate::core::defs::{PrintForLog, SaitoPublicKey, PROJECT_PUBLIC_KEY};
+use crate::core::defs::{PrintForLog, SaitoPublicKey, LOCK_ORDER_MEMPOOL, PROJECT_PUBLIC_KEY};
 use crate::core::io::interface_io::InterfaceIO;
 use crate::lock_for_write;
 

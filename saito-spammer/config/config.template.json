@@ -1,11 +1,11 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 12101,
+    "port": 12202,
     "protocol": "http",
     "endpoint": {
       "host": "127.0.0.1",
-      "port": 12101,
+      "port": 12202,
       "protocol": "http"
     },
     "verification_threads": 4,
@@ -18,7 +18,7 @@
   "peers": [
     {
       "host": "127.0.0.1",
-      "port": 12102,
+      "port": 12101,
       "protocol": "http",
       "synctype": "full"
     }

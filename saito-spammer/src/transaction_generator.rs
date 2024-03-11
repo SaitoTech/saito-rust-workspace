@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::{debug, info, trace};
+use log::{debug, info};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -12,7 +12,10 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
+use saito_core::core::defs::{
+    Currency, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET,
+};
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util::crypto::generate_random_bytes;
 use saito_core::{drain, lock_for_read, lock_for_write};
@@ -86,7 +89,7 @@ impl TransactionGenerator {
     }
 
     pub fn get_state(&self) -> GeneratorState {
-        return self.state.clone();
+        self.state.clone()
     }
     pub async fn on_new_block(&mut self) {
         match self.state {
@@ -97,6 +100,8 @@ impl TransactionGenerator {
                 if self.check_blockchain_for_confirmation().await {
                     self.create_test_transactions().await;
                     self.state = GeneratorState::Done;
+                } else {
+                    tokio::time::sleep(Duration::from_millis(1_000)).await;
                 }
             }
             GeneratorState::Done => {}
@@ -104,7 +109,10 @@ impl TransactionGenerator {
     }
 
     async fn create_slips(&mut self) {
-        trace!("creating slips for spammer");
+        info!(
+            "creating slips for spammer. expect : {:?}",
+            self.expected_slip_count
+        );
         let output_slips_per_input_slip: u8 = 100;
         let unspent_slip_count;
         let available_balance;
@@ -135,7 +143,7 @@ impl TransactionGenerator {
                     to_public_key = peer.1.public_key.clone().unwrap();
                     break;
                 }
-                assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+                // assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
                 assert_ne!(to_public_key, self.public_key);
             }
             let mut txs: VecDeque<Transaction> = Default::default();
@@ -157,25 +165,26 @@ impl TransactionGenerator {
                         "Slip creation completed, current = {:?}, target = {:?}",
                         total_output_slips_created, self.tx_count
                     );
+                    info!("changing state to 'WaitingForBlockChainConfirmation'");
                     self.state = GeneratorState::WaitingForBlockChainConfirmation;
                     break;
                 }
             }
+            info!("{:?} slip creation txs generated", txs.len());
             self.sender.send(txs).await.unwrap();
 
-            self.expected_slip_count = total_output_slips_created;
+            // self.expected_slip_count = total_output_slips_created;
 
             info!(
                 "New slips created, current = {:?}, target = {:?}",
                 total_output_slips_created, self.tx_count
             );
         } else {
-            trace!(
+            info!(
                 "not enough slips. unspent slip count : {:?} tx count : {:?} expected slips : {:?}",
-                unspent_slip_count,
-                self.tx_count,
-                self.expected_slip_count
+                unspent_slip_count, self.tx_count, self.expected_slip_count
             );
+            tokio::time::sleep(Duration::from_millis(1_000)).await;
         }
     }
 
@@ -223,10 +232,11 @@ impl TransactionGenerator {
         transaction.sign(&self.private_key);
         transaction.add_hop(&wallet.private_key, &wallet.public_key, to_public_key);
 
-        return transaction;
+        transaction
     }
 
     async fn check_blockchain_for_confirmation(&mut self) -> bool {
+        info!("checking for blockchain confirmation...");
         let unspent_slip_count;
         {
             let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
@@ -238,15 +248,15 @@ impl TransactionGenerator {
                 "New slips detected on the blockchain, current = {:?}, target = {:?}",
                 unspent_slip_count, self.tx_count
             );
+            info!("changing state to 'Generation Done'");
             self.state = GeneratorState::Done;
             return true;
         }
-        trace!(
+        info!(
             "unspent slips : {:?} tx count : {:?}",
-            unspent_slip_count,
-            self.tx_count
+            unspent_slip_count, self.tx_count
         );
-        return false;
+        false
     }
 
     async fn create_test_transactions(&mut self) {
@@ -254,9 +264,9 @@ impl TransactionGenerator {
 
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet.clone();
-        let blockchain = self.blockchain.clone();
+        let _blockchain = self.blockchain.clone();
         let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
-        let public_key = self.public_key.clone();
+        let public_key = self.public_key;
         let count = self.tx_count;
         let required_balance = (self.tx_payment + self.tx_fee) * count as Currency;
         let payment = self.tx_payment;
@@ -266,12 +276,12 @@ impl TransactionGenerator {
             loop {
                 let mut work_done = false;
                 {
-                    let blockchain = lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+                    // let blockchain = lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
                     let mut wallet = lock_for_write!(wallet, LOCK_ORDER_WALLET);
 
                     if wallet.get_available_balance() >= required_balance {
-                        assert_ne!(blockchain.utxoset.len(), 0);
+                        // assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count as usize);
                         for _ in 0..count {
                             let transaction = Transaction::create(
@@ -296,16 +306,20 @@ impl TransactionGenerator {
                             vec.push_back(transaction);
                         }
                         if !vec.is_empty() {
+                            info!("sending generated {:?} txs to spammer. sender capacity : {:?} / {:?}",vec.len(),sender.capacity(),sender.max_capacity());
                             sender.send(vec).await.unwrap();
                             work_done = true;
                         }
+                    } else {
+                        info!("not enough balance in wallet to create spam txs");
                     }
                 }
                 if !work_done {
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    tokio::time::sleep(Duration::from_millis(1_000)).await;
                 }
             }
         });
+        tokio::task::yield_now().await;
 
         let mut to_public_key = [0; 33];
 
@@ -323,6 +337,10 @@ impl TransactionGenerator {
         while let Some(mut transactions) = receiver.recv().await {
             let sender = self.sender.clone();
             let tx_size = self.tx_size;
+            info!(
+                "received {:?} unsigned txs from generator",
+                transactions.len()
+            );
 
             let txs: VecDeque<Transaction> = drain!(transactions, 100)
                 .map(|mut transaction| {
@@ -336,6 +354,7 @@ impl TransactionGenerator {
                     // sender.send(transaction).await.unwrap();
                 })
                 .collect();
+            info!("sending {:?} signed txs to spammer", txs.len());
             sender.send(txs).await.unwrap();
         }
 
