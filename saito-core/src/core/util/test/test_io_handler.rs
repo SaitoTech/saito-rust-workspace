@@ -5,10 +5,9 @@ pub mod test {
     use std::path::Path;
 
     use async_trait::async_trait;
+    use log::{debug, error, info};
     use tokio::fs::File;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    use log::{debug, error, info};
 
     use crate::core::consensus::peer_service::PeerService;
     use crate::core::consensus::wallet::Wallet;
@@ -187,11 +186,11 @@ pub mod test {
         fn send_interface_event(&self, _event: InterfaceEvent) {}
 
         async fn save_wallet(&self, _wallet: &mut Wallet) -> Result<(), Error> {
-            todo!()
+            Ok(())
         }
 
         async fn load_wallet(&self, _wallet: &mut Wallet) -> Result<(), Error> {
-            todo!()
+            Ok(())
         }
 
         // async fn save_blockchain(&self) -> Result<(), Error> {

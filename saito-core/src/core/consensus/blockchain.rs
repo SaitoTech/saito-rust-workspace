@@ -9,6 +9,7 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use crate::{drain, iterate, lock_for_read, lock_for_write};
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockring::BlockRing;
 use crate::core::consensus::mempool::Mempool;
@@ -16,9 +17,9 @@ use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
-    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
+    Currency, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
+    PrintForLog, PRUNE_AFTER_BLOCKS, SaitoHash, SaitoPublicKey,
+    Timestamp, UtxoSet,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -26,7 +27,6 @@ use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
 use crate::core::util::configuration::Configuration;
-use crate::{drain, iterate, lock_for_read, lock_for_write};
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
     ((top as u64) << 32) + (bottom as u64)
@@ -1578,6 +1578,11 @@ impl Blockchain {
         );
         std::mem::drop(mempool);
 
+        {
+            let mut wallet = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
+            Wallet::save(&mut wallet, storage.io_interface.as_ref()).await;
+        }
+
         blockchain_updated
     }
     pub fn add_ghost_block(
@@ -1695,18 +1700,18 @@ mod tests {
     use log::{debug, error, info};
     use tokio::sync::RwLock;
 
+    use crate::{lock_for_read, lock_for_write};
     use crate::core::consensus::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+        LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET, PrintForLog, SaitoPublicKey,
     };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_manager::test::TestManager;
-    use crate::{lock_for_read, lock_for_write};
 
-    // fn init_testlog() {
+// fn init_testlog() {
     //     let _ = pretty_env_logger::try_init();
     // }
 

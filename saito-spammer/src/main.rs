@@ -513,7 +513,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut wallet = wallet.write().await;
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
-        Wallet::load(&mut wallet, Box::new(RustIOHandler::new(sender, 1))).await;
+        Wallet::load(&mut wallet, &(RustIOHandler::new(sender, 1))).await;
     }
     let context = Context::new(configs_clone.clone(), wallet);
 
