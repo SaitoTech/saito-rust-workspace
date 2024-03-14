@@ -76,7 +76,7 @@ impl Wallet {
         }
     }
 
-    pub async fn load(wallet: &mut Wallet, io: Box<dyn InterfaceIO + Send + Sync>) {
+    pub async fn load(wallet: &mut Wallet, io: &(dyn InterfaceIO + Send + Sync)) {
         info!("loading wallet...");
         let result = io.load_wallet(wallet).await;
         if result.is_err() {
@@ -88,7 +88,7 @@ impl Wallet {
             io.send_interface_event(InterfaceEvent::WalletUpdate());
         }
     }
-    pub async fn save(wallet: &mut Wallet, io: Box<dyn InterfaceIO + Send + Sync>) {
+    pub async fn save(wallet: &mut Wallet, io: &(dyn InterfaceIO + Send + Sync)) {
         trace!("saving wallet");
         io.save_wallet(wallet).await.unwrap();
         trace!("wallet saved");

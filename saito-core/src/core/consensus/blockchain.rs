@@ -1578,6 +1578,11 @@ impl Blockchain {
         );
         std::mem::drop(mempool);
 
+        {
+            let mut wallet = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
+            Wallet::save(&mut wallet, storage.io_interface.as_ref()).await;
+        }
+
         blockchain_updated
     }
     pub fn add_ghost_block(

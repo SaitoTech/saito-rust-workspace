@@ -33,7 +33,7 @@ pub struct WasmWalletSlip {
 impl WasmWallet {
     pub async fn save(&self) {
         let mut wallet = self.wallet.write().await;
-        Wallet::save(&mut wallet, Box::new(WasmIoHandler {})).await;
+        Wallet::save(&mut wallet, &(WasmIoHandler {})).await;
     }
     pub async fn reset(&mut self) {
         self.wallet
@@ -45,7 +45,7 @@ impl WasmWallet {
 
     pub async fn load(&mut self) {
         let mut wallet = self.wallet.write().await;
-        Wallet::load(&mut wallet, Box::new(WasmIoHandler {})).await;
+        Wallet::load(&mut wallet, &(WasmIoHandler {})).await;
     }
 
     pub async fn get_public_key(&self) -> JsString {

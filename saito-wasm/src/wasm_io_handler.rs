@@ -106,15 +106,6 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), std::io::Error> {
-        let result = MsgHandler::ensure_block_directory_exists(block_dir_path);
-        if result.is_err() {
-            error!("{:?}", result.err().unwrap());
-            return Err(Error::from(ErrorKind::Other));
-        }
-        Ok(())
-    }
-
     async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
         let result = MsgHandler::read_value(key.clone());
         if result.is_err() {
@@ -169,6 +160,15 @@ impl InterfaceIO for WasmIoHandler {
 
     fn get_block_dir(&self) -> String {
         "data/blocks/".to_string()
+    }
+
+    fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), std::io::Error> {
+        let result = MsgHandler::ensure_block_directory_exists(block_dir_path);
+        if result.is_err() {
+            error!("{:?}", result.err().unwrap());
+            return Err(Error::from(ErrorKind::Other));
+        }
+        Ok(())
     }
 
     async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex) {

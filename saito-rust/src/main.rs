@@ -618,7 +618,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         let mut wallet = wallet_lock.write().await;
         Wallet::load(
             &mut wallet,
-            Box::new(RustIOHandler::new(
+            &(RustIOHandler::new(
                 sender_to_network_controller.clone(),
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
@@ -754,7 +754,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     {
         let mut wallet = wallet.write().await;
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(100);
-        Wallet::load(&mut wallet, Box::new(RustIOHandler::new(sender, 1))).await;
+        Wallet::load(&mut wallet, &(RustIOHandler::new(sender, 1))).await;
     }
     let context = Context::new(configs_clone.clone(), wallet);
 
