@@ -371,7 +371,9 @@ impl RoutingThread {
     async fn fetch_next_blocks(&mut self) {
         self.blockchain_sync_state.build_peer_block_picture();
 
-        let map = self.blockchain_sync_state.request_blocks_from_waitlist();
+        let map = self
+            .blockchain_sync_state
+            .get_block_list_to_fetch_per_peer();
 
         let mut fetched_blocks: Vec<(PeerIndex, SaitoHash)> = Default::default();
         for (peer_index, vec) in map {

@@ -142,7 +142,7 @@ pub async fn run_spammer(
     configs_lock: Arc<RwLock<SpammerConfigs>>,
 ) {
     info!("starting the spammer");
-    let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(10);
+    let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(1000);
     let mut spammer = Spammer::new(
         wallet_lock,
         peers_lock,

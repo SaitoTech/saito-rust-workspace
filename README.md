@@ -27,6 +27,10 @@ Saito provides a way to compile our shared library into WASM, a type of binary c
 languages and other platforms. An example of this is compiling Saito into WASM for deployment in a browser -- allowing
 the network and browser code to run lite-clients that use the same underlying code so as to prevent accidental forks.
 
+### API Guide
+
+https://saitotech.github.io/saito-rust-workspace/
+
 # Saito Rust Workspace Setup Guide
 
 This guide provides step-by-step instructions for setting up the Saito Rust workspace on a Linux and mac environment.

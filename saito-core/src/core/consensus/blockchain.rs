@@ -142,8 +142,6 @@ impl Blockchain {
         // since we already have the block we unset the fetching state
         self.unmark_as_fetching(&block.hash);
 
-        // trace!("block : {:?}", block);
-
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
         // blockchain and our various indices.
@@ -1204,7 +1202,8 @@ impl Blockchain {
             // successfully added the new chain.
             //
             error!(
-                "ERROR: this block : {:?} does not validate!",
+                "ERROR: this block : {:?} : {:?} does not validate!",
+                block.id,
                 block.hash.to_hex()
             );
             if current_wind_index == new_chain.len() - 1 {
@@ -1232,6 +1231,7 @@ impl Blockchain {
                     info!("old chain len: {}", old_chain.len());
                     return WindingResult::Wind(old_chain.len() - 1, true);
                 } else {
+                    info!("old chain is empty. finishing with failure");
                     return WindingResult::FinishWithFailure;
                 }
             } else {
@@ -1557,15 +1557,13 @@ impl Blockchain {
         debug!("blocks to add : {:?}", blocks.len());
         let mut blockchain_updated = false;
         while let Some(block) = blocks.pop_front() {
+            // info!("adding block : {:?}", block.id);
+            let mut sender = None;
+            if blocks.is_empty() {
+                sender = sender_to_miner.clone();
+            }
             let result = self
-                .add_block(
-                    block,
-                    network,
-                    storage,
-                    sender_to_miner.clone(),
-                    &mut mempool,
-                    configs,
-                )
+                .add_block(block, network, storage, sender, &mut mempool, configs)
                 .await;
             if !blockchain_updated {
                 if let AddBlockResult::BlockAdded = result {
