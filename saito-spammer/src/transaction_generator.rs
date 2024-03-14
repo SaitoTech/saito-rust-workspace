@@ -7,18 +7,18 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::{
-    Currency, SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET,
+    Currency, LOCK_ORDER_CONFIGS, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, SaitoPrivateKey,
+    SaitoPublicKey,
 };
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util::crypto::generate_random_bytes;
-use saito_core::{drain, lock_for_read, lock_for_write};
 use saito_rust::time_keeper::TimeKeeper;
 
 use crate::config_handler::SpammerConfigs;
@@ -139,11 +139,16 @@ impl TransactionGenerator {
             {
                 let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
 
+                if peers.index_to_peers.is_empty() {
+                    info!("not yet connected to a node");
+                    return;
+                }
+
                 for peer in peers.index_to_peers.iter() {
                     to_public_key = peer.1.public_key.clone().unwrap();
                     break;
                 }
-                // assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+                assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
                 assert_ne!(to_public_key, self.public_key);
             }
             let mut txs: VecDeque<Transaction> = Default::default();
@@ -265,7 +270,7 @@ impl TransactionGenerator {
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet.clone();
         let _blockchain = self.blockchain.clone();
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(10);
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
         let public_key = self.public_key;
         let count = self.tx_count;
         let required_balance = (self.tx_payment + self.tx_fee) * count as Currency;
@@ -330,7 +335,7 @@ impl TransactionGenerator {
                 to_public_key = peer.1.public_key.clone().unwrap();
                 break;
             }
-            assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
+            // assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
             assert_ne!(to_public_key, self.public_key);
         }
 

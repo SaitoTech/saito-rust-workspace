@@ -1,7 +1,7 @@
+use std::{i128, mem};
 use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;
-use std::{i128, mem};
 
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
@@ -14,11 +14,11 @@ use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
-use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
-use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::consensus::slip::{Slip, SLIP_SIZE, SlipType};
+use crate::core::consensus::transaction::{Transaction, TRANSACTION_SIZE, TransactionType};
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
+    BLOCK_FILE_EXTENSION, Currency, GENESIS_PERIOD, PrintForLog, SaitoHash, SaitoPrivateKey,
+    SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -977,19 +977,17 @@ impl Block {
                 previous_block.timestamp,
             );
 
-            //
             // difficulty is "mining difficulty" (payout unlock cost)
             //
             // we increase difficulty if two blocks in a row have golden tickets and decrease
             // it if two blocks in a row do not have golden ticket. this targets a difficulty
             // that averages one golden ticket every two blocks.
-            //
             cv.expected_difficulty = previous_block.difficulty;
             if previous_block.has_golden_ticket {
                 if cv.gt_num > 0 {
                     cv.expected_difficulty += 1;
                 }
-            } else if cv.gt_num > 0 && cv.expected_difficulty > 0 {
+            } else if cv.gt_num == 0 && cv.expected_difficulty > 0 {
                 cv.expected_difficulty -= 1;
             }
 
@@ -2063,8 +2061,8 @@ mod tests {
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_WALLET,
+        Currency, GENESIS_PERIOD, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET, SaitoHash, SaitoPrivateKey,
+        SaitoPublicKey,
     };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};

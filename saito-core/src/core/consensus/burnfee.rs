@@ -1,5 +1,7 @@
-use log::debug;
+use std::cmp::max;
 use std::time::Duration;
+
+use log::debug;
 
 use crate::core::defs::{Currency, Timestamp};
 
@@ -43,10 +45,10 @@ impl BurnFee {
             return 10_000_000_000_000_000_000;
         }
 
-        let elapsed_time = match current_block_timestamp_in_ms - previous_block_timestamp_in_ms {
-            0 => 1,
-            diff => diff,
-        };
+        let elapsed_time = max(
+            current_block_timestamp_in_ms - previous_block_timestamp_in_ms,
+            1,
+        );
 
         if elapsed_time >= (2 * HEARTBEAT) {
             return 0;
@@ -80,11 +82,10 @@ impl BurnFee {
         if previous_block_timestamp_in_ms >= current_block_timestamp_in_ms {
             return 10_000_000_000_000_000_000;
         }
-        let timestamp_difference =
-            match current_block_timestamp_in_ms - previous_block_timestamp_in_ms {
-                0 => 1,
-                diff => diff,
-            };
+        let timestamp_difference = max(
+            1,
+            current_block_timestamp_in_ms - previous_block_timestamp_in_ms,
+        );
 
         // algorithm fails if burn fee last block is 0, so default to low value
         if burn_fee_previous_block == 0 {
@@ -104,8 +105,9 @@ impl BurnFee {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::core::defs::Currency;
+
+    use super::*;
 
     #[test]
     fn burnfee_return_work_needed_test() {
