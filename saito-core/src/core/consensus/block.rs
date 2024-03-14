@@ -977,19 +977,17 @@ impl Block {
                 previous_block.timestamp,
             );
 
-            //
             // difficulty is "mining difficulty" (payout unlock cost)
             //
             // we increase difficulty if two blocks in a row have golden tickets and decrease
             // it if two blocks in a row do not have golden ticket. this targets a difficulty
             // that averages one golden ticket every two blocks.
-            //
             cv.expected_difficulty = previous_block.difficulty;
             if previous_block.has_golden_ticket {
                 if cv.gt_num > 0 {
                     cv.expected_difficulty += 1;
                 }
-            } else if cv.gt_num > 0 && cv.expected_difficulty > 0 {
+            } else if cv.gt_num == 0 && cv.expected_difficulty > 0 {
                 cv.expected_difficulty -= 1;
             }
 
