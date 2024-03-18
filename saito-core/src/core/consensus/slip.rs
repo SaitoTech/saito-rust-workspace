@@ -141,15 +141,15 @@ impl Slip {
 
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, spendable: bool) {
         if self.amount > 0 {
-            trace!(
-                "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?} utxo_size : {:?}",
-                self.utxoset_key.to_base58(),
-                spendable,
-                self.block_id,
-                self.tx_ordinal,
-                self.slip_index,
-                utxoset.len()
-            );
+            // trace!(
+            //     "updating slip : {:?} as spendable : {:?}, block : {:?} tx : {:?} index : {:?} utxo_size : {:?}",
+            //     self.utxoset_key.to_base58(),
+            //     spendable,
+            //     self.block_id,
+            //     self.tx_ordinal,
+            //     self.slip_index,
+            //     utxoset.len()
+            // );
             if spendable {
                 utxoset.insert(self.utxoset_key, spendable);
                 // assert_eq!(*utxoset.get(&self.utxoset_key).unwrap(), spendable);
@@ -157,7 +157,7 @@ impl Slip {
                 utxoset.remove(&self.utxoset_key);
             }
 
-            trace!("utxo size : {:?}", utxoset.len());
+            // trace!("utxo size : {:?}", utxoset.len());
         } else {
             // trace!(
             //     "not updating slip : {:?} as amount is 0",
@@ -249,11 +249,10 @@ mod tests {
 
     use tokio::sync::RwLock;
 
+    use crate::{lock_for_read, lock_for_write};
     use crate::core::consensus::blockchain::Blockchain;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_WALLET};
     use crate::core::util::crypto::generate_keys;
-    use crate::{lock_for_read, lock_for_write};
 
     use super::*;
 

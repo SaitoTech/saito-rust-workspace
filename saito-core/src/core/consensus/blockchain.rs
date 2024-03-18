@@ -9,6 +9,7 @@ use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
+use crate::{drain, iterate, lock_for_read, lock_for_write};
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockring::BlockRing;
 use crate::core::consensus::mempool::Mempool;
@@ -16,9 +17,9 @@ use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
-    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
+    Currency, GENESIS_PERIOD, LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
+    PrintForLog, PRUNE_AFTER_BLOCKS, SaitoHash, SaitoPublicKey,
+    Timestamp, UtxoSet,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -26,7 +27,6 @@ use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
 use crate::core::util::configuration::Configuration;
-use crate::{drain, iterate, lock_for_read, lock_for_write};
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
     ((top as u64) << 32) + (bottom as u64)
@@ -130,7 +130,7 @@ impl Blockchain {
             .filter(|tx| tx.transaction_type != TransactionType::SPV)
             .count();
         debug!(
-            "add_block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count : {:?}/{:?}",
+            "adding block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count (spv/total) : {:?}/{:?}",
             block.hash.to_hex(),
             block.block_type,
             block.id,
@@ -301,7 +301,11 @@ impl Blockchain {
             if let Some(block) = self.blocks.get(&new_chain_hash) {
                 if block.in_longest_chain {
                     shared_ancestor_found = true;
-                    trace!("shared ancestor found : {:?}", new_chain_hash.to_hex());
+                    trace!(
+                        "shared ancestor found : {:?} at id : {:?}",
+                        new_chain_hash.to_hex(),
+                        block.id
+                    );
                     break;
                 } else if new_chain_hash == [0; 32] {
                     break;
@@ -319,8 +323,6 @@ impl Blockchain {
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
-            trace!("shared ancestor found");
-
             while new_chain_hash != old_chain_hash {
                 if self.blocks.contains_key(&old_chain_hash) {
                     old_chain.push(old_chain_hash);
@@ -373,7 +375,8 @@ impl Blockchain {
                     info!("blocks received out-of-order issue. handling edge case...");
 
                     let disconnected_block_id = self.get_latest_block_id();
-                    for i in block_id + 1..disconnected_block_id {
+                    debug!("disconnected id : {:?}", disconnected_block_id);
+                    for i in block_id + 1..=disconnected_block_id {
                         let disconnected_block_hash =
                             self.blockring.get_longest_chain_block_hash_at_block_id(i);
                         if disconnected_block_hash != [0; 32] {
@@ -382,8 +385,10 @@ impl Blockchain {
                                 disconnected_block_hash,
                                 false,
                             );
+                            trace!("checking block id : {:?}", i);
                             let disconnected_block = self.get_mut_block(&disconnected_block_hash);
                             if let Some(disconnected_block) = disconnected_block {
+                                trace!("in longest chain set to false");
                                 disconnected_block.in_longest_chain = false;
                             }
                         }
@@ -782,7 +787,7 @@ impl Blockchain {
         if latest_block_id > count {
             min_id = latest_block_id - count;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
         while current_id > 0 && current_id >= min_id {
             let hash = self
                 .blockring
@@ -790,7 +795,7 @@ impl Blockchain {
             if hash == [0; 32] {
                 break;
             }
-            info!(
+            debug!(
                 "{} - {:?}",
                 current_id,
                 self.blockring
@@ -799,7 +804,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
@@ -1678,6 +1683,8 @@ impl Blockchain {
 
         snapshot
     }
+
+    // TODO : this set of methods make things confusing since sync state functions also have same names. need to refactor
     pub fn mark_as_fetching(&mut self, block_hash: SaitoHash) {
         debug!("marking block : {:?} as fetching", block_hash.to_hex());
         self.blocks_fetching.insert(block_hash);
@@ -1700,18 +1707,18 @@ mod tests {
     use log::{debug, error, info};
     use tokio::sync::RwLock;
 
+    use crate::{lock_for_read, lock_for_write};
     use crate::core::consensus::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
+        LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET, PrintForLog, SaitoPublicKey,
     };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_manager::test::TestManager;
-    use crate::{lock_for_read, lock_for_write};
 
-    // fn init_testlog() {
+// fn init_testlog() {
     //     let _ = pretty_env_logger::try_init();
     // }
 
