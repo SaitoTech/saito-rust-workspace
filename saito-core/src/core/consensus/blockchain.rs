@@ -130,7 +130,7 @@ impl Blockchain {
             .filter(|tx| tx.transaction_type != TransactionType::SPV)
             .count();
         debug!(
-            "add_block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count : {:?}/{:?}",
+            "adding block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count (spv/total) : {:?}/{:?}",
             block.hash.to_hex(),
             block.block_type,
             block.id,
@@ -301,7 +301,11 @@ impl Blockchain {
             if let Some(block) = self.blocks.get(&new_chain_hash) {
                 if block.in_longest_chain {
                     shared_ancestor_found = true;
-                    trace!("shared ancestor found : {:?}", new_chain_hash.to_hex());
+                    trace!(
+                        "shared ancestor found : {:?} at id : {:?}",
+                        new_chain_hash.to_hex(),
+                        block.id
+                    );
                     break;
                 } else if new_chain_hash == [0; 32] {
                     break;
@@ -319,8 +323,6 @@ impl Blockchain {
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
-            trace!("shared ancestor found");
-
             while new_chain_hash != old_chain_hash {
                 if self.blocks.contains_key(&old_chain_hash) {
                     old_chain.push(old_chain_hash);
@@ -373,7 +375,8 @@ impl Blockchain {
                     info!("blocks received out-of-order issue. handling edge case...");
 
                     let disconnected_block_id = self.get_latest_block_id();
-                    for i in block_id + 1..disconnected_block_id {
+                    debug!("disconnected id : {:?}", disconnected_block_id);
+                    for i in block_id + 1..=disconnected_block_id {
                         let disconnected_block_hash =
                             self.blockring.get_longest_chain_block_hash_at_block_id(i);
                         if disconnected_block_hash != [0; 32] {
@@ -382,8 +385,10 @@ impl Blockchain {
                                 disconnected_block_hash,
                                 false,
                             );
+                            trace!("checking block id : {:?}", i);
                             let disconnected_block = self.get_mut_block(&disconnected_block_hash);
                             if let Some(disconnected_block) = disconnected_block {
+                                trace!("in longest chain set to false");
                                 disconnected_block.in_longest_chain = false;
                             }
                         }
@@ -782,7 +787,7 @@ impl Blockchain {
         if latest_block_id > count {
             min_id = latest_block_id - count;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
         while current_id > 0 && current_id >= min_id {
             let hash = self
                 .blockring
@@ -790,7 +795,7 @@ impl Blockchain {
             if hash == [0; 32] {
                 break;
             }
-            info!(
+            debug!(
                 "{} - {:?}",
                 current_id,
                 self.blockring
@@ -799,7 +804,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
@@ -1678,6 +1683,8 @@ impl Blockchain {
 
         snapshot
     }
+
+    // TODO : this set of methods make things confusing since sync state functions also have same names. need to refactor
     pub fn mark_as_fetching(&mut self, block_hash: SaitoHash) {
         debug!("marking block : {:?} as fetching", block_hash.to_hex());
         self.blocks_fetching.insert(block_hash);
