@@ -4,16 +4,16 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use log::info;
 use log::{debug, error, trace};
+use log::info;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing_subscriber;
 use tracing_subscriber::filter::Directive;
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
@@ -22,7 +22,7 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_CONFIGS, STAT_BIN_COUNT,
+    LOCK_ORDER_CONFIGS, PrintForLog, SaitoPrivateKey, SaitoPublicKey, STAT_BIN_COUNT, StatVariable,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -374,17 +374,17 @@ fn run_loop_thread(
                 // TODO : remove hard coded values
                 match command.event_processor_id {
                     ROUTING_EVENT_PROCESSOR_ID => {
-                        trace!("routing event to routing event processor  ",);
+                        // trace!("routing event to routing event processor  ",);
                         network_event_sender_to_routing_ep
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     CONSENSUS_EVENT_PROCESSOR_ID => {
-                        trace!(
-                            "routing event to consensus event processor : {:?}",
-                            command.event
-                        );
+                        // trace!(
+                        //     "routing event to consensus event processor : {:?}",
+                        //     command.event
+                        // );
                         unreachable!()
                         // network_event_sender_to_consensus_ep
                         //     .send(command.event)
@@ -392,10 +392,10 @@ fn run_loop_thread(
                         //     .unwrap();
                     }
                     MINING_EVENT_PROCESSOR_ID => {
-                        trace!(
-                            "routing event to mining event processor : {:?}",
-                            command.event
-                        );
+                        // trace!(
+                        //     "routing event to mining event processor : {:?}",
+                        //     command.event
+                        // );
                         unreachable!()
                         // network_event_sender_to_mining_ep
                         //     .send(command.event)

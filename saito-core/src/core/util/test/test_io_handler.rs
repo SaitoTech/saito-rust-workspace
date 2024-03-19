@@ -11,7 +11,7 @@ pub mod test {
 
     use crate::core::consensus::peer_service::PeerService;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
+    use crate::core::defs::{BlockId, PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
     use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
     use crate::core::util::configuration::PeerConfig;
 
@@ -57,6 +57,7 @@ pub mod test {
             _block_hash: SaitoHash,
             _peer_index: u64,
             _url: String,
+            _block_id: BlockId,
         ) -> Result<(), Error> {
             todo!()
         }

@@ -1,4 +1,4 @@
-use crate::core::defs::SaitoHash;
+use crate::core::defs::{BlockId, SaitoHash};
 use crate::core::util;
 
 #[derive(Debug)]
@@ -32,6 +32,7 @@ pub enum NetworkEvent {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
+        block_id: BlockId,
     },
     BlockFetched {
         block_hash: SaitoHash,
@@ -40,5 +41,7 @@ pub enum NetworkEvent {
     },
     BlockFetchFailed {
         block_hash: SaitoHash,
+        peer_index: u64,
+        block_id: BlockId,
     },
 }

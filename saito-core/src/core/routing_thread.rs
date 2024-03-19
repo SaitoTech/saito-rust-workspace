@@ -369,6 +369,7 @@ impl RoutingThread {
         self.fetch_next_blocks().await;
     }
     async fn fetch_next_blocks(&mut self) {
+        trace!("fetching next blocks from peers");
         self.blockchain_sync_state.build_peer_block_picture();
 
         let map = self
@@ -377,11 +378,12 @@ impl RoutingThread {
 
         let mut fetched_blocks: Vec<(PeerIndex, SaitoHash)> = Default::default();
         for (peer_index, vec) in map {
-            for hash in vec.iter() {
+            for (hash, block_id) in vec.iter() {
                 let result = self
                     .network
                     .process_incoming_block_hash(
                         *hash,
+                        *block_id,
                         peer_index,
                         self.blockchain.clone(),
                         self.mempool.clone(),
@@ -456,7 +458,7 @@ impl RoutingThread {
                     blockchain.mark_as_fetching(block_hash);
                     let result = self
                         .network
-                        .fetch_missing_block(block_hash, &peer_key)
+                        .fetch_missing_block(block_hash, &peer_key, chain.block_ids[i])
                         .await;
                     if result.is_err() {
                         warn!("failed fetching block : {:?}. so unmarking block as fetching for ghost chain",block_hash.to_hex());
@@ -572,12 +574,21 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
                 return Some(());
             }
-            NetworkEvent::BlockFetchFailed { block_hash } => {
+            NetworkEvent::BlockFetchFailed {
+                block_hash,
+                peer_index,
+                block_id,
+            } => {
                 debug!("block fetch failed : {:?}", block_hash.to_hex());
                 let mut blockchain = lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
                 warn!("failed fetching block : {:?} from network thread. so unmarking block as fetching",block_hash.to_hex());
 
                 blockchain.unmark_as_fetching(&block_hash);
+
+                self.blockchain_sync_state
+                    .remove_entry(block_hash, peer_index);
+                self.blockchain_sync_state
+                    .add_entry(block_hash, block_id, peer_index);
             }
             NetworkEvent::DisconnectFromPeer { .. } => {
                 todo!()

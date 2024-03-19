@@ -12,7 +12,7 @@ use tokio::sync::mpsc::Sender;
 
 use saito_core::core::consensus::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::defs::{PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
+use saito_core::core::defs::{BLOCK_FILE_EXTENSION, BlockId, PeerIndex, SaitoHash};
 use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::util::configuration::PeerConfig;
@@ -132,6 +132,7 @@ impl InterfaceIO for RustIOHandler {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
+        block_id:BlockId
     ) -> Result<(), Error> {
         if block_hash == [0; 32] {
             return Ok(());
@@ -141,6 +142,7 @@ impl InterfaceIO for RustIOHandler {
         let event = IoEvent::new(NetworkEvent::BlockFetchRequest {
             block_hash,
             peer_index,
+            block_id,
             url: url.clone(),
         });
 
