@@ -211,6 +211,22 @@ impl RoutingThread {
         }
         trace!("incoming message processed");
     }
+    /// Processes a received ghost chain request from a peer to sync itself with the blockchain
+    ///
+    /// # Arguments
+    ///
+    /// * `block_id`:
+    /// * `block_hash`:
+    /// * `fork_id`:
+    /// * `peer_index`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
     async fn process_ghost_chain_request(
         &self,
         block_id: u64,
@@ -240,12 +256,19 @@ impl RoutingThread {
         debug!("last_shared_ancestor 1 : {:?}", last_shared_ancestor);
 
         if last_shared_ancestor == 0 && blockchain.get_latest_block_id() > 10 {
+            // if we cannot find the last shared ancestor in a long chain, we just need to sync the latest 10 blocks
             last_shared_ancestor = blockchain.get_latest_block_id() - 10;
         }
 
         let start = blockchain
             .blockring
             .get_longest_chain_block_hash_at_block_id(last_shared_ancestor);
+
+        let latest_block_id = blockchain.blockring.get_latest_block_id();
+        debug!("latest_block_id : {:?}", latest_block_id);
+        debug!("last_shared_ancestor : {:?}", last_shared_ancestor);
+        debug!("start : {:?}", start.to_hex());
+
         let mut ghost = GhostChainSync {
             start,
             prehashes: vec![],
@@ -255,10 +278,6 @@ impl RoutingThread {
             txs: vec![],
             gts: vec![],
         };
-        let latest_block_id = blockchain.blockring.get_latest_block_id();
-        debug!("latest_block_id : {:?}", latest_block_id);
-        debug!("last_shared_ancestor : {:?}", last_shared_ancestor);
-        debug!("start : {:?}", start.to_hex());
         for i in (last_shared_ancestor + 1)..=latest_block_id {
             let hash = blockchain
                 .blockring
@@ -278,6 +297,7 @@ impl RoutingThread {
                     ghost.block_ids.push(block.id);
 
                     // TODO : shouldn't this check for whole key list instead of peer's key?
+                    // whether this block has any txs which the peer will be interested in
                     ghost.txs.push(block.has_keylist_txs(vec![peer_public_key]));
                 }
             }
@@ -581,7 +601,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             } => {
                 debug!("block fetch failed : {:?}", block_hash.to_hex());
                 let mut blockchain = lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-                warn!("failed fetching block : {:?} from network thread. so unmarking block as fetching",block_hash.to_hex());
+                warn!("failed fetching block : {:?} from network thread. so un-marking block as fetching",block_hash.to_hex());
 
                 blockchain.unmark_as_fetching(&block_hash);
 
@@ -591,7 +611,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     .add_entry(block_hash, block_id, peer_index);
             }
             NetworkEvent::DisconnectFromPeer { .. } => {
-                todo!()
+                unreachable!()
             }
         }
         debug!("network event processed");

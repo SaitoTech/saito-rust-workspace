@@ -268,7 +268,8 @@ impl NetworkController {
         let response = result.unwrap();
         if response.status() != StatusCode::OK {
             warn!(
-                "failed fetching the block with error code : {:?}",
+                "failed fetching block : {:?}, with error code : {:?}",
+                block_hash.to_hex(),
                 response.status()
             );
             sender_to_core
