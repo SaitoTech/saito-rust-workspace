@@ -80,7 +80,7 @@ impl InterfaceIO for WasmIoHandler {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
-        block_id: BlockId,
+        _block_id: BlockId,
     ) -> Result<(), Error> {
         let hash = js_sys::Uint8Array::new_with_length(32);
         hash.copy_from(block_hash.as_slice());

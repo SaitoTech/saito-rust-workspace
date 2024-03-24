@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
 use log::info;
-use log::{debug, error, trace};
+use log::{debug, error};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -22,16 +22,14 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
 use saito_core::core::consensus::blockchain::Blockchain;
-use saito_core::core::consensus::blockchain_sync_state::{
-    BlockchainSyncState, MAX_CONCURRENT_FETCH_COUNT,
-};
+use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
+    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, PROJECT_PUBLIC_KEY,
+    STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;

@@ -9,10 +9,7 @@ use tokio::sync::RwLock;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{
-    BlockId, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_WALLET,
-};
+use crate::core::defs::{BlockId, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::keep_time::KeepTime;
 use crate::core::process::process_event::ProcessEvent;

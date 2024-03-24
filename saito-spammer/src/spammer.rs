@@ -10,7 +10,7 @@ use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::defs::{Currency, LOCK_ORDER_CONFIGS};
+use saito_core::core::defs::Currency;
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::msg::message::Message;
 use saito_core::lock_for_read;

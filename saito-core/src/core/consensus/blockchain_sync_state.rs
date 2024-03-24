@@ -1,14 +1,14 @@
-use std::cmp::{min, Ordering};
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::peer_collection::PeerCollection;
 use ahash::HashMap;
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, trace, warn};
 use tokio::sync::RwLock;
 
-use crate::core::defs::{BlockHash, BlockId, PeerIndex, PrintForLog, SaitoHash, Timestamp};
+use crate::core::defs::{BlockHash, BlockId, PeerIndex, PrintForLog, SaitoHash};
 use crate::lock_for_read;
 
 #[derive(Debug)]
@@ -464,7 +464,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn single_peer_window_test() {
-        let mut t = TestManager::default();
+        let t = TestManager::default();
 
         let mut state = BlockchainSyncState::new(20);
 
@@ -485,7 +485,7 @@ mod tests {
             let (entry, _) = vec.get(i).unwrap();
             assert_eq!(*entry, [(i + 1) as u8; 32]);
         }
-        let vec = vec![(1, [2; 32]), (1, [5; 32])];
+        let _vec = vec![(1, [2; 32]), (1, [5; 32])];
 
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
         let mut result = state.get_blocks_to_fetch_per_peer();
@@ -514,7 +514,7 @@ mod tests {
     #[ignore]
     async fn fetch_count_test() {
         // pretty_env_logger::init();
-        let mut t = TestManager::default();
+        let t = TestManager::default();
         let mut state = BlockchainSyncState::new(3);
         for i in 0..state.batch_size + 50 {
             state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1, t.peers.clone());
@@ -534,7 +534,7 @@ mod tests {
             let (entry, _) = vec.get(i).unwrap();
             assert_eq!(*entry, [(i + 1) as u8; 32]);
         }
-        let vec = vec![(1, [1; 32]), (1, [2; 32]), (1, [3; 32])];
+        let _vec = vec![(1, [1; 32]), (1, [2; 32]), (1, [3; 32])];
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
         let result = state.get_blocks_to_fetch_per_peer();
         assert!(result.is_empty());
@@ -563,7 +563,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn multiple_forks_from_multiple_peers_test() {
-        let mut t = TestManager::default();
+        let t = TestManager::default();
         let mut state = BlockchainSyncState::new(10);
         for i in 0..state.batch_size + 50 {
             state.add_entry([(i + 1) as u8; 32], (i + 1) as BlockId, 1, t.peers.clone());

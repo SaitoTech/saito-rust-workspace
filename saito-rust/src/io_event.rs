@@ -1,7 +1,6 @@
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
-use log::trace;
 
 use saito_core::core::io::network_event::NetworkEvent;
 

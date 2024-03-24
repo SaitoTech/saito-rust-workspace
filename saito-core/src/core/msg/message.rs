@@ -1,12 +1,12 @@
 use std::fmt::Debug;
 use std::io::{Error, ErrorKind};
 
-use log::{debug, error, trace, warn};
+use log::{debug, error, warn};
 
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::transaction::Transaction;
-use crate::core::defs::{BlockHash, BlockId, ForkId, SaitoHash, SaitoPublicKey};
+use crate::core::defs::{BlockHash, BlockId, ForkId, SaitoPublicKey};
 use crate::core::msg::api_message::ApiMessage;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;

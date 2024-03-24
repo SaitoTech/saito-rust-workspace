@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::io::Error;
 use std::sync::Arc;
 
-use ahash::{AHashMap, HashMap, HashSet};
+use ahash::{AHashMap, HashMap};
 use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
@@ -17,8 +17,8 @@ use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
-    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
+    MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
+    PRUNE_AFTER_BLOCKS,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -1726,9 +1726,7 @@ mod tests {
     use crate::core::consensus::blockchain::{bit_pack, bit_unpack, Blockchain};
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{
-        PrintForLog, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET,
-    };
+    use crate::core::defs::{PrintForLog, SaitoPublicKey};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_manager::test::TestManager;

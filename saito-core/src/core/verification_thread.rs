@@ -14,10 +14,7 @@ use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::Transaction;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{
-    PrintForLog, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET,
-};
+use crate::core::defs::{PrintForLog, StatVariable, Timestamp};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::process_event::ProcessEvent;
 use crate::{drain, lock_for_read};

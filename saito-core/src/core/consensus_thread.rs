@@ -13,10 +13,7 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{
-    PrintForLog, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
-};
+use crate::core::defs::{PrintForLog, SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT};
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::io::storage::Storage;
@@ -240,7 +237,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 // dropping the lock here since blockchain needs the write lock to add blocks
                 drop(mempool);
                 self.stats.blocks_created.increment();
-                let updated = blockchain
+                let _updated = blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
                         Some(&self.network),
