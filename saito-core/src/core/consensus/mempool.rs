@@ -64,7 +64,11 @@ impl Mempool {
     }
 
     pub fn add_block(&mut self, block: Block) {
-        debug!("mempool add block : {:?}-{:?}",block.id, block.hash.to_hex());
+        debug!(
+            "mempool add block : {:?}-{:?}",
+            block.id,
+            block.hash.to_hex()
+        );
         let hash_to_insert = block.hash;
         if !iterate!(self.blocks_queue, 100).any(|block| block.hash == hash_to_insert) {
             self.blocks_queue.push_back(block);

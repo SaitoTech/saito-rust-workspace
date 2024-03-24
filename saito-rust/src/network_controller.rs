@@ -5,29 +5,29 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::{SinkExt, StreamExt};
 use futures::stream::{SplitSink, SplitStream};
+use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, trace, warn};
 use reqwest::Client;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
-use tokio::sync::{Mutex, RwLock};
 use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
-use warp::Filter;
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
+use warp::Filter;
 
 use saito_core::core::consensus::block::{Block, BlockType};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::defs::{
-    BLOCK_FILE_EXTENSION, BlockId, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET, PrintForLog, SaitoHash, SaitoPublicKey,
-    STAT_BIN_COUNT, StatVariable,
+    BlockId, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
+    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::process::keep_time::KeepTime;

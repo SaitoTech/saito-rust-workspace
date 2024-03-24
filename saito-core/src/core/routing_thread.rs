@@ -6,7 +6,6 @@ use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
-use crate::{lock_for_read, lock_for_write};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
@@ -14,8 +13,8 @@ use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
-    BlockHash, BlockId, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, PeerIndex, PrintForLog, SaitoHash,
-    SaitoPublicKey, STAT_BIN_COUNT, StatVariable, Timestamp,
+    BlockHash, BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
+    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -29,6 +28,7 @@ use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
+use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
 pub enum RoutingEvent {
@@ -384,7 +384,8 @@ impl RoutingThread {
         );
 
         self.blockchain_sync_state
-            .add_entry(block_hash, block_id, peer_index,self.network.peers.clone()).await;
+            .add_entry(block_hash, block_id, peer_index, self.network.peers.clone())
+            .await;
 
         self.fetch_next_blocks().await;
     }
@@ -393,7 +394,8 @@ impl RoutingThread {
 
         {
             let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-            self.blockchain_sync_state.build_peer_block_picture(&blockchain);
+            self.blockchain_sync_state
+                .build_peer_block_picture(&blockchain);
         }
 
         let map = self.blockchain_sync_state.get_blocks_to_fetch_per_peer();
@@ -468,7 +470,13 @@ impl RoutingThread {
                     block_hash.to_hex()
                 );
                 self.blockchain_sync_state
-                    .add_entry(block_hash, chain.block_ids[i], peer_index, self.network.peers.clone()).await;
+                    .add_entry(
+                        block_hash,
+                        chain.block_ids[i],
+                        peer_index,
+                        self.network.peers.clone(),
+                    )
+                    .await;
             } else {
                 debug!(
                     "ghost block : {:?} doesn't have txs for me. not fetching",
@@ -621,14 +629,18 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_event(&mut self, event: RoutingEvent) -> Option<()> {
         match event {
             RoutingEvent::BlockchainUpdated(block_hash) => {
-                trace!("received blockchain update event : {:?}",block_hash.to_hex());
+                trace!(
+                    "received blockchain update event : {:?}",
+                    block_hash.to_hex()
+                );
                 self.blockchain_sync_state.remove_entry(block_hash);
                 self.fetch_next_blocks().await;
             }
 
             RoutingEvent::BlockFetchRequest(peer_index, block_hash, block_id) => {
                 self.blockchain_sync_state
-                    .add_entry(block_hash, block_id, peer_index,self.network.peers.clone()).await;
+                    .add_entry(block_hash, block_id, peer_index, self.network.peers.clone())
+                    .await;
             }
         }
         None

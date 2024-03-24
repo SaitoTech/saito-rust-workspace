@@ -16,7 +16,10 @@ use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
-use crate::core::defs::{Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD, BlockId};
+use crate::core::defs::{
+    BlockId, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
+};
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};

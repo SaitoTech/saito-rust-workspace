@@ -109,9 +109,7 @@ impl BlockchainSyncState {
     pub fn get_blocks_to_fetch_per_peer(
         &mut self,
     ) -> HashMap<PeerIndex, Vec<(SaitoHash, BlockId)>> {
-        trace!(
-            "getting block to be fetched per each peer",
-        );
+        trace!("getting block to be fetched per each peer",);
         let mut selected_blocks_per_peer: HashMap<PeerIndex, Vec<(SaitoHash, BlockId)>> =
             Default::default();
 
@@ -119,7 +117,10 @@ impl BlockchainSyncState {
         for (peer_index, deq) in self.blocks_to_fetch.iter_mut() {
             // TODO : sorting this array can be a performance hit. need to check
 
-            assert_ne!(*peer_index,0, "peer index 0 should not enter this list since we handle it at add_entry");
+            assert_ne!(
+                *peer_index, 0,
+                "peer index 0 should not enter this list since we handle it at add_entry"
+            );
 
             // we need to sort the list to make sure we are fetching the next in sequence blocks.
             // otherwise our memory will grow since we need to keep those fetched blocks in memory.
@@ -158,7 +159,12 @@ impl BlockchainSyncState {
 
                 match block_data.status {
                     BlockStatus::Queued => {
-                        trace!("selecting entry : {:?}-{:?} for peer : {:?}",block_data.block_id,block_data.block_hash.to_hex(),peer_index);
+                        trace!(
+                            "selecting entry : {:?}-{:?} for peer : {:?}",
+                            block_data.block_id,
+                            block_data.block_hash.to_hex(),
+                            peer_index
+                        );
                         selected_blocks_per_peer
                             .entry(*peer_index)
                             .or_default()
@@ -171,7 +177,12 @@ impl BlockchainSyncState {
                         match block_data.retry_count.cmp(&MAX_RETRIES_PER_BLOCK) {
                             Ordering::Less => {
                                 block_data.retry_count += 1;
-                                trace!("selecting failed entry : {:?}-{:?} for peer : {:?}",block_data.block_id,block_data.block_hash.to_hex(),peer_index);
+                                trace!(
+                                    "selecting failed entry : {:?}-{:?} for peer : {:?}",
+                                    block_data.block_id,
+                                    block_data.block_hash.to_hex(),
+                                    peer_index
+                                );
                                 selected_blocks_per_peer
                                     .entry(*peer_index)
                                     .or_default()
@@ -445,10 +456,10 @@ impl BlockchainSyncState {
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Deref;
     use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
     use crate::core::defs::BlockId;
     use crate::core::util::test::test_manager::test::TestManager;
+    use std::ops::Deref;
 
     #[tokio::test]
     #[ignore]
@@ -458,10 +469,10 @@ mod tests {
         let mut state = BlockchainSyncState::new(20);
 
         for i in 0..state.batch_size + 2 {
-            state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1,t.peers.clone());
+            state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1, t.peers.clone());
         }
-        state.add_entry([200; 32], 200, 1,t.peers.clone());
-        state.add_entry([201; 32], 201, 1,t.peers.clone());
+        state.add_entry([200; 32], 200, 1, t.peers.clone());
+        state.add_entry([201; 32], 201, 1, t.peers.clone());
 
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
         let mut result = state.get_blocks_to_fetch_per_peer();
@@ -506,10 +517,10 @@ mod tests {
         let mut t = TestManager::default();
         let mut state = BlockchainSyncState::new(3);
         for i in 0..state.batch_size + 50 {
-            state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1,t.peers.clone());
+            state.add_entry([(i + 1) as u8; 32], (i + 1) as u64, 1, t.peers.clone());
         }
-        state.add_entry([100; 32], 100, 1,t.peers.clone());
-        state.add_entry([200; 32], 200, 1,t.peers.clone());
+        state.add_entry([100; 32], 100, 1, t.peers.clone());
+        state.add_entry([200; 32], 200, 1, t.peers.clone());
 
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
         let mut result = state.get_blocks_to_fetch_per_peer();
@@ -527,8 +538,8 @@ mod tests {
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
         let result = state.get_blocks_to_fetch_per_peer();
         assert!(result.is_empty());
-        state.remove_entry([1; 32] );
-        state.remove_entry([3; 32] );
+        state.remove_entry([1; 32]);
+        state.remove_entry([3; 32]);
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
         let result = state.get_blocks_to_fetch_per_peer();
         assert_eq!(result.len(), 1);
@@ -540,7 +551,7 @@ mod tests {
         let vec = result.get_mut(&1).unwrap();
         assert_eq!(vec.len(), 1);
 
-        state.remove_entry([2; 32] );
+        state.remove_entry([2; 32]);
         // state.set_latest_blockchain_id(3);
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
         let mut result = state.get_blocks_to_fetch_per_peer();
@@ -551,14 +562,19 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-   async fn multiple_forks_from_multiple_peers_test() {
+    async fn multiple_forks_from_multiple_peers_test() {
         let mut t = TestManager::default();
         let mut state = BlockchainSyncState::new(10);
         for i in 0..state.batch_size + 50 {
-            state.add_entry([(i + 1) as u8; 32], (i + 1) as BlockId, 1,t.peers.clone());
+            state.add_entry([(i + 1) as u8; 32], (i + 1) as BlockId, 1, t.peers.clone());
         }
         for i in 4..state.batch_size + 50 {
-            state.add_entry([(i + 101) as u8; 32], (i + 1) as BlockId, 1,t.peers.clone());
+            state.add_entry(
+                [(i + 101) as u8; 32],
+                (i + 1) as BlockId,
+                1,
+                t.peers.clone(),
+            );
         }
 
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
