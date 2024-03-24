@@ -351,7 +351,7 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
     let result = blockchain.get_block(&block_hash);
 
     if result.is_none() {
-        warn!("block {:?} not found", block_hash);
+        warn!("block {:?} not found", block_hash.to_hex());
         return Err(JsValue::from("block not found"));
     }
     let block = result.cloned().unwrap();
@@ -433,14 +433,6 @@ pub async fn process_fetched_block(
             buffer: buffer.to_vec(),
         })
         .await;
-}
-
-#[wasm_bindgen]
-pub async fn process_failed_block_fetch(hash: js_sys::Uint8Array) {
-    let saito = SAITO.lock().await;
-    let mut blockchain = saito.routing_thread.blockchain.write().await;
-    let hash: SaitoHash = hash.to_vec().try_into().unwrap();
-    blockchain.unmark_as_fetching(&hash);
 }
 
 #[wasm_bindgen]

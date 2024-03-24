@@ -16,10 +16,7 @@ use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
-use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
-};
+use crate::core::defs::{Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD, BlockId};
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
@@ -167,7 +164,7 @@ pub struct Block {
     /// confirming that all of these values are correct given the content
     /// in the block itself.
     ///
-    pub id: u64,
+    pub id: BlockId,
     pub timestamp: Timestamp,
     pub previous_block_hash: [u8; 32],
     #[serde_as(as = "[_; 33]")]
@@ -620,7 +617,7 @@ impl Block {
         block.previous_block_unpaid = previous_block_unpaid;
         block.transactions = transactions.to_vec();
 
-        debug!("block.deserialize tx length = {:?}", transactions_len);
+        trace!("block.deserialize tx length = {:?}", transactions_len);
         if transactions_len == 0 && !(block.id == 1 && previous_block_hash == [0; 32]) {
             block.block_type = BlockType::Header;
         }

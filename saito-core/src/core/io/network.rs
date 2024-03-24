@@ -483,7 +483,8 @@ impl Network {
         }
         if block_exists {
             debug!(
-                "block : {:?} already exists in chain. not fetching",
+                "block : {:?}-{:?} already exists in chain. not fetching",
+                block_id,
                 block_hash.to_hex()
             );
             return None;
@@ -512,8 +513,7 @@ impl Network {
             "fetching block for incoming hash : {:?}",
             block_hash.to_hex()
         );
-        let mut blockchain = lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        blockchain.mark_as_fetching(block_hash);
+
         if self
             .io_interface
             .fetch_block_from_peer(block_hash, peer_index, url, block_id)
@@ -525,7 +525,6 @@ impl Network {
                 "failed fetching block : {:?} for block hash. so unmarking block as fetching",
                 block_hash.to_hex()
             );
-            blockchain.unmark_as_fetching(&block_hash);
         }
         Some(())
     }

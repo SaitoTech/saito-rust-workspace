@@ -2,17 +2,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::info;
+use log::{debug, info};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{
-    PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_WALLET,
-};
+use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp, LOCK_ORDER_CONFIGS, LOCK_ORDER_WALLET, BlockId};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::keep_time::KeepTime;
 use crate::core::process::process_event::ProcessEvent;
@@ -22,7 +19,7 @@ use crate::lock_for_read;
 
 #[derive(Debug)]
 pub enum MiningEvent {
-    LongestChainBlockAdded { hash: SaitoHash, difficulty: u64 },
+    LongestChainBlockAdded { hash: SaitoHash, difficulty: u64, block_id:BlockId },
 }
 
 /// Manages the miner
@@ -108,11 +105,12 @@ impl ProcessEvent<MiningEvent> for MiningThread {
             return None;
         }
         return match event {
-            MiningEvent::LongestChainBlockAdded { hash, difficulty } => {
-                info!(
-                    "Activating miner with hash : {:?} and difficulty : {:?}",
+            MiningEvent::LongestChainBlockAdded { hash, difficulty ,block_id} => {
+                debug!(
+                    "Activating miner with hash : {:?} and difficulty : {:?} for block_id : {:?}",
                     hash.to_hex(),
-                    difficulty
+                    difficulty,
+                    block_id
                 );
                 self.difficulty = difficulty;
                 self.target = hash;

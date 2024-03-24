@@ -54,11 +54,11 @@ pub struct NetworkController {
 impl NetworkController {
     pub async fn send(connection: &mut PeerSender, peer_index: u64, buffer: Vec<u8>) -> bool {
         let mut send_failed = false;
-        trace!(
-            "sending buffer with size : {:?} to peer : {:?}",
-            buffer.len(),
-            peer_index
-        );
+        // trace!(
+        //     "sending buffer with size : {:?} to peer : {:?}",
+        //     buffer.len(),
+        //     peer_index
+        // );
         // TODO : can be better optimized if we buffer the messages and flush once per timer event
         match connection {
             PeerSender::Warp(sender) => {
@@ -108,11 +108,11 @@ impl NetworkController {
         buffer: Vec<u8>,
     ) {
         let buf_len = buffer.len();
-        trace!(
-            "sending outgoing message : peer = {:?} with size : {:?}",
-            peer_index,
-            buf_len
-        );
+        // trace!(
+        //     "sending outgoing message : peer = {:?} with size : {:?}",
+        //     peer_index,
+        //     buf_len
+        // );
         let mut sockets = sockets.lock().await;
         let socket = sockets.get_mut(&peer_index);
         if socket.is_none() {
@@ -268,9 +268,10 @@ impl NetworkController {
         let response = result.unwrap();
         if response.status() != StatusCode::OK {
             warn!(
-                "failed fetching block : {:?}, with error code : {:?}",
+                "failed fetching block : {:?}, with error code : {:?} from url : {:?}",
                 block_hash.to_hex(),
-                response.status()
+                response.status(),
+                url
             );
             sender_to_core
                 .send(IoEvent {
@@ -407,11 +408,11 @@ impl NetworkController {
 
                     if result.is_binary() {
                         let buffer = result.into_bytes();
-                        trace!(
-                            "message buffer with size : {:?} received from peer : {:?}",
-                            buffer.len(),
-                            peer_index
-                        );
+                        // trace!(
+                        //     "message buffer with size : {:?} received from peer : {:?}",
+                        //     buffer.len(),
+                        //     peer_index
+                        // );
                         let message = IoEvent {
                             event_processor_id: 1,
                             event_id: 0,
@@ -442,11 +443,11 @@ impl NetworkController {
                     let result = result.unwrap();
                     match result {
                         tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
-                            trace!(
-                                "message buffer with size : {:?} received from peer : {:?}",
-                                buffer.len(),
-                                peer_index
-                            );
+                            // trace!(
+                            //     "message buffer with size : {:?} received from peer : {:?}",
+                            //     buffer.len(),
+                            //     peer_index
+                            // );
                             let message = IoEvent {
                                 event_processor_id: 1,
                                 event_id: 0,
@@ -471,7 +472,7 @@ pub struct PeerCounter {
 
 impl PeerCounter {
     pub fn get_next_index(&mut self) -> u64 {
-        self.counter = self.counter + 1;
+        self.counter += 1;
         self.counter
     }
 }

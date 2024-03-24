@@ -22,11 +22,13 @@ use crate::core::defs::{
     Timestamp, UtxoSet,
 };
 use crate::core::io::interface_io::InterfaceEvent;
-use crate::core::io::network::Network;
+use crate::core::io::network::Network; 
 use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
+use crate::core::routing_thread::RoutingEvent;
 use crate::core::util::balance_snapshot::BalanceSnapshot;
 use crate::core::util::configuration::Configuration;
+
 
 pub fn bit_pack(top: u32, bottom: u32) -> u64 {
     ((top as u64) << 32) + (bottom as u64)
@@ -73,8 +75,7 @@ pub struct Blockchain {
     pub lowest_acceptable_timestamp: u64,
     pub lowest_acceptable_block_hash: SaitoHash,
     pub lowest_acceptable_block_id: u64,
-
-    blocks_fetching: HashSet<SaitoHash>,
+    // blocks_fetching: HashSet<SaitoHash>,
 }
 
 impl Blockchain {
@@ -96,7 +97,7 @@ impl Blockchain {
             lowest_acceptable_timestamp: 0,
             lowest_acceptable_block_hash: [0; 32],
             lowest_acceptable_block_id: 0,
-            blocks_fetching: Default::default(),
+            // blocks_fetching: Default::default(),
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -119,6 +120,7 @@ impl Blockchain {
         network: Option<&Network>,
         storage: &mut Storage,
         sender_to_miner: Option<Sender<MiningEvent>>,
+        sender_to_router: Option<Sender<RoutingEvent>>,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
     ) -> AddBlockResult {
@@ -140,20 +142,21 @@ impl Blockchain {
         );
 
         // since we already have the block we unset the fetching state
-        self.unmark_as_fetching(&block.hash);
+        // self.unmark_as_fetching(&block.hash);
 
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
         // blockchain and our various indices.
         let block_hash = block.hash;
         let block_id = block.id;
-        let previous_block_hash = self.blockring.get_latest_block_hash();
+        let latest_block_hash = self.blockring.get_latest_block_hash();
         // let previous_block_hash = block.previous_block_hash;
 
         // sanity checks
         if self.blocks.contains_key(&block_hash) {
             error!(
-                "block already exists in blockchain {:?}. not adding",
+                "block : {:?}-{:?} already exists in blockchain. not adding",
+                block.id,
                 block.hash.to_hex()
             );
             return AddBlockResult::BlockAlreadyExists;
@@ -165,7 +168,6 @@ impl Blockchain {
         // penalties on routing peers.
         //
         // get missing block
-        //
         if !self.blockring.is_empty() && self.get_block(&block.previous_block_hash).is_none() {
             if block.previous_block_hash == [0; 32] {
                 info!(
@@ -173,42 +175,28 @@ impl Blockchain {
                     block.hash.to_hex()
                 );
             } else if block.source_connection_id.is_some() {
-                let block_hash = block.previous_block_hash;
+                let previous_block_hash = block.previous_block_hash;
 
-                let previous_is_in_queue;
+                let previous_block_fetched;
                 {
-                    previous_is_in_queue =
-                        iterate!(mempool.blocks_queue, 100).any(|b| block_hash == b.hash);
+                    previous_block_fetched =
+                        iterate!(mempool.blocks_queue, 100).any(|b| previous_block_hash == b.hash);
                 }
-                if !previous_is_in_queue {
-                    if network.is_some() && !self.is_block_fetching(&block_hash) {
-                        info!(
-                            "fetching missing block : {:?} before adding block : {:?}",
-                            block_hash.to_hex(),
-                            block.hash.to_hex()
-                        );
-                        self.mark_as_fetching(block_hash);
-                        let result = network
-                            .unwrap()
-                            .fetch_missing_block(
-                                block_hash,
-                                block.source_connection_id.as_ref().unwrap(),
-                                block.id - 1,
-                            )
-                            .await;
-                        if result.is_err() {
-                            warn!(
-                                "couldn't fetch parent block : {:?} for block : {:?}. unmarking the block",
-                                block.previous_block_hash.to_hex(),
-                                block.hash.to_hex()
-                            );
-                            self.unmark_as_fetching(&block_hash);
-                        }
-                    }
+                if !previous_block_fetched && block.id > 1 {
+                    debug!("need to fetch previous block : {:?}-{:?}",block.id-1,previous_block_hash.to_hex());
+                    sender_to_router
+                        .unwrap()
+                        .send(RoutingEvent::BlockFetchRequest(
+                            0,
+                            previous_block_hash,
+                            block.id - 1,
+                        ))
+                        .await
+                        .unwrap();
                 } else {
                     debug!(
                         "previous block : {:?} is in the mempool. not fetching",
-                        block_hash.to_hex()
+                        previous_block_hash.to_hex()
                     );
                 }
 
@@ -294,7 +282,7 @@ impl Blockchain {
         let mut old_chain: Vec<[u8; 32]> = Vec::new();
         let mut shared_ancestor_found = false;
         let mut new_chain_hash = block_hash;
-        let mut old_chain_hash = previous_block_hash;
+        let mut old_chain_hash = latest_block_hash;
         let mut am_i_the_longest_chain = false;
 
         while !shared_ancestor_found {
@@ -343,7 +331,7 @@ impl Blockchain {
             debug!(
                 "block without parent. block : {:?}, latest : {:?}",
                 block_hash.to_hex(),
-                previous_block_hash.to_hex()
+                latest_block_hash.to_hex()
             );
 
             //
@@ -370,8 +358,7 @@ impl Blockchain {
                 // next block and we are getting blocks out-of-order because of
                 // connection or network issues.
 
-                if previous_block_hash != [0; 32]
-                    && previous_block_hash == self.get_latest_block_hash()
+                if latest_block_hash != [0; 32] && latest_block_hash == self.get_latest_block_hash()
                 {
                     info!("blocks received out-of-order issue. handling edge case...");
 
@@ -462,6 +449,7 @@ impl Blockchain {
                         .send(MiningEvent::LongestChainBlockAdded {
                             hash: block_hash,
                             difficulty,
+                            block_id
                         })
                         .await
                         .unwrap();
@@ -788,7 +776,7 @@ impl Blockchain {
         if latest_block_id > count {
             min_id = latest_block_id - count;
         }
-        debug!("------------------------------------------------------");
+        info!("------------------------------------------------------");
         while current_id > 0 && current_id >= min_id {
             let hash = self
                 .blockring
@@ -796,7 +784,7 @@ impl Blockchain {
             if hash == [0; 32] {
                 break;
             }
-            debug!(
+            info!(
                 "{} - {:?}",
                 current_id,
                 self.blockring
@@ -805,7 +793,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
-        debug!("------------------------------------------------------");
+        info!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
@@ -1551,6 +1539,7 @@ impl Blockchain {
         network: Option<&Network>,
         storage: &mut Storage,
         sender_to_miner: Option<Sender<MiningEvent>>,
+        sender_to_router: Option<Sender<RoutingEvent>>,
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         debug!("adding blocks from mempool to blockchain");
@@ -1568,9 +1557,32 @@ impl Blockchain {
             if blocks.is_empty() {
                 sender = sender_to_miner.clone();
             }
+            let block_hash = block.hash;
             let result = self
-                .add_block(block, network, storage, sender, &mut mempool, configs)
+                .add_block(
+                    block,
+                    network,
+                    storage,
+                    sender,
+                    sender_to_router.clone(),
+                    &mut mempool,
+                    configs,
+                )
                 .await;
+            match result {
+                AddBlockResult::BlockAdded => {
+                    blockchain_updated = true;
+                    if let Some(sender) = sender_to_router.clone() {
+                        sender
+                            .send(RoutingEvent::BlockchainUpdated(block_hash))
+                            .await
+                            .unwrap();
+                    }
+                }
+                AddBlockResult::BlockAlreadyExists => {}
+                AddBlockResult::FailedButRetry => {}
+                AddBlockResult::FailedNotValid => {}
+            }
             if !blockchain_updated {
                 if let AddBlockResult::BlockAdded = result {
                     blockchain_updated = true;
@@ -1686,17 +1698,17 @@ impl Blockchain {
     }
 
     // TODO : this set of methods make things confusing since sync state functions also have same names. need to refactor
-    pub fn mark_as_fetching(&mut self, block_hash: SaitoHash) {
-        debug!("marking block : {:?} as fetching", block_hash.to_hex());
-        self.blocks_fetching.insert(block_hash);
-    }
-    pub fn unmark_as_fetching(&mut self, block_hash: &SaitoHash) {
-        debug!("unmarking block : {:?} as fetching", block_hash.to_hex());
-        self.blocks_fetching.remove(block_hash);
-    }
-    pub fn is_block_fetching(&self, block_hash: &SaitoHash) -> bool {
-        self.blocks_fetching.contains(block_hash)
-    }
+    // pub fn mark_as_fetching(&mut self, block_hash: SaitoHash) {
+    //     debug!("marking block : {:?} as fetching", block_hash.to_hex());
+    //     self.blocks_fetching.insert(block_hash);
+    // }
+    // pub fn unmark_as_fetching(&mut self, block_hash: &SaitoHash) {
+    //     debug!("unmarking block : {:?} as fetching", block_hash.to_hex());
+    //     self.blocks_fetching.remove(block_hash);
+    // }
+    // pub fn is_block_fetching(&self, block_hash: &SaitoHash) -> bool {
+    //     self.blocks_fetching.contains(block_hash)
+    // }
 }
 
 #[cfg(test)]
@@ -1719,7 +1731,7 @@ mod tests {
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_manager::test::TestManager;
 
-// fn init_testlog() {
+    // fn init_testlog() {
     //     let _ = pretty_env_logger::try_init();
     // }
 
@@ -2810,6 +2822,7 @@ mod tests {
                     Some(&t2.network),
                     &mut t2.storage,
                     Some(t2.sender_to_miner.clone()),
+                    None,
                     configs.deref(),
                 )
                 .await;
@@ -3008,6 +3021,7 @@ mod tests {
                     Some(&t.network),
                     &mut t.storage,
                     Some(t.sender_to_miner.clone()),
+                    None,
                     configs.deref(),
                 )
                 .await;

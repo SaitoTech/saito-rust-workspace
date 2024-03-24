@@ -77,7 +77,8 @@ impl Storage {
             .await;
         if result.is_err() {
             let err = result.err().unwrap();
-            error!("failed writing block to disk. {:?}", err);
+            // TODO : panicking currently to make sure we can serve any blocks for which we have propagated the header for
+            panic!("failed writing block to disk. {:?}", err);
             return "".to_string();
         }
         filename

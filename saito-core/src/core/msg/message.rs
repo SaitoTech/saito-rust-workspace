@@ -6,7 +6,7 @@ use log::{debug, error, trace, warn};
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::transaction::Transaction;
-use crate::core::defs::{SaitoHash, SaitoPublicKey};
+use crate::core::defs::{BlockHash, BlockId, ForkId, SaitoHash, SaitoPublicKey};
 use crate::core::msg::api_message::ApiMessage;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;
@@ -20,12 +20,12 @@ pub enum Message {
     Block(Block),
     Transaction(Transaction),
     BlockchainRequest(BlockchainRequest),
-    BlockHeaderHash(SaitoHash, u64),
+    BlockHeaderHash(BlockHash, BlockId),
     Ping(),
     SPVChain(),
     Services(Vec<PeerService>),
     GhostChain(GhostChainSync),
-    GhostChainRequest(u64, SaitoHash, SaitoHash),
+    GhostChainRequest(BlockId, BlockHash, ForkId),
     ApplicationMessage(ApiMessage),
     Result(ApiMessage),
     Error(ApiMessage),
@@ -78,11 +78,11 @@ impl Message {
         let message_type: u8 = u8::from_be_bytes(buffer[0..1].try_into().unwrap());
         let buffer = buffer[1..].to_vec();
 
-        trace!(
-            "deserializing buffer size = {:?} of type = {:?}",
-            buffer.len(),
-            message_type
-        );
+        // trace!(
+        //     "deserializing buffer size = {:?} of type = {:?}",
+        //     buffer.len(),
+        //     message_type
+        // );
 
         // TODO : remove hardcoded values into an enum
         match message_type {

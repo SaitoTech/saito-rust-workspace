@@ -216,6 +216,7 @@ pub mod test {
                         Some(&self.network),
                         &mut self.storage,
                         None,
+                        None,
                         &mut mempool,
                         configs.deref(),
                     )
@@ -927,6 +928,7 @@ pub mod test {
                     Some(&self.network),
                     &mut self.storage,
                     Some(self.sender_to_miner.clone()),
+                    None,
                     &mut mempool,
                     configs.deref(),
                 )
