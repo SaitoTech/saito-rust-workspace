@@ -547,7 +547,7 @@ impl Network {
         trace!("static peers : {:?}", self.static_peer_configs);
     }
 
-    pub async fn connect_to_static_peers(&mut self){
+    pub async fn connect_to_static_peers(&mut self) {
         let current_time = self.time_keeper.get_timestamp_in_ms();
         for (peer, reconnect_after) in &mut self.static_peer_configs {
             trace!("connecting to peer : {:?}", peer);
