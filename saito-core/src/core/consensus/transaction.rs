@@ -325,10 +325,10 @@ impl Transaction {
     /// [message]
     /// [hop][hop][hop]...
     pub fn deserialize_from_net(bytes: &Vec<u8>) -> Result<Transaction, Error> {
-        trace!(
-            "deserializing tx from buffer with length : {:?}",
-            bytes.len()
-        );
+        // trace!(
+        //     "deserializing tx from buffer with length : {:?}",
+        //     bytes.len()
+        // );
         if bytes.len() < TRANSACTION_SIZE {
             return Err(Error::from(ErrorKind::InvalidData));
         }
@@ -464,10 +464,10 @@ impl Transaction {
 
     // calculate total fees in block
     pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
-        trace!(
-            "generating total fees for tx : {:?}",
-            self.hash_for_signature.unwrap().to_hex()
-        );
+        // trace!(
+        //     "generating total fees for tx : {:?}",
+        //     self.hash_for_signature.unwrap().to_hex()
+        // );
 
         // calculate nolan in / out, fees
         // generate utxoset key for every slip

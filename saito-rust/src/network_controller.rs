@@ -8,6 +8,7 @@ use std::time::Duration;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use log::{debug, error, info, trace, warn};
+use reqwest::Client;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
@@ -24,9 +25,8 @@ use saito_core::core::consensus::block::{Block, BlockType};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::defs::{
-    PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
-    LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_NETWORK_CONTROLLER, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET, STAT_BIN_COUNT,
+    BlockId, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
+    STAT_BIN_COUNT,
 };
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::process::keep_time::KeepTime;
@@ -53,11 +53,11 @@ pub struct NetworkController {
 impl NetworkController {
     pub async fn send(connection: &mut PeerSender, peer_index: u64, buffer: Vec<u8>) -> bool {
         let mut send_failed = false;
-        trace!(
-            "sending buffer with size : {:?} to peer : {:?}",
-            buffer.len(),
-            peer_index
-        );
+        // trace!(
+        //     "sending buffer with size : {:?} to peer : {:?}",
+        //     buffer.len(),
+        //     peer_index
+        // );
         // TODO : can be better optimized if we buffer the messages and flush once per timer event
         match connection {
             PeerSender::Warp(sender) => {
@@ -107,11 +107,11 @@ impl NetworkController {
         buffer: Vec<u8>,
     ) {
         let buf_len = buffer.len();
-        trace!(
-            "sending outgoing message : peer = {:?} with size : {:?}",
-            peer_index,
-            buf_len
-        );
+        // trace!(
+        //     "sending outgoing message : peer = {:?} with size : {:?}",
+        //     peer_index,
+        //     buf_len
+        // );
         let mut sockets = sockets.lock().await;
         let socket = sockets.get_mut(&peer_index);
         if socket.is_none() {
@@ -232,6 +232,8 @@ impl NetworkController {
         event_id: u64,
         sender_to_core: Sender<IoEvent>,
         current_queries: Arc<Mutex<HashSet<String>>>,
+        client: Client,
+        block_id: BlockId,
     ) {
         debug!("fetching block : {:?}", url);
 
@@ -244,29 +246,69 @@ impl NetworkController {
             }
             queries.insert(url.clone());
         }
-        let result = reqwest::get(url.clone()).await;
+        let block_fetch_timeout_in_ms = 10_000;
+        let result = client
+            .get(url.clone())
+            .timeout(Duration::from_millis(block_fetch_timeout_in_ms))
+            .send()
+            .await;
         if result.is_err() {
             // TODO : should we retry here?
             warn!("failed fetching : {:?}", url);
+            let mut queries = current_queries.lock().await;
+            queries.remove(&url);
             sender_to_core
                 .send(IoEvent {
                     event_processor_id: 1,
                     event_id,
-                    event: NetworkEvent::BlockFetchFailed { block_hash },
+                    event: NetworkEvent::BlockFetchFailed {
+                        block_hash,
+                        peer_index,
+                        block_id,
+                    },
                 })
                 .await
                 .unwrap();
             return;
         }
         let response = result.unwrap();
-        let result = response.bytes().await;
-        if result.is_err() {
-            warn!("failed getting byte buffer from fetching block : {:?}", url);
+        if !matches!(response.status(), StatusCode::OK) {
+            warn!(
+                "failed fetching block : {:?}, with error code : {:?} from url : {:?}",
+                block_hash.to_hex(),
+                response.status(),
+                url
+            );
+            let mut queries = current_queries.lock().await;
+            queries.remove(&url);
             sender_to_core
                 .send(IoEvent {
                     event_processor_id: 1,
                     event_id,
-                    event: NetworkEvent::BlockFetchFailed { block_hash },
+                    event: NetworkEvent::BlockFetchFailed {
+                        block_hash,
+                        peer_index,
+                        block_id,
+                    },
+                })
+                .await
+                .unwrap();
+            return;
+        }
+        let result = response.bytes().await;
+        if result.is_err() {
+            warn!("failed getting byte buffer from fetching block : {:?}", url);
+            let mut queries = current_queries.lock().await;
+            queries.remove(&url);
+            sender_to_core
+                .send(IoEvent {
+                    event_processor_id: 1,
+                    event_id,
+                    event: NetworkEvent::BlockFetchFailed {
+                        block_hash,
+                        peer_index,
+                        block_id,
+                    },
                 })
                 .await
                 .unwrap();
@@ -376,11 +418,11 @@ impl NetworkController {
 
                     if result.is_binary() {
                         let buffer = result.into_bytes();
-                        trace!(
-                            "message buffer with size : {:?} received from peer : {:?}",
-                            buffer.len(),
-                            peer_index
-                        );
+                        // trace!(
+                        //     "message buffer with size : {:?} received from peer : {:?}",
+                        //     buffer.len(),
+                        //     peer_index
+                        // );
                         let message = IoEvent {
                             event_processor_id: 1,
                             event_id: 0,
@@ -411,11 +453,11 @@ impl NetworkController {
                     let result = result.unwrap();
                     match result {
                         tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
-                            trace!(
-                                "message buffer with size : {:?} received from peer : {:?}",
-                                buffer.len(),
-                                peer_index
-                            );
+                            // trace!(
+                            //     "message buffer with size : {:?} received from peer : {:?}",
+                            //     buffer.len(),
+                            //     peer_index
+                            // );
                             let message = IoEvent {
                                 event_processor_id: 1,
                                 event_id: 0,
@@ -440,7 +482,7 @@ pub struct PeerCounter {
 
 impl PeerCounter {
     pub fn get_next_index(&mut self) -> u64 {
-        self.counter = self.counter + 1;
+        self.counter += 1;
         self.counter
     }
 }
@@ -536,6 +578,14 @@ pub async fn run_network_controller(
                 .unwrap()
                 .thread_sleep_time_in_ms;
         }
+        let io_pool = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(10)
+            .enable_io()
+            .enable_time()
+            .thread_name("io-thread-pool")
+            .build()
+            .unwrap();
+
         let mut last_stat_on: Instant = Instant::now();
         loop {
             let result = receiver.recv().await;
@@ -594,6 +644,7 @@ pub async fn run_network_controller(
                         block_hash,
                         peer_index,
                         url,
+                        block_id,
                     } => {
                         let sender;
                         let current_queries;
@@ -607,7 +658,9 @@ pub async fn run_network_controller(
                             current_queries = network_controller.currently_queried_urls.clone();
                         }
                         // starting new thread to stop io controller from getting blocked
-                        tokio::spawn(async move {
+                        io_pool.spawn(async move {
+                            let client = reqwest::Client::new();
+
                             NetworkController::fetch_block(
                                 block_hash,
                                 peer_index,
@@ -615,6 +668,8 @@ pub async fn run_network_controller(
                                 event_id,
                                 sender,
                                 current_queries,
+                                client,
+                                block_id,
                             )
                             .await
                         });

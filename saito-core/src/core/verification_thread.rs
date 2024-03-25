@@ -14,10 +14,7 @@ use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::Transaction;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{
-    PrintForLog, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_PEERS,
-    LOCK_ORDER_WALLET,
-};
+use crate::core::defs::{PrintForLog, StatVariable, Timestamp};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::process_event::ProcessEvent;
 use crate::{drain, lock_for_read};
@@ -110,7 +107,7 @@ impl VerificationThread {
         self.invalid_txs.increment_by(invalid_txs as u64);
     }
     pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
-        trace!("verifying block buffer of size : {:?}", buffer.len());
+        // trace!("verifying block buffer of size : {:?}", buffer.len());
         let buffer_len = buffer.len();
         let result = Block::deserialize_from_net(buffer);
         if result.is_err() {

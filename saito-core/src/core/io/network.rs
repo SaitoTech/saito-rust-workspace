@@ -12,8 +12,7 @@ use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, LOCK_ORDER_BLOCKCHAIN,
-    LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL, LOCK_ORDER_PEERS, LOCK_ORDER_WALLET,
+    BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp,
     PEER_RECONNECT_WAIT_PERIOD,
 };
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
@@ -146,6 +145,7 @@ impl Network {
         &self,
         block_hash: SaitoHash,
         public_key: &SaitoPublicKey,
+        block_id: BlockId,
     ) -> Result<(), Error> {
         debug!(
             "fetch missing block : block : {:?} from : {:?}",
@@ -187,7 +187,7 @@ impl Network {
             peer_index = peer.index;
         }
         self.io_interface
-            .fetch_block_from_peer(block_hash, peer_index, url)
+            .fetch_block_from_peer(block_hash, peer_index, url, block_id)
             .await
     }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
@@ -458,6 +458,7 @@ impl Network {
     pub async fn process_incoming_block_hash(
         &mut self,
         block_hash: SaitoHash,
+        block_id: BlockId,
         peer_index: PeerIndex,
         blockchain_lock: Arc<RwLock<Blockchain>>,
         mempool_lock: Arc<RwLock<Mempool>>,
@@ -481,7 +482,8 @@ impl Network {
         }
         if block_exists {
             debug!(
-                "block : {:?} already exists in chain. not fetching",
+                "block : {:?}-{:?} already exists in chain. not fetching",
+                block_id,
                 block_hash.to_hex()
             );
             return None;
@@ -510,11 +512,10 @@ impl Network {
             "fetching block for incoming hash : {:?}",
             block_hash.to_hex()
         );
-        let mut blockchain = lock_for_write!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        blockchain.mark_as_fetching(block_hash);
+
         if self
             .io_interface
-            .fetch_block_from_peer(block_hash, peer_index, url)
+            .fetch_block_from_peer(block_hash, peer_index, url, block_id)
             .await
             .is_err()
         {
@@ -523,7 +524,6 @@ impl Network {
                 "failed fetching block : {:?} for block hash. so unmarking block as fetching",
                 block_hash.to_hex()
             );
-            blockchain.unmark_as_fetching(&block_hash);
         }
         Some(())
     }

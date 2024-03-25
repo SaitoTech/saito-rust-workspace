@@ -92,7 +92,7 @@ mod tests {
 
     use crate::core::consensus::hop::Hop;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{SaitoPublicKey, LOCK_ORDER_WALLET};
+    use crate::core::defs::SaitoPublicKey;
     use crate::core::util::crypto::{generate_keys, verify};
     use crate::lock_for_read;
 

@@ -12,6 +12,9 @@ pub type SaitoSignature = [u8; 64];
 pub type SaitoPublicKey = [u8; 33];
 pub type SaitoPrivateKey = [u8; 32];
 pub type SaitoHash = [u8; 32];
+pub type BlockHash = SaitoHash;
+
+pub type ForkId = SaitoHash;
 // pub type SlipUuid = [u8; 17];
 pub type SaitoUTXOSetKey = [u8; 58];
 pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;

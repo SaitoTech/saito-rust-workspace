@@ -50,8 +50,7 @@ pub mod test {
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
         Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-        Timestamp, UtxoSet, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS, LOCK_ORDER_MEMPOOL,
-        LOCK_ORDER_WALLET, PROJECT_PUBLIC_KEY,
+        Timestamp, UtxoSet, PROJECT_PUBLIC_KEY,
     };
     use crate::core::io::network::Network;
     use crate::core::io::storage::Storage;
@@ -215,6 +214,7 @@ pub mod test {
                         block,
                         Some(&self.network),
                         &mut self.storage,
+                        None,
                         None,
                         &mut mempool,
                         configs.deref(),
@@ -927,6 +927,7 @@ pub mod test {
                     Some(&self.network),
                     &mut self.storage,
                     Some(self.sender_to_miner.clone()),
+                    None,
                     &mut mempool,
                     configs.deref(),
                 )

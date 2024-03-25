@@ -9,7 +9,7 @@ use wasm_bindgen::JsValue;
 
 use saito_core::core::consensus::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::defs::{PeerIndex, PrintForLog, SaitoHash};
+use saito_core::core::defs::{BlockId, PeerIndex, PrintForLog, SaitoHash};
 use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use saito_core::core::util::configuration::PeerConfig;
 
@@ -80,6 +80,7 @@ impl InterfaceIO for WasmIoHandler {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
+        _block_id: BlockId,
     ) -> Result<(), Error> {
         let hash = js_sys::Uint8Array::new_with_length(32);
         hash.copy_from(block_hash.as_slice());
