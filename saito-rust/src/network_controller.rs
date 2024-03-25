@@ -246,10 +246,17 @@ impl NetworkController {
             }
             queries.insert(url.clone());
         }
-        let result = client.get(url.clone()).send().await;
+        let block_fetch_timeout_in_ms = 10_000;
+        let result = client
+            .get(url.clone())
+            .timeout(Duration::from_millis(block_fetch_timeout_in_ms))
+            .send()
+            .await;
         if result.is_err() {
             // TODO : should we retry here?
             warn!("failed fetching : {:?}", url);
+            let mut queries = current_queries.lock().await;
+            queries.remove(&url);
             sender_to_core
                 .send(IoEvent {
                     event_processor_id: 1,
@@ -265,13 +272,15 @@ impl NetworkController {
             return;
         }
         let response = result.unwrap();
-        if response.status() != StatusCode::OK {
+        if !matches!(response.status(), StatusCode::OK) {
             warn!(
                 "failed fetching block : {:?}, with error code : {:?} from url : {:?}",
                 block_hash.to_hex(),
                 response.status(),
                 url
             );
+            let mut queries = current_queries.lock().await;
+            queries.remove(&url);
             sender_to_core
                 .send(IoEvent {
                     event_processor_id: 1,
@@ -289,6 +298,8 @@ impl NetworkController {
         let result = response.bytes().await;
         if result.is_err() {
             warn!("failed getting byte buffer from fetching block : {:?}", url);
+            let mut queries = current_queries.lock().await;
+            queries.remove(&url);
             sender_to_core
                 .send(IoEvent {
                     event_processor_id: 1,

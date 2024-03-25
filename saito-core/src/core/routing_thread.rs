@@ -389,9 +389,9 @@ impl RoutingThread {
 
         self.fetch_next_blocks().await;
     }
-    async fn fetch_next_blocks(&mut self) {
+    async fn fetch_next_blocks(&mut self) -> bool {
         trace!("fetching next blocks from peers");
-
+        let mut work_done = false;
         {
             let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
             self.blockchain_sync_state
@@ -403,6 +403,7 @@ impl RoutingThread {
         let mut fetched_blocks: Vec<(PeerIndex, SaitoHash)> = Default::default();
         for (peer_index, vec) in map {
             for (hash, block_id) in vec.iter() {
+                work_done = true;
                 let result = self
                     .network
                     .process_incoming_block_hash(
@@ -421,10 +422,10 @@ impl RoutingThread {
                 }
             }
         }
-        // self.blockchain_sync_state.mark_as_fetching(fetched_blocks);
+        work_done
     }
     async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
-        trace!("sending verification request to thread");
+        // trace!("sending verification request to thread");
         // waiting till we get an acceptable sender
         let sender_count = self.senders_to_verification.len();
         let mut trials = 0;
@@ -439,10 +440,10 @@ impl RoutingThread {
 
             if sender.capacity() > 0 {
                 sender.send(request).await.unwrap();
-                trace!(
-                    "verification request sent to verification thread : {:?}",
-                    sender_index
-                );
+                // trace!(
+                //     "verification request sent to verification thread : {:?}",
+                //     sender_index
+                // );
                 return;
             }
             if trials == sender_count {
@@ -592,10 +593,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 block_id,
             } => {
                 debug!("block fetch failed : {:?}", block_hash.to_hex());
-                // let mut blockchain = lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
-                // warn!("failed fetching block : {:?} from network thread. so un-marking block as fetching",block_hash.to_hex());
-
-                // blockchain.unmark_as_fetching(&block_hash);
 
                 self.blockchain_sync_state
                     .mark_as_failed(block_id, block_hash, peer_index);
@@ -612,16 +609,24 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
         let duration_value: Timestamp = duration.as_millis() as Timestamp;
 
+        let mut work_done = false;
+
         if !self.initial_connection {
             self.network.connect_to_static_peers().await;
             self.initial_connection = true;
+            work_done = true;
         } else if self.initial_connection {
             self.reconnection_timer += duration_value;
             if self.reconnection_timer >= self.reconnection_wait_time {
                 self.network.connect_to_static_peers().await;
                 self.network.send_pings().await;
                 self.reconnection_timer = 0;
+                work_done &= self.fetch_next_blocks().await;
             }
+        }
+
+        if work_done {
+            return Some(());
         }
         None
     }

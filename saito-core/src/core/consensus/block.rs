@@ -620,7 +620,7 @@ impl Block {
         block.previous_block_unpaid = previous_block_unpaid;
         block.transactions = transactions.to_vec();
 
-        trace!("block.deserialize tx length = {:?}", transactions_len);
+        // trace!("block.deserialize tx length = {:?}", transactions_len);
         if transactions_len == 0 && !(block.id == 1 && previous_block_hash == [0; 32]) {
             block.block_type = BlockType::Header;
         }

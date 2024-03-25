@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::peer_collection::PeerCollection;
 use ahash::HashMap;
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::core::defs::{BlockHash, BlockId, PeerIndex, PrintForLog, SaitoHash};
@@ -23,14 +23,11 @@ struct BlockData {
     block_hash: BlockHash,
     block_id: BlockId,
     status: BlockStatus,
-    retry_count: u8,
+    retry_count: u32,
 }
 
-/// Maximum amount of blocks which can be fetched concurrently from a peer. If this number is too high, the peer's performance might get affected or the requests might be rejected
-pub const MAX_CONCURRENT_FETCH_COUNT: u64 = 10;
-
 /// How many times should we retry before giving up on that block for that peer
-const MAX_RETRIES_PER_BLOCK: u8 = 5;
+const MAX_RETRIES_PER_BLOCK: u32 = 500;
 
 /// Maintains the state for fetching blocks from other peers into this peer.
 /// Tries to fetch the blocks in the most resource efficient way possible.
@@ -39,17 +36,19 @@ pub struct BlockchainSyncState {
     received_block_picture: HashMap<PeerIndex, VecDeque<(BlockId, SaitoHash)>>,
     /// These are the blocks which we have to fetch from each of our peers
     blocks_to_fetch: HashMap<PeerIndex, VecDeque<BlockData>>,
-    /// We only fetch within a certain window to make sure we process what we receive and to reduce the burden of the fetched peers
-    // block_fetch_ceiling: BlockId,
+    /// Maximum amount of blocks which can be fetched concurrently from a peer. If this number is too high, the peer's performance might get affected or the requests might be rejected
     batch_size: usize,
 }
 
 impl BlockchainSyncState {
     pub fn new(batch_size: usize) -> BlockchainSyncState {
+        info!(
+            "max concurrent block fetches per peer is set as {:?}",
+            batch_size
+        );
         BlockchainSyncState {
             received_block_picture: Default::default(),
             blocks_to_fetch: Default::default(),
-            // block_fetch_ceiling: batch_size as BlockId,
             batch_size,
         }
     }
@@ -60,11 +59,6 @@ impl BlockchainSyncState {
         trace!("building peer block picture");
         // for every block picture received from a peer, we sort and create a list of sequential hashes to fetch from peers
         for (peer_index, received_picture_from_peer) in self.received_block_picture.iter_mut() {
-            if received_picture_from_peer.is_empty() {
-                // nothing to process for this peer
-                continue;
-            }
-
             // need to sort before sequencing
             received_picture_from_peer.make_contiguous().sort_by(
                 |(id_a, hash_a), (id_b, hash_b)| {
@@ -75,12 +69,14 @@ impl BlockchainSyncState {
                 },
             );
 
+            let blocks_to_fetch_from_peer = self.blocks_to_fetch.entry(*peer_index).or_default();
+            let mut counter = 0;
+
             loop {
                 if received_picture_from_peer.is_empty() {
                     // have added all the received block hashes to the fetching list
                     break;
                 }
-                let blocks_to_fetch_from_peer = self.blocks_to_fetch.entry(*peer_index);
 
                 let (id, hash) = received_picture_from_peer
                     .pop_front()
@@ -97,7 +93,34 @@ impl BlockchainSyncState {
                     status: BlockStatus::Queued,
                     retry_count: 0,
                 };
-                blocks_to_fetch_from_peer.or_default().push_back(block_data);
+
+                let already_exists = blocks_to_fetch_from_peer.iter().any(|b| {
+                    let exists =
+                        b.block_hash == block_data.block_hash && b.block_id == block_data.block_id;
+                    if exists {
+                        trace!(
+                            "block : {:?}-{:?} already in the queue to be fetched with status : {:?} / retry_count : {:?}",
+                            b.block_id,
+                            b.block_hash.to_hex(),
+                            b.status,
+                            b.retry_count
+                        );
+                    }
+                    exists
+                });
+
+                if !already_exists {
+                    counter += 1;
+                    blocks_to_fetch_from_peer.push_back(block_data);
+                }
+            }
+            if counter > 0 {
+                trace!(
+                    "{:?} blocks selected (total : {:?}) for peer : {:?}",
+                    counter,
+                    blocks_to_fetch_from_peer.len(),
+                    peer_index
+                );
             }
         }
         // removing empty lists from memory
@@ -141,6 +164,7 @@ impl BlockchainSyncState {
                     BlockStatus::Queued => {}
                     BlockStatus::Fetching => {
                         fetching_count += 1;
+                        trace!("currently fetching : {:?}-{:?} from peer : {:?} with retry_count : {:?}",block_data.block_id,block_data.block_hash.to_hex(),peer_index, block_data.retry_count);
                     }
                     BlockStatus::Fetched => {}
                     BlockStatus::Failed => {}
@@ -155,7 +179,6 @@ impl BlockchainSyncState {
                     // we have reached allowed concurrent fetches quota.
                     break;
                 }
-                allowed_quota -= 1;
 
                 match block_data.status {
                     BlockStatus::Queued => {
@@ -165,6 +188,7 @@ impl BlockchainSyncState {
                             block_data.block_hash.to_hex(),
                             peer_index
                         );
+                        allowed_quota -= 1;
                         selected_blocks_per_peer
                             .entry(*peer_index)
                             .or_default()
@@ -183,11 +207,8 @@ impl BlockchainSyncState {
                                     block_data.block_hash.to_hex(),
                                     peer_index
                                 );
-                                selected_blocks_per_peer
-                                    .entry(*peer_index)
-                                    .or_default()
-                                    .push((block_data.block_hash, block_data.block_id));
-                                block_data.status = BlockStatus::Fetching;
+                                allowed_quota -= 1;
+                                block_data.status = BlockStatus::Queued;
                             }
                             Ordering::Equal => {
                                 error!("ignoring block : {:?}-{:?} from peer : {:?} since we have repeatedly failed to fetch it",
@@ -205,11 +226,20 @@ impl BlockchainSyncState {
             }
 
             trace!(
-                "peer : {:?} to be fetched {:?} blocks. first : {:?} last : {:?}",
+                "peer : {:?} to be fetched {:?} blocks. first : {:?} last : {:?} fetching : {:?} failed : {:?} queued : {:?}",
                 peer_index,
                 deq.len(),
                 deq.front().unwrap().block_id,
-                deq.back().unwrap().block_id
+                deq.back().unwrap().block_id,
+                deq.iter()
+                    .filter(|b| matches!(b.status, BlockStatus::Fetching))
+                    .count(),
+                deq.iter()
+                    .filter(|b| matches!(b.status, BlockStatus::Failed))
+                    .count(),
+                deq.iter()
+                    .filter(|b| matches!(b.status, BlockStatus::Queued))
+                    .count()
             );
         }
 
@@ -252,7 +282,7 @@ impl BlockchainSyncState {
                 break;
             }
         }
-        self.clean_fetched();
+        self.remove_fetched_blocks();
     }
 
     /// Removes all the entries related to fetched blocks and removes any empty collections from memory
@@ -268,26 +298,19 @@ impl BlockchainSyncState {
     /// ```
     ///
     /// ```
-    fn clean_fetched(&mut self) {
-        trace!("cleaning fetched");
+    fn remove_fetched_blocks(&mut self) {
+        let mut counter = 0;
         self.blocks_to_fetch.retain(|_, res| {
-            while let Some(block_data) = res.front() {
-                match block_data.status {
-                    BlockStatus::Fetched => {}
-                    _ => {
-                        // since the list is ordered, we can break the loop at the first not(Fetched) result
-                        break;
-                    }
+            res.retain(|b| {
+                if matches!(b.status, BlockStatus::Fetched) {
+                    counter += 1;
+                    return false;
                 }
-                trace!(
-                    "removing hash : {:?} - {:?} from peer",
-                    block_data.block_hash.to_hex(),
-                    block_data.block_id,
-                );
-                res.pop_front();
-            }
+                true
+            });
             !res.is_empty()
         });
+        trace!("{:?} fetched blocks removed from sync state", counter);
     }
     /// Adds an entry to this data structure which will be fetched later after prioritizing.
     ///
@@ -442,7 +465,7 @@ impl BlockchainSyncState {
                 .find(|data| data.block_id == id && data.block_hash == hash);
             match data {
                 None => {
-                    error!("we are marking a block {:?}-{:?} from peer : {:?} as failed to fetch. But we don't have such a block",id,hash.to_hex(),peer_index);
+                    error!("we are marking a block {:?}-{:?} from peer : {:?} as failed to fetch. But we don't have such a block or it's already fetched",id,hash.to_hex(),peer_index);
                 }
                 Some(data) => {
                     data.status = BlockStatus::Failed;
