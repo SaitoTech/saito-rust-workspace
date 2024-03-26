@@ -15,7 +15,7 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp, LOCK_ORDER_WALLET,
+    Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -64,7 +64,11 @@ impl Mempool {
     }
 
     pub fn add_block(&mut self, block: Block) {
-        debug!("mempool add block : {:?}", block.hash.to_hex());
+        debug!(
+            "mempool add block : {:?}-{:?}",
+            block.id,
+            block.hash.to_hex()
+        );
         let hash_to_insert = block.hash;
         if !iterate!(self.blocks_queue, 100).any(|block| block.hash == hash_to_insert) {
             self.blocks_queue.push_back(block);
@@ -361,10 +365,7 @@ mod tests {
 
     use crate::core::consensus::burnfee::HEARTBEAT;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{
-        SaitoPrivateKey, SaitoPublicKey, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_MEMPOOL,
-    };
+    use crate::core::defs::{SaitoPrivateKey, SaitoPublicKey};
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
     use crate::{lock_for_read, lock_for_write};
 

@@ -13,10 +13,7 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{
-    PrintForLog, SaitoHash, StatVariable, Timestamp, LOCK_ORDER_BLOCKCHAIN, LOCK_ORDER_CONFIGS,
-    LOCK_ORDER_MEMPOOL, LOCK_ORDER_WALLET, STAT_BIN_COUNT,
-};
+use crate::core::defs::{PrintForLog, SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT};
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::io::storage::Storage;
@@ -163,6 +160,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                             Some(&self.network),
                             &mut self.storage,
                             Some(self.sender_to_miner.clone()),
+                            None,
                             &mut mempool,
                             configs.deref(),
                         )
@@ -239,22 +237,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 // dropping the lock here since blockchain needs the write lock to add blocks
                 drop(mempool);
                 self.stats.blocks_created.increment();
-                let updated = blockchain
+                let _updated = blockchain
                     .add_blocks_from_mempool(
                         self.mempool.clone(),
                         Some(&self.network),
                         &mut self.storage,
                         Some(self.sender_to_miner.clone()),
+                        Some(self.sender_to_router.clone()),
                         configs.deref(),
                     )
                     .await;
-
-                if updated {
-                    self.sender_to_router
-                        .send(RoutingEvent::BlockchainUpdated)
-                        .await
-                        .unwrap();
-                }
 
                 debug!("blocks added to blockchain");
 
@@ -340,19 +332,20 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         Some(&self.network),
                         &mut self.storage,
                         Some(self.sender_to_miner.clone()),
+                        Some(self.sender_to_router.clone()),
                         configs.deref(),
                     )
                     .await;
 
                 if updated {
-                    self.sender_to_router
-                        .send(RoutingEvent::StartBlockIdUpdated(blockchain.last_block_id))
-                        .await
-                        .unwrap();
-                    self.sender_to_router
-                        .send(RoutingEvent::BlockchainUpdated)
-                        .await
-                        .unwrap();
+                    // self.sender_to_router
+                    //     .send(RoutingEvent::StartBlockIdUpdated(blockchain.last_block_id))
+                    //     .await
+                    //     .unwrap();
+                    // self.sender_to_router
+                    //     .send(RoutingEvent::BlockchainUpdated)
+                    //     .await
+                    //     .unwrap();
                 }
 
                 Some(())
@@ -456,6 +449,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         None,
                         &mut self.storage,
                         None,
+                        None,
                         configs.deref(),
                     )
                     .await;
@@ -469,10 +463,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             "sending block id update as : {:?}",
             blockchain.last_block_id
         );
-        self.sender_to_router
-            .send(RoutingEvent::StartBlockIdUpdated(blockchain.last_block_id))
-            .await
-            .unwrap();
+        // self.sender_to_router
+        //     .send(RoutingEvent::StartBlockIdUpdated(blockchain.last_block_id))
+        //     .await
+        //     .unwrap();
     }
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {

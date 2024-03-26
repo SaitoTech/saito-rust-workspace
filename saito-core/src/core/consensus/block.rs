@@ -17,7 +17,7 @@ use crate::core::consensus::merkle::MerkleTree;
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    BlockId, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
     SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
 };
 use crate::core::io::storage::Storage;
@@ -167,7 +167,7 @@ pub struct Block {
     /// confirming that all of these values are correct given the content
     /// in the block itself.
     ///
-    pub id: u64,
+    pub id: BlockId,
     pub timestamp: Timestamp,
     pub previous_block_hash: [u8; 32],
     #[serde_as(as = "[_; 33]")]
@@ -620,7 +620,7 @@ impl Block {
         block.previous_block_unpaid = previous_block_unpaid;
         block.transactions = transactions.to_vec();
 
-        debug!("block.deserialize tx length = {:?}", transactions_len);
+        // trace!("block.deserialize tx length = {:?}", transactions_len);
         if transactions_len == 0 && !(block.id == 1 && previous_block_hash == [0; 32]) {
             block.block_type = BlockType::Header;
         }
@@ -2060,10 +2060,7 @@ mod tests {
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{
-        Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD, LOCK_ORDER_CONFIGS,
-        LOCK_ORDER_WALLET,
-    };
+    use crate::core::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
     use crate::core::util::test::test_manager::test::TestManager;

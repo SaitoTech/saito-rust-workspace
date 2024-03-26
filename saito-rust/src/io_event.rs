@@ -1,7 +1,6 @@
 use std::sync::Mutex;
 
 use lazy_static::lazy_static;
-use log::trace;
 
 use saito_core::core::io::network_event::NetworkEvent;
 
@@ -22,7 +21,7 @@ impl IoEvent {
         let mut value = EVENT_COUNTER.lock().unwrap();
         *value = *value + 1;
         assert_ne!(*value, 0);
-        trace!("new event created : {:?}", *value);
+        // trace!("new event created : {:?}", *value);
         IoEvent {
             event_processor_id: 0,
             event_id: value.clone(),
