@@ -136,6 +136,11 @@ pub fn verify_signature(
     }
 }
 
+pub fn is_valid_public_key(key: &SaitoPublicKey) -> bool {
+    let result = PublicKey::from_slice(key);
+     result.is_ok() 
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -208,5 +213,14 @@ mod tests {
         assert_eq!(verify(&msg, &sign(&msg, &private_key2), &public_key2), true);
         assert_eq!(verify(&msg, &sign(&msg, &private_key), &public_key2), false);
         assert_eq!(verify(&msg, &sign(&msg, &private_key2), &public_key), false);
+    }
+
+    #[test]
+    fn is_valid_public_key_test() {
+        let (public_key, _) = generate_keys();
+        assert!(is_valid_public_key(&public_key));
+
+        let public_key: SaitoPublicKey = [0; 33];
+        assert!(!is_valid_public_key(&public_key));
     }
 }

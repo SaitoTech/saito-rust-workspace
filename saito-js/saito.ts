@@ -415,4 +415,8 @@ export default class Saito {
   public async setWalletVersion(major: number, minor: number, patch: number) {
     await Saito.getLibInstance().set_wallet_version(major, minor, patch);
   }
+
+  public isValidPublicKey(key: string): boolean {
+    return Saito.getLibInstance().is_valid_public_key(key);
+  }
 }

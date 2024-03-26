@@ -761,6 +761,16 @@ pub async fn set_wallet_version(major: u8, minor: u8, patch: u16) {
     };
 }
 
+#[wasm_bindgen]
+pub fn is_valid_public_key(key: JsString) -> bool {
+    let result = string_to_key(key);
+    if result.is_err() {
+        return false;
+    }
+    let key: SaitoPublicKey = result.unwrap();
+    saito_core::core::util::crypto::is_valid_public_key(&key)
+}
+
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
     let (mut secret_key, mut public_key) =
         SECP256K1.generate_keypair(&mut rand::rngs::OsRng::default());

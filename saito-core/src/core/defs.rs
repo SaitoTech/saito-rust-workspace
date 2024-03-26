@@ -340,3 +340,4 @@ impl_print!(SaitoHash);
 impl_print!(SaitoPublicKey);
 impl_print!(SaitoSignature);
 impl_print!(SaitoUTXOSetKey);
+
