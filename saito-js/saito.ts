@@ -266,6 +266,15 @@ export default class Saito {
     return tx;
   }
 
+  public async createTransactionWithMultiplePayments<T extends Transaction>(keys: string[], amounts: bigint[], fee: bigint): Promise<T> {
+    let wasmTx = await Saito.getLibInstance().create_transaction_with_multiple_payments(keys, amounts, fee);
+
+    let tx = Saito.getInstance().factory.createTransaction(wasmTx) as T;
+    tx.timestamp = new Date().getTime();
+
+    return tx;
+  }
+
   public async getPeers(): Promise<Array<Peer>> {
     let peers = await Saito.getLibInstance().get_peers();
     return peers.map((peer: any) => {
@@ -417,6 +426,11 @@ export default class Saito {
   }
 
   public isValidPublicKey(key: string): boolean {
-    return Saito.getLibInstance().is_valid_public_key(key);
+    try {
+      return Saito.getLibInstance().is_valid_public_key(key);
+    } catch (e) {
+      console.error(e);
+    }
+    return false;
   }
 }

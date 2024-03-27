@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use js_sys::{Array, JsString, Uint8Array};
+use js_sys::{Array, BigInt, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
 use secp256k1::SECP256K1;
@@ -25,9 +25,7 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::defs::{
-    PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
-};
+use saito_core::core::defs::{PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT, Currency};
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::io::storage::Storage;
@@ -313,6 +311,42 @@ pub async fn create_transaction(
         amount,
         fee,
         force_merge,
+        Some(&saito.consensus_thread.network),
+    );
+    if transaction.is_err() {
+        error!(
+            "failed creating transaction. {:?}",
+            transaction.err().unwrap()
+        );
+        return Err(JsValue::from("Failed creating transaction"));
+    }
+    let transaction = transaction.unwrap();
+    let wasm_transaction = WasmTransaction::from_transaction(transaction);
+    Ok(wasm_transaction)
+}
+
+#[wasm_bindgen]
+pub async fn create_transaction_with_multiple_payments(
+    public_keys: js_sys::Array,
+    amounts: js_sys::BigUint64Array,
+    fee: u64,
+    force_merge: bool,
+) -> Result<WasmTransaction, JsValue> {
+    let saito = SAITO.lock().await;
+    let mut wallet = saito.context.wallet.write().await;
+    
+    let keys:Vec<SaitoPublicKey> = string_array_to_base58_keys(public_keys);
+    let amounts:Vec<Currency> = amounts.to_vec();
+    
+    if keys.len()!=amounts.len(){
+        return Err(JsValue::from("keys and payments have different counts"));
+    }
+
+    let transaction = Transaction::create_with_multiple_payments(
+        &mut wallet,
+        keys,
+        amounts,
+        fee,
         Some(&saito.consensus_thread.network),
     );
     if transaction.is_err() {
