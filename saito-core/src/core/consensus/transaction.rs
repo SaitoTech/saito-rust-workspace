@@ -1,3 +1,4 @@
+use ahash::HashMap;
 use std::io::{Error, ErrorKind};
 
 use log::{debug, error, info, trace, warn};
@@ -158,11 +159,33 @@ impl Transaction {
         _force_merge: bool,
         network: Option<&Network>,
     ) -> Result<Transaction, Error> {
+        Self::create_with_multiple_payments(
+            wallet,
+            vec![to_public_key],
+            vec![with_payment],
+            with_fee,
+            network,
+        )
+    }
+
+    pub fn create_with_multiple_payments(
+        wallet: &mut Wallet,
+        mut keys: Vec<SaitoPublicKey>,
+        mut payments: Vec<Currency>,
+        mut with_fee: Currency,
+        network: Option<&Network>,
+    ) -> Result<Transaction, Error> {
+        let total_payment: Currency = payments.iter().sum();
         trace!(
-            "generating transaction : payment = {:?}, fee = {:?}",
-            with_payment,
+            "generating transaction : payments = {:?}, fee = {:?}",
+            total_payment,
             with_fee
         );
+
+        if payments.len() != keys.len() {
+            error!("keys and payments provided to the transaction is not similar in count. payments : {:?} keys : {:?}",payments.len(),keys.len());
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
 
         let available_balance = wallet.get_available_balance();
 
@@ -170,11 +193,11 @@ impl Transaction {
             with_fee = 0;
         }
 
-        let total_requested = with_payment + with_fee;
+        let total_requested = total_payment + with_fee;
         trace!(
             "in generate transaction. available: {} and payment: {} and fee: {}",
             available_balance,
-            with_payment,
+            total_payment,
             with_fee
         );
         if available_balance < total_requested {
@@ -206,10 +229,15 @@ impl Transaction {
                 output_slips.remove(0);
             }
         }
-        let mut output = Slip::default();
-        output.public_key = to_public_key;
-        output.amount = with_payment;
-        transaction.add_to_slip(output);
+        for i in 0..keys.len() {
+            let key = keys.pop().unwrap();
+            let payment = payments.pop().unwrap();
+
+            let mut output = Slip::default();
+            output.public_key = key;
+            output.amount = payment;
+            transaction.add_to_slip(output);
+        }
 
         Ok(transaction)
     }
@@ -424,7 +452,6 @@ impl Transaction {
         self.transaction_type == TransactionType::Issuance
     }
 
-    //
     // generates
     //
     // when the block is created, block.generate() is called to fill in all of the
@@ -434,29 +461,20 @@ impl Transaction {
     // tx.hash -> needed to generate merkle root
     // tx.fees -> needed to calculate payouts
     // tx.work -> needed to confirm adequate routing work
-    //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
-        //
         // ensure hash exists for signing
-        //
         self.generate_hash_for_signature();
 
-        //
         // nolan_in, nolan_out, total fees
-        //
         self.generate_total_fees(tx_index, block_id);
 
-        //
         // routing work for asserted public_key (creator)
-        //
         self.generate_total_work(public_key);
 
         true
     }
 
-    //
     // calculate cumulative fee share in block
-    //
     pub fn generate_cumulative_fees(&mut self, cumulative_fees: Currency) -> Currency {
         self.cumulative_fees = cumulative_fees + self.total_fees;
         self.cumulative_fees
