@@ -25,7 +25,9 @@ use saito_core::core::consensus::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::defs::{PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT, Currency};
+use saito_core::core::defs::{
+    Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+};
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::io::storage::Storage;
@@ -334,11 +336,11 @@ pub async fn create_transaction_with_multiple_payments(
 ) -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.lock().await;
     let mut wallet = saito.context.wallet.write().await;
-    
-    let keys:Vec<SaitoPublicKey> = string_array_to_base58_keys(public_keys);
-    let amounts:Vec<Currency> = amounts.to_vec();
-    
-    if keys.len()!=amounts.len(){
+
+    let keys: Vec<SaitoPublicKey> = string_array_to_base58_keys(public_keys);
+    let amounts: Vec<Currency> = amounts.to_vec();
+
+    if keys.len() != amounts.len() {
         return Err(JsValue::from("keys and payments have different counts"));
     }
 

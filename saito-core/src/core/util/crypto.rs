@@ -138,7 +138,7 @@ pub fn verify_signature(
 
 pub fn is_valid_public_key(key: &SaitoPublicKey) -> bool {
     let result = PublicKey::from_slice(key);
-     result.is_ok() 
+    result.is_ok()
 }
 
 #[cfg(test)]
@@ -222,7 +222,7 @@ mod tests {
 
         let public_key: SaitoPublicKey = [0; 33];
         assert!(!is_valid_public_key(&public_key));
-        
+
         let public_key: SaitoPublicKey = [u8::try_from('a').unwrap(); 33];
         assert!(!is_valid_public_key(&public_key));
     }
