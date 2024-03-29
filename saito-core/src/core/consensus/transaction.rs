@@ -774,7 +774,7 @@ impl Transaction {
             self.timestamp.to_be_bytes().as_slice(),
             inputs.as_slice(),
             outputs.as_slice(),
-            (self.txs_replacements as u32).to_be_bytes().as_slice(),
+            self.txs_replacements.to_be_bytes().as_slice(),
             (self.transaction_type as u32).to_be_bytes().as_slice(),
             self.data.as_slice(),
         ]
