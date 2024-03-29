@@ -779,7 +779,7 @@ impl Blockchain {
         if latest_block_id > count {
             min_id = latest_block_id - count;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
         while current_id > 0 && current_id >= min_id {
             let hash = self
                 .blockring
@@ -787,7 +787,7 @@ impl Blockchain {
             if hash == [0; 32] {
                 break;
             }
-            info!(
+            debug!(
                 "{} - {:?}",
                 current_id,
                 self.blockring
@@ -796,7 +796,7 @@ impl Blockchain {
             );
             current_id -= 1;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
