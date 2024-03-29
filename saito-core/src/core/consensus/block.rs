@@ -1287,6 +1287,7 @@ impl Block {
             let mut slip_index = 0;
             let mut transaction = Transaction::default();
             transaction.transaction_type = TransactionType::Fee;
+            transaction.timestamp = self.timestamp;
             if miner_publickey != [0; 33] {
                 let mut output = Slip::default();
                 output.public_key = miner_publickey;
