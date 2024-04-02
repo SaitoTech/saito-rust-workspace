@@ -367,6 +367,11 @@ impl Blockchain {
 
                     let disconnected_block_id = self.get_latest_block_id();
                     debug!("disconnected id : {:?}", disconnected_block_id);
+                    debug!(
+                        "disconnecting blocks from : {:?} to : {:?}",
+                        block_id + 1,
+                        disconnected_block_id
+                    );
                     for i in block_id + 1..=disconnected_block_id {
                         let disconnected_block_hash =
                             self.blockring.get_longest_chain_block_hash_at_block_id(i);
