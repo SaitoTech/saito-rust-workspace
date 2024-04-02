@@ -471,6 +471,19 @@ pub async fn process_fetched_block(
 }
 
 #[wasm_bindgen]
+pub async fn process_failed_block_fetch(hash: js_sys::Uint8Array, block_id: u64, peer_index: u64) {
+    let mut saito = SAITO.lock().await;
+    saito
+        .routing_thread
+        .process_network_event(NetworkEvent::BlockFetchFailed {
+            block_hash: hash.to_vec().try_into().unwrap(),
+            peer_index,
+            block_id,
+        })
+        .await;
+}
+
+#[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
     let mut saito = SAITO.lock().await;
 

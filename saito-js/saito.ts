@@ -70,7 +70,7 @@ export default class Saito {
       disconnect_from_peer: (peer_index: bigint) => {
         return sharedMethods.disconnectFromPeer(peer_index);
       },
-      fetch_block_from_peer: (hash: Uint8Array, peer_index: bigint, url: string) => {
+      fetch_block_from_peer: (hash: Uint8Array, peer_index: bigint, url: string, block_id: bigint) => {
         // console.log("fetching block : " + url);
         sharedMethods.fetchBlockFromPeer(url)
           .then((buffer: Uint8Array) => {
@@ -79,7 +79,7 @@ export default class Saito {
           .catch((error: any) => {
             console.log("failed fetching block for url : " + url + " from peer : " + peer_index);
             console.error(error);
-            return Saito.getLibInstance().process_failed_block_fetch(hash);
+            return Saito.getLibInstance().process_failed_block_fetch(hash, block_id, peer_index);
           });
       },
       process_api_call: (buffer: Uint8Array, msgIndex: number, peerIndex: bigint) => {
