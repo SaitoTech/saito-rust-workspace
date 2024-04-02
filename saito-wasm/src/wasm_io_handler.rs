@@ -80,11 +80,16 @@ impl InterfaceIO for WasmIoHandler {
         block_hash: SaitoHash,
         peer_index: u64,
         url: String,
-        _block_id: BlockId,
+        block_id: BlockId,
     ) -> Result<(), Error> {
         let hash = js_sys::Uint8Array::new_with_length(32);
         hash.copy_from(block_hash.as_slice());
-        let result = MsgHandler::fetch_block_from_peer(&hash, BigInt::from(peer_index), url);
+        let result = MsgHandler::fetch_block_from_peer(
+            &hash,
+            BigInt::from(peer_index),
+            url,
+            BigInt::from(block_id),
+        );
         if result.is_err() {
             error!(
                 "failed fetching block : {:?} from peer. {:?}",
@@ -325,6 +330,7 @@ extern "C" {
         hash: &Uint8Array,
         peer_index: BigInt,
         url: String,
+        block_id: BigInt,
     ) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(static_method_of = MsgHandler)]

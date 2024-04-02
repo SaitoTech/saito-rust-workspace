@@ -39,8 +39,8 @@ class MsgHandler {
     return global.shared_methods.disconnect_from_peer(peer_index);
   }
 
-  static fetch_block_from_peer(hash, peer_index, url) {
-    return global.shared_methods.fetch_block_from_peer(hash, peer_index, url);
+  static fetch_block_from_peer(hash, peer_index, url, block_id) {
+    return global.shared_methods.fetch_block_from_peer(hash, peer_index, url, block_id);
   }
 
   static process_api_call(buffer, msgIndex, peerIndex) {
