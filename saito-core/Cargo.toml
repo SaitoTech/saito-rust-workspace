@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.34.0", features = ["sync", "tokio-macros", "test-util", "macros", "tracing"] }
-secp256k1 = { version = "0.28.0", features = ["rand", "hashes", "global-context", "serde"] }
+secp256k1 = { version = "0.28.2", features = ["rand", "hashes", "global-context", "serde"] }
 getrandom = { version = "0.2.11", features = ["js"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
 pretty_env_logger = "0.5.0"
