@@ -806,8 +806,8 @@ fn run_websocket_server(
                     if !filename.contains(block_hash.as_str()) {
                         return false;
                     }
-                    debug!("selected file : {:?}", filename);
-                    return true;
+                    // debug!("selected file : {:?}", filename);
+                    true
                 })
                 .collect();
 
@@ -917,7 +917,7 @@ fn run_websocket_server(
                             if !filename.contains(block_hash.as_str()) {
                                 return false;
                             }
-                            debug!("selected file : {:?}", filename);
+                            // debug!("selected file : {:?}", filename);
                             true
                         })
                         .collect();
