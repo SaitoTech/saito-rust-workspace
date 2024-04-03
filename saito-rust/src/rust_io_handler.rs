@@ -94,7 +94,7 @@ impl InterfaceIO for RustIOHandler {
         buffer: Vec<u8>,
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
-        debug!("send message to all");
+        // debug!("send message to all");
 
         let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessageForAll {
             buffer,

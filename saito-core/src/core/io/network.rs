@@ -90,7 +90,7 @@ impl Network {
             .send_message_to_all(message.serialize(), excluded_peers)
             .await
             .unwrap();
-        trace!("block sent via io interface");
+        // trace!("block sent via io interface");
     }
 
     pub async fn propagate_transaction(&self, transaction: &Transaction) {
@@ -99,11 +99,11 @@ impl Network {
         let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
         let mut wallet = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
 
-        trace!(
-            "propagating transaction : {:?} peers : {:?}",
-            transaction.signature.to_hex(),
-            peers.index_to_peers.len()
-        );
+        // trace!(
+        //     "propagating transaction : {:?} peers : {:?}",
+        //     transaction.signature.to_hex(),
+        //     peers.index_to_peers.len()
+        // );
 
         let public_key = wallet.public_key;
 
@@ -301,7 +301,7 @@ impl Network {
         blockchain: Arc<RwLock<Blockchain>>,
         configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
-        debug!("handling handshake response");
+        // debug!("handling handshake response");
         let mut peers = lock_for_write!(self.peers, LOCK_ORDER_PEERS);
 
         let peer = peers.index_to_peers.get_mut(&peer_index);
@@ -503,7 +503,10 @@ impl Network {
                 }
                 url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
             } else {
-                warn!("peer : {:?} is not in peer list", peer_index);
+                warn!(
+                    "peer : {:?} is not in peer list. cannot generate the block fetch url",
+                    peer_index
+                );
                 return None;
             }
         }

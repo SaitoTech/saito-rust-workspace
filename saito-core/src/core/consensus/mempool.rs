@@ -124,11 +124,11 @@ impl Mempool {
         }
     }
     pub async fn add_transaction(&mut self, transaction: Transaction) {
-        trace!(
-            "add_transaction {:?} : type = {:?}",
-            transaction.signature.to_hex(),
-            transaction.transaction_type
-        );
+        // trace!(
+        //     "add_transaction {:?} : type = {:?}",
+        //     transaction.signature.to_hex(),
+        //     transaction.transaction_type
+        // );
 
         debug_assert!(transaction.hash_for_signature.is_some());
         // this assigns the amount of routing work that this transaction
@@ -141,10 +141,10 @@ impl Mempool {
 
         if !self.transactions.contains_key(&transaction.signature) {
             self.routing_work_in_mempool += transaction.total_work_for_me;
-            trace!(
-                "routing work available in mempool : {:?} after adding work : {:?} from tx with fees : {:?}",
-                self.routing_work_in_mempool, transaction.total_work_for_me, transaction.total_fees
-            );
+            // trace!(
+            //     "routing work available in mempool : {:?} after adding work : {:?} from tx with fees : {:?}",
+            //     self.routing_work_in_mempool, transaction.total_work_for_me, transaction.total_fees
+            // );
             if let TransactionType::GoldenTicket = transaction.transaction_type {
                 panic!("golden tickets should be in gt collection");
             } else {

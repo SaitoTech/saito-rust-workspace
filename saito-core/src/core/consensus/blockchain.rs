@@ -289,7 +289,7 @@ impl Blockchain {
         let mut am_i_the_longest_chain = false;
 
         while !shared_ancestor_found {
-            trace!("checking new chain hash : {:?}", new_chain_hash.to_hex());
+            // trace!("checking new chain hash : {:?}", new_chain_hash.to_hex());
             if let Some(block) = self.blocks.get(&new_chain_hash) {
                 if block.in_longest_chain {
                     shared_ancestor_found = true;
@@ -860,6 +860,11 @@ impl Blockchain {
         }
 
         if self.blockring.get_latest_block_id() >= self.blocks.get(&new_chain[0]).unwrap().id {
+            trace!(
+                "blockring latest : {:?} >= new chain block id : {:?}",
+                self.blockring.get_latest_block_id(),
+                self.blocks.get(&new_chain[0]).unwrap().id
+            );
             return false;
         }
 
@@ -873,12 +878,23 @@ impl Blockchain {
             if let Some(x) = self.blocks.get(hash) {
                 new_bf += x.burnfee;
             } else {
+                trace!(
+                    "block : {:?} in the new chain cannot be found",
+                    hash.to_hex()
+                );
                 return false;
             }
             //new_bf += self.blocks.get(hash).unwrap().get_burnfee();
         }
+        trace!(
+            "old chain len : {:?} new chain len : {:?} old_bf : {:?} new_bf : {:?}",
+            old_chain.len(),
+            new_chain.len(),
+            old_bf,
+            new_bf
+        );
+
         // new chain must have more accumulated work AND be longer
-        //
         old_chain.len() < new_chain.len() && old_bf <= new_bf
     }
 

@@ -577,14 +577,14 @@ impl Transaction {
         }
 
         self.total_work_for_me = routing_work_available_to_public_key;
-        trace!(
-            "total work : {:?} for tx : {:?}. total fees : {:?} total in : {:?} total_out : {:?}",
-            self.total_work_for_me,
-            self.signature.to_hex(),
-            self.total_fees,
-            self.total_in,
-            self.total_out
-        );
+        // trace!(
+        //     "total work : {:?} for tx : {:?}. total fees : {:?} total in : {:?} total_out : {:?}",
+        //     self.total_work_for_me,
+        //     self.signature.to_hex(),
+        //     self.total_fees,
+        //     self.total_in,
+        //     self.total_out
+        // );
     }
 
     //

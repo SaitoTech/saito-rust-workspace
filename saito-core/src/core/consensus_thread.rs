@@ -321,7 +321,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         );
                         return Some(());
                     }
-                    debug!("adding fetched block to mempool");
+                    debug!(
+                        "adding fetched block : {:?} to mempool",
+                        block.hash.to_hex()
+                    );
                     let mut mempool = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
                     mempool.add_block(block);
                 }
@@ -353,11 +356,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             ConsensusEvent::NewTransaction { transaction } => {
                 self.stats.received_tx.increment();
 
-                trace!(
-                    "tx received with sig: {:?} hash : {:?}",
-                    transaction.signature.to_hex(),
-                    hash(&transaction.serialize_for_net()).to_hex()
-                );
+                // trace!(
+                //     "tx received with sig: {:?} hash : {:?}",
+                //     transaction.signature.to_hex(),
+                //     hash(&transaction.serialize_for_net()).to_hex()
+                // );
                 if let TransactionType::GoldenTicket = transaction.transaction_type {
                     let mut mempool = lock_for_write!(self.mempool, LOCK_ORDER_MEMPOOL);
 

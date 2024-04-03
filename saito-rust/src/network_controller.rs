@@ -203,7 +203,7 @@ impl NetworkController {
         buffer: Vec<u8>,
         exceptions: Vec<u64>,
     ) {
-        trace!("sending message : {:?} to all", buffer[0]);
+        // trace!("sending message : {:?} to all", buffer[0]);
         let mut sockets = sockets.lock().await;
         let mut peers_with_errors: Vec<u64> = Default::default();
 
@@ -223,7 +223,7 @@ impl NetworkController {
             sockets.remove(&peer);
         }
 
-        trace!("message sent to all");
+        // trace!("message sent to all");
     }
     pub async fn fetch_block(
         block_hash: SaitoHash,
@@ -340,7 +340,7 @@ impl NetworkController {
             let mut queries = current_queries.lock().await;
             queries.remove(&url);
         }
-        debug!("block buffer sent to blockchain controller");
+        // debug!("block buffer sent to blockchain controller");
     }
     pub async fn send_new_peer(
         event_id: u64,

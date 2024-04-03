@@ -137,7 +137,7 @@ impl RoutingThread {
                     .await;
             }
             Message::HandshakeResponse(response) => {
-                debug!("received handshake response");
+                // debug!("received handshake response");
                 self.network
                     .handle_handshake_response(
                         peer_index,
@@ -153,10 +153,10 @@ impl RoutingThread {
                 unreachable!("received block");
             }
             Message::Transaction(transaction) => {
-                trace!(
-                    "received transaction : {:?}",
-                    transaction.signature.to_hex()
-                );
+                // trace!(
+                //     "received transaction : {:?}",
+                //     transaction.signature.to_hex()
+                // );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;
@@ -390,7 +390,7 @@ impl RoutingThread {
         self.fetch_next_blocks().await;
     }
     async fn fetch_next_blocks(&mut self) -> bool {
-        trace!("fetching next blocks from peers");
+        // trace!("fetching next blocks from peers");
         let mut work_done = false;
         {
             let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
