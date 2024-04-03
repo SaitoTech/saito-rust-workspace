@@ -366,7 +366,7 @@ impl RoutingThread {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
             }
-            trace!("sending block header for : {:?}", block_hash.to_hex());
+            // trace!("sending block header for : {:?}", block_hash.to_hex());
             let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
