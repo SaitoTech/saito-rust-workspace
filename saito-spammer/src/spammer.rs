@@ -13,7 +13,6 @@ use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::Currency;
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::msg::message::Message;
-use saito_core::lock_for_read;
 use saito_rust::io_event::IoEvent;
 
 use crate::config_handler::SpammerConfigs;
@@ -40,7 +39,7 @@ impl Spammer {
         let tx_payment;
         let tx_fee;
         {
-            let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+            let configs = configs_lock.read().await;
             tx_payment = configs.get_spammer_configs().tx_payment;
             tx_fee = configs.get_spammer_configs().tx_fee;
         }
@@ -70,7 +69,7 @@ impl Spammer {
         let stop_after;
 
         {
-            let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let configs = self.configs.read().await;
 
             timer_in_milli = configs.get_spammer_configs().timer_in_milli;
             burst_count = configs.get_spammer_configs().burst_count;

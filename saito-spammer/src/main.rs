@@ -35,7 +35,6 @@ use saito_core::core::routing_thread::{
 };
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::lock_for_read;
 use saito_rust::io_event::IoEvent;
 use saito_rust::network_controller::run_network_controller;
 use saito_rust::rust_io_handler::RustIOHandler;
@@ -177,7 +176,7 @@ async fn run_consensus_event_processor(
     }
     let generate_genesis_block: bool;
     {
-        let configs = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
+        let configs = context.configuration.read().await;
 
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
         generate_genesis_block = configs.get_peer_configs().is_empty();
@@ -327,7 +326,7 @@ async fn run_routing_event_processor(
         reconnection_wait_time: 0,
     };
     {
-        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = configs_lock.read().await;
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -485,7 +484,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fetch_batch_size: usize;
 
     {
-        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = configs_lock.read().await;
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs

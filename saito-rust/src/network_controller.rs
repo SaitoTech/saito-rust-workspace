@@ -32,7 +32,6 @@ use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util;
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
-use saito_core::lock_for_read;
 
 use crate::io_event::IoEvent;
 use crate::rust_io_handler::BLOCKS_DIR_PATH;
@@ -157,7 +156,7 @@ impl NetworkController {
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-            let network_controller = lock_for_read!(io_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+            let network_controller = io_controller.read().await;
 
             let sender_to_controller = network_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
@@ -524,7 +523,7 @@ pub async fn run_network_controller(
     let port;
     let public_key;
     {
-        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = configs_lock.read().await;
 
         url = configs.get_server_configs().unwrap().host.clone()
             + ":"
@@ -537,8 +536,8 @@ pub async fn run_network_controller(
         port = configs.get_server_configs().unwrap().port;
         host = configs.get_server_configs().unwrap().host.clone();
 
-        let blockchain = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        let wallet = lock_for_read!(blockchain.wallet_lock, LOCK_ORDER_WALLET);
+        let blockchain = blockchain_lock.read().await;
+        let wallet = blockchain.wallet_lock.read().await;
         public_key = wallet.public_key;
     }
 
@@ -571,7 +570,7 @@ pub async fn run_network_controller(
         let stat_timer_in_ms;
         let thread_sleep_time_in_ms;
         {
-            let configs_temp = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+            let configs_temp = configs_lock.read().await;
             stat_timer_in_ms = configs_temp.get_server_configs().unwrap().stat_timer_in_ms;
             thread_sleep_time_in_ms = configs_temp
                 .get_server_configs()
@@ -598,10 +597,7 @@ pub async fn run_network_controller(
                     NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
                         let sockets;
                         {
-                            let network_controller = lock_for_read!(
-                                network_controller_lock,
-                                LOCK_ORDER_NETWORK_CONTROLLER
-                            );
+                            let network_controller = network_controller_lock.read().await;
                             sockets = network_controller.sockets.clone();
                         }
 
@@ -614,10 +610,7 @@ pub async fn run_network_controller(
                     } => {
                         let sockets;
                         {
-                            let network_controller = lock_for_read!(
-                                network_controller_lock,
-                                LOCK_ORDER_NETWORK_CONTROLLER
-                            );
+                            let network_controller = network_controller_lock.read().await;
                             sockets = network_controller.sockets.clone();
                         }
                         NetworkController::send_outgoing_message(sockets, index, buffer).await;
@@ -649,10 +642,7 @@ pub async fn run_network_controller(
                         let sender;
                         let current_queries;
                         {
-                            let network_controller = lock_for_read!(
-                                network_controller_lock,
-                                LOCK_ORDER_NETWORK_CONTROLLER
-                            );
+                            let network_controller = network_controller_lock.read().await;
 
                             sender = network_controller.sender_to_saito_controller.clone();
                             current_queries = network_controller.currently_queried_urls.clone();
@@ -700,8 +690,7 @@ pub async fn run_network_controller(
                     outgoing_messages
                         .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
                         .await;
-                    let network_controller =
-                        lock_for_read!(network_controller_lock, LOCK_ORDER_NETWORK_CONTROLLER);
+                    let network_controller = network_controller_lock.read().await;
 
                     let stat = format!(
                         "{} - {} - capacity : {:?} / {:?}",
@@ -767,7 +756,7 @@ fn run_websocket_server(
                     debug!("socket connection established");
                     let (sender, receiver) = socket.split();
 
-                    let network_controller = lock_for_read!(clone, LOCK_ORDER_NETWORK_CONTROLLER);
+                    let network_controller = clone.read().await;
 
                     let peer_index;
                     {
@@ -888,7 +877,7 @@ fn run_websocket_server(
                     }
                     let mut keylist;
                     {
-                        let peers = lock_for_read!(peers, LOCK_ORDER_PEERS);
+                        let peers = peers.read().await;
                         let peer = peers.find_peer_by_address(&key);
                         if peer.is_none() {
                             keylist = vec![key];

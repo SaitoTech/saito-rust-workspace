@@ -116,25 +116,25 @@ impl Drop for LockGuardWatcher {
 //     LockGuardWatcher { order }
 // }
 
-#[macro_export]
-macro_rules! lock_for_write {
-    ($lock:expr, $order:expr) => {{
-        // log::trace!("mutex : {:?} requested for write", $order);
-        let l = $lock.write().await;
-        // log::trace!("mutex : {:?} locked for write", $order);
-        l
-    }};
-}
-
-#[macro_export]
-macro_rules! lock_for_read {
-    ($lock:expr, $order:expr) => {{
-        // log::trace!("mutex : {:?} requested for read", $order);
-        let l = $lock.read().await;
-        // log::trace!("mutex : {:?} locked for read", $order);
-        l
-    }};
-}
+// #[macro_export]
+// macro_rules! lock_for_write {
+//     ($lock:expr, $order:expr) => {{
+//         // log::trace!("mutex : {:?} requested for write", $order);
+//         let l = $lock.write().await;
+//         // log::trace!("mutex : {:?} locked for write", $order);
+//         l
+//     }};
+// }
+//
+// #[macro_export]
+// macro_rules! lock_for_read {
+//     ($lock:expr, $order:expr) => {{
+//         // log::trace!("mutex : {:?} requested for read", $order);
+//         let l = $lock.read().await;
+//         // log::trace!("mutex : {:?} locked for read", $order);
+//         l
+//     }};
+// }
 
 #[macro_export]
 macro_rules! iterate {

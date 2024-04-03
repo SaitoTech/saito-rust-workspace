@@ -17,7 +17,7 @@ use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{PrintForLog, StatVariable, Timestamp};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::process_event::ProcessEvent;
-use crate::{drain, lock_for_read};
+use crate::drain;
 
 #[derive(Debug)]
 pub enum VerifyRequest {
@@ -42,13 +42,13 @@ impl VerificationThread {
     pub async fn verify_tx(&mut self, mut transaction: Transaction) {
         let public_key;
         {
-            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = self.wallet.read().await;
             public_key = wallet.public_key;
         }
         {
             transaction.generate(&public_key, 0, 0);
 
-            let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain.read().await;
 
             if !transaction.validate(&blockchain.utxoset) {
                 debug!(
@@ -73,11 +73,11 @@ impl VerificationThread {
         let prev_count = transactions.len();
         let txs: Vec<Transaction>;
         {
-            let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain.read().await;
 
             let public_key;
             {
-                let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+                let wallet = self.wallet.read().await;
                 public_key = wallet.public_key;
             }
             txs = drain!(transactions, 10)
@@ -117,7 +117,7 @@ impl VerificationThread {
             );
             return;
         }
-        let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+        let peers = self.peers.read().await;
 
         let mut block = result.unwrap();
         let peer = peers.index_to_peers.get(&peer_index);

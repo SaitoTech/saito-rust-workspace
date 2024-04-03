@@ -15,7 +15,7 @@ use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::{Currency, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util::crypto::generate_random_bytes;
-use saito_core::{drain, lock_for_read, lock_for_write};
+use saito_core::drain;
 use saito_rust::time_keeper::TimeKeeper;
 
 use crate::config_handler::SpammerConfigs;
@@ -56,7 +56,7 @@ impl TransactionGenerator {
         let mut tx_size = 10;
         let tx_count;
         {
-            let configs = lock_for_read!(configuration_lock, LOCK_ORDER_CONFIGS);
+            let configs = configuration_lock.read().await;
 
             tx_size = configs.get_spammer_configs().tx_size;
             tx_count = configs.get_spammer_configs().tx_count;
@@ -78,7 +78,7 @@ impl TransactionGenerator {
             peers: peers_lock.clone(),
         };
         {
-            let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = wallet_lock.read().await;
             res.public_key = wallet.public_key;
             res.private_key = wallet.private_key;
         }
@@ -115,7 +115,7 @@ impl TransactionGenerator {
         let available_balance;
 
         {
-            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = self.wallet.read().await;
 
             unspent_slip_count = wallet.get_unspent_slip_count();
             available_balance = wallet.get_available_balance();
@@ -134,7 +134,7 @@ impl TransactionGenerator {
             let mut to_public_key = [0; 33];
 
             {
-                let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+                let peers = self.peers.read().await;
 
                 if peers.index_to_peers.is_empty() {
                     info!("not yet connected to a node");
@@ -200,7 +200,7 @@ impl TransactionGenerator {
         let payment_amount =
             total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
 
-        let mut wallet = lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        let mut wallet = self.wallet.write().await;
 
         let mut transaction = Transaction::default();
 
@@ -241,7 +241,7 @@ impl TransactionGenerator {
         info!("checking for blockchain confirmation...");
         let unspent_slip_count;
         {
-            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = self.wallet.read().await;
             unspent_slip_count = wallet.get_unspent_slip_count();
         }
 
@@ -280,7 +280,7 @@ impl TransactionGenerator {
                 {
                     // let blockchain = lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
-                    let mut wallet = lock_for_write!(wallet, LOCK_ORDER_WALLET);
+                    let mut wallet = wallet.write().await;
 
                     if wallet.get_available_balance() >= required_balance {
                         // assert_ne!(blockchain.utxoset.len(), 0);
@@ -326,7 +326,7 @@ impl TransactionGenerator {
         let mut to_public_key = [0; 33];
 
         {
-            let peers = lock_for_read!(self.peers, LOCK_ORDER_PEERS);
+            let peers = self.peers.read().await;
 
             for peer in peers.index_to_peers.iter() {
                 to_public_key = peer.1.public_key.clone().unwrap();

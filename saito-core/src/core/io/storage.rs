@@ -12,7 +12,6 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::defs::{PrintForLog, SaitoPublicKey, PROJECT_PUBLIC_KEY};
 use crate::core::io::interface_io::InterfaceIO;
-use crate::lock_for_write;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -146,7 +145,7 @@ impl Storage {
             block.force_loaded = true;
             block.generate();
             debug!("block : {:?} loaded from disk", block.hash.to_hex());
-            let mut mempool = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
+            let mut mempool = mempool_lock.write().await;
             mempool.add_block(block);
         }
 

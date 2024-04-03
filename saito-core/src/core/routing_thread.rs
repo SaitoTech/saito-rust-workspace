@@ -28,7 +28,6 @@ use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
-use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
 pub enum RoutingEvent {
@@ -240,10 +239,10 @@ impl RoutingThread {
            block_hash.to_hex(),
             fork_id.to_hex()
         );
-        let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let blockchain = self.blockchain.read().await;
         let peer_public_key;
         {
-            let peers = lock_for_read!(self.network.peers, LOCK_ORDER_PEERS);
+            let peers = self.network.peers.read().await;
             peer_public_key = peers
                 .find_peer_by_index(peer_index)
                 .unwrap()
@@ -327,8 +326,7 @@ impl RoutingThread {
         self.network.handle_peer_disconnect(peer_index).await;
     }
     pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
-        let mut wallet: tokio::sync::RwLockWriteGuard<'_, Wallet> =
-            lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        let mut wallet: tokio::sync::RwLockWriteGuard<'_, Wallet> = self.wallet.write().await;
 
         wallet.set_key_list(key_list);
         self.network.send_key_list(&wallet.key_list).await;
@@ -348,7 +346,7 @@ impl RoutingThread {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let blockchain = self.blockchain.read().await;
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
@@ -397,7 +395,7 @@ impl RoutingThread {
         // trace!("fetching next blocks from peers");
         let mut work_done = false;
         {
-            let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain.read().await;
             self.blockchain_sync_state
                 .build_peer_block_picture(&blockchain);
         }
@@ -461,7 +459,7 @@ impl RoutingThread {
         debug!("ghost : {:?}", chain);
 
         let mut previous_block_hash = chain.start;
-        let mut blockchain = lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let mut blockchain = self.blockchain.write().await;
         for i in 0..chain.prehashes.len() {
             let buf = [
                 previous_block_hash.as_slice(),
@@ -502,7 +500,7 @@ impl RoutingThread {
 
     // TODO : remove if not required
     async fn process_peer_services(&mut self, services: Vec<PeerService>, peer_index: u64) {
-        let mut peers = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
+        let mut peers = self.network.peers.write().await;
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_some() {
             let peer = peer.unwrap();

@@ -1,7 +1,7 @@
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-use log::{debug, info, trace, warn};
+use log::{debug, info, warn};
 use tokio::sync::RwLock;
 
 use crate::core::consensus::peer_service::PeerService;
@@ -13,7 +13,6 @@ use crate::core::msg::message::Message;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use crate::lock_for_read;
 
 #[derive(Debug, Clone)]
 pub struct Peer {
@@ -71,7 +70,7 @@ impl Peer {
         let block_fetch_url;
         let is_lite;
         {
-            let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+            let configs = configs_lock.read().await;
 
             is_lite = configs.is_browser();
             if is_lite {
@@ -81,7 +80,7 @@ impl Peer {
             }
         }
 
-        let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+        let wallet = wallet_lock.read().await;
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(challenge.challenge.as_slice(), &wallet.private_key),
@@ -136,7 +135,7 @@ impl Peer {
         let block_fetch_url;
         let is_lite;
         {
-            let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+            let configs = configs_lock.read().await;
 
             is_lite = configs.is_browser();
             if is_lite {
@@ -150,7 +149,7 @@ impl Peer {
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
 
-        let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+        let wallet = wallet_lock.read().await;
 
         info!(
             "my version : {:?} peer version : {:?}",

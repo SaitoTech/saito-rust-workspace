@@ -20,7 +20,7 @@ use crate::core::defs::{
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
-use crate::{iterate, lock_for_read};
+use crate::iterate;
 
 //
 // In addition to responding to global broadcast messages, the
@@ -108,7 +108,7 @@ impl Mempool {
         );
         let public_key;
         {
-            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = self.wallet.read().await;
             public_key = wallet.public_key;
         }
 
@@ -167,7 +167,7 @@ impl Mempool {
         let private_key;
         let block_timestamp_gap;
         {
-            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = self.wallet.read().await;
             previous_block_hash = blockchain.get_latest_block_hash();
             let previous_block_timestamp = match blockchain.get_latest_block() {
                 None => 0,
@@ -222,7 +222,7 @@ impl Mempool {
         let public_key;
         let private_key;
 
-        let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+        let wallet = self.wallet.read().await;
         public_key = wallet.public_key;
         private_key = wallet.private_key;
 
@@ -367,7 +367,6 @@ mod tests {
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{SaitoPrivateKey, SaitoPublicKey};
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
-    use crate::{lock_for_read, lock_for_write};
 
     use super::*;
 
@@ -405,7 +404,7 @@ mod tests {
         }
 
         {
-            let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = wallet_lock.read().await;
 
             public_key = wallet.public_key;
             private_key = wallet.private_key;
@@ -414,9 +413,9 @@ mod tests {
         let ts = create_timestamp();
         let _next_block_timestamp = ts + (HEARTBEAT * 2);
 
-        let configs = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
-        let blockchain = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        let mut mempool = lock_for_write!(mempool_lock, LOCK_ORDER_MEMPOOL);
+        let configs = t.configs.read().await;
+        let blockchain = blockchain_lock.read().await;
+        let mut mempool = mempool_lock.write().await;
 
         let _txs = Vec::<Transaction>::new();
 
@@ -426,7 +425,7 @@ mod tests {
             let mut tx = Transaction::default();
 
             {
-                let mut wallet = lock_for_write!(wallet_lock, LOCK_ORDER_WALLET);
+                let mut wallet = wallet_lock.write().await;
 
                 let (inputs, outputs) = wallet.generate_slips(720_000, None);
                 tx.from = inputs;
@@ -437,7 +436,7 @@ mod tests {
                 tx.generate(&public_key, 0, 0);
                 tx.sign(&private_key);
             }
-            let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = wallet_lock.read().await;
             tx.add_hop(&wallet.private_key, &wallet.public_key, &[1; 33]);
             tx.generate(&public_key, 0, 0);
             mempool.add_transaction(tx).await;

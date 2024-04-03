@@ -15,7 +15,6 @@ use crate::core::process::keep_time::KeepTime;
 use crate::core::process::process_event::ProcessEvent;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, hash};
-use crate::lock_for_read;
 
 #[derive(Debug)]
 pub enum MiningEvent {
@@ -48,7 +47,7 @@ impl MiningThread {
         assert!(self.miner_active);
 
         if self.public_key == [0; 33] {
-            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = self.wallet.read().await;
             if wallet.public_key == [0; 33] {
                 // wallet not initialized yet
                 return false;
@@ -129,11 +128,11 @@ impl ProcessEvent<MiningEvent> for MiningThread {
     }
 
     async fn on_init(&mut self) {
-        let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        let configs = self.configs.read().await;
         info!("is browser = {:?}", configs.is_browser());
         self.enabled = !configs.is_browser();
         info!("miner is enabled");
-        let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+        let wallet = self.wallet.read().await;
         self.public_key = wallet.public_key;
         info!("node public key = {:?}", self.public_key.to_base58());
     }

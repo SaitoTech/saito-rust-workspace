@@ -43,7 +43,6 @@ use saito_core::core::routing_thread::{
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::{lock_for_read, lock_for_write};
 use saito_rust::config_handler::{ConfigHandler, NodeConfigurations};
 use saito_rust::io_event::IoEvent;
 use saito_rust::network_controller::run_network_controller;
@@ -373,7 +372,7 @@ async fn run_routing_event_processor(
     };
 
     {
-        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = configs_lock.read().await;
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -591,7 +590,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     let fetch_batch_size;
 
     {
-        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = configs_lock.read().await;
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs
@@ -769,9 +768,9 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     let _peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
-    let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+    let configs = configs_lock.read().await;
 
-    let mut blockchain = lock_for_write!(context.blockchain, LOCK_ORDER_BLOCKCHAIN);
+    let mut blockchain = context.blockchain.write().await;
     blockchain
         .add_blocks_from_mempool(
             context.mempool.clone(),
