@@ -465,14 +465,14 @@ impl BlockchainSyncState {
                 .find(|data| data.block_id == id && data.block_hash == hash);
             match data {
                 None => {
-                    error!("we are marking a block {:?}-{:?} from peer : {:?} as failed to fetch. But we don't have such a block or it's already fetched",id,hash.to_hex(),peer_index);
+                    debug!("we are marking a block {:?}-{:?} from peer : {:?} as failed to fetch. But we don't have such a block or it's already fetched",id,hash.to_hex(),peer_index);
                 }
                 Some(data) => {
                     data.status = BlockStatus::Failed;
                 }
             }
         } else {
-            error!("we are marking a block {:?}-{:?} from peer : {:?} as failed to fetch. But we don't have such a peer",id,hash.to_hex(),peer_index);
+            debug!("we are marking a block {:?}-{:?} from peer : {:?} as failed to fetch. But we don't have such a peer",id,hash.to_hex(),peer_index);
         }
     }
 }
