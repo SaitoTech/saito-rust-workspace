@@ -1208,7 +1208,6 @@ impl Block {
 
         // if there is a golden ticket
         if let Some(gt_index) = cv.gt_index {
-            trace!("!");
             trace!("there is a golden ticket: {:?}", cv.gt_index);
 
             // we fetch the random number for determining the payouts from the golden ticket
@@ -1230,8 +1229,7 @@ impl Block {
                 router1_payout = previous_block.total_fees - miner_payout;
                 router1_publickey = previous_block.find_winning_router(next_random_number);
 
-                trace!("!");
-                trace!("there is a miner publickey: {:?}", miner_publickey);
+                trace!("there is a miner publickey: {:?}", miner_publickey.to_hex());
 
                 // iterate our hash 2 times to accomodate for the iteration that was
                 // done in order to find the previous winning router.

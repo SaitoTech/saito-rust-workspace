@@ -657,7 +657,8 @@ impl Blockchain {
         for (i, weight) in weights.iter().enumerate() {
             if current_block_id <= *weight {
                 debug!(
-                    "current_id : {:?} is less than weight : {:?}",
+                    "generating fork id for block : {:?}. current_id : {:?} is less than weight : {:?}",
+                    block_id,
                     current_block_id, weight
                 );
                 break;
