@@ -788,7 +788,7 @@ fn run_websocket_server(
                 })
             });
         let http_route = warp::path!("block" / String).and_then(|block_hash: String| async move {
-            debug!("serving block : {:?}", block_hash);
+            // debug!("serving block : {:?}", block_hash);
             let mut buffer: Vec<u8> = Default::default();
             let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
             if result.is_err() {
@@ -834,8 +834,8 @@ fn run_websocket_server(
 
             let buffer_len = buffer.len();
             let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
-            debug!("served block with : {:?} length", buffer_len);
-            return result;
+            // debug!("served block with : {:?} length", buffer_len);
+            result
         });
 
         // TODO : review this code
@@ -850,7 +850,7 @@ fn run_websocket_server(
                 move |block_hash: String,
                       key: Option<String>,
                       peers: Arc<RwLock<PeerCollection>>| async move {
-                    debug!("serving lite block : {:?}", block_hash);
+                    // debug!("serving lite block : {:?}", block_hash);
 
                     let mut key1 = String::from("");
                     if key.is_some() {
@@ -862,7 +862,7 @@ fn run_websocket_server(
 
                     let key;
                     if key1.is_empty() {
-                        key = public_key.clone();
+                        key = public_key;
                     } else {
                         let result;
                         if key1.len() == 66 {
@@ -918,7 +918,7 @@ fn run_websocket_server(
                                 return false;
                             }
                             debug!("selected file : {:?}", filename);
-                            return true;
+                            true
                         })
                         .collect();
 
@@ -952,10 +952,10 @@ fn run_websocket_server(
                     block.generate();
                     let block = block.generate_lite_block(keylist);
                     let buffer = block.serialize_for_net(BlockType::Full);
-                    let buffer_len = buffer.len();
+                    // let buffer_len = buffer.len();
                     let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
-                    debug!("served block with : {:?} length", buffer_len);
-                    return result;
+                    // debug!("served block with : {:?} length", buffer_len);
+                    result
                     // }
                     // .await
                 },

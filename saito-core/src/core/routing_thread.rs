@@ -352,7 +352,11 @@ impl RoutingThread {
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
-        debug!("last shared ancestor = {:?}", last_shared_ancestor);
+        debug!(
+            "last shared ancestor = {:?} latest_id = {:?}",
+            last_shared_ancestor,
+            blockchain.blockring.get_latest_block_id()
+        );
 
         for i in last_shared_ancestor..(blockchain.blockring.get_latest_block_id() + 1) {
             let block_hash = blockchain
@@ -362,7 +366,7 @@ impl RoutingThread {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
             }
-            debug!("sending block header for : {:?}", block_hash.to_hex());
+            trace!("sending block header for : {:?}", block_hash.to_hex());
             let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface

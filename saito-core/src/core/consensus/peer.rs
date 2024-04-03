@@ -229,7 +229,7 @@ impl Peer {
     ) {
         if self.last_msg_at + WS_KEEP_ALIVE_PERIOD < current_time {
             self.last_msg_at = current_time;
-            trace!("sending ping to peer : {:?}", self.index);
+            // trace!("sending ping to peer : {:?}", self.index);
             io_handler
                 .send_message(self.index, Message::Ping().serialize())
                 .await
