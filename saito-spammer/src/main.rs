@@ -598,7 +598,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_timer_in_ms,
     );
 
-    let network_handle = tokio::spawn(run_network_controller(
+    let (server_handle, controller_handle) = run_network_controller(
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
         configs_clone.clone(),
@@ -606,7 +606,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_stat.clone(),
         peers_lock.clone(),
         sender_to_network_controller.clone(),
-    ));
+    )
+    .await;
 
     let spammer_handle = tokio::spawn(run_spammer(
         context.wallet.clone(),
@@ -621,7 +622,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         blockchain_handle,
         miner_handle,
         loop_handle,
-        network_handle,
+        server_handle,
+        controller_handle,
         spammer_handle,
         stat_handle,
         futures::future::join_all(verification_handles)

@@ -15,11 +15,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing_subscriber;
-use tracing_subscriber::filter::Directive;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
@@ -83,140 +78,148 @@ async fn run_thread<T>(
     mut network_event_receiver: Option<Receiver<NetworkEvent>>,
     mut event_receiver: Option<Receiver<T>>,
     stat_timer_in_ms: u64,
+    thread_name: &str,
     thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()>
 where
     T: Send + 'static,
 {
-    tokio::spawn(async move {
-        info!("new thread started");
-        let mut work_done;
-        let mut last_timestamp = Instant::now();
-        let mut stat_timer = Instant::now();
-        let time_keeper = TimeKeeper {};
+    tokio::task::Builder::new()
+        .name(thread_name)
+        .spawn(async move {
+            info!("new thread started");
+            let mut work_done;
+            let mut last_timestamp = Instant::now();
+            let mut stat_timer = Instant::now();
+            let time_keeper = TimeKeeper {};
 
-        event_processor.on_init().await;
+            event_processor.on_init().await;
 
-        loop {
-            work_done = false;
-            if network_event_receiver.is_some() {
-                // TODO : update to recv().await
-                let result = network_event_receiver.as_mut().unwrap().try_recv();
-                if result.is_ok() {
-                    let event: NetworkEvent = result.unwrap();
-                    if event_processor.process_network_event(event).await.is_some() {
-                        work_done = true;
+            loop {
+                work_done = false;
+                if network_event_receiver.is_some() {
+                    // TODO : update to recv().await
+                    let result = network_event_receiver.as_mut().unwrap().try_recv();
+                    if result.is_ok() {
+                        let event: NetworkEvent = result.unwrap();
+                        if event_processor.process_network_event(event).await.is_some() {
+                            work_done = true;
+                        }
                     }
                 }
-            }
 
-            if event_receiver.is_some() {
-                // TODO : update to recv().await
-                let result = event_receiver.as_mut().unwrap().try_recv();
-                if result.is_ok() {
-                    let event = result.unwrap();
-                    if event_processor.process_event(event).await.is_some() {
-                        work_done = true;
+                if event_receiver.is_some() {
+                    // TODO : update to recv().await
+                    let result = event_receiver.as_mut().unwrap().try_recv();
+                    if result.is_ok() {
+                        let event = result.unwrap();
+                        if event_processor.process_event(event).await.is_some() {
+                            work_done = true;
+                        }
                     }
                 }
-            }
 
-            let current_instant = Instant::now();
-            let duration = current_instant.duration_since(last_timestamp);
-            last_timestamp = current_instant;
+                let current_instant = Instant::now();
+                let duration = current_instant.duration_since(last_timestamp);
+                last_timestamp = current_instant;
 
-            if event_processor
-                .process_timer_event(duration)
-                .await
-                .is_some()
-            {
-                work_done = true;
-            }
-            #[cfg(feature = "with-stats")]
-            {
-                let duration = current_instant.duration_since(stat_timer);
-                if duration > Duration::from_millis(stat_timer_in_ms) {
-                    stat_timer = current_instant;
-                    event_processor
-                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                        .await;
+                if event_processor
+                    .process_timer_event(duration)
+                    .await
+                    .is_some()
+                {
+                    work_done = true;
+                }
+                #[cfg(feature = "with-stats")]
+                {
+                    let duration = current_instant.duration_since(stat_timer);
+                    if duration > Duration::from_millis(stat_timer_in_ms) {
+                        stat_timer = current_instant;
+                        event_processor
+                            .on_stat_interval(time_keeper.get_timestamp_in_ms())
+                            .await;
+                    }
+                }
+
+                if !work_done {
+                    // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
                 }
             }
-
-            if !work_done {
-                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-            }
-        }
-    })
+        })
+        .unwrap()
 }
 
 async fn run_verification_thread(
     mut event_processor: Box<VerificationThread>,
     mut event_receiver: Receiver<VerifyRequest>,
     stat_timer_in_ms: u64,
+    thread_name: &str,
     thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        info!("verification thread started");
-        let mut work_done;
-        let mut stat_timer = Instant::now();
-        let time_keeper = TimeKeeper {};
-        let batch_size = 10000;
+    tokio::task::Builder::new()
+        .name(thread_name)
+        .spawn(async move {
+            info!("verification thread started");
+            let mut work_done;
+            let mut stat_timer = Instant::now();
+            let time_keeper = TimeKeeper {};
+            let batch_size = 10000;
 
-        event_processor.on_init().await;
-        let mut queued_requests = vec![];
-        let mut requests = VecDeque::new();
-
-        loop {
-            work_done = false;
+            event_processor.on_init().await;
+            let mut queued_requests = vec![];
+            let mut requests = VecDeque::new();
 
             loop {
-                // TODO : update to recv().await
-                let result = event_receiver.try_recv();
-                if result.is_ok() {
-                    let request = result.unwrap();
-                    if let VerifyRequest::Block(..) = &request {
-                        queued_requests.push(request);
+                work_done = false;
+
+                loop {
+                    // TODO : update to recv().await
+                    let result = event_receiver.try_recv();
+                    if result.is_ok() {
+                        let request = result.unwrap();
+                        if let VerifyRequest::Block(..) = &request {
+                            queued_requests.push(request);
+                            break;
+                        }
+                        if let VerifyRequest::Transaction(tx) = request {
+                            requests.push_back(tx);
+                        }
+                    } else {
                         break;
                     }
-                    if let VerifyRequest::Transaction(tx) = request {
-                        requests.push_back(tx);
+                    if requests.len() == batch_size {
+                        break;
                     }
-                } else {
-                    break;
                 }
-                if requests.len() == batch_size {
-                    break;
-                }
-            }
-            if !requests.is_empty() {
-                event_processor
-                    .processed_msgs
-                    .increment_by(requests.len() as u64);
-                event_processor.verify_txs(&mut requests).await;
-                work_done = true;
-            }
-            for request in queued_requests.drain(..) {
-                event_processor.process_event(request).await;
-                work_done = true;
-            }
-            #[cfg(feature = "with-stats")]
-            {
-                let current_instant = Instant::now();
-                let duration = current_instant.duration_since(stat_timer);
-                if duration > Duration::from_millis(stat_timer_in_ms) {
-                    stat_timer = current_instant;
+                if !requests.is_empty() {
                     event_processor
-                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                        .await;
+                        .processed_msgs
+                        .increment_by(requests.len() as u64);
+                    event_processor.verify_txs(&mut requests).await;
+                    work_done = true;
+                }
+                for request in queued_requests.drain(..) {
+                    event_processor.process_event(request).await;
+                    work_done = true;
+                }
+                #[cfg(feature = "with-stats")]
+                {
+                    let current_instant = Instant::now();
+                    let duration = current_instant.duration_since(stat_timer);
+                    if duration > Duration::from_millis(stat_timer_in_ms) {
+                        stat_timer = current_instant;
+                        event_processor
+                            .on_stat_interval(time_keeper.get_timestamp_in_ms())
+                            .await;
+                    }
+                }
+
+                if !work_done {
+                    // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
                 }
             }
-
-            if !work_done {
-                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-            }
-        }
-    })
+        })
+        .unwrap()
 }
 
 async fn run_mining_event_processor(
@@ -252,6 +255,7 @@ async fn run_mining_event_processor(
         Some(interface_receiver_for_miner),
         Some(receiver_for_miner),
         stat_timer_in_ms,
+        "saito-mining",
         thread_sleep_time_in_ms,
     )
     .await;
@@ -320,6 +324,7 @@ async fn run_consensus_event_processor(
         None,
         Some(receiver_for_blockchain),
         stat_timer_in_ms,
+        "saito-consensus",
         thread_sleep_time_in_ms,
     )
     .await;
@@ -394,6 +399,7 @@ async fn run_routing_event_processor(
         Some(interface_receiver_for_routing),
         Some(receiver_for_routing),
         stat_timer_in_ms,
+        "saito-routing",
         thread_sleep_time_in_ms,
     )
     .await;
@@ -449,6 +455,7 @@ async fn run_verification_threads(
             Box::new(verification_thread),
             receiver,
             stat_timer_in_ms,
+            format!("saito-verification-{:?}", i).as_str(),
             thread_sleep_time_in_ms,
         )
         .await;
@@ -466,93 +473,96 @@ fn run_loop_thread(
     thread_sleep_time_in_ms: u64,
     sender_to_stat: Sender<String>,
 ) -> JoinHandle<()> {
-    let loop_handle = tokio::spawn(async move {
-        let mut work_done: bool;
-        let mut incoming_msgs = StatVariable::new(
-            "network::incoming_msgs".to_string(),
-            STAT_BIN_COUNT,
-            sender_to_stat.clone(),
-        );
-        let mut last_stat_on: Instant = Instant::now();
-        loop {
-            work_done = false;
+    tokio::task::Builder::new()
+        .name("saito-looper")
+        .spawn(async move {
+            let mut work_done: bool;
+            let mut incoming_msgs = StatVariable::new(
+                "network::incoming_msgs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            );
+            let mut last_stat_on: Instant = Instant::now();
+            loop {
+                work_done = false;
 
-            let result = receiver.recv().await;
-            if result.is_some() {
-                let command = result.unwrap();
-                incoming_msgs.increment();
-                work_done = true;
-                // TODO : remove hard coded values
-                match command.event_processor_id {
-                    ROUTING_EVENT_PROCESSOR_ID => {
-                        // trace!("routing event to routing event processor  ",);
-                        network_event_sender_to_routing_ep
-                            .send(command.event)
-                            .await
-                            .unwrap();
-                    }
-                    CONSENSUS_EVENT_PROCESSOR_ID => {
-                        // trace!(
-                        //     "routing event to consensus event processor : {:?}",
-                        //     command.event
-                        // );
-                        unreachable!()
-                        // network_event_sender_to_consensus_ep
-                        //     .send(command.event)
-                        //     .await
-                        //     .unwrap();
-                    }
-                    MINING_EVENT_PROCESSOR_ID => {
-                        // trace!(
-                        //     "routing event to mining event processor : {:?}",
-                        //     command.event
-                        // );
-                        unreachable!()
-                        // network_event_sender_to_mining_ep
-                        //     .send(command.event)
-                        //     .await
-                        //     .unwrap();
-                    }
+                let result = receiver.recv().await;
+                if result.is_some() {
+                    let command = result.unwrap();
+                    incoming_msgs.increment();
+                    work_done = true;
+                    // TODO : remove hard coded values
+                    match command.event_processor_id {
+                        ROUTING_EVENT_PROCESSOR_ID => {
+                            // trace!("routing event to routing event processor  ",);
+                            network_event_sender_to_routing_ep
+                                .send(command.event)
+                                .await
+                                .unwrap();
+                        }
+                        CONSENSUS_EVENT_PROCESSOR_ID => {
+                            // trace!(
+                            //     "routing event to consensus event processor : {:?}",
+                            //     command.event
+                            // );
+                            unreachable!()
+                            // network_event_sender_to_consensus_ep
+                            //     .send(command.event)
+                            //     .await
+                            //     .unwrap();
+                        }
+                        MINING_EVENT_PROCESSOR_ID => {
+                            // trace!(
+                            //     "routing event to mining event processor : {:?}",
+                            //     command.event
+                            // );
+                            unreachable!()
+                            // network_event_sender_to_mining_ep
+                            //     .send(command.event)
+                            //     .await
+                            //     .unwrap();
+                        }
 
-                    _ => {}
+                        _ => {}
+                    }
                 }
-            }
-            #[cfg(feature = "with-stats")]
-            {
-                if Instant::now().duration_since(last_stat_on)
-                    > Duration::from_millis(stat_timer_in_ms)
+                #[cfg(feature = "with-stats")]
                 {
-                    last_stat_on = Instant::now();
-                    incoming_msgs
-                        .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
-                        .await;
+                    if Instant::now().duration_since(last_stat_on)
+                        > Duration::from_millis(stat_timer_in_ms)
+                    {
+                        last_stat_on = Instant::now();
+                        incoming_msgs
+                            .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
+                            .await;
+                    }
+                }
+                if !work_done {
+                    // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
                 }
             }
-            if !work_done {
-                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-            }
-        }
-    });
-
-    loop_handle
+        })
+        .unwrap()
 }
 
 fn setup_log() {
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
-    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    // let filter = tracing_subscriber::EnvFilter::from_default_env();
+    // let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
     // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
 
-    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+    // let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+    //
+    // tracing_subscriber::registry().with(fmt_layer).init();
 
-    tracing_subscriber::registry().with(fmt_layer).init();
+    console_subscriber::init();
 }
 
 fn setup_hook() {
@@ -696,6 +706,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         None,
         Some(receiver_for_stat),
         stat_timer_in_ms,
+        "saito-stats",
         thread_sleep_time_in_ms,
     )
     .await;
@@ -707,7 +718,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         sender_to_stat.clone(),
     );
 
-    let network_handle = tokio::spawn(run_network_controller(
+    let (server_handle, controller_handle) = run_network_controller(
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
         configs_lock.clone(),
@@ -715,14 +726,16 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         sender_to_stat.clone(),
         peers_lock.clone(),
         sender_to_network_controller.clone(),
-    ));
+    )
+    .await;
 
     let _result = tokio::join!(
         routing_handle,
         blockchain_handle,
         miner_handle,
         loop_handle,
-        network_handle,
+        server_handle,
+        controller_handle,
         stat_handle,
         futures::future::join_all(verification_handles)
     );
