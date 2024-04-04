@@ -130,7 +130,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
-        // trace!("processing timer event : {:?}", duration.as_micros());
+        // println!("processing timer event : {:?}", duration.as_micros());
         let mut work_done = false;
         let timestamp = self.time_keeper.get_timestamp_in_ms();
         let duration_value = duration.as_millis() as u64;

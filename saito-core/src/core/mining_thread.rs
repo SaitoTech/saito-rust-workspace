@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info};
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -141,6 +141,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         if !self.enabled {
             return;
         }
+
         let stat = format!("{} - {} - total : {:?}, current difficulty : {:?}, miner_active : {:?}, current target : {:?} ",
                            StatVariable::format_timestamp(current_time),
                            format!("{:width$}", "mining::golden_tickets", width = 40),

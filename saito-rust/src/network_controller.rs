@@ -12,6 +12,7 @@ use reqwest::Client;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
+use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -565,7 +566,6 @@ pub async fn run_network_controller(
         peers_lock,
     );
 
-    let mut work_done = false;
     let controller_handle = tokio::task::Builder::new()
         .name("saito-io-controller")
         .spawn(async move {
@@ -575,152 +575,148 @@ pub async fn run_network_controller(
                 sender_to_stat.clone(),
             );
             let stat_timer_in_ms;
-            let thread_sleep_time_in_ms;
             {
                 let configs_temp = configs_lock.read().await;
                 stat_timer_in_ms = configs_temp.get_server_configs().unwrap().stat_timer_in_ms;
-                thread_sleep_time_in_ms = configs_temp
-                    .get_server_configs()
-                    .unwrap()
-                    .thread_sleep_time_in_ms;
             }
+            let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
+
             let io_pool = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(10)
                 .enable_io()
                 .enable_time()
-                .thread_name("io-thread-pool")
+                .thread_name("saito-io-thread-pool")
                 .build()
                 .unwrap();
 
             let mut last_stat_on: Instant = Instant::now();
             loop {
-                let result = receiver.recv().await;
-                if result.is_some() {
-                    let event = result.unwrap();
-                    let event_id = event.event_id;
-                    let interface_event = event.event;
-                    work_done = true;
-                    match interface_event {
-                        NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
-                            let sockets;
-                            {
-                                let network_controller = network_controller_lock.read().await;
-                                sockets = network_controller.sockets.clone();
-                            }
+                select!{
+                    result = receiver.recv()=>{
+                        if result.is_some() {
+                            let event = result.unwrap();
+                            let event_id = event.event_id;
+                            let interface_event = event.event;
+                            match interface_event {
+                                NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
+                                    let sockets;
+                                    {
+                                        let network_controller = network_controller_lock.read().await;
+                                        sockets = network_controller.sockets.clone();
+                                    }
 
-                            NetworkController::send_to_all(sockets, buffer, exceptions).await;
-                            outgoing_messages.increment();
-                        }
-                        NetworkEvent::OutgoingNetworkMessage {
-                            peer_index: index,
-                            buffer,
-                        } => {
-                            let sockets;
-                            {
-                                let network_controller = network_controller_lock.read().await;
-                                sockets = network_controller.sockets.clone();
-                            }
-                            NetworkController::send_outgoing_message(sockets, index, buffer).await;
-                            outgoing_messages.increment();
-                        }
-                        NetworkEvent::ConnectToPeer { peer_details } => {
-                            NetworkController::connect_to_peer(
-                                event_id,
-                                network_controller_lock.clone(),
-                                peer_details,
-                            )
-                            .await;
-                        }
-                        NetworkEvent::PeerConnectionResult { .. } => {
-                            unreachable!()
-                        }
-                        NetworkEvent::PeerDisconnected { peer_index: _ } => {
-                            unreachable!()
-                        }
-                        NetworkEvent::IncomingNetworkMessage { .. } => {
-                            unreachable!()
-                        }
-                        NetworkEvent::BlockFetchRequest {
-                            block_hash,
-                            peer_index,
-                            url,
-                            block_id,
-                        } => {
-                            let sender;
-                            let current_queries;
-                            {
-                                let network_controller = network_controller_lock.read().await;
-
-                                sender = network_controller.sender_to_saito_controller.clone();
-                                current_queries = network_controller.currently_queried_urls.clone();
-                            }
-                            // starting new thread to stop io controller from getting blocked
-                            io_pool.spawn(async move {
-                                let client = reqwest::Client::new();
-
-                                NetworkController::fetch_block(
+                                    NetworkController::send_to_all(sockets, buffer, exceptions).await;
+                                    outgoing_messages.increment();
+                                }
+                                NetworkEvent::OutgoingNetworkMessage {
+                                    peer_index: index,
+                                    buffer,
+                                } => {
+                                    let sockets;
+                                    {
+                                        let network_controller = network_controller_lock.read().await;
+                                        sockets = network_controller.sockets.clone();
+                                    }
+                                    NetworkController::send_outgoing_message(sockets, index, buffer).await;
+                                    outgoing_messages.increment();
+                                }
+                                NetworkEvent::ConnectToPeer { peer_details } => {
+                                    NetworkController::connect_to_peer(
+                                        event_id,
+                                        network_controller_lock.clone(),
+                                        peer_details,
+                                    )
+                                    .await;
+                                }
+                                NetworkEvent::PeerConnectionResult { .. } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::PeerDisconnected { peer_index: _ } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::IncomingNetworkMessage { .. } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::BlockFetchRequest {
                                     block_hash,
                                     peer_index,
                                     url,
-                                    event_id,
-                                    sender,
-                                    current_queries,
-                                    client,
                                     block_id,
-                                )
-                                .await
-                            });
-                        }
-                        NetworkEvent::BlockFetched { .. } => {
-                            unreachable!()
-                        }
-                        NetworkEvent::BlockFetchFailed { .. } => {
-                            unreachable!()
-                        }
-                        NetworkEvent::DisconnectFromPeer { peer_index } => {
-                            NetworkController::disconnect_from_peer(
-                                event_id,
-                                network_controller_lock.clone(),
-                                peer_index,
-                            )
-                            .await
+                                } => {
+                                    let sender;
+                                    let current_queries;
+                                    {
+                                        let network_controller = network_controller_lock.read().await;
+
+                                        sender = network_controller.sender_to_saito_controller.clone();
+                                        current_queries = network_controller.currently_queried_urls.clone();
+                                    }
+                                    // starting new thread to stop io controller from getting blocked
+                                    io_pool.spawn(async move {
+                                        let client = reqwest::Client::new();
+
+                                        NetworkController::fetch_block(
+                                            block_hash,
+                                            peer_index,
+                                            url,
+                                            event_id,
+                                            sender,
+                                            current_queries,
+                                            client,
+                                            block_id,
+                                        )
+                                        .await
+                                    });
+                                }
+                                NetworkEvent::BlockFetched { .. } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::BlockFetchFailed { .. } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::DisconnectFromPeer { peer_index } => {
+                                    NetworkController::disconnect_from_peer(
+                                        event_id,
+                                        network_controller_lock.clone(),
+                                        peer_index,
+                                    )
+                                    .await
+                                }
+                            }
                         }
                     }
-                }
+                    result = stat_interval.tick() => {
+                        #[cfg(feature = "with-stats")]
+                        {
+                            if Instant::now().duration_since(last_stat_on)
+                                > Duration::from_millis(stat_timer_in_ms)
+                            {
+                                last_stat_on = Instant::now();
+                                outgoing_messages
+                                    .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
+                                    .await;
+                                let network_controller = network_controller_lock.read().await;
 
-                #[cfg(feature = "with-stats")]
-                {
-                    if Instant::now().duration_since(last_stat_on)
-                        > Duration::from_millis(stat_timer_in_ms)
-                    {
-                        last_stat_on = Instant::now();
-                        outgoing_messages
-                            .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
-                            .await;
-                        let network_controller = network_controller_lock.read().await;
+                                let stat = format!(
+                                    "{} - {} - capacity : {:?} / {:?}",
+                                    StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                                    format!("{:width$}", "network::queue_to_core", width = 40),
+                                    network_controller.sender_to_saito_controller.capacity(),
+                                    network_controller.sender_to_saito_controller.max_capacity()
+                                );
+                                sender_to_stat.send(stat).await.unwrap();
 
-                        let stat = format!(
-                            "{} - {} - capacity : {:?} / {:?}",
-                            StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
-                            format!("{:width$}", "network::queue_to_core", width = 40),
-                            network_controller.sender_to_saito_controller.capacity(),
-                            network_controller.sender_to_saito_controller.max_capacity()
-                        );
-                        sender_to_stat.send(stat).await.unwrap();
-
-                        let stat = format!(
-                            "{} - {} - capacity : {:?} / {:?}",
-                            StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
-                            format!("{:width$}", "network::queue_outgoing", width = 40),
-                            sender_to_network.capacity(),
-                            sender_to_network.max_capacity()
-                        );
-                        sender_to_stat.send(stat).await.unwrap();
+                                let stat = format!(
+                                    "{} - {} - capacity : {:?} / {:?}",
+                                    StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                                    format!("{:width$}", "network::queue_outgoing", width = 40),
+                                    sender_to_network.capacity(),
+                                    sender_to_network.max_capacity()
+                                );
+                                sender_to_stat.send(stat).await.unwrap();
+                            }
+                        }
                     }
-                }
-
-                if !work_done {
-                    // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
                 }
             }
         })

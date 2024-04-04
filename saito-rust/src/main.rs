@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::ops::Deref;
 use std::panic;
 use std::path::Path;
@@ -90,66 +91,55 @@ async fn run_thread<T>(
     thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()>
 where
-    T: Send + 'static,
+    T: Send + Debug + 'static,
 {
     tokio::task::Builder::new()
         .name(thread_name)
         .spawn(async move {
             info!("new thread started");
             // let mut work_done;
-            let mut last_timestamp = Instant::now();
-            let mut stat_timer = Instant::now();
+            let mut last_stat_time = Instant::now();
             let time_keeper = TimeKeeper {};
 
             event_processor.on_init().await;
             let mut interval =
                 tokio::time::interval(Duration::from_millis(thread_sleep_time_in_ms));
-            let mut stat_interval =
-                tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
+            let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
             loop {
                 select! {
-                                    result = receive_event(&mut network_event_receiver)=>{
-if result.is_some() {
-                        let event: NetworkEvent = result.unwrap();
-                        event_processor.process_network_event(event).await;
-                    }
-                                    }
-                                    result= receive_event(&mut event_receiver)=>{
+                    result = receive_event(&mut network_event_receiver)=>{
                         if result.is_some() {
-                        let event = result.unwrap();
-                         event_processor.process_event(event).await;
+                            let event: NetworkEvent = result.unwrap();
+                            event_processor.process_network_event(event).await;
+                        }
                     }
+                    result= receive_event(&mut event_receiver)=>{
+                        if result.is_some() {
+                            let event = result.unwrap();
+                            event_processor.process_event(event).await;
+                        }
                     }
-                result = interval.tick()=>{
+                    _ = interval.tick()=>{
+                            event_processor
+                               .process_timer_event(interval.period())
+                               .await;
+                    }
+                    _ = stat_interval.tick()=>{
+                        #[cfg(feature = "with-stats")]
+                        {
+                            let current_instant = Instant::now();
 
-
-                 event_processor
-                    .process_timer_event(interval.period())
-                    .await;
-
-
-
-                                    }
-                    result = stat_interval.tick()=>{
-                          #[cfg(feature = "with-stats")]
-                {
-                     let current_instant = Instant::now();
-                let duration = current_instant.duration_since(last_timestamp);
-                last_timestamp = current_instant;
-
-                    let duration = current_instant.duration_since(stat_timer);
-                    if duration > Duration::from_millis(stat_timer_in_ms) {
-                        stat_timer = current_instant;
-                        event_processor
-                            .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                            .await;
+                            let duration = current_instant.duration_since(last_stat_time);
+                            if duration > Duration::from_millis(stat_timer_in_ms) {
+                                last_stat_time = current_instant;
+                                event_processor
+                                    .on_stat_interval(time_keeper.get_timestamp_in_ms())
+                                    .await;
+                            }
+                        }
                     }
                 }
-                    }
-                                }
-
-
             }
         })
         .unwrap()
@@ -179,61 +169,52 @@ async fn run_verification_thread(
             let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
             loop {
-                // work_done = false;
-
                 loop {
                     select! {
                         result = event_receiver.recv() =>{
                             if result.is_some() {
-                            let request = result.unwrap();
-                            if let VerifyRequest::Block(..) = &request {
-                                queued_requests.push(request);
+                                let request = result.unwrap();
+                                if let VerifyRequest::Block(..) = &request {
+                                    queued_requests.push(request);
+                                    break;
+                                }
+                                if let VerifyRequest::Transaction(tx) = request {
+                                    requests.push_back(tx);
+                                }
+                            } else {
                                 break;
                             }
-                            if let VerifyRequest::Transaction(tx) = request {
-                                requests.push_back(tx);
+                            if requests.len() == batch_size {
+                                break;
                             }
-                        } else {
-                            break;
                         }
-                        if requests.len() == batch_size {
-                            break;
-                        }
-                        }
-                            result = interval.tick()=>{
+                        _ = interval.tick()=>{
 
+                        }
+                        _ = stat_interval.tick()=>{
+                            #[cfg(feature = "with-stats")]
+                            {
+                                let current_instant = Instant::now();
+                                let duration = current_instant.duration_since(stat_timer);
+                                if duration > Duration::from_millis(stat_timer_in_ms) {
+                                    stat_timer = current_instant;
+                                    event_processor
+                                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
+                                        .await;
+                                }
                             }
-                            result = stat_interval.tick()=>{
-                                  #[cfg(feature = "with-stats")]
-                    {
-                        let current_instant = Instant::now();
-                        let duration = current_instant.duration_since(stat_timer);
-                        if duration > Duration::from_millis(stat_timer_in_ms) {
-                            stat_timer = current_instant;
-                            event_processor
-                                .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                                .await;
                         }
                     }
-                            }
-                    }
-                    // let result = event_receiver.recv().await;
                 }
                 if !requests.is_empty() {
                     event_processor
                         .processed_msgs
                         .increment_by(requests.len() as u64);
                     event_processor.verify_txs(&mut requests).await;
-                    // work_done = true;
                 }
                 for request in queued_requests.drain(..) {
                     event_processor.process_event(request).await;
-                    // work_done = true;
                 }
-
-                // if !work_done {
-                // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-                // }
             }
         })
         .unwrap()
@@ -260,7 +241,7 @@ async fn run_mining_event_processor(
         stat_sender: sender_to_stat.clone(),
         config_lock: context.config_lock.clone(),
         enabled: true,
-        mining_iterations: 10_000,
+        mining_iterations: 100_000,
     };
 
     let (interface_sender_to_miner, interface_receiver_for_miner) =
@@ -291,11 +272,6 @@ async fn run_consensus_event_processor(
     channel_size: usize,
     sender_to_stat: Sender<String>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let result = std::env::var("GEN_TX");
-    let mut create_test_tx = false;
-    if result.is_ok() {
-        create_test_tx = result.unwrap().eq("1");
-    }
     // let generate_genesis_block: bool;
     // {
     //     let configs = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
