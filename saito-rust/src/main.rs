@@ -12,6 +12,7 @@ use log::info;
 use log::{debug, error};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -48,6 +49,13 @@ use saito_rust::time_keeper::TimeKeeper;
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
+
+async fn receive_event<T>(receiver: &mut Option<Receiver<T>>) -> Option<T> {
+    if let Some(receiver) = receiver.as_mut() {
+        return receiver.recv().await;
+    }
+    return None;
+}
 
 /// Runs a permanent thread with an event loop
 ///
@@ -88,50 +96,48 @@ where
         .name(thread_name)
         .spawn(async move {
             info!("new thread started");
-            let mut work_done;
+            // let mut work_done;
             let mut last_timestamp = Instant::now();
             let mut stat_timer = Instant::now();
             let time_keeper = TimeKeeper {};
 
             event_processor.on_init().await;
+            let mut interval =
+                tokio::time::interval(Duration::from_millis(thread_sleep_time_in_ms));
+            let mut stat_interval =
+                tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
             loop {
-                work_done = false;
-                if network_event_receiver.is_some() {
-                    // TODO : update to recv().await
-                    let result = network_event_receiver.as_mut().unwrap().try_recv();
-                    if result.is_ok() {
+                select! {
+                                    result = receive_event(&mut network_event_receiver)=>{
+if result.is_some() {
                         let event: NetworkEvent = result.unwrap();
-                        if event_processor.process_network_event(event).await.is_some() {
-                            work_done = true;
-                        }
+                        event_processor.process_network_event(event).await;
                     }
-                }
-
-                if event_receiver.is_some() {
-                    // TODO : update to recv().await
-                    let result = event_receiver.as_mut().unwrap().try_recv();
-                    if result.is_ok() {
+                                    }
+                                    result= receive_event(&mut event_receiver)=>{
+                        if result.is_some() {
                         let event = result.unwrap();
-                        if event_processor.process_event(event).await.is_some() {
-                            work_done = true;
-                        }
+                         event_processor.process_event(event).await;
                     }
-                }
+                    }
+                result = interval.tick()=>{
 
-                let current_instant = Instant::now();
+
+                 event_processor
+                    .process_timer_event(interval.period())
+                    .await;
+
+
+
+                                    }
+                    result = stat_interval.tick()=>{
+                          #[cfg(feature = "with-stats")]
+                {
+                     let current_instant = Instant::now();
                 let duration = current_instant.duration_since(last_timestamp);
                 last_timestamp = current_instant;
 
-                if event_processor
-                    .process_timer_event(duration)
-                    .await
-                    .is_some()
-                {
-                    work_done = true;
-                }
-                #[cfg(feature = "with-stats")]
-                {
                     let duration = current_instant.duration_since(stat_timer);
                     if duration > Duration::from_millis(stat_timer_in_ms) {
                         stat_timer = current_instant;
@@ -140,10 +146,10 @@ where
                             .await;
                     }
                 }
+                    }
+                                }
 
-                if !work_done {
-                    // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-                }
+
             }
         })
         .unwrap()
@@ -160,7 +166,7 @@ async fn run_verification_thread(
         .name(thread_name)
         .spawn(async move {
             info!("verification thread started");
-            let mut work_done;
+            // let mut work_done;
             let mut stat_timer = Instant::now();
             let time_keeper = TimeKeeper {};
             let batch_size = 10000;
@@ -168,55 +174,66 @@ async fn run_verification_thread(
             event_processor.on_init().await;
             let mut queued_requests = vec![];
             let mut requests = VecDeque::new();
+            let mut interval =
+                tokio::time::interval(Duration::from_millis(thread_sleep_time_in_ms));
+            let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
             loop {
-                work_done = false;
+                // work_done = false;
 
                 loop {
-                    // TODO : update to recv().await
-                    let result = event_receiver.try_recv();
-                    if result.is_ok() {
-                        let request = result.unwrap();
-                        if let VerifyRequest::Block(..) = &request {
-                            queued_requests.push(request);
+                    select! {
+                        result = event_receiver.recv() =>{
+                            if result.is_some() {
+                            let request = result.unwrap();
+                            if let VerifyRequest::Block(..) = &request {
+                                queued_requests.push(request);
+                                break;
+                            }
+                            if let VerifyRequest::Transaction(tx) = request {
+                                requests.push_back(tx);
+                            }
+                        } else {
                             break;
                         }
-                        if let VerifyRequest::Transaction(tx) = request {
-                            requests.push_back(tx);
+                        if requests.len() == batch_size {
+                            break;
                         }
-                    } else {
-                        break;
+                        }
+                            result = interval.tick()=>{
+
+                            }
+                            result = stat_interval.tick()=>{
+                                  #[cfg(feature = "with-stats")]
+                    {
+                        let current_instant = Instant::now();
+                        let duration = current_instant.duration_since(stat_timer);
+                        if duration > Duration::from_millis(stat_timer_in_ms) {
+                            stat_timer = current_instant;
+                            event_processor
+                                .on_stat_interval(time_keeper.get_timestamp_in_ms())
+                                .await;
+                        }
                     }
-                    if requests.len() == batch_size {
-                        break;
+                            }
                     }
+                    // let result = event_receiver.recv().await;
                 }
                 if !requests.is_empty() {
                     event_processor
                         .processed_msgs
                         .increment_by(requests.len() as u64);
                     event_processor.verify_txs(&mut requests).await;
-                    work_done = true;
+                    // work_done = true;
                 }
                 for request in queued_requests.drain(..) {
                     event_processor.process_event(request).await;
-                    work_done = true;
-                }
-                #[cfg(feature = "with-stats")]
-                {
-                    let current_instant = Instant::now();
-                    let duration = current_instant.duration_since(stat_timer);
-                    if duration > Duration::from_millis(stat_timer_in_ms) {
-                        stat_timer = current_instant;
-                        event_processor
-                            .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                            .await;
-                    }
+                    // work_done = true;
                 }
 
-                if !work_done {
-                    // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-                }
+                // if !work_done {
+                // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
+                // }
             }
         })
         .unwrap()
@@ -476,21 +493,20 @@ fn run_loop_thread(
     tokio::task::Builder::new()
         .name("saito-looper")
         .spawn(async move {
-            let mut work_done: bool;
             let mut incoming_msgs = StatVariable::new(
                 "network::incoming_msgs".to_string(),
                 STAT_BIN_COUNT,
                 sender_to_stat.clone(),
             );
+            let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
+
             let mut last_stat_on: Instant = Instant::now();
             loop {
-                work_done = false;
-
-                let result = receiver.recv().await;
-                if result.is_some() {
+                select! {
+                    result = receiver.recv()=>{
+                        if result.is_some() {
                     let command = result.unwrap();
                     incoming_msgs.increment();
-                    work_done = true;
                     // TODO : remove hard coded values
                     match command.event_processor_id {
                         ROUTING_EVENT_PROCESSOR_ID => {
@@ -505,11 +521,8 @@ fn run_loop_thread(
                             //     "routing event to consensus event processor : {:?}",
                             //     command.event
                             // );
-                            unreachable!()
-                            // network_event_sender_to_consensus_ep
-                            //     .send(command.event)
-                            //     .await
-                            //     .unwrap();
+                            unreachable!("not expecting consensus events")
+
                         }
                         MINING_EVENT_PROCESSOR_ID => {
                             // trace!(
@@ -526,7 +539,9 @@ fn run_loop_thread(
                         _ => {}
                     }
                 }
-                #[cfg(feature = "with-stats")]
+                    }
+                    result = stat_interval.tick()=>{
+                        #[cfg(feature = "with-stats")]
                 {
                     if Instant::now().duration_since(last_stat_on)
                         > Duration::from_millis(stat_timer_in_ms)
@@ -537,8 +552,7 @@ fn run_loop_thread(
                             .await;
                     }
                 }
-                if !work_done {
-                    // tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
+                    }
                 }
             }
         })
