@@ -614,7 +614,7 @@ impl Blockchain {
         let mut block = block.unwrap();
         let public_key;
         {
-            let wallet = mempool.wallet.read().await;
+            let wallet = mempool.wallet_lock.read().await;
             public_key = wallet.public_key;
         }
         if block.creator == public_key {
@@ -1568,63 +1568,62 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
     ) -> bool {
         debug!("adding blocks from mempool to blockchain");
-        let mut blocks: VecDeque<Block>;
-        let mut mempool = mempool_lock.write().await;
-
-        blocks = mempool.blocks_queue.drain(..).collect();
-        blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
-
-        debug!("blocks to add : {:?}", blocks.len());
         let mut blockchain_updated = false;
-        while let Some(block) = blocks.pop_front() {
-            // info!("adding block : {:?}", block.id);
-            let mut sender = None;
-            if blocks.is_empty() {
-                sender = sender_to_miner.clone();
-            }
-            let block_hash = block.hash;
-            let result = self
-                .add_block(
-                    block,
-                    network,
-                    storage,
-                    sender,
-                    sender_to_router.clone(),
-                    &mut mempool,
-                    configs,
-                )
-                .await;
-            match result {
-                AddBlockResult::BlockAdded => {
-                    blockchain_updated = true;
-                    if let Some(sender) = sender_to_router.clone() {
-                        sender
-                            .send(RoutingEvent::BlockchainUpdated(block_hash))
-                            .await
-                            .unwrap();
+        let mut blocks: VecDeque<Block>;
+        {
+            let mut mempool = mempool_lock.write().await;
+
+            blocks = mempool.blocks_queue.drain(..).collect();
+            blocks.make_contiguous().sort_by(|a, b| a.id.cmp(&b.id));
+
+            debug!("blocks to add : {:?}", blocks.len());
+            while let Some(block) = blocks.pop_front() {
+                // info!("adding block : {:?}", block.id);
+                let mut sender = None;
+                if blocks.is_empty() {
+                    sender = sender_to_miner.clone();
+                }
+                let block_hash = block.hash;
+                let result = self
+                    .add_block(
+                        block,
+                        network,
+                        storage,
+                        sender,
+                        sender_to_router.clone(),
+                        &mut mempool,
+                        configs,
+                    )
+                    .await;
+                match result {
+                    AddBlockResult::BlockAdded => {
+                        blockchain_updated = true;
+                        if let Some(sender) = sender_to_router.clone() {
+                            sender
+                                .send(RoutingEvent::BlockchainUpdated(block_hash))
+                                .await
+                                .unwrap();
+                        }
+                    }
+                    AddBlockResult::BlockAlreadyExists => {}
+                    AddBlockResult::FailedButRetry => {}
+                    AddBlockResult::FailedNotValid => {}
+                }
+                if !blockchain_updated {
+                    if let AddBlockResult::BlockAdded = result {
+                        blockchain_updated = true;
                     }
                 }
-                AddBlockResult::BlockAlreadyExists => {}
-                AddBlockResult::FailedButRetry => {}
-                AddBlockResult::FailedNotValid => {}
             }
-            if !blockchain_updated {
-                if let AddBlockResult::BlockAdded = result {
-                    blockchain_updated = true;
-                }
-            }
+
+            debug!(
+                "added blocks to blockchain. added back : {:?}",
+                mempool.blocks_queue.len()
+            );
         }
 
-        debug!(
-            "added blocks to blockchain. added back : {:?}",
-            mempool.blocks_queue.len()
-        );
-        std::mem::drop(mempool);
-
-        {
-            let mut wallet = self.wallet_lock.write().await;
-            Wallet::save(&mut wallet, storage.io_interface.as_ref()).await;
-        }
+        let mut wallet = self.wallet_lock.write().await;
+        Wallet::save(&mut wallet, storage.io_interface.as_ref()).await;
 
         blockchain_updated
     }
@@ -2835,7 +2834,7 @@ mod tests {
             .load_blocks_from_disk(list, t2.mempool_lock.clone())
             .await;
         {
-            let configs = t2.configs.read().await;
+            let configs = t2.config_lock.read().await;
             let mut blockchain2 = t2.blockchain_lock.write().await;
 
             blockchain2
@@ -3034,7 +3033,7 @@ mod tests {
         }
 
         {
-            let configs = t.configs.read().await;
+            let configs = t.config_lock.read().await;
             let mut blockchain = t.blockchain_lock.write().await;
 
             blockchain

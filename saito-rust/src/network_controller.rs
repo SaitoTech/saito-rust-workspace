@@ -30,7 +30,6 @@ use saito_core::core::defs::{
 };
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::process::keep_time::KeepTime;
-use saito_core::core::util;
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
 
 use crate::io_event::IoEvent;
@@ -135,7 +134,7 @@ impl NetworkController {
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<NetworkController>>,
-        peer: util::configuration::PeerConfig,
+        peer: PeerConfig,
     ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
 
@@ -745,7 +744,7 @@ fn run_websocket_server(
     port: u16,
     host: String,
     public_key: SaitoPublicKey,
-    peers: Arc<RwLock<PeerCollection>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
     tokio::task::Builder::new()
@@ -845,11 +844,11 @@ fn run_websocket_server(
             let lite_route = warp::path!("lite-block" / String / ..)
                 .and(opt)
                 .and(warp::path::end())
-                .and(warp::any().map(move || peers.clone()))
+                .and(warp::any().map(move || peer_lock.clone()))
                 .and_then(
                     move |block_hash: String,
                           key: Option<String>,
-                          peers: Arc<RwLock<PeerCollection>>| async move {
+                          peer_lock: Arc<RwLock<PeerCollection>>| async move {
                         // debug!("serving lite block : {:?}", block_hash);
 
                         let mut key1 = String::from("");
@@ -888,7 +887,7 @@ fn run_websocket_server(
                         }
                         let mut keylist;
                         {
-                            let peers = peers.read().await;
+                            let peers = peer_lock.read().await;
                             let peer = peers.find_peer_by_address(&key);
                             if peer.is_none() {
                                 keylist = vec![key];

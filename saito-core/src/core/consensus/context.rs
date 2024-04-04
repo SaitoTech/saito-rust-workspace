@@ -11,22 +11,22 @@ use crate::core::util::configuration::Configuration;
 
 #[derive(Clone)]
 pub struct Context {
-    pub blockchain: Arc<RwLock<Blockchain>>,
-    pub mempool: Arc<RwLock<Mempool>>,
-    pub wallet: Arc<RwLock<Wallet>>,
-    pub configuration: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    pub blockchain_lock: Arc<RwLock<Blockchain>>,
+    pub mempool_lock: Arc<RwLock<Mempool>>,
+    pub wallet_lock: Arc<RwLock<Wallet>>,
+    pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
 }
 
 impl Context {
     pub fn new(
-        configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
-        wallet: Arc<RwLock<Wallet>>,
+        config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        wallet_lock: Arc<RwLock<Wallet>>,
     ) -> Context {
         Context {
-            blockchain: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
-            mempool: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
-            wallet,
-            configuration: configs,
+            blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone()))),
+            mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet_lock.clone()))),
+            wallet_lock,
+            config_lock,
         }
     }
     pub async fn init(&self, _task_runner: &dyn RunTask) -> Result<(), Error> {

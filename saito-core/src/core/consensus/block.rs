@@ -2406,7 +2406,7 @@ mod tests {
         }
 
         {
-            let configs = t.configs.read().await;
+            let configs = t.config_lock.read().await;
             block.merkle_root =
                 block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
         }

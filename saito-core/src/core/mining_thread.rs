@@ -27,7 +27,7 @@ pub enum MiningEvent {
 
 /// Manages the miner
 pub struct MiningThread {
-    pub wallet: Arc<RwLock<Wallet>>,
+    pub wallet_lock: Arc<RwLock<Wallet>>,
     pub sender_to_mempool: Sender<ConsensusEvent>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub miner_active: bool,
@@ -36,7 +36,7 @@ pub struct MiningThread {
     pub public_key: SaitoPublicKey,
     pub mined_golden_tickets: u64,
     pub stat_sender: Sender<String>,
-    pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     // todo : make this private and init using configs
     pub enabled: bool,
     pub mining_iterations: u32,
@@ -47,7 +47,7 @@ impl MiningThread {
         assert!(self.miner_active);
 
         if self.public_key == [0; 33] {
-            let wallet = self.wallet.read().await;
+            let wallet = self.wallet_lock.read().await;
             if wallet.public_key == [0; 33] {
                 // wallet not initialized yet
                 return false;
@@ -128,11 +128,11 @@ impl ProcessEvent<MiningEvent> for MiningThread {
     }
 
     async fn on_init(&mut self) {
-        let configs = self.configs.read().await;
+        let configs = self.config_lock.read().await;
         info!("is browser = {:?}", configs.is_browser());
         self.enabled = !configs.is_browser();
         info!("miner is enabled");
-        let wallet = self.wallet.read().await;
+        let wallet = self.wallet_lock.read().await;
         self.public_key = wallet.public_key;
         info!("node public key = {:?}", self.public_key.to_base58());
     }

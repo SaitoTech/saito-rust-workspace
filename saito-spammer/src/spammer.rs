@@ -20,8 +20,8 @@ use crate::transaction_generator::{GeneratorState, TransactionGenerator};
 
 pub struct Spammer {
     sender_to_network: Sender<IoEvent>,
-    peers: Arc<RwLock<PeerCollection>>,
-    configs: Arc<RwLock<SpammerConfigs>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
+    config_lock: Arc<RwLock<SpammerConfigs>>,
     bootstrap_done: bool,
     sent_tx_count: u64,
     tx_generator: TransactionGenerator,
@@ -45,8 +45,8 @@ impl Spammer {
         }
         Spammer {
             sender_to_network,
-            peers: peers_lock.clone(),
-            configs: configs_lock.clone(),
+            peer_lock: peers_lock.clone(),
+            config_lock: configs_lock.clone(),
             bootstrap_done: false,
             sent_tx_count: 0,
             tx_generator: TransactionGenerator::create(
@@ -69,7 +69,7 @@ impl Spammer {
         let stop_after;
 
         {
-            let configs = self.configs.read().await;
+            let configs = self.config_lock.read().await;
 
             timer_in_milli = configs.get_spammer_configs().timer_in_milli;
             burst_count = configs.get_spammer_configs().burst_count;

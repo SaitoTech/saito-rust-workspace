@@ -232,7 +232,7 @@ async fn run_mining_event_processor(
     sender_to_stat: Sender<String>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mining_event_processor = MiningThread {
-        wallet: context.wallet.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         miner_active: false,
@@ -241,7 +241,7 @@ async fn run_mining_event_processor(
         public_key: [0; 33],
         mined_golden_tickets: 0,
         stat_sender: sender_to_stat.clone(),
-        configs: context.configuration.clone(),
+        config_lock: context.config_lock.clone(),
         enabled: true,
         mining_iterations: 10_000,
     };
@@ -264,7 +264,7 @@ async fn run_mining_event_processor(
 
 async fn run_consensus_event_processor(
     context: &Context,
-    peers: Arc<RwLock<PeerCollection>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
     sender_to_routing: &Sender<RoutingEvent>,
     sender_to_miner: Sender<MiningEvent>,
@@ -288,9 +288,9 @@ async fn run_consensus_event_processor(
     // }
 
     let consensus_event_processor = ConsensusThread {
-        mempool: context.mempool.clone(),
-        blockchain: context.blockchain.clone(),
-        wallet: context.wallet.clone(),
+        mempool_lock: context.mempool_lock.clone(),
+        blockchain_lock: context.blockchain_lock.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         generate_genesis_block: false,
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
@@ -301,9 +301,9 @@ async fn run_consensus_event_processor(
                 sender_to_network_controller.clone(),
                 CONSENSUS_EVENT_PROCESSOR_ID,
             )),
-            peers.clone(),
-            context.wallet.clone(),
-            context.configuration.clone(),
+            peer_lock.clone(),
+            context.wallet_lock.clone(),
+            context.config_lock.clone(),
             Box::new(TimeKeeper {}),
         ),
         block_producing_timer: 0,
@@ -314,7 +314,7 @@ async fn run_consensus_event_processor(
         stats: ConsensusStats::new(sender_to_stat.clone()),
         txs_for_mempool: Vec::new(),
         stat_sender: sender_to_stat.clone(),
-        configs: context.configuration.clone(),
+        config_lock: context.config_lock.clone(),
     };
     let (interface_sender_to_blockchain, _interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
@@ -348,21 +348,21 @@ async fn run_routing_event_processor(
     fetch_batch_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
-        blockchain: context.blockchain.clone(),
-        mempool: context.mempool.clone(),
+        blockchain_lock: context.blockchain_lock.clone(),
+        mempool_lock: context.mempool_lock.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         static_peers: vec![],
-        configs: configs_lock.clone(),
-        wallet: context.wallet.clone(),
+        config_lock: configs_lock.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_io_controller.clone(),
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
             peers_lock.clone(),
-            context.wallet.clone(),
+            context.wallet_lock.clone(),
             configs_lock.clone(),
             Box::new(TimeKeeper {}),
         ),
@@ -409,9 +409,9 @@ async fn run_routing_event_processor(
 
 async fn run_verification_threads(
     sender_to_consensus: Sender<ConsensusEvent>,
-    blockchain: Arc<RwLock<Blockchain>>,
-    peers: Arc<RwLock<PeerCollection>>,
-    wallet: Arc<RwLock<Wallet>>,
+    blockchain_lock: Arc<RwLock<Blockchain>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
+    wallet_lock: Arc<RwLock<Wallet>>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
     verification_thread_count: u16,
@@ -425,9 +425,9 @@ async fn run_verification_threads(
         senders.push(sender);
         let verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
-            blockchain: blockchain.clone(),
-            peers: peers.clone(),
-            wallet: wallet.clone(),
+            blockchain_lock: blockchain_lock.clone(),
+            peer_lock: peer_lock.clone(),
+            wallet_lock: wallet_lock.clone(),
             processed_txs: StatVariable::new(
                 format!("verification_{:?}::processed_txs", i),
                 STAT_BIN_COUNT,
@@ -650,9 +650,9 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
 
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
-        context.blockchain.clone(),
+        context.blockchain_lock.clone(),
         peers_lock.clone(),
-        context.wallet.clone(),
+        context.wallet_lock.clone(),
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
         verification_thread_count,
@@ -722,7 +722,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
         configs_lock.clone(),
-        context.blockchain.clone(),
+        context.blockchain_lock.clone(),
         sender_to_stat.clone(),
         peers_lock.clone(),
         sender_to_network_controller.clone(),
@@ -776,17 +776,17 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     )));
     let list = storage.load_block_name_list().await.unwrap();
     storage
-        .load_blocks_from_disk(list, context.mempool.clone())
+        .load_blocks_from_disk(list, context.mempool_lock.clone())
         .await;
 
     let _peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
     let configs = configs_lock.read().await;
 
-    let mut blockchain = context.blockchain.write().await;
+    let mut blockchain = context.blockchain_lock.write().await;
     blockchain
         .add_blocks_from_mempool(
-            context.mempool.clone(),
+            context.mempool_lock.clone(),
             None,
             &mut storage,
             None,

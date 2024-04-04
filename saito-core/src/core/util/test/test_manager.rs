@@ -84,10 +84,10 @@ pub mod test {
         pub latest_block_hash: SaitoHash,
         pub network: Network,
         pub storage: Storage,
-        pub peers: Arc<RwLock<PeerCollection>>,
+        pub peer_lock: Arc<RwLock<PeerCollection>>,
         pub sender_to_miner: Sender<MiningEvent>,
         pub receiver_in_miner: Receiver<MiningEvent>,
-        pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
         pub issuance_path: &'static str,
     }
     impl Default for TestManager {
@@ -117,11 +117,11 @@ pub mod test {
                     configs.clone(),
                     Box::new(TestTimeKeeper {}),
                 ),
-                peers: peers.clone(),
+                peer_lock: peers.clone(),
                 storage: Storage::new(Box::new(TestIOHandler::new())),
                 sender_to_miner: sender_to_miner.clone(),
                 receiver_in_miner,
-                configs,
+                config_lock: configs,
                 issuance_path,
             }
         }
@@ -204,7 +204,7 @@ pub mod test {
             debug!("adding block to test manager blockchain");
 
             {
-                let configs = self.configs.write().await;
+                let configs = self.config_lock.write().await;
                 let mut blockchain = self.blockchain_lock.write().await;
                 let mut mempool = self.mempool_lock.write().await;
 
@@ -639,7 +639,7 @@ pub mod test {
                 transactions.insert(gttx.signature, gttx);
             }
 
-            let configs = self.configs.read().await;
+            let configs = self.config_lock.read().await;
             let mut blockchain = self.blockchain_lock.write().await;
 
             // create block
@@ -773,7 +773,7 @@ pub mod test {
             block.add_transaction(tx);
 
             {
-                let configs = self.configs.read().await;
+                let configs = self.config_lock.read().await;
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
@@ -830,7 +830,7 @@ pub mod test {
             }
 
             {
-                let configs = self.configs.read().await;
+                let configs = self.config_lock.read().await;
                 // we have added VIP, so need to regenerate the merkle-root
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
@@ -881,7 +881,7 @@ pub mod test {
             }
 
             {
-                let configs = self.configs.read().await;
+                let configs = self.config_lock.read().await;
                 // we have added txs, so need to regenerate the merkle-root
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
@@ -906,7 +906,7 @@ pub mod test {
             let mut tx = Transaction::create_issuance_transaction(wallet_read.public_key, amount);
             tx.sign(&wallet_read.private_key);
             drop(wallet_read);
-            let configs = self.configs.read().await;
+            let configs = self.config_lock.read().await;
 
             let mut blockchain = self.blockchain_lock.write().await;
             let mut mempool = self.mempool_lock.write().await;
@@ -1008,7 +1008,7 @@ pub mod test {
             }
 
             {
-                let configs = self.configs.read().await;
+                let configs = self.config_lock.read().await;
 
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());

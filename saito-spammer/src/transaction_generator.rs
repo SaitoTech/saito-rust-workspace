@@ -29,8 +29,8 @@ pub enum GeneratorState {
 
 pub struct TransactionGenerator {
     state: GeneratorState,
-    wallet: Arc<RwLock<Wallet>>,
-    blockchain: Arc<RwLock<Blockchain>>,
+    wallet_lock: Arc<RwLock<Wallet>>,
+    blockchain_lock: Arc<RwLock<Blockchain>>,
     expected_slip_count: u64,
     tx_size: u64,
     tx_count: u64,
@@ -40,7 +40,7 @@ pub struct TransactionGenerator {
     sender: Sender<VecDeque<Transaction>>,
     tx_payment: Currency,
     tx_fee: Currency,
-    peers: Arc<RwLock<PeerCollection>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
 }
 
 impl TransactionGenerator {
@@ -64,8 +64,8 @@ impl TransactionGenerator {
 
         let mut res = TransactionGenerator {
             state: GeneratorState::CreatingSlips,
-            wallet: wallet_lock.clone(),
-            blockchain: blockchain_lock.clone(),
+            wallet_lock: wallet_lock.clone(),
+            blockchain_lock: blockchain_lock.clone(),
             expected_slip_count: 1,
             tx_size,
             tx_count,
@@ -75,7 +75,7 @@ impl TransactionGenerator {
             sender,
             tx_payment,
             tx_fee,
-            peers: peers_lock.clone(),
+            peer_lock: peers_lock.clone(),
         };
         {
             let wallet = wallet_lock.read().await;
@@ -115,7 +115,7 @@ impl TransactionGenerator {
         let available_balance;
 
         {
-            let wallet = self.wallet.read().await;
+            let wallet = self.wallet_lock.read().await;
 
             unspent_slip_count = wallet.get_unspent_slip_count();
             available_balance = wallet.get_available_balance();
@@ -134,7 +134,7 @@ impl TransactionGenerator {
             let mut to_public_key = [0; 33];
 
             {
-                let peers = self.peers.read().await;
+                let peers = self.peer_lock.read().await;
 
                 if peers.index_to_peers.is_empty() {
                     info!("not yet connected to a node");
@@ -200,7 +200,7 @@ impl TransactionGenerator {
         let payment_amount =
             total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
 
-        let mut wallet = self.wallet.write().await;
+        let mut wallet = self.wallet_lock.write().await;
 
         let mut transaction = Transaction::default();
 
@@ -241,7 +241,7 @@ impl TransactionGenerator {
         info!("checking for blockchain confirmation...");
         let unspent_slip_count;
         {
-            let wallet = self.wallet.read().await;
+            let wallet = self.wallet_lock.read().await;
             unspent_slip_count = wallet.get_unspent_slip_count();
         }
 
@@ -265,8 +265,8 @@ impl TransactionGenerator {
         info!("creating test transactions : {:?}", self.tx_count);
 
         let time_keeper = TimeKeeper {};
-        let wallet = self.wallet.clone();
-        let _blockchain = self.blockchain.clone();
+        let wallet = self.wallet_lock.clone();
+        let _blockchain = self.blockchain_lock.clone();
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
         let public_key = self.public_key;
         let count = self.tx_count;
@@ -326,7 +326,7 @@ impl TransactionGenerator {
         let mut to_public_key = [0; 33];
 
         {
-            let peers = self.peers.read().await;
+            let peers = self.peer_lock.read().await;
 
             for peer in peers.index_to_peers.iter() {
                 to_public_key = peer.1.public_key.clone().unwrap();

@@ -130,10 +130,10 @@ async fn run_mining_event_processor(
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
     sender_to_stat: Sender<String>,
-    configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
 ) -> JoinHandle<()> {
     let mining_event_processor = MiningThread {
-        wallet: context.wallet.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         miner_active: false,
@@ -142,7 +142,7 @@ async fn run_mining_event_processor(
         public_key: [0; 33],
         mined_golden_tickets: 0,
         stat_sender: sender_to_stat.clone(),
-        configs,
+        config_lock,
         enabled: false,
         mining_iterations: 100,
     };
@@ -160,7 +160,7 @@ async fn run_mining_event_processor(
 
 async fn run_consensus_event_processor(
     context: &Context,
-    peers: Arc<RwLock<PeerCollection>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
     sender_to_routing: &Sender<RoutingEvent>,
     sender_to_miner: Sender<MiningEvent>,
@@ -176,15 +176,15 @@ async fn run_consensus_event_processor(
     }
     let generate_genesis_block: bool;
     {
-        let configs = context.configuration.read().await;
+        let configs = context.config_lock.read().await;
 
         // if we have peers defined in configs, there's already an existing network. so we don't need to generate the first block.
         generate_genesis_block = configs.get_peer_configs().is_empty();
     }
     let consensus_event_processor = ConsensusThread {
-        mempool: context.mempool.clone(),
-        blockchain: context.blockchain.clone(),
-        wallet: context.wallet.clone(),
+        mempool_lock: context.mempool_lock.clone(),
+        blockchain_lock: context.blockchain_lock.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         generate_genesis_block,
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
@@ -195,9 +195,9 @@ async fn run_consensus_event_processor(
                 sender_to_network_controller.clone(),
                 CONSENSUS_EVENT_PROCESSOR_ID,
             )),
-            peers.clone(),
-            context.wallet.clone(),
-            context.configuration.clone(),
+            peer_lock.clone(),
+            context.wallet_lock.clone(),
+            context.config_lock.clone(),
             Box::new(TimeKeeper {}),
         ),
         block_producing_timer: 0,
@@ -208,7 +208,7 @@ async fn run_consensus_event_processor(
         stats: ConsensusStats::new(sender_to_stat.clone()),
         txs_for_mempool: vec![],
         stat_sender: sender_to_stat.clone(),
-        configs: context.configuration.clone(),
+        config_lock: context.config_lock.clone(),
     };
 
     debug!("running mempool thread");
@@ -226,9 +226,9 @@ async fn run_consensus_event_processor(
 
 async fn run_verification_threads(
     sender_to_consensus: Sender<ConsensusEvent>,
-    blockchain: Arc<RwLock<Blockchain>>,
-    peers: Arc<RwLock<PeerCollection>>,
-    wallet: Arc<RwLock<Wallet>>,
+    blockchain_lock: Arc<RwLock<Blockchain>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
+    wallet_lock: Arc<RwLock<Wallet>>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
     verification_thread_count: u16,
@@ -242,9 +242,9 @@ async fn run_verification_threads(
         senders.push(sender);
         let verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
-            blockchain: blockchain.clone(),
-            peers: peers.clone(),
-            wallet: wallet.clone(),
+            blockchain_lock: blockchain_lock.clone(),
+            peer_lock: peer_lock.clone(),
+            wallet_lock: wallet_lock.clone(),
             processed_txs: StatVariable::new(
                 format!("verification_{:?}::processed_txs", i),
                 STAT_BIN_COUNT,
@@ -298,22 +298,22 @@ async fn run_routing_event_processor(
     fetch_batch_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
-        blockchain: context.blockchain.clone(),
-        mempool: context.mempool.clone(),
+        blockchain_lock: context.blockchain_lock.clone(),
+        mempool_lock: context.mempool_lock.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         static_peers: vec![],
-        configs: configs_lock.clone(),
-        wallet: context.wallet.clone(),
+        config_lock: configs_lock.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_io_controller.clone(),
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
             peers_lock.clone(),
-            context.wallet.clone(),
-            context.configuration.clone(),
+            context.wallet_lock.clone(),
+            context.config_lock.clone(),
             Box::new(TimeKeeper {}),
         ),
         reconnection_timer: 0,
@@ -531,9 +531,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
-        context.blockchain.clone(),
+        context.blockchain_lock.clone(),
         peers_lock.clone(),
-        context.wallet.clone(),
+        context.wallet_lock.clone(),
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
         verification_thread_count,
@@ -602,7 +602,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
         configs_clone.clone(),
-        context.blockchain.clone(),
+        context.blockchain_lock.clone(),
         sender_to_stat.clone(),
         peers_lock.clone(),
         sender_to_network_controller.clone(),
@@ -610,9 +610,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     let spammer_handle = tokio::spawn(run_spammer(
-        context.wallet.clone(),
+        context.wallet_lock.clone(),
         peers_lock.clone(),
-        context.blockchain.clone(),
+        context.blockchain_lock.clone(),
         sender_to_network_controller.clone(),
         configs_lock.clone(),
     ));

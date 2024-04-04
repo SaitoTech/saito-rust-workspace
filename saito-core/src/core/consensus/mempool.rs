@@ -47,19 +47,19 @@ pub struct Mempool {
     // vector so we just copy it over
     routing_work_in_mempool: Currency,
     pub new_tx_added: bool,
-    pub wallet: Arc<RwLock<Wallet>>,
+    pub wallet_lock: Arc<RwLock<Wallet>>,
 }
 
 impl Mempool {
     #[allow(clippy::new_without_default)]
-    pub fn new(wallet: Arc<RwLock<Wallet>>) -> Self {
+    pub fn new(wallet_lock: Arc<RwLock<Wallet>>) -> Self {
         Mempool {
             blocks_queue: VecDeque::new(),
             transactions: Default::default(),
             golden_tickets: Default::default(),
             routing_work_in_mempool: 0,
             new_tx_added: false,
-            wallet,
+            wallet_lock,
         }
     }
 
@@ -108,7 +108,7 @@ impl Mempool {
         );
         let public_key;
         {
-            let wallet = self.wallet.read().await;
+            let wallet = self.wallet_lock.read().await;
             public_key = wallet.public_key;
         }
 
@@ -167,7 +167,7 @@ impl Mempool {
         let private_key;
         let block_timestamp_gap;
         {
-            let wallet = self.wallet.read().await;
+            let wallet = self.wallet_lock.read().await;
             previous_block_hash = blockchain.get_latest_block_hash();
             let previous_block_timestamp = match blockchain.get_latest_block() {
                 None => 0,
@@ -222,7 +222,7 @@ impl Mempool {
         let public_key;
         let private_key;
 
-        let wallet = self.wallet.read().await;
+        let wallet = self.wallet_lock.read().await;
         public_key = wallet.public_key;
         private_key = wallet.private_key;
 
@@ -413,7 +413,7 @@ mod tests {
         let ts = create_timestamp();
         let _next_block_timestamp = ts + (HEARTBEAT * 2);
 
-        let configs = t.configs.read().await;
+        let configs = t.config_lock.read().await;
         let blockchain = blockchain_lock.read().await;
         let mut mempool = mempool_lock.write().await;
 
