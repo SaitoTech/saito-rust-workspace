@@ -353,7 +353,6 @@ impl TransactionGenerator {
                     transaction.add_hop(&self.private_key, &self.public_key, &to_public_key);
 
                     transaction
-                    // sender.send(transaction).await.unwrap();
                 })
                 .collect();
             info!("sending {:?} signed txs to spammer", txs.len());

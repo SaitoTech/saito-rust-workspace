@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::future::pending;
 use std::ops::Deref;
 use std::panic;
 use std::path::Path;
@@ -56,7 +55,7 @@ async fn receive_event<T>(receiver: &mut Option<Receiver<T>>) -> Option<T> {
     if let Some(receiver) = receiver.as_mut() {
         return receiver.recv().await;
     }
-    tokio::time::sleep(Duration::from_secs(1_000)).await;
+    // tokio::time::sleep(Duration::from_secs(1_000_000)).await;
     None
 }
 
@@ -110,13 +109,13 @@ where
 
             loop {
                 select! {
-                    result = receive_event(&mut network_event_receiver)=>{
+                    result = receive_event(&mut network_event_receiver), if network_event_receiver.is_some()=>{
                         if result.is_some() {
                             let event: NetworkEvent = result.unwrap();
                             event_processor.process_network_event(event).await;
                         }
                     }
-                    result= receive_event(&mut event_receiver)=>{
+                    result= receive_event(&mut event_receiver), if event_receiver.is_some()=>{
                         if result.is_some() {
                             let event = result.unwrap();
                             event_processor.process_event(event).await;
@@ -483,53 +482,38 @@ fn run_loop_thread(
                 select! {
                     result = receiver.recv()=>{
                         if result.is_some() {
-                    let command = result.unwrap();
-                    incoming_msgs.increment();
-                    // TODO : remove hard coded values
-                    match command.event_processor_id {
-                        ROUTING_EVENT_PROCESSOR_ID => {
-                            // trace!("routing event to routing event processor  ",);
-                            network_event_sender_to_routing_ep
-                                .send(command.event)
-                                .await
-                                .unwrap();
-                        }
-                        CONSENSUS_EVENT_PROCESSOR_ID => {
-                            // trace!(
-                            //     "routing event to consensus event processor : {:?}",
-                            //     command.event
-                            // );
-                            unreachable!("not expecting consensus events")
+                            let command = result.unwrap();
+                            incoming_msgs.increment();
+                            match command.event_processor_id {
+                                ROUTING_EVENT_PROCESSOR_ID => {
+                                    network_event_sender_to_routing_ep
+                                        .send(command.event)
+                                        .await
+                                        .unwrap();
+                                }
+                                CONSENSUS_EVENT_PROCESSOR_ID => {
+                                    unreachable!("not expecting consensus events")
+                                }
+                                MINING_EVENT_PROCESSOR_ID => {
+                                    unreachable!()
+                                }
 
+                                _ => {}
+                            }
                         }
-                        MINING_EVENT_PROCESSOR_ID => {
-                            // trace!(
-                            //     "routing event to mining event processor : {:?}",
-                            //     command.event
-                            // );
-                            unreachable!()
-                            // network_event_sender_to_mining_ep
-                            //     .send(command.event)
-                            //     .await
-                            //     .unwrap();
-                        }
-
-                        _ => {}
                     }
-                }
-                    }
-                    result = stat_interval.tick()=>{
+                    _ = stat_interval.tick()=>{
                         #[cfg(feature = "with-stats")]
-                {
-                    if Instant::now().duration_since(last_stat_on)
-                        > Duration::from_millis(stat_timer_in_ms)
-                    {
-                        last_stat_on = Instant::now();
-                        incoming_msgs
-                            .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
-                            .await;
-                    }
-                }
+                        {
+                            if Instant::now().duration_since(last_stat_on)
+                                > Duration::from_millis(stat_timer_in_ms)
+                            {
+                                last_stat_on = Instant::now();
+                                incoming_msgs
+                                    .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
+                                    .await;
+                            }
+                        }
                     }
                 }
             }

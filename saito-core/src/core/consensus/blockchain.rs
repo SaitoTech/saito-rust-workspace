@@ -538,32 +538,9 @@ impl Blockchain {
                 .transactions
                 .retain(|_, tx| tx.validate_against_utxoset(&self.utxoset));
             let block = self.get_mut_block(&block_hash).unwrap();
-            // we calling delete_tx after removing invalidated txs, to make sure routing work is calculated after removing all the txs
+            // we call delete_tx after removing invalidated txs, to make sure routing work is calculated after removing all the txs
             mempool.delete_transactions(&block.transactions);
         }
-
-        // propagate block to network
-        // TODO : notify other threads and propagate to other peers
-
-        // {
-        //     // TODO : no need to access block multiple times. combine with previous call in block save call
-        //     let block = self.get_mut_block(&block_hash).await;
-        // }
-
-        // global_sender
-        //     .send(GlobalEvent::BlockchainSavedBlock { hash: block_hash })
-        //     .expect("error: BlockchainSavedBlock message failed to send");
-        // trace!(" ... block save done:            {:?}", create_timestamp());
-
-        // update_genesis_period and prune old data - MOVED to on_chain_reorganization()
-        //
-        // self.update_genesis_period().await;
-
-        //
-        // fork id  - MOVED to on_chain_reorganization()
-        //
-        // let fork_id = self.generate_fork_id(block_id);
-        // self.set_fork_id(fork_id);
 
         // ensure pruning of next block OK will have the right CVs
         if self.get_latest_block_id() > GENESIS_PERIOD {

@@ -370,38 +370,19 @@ fn run_loop_thread(
             if result.is_some() {
                 let command = result.unwrap();
                 work_done = true;
-                // TODO : remove hard coded values
                 match command.event_processor_id {
                     ROUTING_EVENT_PROCESSOR_ID => {
-                        // trace!("routing event to routing event processor  ",);
                         network_event_sender_to_routing_ep
                             .send(command.event)
                             .await
                             .unwrap();
                     }
                     CONSENSUS_EVENT_PROCESSOR_ID => {
-                        // trace!(
-                        //     "routing event to consensus event processor : {:?}",
-                        //     command.event
-                        // );
                         unreachable!()
-                        // network_event_sender_to_consensus_ep
-                        //     .send(command.event)
-                        //     .await
-                        //     .unwrap();
                     }
                     MINING_EVENT_PROCESSOR_ID => {
-                        // trace!(
-                        //     "routing event to mining event processor : {:?}",
-                        //     command.event
-                        // );
                         unreachable!()
-                        // network_event_sender_to_mining_ep
-                        //     .send(command.event)
-                        //     .await
-                        //     .unwrap();
                     }
-
                     _ => {}
                 }
             }
