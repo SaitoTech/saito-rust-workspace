@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
+use std::future::pending;
 use std::ops::Deref;
 use std::panic;
 use std::path::Path;
@@ -55,7 +56,8 @@ async fn receive_event<T>(receiver: &mut Option<Receiver<T>>) -> Option<T> {
     if let Some(receiver) = receiver.as_mut() {
         return receiver.recv().await;
     }
-    return None;
+    tokio::time::sleep(Duration::from_secs(1_000)).await;
+    None
 }
 
 /// Runs a permanent thread with an event loop

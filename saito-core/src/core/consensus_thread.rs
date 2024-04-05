@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::time::Duration;
@@ -285,6 +286,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
+        // println!("process_event : {:?}", event.type_id());
         return match event {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
@@ -462,6 +464,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
+        // println!("on_stat_interval : {:?}", current_time);
+
         self.stats
             .blocks_fetched
             .calculate_stats(current_time)
@@ -490,16 +494,17 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             let stat;
             {
                 let blockchain = self.blockchain_lock.read().await;
+
                 stat = format!(
-                "{} - {} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?} full_block_count : {:?} txs_in_blocks : {:?}",
-                StatVariable::format_timestamp(current_time),
-                format!("{:width$}", "blockchain::state", width = 40),
-                blockchain.utxoset.len(),
-                blockchain.blocks.len(),
-                blockchain.get_latest_block_id(),
-                blockchain.blocks.iter().filter(|(_hash, block)| { block.block_type == BlockType::Full }).count(),
-                blockchain.blocks.iter().map(|(_hash, block)| { block.transactions.len() }).sum::<usize>()
-            );
+                    "{} - {} - utxo_size : {:?}, block_count : {:?}, longest_chain_len : {:?} full_block_count : {:?} txs_in_blocks : {:?}",
+                    StatVariable::format_timestamp(current_time),
+                    format!("{:width$}", "blockchain::state", width = 40),
+                    blockchain.utxoset.len(),
+                    blockchain.blocks.len(),
+                    blockchain.get_latest_block_id(),
+                    blockchain.blocks.iter().filter(|(_hash, block)| { block.block_type == BlockType::Full }).count(),
+                    blockchain.blocks.iter().map(|(_hash, block)| { block.transactions.len() }).sum::<usize>()
+                    );
             }
             self.stat_sender.send(stat).await.unwrap();
         }
