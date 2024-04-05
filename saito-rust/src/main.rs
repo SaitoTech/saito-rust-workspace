@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::ops::Deref;
 use std::panic;
 use std::path::Path;
@@ -12,14 +13,10 @@ use log::info;
 use log::{debug, error};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing_subscriber;
-use tracing_subscriber::filter::Directive;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
@@ -43,7 +40,6 @@ use saito_core::core::routing_thread::{
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use saito_core::{lock_for_read, lock_for_write};
 use saito_rust::config_handler::{ConfigHandler, NodeConfigurations};
 use saito_rust::io_event::IoEvent;
 use saito_rust::network_controller::run_network_controller;
@@ -54,6 +50,14 @@ use saito_rust::time_keeper::TimeKeeper;
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
 const MINING_EVENT_PROCESSOR_ID: u8 = 3;
+
+async fn receive_event<T>(receiver: &mut Option<Receiver<T>>) -> Option<T> {
+    if let Some(receiver) = receiver.as_mut() {
+        return receiver.recv().await;
+    }
+    // tokio::time::sleep(Duration::from_secs(1_000_000)).await;
+    None
+}
 
 /// Runs a permanent thread with an event loop
 ///
@@ -84,140 +88,137 @@ async fn run_thread<T>(
     mut network_event_receiver: Option<Receiver<NetworkEvent>>,
     mut event_receiver: Option<Receiver<T>>,
     stat_timer_in_ms: u64,
+    thread_name: &str,
     thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()>
 where
-    T: Send + 'static,
+    T: Send + Debug + 'static,
 {
-    tokio::spawn(async move {
-        info!("new thread started");
-        let mut work_done;
-        let mut last_timestamp = Instant::now();
-        let mut stat_timer = Instant::now();
-        let time_keeper = TimeKeeper {};
+    tokio::task::Builder::new()
+        .name(thread_name)
+        .spawn(async move {
+            info!("new thread started");
+            // let mut work_done;
+            let mut last_stat_time = Instant::now();
+            let time_keeper = TimeKeeper {};
 
-        event_processor.on_init().await;
+            event_processor.on_init().await;
+            let mut interval =
+                tokio::time::interval(Duration::from_millis(thread_sleep_time_in_ms));
+            let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
-        loop {
-            work_done = false;
-            if network_event_receiver.is_some() {
-                // TODO : update to recv().await
-                let result = network_event_receiver.as_mut().unwrap().try_recv();
-                if result.is_ok() {
-                    let event: NetworkEvent = result.unwrap();
-                    if event_processor.process_network_event(event).await.is_some() {
-                        work_done = true;
+            loop {
+                select! {
+                    result = receive_event(&mut network_event_receiver), if network_event_receiver.is_some()=>{
+                        if result.is_some() {
+                            let event: NetworkEvent = result.unwrap();
+                            event_processor.process_network_event(event).await;
+                        }
+                    }
+                    result= receive_event(&mut event_receiver), if event_receiver.is_some()=>{
+                        if result.is_some() {
+                            let event = result.unwrap();
+                            event_processor.process_event(event).await;
+                        }
+                    }
+                    _ = interval.tick()=>{
+                            event_processor
+                               .process_timer_event(interval.period())
+                               .await;
+                    }
+                    _ = stat_interval.tick()=>{
+                        #[cfg(feature = "with-stats")]
+                        {
+                            let current_instant = Instant::now();
+
+                            let duration = current_instant.duration_since(last_stat_time);
+                            if duration > Duration::from_millis(stat_timer_in_ms) {
+                                last_stat_time = current_instant;
+                                event_processor
+                                    .on_stat_interval(time_keeper.get_timestamp_in_ms())
+                                    .await;
+                            }
+                        }
                     }
                 }
             }
-
-            if event_receiver.is_some() {
-                // TODO : update to recv().await
-                let result = event_receiver.as_mut().unwrap().try_recv();
-                if result.is_ok() {
-                    let event = result.unwrap();
-                    if event_processor.process_event(event).await.is_some() {
-                        work_done = true;
-                    }
-                }
-            }
-
-            let current_instant = Instant::now();
-            let duration = current_instant.duration_since(last_timestamp);
-            last_timestamp = current_instant;
-
-            if event_processor
-                .process_timer_event(duration)
-                .await
-                .is_some()
-            {
-                work_done = true;
-            }
-            #[cfg(feature = "with-stats")]
-            {
-                let duration = current_instant.duration_since(stat_timer);
-                if duration > Duration::from_millis(stat_timer_in_ms) {
-                    stat_timer = current_instant;
-                    event_processor
-                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                        .await;
-                }
-            }
-
-            if !work_done {
-                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-            }
-        }
-    })
+        })
+        .unwrap()
 }
 
 async fn run_verification_thread(
     mut event_processor: Box<VerificationThread>,
     mut event_receiver: Receiver<VerifyRequest>,
     stat_timer_in_ms: u64,
+    thread_name: &str,
     thread_sleep_time_in_ms: u64,
 ) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        info!("verification thread started");
-        let mut work_done;
-        let mut stat_timer = Instant::now();
-        let time_keeper = TimeKeeper {};
-        let batch_size = 10000;
+    tokio::task::Builder::new()
+        .name(thread_name)
+        .spawn(async move {
+            info!("verification thread started");
+            // let mut work_done;
+            let mut stat_timer = Instant::now();
+            let time_keeper = TimeKeeper {};
+            let batch_size = 10000;
 
-        event_processor.on_init().await;
-        let mut queued_requests = vec![];
-        let mut requests = VecDeque::new();
-
-        loop {
-            work_done = false;
+            event_processor.on_init().await;
+            let mut queued_requests = vec![];
+            let mut requests = VecDeque::new();
+            let mut interval =
+                tokio::time::interval(Duration::from_millis(thread_sleep_time_in_ms));
+            let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
             loop {
-                // TODO : update to recv().await
-                let result = event_receiver.try_recv();
-                if result.is_ok() {
-                    let request = result.unwrap();
-                    if let VerifyRequest::Block(..) = &request {
-                        queued_requests.push(request);
-                        break;
-                    }
-                    if let VerifyRequest::Transaction(tx) = request {
-                        requests.push_back(tx);
-                    }
-                } else {
-                    break;
-                }
-                if requests.len() == batch_size {
-                    break;
-                }
-            }
-            if !requests.is_empty() {
-                event_processor
-                    .processed_msgs
-                    .increment_by(requests.len() as u64);
-                event_processor.verify_txs(&mut requests).await;
-                work_done = true;
-            }
-            for request in queued_requests.drain(..) {
-                event_processor.process_event(request).await;
-                work_done = true;
-            }
-            #[cfg(feature = "with-stats")]
-            {
-                let current_instant = Instant::now();
-                let duration = current_instant.duration_since(stat_timer);
-                if duration > Duration::from_millis(stat_timer_in_ms) {
-                    stat_timer = current_instant;
-                    event_processor
-                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                        .await;
-                }
-            }
+                loop {
+                    select! {
+                        result = event_receiver.recv() =>{
+                            if result.is_some() {
+                                let request = result.unwrap();
+                                if let VerifyRequest::Block(..) = &request {
+                                    queued_requests.push(request);
+                                    break;
+                                }
+                                if let VerifyRequest::Transaction(tx) = request {
+                                    requests.push_back(tx);
+                                }
+                            } else {
+                                break;
+                            }
+                            if requests.len() == batch_size {
+                                break;
+                            }
+                        }
+                        _ = interval.tick()=>{
 
-            if !work_done {
-                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
+                        }
+                        _ = stat_interval.tick()=>{
+                            #[cfg(feature = "with-stats")]
+                            {
+                                let current_instant = Instant::now();
+                                let duration = current_instant.duration_since(stat_timer);
+                                if duration > Duration::from_millis(stat_timer_in_ms) {
+                                    stat_timer = current_instant;
+                                    event_processor
+                                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
+                                        .await;
+                                }
+                            }
+                        }
+                    }
+                }
+                if !requests.is_empty() {
+                    event_processor
+                        .processed_msgs
+                        .increment_by(requests.len() as u64);
+                    event_processor.verify_txs(&mut requests).await;
+                }
+                for request in queued_requests.drain(..) {
+                    event_processor.process_event(request).await;
+                }
             }
-        }
-    })
+        })
+        .unwrap()
 }
 
 async fn run_mining_event_processor(
@@ -230,7 +231,7 @@ async fn run_mining_event_processor(
     sender_to_stat: Sender<String>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mining_event_processor = MiningThread {
-        wallet: context.wallet.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         miner_active: false,
@@ -239,7 +240,7 @@ async fn run_mining_event_processor(
         public_key: [0; 33],
         mined_golden_tickets: 0,
         stat_sender: sender_to_stat.clone(),
-        configs: context.configuration.clone(),
+        config_lock: context.config_lock.clone(),
         enabled: true,
         mining_iterations: 10_000,
     };
@@ -253,6 +254,7 @@ async fn run_mining_event_processor(
         Some(interface_receiver_for_miner),
         Some(receiver_for_miner),
         stat_timer_in_ms,
+        "saito-mining",
         thread_sleep_time_in_ms,
     )
     .await;
@@ -261,7 +263,7 @@ async fn run_mining_event_processor(
 
 async fn run_consensus_event_processor(
     context: &Context,
-    peers: Arc<RwLock<PeerCollection>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
     sender_to_routing: &Sender<RoutingEvent>,
     sender_to_miner: Sender<MiningEvent>,
@@ -271,11 +273,6 @@ async fn run_consensus_event_processor(
     channel_size: usize,
     sender_to_stat: Sender<String>,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let result = std::env::var("GEN_TX");
-    let mut create_test_tx = false;
-    if result.is_ok() {
-        create_test_tx = result.unwrap().eq("1");
-    }
     // let generate_genesis_block: bool;
     // {
     //     let configs = lock_for_read!(context.configuration, LOCK_ORDER_CONFIGS);
@@ -285,9 +282,9 @@ async fn run_consensus_event_processor(
     // }
 
     let consensus_event_processor = ConsensusThread {
-        mempool: context.mempool.clone(),
-        blockchain: context.blockchain.clone(),
-        wallet: context.wallet.clone(),
+        mempool_lock: context.mempool_lock.clone(),
+        blockchain_lock: context.blockchain_lock.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         generate_genesis_block: false,
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
@@ -298,9 +295,9 @@ async fn run_consensus_event_processor(
                 sender_to_network_controller.clone(),
                 CONSENSUS_EVENT_PROCESSOR_ID,
             )),
-            peers.clone(),
-            context.wallet.clone(),
-            context.configuration.clone(),
+            peer_lock.clone(),
+            context.wallet_lock.clone(),
+            context.config_lock.clone(),
             Box::new(TimeKeeper {}),
         ),
         block_producing_timer: 0,
@@ -311,7 +308,7 @@ async fn run_consensus_event_processor(
         stats: ConsensusStats::new(sender_to_stat.clone()),
         txs_for_mempool: Vec::new(),
         stat_sender: sender_to_stat.clone(),
-        configs: context.configuration.clone(),
+        config_lock: context.config_lock.clone(),
     };
     let (interface_sender_to_blockchain, _interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
@@ -321,6 +318,7 @@ async fn run_consensus_event_processor(
         None,
         Some(receiver_for_blockchain),
         stat_timer_in_ms,
+        "saito-consensus",
         thread_sleep_time_in_ms,
     )
     .await;
@@ -344,21 +342,21 @@ async fn run_routing_event_processor(
     fetch_batch_size: usize,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
-        blockchain: context.blockchain.clone(),
-        mempool: context.mempool.clone(),
+        blockchain_lock: context.blockchain_lock.clone(),
+        mempool_lock: context.mempool_lock.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         time_keeper: Box::new(TimeKeeper {}),
         static_peers: vec![],
-        configs: configs_lock.clone(),
-        wallet: context.wallet.clone(),
+        config_lock: configs_lock.clone(),
+        wallet_lock: context.wallet_lock.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_io_controller.clone(),
                 ROUTING_EVENT_PROCESSOR_ID,
             )),
             peers_lock.clone(),
-            context.wallet.clone(),
+            context.wallet_lock.clone(),
             configs_lock.clone(),
             Box::new(TimeKeeper {}),
         ),
@@ -373,7 +371,7 @@ async fn run_routing_event_processor(
     };
 
     {
-        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = configs_lock.read().await;
         routing_event_processor.reconnection_wait_time =
             configs.get_server_configs().unwrap().reconnection_wait_time;
         let peers = configs.get_peer_configs();
@@ -395,6 +393,7 @@ async fn run_routing_event_processor(
         Some(interface_receiver_for_routing),
         Some(receiver_for_routing),
         stat_timer_in_ms,
+        "saito-routing",
         thread_sleep_time_in_ms,
     )
     .await;
@@ -404,9 +403,9 @@ async fn run_routing_event_processor(
 
 async fn run_verification_threads(
     sender_to_consensus: Sender<ConsensusEvent>,
-    blockchain: Arc<RwLock<Blockchain>>,
-    peers: Arc<RwLock<PeerCollection>>,
-    wallet: Arc<RwLock<Wallet>>,
+    blockchain_lock: Arc<RwLock<Blockchain>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
+    wallet_lock: Arc<RwLock<Wallet>>,
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
     verification_thread_count: u16,
@@ -420,9 +419,9 @@ async fn run_verification_threads(
         senders.push(sender);
         let verification_thread = VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
-            blockchain: blockchain.clone(),
-            peers: peers.clone(),
-            wallet: wallet.clone(),
+            blockchain_lock: blockchain_lock.clone(),
+            peer_lock: peer_lock.clone(),
+            wallet_lock: wallet_lock.clone(),
             processed_txs: StatVariable::new(
                 format!("verification_{:?}::processed_txs", i),
                 STAT_BIN_COUNT,
@@ -450,6 +449,7 @@ async fn run_verification_threads(
             Box::new(verification_thread),
             receiver,
             stat_timer_in_ms,
+            format!("saito-verification-{:?}", i).as_str(),
             thread_sleep_time_in_ms,
         )
         .await;
@@ -467,93 +467,62 @@ fn run_loop_thread(
     thread_sleep_time_in_ms: u64,
     sender_to_stat: Sender<String>,
 ) -> JoinHandle<()> {
-    let loop_handle = tokio::spawn(async move {
-        let mut work_done: bool;
-        let mut incoming_msgs = StatVariable::new(
-            "network::incoming_msgs".to_string(),
-            STAT_BIN_COUNT,
-            sender_to_stat.clone(),
-        );
-        let mut last_stat_on: Instant = Instant::now();
-        loop {
-            work_done = false;
+    tokio::task::Builder::new()
+        .name("saito-looper")
+        .spawn(async move {
+            let mut incoming_msgs = StatVariable::new(
+                "network::incoming_msgs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            );
+            let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
-            let result = receiver.recv().await;
-            if result.is_some() {
-                let command = result.unwrap();
-                incoming_msgs.increment();
-                work_done = true;
-                // TODO : remove hard coded values
-                match command.event_processor_id {
-                    ROUTING_EVENT_PROCESSOR_ID => {
-                        // trace!("routing event to routing event processor  ",);
-                        network_event_sender_to_routing_ep
-                            .send(command.event)
-                            .await
-                            .unwrap();
-                    }
-                    CONSENSUS_EVENT_PROCESSOR_ID => {
-                        // trace!(
-                        //     "routing event to consensus event processor : {:?}",
-                        //     command.event
-                        // );
-                        unreachable!()
-                        // network_event_sender_to_consensus_ep
-                        //     .send(command.event)
-                        //     .await
-                        //     .unwrap();
-                    }
-                    MINING_EVENT_PROCESSOR_ID => {
-                        // trace!(
-                        //     "routing event to mining event processor : {:?}",
-                        //     command.event
-                        // );
-                        unreachable!()
-                        // network_event_sender_to_mining_ep
-                        //     .send(command.event)
-                        //     .await
-                        //     .unwrap();
-                    }
+            let mut last_stat_on: Instant = Instant::now();
+            loop {
+                select! {
+                    result = receiver.recv()=>{
+                        if result.is_some() {
+                            let command = result.unwrap();
+                            incoming_msgs.increment();
+                            match command.event_processor_id {
+                                ROUTING_EVENT_PROCESSOR_ID => {
+                                    network_event_sender_to_routing_ep
+                                        .send(command.event)
+                                        .await
+                                        .unwrap();
+                                }
+                                CONSENSUS_EVENT_PROCESSOR_ID => {
+                                    unreachable!("not expecting consensus events")
+                                }
+                                MINING_EVENT_PROCESSOR_ID => {
+                                    unreachable!()
+                                }
 
-                    _ => {}
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ = stat_interval.tick()=>{
+                        #[cfg(feature = "with-stats")]
+                        {
+                            if Instant::now().duration_since(last_stat_on)
+                                > Duration::from_millis(stat_timer_in_ms)
+                            {
+                                last_stat_on = Instant::now();
+                                incoming_msgs
+                                    .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
+                                    .await;
+                            }
+                        }
+                    }
                 }
             }
-            #[cfg(feature = "with-stats")]
-            {
-                if Instant::now().duration_since(last_stat_on)
-                    > Duration::from_millis(stat_timer_in_ms)
-                {
-                    last_stat_on = Instant::now();
-                    incoming_msgs
-                        .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
-                        .await;
-                }
-            }
-            if !work_done {
-                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-            }
-        }
-    });
-
-    loop_handle
+        })
+        .unwrap()
 }
 
 fn setup_log() {
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
-    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
-    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
-    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
-
-    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
-
-    tracing_subscriber::registry().with(fmt_layer).init();
+    console_subscriber::init();
 }
 
 fn setup_hook() {
@@ -591,7 +560,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
     let fetch_batch_size;
 
     {
-        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = configs_lock.read().await;
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
         thread_sleep_time_in_ms = configs
@@ -641,9 +610,9 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
 
     let (senders, verification_handles) = run_verification_threads(
         sender_to_consensus.clone(),
-        context.blockchain.clone(),
+        context.blockchain_lock.clone(),
         peers_lock.clone(),
-        context.wallet.clone(),
+        context.wallet_lock.clone(),
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
         verification_thread_count,
@@ -697,6 +666,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         None,
         Some(receiver_for_stat),
         stat_timer_in_ms,
+        "saito-stats",
         thread_sleep_time_in_ms,
     )
     .await;
@@ -708,22 +678,24 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
         sender_to_stat.clone(),
     );
 
-    let network_handle = tokio::spawn(run_network_controller(
+    let (server_handle, controller_handle) = run_network_controller(
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
         configs_lock.clone(),
-        context.blockchain.clone(),
+        context.blockchain_lock.clone(),
         sender_to_stat.clone(),
         peers_lock.clone(),
         sender_to_network_controller.clone(),
-    ));
+    )
+    .await;
 
     let _result = tokio::join!(
         routing_handle,
         blockchain_handle,
         miner_handle,
         loop_handle,
-        network_handle,
+        server_handle,
+        controller_handle,
         stat_handle,
         futures::future::join_all(verification_handles)
     );
@@ -731,7 +703,7 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
 
 pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     let (sender_to_network_controller, _receiver_in_network_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(100);
+        tokio::sync::mpsc::channel::<IoEvent>(1000);
 
     info!("running saito controllers");
     let public_key: SaitoPublicKey =
@@ -764,17 +736,17 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     )));
     let list = storage.load_block_name_list().await.unwrap();
     storage
-        .load_blocks_from_disk(list, context.mempool.clone())
+        .load_blocks_from_disk(list, context.mempool_lock.clone())
         .await;
 
     let _peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
 
-    let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+    let configs = configs_lock.read().await;
 
-    let mut blockchain = lock_for_write!(context.blockchain, LOCK_ORDER_BLOCKCHAIN);
+    let mut blockchain = context.blockchain_lock.write().await;
     blockchain
         .add_blocks_from_mempool(
-            context.mempool.clone(),
+            context.mempool_lock.clone(),
             None,
             &mut storage,
             None,

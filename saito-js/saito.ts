@@ -77,7 +77,7 @@ export default class Saito {
             return Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
           })
           .catch((error: any) => {
-            console.log("failed fetching block for url : " + url + " from peer : " + peer_index);
+            console.log("failed fetching block for url : " + url + " from peer : " + peer_index + ", block id = " + block_id);
             console.error(error);
             return Saito.getLibInstance().process_failed_block_fetch(hash, block_id, peer_index);
           });

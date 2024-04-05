@@ -1208,7 +1208,6 @@ impl Block {
 
         // if there is a golden ticket
         if let Some(gt_index) = cv.gt_index {
-            trace!("!");
             trace!("there is a golden ticket: {:?}", cv.gt_index);
 
             // we fetch the random number for determining the payouts from the golden ticket
@@ -1230,8 +1229,7 @@ impl Block {
                 router1_payout = previous_block.total_fees - miner_payout;
                 router1_publickey = previous_block.find_winning_router(next_random_number);
 
-                trace!("!");
-                trace!("there is a miner publickey: {:?}", miner_publickey);
+                trace!("there is a miner publickey: {:?}", miner_publickey.to_hex());
 
                 // iterate our hash 2 times to accomodate for the iteration that was
                 // done in order to find the previous winning router.
@@ -2065,7 +2063,6 @@ mod tests {
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
     use crate::core::util::test::test_manager::test::TestManager;
-    use crate::lock_for_read;
 
     #[test]
     fn block_new_test() {
@@ -2281,7 +2278,7 @@ mod tests {
         let mut block = Block::new();
         let transactions = join_all((0..5).map(|_| async {
             let mut transaction = Transaction::default();
-            let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = wallet_lock.read().await;
 
             transaction.sign(&wallet.private_key);
             transaction
@@ -2330,7 +2327,7 @@ mod tests {
         let block1 = t.get_latest_block().await;
         let public_key: SaitoPublicKey;
         {
-            let wallet = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = t.wallet_lock.read().await;
             public_key = wallet.public_key;
         }
         let lite_block = block1.generate_lite_block(vec![public_key]);
@@ -2381,7 +2378,7 @@ mod tests {
         let private_key: SaitoPrivateKey;
         let public_key: SaitoPublicKey;
         {
-            let wallet = lock_for_read!(t.wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = t.wallet_lock.read().await;
 
             public_key = wallet.public_key;
             private_key = wallet.private_key;
@@ -2409,7 +2406,7 @@ mod tests {
         }
 
         {
-            let configs = lock_for_read!(t.configs, LOCK_ORDER_CONFIGS);
+            let configs = t.config_lock.read().await;
             block.merkle_root =
                 block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
         }

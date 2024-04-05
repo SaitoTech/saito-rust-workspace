@@ -59,7 +59,6 @@ pub mod test {
     use crate::core::util::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::util::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
-    use crate::{lock_for_read, lock_for_write};
 
     pub fn create_timestamp() -> Timestamp {
         SystemTime::now()
@@ -85,10 +84,10 @@ pub mod test {
         pub latest_block_hash: SaitoHash,
         pub network: Network,
         pub storage: Storage,
-        pub peers: Arc<RwLock<PeerCollection>>,
+        pub peer_lock: Arc<RwLock<PeerCollection>>,
         pub sender_to_miner: Sender<MiningEvent>,
         pub receiver_in_miner: Receiver<MiningEvent>,
-        pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
         pub issuance_path: &'static str,
     }
     impl Default for TestManager {
@@ -118,11 +117,11 @@ pub mod test {
                     configs.clone(),
                     Box::new(TestTimeKeeper {}),
                 ),
-                peers: peers.clone(),
+                peer_lock: peers.clone(),
                 storage: Storage::new(Box::new(TestIOHandler::new())),
                 sender_to_miner: sender_to_miner.clone(),
                 receiver_in_miner,
-                configs,
+                config_lock: configs,
                 issuance_path,
             }
         }
@@ -205,9 +204,9 @@ pub mod test {
             debug!("adding block to test manager blockchain");
 
             {
-                let configs = lock_for_write!(self.configs, LOCK_ORDER_CONFIGS);
-                let mut blockchain = lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-                let mut mempool = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
+                let configs = self.config_lock.write().await;
+                let mut blockchain = self.blockchain_lock.write().await;
+                let mut mempool = self.mempool_lock.write().await;
 
                 let _ = blockchain
                     .add_block(
@@ -227,7 +226,7 @@ pub mod test {
 
         // check that the blockchain connects properly
         pub async fn check_blockchain(&self) {
-            let blockchain = lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain_lock.read().await;
 
             for i in 1..blockchain.blocks.len() {
                 let block_hash = blockchain
@@ -259,7 +258,7 @@ pub mod test {
         // check that everything spendable in the main UTXOSET is spendable on the longest
         // chain and vice-versa.
         pub async fn check_utxoset(&self) {
-            let blockchain = lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain_lock.read().await;
 
             let mut utxoset: UtxoSet = AHashMap::new();
             let latest_block_id = blockchain.get_latest_block_id();
@@ -398,7 +397,7 @@ pub mod test {
             let mut block_contains_fee_tx: bool;
             let mut block_fee_tx_index: usize = 0;
 
-            let blockchain = lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain_lock.read().await;
 
             let latest_block_id = blockchain.get_latest_block_id();
 
@@ -586,7 +585,7 @@ pub mod test {
             let public_key: SaitoPublicKey;
 
             {
-                let wallet = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let wallet = self.wallet_lock.read().await;
 
                 public_key = wallet.public_key;
                 private_key = wallet.private_key;
@@ -595,7 +594,7 @@ pub mod test {
             for _i in 0..txs_count {
                 let mut transaction;
                 {
-                    let mut wallet = lock_for_write!(self.wallet_lock, LOCK_ORDER_WALLET);
+                    let mut wallet = self.wallet_lock.write().await;
 
                     transaction = Transaction::create(
                         &mut wallet,
@@ -614,7 +613,7 @@ pub mod test {
             }
 
             if include_valid_golden_ticket {
-                let blockchain = lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+                let blockchain = self.blockchain_lock.read().await;
 
                 let block = blockchain.get_block(&parent_hash).unwrap_or_else(|| {
                     panic!("couldn't find block for hash : {:?}", parent_hash.to_hex())
@@ -627,7 +626,7 @@ pub mod test {
                 .await;
                 let mut gttx: Transaction;
                 {
-                    let wallet = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                    let wallet = self.wallet_lock.read().await;
 
                     gttx = Wallet::create_golden_ticket_transaction(
                         golden_ticket,
@@ -640,8 +639,8 @@ pub mod test {
                 transactions.insert(gttx.signature, gttx);
             }
 
-            let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
-            let mut blockchain = lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let configs = self.config_lock.read().await;
+            let mut blockchain = self.blockchain_lock.write().await;
 
             // create block
             let mut block = Block::create(
@@ -669,7 +668,7 @@ pub mod test {
         ) -> GoldenTicket {
             let public_key;
             {
-                let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+                let wallet = wallet_lock.read().await;
 
                 public_key = wallet.public_key;
             }
@@ -687,7 +686,7 @@ pub mod test {
 
         pub async fn get_balance(&self) -> u64 {
             let wallet_lock = self.get_wallet_lock();
-            let wallet = lock_for_read!(wallet_lock, LOCK_ORDER_WALLET);
+            let wallet = wallet_lock.read().await;
             let my_balance = wallet.get_available_balance();
 
             my_balance
@@ -704,7 +703,7 @@ pub mod test {
         // pub async fn get_wallet(&self) -> tokio::sync::RwLockReadGuard<'_, Wallet> {
         //     let wallet;
         //     let _wallet_;
-        //     wallet = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+        //     wallet = self.wallet_lock.read().await;
         //     // return wallet;
         // }
 
@@ -713,11 +712,11 @@ pub mod test {
         }
 
         pub async fn get_latest_block_hash(&self) -> SaitoHash {
-            let blockchain = lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain_lock.read().await;
             blockchain.blockring.get_latest_block_hash()
         }
         pub async fn get_latest_block(&self) -> Block {
-            let blockchain = lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain_lock.read().await;
             let block = blockchain
                 .get_latest_block()
                 .expect("latest block should exist")
@@ -725,7 +724,7 @@ pub mod test {
             block
         }
         pub async fn get_latest_block_id(&self) -> u64 {
-            let blockchain = lock_for_read!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain_lock.read().await;
             blockchain.blockring.get_latest_block_id()
         }
 
@@ -749,7 +748,7 @@ pub mod test {
             let private_key: SaitoPrivateKey;
             let my_public_key: SaitoPublicKey;
             {
-                let wallet = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let wallet = self.wallet_lock.read().await;
                 private_key = wallet.private_key;
                 my_public_key = wallet.public_key;
             }
@@ -774,7 +773,7 @@ pub mod test {
             block.add_transaction(tx);
 
             {
-                let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+                let configs = self.config_lock.read().await;
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
@@ -810,7 +809,7 @@ pub mod test {
             //
             let private_key: SaitoPrivateKey;
             {
-                let wallet = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let wallet = self.wallet_lock.read().await;
                 private_key = wallet.private_key;
             }
 
@@ -831,7 +830,7 @@ pub mod test {
             }
 
             {
-                let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+                let configs = self.config_lock.read().await;
                 // we have added VIP, so need to regenerate the merkle-root
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
@@ -864,7 +863,7 @@ pub mod test {
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
             {
-                let wallet = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                let wallet = self.wallet_lock.read().await;
 
                 public_key = wallet.public_key;
                 private_key = wallet.private_key;
@@ -882,7 +881,7 @@ pub mod test {
             }
 
             {
-                let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+                let configs = self.config_lock.read().await;
                 // we have added txs, so need to regenerate the merkle-root
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
@@ -907,10 +906,10 @@ pub mod test {
             let mut tx = Transaction::create_issuance_transaction(wallet_read.public_key, amount);
             tx.sign(&wallet_read.private_key);
             drop(wallet_read);
-            let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+            let configs = self.config_lock.read().await;
 
-            let mut blockchain = lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-            let mut mempool = lock_for_write!(self.mempool_lock, LOCK_ORDER_MEMPOOL);
+            let mut blockchain = self.blockchain_lock.write().await;
+            let mut mempool = self.mempool_lock.write().await;
 
             mempool
                 .add_transaction_if_validates(tx.clone(), &blockchain)
@@ -936,7 +935,7 @@ pub mod test {
 
         //convenience function assuming longest chain
         pub async fn balance_map(&mut self) -> AHashMap<SaitoPublicKey, u64> {
-            let blockchain = lock_for_write!(self.blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain_lock.write().await;
 
             let mut utxo_balances: AHashMap<SaitoPublicKey, u64> = AHashMap::new();
 
@@ -993,7 +992,7 @@ pub mod test {
 
             {
                 let wallet;
-                wallet = lock_for_read!(self.wallet_lock, LOCK_ORDER_WALLET);
+                wallet = self.wallet_lock.read().await;
                 from_public_key = wallet.public_key;
                 private_key = wallet.private_key;
                 let mut tx = Transaction::create(
@@ -1009,7 +1008,7 @@ pub mod test {
             }
 
             {
-                let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+                let configs = self.config_lock.read().await;
 
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());

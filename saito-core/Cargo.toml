@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.34.0", features = ["sync", "tokio-macros", "test-util", "macros", "tracing"] }
-secp256k1 = { version = "0.28.0", features = ["rand", "hashes", "global-context", "serde"] }
+tokio = { version = "1.36.0", features = ["sync", "tokio-macros", "test-util", "macros", "tracing"] }
+secp256k1 = { version = "0.28.2", features = ["rand", "hashes", "global-context", "serde"] }
 getrandom = { version = "0.2.11", features = ["js"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
 pretty_env_logger = "0.5.0"
@@ -33,13 +33,12 @@ chrono = "0.4.35"
 
 [dev-dependencies]
 serial_test = "3.0.0"
-tokio = { version = "1.34.0", features = ["full"] }
+tokio = { version = "1.36.0", features = ["full"] }
 criterion = { version = "0.5.1", features = ["default", "html_reports"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [features]
 default = []
-locking-logs = []
 with-stats = []
 with-rayon = []
 

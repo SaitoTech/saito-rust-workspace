@@ -23,7 +23,7 @@ console_log = { version = "1.0.0", features = ["color"] }
 log = "0.4.20"
 getrandom = { version = "0.2.11", features = ["js", "std"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
-secp256k1 = { version = "0.28.0", features = ["hashes", "global-context", "serde"] }
+secp256k1 = { version = "0.28.2", features = ["hashes", "global-context", "serde"] }
 bs58 = "0.5.0"
 figment = { version = "0.10.12", features = ["json"] }
 serde_json = { version = "1.0.108" }

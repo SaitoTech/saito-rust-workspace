@@ -37,7 +37,7 @@ pub mod test {
             _buffer: Vec<u8>,
             _peer_exceptions: Vec<u64>,
         ) -> Result<(), Error> {
-            debug!("send message to all");
+            // debug!("send message to all");
 
             Ok(())
         }

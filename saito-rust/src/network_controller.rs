@@ -12,6 +12,7 @@ use reqwest::Client;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
+use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
@@ -30,9 +31,7 @@ use saito_core::core::defs::{
 };
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::process::keep_time::KeepTime;
-use saito_core::core::util;
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
-use saito_core::lock_for_read;
 
 use crate::io_event::IoEvent;
 use crate::rust_io_handler::BLOCKS_DIR_PATH;
@@ -136,7 +135,7 @@ impl NetworkController {
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<NetworkController>>,
-        peer: util::configuration::PeerConfig,
+        peer: PeerConfig,
     ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
 
@@ -157,7 +156,7 @@ impl NetworkController {
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
-            let network_controller = lock_for_read!(io_controller, LOCK_ORDER_NETWORK_CONTROLLER);
+            let network_controller = io_controller.read().await;
 
             let sender_to_controller = network_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
@@ -203,7 +202,7 @@ impl NetworkController {
         buffer: Vec<u8>,
         exceptions: Vec<u64>,
     ) {
-        trace!("sending message : {:?} to all", buffer[0]);
+        // trace!("sending message : {:?} to all", buffer[0]);
         let mut sockets = sockets.lock().await;
         let mut peers_with_errors: Vec<u64> = Default::default();
 
@@ -223,7 +222,7 @@ impl NetworkController {
             sockets.remove(&peer);
         }
 
-        trace!("message sent to all");
+        // trace!("message sent to all");
     }
     pub async fn fetch_block(
         block_hash: SaitoHash,
@@ -340,7 +339,7 @@ impl NetworkController {
             let mut queries = current_queries.lock().await;
             queries.remove(&url);
         }
-        debug!("block buffer sent to blockchain controller");
+        // debug!("block buffer sent to blockchain controller");
     }
     pub async fn send_new_peer(
         event_id: u64,
@@ -398,61 +397,28 @@ impl NetworkController {
         sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
     ) {
         debug!("starting new task for reading from peer : {:?}", peer_index);
-        tokio::spawn(async move {
-            debug!("new thread started for peer receiving");
-            match receiver {
-                PeerReceiver::Warp(mut receiver) => loop {
-                    let result = receiver.next().await;
-                    if result.is_none() {
-                        continue;
-                    }
-                    let result = result.unwrap();
-                    if result.is_err() {
-                        // TODO : handle peer disconnections
-                        warn!("failed receiving message [1] : {:?}", result.err().unwrap());
-                        NetworkController::send_peer_disconnect(sender, peer_index).await;
-                        sockets.lock().await.remove(&peer_index);
-                        break;
-                    }
-                    let result = result.unwrap();
+        tokio::task::Builder::new()
+            .name(format!("saito-peer-receiver-{:?}", peer_index).as_str())
+            .spawn(async move {
+                debug!("new thread started for peer receiving");
+                match receiver {
+                    PeerReceiver::Warp(mut receiver) => loop {
+                        let result = receiver.next().await;
+                        if result.is_none() {
+                            continue;
+                        }
+                        let result = result.unwrap();
+                        if result.is_err() {
+                            // TODO : handle peer disconnections
+                            warn!("failed receiving message [1] : {:?}", result.err().unwrap());
+                            NetworkController::send_peer_disconnect(sender, peer_index).await;
+                            sockets.lock().await.remove(&peer_index);
+                            break;
+                        }
+                        let result = result.unwrap();
 
-                    if result.is_binary() {
-                        let buffer = result.into_bytes();
-                        // trace!(
-                        //     "message buffer with size : {:?} received from peer : {:?}",
-                        //     buffer.len(),
-                        //     peer_index
-                        // );
-                        let message = IoEvent {
-                            event_processor_id: 1,
-                            event_id: 0,
-                            event: NetworkEvent::IncomingNetworkMessage { peer_index, buffer },
-                        };
-                        sender.send(message).await.expect("sending failed");
-                    } else if result.is_close() {
-                        warn!("connection closed by remote peer : {:?}", peer_index);
-                        NetworkController::send_peer_disconnect(sender, peer_index).await;
-                        sockets.lock().await.remove(&peer_index);
-                        break;
-                    } else {
-                        // warn!("unhandled type");
-                    }
-                },
-                PeerReceiver::Tungstenite(mut receiver) => loop {
-                    let result = receiver.next().await;
-                    if result.is_none() {
-                        continue;
-                    }
-                    let result = result.unwrap();
-                    if result.is_err() {
-                        warn!("failed receiving message [2] : {:?}", result.err().unwrap());
-                        NetworkController::send_peer_disconnect(sender, peer_index).await;
-                        sockets.lock().await.remove(&peer_index);
-                        break;
-                    }
-                    let result = result.unwrap();
-                    match result {
-                        tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
+                        if result.is_binary() {
+                            let buffer = result.into_bytes();
                             // trace!(
                             //     "message buffer with size : {:?} received from peer : {:?}",
                             //     buffer.len(),
@@ -464,15 +430,54 @@ impl NetworkController {
                                 event: NetworkEvent::IncomingNetworkMessage { peer_index, buffer },
                             };
                             sender.send(message).await.expect("sending failed");
+                        } else if result.is_close() {
+                            warn!("connection closed by remote peer : {:?}", peer_index);
+                            NetworkController::send_peer_disconnect(sender, peer_index).await;
+                            sockets.lock().await.remove(&peer_index);
+                            break;
+                        } else {
+                            // warn!("unhandled type");
                         }
-                        _ => {
-                            // Not handling these scenarios
+                    },
+                    PeerReceiver::Tungstenite(mut receiver) => loop {
+                        let result = receiver.next().await;
+                        if result.is_none() {
+                            continue;
                         }
-                    }
-                },
-            }
-            debug!("listening thread existed for peer : {:?}", peer_index);
-        });
+                        let result = result.unwrap();
+                        if result.is_err() {
+                            warn!("failed receiving message [2] : {:?}", result.err().unwrap());
+                            NetworkController::send_peer_disconnect(sender, peer_index).await;
+                            sockets.lock().await.remove(&peer_index);
+                            break;
+                        }
+                        let result = result.unwrap();
+                        match result {
+                            tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
+                                // trace!(
+                                //     "message buffer with size : {:?} received from peer : {:?}",
+                                //     buffer.len(),
+                                //     peer_index
+                                // );
+                                let message = IoEvent {
+                                    event_processor_id: 1,
+                                    event_id: 0,
+                                    event: NetworkEvent::IncomingNetworkMessage {
+                                        peer_index,
+                                        buffer,
+                                    },
+                                };
+                                sender.send(message).await.expect("sending failed");
+                            }
+                            _ => {
+                                // Not handling these scenarios
+                            }
+                        }
+                    },
+                }
+                debug!("listening thread existed for peer : {:?}", peer_index);
+            })
+            .unwrap();
     }
 }
 
@@ -515,7 +520,7 @@ pub async fn run_network_controller(
     sender_to_stat: Sender<String>,
     peers_lock: Arc<RwLock<PeerCollection>>,
     sender_to_network: Sender<IoEvent>,
-) {
+) -> (JoinHandle<()>, JoinHandle<()>) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
 
@@ -524,7 +529,7 @@ pub async fn run_network_controller(
     let port;
     let public_key;
     {
-        let configs = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
+        let configs = configs_lock.read().await;
 
         url = configs.get_server_configs().unwrap().host.clone()
             + ":"
@@ -537,8 +542,8 @@ pub async fn run_network_controller(
         port = configs.get_server_configs().unwrap().port;
         host = configs.get_server_configs().unwrap().host.clone();
 
-        let blockchain = lock_for_read!(blockchain_lock, LOCK_ORDER_BLOCKCHAIN);
-        let wallet = lock_for_read!(blockchain.wallet_lock, LOCK_ORDER_WALLET);
+        let blockchain = blockchain_lock.read().await;
+        let wallet = blockchain.wallet_lock.read().await;
         public_key = wallet.public_key;
     }
 
@@ -561,174 +566,162 @@ pub async fn run_network_controller(
         peers_lock,
     );
 
-    let mut work_done = false;
-    let controller_handle = tokio::spawn(async move {
-        let mut outgoing_messages = StatVariable::new(
-            "network::outgoing_msgs".to_string(),
-            STAT_BIN_COUNT,
-            sender_to_stat.clone(),
-        );
-        let stat_timer_in_ms;
-        let thread_sleep_time_in_ms;
-        {
-            let configs_temp = lock_for_read!(configs_lock, LOCK_ORDER_CONFIGS);
-            stat_timer_in_ms = configs_temp.get_server_configs().unwrap().stat_timer_in_ms;
-            thread_sleep_time_in_ms = configs_temp
-                .get_server_configs()
-                .unwrap()
-                .thread_sleep_time_in_ms;
-        }
-        let io_pool = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(10)
-            .enable_io()
-            .enable_time()
-            .thread_name("io-thread-pool")
-            .build()
-            .unwrap();
-
-        let mut last_stat_on: Instant = Instant::now();
-        loop {
-            let result = receiver.recv().await;
-            if result.is_some() {
-                let event = result.unwrap();
-                let event_id = event.event_id;
-                let interface_event = event.event;
-                work_done = true;
-                match interface_event {
-                    NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
-                        let sockets;
-                        {
-                            let network_controller = lock_for_read!(
-                                network_controller_lock,
-                                LOCK_ORDER_NETWORK_CONTROLLER
-                            );
-                            sockets = network_controller.sockets.clone();
-                        }
-
-                        NetworkController::send_to_all(sockets, buffer, exceptions).await;
-                        outgoing_messages.increment();
-                    }
-                    NetworkEvent::OutgoingNetworkMessage {
-                        peer_index: index,
-                        buffer,
-                    } => {
-                        let sockets;
-                        {
-                            let network_controller = lock_for_read!(
-                                network_controller_lock,
-                                LOCK_ORDER_NETWORK_CONTROLLER
-                            );
-                            sockets = network_controller.sockets.clone();
-                        }
-                        NetworkController::send_outgoing_message(sockets, index, buffer).await;
-                        outgoing_messages.increment();
-                    }
-                    NetworkEvent::ConnectToPeer { peer_details } => {
-                        NetworkController::connect_to_peer(
-                            event_id,
-                            network_controller_lock.clone(),
-                            peer_details,
-                        )
-                        .await;
-                    }
-                    NetworkEvent::PeerConnectionResult { .. } => {
-                        unreachable!()
-                    }
-                    NetworkEvent::PeerDisconnected { peer_index: _ } => {
-                        unreachable!()
-                    }
-                    NetworkEvent::IncomingNetworkMessage { .. } => {
-                        unreachable!()
-                    }
-                    NetworkEvent::BlockFetchRequest {
-                        block_hash,
-                        peer_index,
-                        url,
-                        block_id,
-                    } => {
-                        let sender;
-                        let current_queries;
-                        {
-                            let network_controller = lock_for_read!(
-                                network_controller_lock,
-                                LOCK_ORDER_NETWORK_CONTROLLER
-                            );
-
-                            sender = network_controller.sender_to_saito_controller.clone();
-                            current_queries = network_controller.currently_queried_urls.clone();
-                        }
-                        // starting new thread to stop io controller from getting blocked
-                        io_pool.spawn(async move {
-                            let client = reqwest::Client::new();
-
-                            NetworkController::fetch_block(
-                                block_hash,
-                                peer_index,
-                                url,
-                                event_id,
-                                sender,
-                                current_queries,
-                                client,
-                                block_id,
-                            )
-                            .await
-                        });
-                    }
-                    NetworkEvent::BlockFetched { .. } => {
-                        unreachable!()
-                    }
-                    NetworkEvent::BlockFetchFailed { .. } => {
-                        unreachable!()
-                    }
-                    NetworkEvent::DisconnectFromPeer { peer_index } => {
-                        NetworkController::disconnect_from_peer(
-                            event_id,
-                            network_controller_lock.clone(),
-                            peer_index,
-                        )
-                        .await
-                    }
-                }
-            }
-
-            #[cfg(feature = "with-stats")]
+    let controller_handle = tokio::task::Builder::new()
+        .name("saito-io-controller")
+        .spawn(async move {
+            let mut outgoing_messages = StatVariable::new(
+                "network::outgoing_msgs".to_string(),
+                STAT_BIN_COUNT,
+                sender_to_stat.clone(),
+            );
+            let stat_timer_in_ms;
             {
-                if Instant::now().duration_since(last_stat_on)
-                    > Duration::from_millis(stat_timer_in_ms)
-                {
-                    last_stat_on = Instant::now();
-                    outgoing_messages
-                        .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
-                        .await;
-                    let network_controller =
-                        lock_for_read!(network_controller_lock, LOCK_ORDER_NETWORK_CONTROLLER);
+                let configs_temp = configs_lock.read().await;
+                stat_timer_in_ms = configs_temp.get_server_configs().unwrap().stat_timer_in_ms;
+            }
+            let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
-                    let stat = format!(
-                        "{} - {} - capacity : {:?} / {:?}",
-                        StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
-                        format!("{:width$}", "network::queue_to_core", width = 40),
-                        network_controller.sender_to_saito_controller.capacity(),
-                        network_controller.sender_to_saito_controller.max_capacity()
-                    );
-                    sender_to_stat.send(stat).await.unwrap();
+            let io_pool = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(10)
+                .enable_io()
+                .enable_time()
+                .thread_name("saito-io-thread-pool")
+                .build()
+                .unwrap();
 
-                    let stat = format!(
-                        "{} - {} - capacity : {:?} / {:?}",
-                        StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
-                        format!("{:width$}", "network::queue_outgoing", width = 40),
-                        sender_to_network.capacity(),
-                        sender_to_network.max_capacity()
-                    );
-                    sender_to_stat.send(stat).await.unwrap();
+            let mut last_stat_on: Instant = Instant::now();
+            loop {
+                select!{
+                    result = receiver.recv()=>{
+                        if result.is_some() {
+                            let event = result.unwrap();
+                            let event_id = event.event_id;
+                            let interface_event = event.event;
+                            match interface_event {
+                                NetworkEvent::OutgoingNetworkMessageForAll { buffer, exceptions } => {
+                                    let sockets;
+                                    {
+                                        let network_controller = network_controller_lock.read().await;
+                                        sockets = network_controller.sockets.clone();
+                                    }
+
+                                    NetworkController::send_to_all(sockets, buffer, exceptions).await;
+                                    outgoing_messages.increment();
+                                }
+                                NetworkEvent::OutgoingNetworkMessage {
+                                    peer_index: index,
+                                    buffer,
+                                } => {
+                                    let sockets;
+                                    {
+                                        let network_controller = network_controller_lock.read().await;
+                                        sockets = network_controller.sockets.clone();
+                                    }
+                                    NetworkController::send_outgoing_message(sockets, index, buffer).await;
+                                    outgoing_messages.increment();
+                                }
+                                NetworkEvent::ConnectToPeer { peer_details } => {
+                                    NetworkController::connect_to_peer(
+                                        event_id,
+                                        network_controller_lock.clone(),
+                                        peer_details,
+                                    )
+                                    .await;
+                                }
+                                NetworkEvent::PeerConnectionResult { .. } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::PeerDisconnected { peer_index: _ } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::IncomingNetworkMessage { .. } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::BlockFetchRequest {
+                                    block_hash,
+                                    peer_index,
+                                    url,
+                                    block_id,
+                                } => {
+                                    let sender;
+                                    let current_queries;
+                                    {
+                                        let network_controller = network_controller_lock.read().await;
+
+                                        sender = network_controller.sender_to_saito_controller.clone();
+                                        current_queries = network_controller.currently_queried_urls.clone();
+                                    }
+                                    // starting new thread to stop io controller from getting blocked
+                                    io_pool.spawn(async move {
+                                        let client = reqwest::Client::new();
+
+                                        NetworkController::fetch_block(
+                                            block_hash,
+                                            peer_index,
+                                            url,
+                                            event_id,
+                                            sender,
+                                            current_queries,
+                                            client,
+                                            block_id,
+                                        )
+                                        .await
+                                    });
+                                }
+                                NetworkEvent::BlockFetched { .. } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::BlockFetchFailed { .. } => {
+                                    unreachable!()
+                                }
+                                NetworkEvent::DisconnectFromPeer { peer_index } => {
+                                    NetworkController::disconnect_from_peer(
+                                        event_id,
+                                        network_controller_lock.clone(),
+                                        peer_index,
+                                    )
+                                    .await
+                                }
+                            }
+                        }
+                    }
+                    result = stat_interval.tick() => {
+                        #[cfg(feature = "with-stats")]
+                        {
+                            if Instant::now().duration_since(last_stat_on)
+                                > Duration::from_millis(stat_timer_in_ms)
+                            {
+                                last_stat_on = Instant::now();
+                                outgoing_messages
+                                    .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
+                                    .await;
+                                let network_controller = network_controller_lock.read().await;
+
+                                let stat = format!(
+                                    "{} - {} - capacity : {:?} / {:?}",
+                                    StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                                    format!("{:width$}", "network::queue_to_core", width = 40),
+                                    network_controller.sender_to_saito_controller.capacity(),
+                                    network_controller.sender_to_saito_controller.max_capacity()
+                                );
+                                sender_to_stat.send(stat).await.unwrap();
+
+                                let stat = format!(
+                                    "{} - {} - capacity : {:?} / {:?}",
+                                    StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                                    format!("{:width$}", "network::queue_outgoing", width = 40),
+                                    sender_to_network.capacity(),
+                                    sender_to_network.max_capacity()
+                                );
+                                sender_to_stat.send(stat).await.unwrap();
+                            }
+                        }
+                    }
                 }
             }
-
-            if !work_done {
-                tokio::time::sleep(Duration::from_millis(thread_sleep_time_in_ms)).await;
-            }
-        }
-    });
-    let _result = tokio::join!(server_handle, controller_handle);
+        })
+        .unwrap();
+    (server_handle, controller_handle)
 }
 
 pub enum PeerSender {
@@ -747,159 +740,50 @@ fn run_websocket_server(
     port: u16,
     host: String,
     public_key: SaitoPublicKey,
-    peers: Arc<RwLock<PeerCollection>>,
+    peer_lock: Arc<RwLock<PeerCollection>>,
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
-    tokio::spawn(async move {
-        info!("starting websocket server");
-        let io_controller = io_controller.clone();
-        let sender_to_io = sender_clone.clone();
-        let public_key = public_key.clone();
-        let ws_route = warp::path("wsopen")
-            .and(warp::ws())
-            .map(move |ws: warp::ws::Ws| {
-                debug!("incoming connection received");
-                let clone = io_controller.clone();
-                let sender_to_io = sender_to_io.clone();
-                let ws = ws.max_message_size(10_000_000_000);
-                let ws = ws.max_frame_size(10_000_000_000);
-                ws.on_upgrade(move |socket| async move {
-                    debug!("socket connection established");
-                    let (sender, receiver) = socket.split();
+    tokio::task::Builder::new()
+        .name("saito-ws-server")
+        .spawn(async move {
+            info!("starting websocket server");
+            let io_controller = io_controller.clone();
+            let sender_to_io = sender_clone.clone();
+            let ws_route = warp::path("wsopen")
+                .and(warp::ws())
+                .map(move |ws: warp::ws::Ws| {
+                    debug!("incoming connection received");
+                    let clone = io_controller.clone();
+                    let sender_to_io = sender_to_io.clone();
+                    let ws = ws.max_message_size(10_000_000_000);
+                    let ws = ws.max_frame_size(10_000_000_000);
+                    ws.on_upgrade(move |socket| async move {
+                        debug!("socket connection established");
+                        let (sender, receiver) = socket.split();
 
-                    let network_controller = lock_for_read!(clone, LOCK_ORDER_NETWORK_CONTROLLER);
+                        let network_controller = clone.read().await;
 
-                    let peer_index;
-                    {
-                        let mut counter = network_controller.peer_counter.lock().await;
-                        peer_index = counter.get_next_index();
-                    }
-
-                    NetworkController::send_new_peer(
-                        0,
-                        peer_index,
-                        network_controller.sockets.clone(),
-                        PeerSender::Warp(sender),
-                        PeerReceiver::Warp(receiver),
-                        sender_to_io,
-                        None,
-                    )
-                    .await
-                })
-            });
-        let http_route = warp::path!("block" / String).and_then(|block_hash: String| async move {
-            debug!("serving block : {:?}", block_hash);
-            let mut buffer: Vec<u8> = Default::default();
-            let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
-            if result.is_err() {
-                debug!("no blocks found");
-                return Err(warp::reject::not_found());
-            }
-            let paths: Vec<_> = result
-                .unwrap()
-                .map(|r| r.unwrap())
-                .filter(|r| {
-                    let filename = r.file_name().into_string().unwrap();
-                    if !filename.contains(BLOCK_FILE_EXTENSION) {
-                        return false;
-                    }
-                    if !filename.contains(block_hash.as_str()) {
-                        return false;
-                    }
-                    debug!("selected file : {:?}", filename);
-                    return true;
-                })
-                .collect();
-
-            if paths.is_empty() {
-                return Err(warp::reject::not_found());
-            }
-            let path = paths.first().unwrap();
-            let file_path = BLOCKS_DIR_PATH.to_string()
-                + "/"
-                + path.file_name().into_string().unwrap().as_str();
-            let result = File::open(file_path.as_str()).await;
-            if result.is_err() {
-                error!("failed opening file : {:?}", result.err().unwrap());
-                return Err(warp::reject::not_found());
-            }
-            let mut file = result.unwrap();
-
-            let result = file.read_to_end(&mut buffer).await;
-            if result.is_err() {
-                error!("failed reading file : {:?}", result.err().unwrap());
-                return Err(warp::reject::not_found());
-            }
-            drop(file);
-
-            let buffer_len = buffer.len();
-            let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
-            debug!("served block with : {:?} length", buffer_len);
-            return result;
-        });
-
-        // TODO : review this code
-        let opt = warp::path::param::<String>()
-            .map(Some)
-            .or_else(|_| async { Ok::<(Option<String>,), std::convert::Infallible>((None,)) });
-        let lite_route = warp::path!("lite-block" / String / ..)
-            .and(opt)
-            .and(warp::path::end())
-            .and(warp::any().map(move || peers.clone()))
-            .and_then(
-                move |block_hash: String,
-                      key: Option<String>,
-                      peers: Arc<RwLock<PeerCollection>>| async move {
-                    debug!("serving lite block : {:?}", block_hash);
-
-                    let mut key1 = String::from("");
-                    if key.is_some() {
-                        key1 = key.unwrap();
-                    } else {
-                        warn!("key is not set to request lite blocks");
-                        return Err(warp::reject::reject());
-                    }
-
-                    let key;
-                    if key1.is_empty() {
-                        key = public_key.clone();
-                    } else {
-                        let result;
-                        if key1.len() == 66 {
-                            result = SaitoPublicKey::from_hex(key1.as_str());
-                            if result.is_err() {
-                                warn!("key : {:?} couldn't be decoded", key1);
-                                return Err(warp::reject::reject());
-                            }
-                        } else {
-                            result = SaitoPublicKey::from_base58(key1.as_str());
-                            if result.is_err() {
-                                warn!("key : {:?} couldn't be decoded", key1);
-                                return Err(warp::reject::reject());
-                            }
+                        let peer_index;
+                        {
+                            let mut counter = network_controller.peer_counter.lock().await;
+                            peer_index = counter.get_next_index();
                         }
 
-                        let result = result.unwrap();
-                        if result.len() != 33 {
-                            warn!("key length : {:?} is not for public key", result.len());
-                            return Err(warp::reject::reject());
-                        }
-                        key = result.try_into().unwrap();
-                    }
-                    let mut keylist;
-                    {
-                        let peers = lock_for_read!(peers, LOCK_ORDER_PEERS);
-                        let peer = peers.find_peer_by_address(&key);
-                        if peer.is_none() {
-                            keylist = vec![key];
-                        } else {
-                            keylist = peer.as_ref().unwrap().key_list.clone();
-                            keylist.push(key);
-                        }
-                    }
-
-                    // let blockchain = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-
+                        NetworkController::send_new_peer(
+                            0,
+                            peer_index,
+                            network_controller.sockets.clone(),
+                            PeerSender::Warp(sender),
+                            PeerReceiver::Warp(receiver),
+                            sender_to_io,
+                            None,
+                        )
+                        .await
+                    })
+                });
+            let http_route =
+                warp::path!("block" / String).and_then(|block_hash: String| async move {
+                    // debug!("serving block : {:?}", block_hash);
                     let mut buffer: Vec<u8> = Default::default();
                     let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
                     if result.is_err() {
@@ -917,8 +801,8 @@ fn run_websocket_server(
                             if !filename.contains(block_hash.as_str()) {
                                 return false;
                             }
-                            debug!("selected file : {:?}", filename);
-                            return true;
+                            // debug!("selected file : {:?}", filename);
+                            true
                         })
                         .collect();
 
@@ -943,31 +827,143 @@ fn run_websocket_server(
                     }
                     drop(file);
 
-                    let block = Block::deserialize_from_net(buffer);
-                    if block.is_err() {
-                        error!("failed parsing buffer into a block");
-                        return Err(warp::reject::not_found());
-                    }
-                    let mut block = block.unwrap();
-                    block.generate();
-                    let block = block.generate_lite_block(keylist);
-                    let buffer = block.serialize_for_net(BlockType::Full);
                     let buffer_len = buffer.len();
                     let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
-                    debug!("served block with : {:?} length", buffer_len);
-                    return result;
-                    // }
-                    // .await
-                },
-            );
-        let routes = http_route.or(ws_route).or(lite_route);
-        // let (_, server) =
-        //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
-        //         // tokio::signal::ctrl_c().await.ok();
-        //     });
-        // server.await;
-        let address =
-            SocketAddr::from_str((host + ":" + port.to_string().as_str()).as_str()).unwrap();
-        warp::serve(routes).run(address).await;
-    })
+                    // debug!("served block with : {:?} length", buffer_len);
+                    result
+                });
+
+            // TODO : review this code
+            let opt = warp::path::param::<String>()
+                .map(Some)
+                .or_else(|_| async { Ok::<(Option<String>,), std::convert::Infallible>((None,)) });
+            let lite_route = warp::path!("lite-block" / String / ..)
+                .and(opt)
+                .and(warp::path::end())
+                .and(warp::any().map(move || peer_lock.clone()))
+                .and_then(
+                    move |block_hash: String,
+                          key: Option<String>,
+                          peer_lock: Arc<RwLock<PeerCollection>>| async move {
+                        // debug!("serving lite block : {:?}", block_hash);
+
+                        let mut key1 = String::from("");
+                        if key.is_some() {
+                            key1 = key.unwrap();
+                        } else {
+                            warn!("key is not set to request lite blocks");
+                            return Err(warp::reject::reject());
+                        }
+
+                        let key;
+                        if key1.is_empty() {
+                            key = public_key;
+                        } else {
+                            let result;
+                            if key1.len() == 66 {
+                                result = SaitoPublicKey::from_hex(key1.as_str());
+                                if result.is_err() {
+                                    warn!("key : {:?} couldn't be decoded", key1);
+                                    return Err(warp::reject::reject());
+                                }
+                            } else {
+                                result = SaitoPublicKey::from_base58(key1.as_str());
+                                if result.is_err() {
+                                    warn!("key : {:?} couldn't be decoded", key1);
+                                    return Err(warp::reject::reject());
+                                }
+                            }
+
+                            let result = result.unwrap();
+                            if result.len() != 33 {
+                                warn!("key length : {:?} is not for public key", result.len());
+                                return Err(warp::reject::reject());
+                            }
+                            key = result.try_into().unwrap();
+                        }
+                        let mut keylist;
+                        {
+                            let peers = peer_lock.read().await;
+                            let peer = peers.find_peer_by_address(&key);
+                            if peer.is_none() {
+                                keylist = vec![key];
+                            } else {
+                                keylist = peer.as_ref().unwrap().key_list.clone();
+                                keylist.push(key);
+                            }
+                        }
+
+                        // let blockchain = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
+
+                        let mut buffer: Vec<u8> = Default::default();
+                        let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
+                        if result.is_err() {
+                            debug!("no blocks found");
+                            return Err(warp::reject::not_found());
+                        }
+                        let paths: Vec<_> = result
+                            .unwrap()
+                            .map(|r| r.unwrap())
+                            .filter(|r| {
+                                let filename = r.file_name().into_string().unwrap();
+                                if !filename.contains(BLOCK_FILE_EXTENSION) {
+                                    return false;
+                                }
+                                if !filename.contains(block_hash.as_str()) {
+                                    return false;
+                                }
+                                // debug!("selected file : {:?}", filename);
+                                true
+                            })
+                            .collect();
+
+                        if paths.is_empty() {
+                            return Err(warp::reject::not_found());
+                        }
+                        let path = paths.first().unwrap();
+                        let file_path = BLOCKS_DIR_PATH.to_string()
+                            + "/"
+                            + path.file_name().into_string().unwrap().as_str();
+                        let result = File::open(file_path.as_str()).await;
+                        if result.is_err() {
+                            error!("failed opening file : {:?}", result.err().unwrap());
+                            return Err(warp::reject::not_found());
+                        }
+                        let mut file = result.unwrap();
+
+                        let result = file.read_to_end(&mut buffer).await;
+                        if result.is_err() {
+                            error!("failed reading file : {:?}", result.err().unwrap());
+                            return Err(warp::reject::not_found());
+                        }
+                        drop(file);
+
+                        let block = Block::deserialize_from_net(buffer);
+                        if block.is_err() {
+                            error!("failed parsing buffer into a block");
+                            return Err(warp::reject::not_found());
+                        }
+                        let mut block = block.unwrap();
+                        block.generate();
+                        let block = block.generate_lite_block(keylist);
+                        let buffer = block.serialize_for_net(BlockType::Full);
+                        // let buffer_len = buffer.len();
+                        let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
+                        // debug!("served block with : {:?} length", buffer_len);
+                        result
+                        // }
+                        // .await
+                    },
+                );
+            let routes = http_route.or(ws_route).or(lite_route);
+            // let (_, server) =
+            //     warp::serve(ws_route).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async {
+            //         // tokio::signal::ctrl_c().await.ok();
+            //     });
+            // server.await;
+            let address =
+                SocketAddr::from_str((host + ":" + port.to_string().as_str()).as_str()).unwrap();
+            warp::serve(routes).run(address).await;
+        })
+        .unwrap()
 }

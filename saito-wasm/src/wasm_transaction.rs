@@ -129,7 +129,7 @@ impl WasmTransaction {
 
     pub async fn sign(&mut self) {
         let saito = SAITO.lock().await;
-        let wallet = saito.context.wallet.read().await;
+        let wallet = saito.context.wallet_lock.read().await;
         self.tx.sign(&wallet.private_key);
     }
 

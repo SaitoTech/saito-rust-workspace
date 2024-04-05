@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info};
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -15,7 +15,6 @@ use crate::core::process::keep_time::KeepTime;
 use crate::core::process::process_event::ProcessEvent;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, hash};
-use crate::lock_for_read;
 
 #[derive(Debug)]
 pub enum MiningEvent {
@@ -28,7 +27,7 @@ pub enum MiningEvent {
 
 /// Manages the miner
 pub struct MiningThread {
-    pub wallet: Arc<RwLock<Wallet>>,
+    pub wallet_lock: Arc<RwLock<Wallet>>,
     pub sender_to_mempool: Sender<ConsensusEvent>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
     pub miner_active: bool,
@@ -37,7 +36,7 @@ pub struct MiningThread {
     pub public_key: SaitoPublicKey,
     pub mined_golden_tickets: u64,
     pub stat_sender: Sender<String>,
-    pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     // todo : make this private and init using configs
     pub enabled: bool,
     pub mining_iterations: u32,
@@ -48,7 +47,7 @@ impl MiningThread {
         assert!(self.miner_active);
 
         if self.public_key == [0; 33] {
-            let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+            let wallet = self.wallet_lock.read().await;
             if wallet.public_key == [0; 33] {
                 // wallet not initialized yet
                 return false;
@@ -129,11 +128,11 @@ impl ProcessEvent<MiningEvent> for MiningThread {
     }
 
     async fn on_init(&mut self) {
-        let configs = lock_for_read!(self.configs, LOCK_ORDER_CONFIGS);
+        let configs = self.config_lock.read().await;
         info!("is browser = {:?}", configs.is_browser());
         self.enabled = !configs.is_browser();
         info!("miner is enabled");
-        let wallet = lock_for_read!(self.wallet, LOCK_ORDER_WALLET);
+        let wallet = self.wallet_lock.read().await;
         self.public_key = wallet.public_key;
         info!("node public key = {:?}", self.public_key.to_base58());
     }
@@ -142,6 +141,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         if !self.enabled {
             return;
         }
+
         let stat = format!("{} - {} - total : {:?}, current difficulty : {:?}, miner_active : {:?}, current target : {:?} ",
                            StatVariable::format_timestamp(current_time),
                            format!("{:width$}", "mining::golden_tickets", width = 40),

@@ -113,7 +113,6 @@ export default class WebSharedMethods extends CustomSharedMethods {
   }
 
   sendMessage(peerIndex: bigint, buffer: Uint8Array): void {
-    // console.debug("sending message to peer : " + peerIndex + " with size : " + buffer.byteLength);
     let socket = Saito.getInstance().getSocket(peerIndex);
     if (socket) {
       socket.send(buffer);
@@ -150,5 +149,5 @@ export default class WebSharedMethods extends CustomSharedMethods {
   sendInterfaceEvent(event: String, peerIndex: bigint) {
     throw new Error("Method not implemented.");
   }
- 
+
 }

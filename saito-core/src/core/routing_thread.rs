@@ -28,7 +28,6 @@ use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
-use crate::{lock_for_read, lock_for_write};
 
 #[derive(Debug)]
 pub enum RoutingEvent {
@@ -79,15 +78,15 @@ impl RoutingStats {
 
 /// Manages peers and routes messages to correct controller
 pub struct RoutingThread {
-    pub blockchain: Arc<RwLock<Blockchain>>,
-    pub mempool: Arc<RwLock<Mempool>>,
+    pub blockchain_lock: Arc<RwLock<Blockchain>>,
+    pub mempool_lock: Arc<RwLock<Mempool>>,
     pub sender_to_consensus: Sender<ConsensusEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
-    pub configs: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     pub time_keeper: Box<dyn KeepTime + Send + Sync>,
-    pub wallet: Arc<RwLock<Wallet>>,
+    pub wallet_lock: Arc<RwLock<Wallet>>,
     pub network: Network,
     pub reconnection_timer: Timestamp,
     pub stats: RoutingStats,
@@ -131,20 +130,20 @@ impl RoutingThread {
                     .handle_handshake_challenge(
                         peer_index,
                         challenge,
-                        self.wallet.clone(),
-                        self.configs.clone(),
+                        self.wallet_lock.clone(),
+                        self.config_lock.clone(),
                     )
                     .await;
             }
             Message::HandshakeResponse(response) => {
-                debug!("received handshake response");
+                // debug!("received handshake response");
                 self.network
                     .handle_handshake_response(
                         peer_index,
                         response,
-                        self.wallet.clone(),
-                        self.blockchain.clone(),
-                        self.configs.clone(),
+                        self.wallet_lock.clone(),
+                        self.blockchain_lock.clone(),
+                        self.config_lock.clone(),
                     )
                     .await;
             }
@@ -153,10 +152,10 @@ impl RoutingThread {
                 unreachable!("received block");
             }
             Message::Transaction(transaction) => {
-                trace!(
-                    "received transaction : {:?}",
-                    transaction.signature.to_hex()
-                );
+                // trace!(
+                //     "received transaction : {:?}",
+                //     transaction.signature.to_hex()
+                // );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;
@@ -240,10 +239,10 @@ impl RoutingThread {
            block_hash.to_hex(),
             fork_id.to_hex()
         );
-        let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let blockchain = self.blockchain_lock.read().await;
         let peer_public_key;
         {
-            let peers = lock_for_read!(self.network.peers, LOCK_ORDER_PEERS);
+            let peers = self.network.peer_lock.read().await;
             peer_public_key = peers
                 .find_peer_by_index(peer_index)
                 .unwrap()
@@ -327,8 +326,7 @@ impl RoutingThread {
         self.network.handle_peer_disconnect(peer_index).await;
     }
     pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
-        let mut wallet: tokio::sync::RwLockWriteGuard<'_, Wallet> =
-            lock_for_write!(self.wallet, LOCK_ORDER_WALLET);
+        let mut wallet: tokio::sync::RwLockWriteGuard<'_, Wallet> = self.wallet_lock.write().await;
 
         wallet.set_key_list(key_list);
         self.network.send_key_list(&wallet.key_list).await;
@@ -348,11 +346,15 @@ impl RoutingThread {
         );
         // TODO : can we ignore the functionality if it's a lite node ?
 
-        let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let blockchain = self.blockchain_lock.read().await;
 
         let last_shared_ancestor =
             blockchain.generate_last_shared_ancestor(request.latest_block_id, request.fork_id);
-        debug!("last shared ancestor = {:?}", last_shared_ancestor);
+        debug!(
+            "last shared ancestor = {:?} latest_id = {:?}",
+            last_shared_ancestor,
+            blockchain.blockring.get_latest_block_id()
+        );
 
         for i in last_shared_ancestor..(blockchain.blockring.get_latest_block_id() + 1) {
             let block_hash = blockchain
@@ -362,7 +364,7 @@ impl RoutingThread {
                 // TODO : can the block hash not be in the ring if we are going through the longest chain ?
                 continue;
             }
-            debug!("sending block header for : {:?}", block_hash.to_hex());
+            // trace!("sending block header for : {:?}", block_hash.to_hex());
             let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
@@ -384,16 +386,21 @@ impl RoutingThread {
         );
 
         self.blockchain_sync_state
-            .add_entry(block_hash, block_id, peer_index, self.network.peers.clone())
+            .add_entry(
+                block_hash,
+                block_id,
+                peer_index,
+                self.network.peer_lock.clone(),
+            )
             .await;
 
         self.fetch_next_blocks().await;
     }
     async fn fetch_next_blocks(&mut self) -> bool {
-        trace!("fetching next blocks from peers");
+        // trace!("fetching next blocks from peers");
         let mut work_done = false;
         {
-            let blockchain = lock_for_read!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+            let blockchain = self.blockchain_lock.read().await;
             self.blockchain_sync_state
                 .build_peer_block_picture(&blockchain);
         }
@@ -410,8 +417,8 @@ impl RoutingThread {
                         *hash,
                         *block_id,
                         peer_index,
-                        self.blockchain.clone(),
-                        self.mempool.clone(),
+                        self.blockchain_lock.clone(),
+                        self.mempool_lock.clone(),
                     )
                     .await;
                 if result.is_some() {
@@ -457,7 +464,7 @@ impl RoutingThread {
         debug!("ghost : {:?}", chain);
 
         let mut previous_block_hash = chain.start;
-        let mut blockchain = lock_for_write!(self.blockchain, LOCK_ORDER_BLOCKCHAIN);
+        let mut blockchain = self.blockchain_lock.write().await;
         for i in 0..chain.prehashes.len() {
             let buf = [
                 previous_block_hash.as_slice(),
@@ -475,7 +482,7 @@ impl RoutingThread {
                         block_hash,
                         chain.block_ids[i],
                         peer_index,
-                        self.network.peers.clone(),
+                        self.network.peer_lock.clone(),
                     )
                     .await;
             } else {
@@ -498,7 +505,7 @@ impl RoutingThread {
 
     // TODO : remove if not required
     async fn process_peer_services(&mut self, services: Vec<PeerService>, peer_index: u64) {
-        let mut peers = lock_for_write!(self.network.peers, LOCK_ORDER_PEERS);
+        let mut peers = self.network.peer_lock.write().await;
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_some() {
             let peer = peer.unwrap();
@@ -644,7 +651,12 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
             RoutingEvent::BlockFetchRequest(peer_index, block_hash, block_id) => {
                 self.blockchain_sync_state
-                    .add_entry(block_hash, block_id, peer_index, self.network.peers.clone())
+                    .add_entry(
+                        block_hash,
+                        block_id,
+                        peer_index,
+                        self.network.peer_lock.clone(),
+                    )
                     .await;
             }
         }
@@ -655,7 +667,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         assert!(!self.senders_to_verification.is_empty());
         // connect to peers
         self.network
-            .initialize_static_peers(self.configs.clone())
+            .initialize_static_peers(self.config_lock.clone())
             .await;
     }
     async fn on_stat_interval(&mut self, current_time: Timestamp) {
