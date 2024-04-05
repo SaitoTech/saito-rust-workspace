@@ -254,15 +254,8 @@ pub async fn initialize(
         let mut configs = CONFIGS.write().await;
         info!("config lock acquired");
 
-        let str: Result<String, _> = json.try_into();
-        if str.is_err() {
-            error!(
-                "cannot parse json configs string : {:?}",
-                str.err().unwrap()
-            );
-            return Err(JsValue::from("Failed parsing configs string"));
-        }
-        let config = WasmConfiguration::new_from_json(str.expect("couldn't get string").as_str());
+        let str: String = json.into();
+        let config = WasmConfiguration::new_from_json(str.as_str());
 
         if config.is_err() {
             error!("failed parsing configs. {:?}", config.err().unwrap());
@@ -290,7 +283,7 @@ pub async fn initialize(
     saito.verification_thread.on_init().await;
     saito.routing_thread.on_init().await;
 
-    return Ok(JsValue::from("initialized"));
+    Ok(JsValue::from("initialized"))
 }
 
 #[wasm_bindgen]

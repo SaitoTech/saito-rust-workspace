@@ -242,7 +242,7 @@ async fn run_mining_event_processor(
         stat_sender: sender_to_stat.clone(),
         config_lock: context.config_lock.clone(),
         enabled: true,
-        mining_iterations: 100_000,
+        mining_iterations: 10_000,
     };
 
     let (interface_sender_to_miner, interface_receiver_for_miner) =
