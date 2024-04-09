@@ -434,7 +434,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 self.generate_genesis_block = true;
             }
 
-            info!("loading {:?} blocks from disk", list.len());
+            info!(
+                "loading {:?} blocks from disk. Timestamp : {:?}",
+                list.len(),
+                self.time_keeper.get_timestamp_in_ms()
+            );
             while !list.is_empty() {
                 let file_names = list.drain(..std::cmp::min(100, list.len())).collect();
                 self.storage
@@ -452,9 +456,17 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     )
                     .await;
 
-                info!("{:?} blocks remaining to be loaded", list.len());
+                info!(
+                    "{:?} blocks remaining to be loaded. Timestamp : {:?}",
+                    list.len(),
+                    self.time_keeper.get_timestamp_in_ms()
+                );
             }
-            info!("{:?} total blocks in blockchain", blockchain.blocks.len());
+            info!(
+                "{:?} total blocks in blockchain. Timestamp : {:?}",
+                blockchain.blocks.len(),
+                self.time_keeper.get_timestamp_in_ms()
+            );
         }
 
         debug!(
