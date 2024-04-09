@@ -437,7 +437,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             info!(
                 "loading {:?} blocks from disk. Timestamp : {:?}",
                 list.len(),
-                self.time_keeper.get_timestamp_in_ms()
+                StatVariable::format_timestamp(self.time_keeper.get_timestamp_in_ms())
             );
             while !list.is_empty() {
                 let file_names = list.drain(..std::cmp::min(1000, list.len())).collect();
@@ -459,13 +459,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 info!(
                     "{:?} blocks remaining to be loaded. Timestamp : {:?}",
                     list.len(),
-                    self.time_keeper.get_timestamp_in_ms()
+                    StatVariable::format_timestamp(self.time_keeper.get_timestamp_in_ms())
                 );
             }
             info!(
                 "{:?} total blocks in blockchain. Timestamp : {:?}",
                 blockchain.blocks.len(),
-                self.time_keeper.get_timestamp_in_ms()
+                StatVariable::format_timestamp(self.time_keeper.get_timestamp_in_ms())
             );
         }
 
