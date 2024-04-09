@@ -514,7 +514,10 @@ impl Blockchain {
             block_id = block.id;
             block_type = block.block_type;
             tx_count = block.transactions.len();
-            if block.block_type != BlockType::Header && !configs.is_browser() {
+            if block.block_type != BlockType::Header
+                && !configs.is_browser()
+                && !configs.is_spv_mode()
+            {
                 // TODO : this will have an impact when the block sizes are getting large or there are many forks. need to handle this
                 storage.write_block_to_disk(block).await;
             } else if block.block_type == BlockType::Header {
@@ -557,7 +560,7 @@ impl Blockchain {
             if pruned_block_hash != [0; 32] {
                 let pblock = self.get_mut_block(&pruned_block_hash).unwrap();
                 pblock
-                    .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
+                    .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_spv_mode())
                     .await;
             }
         }
@@ -1106,7 +1109,7 @@ impl Blockchain {
             let block = self.get_mut_block(block_hash).unwrap();
 
             block
-                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
+                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_spv_mode())
                 .await;
 
             let latest_block_id = block.id;
@@ -1126,7 +1129,11 @@ impl Blockchain {
                 if self.is_block_indexed(previous_block_hash) {
                     let block = self.get_mut_block(&previous_block_hash).unwrap();
                     block
-                        .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
+                        .upgrade_block_to_block_type(
+                            BlockType::Full,
+                            storage,
+                            configs.is_spv_mode(),
+                        )
                         .await;
                 }
             }
@@ -1286,7 +1293,7 @@ impl Blockchain {
                 .get_mut(&old_chain[current_unwind_index])
                 .unwrap();
             block
-                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_browser())
+                .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_spv_mode())
                 .await;
             block_id = block.id;
             block_hash = block.hash;
@@ -1355,7 +1362,7 @@ impl Blockchain {
                 "last block id : {:?} is later than this block id : {:?}. skipping reorg",
                 self.last_block_id, block_id
             );
-            self.downgrade_blockchain_data(configs.is_browser()).await;
+            self.downgrade_blockchain_data(configs.is_spv_mode()).await;
             return;
         }
 
@@ -1384,7 +1391,7 @@ impl Blockchain {
             self.set_fork_id(fork_id);
         }
 
-        self.downgrade_blockchain_data(configs.is_browser()).await;
+        self.downgrade_blockchain_data(configs.is_spv_mode()).await;
     }
 
     pub async fn update_genesis_period(&mut self, storage: &Storage, network: Option<&Network>) {
@@ -1500,7 +1507,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn downgrade_blockchain_data(&mut self, is_browser: bool) {
+    pub async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
         trace!("downgrading blockchain data");
         //
         // downgrade blocks still on the chain
@@ -1527,7 +1534,7 @@ impl Blockchain {
                 let block = self.get_mut_block(&hash);
                 if let Some(block) = block {
                     block
-                        .downgrade_block_to_block_type(BlockType::Pruned, is_browser)
+                        .downgrade_block_to_block_type(BlockType::Pruned, is_spv)
                         .await;
                 } else {
                     warn!("block : {:?} not found to downgrade", hash.to_hex());

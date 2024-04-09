@@ -56,8 +56,8 @@ impl Network {
         configs: &(dyn Configuration + Send + Sync),
     ) {
         debug!("propagating block : {:?}", block.hash.to_hex());
-        if configs.is_browser() {
-            trace!("not propagating block since we are in browser");
+        if configs.is_spv_mode() {
+            trace!("not propagating block since we are in spv mode");
             return;
         }
 

@@ -129,9 +129,9 @@ impl ProcessEvent<MiningEvent> for MiningThread {
 
     async fn on_init(&mut self) {
         let configs = self.config_lock.read().await;
-        info!("is browser = {:?}", configs.is_browser());
-        self.enabled = !configs.is_browser();
-        info!("miner is enabled");
+        info!("is spv mode = {:?}", configs.is_spv_mode());
+        self.enabled = !configs.is_spv_mode();
+        info!("miner is enabled = {:?}", self.enabled);
         let wallet = self.wallet_lock.read().await;
         self.public_key = wallet.public_key;
         info!("node public key = {:?}", self.public_key.to_base58());
