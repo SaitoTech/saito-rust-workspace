@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
 use std::sync::Arc;
@@ -12,6 +13,7 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::defs::{PrintForLog, SaitoPublicKey, PROJECT_PUBLIC_KEY};
 use crate::core::io::interface_io::InterfaceIO;
+use crate::iterate;
 
 #[derive(Debug)]
 pub struct Storage {
@@ -116,38 +118,41 @@ impl Storage {
     ) {
         debug!("loading  {:?} blocks from disk", file_names.len());
 
-        for file_name in file_names {
-            let result = self
-                .io_interface
-                .read_value(self.io_interface.get_block_dir() + file_name.as_str())
-                .await;
-            if result.is_err() {
-                error!(
-                    "failed loading block from disk : {:?}",
-                    result.err().unwrap()
-                );
-                continue;
-            }
-            debug!("file : {:?} loaded", file_name);
-            let buffer: Vec<u8> = result.unwrap();
-            let buffer_len = buffer.len();
-            let result = Block::deserialize_from_net(buffer);
-            if result.is_err() {
-                // ideally this shouldn't happen since we only write blocks which are valid to disk
-                warn!(
-                    "failed deserializing block with buffer length : {:?}",
-                    buffer_len
-                );
-                continue;
-            }
-            let mut block: Block = result.unwrap();
-            block.force_loaded = true;
-            block.generate();
-            debug!("block : {:?} loaded from disk", block.hash.to_hex());
-            let mut mempool = mempool_lock.write().await;
-            mempool.add_block(block);
-        }
-
+        let promises: Vec<_> = iterate!(file_names, 10)
+            .map(|file_name| async {
+                let file_name = file_name.clone();
+                let result = self
+                    .io_interface
+                    .read_value(self.io_interface.get_block_dir() + file_name.as_str())
+                    .await;
+                if result.is_err() {
+                    error!(
+                        "failed loading block from disk : {:?}",
+                        result.err().unwrap()
+                    );
+                    return;
+                }
+                debug!("file : {:?} loaded", file_name);
+                let buffer: Vec<u8> = result.unwrap();
+                let buffer_len = buffer.len();
+                let result = Block::deserialize_from_net(buffer);
+                if result.is_err() {
+                    // ideally this shouldn't happen since we only write blocks which are valid to disk
+                    warn!(
+                        "failed deserializing block with buffer length : {:?}",
+                        buffer_len
+                    );
+                    return;
+                }
+                let mut block: Block = result.unwrap();
+                block.force_loaded = true;
+                block.generate();
+                debug!("block : {:?} loaded from disk", block.hash.to_hex());
+                let mut mempool = mempool_lock.write().await;
+                mempool.add_block(block);
+            })
+            .collect();
+        futures::future::join_all(promises).await;
         debug!("blocks loaded to mempool");
     }
 
