@@ -123,6 +123,7 @@ impl Storage {
             .iter()
             .map(|file_name| async {
                 let file_name = file_name.clone();
+                tokio::task::yield_now().await;
                 let result = self
                     .io_interface
                     .read_value(self.io_interface.get_block_dir() + file_name.as_str())
