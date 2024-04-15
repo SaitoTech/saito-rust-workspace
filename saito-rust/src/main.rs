@@ -739,8 +739,6 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
         .load_blocks_from_disk(list, context.mempool_lock.clone())
         .await;
 
-    let _peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
-
     let configs = configs_lock.read().await;
 
     let mut blockchain = context.blockchain_lock.write().await;

@@ -118,7 +118,8 @@ impl Storage {
     ) {
         debug!("loading  {:?} blocks from disk", file_names.len());
 
-        let promises: Vec<_> = iterate!(file_names, 1000)
+        // TODO : make the concurrent count a config
+        let promises: Vec<_> = iterate!(file_names, 100)
             .map(|file_name| async {
                 let file_name = file_name.clone();
                 let result = self
