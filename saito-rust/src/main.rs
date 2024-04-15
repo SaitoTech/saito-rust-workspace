@@ -8,7 +8,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use clap::{App, Arg};
+use clap::{crate_version, App, Arg};
 use log::info;
 use log::{debug, error};
 use tokio::fs::File;
@@ -820,7 +820,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let matches = App::new("Saito")
+    let matches = App::new("saito-rust")
+        .version(crate_version!())
         .arg(
             Arg::with_name("config")
                 .long("config")
