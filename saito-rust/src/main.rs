@@ -762,6 +762,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
             .await;
     }
 
+    info!("utxo size : {:?}", blockchain.utxoset.len());
+
     let data = blockchain.get_utxoset_data();
 
     info!("{:?} entries in utxo to write to file", data.len());
