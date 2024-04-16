@@ -739,12 +739,11 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
     let page_size = 100;
     let pages = list.len() / page_size;
-    let current_page = 0;
     let configs = configs_lock.read().await;
 
     let mut blockchain = context.blockchain_lock.write().await;
 
-    for i in 0..pages {
+    for current_page in 0..pages {
         let start = current_page * page_size;
         let end = min(start + page_size, list.len());
         storage
