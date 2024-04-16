@@ -737,7 +737,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     )));
     let list = storage.load_block_name_list().await.unwrap();
 
-    let page_size = 100;
+    let page_size = 10;
     let pages = list.len() / page_size;
     let configs = configs_lock.read().await;
 
