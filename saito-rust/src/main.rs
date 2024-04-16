@@ -737,7 +737,7 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     )));
     let list = storage.load_block_name_list().await.unwrap();
 
-    let page_size = 10;
+    let page_size = 100;
     let pages = list.len() / page_size;
     let configs = configs_lock.read().await;
 
@@ -760,6 +760,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
                 configs.deref(),
             )
             .await;
+        blockchain.utxoset.shrink_to_fit();
+        blockchain.blocks.shrink_to_fit();
     }
 
     info!("utxo size : {:?}", blockchain.utxoset.len());
