@@ -118,11 +118,9 @@ impl Storage {
     ) {
         debug!("loading  {:?} blocks from disk", file_names.len());
 
+        let mut mempool = mempool_lock.write().await;
         for (index, file_name) in file_names.iter().enumerate() {
             let file_name = file_name.clone();
-            if index % 100 == 0 {
-                tokio::task::yield_now().await;
-            }
             let result = self
                 .io_interface
                 .read_value(self.io_interface.get_block_dir() + file_name.as_str())
@@ -150,9 +148,11 @@ impl Storage {
             block.force_loaded = true;
             block.generate();
             debug!("block : {:?} loaded from disk", block.hash.to_hex());
-            let mut mempool = mempool_lock.write().await;
             mempool.add_block(block);
         }
+        mempool.blocks_queue.shrink_to_fit();
+        mempool.transactions.shrink_to_fit();
+        mempool.golden_tickets.shrink_to_fit();
 
         debug!("blocks loaded to mempool");
     }

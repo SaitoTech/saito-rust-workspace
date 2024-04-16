@@ -750,6 +750,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
             .load_blocks_from_disk(&list[start..end], context.mempool_lock.clone())
             .await;
 
+        tokio::task::yield_now().await;
+
         blockchain
             .add_blocks_from_mempool(
                 context.mempool_lock.clone(),
