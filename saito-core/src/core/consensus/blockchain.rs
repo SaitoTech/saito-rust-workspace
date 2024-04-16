@@ -2815,7 +2815,7 @@ mod tests {
 
         let list = t2.storage.load_block_name_list().await.unwrap();
         t2.storage
-            .load_blocks_from_disk(list, t2.mempool_lock.clone())
+            .load_blocks_from_disk(list.as_slice(), t2.mempool_lock.clone())
             .await;
         {
             let configs = t2.config_lock.read().await;

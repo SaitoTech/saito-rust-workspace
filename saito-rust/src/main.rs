@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -735,23 +736,32 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
         0,
     )));
     let list = storage.load_block_name_list().await.unwrap();
-    storage
-        .load_blocks_from_disk(list, context.mempool_lock.clone())
-        .await;
 
+    let page_size = 100;
+    let pages = list.len() / page_size;
+    let current_page = 0;
     let configs = configs_lock.read().await;
 
     let mut blockchain = context.blockchain_lock.write().await;
-    blockchain
-        .add_blocks_from_mempool(
-            context.mempool_lock.clone(),
-            None,
-            &mut storage,
-            None,
-            None,
-            configs.deref(),
-        )
-        .await;
+
+    for i in 0..pages {
+        let start = current_page * page_size;
+        let end = min(start + page_size, list.len());
+        storage
+            .load_blocks_from_disk(&list[start..end], context.mempool_lock.clone())
+            .await;
+
+        blockchain
+            .add_blocks_from_mempool(
+                context.mempool_lock.clone(),
+                None,
+                &mut storage,
+                None,
+                None,
+                configs.deref(),
+            )
+            .await;
+    }
 
     let data = blockchain.get_utxoset_data();
 

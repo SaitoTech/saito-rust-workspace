@@ -113,7 +113,7 @@ impl Storage {
 
     pub async fn load_blocks_from_disk(
         &mut self,
-        file_names: Vec<String>,
+        file_names: &[String],
         mempool_lock: Arc<RwLock<Mempool>>,
     ) {
         debug!("loading  {:?} blocks from disk", file_names.len());

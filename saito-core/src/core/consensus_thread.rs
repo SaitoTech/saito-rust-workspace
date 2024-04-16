@@ -440,9 +440,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 StatVariable::format_timestamp(self.time_keeper.get_timestamp_in_ms())
             );
             while !list.is_empty() {
-                let file_names = list.drain(..std::cmp::min(1000, list.len())).collect();
+                let file_names: Vec<String> =
+                    list.drain(..std::cmp::min(1000, list.len())).collect();
                 self.storage
-                    .load_blocks_from_disk(file_names, self.mempool_lock.clone())
+                    .load_blocks_from_disk(file_names.as_slice(), self.mempool_lock.clone())
                     .await;
 
                 blockchain
