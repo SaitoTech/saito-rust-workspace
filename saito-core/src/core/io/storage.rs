@@ -150,9 +150,9 @@ impl Storage {
             debug!("block : {:?} loaded from disk", block.hash.to_hex());
             mempool.add_block(block);
         }
-        mempool.blocks_queue.shrink_to_fit();
-        mempool.transactions.shrink_to_fit();
-        mempool.golden_tickets.shrink_to_fit();
+        // mempool.blocks_queue.shrink_to_fit();
+        // mempool.transactions.shrink_to_fit();
+        // mempool.golden_tickets.shrink_to_fit();
 
         debug!("blocks loaded to mempool");
     }

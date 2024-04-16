@@ -762,8 +762,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
                 configs.deref(),
             )
             .await;
-        blockchain.utxoset.shrink_to_fit();
-        blockchain.blocks.shrink_to_fit();
+        // blockchain.utxoset.shrink_to_fit();
+        // blockchain.blocks.shrink_to_fit();
     }
 
     info!("utxo size : {:?}", blockchain.utxoset.len());

@@ -427,6 +427,13 @@ impl Blockchain {
             debug!("this is the longest chain");
             self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
+            debug!(
+                "Full block count before= {:?}",
+                self.blocks
+                    .iter()
+                    .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
+                    .count()
+            );
             let does_new_chain_validate = self
                 .validate(
                     new_chain.as_slice(),
@@ -436,6 +443,13 @@ impl Blockchain {
                     network,
                 )
                 .await;
+            debug!(
+                "Full block count after= {:?}",
+                self.blocks
+                    .iter()
+                    .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
+                    .count()
+            );
 
             if does_new_chain_validate {
                 self.add_block_success(

@@ -1505,7 +1505,8 @@ impl Block {
         is_spv: bool,
     ) -> bool {
         debug!(
-            "upgrading block : {:?} of type : {:?} to type : {:?}",
+            "upgrading block : {:?}-{:?} of type : {:?} to type : {:?}",
+            self.id,
             self.hash.to_hex(),
             self.block_type,
             block_type
