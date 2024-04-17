@@ -18,6 +18,10 @@ use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use tracing_subscriber::filter::Directive;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Layer;
 
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
@@ -523,7 +527,24 @@ fn run_loop_thread(
 }
 
 fn setup_log() {
-    console_subscriber::init();
+    // switch to this for instrumentation
+    // console_subscriber::init();
+
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::proto=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("hyper::client=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("want=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
+
+    let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+
+    tracing_subscriber::registry().with(fmt_layer).init();
 }
 
 fn setup_hook() {
