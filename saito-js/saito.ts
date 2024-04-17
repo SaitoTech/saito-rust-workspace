@@ -429,4 +429,13 @@ export default class Saito {
     }
     return false;
   }
+
+  public async writeIssuanceFile(threshold: bigint) {
+    try {
+      return Saito.getLibInstance().write_issuance_file(threshold);
+    } catch (error) {
+      console.warn("failed writing issuance file");
+      console.error(error);
+    }
+  }
 }

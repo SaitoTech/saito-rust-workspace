@@ -15,6 +15,7 @@ pub struct NodeConfigurations {
     peers: Vec<PeerConfig>,
     #[serde(skip)]
     lite: bool,
+    spv_mode: Option<bool>,
 }
 
 impl NodeConfigurations {}
@@ -39,17 +40,18 @@ impl Default for NodeConfigurations {
             },
             peers: vec![],
             lite: false,
+            spv_mode: Some(false),
         }
     }
 }
 
 impl Configuration for NodeConfigurations {
     fn get_server_configs(&self) -> Option<&Server> {
-        return Some(&self.server);
+        Some(&self.server)
     }
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
-        return &self.peers;
+        &self.peers
     }
 
     fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
@@ -66,7 +68,7 @@ impl Configuration for NodeConfigurations {
     }
 
     fn is_spv_mode(&self) -> bool {
-        false
+        self.spv_mode.is_some() && self.spv_mode.unwrap()
     }
 
     fn is_browser(&self) -> bool {
@@ -76,6 +78,7 @@ impl Configuration for NodeConfigurations {
     fn replace(&mut self, config: &dyn Configuration) {
         self.server = config.get_server_configs().cloned().unwrap();
         self.peers = config.get_peer_configs().clone();
+        self.spv_mode = Some(config.is_spv_mode());
         self.lite = config.is_spv_mode();
     }
 }

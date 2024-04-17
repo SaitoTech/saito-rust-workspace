@@ -685,7 +685,7 @@ pub async fn run_network_controller(
                             }
                         }
                     }
-                    result = stat_interval.tick() => {
+                    _ = stat_interval.tick() => {
                         #[cfg(feature = "with-stats")]
                         {
                             if Instant::now().duration_since(last_stat_on)
@@ -859,19 +859,15 @@ fn run_websocket_server(
                         if key1.is_empty() {
                             key = public_key;
                         } else {
-                            let result;
+                            let result: Result<SaitoPublicKey, String>;
                             if key1.len() == 66 {
                                 result = SaitoPublicKey::from_hex(key1.as_str());
-                                if result.is_err() {
-                                    warn!("key : {:?} couldn't be decoded", key1);
-                                    return Err(warp::reject::reject());
-                                }
                             } else {
                                 result = SaitoPublicKey::from_base58(key1.as_str());
-                                if result.is_err() {
-                                    warn!("key : {:?} couldn't be decoded", key1);
-                                    return Err(warp::reject::reject());
-                                }
+                            }
+                            if result.is_err() {
+                                warn!("key : {:?} couldn't be decoded", key1);
+                                return Err(warp::reject::reject());
                             }
 
                             let result = result.unwrap();
@@ -879,21 +875,23 @@ fn run_websocket_server(
                                 warn!("key length : {:?} is not for public key", result.len());
                                 return Err(warp::reject::reject());
                             }
-                            key = result.try_into().unwrap();
+                            key = result;
                         }
                         let mut keylist;
                         {
                             let peers = peer_lock.read().await;
                             let peer = peers.find_peer_by_address(&key);
                             if peer.is_none() {
+                                debug!(
+                                    "lite block requester : {:?} is not connected as a peer",
+                                    key.to_hex()
+                                );
                                 keylist = vec![key];
                             } else {
                                 keylist = peer.as_ref().unwrap().key_list.clone();
                                 keylist.push(key);
                             }
                         }
-
-                        // let blockchain = lock_for_read!(blockchain, LOCK_ORDER_BLOCKCHAIN);
 
                         let mut buffer: Vec<u8> = Default::default();
                         let result = fs::read_dir(BLOCKS_DIR_PATH.to_string());
@@ -912,7 +910,6 @@ fn run_websocket_server(
                                 if !filename.contains(block_hash.as_str()) {
                                     return false;
                                 }
-                                // debug!("selected file : {:?}", filename);
                                 true
                             })
                             .collect();
@@ -947,12 +944,7 @@ fn run_websocket_server(
                         block.generate();
                         let block = block.generate_lite_block(keylist);
                         let buffer = block.serialize_for_net(BlockType::Full);
-                        // let buffer_len = buffer.len();
-                        let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
-                        // debug!("served block with : {:?} length", buffer_len);
-                        result
-                        // }
-                        // .await
+                        Ok(warp::reply::with_status(buffer, StatusCode::OK))
                     },
                 );
             let routes = http_route.or(ws_route).or(lite_route);

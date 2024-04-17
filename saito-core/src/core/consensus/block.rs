@@ -632,7 +632,7 @@ impl Block {
     pub async fn downgrade_block_to_block_type(
         &mut self,
         block_type: BlockType,
-        _is_browser: bool,
+        _is_spv: bool,
     ) -> bool {
         debug!(
             "downgrading BLOCK_ID {:?} to type : {:?}",
@@ -1502,10 +1502,11 @@ impl Block {
         &mut self,
         block_type: BlockType,
         storage: &Storage,
-        is_browser: bool,
+        is_spv: bool,
     ) -> bool {
         debug!(
-            "upgrading block : {:?} of type : {:?} to type : {:?}",
+            "upgrading block : {:?}-{:?} of type : {:?} to type : {:?}",
+            self.id,
             self.hash.to_hex(),
             self.block_type,
             block_type
@@ -1525,7 +1526,7 @@ impl Block {
         // load the block if it exists on disk.
         //
         if block_type == BlockType::Full {
-            if is_browser {
+            if is_spv {
                 return false;
             }
             let new_block = storage
@@ -1562,46 +1563,36 @@ impl Block {
             keylist.iter().map(hex::encode).collect::<Vec<String>>()
         );
 
-        let mut pruned_txs = vec![];
-        let mut selected_txs = 0;
-
-        for tx in &self.transactions {
-            if tx
-                .from
-                .iter()
-                .any(|slip| keylist.contains(&slip.public_key))
-                || tx.to.iter().any(|slip| keylist.contains(&slip.public_key))
-                || tx.is_golden_ticket()
-            {
-                pruned_txs.push(tx.clone());
-                selected_txs += 1;
-            } else {
-                let spv = Transaction {
-                    timestamp: tx.timestamp,
-                    from: vec![],
-                    to: vec![],
-                    data: vec![],
-                    transaction_type: TransactionType::SPV,
-                    txs_replacements: 1,
-                    signature: tx.signature,
-                    path: vec![],
-                    hash_for_signature: tx.hash_for_signature,
-                    total_in: 0,
-                    total_out: 0,
-                    total_fees: 0,
-                    total_work_for_me: 0,
-                    cumulative_fees: 0,
-                };
-
-                pruned_txs.push(spv);
-            }
-        }
-
-        debug!(
-            "selected txs : {} out of {}",
-            selected_txs,
-            self.transactions.len()
-        );
+        let mut pruned_txs: Vec<Transaction> = iterate!(&self.transactions, 10)
+            .map(|tx| {
+                if tx
+                    .from
+                    .iter()
+                    .any(|slip| keylist.contains(&slip.public_key))
+                    || tx.to.iter().any(|slip| keylist.contains(&slip.public_key))
+                    || tx.is_golden_ticket()
+                {
+                    tx.clone()
+                } else {
+                    Transaction {
+                        timestamp: tx.timestamp,
+                        from: vec![],
+                        to: vec![],
+                        data: vec![],
+                        transaction_type: TransactionType::SPV,
+                        txs_replacements: 1,
+                        signature: tx.signature,
+                        path: vec![],
+                        hash_for_signature: tx.hash_for_signature,
+                        total_in: 0,
+                        total_out: 0,
+                        total_fees: 0,
+                        total_work_for_me: 0,
+                        cumulative_fees: 0,
+                    }
+                }
+            })
+            .collect();
 
         let mut i = 0;
         while i + 1 < pruned_txs.len() {
@@ -1654,7 +1645,7 @@ impl Block {
     ) -> bool {
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
         assert!(self.id > 0);
-        if configs.is_browser() {
+        if configs.is_spv_mode() {
             self.generate_consensus_values(blockchain, storage).await;
             return true;
         }

@@ -125,21 +125,24 @@ impl Wallet {
 
     /// [private_key - 32 bytes]
     /// [public_key - 33 bytes]
-    pub fn deserialize_from_disk(&mut self, bytes: &Vec<u8>) {
+    pub fn deserialize_from_disk(&mut self, bytes: &[u8]) {
         self.private_key = bytes[0..32].try_into().unwrap();
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
     pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool, network: Option<&Network>) {
+        let mut wallet_changed = false;
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
+                        wallet_changed = true;
                         self.delete_slip(input, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
+                        wallet_changed = true;
                         self.add_slip(block.id, index as u64, output, true, None);
                     }
                 }
@@ -148,27 +151,35 @@ impl Wallet {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
+                        wallet_changed = true;
                         self.add_slip(block.id, index as u64, input, true, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
+                        wallet_changed = true;
                         self.delete_slip(output, None);
                     }
                 }
             }
         }
-        if let Some(network) = network {
-            network
-                .io_interface
-                .send_interface_event(InterfaceEvent::WalletUpdate());
+        if wallet_changed {
+            if let Some(network) = network {
+                network
+                    .io_interface
+                    .send_interface_event(InterfaceEvent::WalletUpdate());
+            }
         }
     }
 
     // removes all slips in block when pruned / deleted
     pub fn delete_block(&mut self, block: &Block, network: Option<&Network>) {
+        let mut wallet_changed = false;
         for tx in block.transactions.iter() {
             for input in tx.from.iter() {
+                if input.public_key == self.public_key {
+                    wallet_changed = true;
+                }
                 self.delete_slip(input, None);
             }
             for output in tx.to.iter() {
@@ -177,10 +188,12 @@ impl Wallet {
                 }
             }
         }
-        if let Some(network) = network {
-            network
-                .io_interface
-                .send_interface_event(InterfaceEvent::WalletUpdate());
+        if wallet_changed {
+            if let Some(network) = network {
+                network
+                    .io_interface
+                    .send_interface_event(InterfaceEvent::WalletUpdate());
+            }
         }
     }
 
@@ -203,6 +216,7 @@ impl Wallet {
         wallet_slip.block_id = block_id;
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
+
         self.unspent_slips.insert(wallet_slip.utxokey);
         self.available_balance += slip.amount;
         trace!(
@@ -230,11 +244,11 @@ impl Wallet {
             if in_unspent_list {
                 self.available_balance -= removed_slip.amount;
             }
-        }
-        if let Some(network) = network {
-            network
-                .io_interface
-                .send_interface_event(InterfaceEvent::WalletUpdate());
+            if let Some(network) = network {
+                network
+                    .io_interface
+                    .send_interface_event(InterfaceEvent::WalletUpdate());
+            }
         }
     }
 
@@ -345,13 +359,13 @@ impl Wallet {
         transaction.data = golden_ticket.serialize_for_net();
 
         let mut input1 = Slip::default();
-        input1.public_key = public_key.clone();
+        input1.public_key = *public_key;
         input1.amount = 0;
         input1.block_id = 0;
         input1.tx_ordinal = 0;
 
         let mut output1 = Slip::default();
-        output1.public_key = public_key.clone();
+        output1.public_key = *public_key;
         output1.amount = 0;
         output1.block_id = 0;
         output1.tx_ordinal = 0;
@@ -367,7 +381,7 @@ impl Wallet {
         transaction
     }
     pub fn add_to_pending(&mut self, tx: Transaction) {
-        assert_eq!(tx.from.get(0).unwrap().public_key, self.public_key);
+        assert_eq!(tx.from.first().unwrap().public_key, self.public_key);
         assert_ne!(tx.transaction_type, TransactionType::GoldenTicket);
         assert!(tx.hash_for_signature.is_some());
         self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
