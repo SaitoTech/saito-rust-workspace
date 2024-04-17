@@ -56,8 +56,8 @@ impl Network {
         configs: &(dyn Configuration + Send + Sync),
     ) {
         debug!("propagating block : {:?}", block.hash.to_hex());
-        if configs.is_browser() {
-            trace!("not propagating block since we are in browser");
+        if configs.is_spv_mode() {
+            trace!("not propagating block since we are in spv mode");
             return;
         }
 
@@ -97,12 +97,6 @@ impl Network {
 
         let peers = self.peer_lock.read().await;
         let mut wallet = self.wallet_lock.write().await;
-
-        // trace!(
-        //     "propagating transaction : {:?} peers : {:?}",
-        //     transaction.signature.to_hex(),
-        //     peers.index_to_peers.len()
-        // );
 
         let public_key = wallet.public_key;
 

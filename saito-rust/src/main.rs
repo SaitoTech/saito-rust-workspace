@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -8,7 +9,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use clap::{App, Arg};
+use clap::{crate_version, App, Arg};
 use log::info;
 use log::{debug, error};
 use tokio::fs::File;
@@ -702,9 +703,6 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
 }
 
 pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
-    let (sender_to_network_controller, _receiver_in_network_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
-
     info!("running saito controllers");
     let public_key: SaitoPublicKey =
         hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
@@ -730,30 +728,44 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     }
     let context = Context::new(configs_clone.clone(), wallet);
 
+    let (sender_to_network_controller, _receiver_in_network_controller) =
+        tokio::sync::mpsc::channel::<IoEvent>(100000);
     let mut storage = Storage::new(Box::new(RustIOHandler::new(
         sender_to_network_controller.clone(),
         0,
     )));
     let list = storage.load_block_name_list().await.unwrap();
-    storage
-        .load_blocks_from_disk(list, context.mempool_lock.clone())
-        .await;
 
-    let _peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
-
+    let page_size = 100;
+    let pages = list.len() / page_size;
     let configs = configs_lock.read().await;
 
     let mut blockchain = context.blockchain_lock.write().await;
-    blockchain
-        .add_blocks_from_mempool(
-            context.mempool_lock.clone(),
-            None,
-            &mut storage,
-            None,
-            None,
-            configs.deref(),
-        )
-        .await;
+
+    for current_page in 0..pages {
+        let start = current_page * page_size;
+        let end = min(start + page_size, list.len());
+        storage
+            .load_blocks_from_disk(&list[start..end], context.mempool_lock.clone())
+            .await;
+
+        tokio::task::yield_now().await;
+
+        blockchain
+            .add_blocks_from_mempool(
+                context.mempool_lock.clone(),
+                None,
+                &mut storage,
+                None,
+                None,
+                configs.deref(),
+            )
+            .await;
+        // blockchain.utxoset.shrink_to_fit();
+        // blockchain.blocks.shrink_to_fit();
+    }
+
+    info!("utxo size : {:?}", blockchain.utxoset.len());
 
     let data = blockchain.get_utxoset_data();
 
@@ -820,7 +832,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let matches = App::new("Saito")
+    let matches = App::new("saito-rust")
+        .version(crate_version!())
         .arg(
             Arg::with_name("config")
                 .long("config")

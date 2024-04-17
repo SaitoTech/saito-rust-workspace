@@ -3,7 +3,10 @@
 // #[global_allocator]
 // static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+use std::cmp::min;
 use std::io::{Error, ErrorKind};
+use std::ops::Deref;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -26,7 +29,8 @@ use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, STAT_BIN_COUNT,
+    Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
+    PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -811,6 +815,90 @@ pub fn is_valid_public_key(key: JsString) -> bool {
     }
     let key: SaitoPublicKey = result.unwrap();
     saito_core::core::util::crypto::is_valid_public_key(&key)
+}
+
+#[wasm_bindgen]
+pub async fn write_issuance_file(threshold: Currency) {
+    let mut saito = SAITO.lock().await;
+    let configs_lock = saito.routing_thread.config_lock.clone();
+    let mempool_lock = saito.routing_thread.mempool_lock.clone();
+    let blockchain_lock = saito.routing_thread.blockchain_lock.clone();
+    let storage = &mut saito.consensus_thread.storage;
+    let list = storage.load_block_name_list().await.unwrap();
+
+    let page_size = 100;
+    let pages = list.len() / page_size;
+    let configs = configs_lock.read().await;
+
+    let mut blockchain = blockchain_lock.write().await;
+
+    // for current_page in 0..pages {
+    //     let start = current_page * page_size;
+    //     let end = min(start + page_size, list.len());
+    //     storage
+    //         .load_blocks_from_disk(&list[start..end], mempool_lock.clone())
+    //         .await;
+    //
+    //     tokio::task::yield_now().await;
+    //
+    //     blockchain
+    //         .add_blocks_from_mempool(
+    //             mempool_lock.clone(),
+    //             None,
+    //             storage,
+    //             None,
+    //             None,
+    //             configs.deref(),
+    //         )
+    //         .await;
+    // }
+
+    info!("utxo size : {:?}", blockchain.utxoset.len());
+
+    let data = blockchain.get_utxoset_data();
+
+    info!("{:?} entries in utxo to write to file", data.len());
+    let issuance_path: String = "./data/issuance.file".to_string();
+    info!("opening file : {:?}", issuance_path);
+
+    let mut buffer: Vec<u8> = vec![];
+    let slip_type = "Normal";
+    let mut aggregated_value = 0;
+    let mut total_written_lines = 0;
+    for (key, value) in &data {
+        if value < &threshold {
+            // PROJECT_PUBLIC_KEY.to_string()
+            aggregated_value += value;
+        } else {
+            total_written_lines += 1;
+            let key_base58 = key.to_base58();
+
+            let s = format!("{}\t{}\t{}\n", value, key_base58, slip_type);
+            let buf = s.as_bytes();
+            buffer.extend(buf);
+        };
+    }
+
+    // add remaining value
+    if aggregated_value > 0 {
+        total_written_lines += 1;
+        let s = format!(
+            "{}\t{}\t{}\n",
+            aggregated_value,
+            PROJECT_PUBLIC_KEY.to_string(),
+            slip_type
+        );
+        let buf = s.as_bytes();
+        buffer.extend(buf);
+    }
+
+    storage
+        .io_interface
+        .write_value(issuance_path, buffer)
+        .await
+        .expect("issuance file should be written");
+
+    info!("total written lines : {:?}", total_written_lines);
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {

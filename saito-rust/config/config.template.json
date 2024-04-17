@@ -22,5 +22,6 @@
       "protocol": "http",
       "synctype": "full"
     }
-  ]
+  ],
+  "spv_mode": false
 }

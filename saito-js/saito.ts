@@ -71,7 +71,6 @@ export default class Saito {
         return sharedMethods.disconnectFromPeer(peer_index);
       },
       fetch_block_from_peer: (hash: Uint8Array, peer_index: bigint, url: string, block_id: bigint) => {
-        // console.log("fetching block : " + url);
         sharedMethods.fetchBlockFromPeer(url)
           .then((buffer: Uint8Array) => {
             return Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
@@ -201,8 +200,6 @@ export default class Saito {
   }
 
   public async getBlock<B extends Block>(blockHash: string): Promise<B | null> {
-    // console.assert(!!Saito.libInstance, "wasm lib instance not set");
-    // console.log("lib instance : ", Saito.getLibInstance());
     try {
       let block = await Saito.getLibInstance().get_block(blockHash);
       return Saito.getInstance().factory.createBlock(block) as B;
@@ -308,7 +305,6 @@ export default class Saito {
     peerIndex: bigint,
     waitForReply: boolean
   ): Promise<Uint8Array> {
-    // console.log("saito.sendApiCall : peer = " + peerIndex + " wait for reply = " + waitForReply);
     let callbackIndex = this.callbackIndex++;
     if (waitForReply) {
       return new Promise((resolve, reject) => {
@@ -432,5 +428,14 @@ export default class Saito {
       console.error(e);
     }
     return false;
+  }
+
+  public async writeIssuanceFile(threshold: bigint) {
+    try {
+      return Saito.getLibInstance().write_issuance_file(threshold);
+    } catch (error) {
+      console.warn("failed writing issuance file");
+      console.error(error);
+    }
   }
 }

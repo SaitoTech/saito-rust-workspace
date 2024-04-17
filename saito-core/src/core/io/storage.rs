@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Write};
 use std::sync::Arc;
@@ -12,13 +13,13 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::defs::{PrintForLog, SaitoPublicKey, PROJECT_PUBLIC_KEY};
 use crate::core::io::interface_io::InterfaceIO;
+use crate::iterate;
 
 #[derive(Debug)]
 pub struct Storage {
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
 
-// pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const ISSUANCE_FILE_PATH: &'static str = "./data/issuance/issuance";
 pub const EARLYBIRDS_FILE_PATH: &'static str = "./data/issuance/earlybirds";
 pub const DEFAULT_FILE_PATH: &'static str = "./data/issuance/default";
@@ -112,12 +113,14 @@ impl Storage {
 
     pub async fn load_blocks_from_disk(
         &mut self,
-        file_names: Vec<String>,
+        file_names: &[String],
         mempool_lock: Arc<RwLock<Mempool>>,
     ) {
         debug!("loading  {:?} blocks from disk", file_names.len());
 
-        for file_name in file_names {
+        let mut mempool = mempool_lock.write().await;
+        for (index, file_name) in file_names.iter().enumerate() {
+            let file_name = file_name.clone();
             let result = self
                 .io_interface
                 .read_value(self.io_interface.get_block_dir() + file_name.as_str())
@@ -127,7 +130,7 @@ impl Storage {
                     "failed loading block from disk : {:?}",
                     result.err().unwrap()
                 );
-                continue;
+                return;
             }
             debug!("file : {:?} loaded", file_name);
             let buffer: Vec<u8> = result.unwrap();
@@ -139,15 +142,17 @@ impl Storage {
                     "failed deserializing block with buffer length : {:?}",
                     buffer_len
                 );
-                continue;
+                return;
             }
             let mut block: Block = result.unwrap();
             block.force_loaded = true;
             block.generate();
             debug!("block : {:?} loaded from disk", block.hash.to_hex());
-            let mut mempool = mempool_lock.write().await;
             mempool.add_block(block);
         }
+        // mempool.blocks_queue.shrink_to_fit();
+        // mempool.transactions.shrink_to_fit();
+        // mempool.golden_tickets.shrink_to_fit();
 
         debug!("blocks loaded to mempool");
     }

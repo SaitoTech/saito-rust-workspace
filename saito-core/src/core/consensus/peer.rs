@@ -72,7 +72,7 @@ impl Peer {
         {
             let configs = configs_lock.read().await;
 
-            is_lite = configs.is_browser();
+            is_lite = configs.is_spv_mode();
             if is_lite {
                 block_fetch_url = "".to_string();
             } else {
@@ -137,7 +137,7 @@ impl Peer {
         {
             let configs = configs_lock.read().await;
 
-            is_lite = configs.is_browser();
+            is_lite = configs.is_spv_mode();
             if is_lite {
                 block_fetch_url = "".to_string();
             } else {

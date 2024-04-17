@@ -78,10 +78,6 @@ export default class WebSharedMethods extends CustomSharedMethods {
 
   loadBlockFileList(): Array<string> {
     try {
-      // console.log("loading block file list...");
-      // let files = Object.keys(localStorage);
-      // console.log("files : ", files);
-      // return files;
       return [];
     } catch (e) {
       console.error(e);
