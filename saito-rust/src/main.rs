@@ -703,9 +703,6 @@ async fn run_node(configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>) {
 }
 
 pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
-    let (sender_to_network_controller, _receiver_in_network_controller) =
-        tokio::sync::mpsc::channel::<IoEvent>(1000);
-
     info!("running saito controllers");
     let public_key: SaitoPublicKey =
         hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
@@ -731,6 +728,8 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
     }
     let context = Context::new(configs_clone.clone(), wallet);
 
+    let (sender_to_network_controller, _receiver_in_network_controller) =
+        tokio::sync::mpsc::channel::<IoEvent>(100000);
     let mut storage = Storage::new(Box::new(RustIOHandler::new(
         sender_to_network_controller.clone(),
         0,
