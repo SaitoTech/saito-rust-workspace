@@ -30,17 +30,17 @@ jobs:
         working-directory: 'slr'
 
       - name: create ssh keys
-        run: echo "$CI_SSH_PRIVATE_KEY" >> ~/CI_KEY
+        run: echo "$CI_SSH_PRIVATE_KEY" >> CI_KEY
         working-directory: 'slr'
         env:
           CI_SSH_PRIVATE_KEY: ${{ secrets.CI_SSH_PRIVATE_KEY }}
 
       - name: gen key
-        run: ssh-keygen -t ~/CI_KEY
-        working-directory: "~"
+        run: ssh-keygen -t CI_KEY
+        working-directory: "slr"
 
       - name: print size of key
-        run: ls -l ~/CI_KEY*
+        run: ls -l CI_KEY*
         working-directory: 'slr'
 
       - name: create directory
@@ -48,7 +48,7 @@ jobs:
         working-directory: 'slr'
 
       - name: copy blocks in prod-services into data/blocks folder
-        run: rsync -avP -e "ssh -o StrictHostKeyChecking=no -i ~/CI_KEY" root@prod-services.saito.io:/opt/saito/data/blocks/ data/blocks/
+        run: rsync -avP -e "ssh -o StrictHostKeyChecking=no -i ./CI_KEY" root@prod-services.saito.io:/opt/saito/data/blocks/ data/blocks/
         working-directory: 'slr'
 
       - name: run issuance file generation
