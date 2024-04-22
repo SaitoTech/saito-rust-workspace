@@ -37,6 +37,10 @@ jobs:
       - name: ts-node install
         run: npm install -g ts-node
 
+      - name: Compile SLR
+        run: ./compile reset dev
+        working-directory: 'slr'
+
       - name: create ssh keys
         run: echo "$CI_SSH_PRIVATE_KEY" >> CI_KEY
         working-directory: 'slr'
