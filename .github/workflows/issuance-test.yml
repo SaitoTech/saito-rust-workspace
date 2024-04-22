@@ -55,7 +55,7 @@ jobs:
         working-directory: 'slr'
 
       - name: copy blocks in prod-services into data/blocks folder
-        run: rsync -avP -e "ssh -o StrictHostKeyChecking=no -i ./CI_KEY" root@prod-services.saito.io:/opt/saito/data/blocks/ data/blocks/
+        run: rsync -avPq -e "ssh -o StrictHostKeyChecking=no -i ./CI_KEY" root@prod-services.saito.io:/opt/saito/data/blocks/ data/blocks/
         working-directory: 'slr'
 
       - name: run issuance file generation
