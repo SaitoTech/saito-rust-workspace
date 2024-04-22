@@ -27,6 +27,7 @@ jobs:
 
       - name: Copy modules.config
         run: cp config/modules.default.js config/modules.config.js
+        working-directory: 'slr'
 
       - name: npm install
         run: npm install
