@@ -76,6 +76,5 @@ jobs:
         working-directory: 'slr'
 
       - name: check for generated issuance file
-        uses: andstor/file-existence-action@v3
-        with:
-          files: "../slr/data/issuance.file"
+        run: ls data/issuance.file
+        working-directory: 'slr'
