@@ -20,10 +20,7 @@ jobs:
         with:
           repository: 'SaitoTech/saito-lite-rust'
           path: 'slr'
-
-      - name: checkout staging
-        run: git checkout staging
-        working-directory: 'slr'
+          ref: 'staging'
 
       - name: update package.json
         run: npm update saito-js
