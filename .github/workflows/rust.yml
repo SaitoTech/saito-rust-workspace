@@ -2,9 +2,9 @@ name: build
 
 on:
   push:
-    branches: [ develop, staging, prod ]
+    branches: [ develop, staging, master ]
   pull_request:
-    branches: [ develop, staging, prod ]
+    branches: [ develop, staging, master ]
 
 env:
   CARGO_TERM_COLOR: always
