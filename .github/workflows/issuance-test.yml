@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
 
@@ -30,7 +30,7 @@ jobs:
         working-directory: 'slr'
 
       - name: create ssh keys
-        run: echo $CI_SSH_PRIVATE_KEY &gt;&gt; ~/CI_KEY
+        run: echo $CI_SSH_PRIVATE_KEY >> ~/CI_KEY
         working-directory: 'slr'
 
       - name: create directory
