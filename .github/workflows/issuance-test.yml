@@ -30,10 +30,10 @@ jobs:
         working-directory: 'slr'
 
       - name: create ssh keys
-        run: echo $CI_SSH_PRIVATE_KEY >> ~/CI_KEY
+        run: echo "$CI_SSH_PRIVATE_KEY" >> ~/CI_KEY
         working-directory: 'slr'
         env:
-          CI_SSH_PRIVATE_KEY:${{secrets.CI_SSH_PRIVATE_KEY}}
+          CI_SSH_PRIVATE_KEY: ${{ secrets.CI_SSH_PRIVATE_KEY }}
 
       - name: create directory
         run: mkdir data/blocks
