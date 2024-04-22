@@ -58,10 +58,10 @@ jobs:
       - name: print size of key
         run: ls -l CI_KEY*
         working-directory: 'slr'
-
-      - name: create directory
-        run: mkdir data/blocks
-        working-directory: 'slr'
+      #
+      #      - name: create directory
+      #        run: mkdir data/blocks
+      #        working-directory: 'slr'
 
       - name: copy blocks in prod-services into data/blocks folder
         run: rsync -avPq -e "ssh -o StrictHostKeyChecking=no -i ./CI_KEY" root@prod-services.saito.io:/opt/saito/data/blocks/ data/blocks/
