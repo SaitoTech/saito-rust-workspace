@@ -153,6 +153,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: saito-js/dist
+
   deploy_docs:
     needs: build_and_publish
     runs-on: ubuntu-latest
@@ -169,3 +170,31 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  test-issuance:
+    needs: build_and_publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout SLR
+        uses: actions/checkout@v2
+        with:
+          repository: 'SaitoTech/saito-lite-rust'
+          path: 'slr'
+
+      - name: update package.json
+        run: npm update saito-js
+        working-directory: 'slr'
+
+      - name: npm install
+        run: npm install
+        working-directory: 'slr'
+
+      - name: copy blocks in prod-services into data/blocks folder
+        run: ...
+
+      - name: run issuance file generation
+        run: ts-node gen-issuance.ts
+
+      - name: check for generated issuance file
+        run: ...
