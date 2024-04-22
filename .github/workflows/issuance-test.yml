@@ -25,6 +25,9 @@ jobs:
         run: npm update saito-js
         working-directory: 'slr'
 
+      - name: Copy modules.config
+        run: cp config/modules.default.js config/modules.config.js
+
       - name: npm install
         run: npm install
         working-directory: 'slr'
