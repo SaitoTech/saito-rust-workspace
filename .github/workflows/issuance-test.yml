@@ -35,6 +35,10 @@ jobs:
         env:
           CI_SSH_PRIVATE_KEY: ${{ secrets.CI_SSH_PRIVATE_KEY }}
 
+      - name: print size of key
+        run: ls -l ~/CI_KEY
+        working-directory: 'slr'
+
       - name: create directory
         run: mkdir data/blocks
         working-directory: 'slr'
