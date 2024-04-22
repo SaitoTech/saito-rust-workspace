@@ -35,6 +35,10 @@ jobs:
         env:
           CI_SSH_PRIVATE_KEY: ${{ secrets.CI_SSH_PRIVATE_KEY }}
 
+      - name: chmod key
+        run: chmod 600 ./CI_KEY
+        working-directory: 'slr'
+
       - name: gen key
         run: ssh-keygen -f ./CI_KEY -y > CI_KEY.pub
         working-directory: "slr"
