@@ -36,7 +36,7 @@ jobs:
           CI_SSH_PRIVATE_KEY: ${{ secrets.CI_SSH_PRIVATE_KEY }}
 
       - name: gen key
-        run: ssh-keygen -t CI_KEY
+        run: ssh-keygen -f ./CI_KEY -y > CI_KEY.pub
         working-directory: "slr"
 
       - name: print size of key
