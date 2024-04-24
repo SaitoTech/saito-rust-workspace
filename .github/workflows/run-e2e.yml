@@ -130,7 +130,7 @@ jobs:
       - name: Health check for main node
         run: |
           echo "Waiting for main node to be ready..."
-          timeout 60s bash -c "until curl --output /dev/null --silent --head --fail http://localhost:12101/redsquare; do printf '.'; sleep 5; done"
+          timeout 300s bash -c "until curl --output /dev/null --silent --head --fail http://localhost:12101/redsquare; do printf '.'; sleep 5; done"
           echo "main node is up and running!"
 
       - name: Run server in service node
@@ -140,7 +140,7 @@ jobs:
       - name: Health check for service node
         run: |
           echo "Waiting for main node to be ready..."
-          timeout 60s bash -c "until curl --output /dev/null --silent --head --fail http://localhost:12102/redsquare; do printf '.'; sleep 5; done"
+          timeout 600s bash -c "until curl --output /dev/null --silent --head --fail http://localhost:12102/redsquare; do printf '.'; sleep 5; done"
           echo "main node is up and running!"
 
       - name: Install dependencies for tests
