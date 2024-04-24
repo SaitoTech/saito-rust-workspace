@@ -68,7 +68,7 @@ jobs:
         working-directory: saito-js/dist
 
       - name: npm link saito-wasm
-        run: npm link saito-js
+        run: npm link saito-wasm
         working-directory: saito-js/dist
 
       - name: link saito-js
