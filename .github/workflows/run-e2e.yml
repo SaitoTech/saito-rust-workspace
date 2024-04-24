@@ -1,0 +1,150 @@
+name: Spin up Saito Servers and Run CI Tests
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  setup_and_run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the current repository
+        uses: actions/checkout@v3
+        with:
+          path: workspace
+
+      - name: Bootstrapping
+        run: bash ./scripts/bootstrap_for_ci.sh
+        shell: bash
+        working-directory: workspace
+
+      - name: saito-wasm npm install
+        run: npm install
+        working-directory: workspace/saito-wasm
+
+      - name: Wasm Build
+        run: npm run build-prod
+        working-directory: workspace/saito-wasm
+
+      - name: link saito-wasm
+        run: npm link
+        working-directory: workspace/saito-wasm
+
+      - name: Install npm packages for saito-js
+        run: npm install
+        working-directory: workspace/saito-js
+
+      - name: link saito-wasm to saito-js
+        run: npm link saito-wasm
+        working-directory: workspace/saito-js
+
+      - name: build saito-js
+        run: npm run build
+        working-directory: workspace/saito-js
+
+      - name: copying saito-js
+        run: |
+          cp package.json dist
+          cp package-lock.json dist
+          cp tsconfig.json dist
+          cp .npmignore dist
+        working-directory: workspace/saito-js
+
+      - name: link saito-js
+        run: npm link
+        working-directory: workspace/saito-js
+
+      - name: Check out the external repository
+        uses: actions/checkout@v2
+        with:
+          repository: 'SaitoTech/saito-lite-rust'
+          path: main
+
+      - name: Check out the external repository
+        uses: actions/checkout@v2
+        with:
+          repository: 'SaitoTech/saito-lite-rust'
+          path: services
+
+      - name: Install dependencies in main node
+        run: npm install
+        working-directory: main
+
+      - name: Install dependencies in main node
+        run: npm install
+        working-directory: services
+
+      - name: link saito-js to main
+        run: npm link saito-js
+        working-directory: main
+
+      - name: link saito-js to services
+        run: npm link saito-js
+        working-directory: services
+
+      - name: Copy main modules config
+        run: cp workspace/saito-e2e/test-data/slr-modules.config.main.js main/config/modules.config.js
+
+      - name: Copy services modules config
+        run: cp workspace/saito-e2e/test-data/slr-modules.config.main.js services/config/modules.config.js
+
+      - name: Copy main config
+        run: cp workspace/saito-e2e/test-data/slr-main.options.json main/config/options.conf
+
+      - name: Copy services config
+        run: cp workspace/saito-e2e/test-data/slr-services.options.json services/config/options.conf
+
+      - name: Compile Main
+        run: ./compile reset dev
+        working-directory: main
+
+      - name: Compile Services
+        run: ./compile reset dev
+        working-directory: services
+
+      - name: Run server in main node
+        run: npm run dev-server &
+        working-directory: main
+
+      - name: Health check for main node
+        run: |
+          echo "Waiting for main node to be ready..."
+          until curl --output /dev/null --silent --head --fail http://localhost:12101/redsquare; do
+            printf '.'
+            sleep 5
+          done
+          echo "main node is up and running!"
+
+      - name: Run server in service node
+        run: npm run dev-server &
+        working-directory: services
+
+      - name: Health check for service node
+        run: |
+          echo "Waiting for main node to be ready..."
+          until curl --output /dev/null --silent --head --fail http://localhost:12102/redsquare; do
+            printf '.'
+            sleep 5
+          done
+          echo "main node is up and running!"
+
+      - name: Install dependencies for tests
+        run: npm install
+        working-directory: workspace/saito-e2e
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        working-directory: workspace/saito-e2e
+
+      - name: Run Playwright tests
+        run: npx playwright test
+        working-directory: workspace/saito-e2e
+
+#      - uses: actions/upload-artifact@v3
+#        if: always()
+#        with:
+#          name: playwright-report
+#          path: workspace/saito-e2e/playwright-report/
+#          retention-days: 7
