@@ -1,4 +1,4 @@
-name: Spin up Saito Servers and Run CI Tests
+name: Run CI Tests
 
 on:
   push:
@@ -63,9 +63,17 @@ jobs:
           cp .npmignore dist
         working-directory: saito-js
 
+      - name: npm install in saito-js dist
+        run: npm install
+        working-directory: saito-js/dist
+
+      - name: npm link saito-wasm
+        run: npm link saito-js
+        working-directory: saito-js/dist
+
       - name: link saito-js
         run: npm link
-        working-directory: saito-js
+        working-directory: saito-js/dist
 
       - name: Check out the external repository
         uses: actions/checkout@v2
