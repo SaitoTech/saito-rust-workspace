@@ -13,7 +13,7 @@ test("issuance file generation @consensus", async ({ page }, testInfo) => {
     fs.mkdirSync(dir);
   }
 
-  // fetch blocks from prod-services into SLR directory
+  // generate some blocks
   process.exec();
 
   // run utxo file generation in SLR
