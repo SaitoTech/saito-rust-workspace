@@ -579,6 +579,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_timer_in_ms,
     );
 
+    let time_keeper = TimeKeeper {};
+
     let (server_handle, controller_handle) = run_network_controller(
         receiver_in_network_controller,
         event_sender_to_loop.clone(),
@@ -587,6 +589,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_stat.clone(),
         peers_lock.clone(),
         sender_to_network_controller.clone(),
+        &time_keeper,
     )
     .await;
 
