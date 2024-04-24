@@ -84,28 +84,11 @@ lazy_static! {
 pub fn new() -> SaitoWasm {
     info!("creating new saito wasm instance");
 
-    // let keys = generate_keys_wasm();
-    // let private_key;
-    // let public_key;
-    // {
-    //     let key = PRIVATE_KEY.lock().await;
-    //     private_key = key;
-    //
-    // }
-    // let keys = generate_public_key()
     let wallet = Arc::new(RwLock::new(Wallet::new([0; 32], [0; 33])));
-    // {
-    //     Wallet::load(Box::new(WasmIoHandler {})).await;
-    // }
-    // let public_key = wallet.public_key.clone();
-    // let private_key = wallet.private_key.clone();
+
     let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
 
     let channel_size = 1_000_000;
-    // {
-    //     let configs = configuration.read().await;
-    //     channel_size = configs.get_server_configs().unwrap().channel_size;
-    // }
 
     let peers = Arc::new(RwLock::new(PeerCollection::new()));
     let context = Context {
@@ -372,7 +355,6 @@ pub async fn get_latest_block_hash() -> JsString {
 
 #[wasm_bindgen]
 pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
-    // debug!("get_block");
     let block_hash = string_to_hex(block_hash).or(Err(JsValue::from(
         "Failed parsing block hash string to key",
     )))?;
@@ -752,25 +734,6 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
         .unwrap();
 }
 
-// #[wasm_bindgen]
-// pub async fn propagate_services(peer_index: PeerIndex, services: JsValue) {
-//     info!("propagating services : {:?} - {:?}", peer_index, services);
-//     let arr = js_sys::Array::from(&services);
-//     let mut services: Vec<WasmPeerService> = serde_wasm_bindgen::from_value(services).unwrap();
-//     // for i in 0..arr.length() {
-//     //     let service = WasmPeerService::from(arr.at(i as i32));
-//     //     let service = service.service;
-//     //     services.push(service);
-//     // }
-//     let services = services.drain(..).map(|s| s.service).collect();
-//     let saito = SAITO.lock().await;
-//     saito
-//         .routing_thread
-//         .network
-//         .propagate_services(peer_index, services)
-//         .await;
-// }
-
 #[wasm_bindgen]
 pub async fn get_wallet() -> WasmWallet {
     let saito = SAITO.lock().await;
@@ -780,7 +743,7 @@ pub async fn get_wallet() -> WasmWallet {
 #[wasm_bindgen]
 pub async fn get_blockchain() -> WasmBlockchain {
     let saito = SAITO.lock().await;
-    return saito.blockchain.clone();
+    saito.blockchain.clone()
 }
 
 #[wasm_bindgen]
@@ -826,32 +789,7 @@ pub async fn write_issuance_file(threshold: Currency) {
     let storage = &mut saito.consensus_thread.storage;
     let list = storage.load_block_name_list().await.unwrap();
 
-    let page_size = 100;
-    let pages = list.len() / page_size;
-    let configs = configs_lock.read().await;
-
-    let mut blockchain = blockchain_lock.write().await;
-
-    // for current_page in 0..pages {
-    //     let start = current_page * page_size;
-    //     let end = min(start + page_size, list.len());
-    //     storage
-    //         .load_blocks_from_disk(&list[start..end], mempool_lock.clone())
-    //         .await;
-    //
-    //     tokio::task::yield_now().await;
-    //
-    //     blockchain
-    //         .add_blocks_from_mempool(
-    //             mempool_lock.clone(),
-    //             None,
-    //             storage,
-    //             None,
-    //             None,
-    //             configs.deref(),
-    //         )
-    //         .await;
-    // }
+    let blockchain = blockchain_lock.write().await;
 
     info!("utxo size : {:?}", blockchain.utxoset.len());
 
@@ -867,7 +805,6 @@ pub async fn write_issuance_file(threshold: Currency) {
     let mut total_written_lines = 0;
     for (key, value) in &data {
         if value < &threshold {
-            // PROJECT_PUBLIC_KEY.to_string()
             aggregated_value += value;
         } else {
             total_written_lines += 1;
@@ -982,17 +919,13 @@ pub fn string_array_to_base58_keys<T: TryFrom<Vec<u8>> + PrintForLog<T>>(
         .to_vec()
         .drain(..)
         .filter_map(|key| {
-            let key: Option<String> = key.as_string();
-            if key.is_none() {
-                return None;
-            }
-            let key: String = key.unwrap();
+            let key: String = key.as_string()?;
             let key = T::from_base58(key.as_str());
             if key.is_err() {
                 return None;
             }
             let key: T = key.unwrap();
-            return Some(key);
+            Some(key)
         })
         .collect();
     array
