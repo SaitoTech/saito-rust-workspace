@@ -2,7 +2,7 @@ name: Spin up Saito Servers and Run CI Tests
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master, develop, feature/315/e2e ]
   pull_request:
     branches: [ master ]
 
