@@ -1,4 +1,4 @@
-use ahash::HashMap;
+
 use std::io::{Error, ErrorKind};
 
 use log::{debug, error, info, trace, warn};
@@ -155,7 +155,7 @@ impl Transaction {
         wallet: &mut Wallet,
         to_public_key: SaitoPublicKey,
         with_payment: Currency,
-        mut with_fee: Currency,
+        with_fee: Currency,
         _force_merge: bool,
         network: Option<&Network>,
     ) -> Result<Transaction, Error> {
@@ -229,7 +229,7 @@ impl Transaction {
                 output_slips.remove(0);
             }
         }
-        for i in 0..keys.len() {
+        for _i in 0..keys.len() {
             let key = keys.pop().unwrap();
             let payment = payments.pop().unwrap();
 

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use reqwest::Client;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -827,7 +827,7 @@ fn run_websocket_server(
                     }
                     drop(file);
 
-                    let buffer_len = buffer.len();
+                    let _buffer_len = buffer.len();
                     let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
                     // debug!("served block with : {:?} length", buffer_len);
                     result

@@ -469,7 +469,7 @@ fn run_loop_thread(
     mut receiver: Receiver<IoEvent>,
     network_event_sender_to_routing_ep: Sender<NetworkEvent>,
     stat_timer_in_ms: u64,
-    thread_sleep_time_in_ms: u64,
+    _thread_sleep_time_in_ms: u64,
     sender_to_stat: Sender<String>,
 ) -> JoinHandle<()> {
     tokio::task::Builder::new()

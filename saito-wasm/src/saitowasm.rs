@@ -3,16 +3,16 @@
 // #[global_allocator]
 // static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-use std::cmp::min;
+
 use std::io::{Error, ErrorKind};
-use std::ops::Deref;
-use std::path::Path;
+
+
 use std::sync::Arc;
 use std::time::Duration;
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use js_sys::{Array, BigInt, JsString, Uint8Array};
+use js_sys::{Array, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
 use secp256k1::SECP256K1;
@@ -312,7 +312,7 @@ pub async fn create_transaction_with_multiple_payments(
     public_keys: js_sys::Array,
     amounts: js_sys::BigUint64Array,
     fee: u64,
-    force_merge: bool,
+    _force_merge: bool,
 ) -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.lock().await;
     let mut wallet = saito.context.wallet_lock.write().await;
@@ -783,11 +783,11 @@ pub fn is_valid_public_key(key: JsString) -> bool {
 #[wasm_bindgen]
 pub async fn write_issuance_file(threshold: Currency) {
     let mut saito = SAITO.lock().await;
-    let configs_lock = saito.routing_thread.config_lock.clone();
-    let mempool_lock = saito.routing_thread.mempool_lock.clone();
+    let _configs_lock = saito.routing_thread.config_lock.clone();
+    let _mempool_lock = saito.routing_thread.mempool_lock.clone();
     let blockchain_lock = saito.routing_thread.blockchain_lock.clone();
     let storage = &mut saito.consensus_thread.storage;
-    let list = storage.load_block_name_list().await.unwrap();
+    let _list = storage.load_block_name_list().await.unwrap();
 
     let blockchain = blockchain_lock.write().await;
 
