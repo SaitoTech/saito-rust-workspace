@@ -1,4 +1,4 @@
-name: Run CI Tests
+name: Run E2E Tests
 
 on:
   push:
@@ -155,9 +155,9 @@ jobs:
         run: npx playwright test
         working-directory: saito-e2e
 
-#      - uses: actions/upload-artifact@v3
-#        if: always()
-#        with:
-#          name: playwright-report
-#          path: workspace/saito-e2e/playwright-report/
-#          retention-days: 7
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: saito-e2e/playwright-report/
+          retention-days: 7

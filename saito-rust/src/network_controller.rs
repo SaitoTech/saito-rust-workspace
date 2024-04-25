@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use reqwest::Client;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -512,7 +512,7 @@ impl PeerCounter {
 ///
 /// ```
 // TODO : refactor to use ProcessEvent trait
-pub async fn run_network_controller(
+pub async fn run_network_controller<TK: KeepTime + Clone + Send + Sync + 'static>(
     mut receiver: Receiver<IoEvent>,
     sender_to_core: Sender<IoEvent>,
     configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
@@ -520,6 +520,7 @@ pub async fn run_network_controller(
     sender_to_stat: Sender<String>,
     peers_lock: Arc<RwLock<PeerCollection>>,
     sender_to_network: Sender<IoEvent>,
+    time_keeper: &TK,
 ) -> (JoinHandle<()>, JoinHandle<()>) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -565,6 +566,8 @@ pub async fn run_network_controller(
         public_key,
         peers_lock,
     );
+
+    let time_keeper = time_keeper.clone();
 
     let controller_handle = tokio::task::Builder::new()
         .name("saito-io-controller")
@@ -693,13 +696,13 @@ pub async fn run_network_controller(
                             {
                                 last_stat_on = Instant::now();
                                 outgoing_messages
-                                    .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
+                                    .calculate_stats(time_keeper.get_timestamp_in_ms())
                                     .await;
                                 let network_controller = network_controller_lock.read().await;
 
                                 let stat = format!(
                                     "{} - {} - capacity : {:?} / {:?}",
-                                    StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                                    StatVariable::format_timestamp(time_keeper.get_timestamp_in_ms()),
                                     format!("{:width$}", "network::queue_to_core", width = 40),
                                     network_controller.sender_to_saito_controller.capacity(),
                                     network_controller.sender_to_saito_controller.max_capacity()
@@ -708,7 +711,7 @@ pub async fn run_network_controller(
 
                                 let stat = format!(
                                     "{} - {} - capacity : {:?} / {:?}",
-                                    StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                                    StatVariable::format_timestamp(time_keeper.get_timestamp_in_ms()),
                                     format!("{:width$}", "network::queue_outgoing", width = 40),
                                     sender_to_network.capacity(),
                                     sender_to_network.max_capacity()
@@ -827,7 +830,7 @@ fn run_websocket_server(
                     }
                     drop(file);
 
-                    let buffer_len = buffer.len();
+                    let _buffer_len = buffer.len();
                     let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
                     // debug!("served block with : {:?} length", buffer_len);
                     result

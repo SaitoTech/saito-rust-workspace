@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info, trace};
+use log::{debug, info};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 

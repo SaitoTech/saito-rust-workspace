@@ -13,7 +13,7 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::defs::{PrintForLog, SaitoPublicKey, PROJECT_PUBLIC_KEY};
 use crate::core::io::interface_io::InterfaceIO;
-use crate::iterate;
+
 
 #[derive(Debug)]
 pub struct Storage {
@@ -119,7 +119,7 @@ impl Storage {
         debug!("loading  {:?} blocks from disk", file_names.len());
 
         let mut mempool = mempool_lock.write().await;
-        for (index, file_name) in file_names.iter().enumerate() {
+        for (_index, file_name) in file_names.iter().enumerate() {
             let file_name = file_name.clone();
             let result = self
                 .io_interface
