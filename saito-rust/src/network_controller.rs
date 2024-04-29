@@ -35,7 +35,7 @@ use saito_core::core::util::configuration::{Configuration, PeerConfig};
 
 use crate::io_event::IoEvent;
 use crate::rust_io_handler::BLOCKS_DIR_PATH;
-use crate::time_keeper::TimeKeeper;
+
 
 // use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
@@ -965,14 +965,14 @@ fn run_websocket_server(
 
 #[cfg(test)]
 mod tests {
-    use crate::network_controller::{SocketReceiver, SocketSender};
+    
     use log::info;
-    use saito_core::core::msg::handshake::HandshakeChallenge;
-    use saito_core::core::msg::message::Message;
-    use saito_core::core::util::crypto::generate_random_bytes;
-    use tokio::net::TcpStream;
-    use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
-    use tungstenite::connect;
+    
+    
+    
+    
+    use tokio_tungstenite::{connect_async};
+    
 
     #[ignore]
     #[tokio::test]
@@ -991,7 +991,7 @@ mod tests {
                 return;
             }
             let result = result.unwrap();
-            let mut socket = result.0;
+            let socket = result.0;
 
             // let challenge = HandshakeChallenge {
             //     challenge: generate_random_bytes(32).try_into().unwrap(),
