@@ -22,7 +22,7 @@ use crate::core::mining_thread::MiningEvent;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::msg::message::Message;
-use crate::core::process::keep_time::KeepTime;
+use crate::core::process::keep_time::Timer;
 use crate::core::process::process_event::ProcessEvent;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
@@ -85,7 +85,7 @@ pub struct RoutingThread {
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
-    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
+    pub timer: Timer,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub network: Network,
     pub reconnection_timer: Timestamp,

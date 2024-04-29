@@ -37,7 +37,7 @@ use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
-use saito_core::core::process::keep_time::KeepTime;
+use saito_core::core::process::keep_time::{KeepTime, Timer};
 use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
@@ -50,7 +50,7 @@ use saito_rust::io_event::IoEvent;
 use saito_rust::network_controller::run_network_controller;
 use saito_rust::rust_io_handler::RustIOHandler;
 use saito_rust::stat_thread::StatThread;
-use saito_rust::time_keeper::{HastenedTimeKeeper, TimeKeeper};
+use saito_rust::time_keeper::TimeKeeper;
 
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
@@ -88,14 +88,14 @@ async fn receive_event<T>(receiver: &mut Option<Receiver<T>>) -> Option<T> {
 /// ```
 ///
 /// ```
-async fn run_thread<T, TK: KeepTime + Clone + Send + Sync + 'static>(
+async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
     mut network_event_receiver: Option<Receiver<NetworkEvent>>,
     mut event_receiver: Option<Receiver<T>>,
     stat_timer_in_ms: u64,
     thread_name: &str,
     thread_sleep_time_in_ms: u64,
-    time_keeper_origin: &TK,
+    time_keeper_origin: &Timer,
 ) -> JoinHandle<()>
 where
     T: Send + Debug + 'static,
@@ -153,13 +153,13 @@ where
         .unwrap()
 }
 
-async fn run_verification_thread<TK: KeepTime + Clone + Send + Sync + 'static>(
+async fn run_verification_thread(
     mut event_processor: Box<VerificationThread>,
     mut event_receiver: Receiver<VerifyRequest>,
     stat_timer_in_ms: u64,
     thread_name: &str,
     thread_sleep_time_in_ms: u64,
-    time_keeper_origin: &TK,
+    time_keeper_origin: &Timer,
 ) -> JoinHandle<()> {
     let time_keeper = time_keeper_origin.clone();
     tokio::task::Builder::new()
@@ -229,7 +229,7 @@ async fn run_verification_thread<TK: KeepTime + Clone + Send + Sync + 'static>(
         .unwrap()
 }
 
-async fn run_mining_event_processor<TK: KeepTime + Clone + Send + Sync + 'static>(
+async fn run_mining_event_processor(
     context: &Context,
     sender_to_mempool: &Sender<ConsensusEvent>,
     receiver_for_miner: Receiver<MiningEvent>,
@@ -237,12 +237,12 @@ async fn run_mining_event_processor<TK: KeepTime + Clone + Send + Sync + 'static
     thread_sleep_time_in_ms: u64,
     channel_size: usize,
     sender_to_stat: Sender<String>,
-    time_keeper_origin: &TK,
+    time_keeper_origin: &Timer,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mining_event_processor = MiningThread {
         wallet_lock: context.wallet_lock.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
-        time_keeper: Box::new(time_keeper_origin.clone()),
+        timer: time_keeper_origin.clone(),
         miner_active: false,
         target: [0; 32],
         difficulty: 0,
@@ -271,7 +271,7 @@ async fn run_mining_event_processor<TK: KeepTime + Clone + Send + Sync + 'static
     (interface_sender_to_miner, miner_handle)
 }
 
-async fn run_consensus_event_processor<TK: KeepTime + Clone + Send + Sync + 'static>(
+async fn run_consensus_event_processor(
     context: &Context,
     peer_lock: Arc<RwLock<PeerCollection>>,
     receiver_for_blockchain: Receiver<ConsensusEvent>,
@@ -282,7 +282,7 @@ async fn run_consensus_event_processor<TK: KeepTime + Clone + Send + Sync + 'sta
     thread_sleep_time_in_ms: u64,
     channel_size: usize,
     sender_to_stat: Sender<String>,
-    time_keeper_origin: &TK,
+    time_keeper_origin: &Timer,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let consensus_event_processor = ConsensusThread {
         mempool_lock: context.mempool_lock.clone(),
@@ -292,7 +292,7 @@ async fn run_consensus_event_processor<TK: KeepTime + Clone + Send + Sync + 'sta
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
-        time_keeper: Box::new(time_keeper_origin.clone()),
+        timer: time_keeper_origin.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_network_controller.clone(),
@@ -301,7 +301,7 @@ async fn run_consensus_event_processor<TK: KeepTime + Clone + Send + Sync + 'sta
             peer_lock.clone(),
             context.wallet_lock.clone(),
             context.config_lock.clone(),
-            Box::new(time_keeper_origin.clone()),
+            time_keeper_origin.clone(),
         ),
         block_producing_timer: 0,
         storage: Storage::new(Box::new(RustIOHandler::new(
@@ -330,7 +330,7 @@ async fn run_consensus_event_processor<TK: KeepTime + Clone + Send + Sync + 'sta
     (interface_sender_to_blockchain, blockchain_handle)
 }
 
-async fn run_routing_event_processor<TK: KeepTime + Clone + Send + Sync + 'static>(
+async fn run_routing_event_processor(
     sender_to_io_controller: Sender<IoEvent>,
     configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     context: &Context,
@@ -344,14 +344,14 @@ async fn run_routing_event_processor<TK: KeepTime + Clone + Send + Sync + 'stati
     channel_size: usize,
     sender_to_stat: Sender<String>,
     fetch_batch_size: usize,
-    time_keeper_origin: &TK,
+    time_keeper_origin: &Timer,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
         blockchain_lock: context.blockchain_lock.clone(),
         mempool_lock: context.mempool_lock.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
-        time_keeper: Box::new(time_keeper_origin.clone()),
+        timer: time_keeper_origin.clone(),
         static_peers: vec![],
         config_lock: configs_lock.clone(),
         wallet_lock: context.wallet_lock.clone(),
@@ -363,7 +363,7 @@ async fn run_routing_event_processor<TK: KeepTime + Clone + Send + Sync + 'stati
             peers_lock.clone(),
             context.wallet_lock.clone(),
             configs_lock.clone(),
-            Box::new(time_keeper_origin.clone()),
+            time_keeper_origin.clone(),
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
@@ -407,7 +407,7 @@ async fn run_routing_event_processor<TK: KeepTime + Clone + Send + Sync + 'stati
     (interface_sender_to_routing, routing_handle)
 }
 
-async fn run_verification_threads<TK: KeepTime + Clone + Send + Sync + 'static>(
+async fn run_verification_threads(
     sender_to_consensus: Sender<ConsensusEvent>,
     blockchain_lock: Arc<RwLock<Blockchain>>,
     peer_lock: Arc<RwLock<PeerCollection>>,
@@ -416,7 +416,7 @@ async fn run_verification_threads<TK: KeepTime + Clone + Send + Sync + 'static>(
     thread_sleep_time_in_ms: u64,
     verification_thread_count: u16,
     sender_to_stat: Sender<String>,
-    time_keeper_origin: &TK,
+    time_keeper_origin: &Timer,
 ) -> (Vec<Sender<VerifyRequest>>, Vec<JoinHandle<()>>) {
     let mut senders = vec![];
     let mut thread_handles = vec![];
@@ -468,13 +468,13 @@ async fn run_verification_threads<TK: KeepTime + Clone + Send + Sync + 'static>(
 }
 
 // TODO : to be moved to routing event processor
-fn run_loop_thread<TK: KeepTime + Clone + Send + Sync + 'static>(
+fn run_loop_thread(
     mut receiver: Receiver<IoEvent>,
     network_event_sender_to_routing_ep: Sender<NetworkEvent>,
     stat_timer_in_ms: u64,
     _thread_sleep_time_in_ms: u64,
     sender_to_stat: Sender<String>,
-    time_keeper_origin: &TK,
+    time_keeper_origin: &Timer,
 ) -> JoinHandle<()> {
     let time_keeper = time_keeper_origin.clone();
     tokio::task::Builder::new()
@@ -577,9 +577,9 @@ fn setup_hook() {
     }));
 }
 
-async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
+async fn run_node(
     configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
-    time_keeper: &TK,
+    hasten_multiplier: u64,
 ) {
     info!("Running saito with config {:?}", configs_lock.read().await);
 
@@ -624,6 +624,12 @@ async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
         )
         .await;
     }
+
+    let time_keeper = Timer {
+        time_reader: Arc::new(TimeKeeper {}),
+        hasten_multiplier,
+        start_time: TimeKeeper {}.get_timestamp_in_ms(),
+    };
     let context = Context::new(configs_lock.clone(), wallet_lock);
 
     let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
@@ -647,7 +653,7 @@ async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
         thread_sleep_time_in_ms,
         verification_thread_count,
         sender_to_stat.clone(),
-        time_keeper,
+        &time_keeper,
     )
     .await;
 
@@ -665,7 +671,7 @@ async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
         channel_size,
         sender_to_stat.clone(),
         fetch_batch_size,
-        time_keeper,
+        &time_keeper,
     )
     .await;
 
@@ -680,7 +686,7 @@ async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
         thread_sleep_time_in_ms,
         channel_size,
         sender_to_stat.clone(),
-        time_keeper,
+        &time_keeper,
     )
     .await;
 
@@ -692,7 +698,7 @@ async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
         thread_sleep_time_in_ms,
         channel_size,
         sender_to_stat.clone(),
-        time_keeper,
+        &time_keeper,
     )
     .await;
     let stat_handle = run_thread(
@@ -702,7 +708,7 @@ async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
         stat_timer_in_ms,
         "saito-stats",
         thread_sleep_time_in_ms,
-        time_keeper,
+        &time_keeper,
     )
     .await;
     let loop_handle: JoinHandle<()> = run_loop_thread(
@@ -711,7 +717,7 @@ async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
         sender_to_stat.clone(),
-        time_keeper,
+        &time_keeper,
     );
 
     let (server_handle, controller_handle) = run_network_controller(
@@ -722,7 +728,7 @@ async fn run_node<TK: KeepTime + Clone + Send + Sync + 'static>(
         sender_to_stat.clone(),
         peers_lock.clone(),
         sender_to_network_controller.clone(),
-        time_keeper,
+        &time_keeper,
     )
     .await;
 
@@ -921,7 +927,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let configs: Arc<RwLock<dyn Configuration + Send + Sync>> =
             Arc::new(RwLock::new(configs.unwrap()));
 
-        run_node(configs, &TimeKeeper {}).await;
+        run_node(configs, 1).await;
     } else if program_mode == "utxo-issuance" {
         let threshold_str = matches.value_of("utxo_threshold");
         let mut threshold: Currency = 25_000;
@@ -961,9 +967,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let configs: Arc<RwLock<dyn Configuration + Send + Sync>> =
             Arc::new(RwLock::new(configs.unwrap()));
 
-        let time_keeper = HastenedTimeKeeper::new(TimeKeeper {}.get_timestamp_in_ms(), multiplier);
-
-        run_node(configs, &time_keeper).await;
+        run_node(configs, multiplier).await;
     }
 
     Ok(())

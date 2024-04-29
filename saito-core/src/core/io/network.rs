@@ -19,7 +19,7 @@ use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
-use crate::core::process::keep_time::KeepTime;
+use crate::core::process::keep_time::{KeepTime, Timer};
 use crate::core::util::configuration::{Configuration, PeerConfig};
 
 // #[derive(Debug)]
@@ -30,7 +30,7 @@ pub struct Network {
     static_peer_configs: Vec<(PeerConfig, Timestamp)>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
-    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
+    pub timer: Timer,
 }
 
 impl Network {
@@ -39,7 +39,7 @@ impl Network {
         peer_lock: Arc<RwLock<PeerCollection>>,
         wallet_lock: Arc<RwLock<Wallet>>,
         config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
-        time_keeper: Box<dyn KeepTime + Send + Sync>,
+        timer: Timer,
     ) -> Network {
         Network {
             peer_lock,
@@ -47,7 +47,7 @@ impl Network {
             static_peer_configs: Default::default(),
             wallet_lock,
             config_lock,
-            time_keeper,
+            timer,
         }
     }
     pub async fn propagate_block(
@@ -549,7 +549,7 @@ impl Network {
     }
 
     pub async fn connect_to_static_peers(&mut self) {
-        let current_time = self.time_keeper.get_timestamp_in_ms();
+        let current_time = self.timer.get_timestamp_in_ms();
         for (peer, reconnect_after) in &mut self.static_peer_configs {
             trace!("connecting to peer : {:?}", peer);
             if *reconnect_after > current_time {
@@ -564,7 +564,7 @@ impl Network {
     }
 
     pub async fn send_pings(&mut self) {
-        let current_time = self.time_keeper.get_timestamp_in_ms();
+        let current_time = self.timer.get_timestamp_in_ms();
         let mut peers = self.peer_lock.write().await;
         for (_, peer) in peers.index_to_peers.iter_mut() {
             peer.send_ping(current_time, &self.io_interface).await;
@@ -578,6 +578,6 @@ impl Network {
             return;
         }
         let peer = peer.unwrap();
-        peer.last_msg_at = self.time_keeper.get_timestamp_in_ms();
+        peer.last_msg_at = self.timer.get_timestamp_in_ms();
     }
 }

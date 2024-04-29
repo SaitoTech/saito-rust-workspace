@@ -18,7 +18,7 @@ use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
-use crate::core::process::keep_time::KeepTime;
+use crate::core::process::keep_time::{KeepTime, Timer};
 use crate::core::process::process_event::ProcessEvent;
 use crate::core::routing_thread::RoutingEvent;
 use crate::core::util::configuration::Configuration;
@@ -77,7 +77,7 @@ pub struct ConsensusThread {
     pub sender_to_router: Sender<RoutingEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
     pub block_producing_timer: u64,
-    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
+    pub timer: Timer,
     pub network: Network,
     pub storage: Storage,
     pub stats: ConsensusStats,
@@ -132,7 +132,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
         // println!("processing timer event : {:?}", duration.as_micros());
         let mut work_done = false;
-        let timestamp = self.time_keeper.get_timestamp_in_ms();
+        let timestamp = self.timer.get_timestamp_in_ms();
         let duration_value = duration.as_millis() as u64;
 
         if self.generate_genesis_block {
@@ -436,7 +436,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             info!(
                 "loading {:?} blocks from disk. Timestamp : {:?}",
                 list.len(),
-                StatVariable::format_timestamp(self.time_keeper.get_timestamp_in_ms())
+                StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
             );
             while !list.is_empty() {
                 let file_names: Vec<String> =
@@ -459,13 +459,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 info!(
                     "{:?} blocks remaining to be loaded. Timestamp : {:?}",
                     list.len(),
-                    StatVariable::format_timestamp(self.time_keeper.get_timestamp_in_ms())
+                    StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
                 );
             }
             info!(
                 "{:?} total blocks in blockchain. Timestamp : {:?}",
                 blockchain.blocks.len(),
-                StatVariable::format_timestamp(self.time_keeper.get_timestamp_in_ms())
+                StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
             );
         }
 

@@ -14,7 +14,6 @@ use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::defs::{PrintForLog, SaitoPublicKey, PROJECT_PUBLIC_KEY};
 use crate::core::io::interface_io::InterfaceIO;
 
-
 #[derive(Debug)]
 pub struct Storage {
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
