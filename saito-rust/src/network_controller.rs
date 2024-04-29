@@ -36,7 +36,6 @@ use saito_core::core::util::configuration::{Configuration, PeerConfig};
 use crate::io_event::IoEvent;
 use crate::rust_io_handler::BLOCKS_DIR_PATH;
 
-
 // use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
 type SocketSender = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>;
@@ -965,14 +964,10 @@ fn run_websocket_server(
 
 #[cfg(test)]
 mod tests {
-    
+
     use log::info;
-    
-    
-    
-    
-    use tokio_tungstenite::{connect_async};
-    
+
+    use tokio_tungstenite::connect_async;
 
     #[ignore]
     #[tokio::test]
