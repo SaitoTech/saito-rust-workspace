@@ -30,7 +30,8 @@ export async function initialize(
   sharedMethods: SharedMethods,
   factory: Factory,
   privateKey: string,
-  logLevel: LogLevel = LogLevel.Info
+  logLevel: LogLevel = LogLevel.Info,
+  haste_multiplier: bigint
 ) {
   if (Saito.getLibInstance()) {
     console.error("saito already initialized");
@@ -58,7 +59,7 @@ export async function initialize(
   WalletSlip.Type = s.WasmWalletSlip;
   // Config.Type = s.WasmConfiguration;
 
-  return Saito.initialize(configs, sharedMethods, factory, privateKey, logLevel);
+  return Saito.initialize(configs, sharedMethods, factory, privateKey, logLevel, haste_multiplier);
 }
 
 export default Saito;

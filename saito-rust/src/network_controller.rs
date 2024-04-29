@@ -30,7 +30,7 @@ use saito_core::core::defs::{
     STAT_BIN_COUNT,
 };
 use saito_core::core::io::network_event::NetworkEvent;
-use saito_core::core::process::keep_time::KeepTime;
+use saito_core::core::process::keep_time::{KeepTime, Timer};
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
 
 use crate::io_event::IoEvent;
@@ -512,7 +512,7 @@ impl PeerCounter {
 ///
 /// ```
 // TODO : refactor to use ProcessEvent trait
-pub async fn run_network_controller<TK: KeepTime + Clone + Send + Sync + 'static>(
+pub async fn run_network_controller(
     mut receiver: Receiver<IoEvent>,
     sender_to_core: Sender<IoEvent>,
     configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
@@ -520,7 +520,7 @@ pub async fn run_network_controller<TK: KeepTime + Clone + Send + Sync + 'static
     sender_to_stat: Sender<String>,
     peers_lock: Arc<RwLock<PeerCollection>>,
     sender_to_network: Sender<IoEvent>,
-    time_keeper: &TK,
+    timer: &Timer,
 ) -> (JoinHandle<()>, JoinHandle<()>) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -567,7 +567,7 @@ pub async fn run_network_controller<TK: KeepTime + Clone + Send + Sync + 'static
         peers_lock,
     );
 
-    let time_keeper = time_keeper.clone();
+    let time_keeper = timer.clone();
 
     let controller_handle = tokio::task::Builder::new()
         .name("saito-io-controller")
@@ -961,4 +961,54 @@ fn run_websocket_server(
             warp::serve(routes).run(address).await;
         })
         .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::network_controller::{SocketReceiver, SocketSender};
+    use log::info;
+    use saito_core::core::msg::handshake::HandshakeChallenge;
+    use saito_core::core::msg::message::Message;
+    use saito_core::core::util::crypto::generate_random_bytes;
+    use tokio::net::TcpStream;
+    use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+    use tungstenite::connect;
+
+    #[ignore]
+    #[tokio::test]
+    async fn multi_peer_perf_test() {
+        // pretty_env_logger::init();
+        let url = "ws://152.42.181.221:12101/wsopen";
+
+        info!("url = {:?}", url);
+
+        let mut sockets = vec![];
+        let it = 10000;
+        for i in 0..it {
+            let result = connect_async(url).await;
+            if result.is_err() {
+                println!("{:?}", result.err().unwrap());
+                return;
+            }
+            let result = result.unwrap();
+            let mut socket = result.0;
+
+            // let challenge = HandshakeChallenge {
+            //     challenge: generate_random_bytes(32).try_into().unwrap(),
+            // };
+            // // challenge_for_peer = Some(challenge.challenge);
+            // let message = Message::HandshakeChallenge(challenge);
+            //
+            // socket
+            //     .send(tokio_tungstenite::tungstenite::Message::Binary(
+            //         message.serialize(),
+            //     ))
+            //     .unwrap();
+
+            sockets.push(socket);
+
+            // let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
+            info!("connecting ... : {:?}", i);
+        }
+    }
 }

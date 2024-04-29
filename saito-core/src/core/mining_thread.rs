@@ -11,7 +11,7 @@ use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{BlockId, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp};
 use crate::core::io::network_event::NetworkEvent;
-use crate::core::process::keep_time::KeepTime;
+use crate::core::process::keep_time::{KeepTime, Timer};
 use crate::core::process::process_event::ProcessEvent;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, hash};
@@ -29,7 +29,7 @@ pub enum MiningEvent {
 pub struct MiningThread {
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub sender_to_mempool: Sender<ConsensusEvent>,
-    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
+    pub timer: Timer,
     pub miner_active: bool,
     pub target: SaitoHash,
     pub difficulty: u64,
