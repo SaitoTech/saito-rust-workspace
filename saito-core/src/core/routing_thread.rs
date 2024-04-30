@@ -711,5 +711,26 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         for stat in stats {
             self.stat_sender.send(stat).await.unwrap();
         }
+
+        let peers = self.network.peer_lock.read().await;
+        let mut peer_count = 0;
+        let mut peers_in_handshake = 0;
+
+        for (_, peer) in peers.index_to_peers.iter() {
+            peer_count += 1;
+
+            if peer.challenge_for_peer.is_some() {
+                peers_in_handshake += 1;
+            }
+        }
+
+        let stat = format!(
+            "{} - {} - total peers : {:?}. in handshake : {:?}",
+            StatVariable::format_timestamp(current_time),
+            format!("{:width$}", "peers::state", width = 40),
+            peer_count,
+            peers_in_handshake,
+        );
+        self.stat_sender.send(stat).await.unwrap();
     }
 }
