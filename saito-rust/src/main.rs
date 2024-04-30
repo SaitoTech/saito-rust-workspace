@@ -42,6 +42,7 @@ use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
+use saito_core::core::stat_thread::StatThread;
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
@@ -49,7 +50,6 @@ use saito_rust::config_handler::{ConfigHandler, NodeConfigurations};
 use saito_rust::io_event::IoEvent;
 use saito_rust::network_controller::run_network_controller;
 use saito_rust::rust_io_handler::RustIOHandler;
-use saito_rust::stat_thread::StatThread;
 use saito_rust::time_keeper::TimeKeeper;
 
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
@@ -702,7 +702,13 @@ async fn run_node(
     )
     .await;
     let stat_handle = run_thread(
-        Box::new(StatThread::new().await),
+        Box::new(
+            StatThread::new(Box::new(RustIOHandler::new(
+                sender_to_network_controller.clone(),
+                ROUTING_EVENT_PROCESSOR_ID,
+            )))
+            .await,
+        ),
         None,
         Some(receiver_for_stat),
         stat_timer_in_ms,

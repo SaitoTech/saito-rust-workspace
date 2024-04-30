@@ -782,7 +782,7 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
             .routing_thread
             .network
             .io_interface
-            .send_message_to_all(buffer, vec![])
+            .send_message_to_all(buffer.as_slice(), vec![])
             .await
             .unwrap();
     } else {
@@ -792,7 +792,7 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
             .routing_thread
             .network
             .io_interface
-            .send_message(peer_index, buffer)
+            .send_message(peer_index, buffer.as_slice())
             .await
             .unwrap();
     }
@@ -815,7 +815,7 @@ pub async fn send_api_success(buffer: Uint8Array, msg_index: u32, peer_index: Pe
         .routing_thread
         .network
         .io_interface
-        .send_message(peer_index, buffer)
+        .send_message(peer_index, buffer.as_slice())
         .await
         .unwrap();
 }
@@ -837,7 +837,7 @@ pub async fn send_api_error(buffer: Uint8Array, msg_index: u32, peer_index: Peer
         .routing_thread
         .network
         .io_interface
-        .send_message(peer_index, buffer)
+        .send_message(peer_index, buffer.as_slice())
         .await
         .unwrap();
 }
@@ -950,7 +950,7 @@ pub async fn write_issuance_file(threshold: Currency) {
 
     storage
         .io_interface
-        .write_value(issuance_path, buffer)
+        .write_value(issuance_path.as_str(), buffer.as_slice(), false)
         .await
         .expect("issuance file should be written");
 

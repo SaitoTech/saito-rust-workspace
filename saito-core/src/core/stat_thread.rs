@@ -1,28 +1,23 @@
 use std::collections::VecDeque;
-use std::path::Path;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 
-use saito_core::core::defs::Timestamp;
-use saito_core::core::io::network_event::NetworkEvent;
-use saito_core::core::process::process_event::ProcessEvent;
+use crate::core::defs::Timestamp;
+use crate::core::io::interface_io::InterfaceIO;
+use crate::core::io::network_event::NetworkEvent;
+use crate::core::process::process_event::ProcessEvent;
 
 pub struct StatThread {
-    pub file: File,
+    // pub file: File,
     pub stat_queue: VecDeque<String>,
+    pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
 }
 
 impl StatThread {
-    pub async fn new() -> StatThread {
-        let path = Path::new("./data/saito.stats");
-
-        let file = File::create(path).await.unwrap();
-
+    pub async fn new(io_interface: Box<dyn InterfaceIO + Send + Sync>) -> StatThread {
         StatThread {
-            file,
+            io_interface,
             stat_queue: VecDeque::new(),
         }
     }
@@ -39,11 +34,17 @@ impl ProcessEvent<String> for StatThread {
 
         for stat in self.stat_queue.drain(..) {
             let stat = stat + "\r\n";
-            self.file.write_all(stat.as_bytes()).await.unwrap();
+            self.io_interface
+                .write_value("./data/saito.stats", stat.as_bytes(), true)
+                .await
+                .unwrap();
             work_done = true;
         }
         if work_done {
-            self.file.flush().await.expect("stat file flush failed");
+            self.io_interface
+                .flush_data("./data/saito.stats")
+                .await
+                .unwrap();
             return Some(());
         }
         None

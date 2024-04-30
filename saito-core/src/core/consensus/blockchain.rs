@@ -1504,7 +1504,9 @@ impl Blockchain {
             //
             // deletes block from disk
             //
-            storage.delete_block_from_disk(pblock_filename).await;
+            storage
+                .delete_block_from_disk(pblock_filename.as_str())
+                .await;
         }
 
         //

@@ -80,9 +80,12 @@ impl Debug for RustIOHandler {
 
 #[async_trait]
 impl InterfaceIO for RustIOHandler {
-    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
+    async fn send_message(&self, peer_index: u64, buffer: &[u8]) -> Result<(), Error> {
         // TODO : refactor to combine event and the future
-        let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessage { peer_index, buffer });
+        let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessage {
+            peer_index,
+            buffer: buffer.to_vec(),
+        });
 
         self.sender.send(event).await.unwrap();
 
@@ -91,13 +94,13 @@ impl InterfaceIO for RustIOHandler {
 
     async fn send_message_to_all(
         &self,
-        buffer: Vec<u8>,
+        buffer: &[u8],
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
         // debug!("send message to all");
 
         let event = IoEvent::new(NetworkEvent::OutgoingNetworkMessageForAll {
-            buffer,
+            buffer: buffer.to_vec(),
             exceptions: peer_exceptions,
         });
 
@@ -131,7 +134,7 @@ impl InterfaceIO for RustIOHandler {
         &self,
         block_hash: SaitoHash,
         peer_index: u64,
-        url: String,
+        url: &str,
         block_id: BlockId,
     ) -> Result<(), Error> {
         if block_hash == [0; 32] {
@@ -143,7 +146,7 @@ impl InterfaceIO for RustIOHandler {
             block_hash,
             peer_index,
             block_id,
-            url: url.clone(),
+            url: url.to_string(),
         });
 
         self.sender
@@ -154,9 +157,9 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
+    async fn write_value(&self, key: &str, value: &[u8], append: bool) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
-        let filename = key.as_str();
+        let filename = key;
         let path = Path::new(filename);
         if path.parent().is_some() {
             tokio::fs::create_dir_all(path.parent().unwrap())
@@ -176,7 +179,11 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
+    async fn flush_data(&self, key: &str) -> Result<(), Error> {
+        todo!()
+    }
+
+    async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error> {
         let result = File::open(key.clone()).await;
         if result.is_err() {
             let err = result.err().unwrap();
@@ -232,11 +239,11 @@ impl InterfaceIO for RustIOHandler {
         Ok(filenames)
     }
 
-    async fn is_existing_file(&self, key: String) -> bool {
+    async fn is_existing_file(&self, key: &str) -> bool {
         return Path::new(&key).exists();
     }
 
-    async fn remove_value(&self, key: String) -> Result<(), Error> {
+    async fn remove_value(&self, key: &str) -> Result<(), Error> {
         let result = tokio::fs::remove_file(key).await;
         return result;
     }
@@ -245,7 +252,7 @@ impl InterfaceIO for RustIOHandler {
         BLOCKS_DIR_PATH.to_string()
     }
 
-    fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), Error> {
+    fn ensure_block_directory_exists(&self, block_dir_path: &str) -> Result<(), Error> {
         if !Path::new(&block_dir_path).exists() {
             fs::create_dir_all(BLOCKS_DIR_PATH.to_string())?;
         }
@@ -265,14 +272,15 @@ impl InterfaceIO for RustIOHandler {
 
     async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
         let buffer = wallet.serialize_for_disk();
-        self.write_value(WALLET_DIR_PATH.clone(), buffer).await
+        self.write_value(WALLET_DIR_PATH.as_str(), buffer.as_slice(), false)
+            .await
     }
 
     async fn load_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
-        if !self.is_existing_file(WALLET_DIR_PATH.clone()).await {
+        if !self.is_existing_file(WALLET_DIR_PATH.as_str()).await {
             return Ok(());
         }
-        let buffer = self.read_value(WALLET_DIR_PATH.clone()).await?;
+        let buffer = self.read_value(WALLET_DIR_PATH.as_str()).await?;
         wallet.deserialize_from_disk(&buffer);
         Ok(())
     }
@@ -294,10 +302,10 @@ mod tests {
         let io_handler = RustIOHandler::new(sender, 0);
 
         let result = io_handler
-            .write_value("./data/test/KEY".to_string(), [1, 2, 3, 4].to_vec())
+            .write_value("./data/test/KEY", [1, 2, 3, 4].as_slice(), false)
             .await;
         assert!(result.is_ok(), "{:?}", result.err().unwrap().to_string());
-        let result = io_handler.read_value("./data/test/KEY".to_string()).await;
+        let result = io_handler.read_value("./data/test/KEY").await;
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result, [1, 2, 3, 4]);
@@ -309,7 +317,7 @@ mod tests {
         let io_handler = RustIOHandler::new(sender, 0);
         let path = String::from("src/test/data/config_handler_tests.json");
 
-        let result = io_handler.is_existing_file(path).await;
+        let result = io_handler.is_existing_file(path.as_str()).await;
         assert!(result);
     }
 
@@ -319,7 +327,7 @@ mod tests {
         let io_handler = RustIOHandler::new(sender, 0);
         let path = String::from("badfilename.json");
 
-        let result = io_handler.is_existing_file(path).await;
+        let result = io_handler.is_existing_file(path.as_str()).await;
         assert!(!result);
     }
 }

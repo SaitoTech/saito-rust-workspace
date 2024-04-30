@@ -86,7 +86,7 @@ impl Network {
         debug!("sending block : {:?} to peers", block.hash.to_hex());
         let message = Message::BlockHeaderHash(block.hash, block.id);
         self.io_interface
-            .send_message_to_all(message.serialize(), excluded_peers)
+            .send_message_to_all(message.serialize().as_slice(), excluded_peers)
             .await
             .unwrap();
         // trace!("block sent via io interface");
@@ -128,7 +128,7 @@ impl Network {
             );
             let message = Message::Transaction(transaction);
             self.io_interface
-                .send_message(*index, message.serialize())
+                .send_message(*index, message.serialize().as_slice())
                 .await
                 .unwrap();
         }
@@ -180,7 +180,7 @@ impl Network {
             peer_index = peer.index;
         }
         self.io_interface
-            .fetch_block_from_peer(block_hash, peer_index, url, block_id)
+            .fetch_block_from_peer(block_hash, peer_index, url.as_str(), block_id)
             .await
     }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
@@ -371,7 +371,12 @@ impl Network {
     pub async fn send_key_list(&self, key_list: &Vec<SaitoPublicKey>) {
         debug!("sending key list to all the peers");
         self.io_interface
-            .send_message_to_all(Message::KeyListUpdate(key_list.clone()).serialize(), vec![])
+            .send_message_to_all(
+                Message::KeyListUpdate(key_list.clone())
+                    .serialize()
+                    .as_slice(),
+                vec![],
+            )
             .await
             .unwrap();
     }
@@ -431,7 +436,7 @@ impl Network {
             )
             .serialize();
             self.io_interface
-                .send_message(peer_index, buffer)
+                .send_message(peer_index, buffer.as_slice())
                 .await
                 .unwrap();
         } else {
@@ -448,7 +453,7 @@ impl Network {
             debug!("sending blockchain request to peer : {:?}", peer_index);
             let buffer = Message::BlockchainRequest(request).serialize();
             self.io_interface
-                .send_message(peer_index, buffer)
+                .send_message(peer_index, buffer.as_slice())
                 .await
                 .unwrap();
         }
@@ -516,7 +521,7 @@ impl Network {
 
         if self
             .io_interface
-            .fetch_block_from_peer(block_hash, peer_index, url, block_id)
+            .fetch_block_from_peer(block_hash, peer_index, url.as_str(), block_id)
             .await
             .is_err()
         {
