@@ -101,7 +101,6 @@ where
                 work_done = true;
             }
 
-            #[cfg(feature = "with-stats")]
             {
                 let duration = current_instant.duration_since(stat_timer);
                 if duration > Duration::from_millis(stat_timer_in_ms) {

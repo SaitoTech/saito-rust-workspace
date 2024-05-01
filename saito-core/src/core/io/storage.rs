@@ -52,7 +52,7 @@ impl Storage {
 
     pub async fn write(&mut self, data: &[u8], filename: &str) {
         self.io_interface
-            .write_value(filename, data, false)
+            .write_value(filename, data)
             .await
             .expect("writing to storage failed");
     }
@@ -70,13 +70,12 @@ impl Storage {
 
         let result = self
             .io_interface
-            .write_value(filename.as_str(), buffer.as_slice(), false)
+            .write_value(filename.as_str(), buffer.as_slice())
             .await;
         if result.is_err() {
             let err = result.err().unwrap();
             // TODO : panicking currently to make sure we can serve any blocks for which we have propagated the header for
             panic!("failed writing block to disk. {:?}", err);
-            return "".to_string();
         }
         filename
     }

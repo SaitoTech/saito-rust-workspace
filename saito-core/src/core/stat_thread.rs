@@ -8,10 +8,12 @@ use crate::core::io::interface_io::InterfaceIO;
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::process_event::ProcessEvent;
 
+const STAT_FILENAME: &str = "./data/saito.stats";
+
 pub struct StatThread {
-    // pub file: File,
     pub stat_queue: VecDeque<String>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
+    pub enabled: bool,
 }
 
 impl StatThread {
@@ -19,6 +21,7 @@ impl StatThread {
         StatThread {
             io_interface,
             stat_queue: VecDeque::new(),
+            enabled: true,
         }
     }
 }
@@ -31,31 +34,42 @@ impl ProcessEvent<String> for StatThread {
 
     async fn process_timer_event(&mut self, _duration: Duration) -> Option<()> {
         let mut work_done = false;
+        if !self.enabled {
+            return None;
+        }
 
         for stat in self.stat_queue.drain(..) {
             let stat = stat + "\r\n";
             self.io_interface
-                .write_value("./data/saito.stats", stat.as_bytes(), true)
+                .append_value(STAT_FILENAME, stat.as_bytes())
                 .await
                 .unwrap();
             work_done = true;
         }
         if work_done {
-            self.io_interface
-                .flush_data("./data/saito.stats")
-                .await
-                .unwrap();
+            self.io_interface.flush_data(STAT_FILENAME).await.unwrap();
             return Some(());
         }
         None
     }
 
     async fn process_event(&mut self, event: String) -> Option<()> {
+        if !self.enabled {
+            return None;
+        }
         self.stat_queue.push_back(event);
         return Some(());
     }
 
-    async fn on_init(&mut self) {}
+    async fn on_init(&mut self) {
+        if !self.enabled {
+            return;
+        }
+        self.io_interface
+            .write_value(STAT_FILENAME, vec![].as_slice())
+            .await
+            .unwrap();
+    }
 
     async fn on_stat_interval(&mut self, _current_time: Timestamp) {}
 }

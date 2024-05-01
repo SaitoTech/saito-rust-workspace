@@ -40,6 +40,7 @@ use saito_core::core::process::keep_time::Timer;
 use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::process::version::Version;
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
+use saito_core::core::stat_thread::StatThread;
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
 use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
@@ -61,26 +62,25 @@ pub struct SaitoWasm {
     consensus_thread: ConsensusThread,
     mining_thread: MiningThread,
     verification_thread: VerificationThread,
+    stat_thread: StatThread,
     receiver_for_router: Receiver<RoutingEvent>,
     receiver_for_consensus: Receiver<ConsensusEvent>,
     receiver_for_miner: Receiver<MiningEvent>,
     receiver_for_verification: Receiver<VerifyRequest>,
+    receiver_for_stats: Receiver<String>,
     pub(crate) context: Context,
     wallet: WasmWallet,
     blockchain: WasmBlockchain,
 }
 
 lazy_static! {
-    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1)));
+    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true)));
     static ref CONFIGS: Arc<RwLock<dyn Configuration + Send + Sync>> =
         Arc::new(RwLock::new(WasmConfiguration::new()));
     static ref PRIVATE_KEY: Mutex<String> = Mutex::new("".to_string());
 }
 
-// #[wasm_bindgen]
-// impl SaitoWasm {}
-
-pub fn new(haste_multiplier: u64) -> SaitoWasm {
+pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
     info!("creating new saito wasm instance");
 
     let wallet = Arc::new(RwLock::new(Wallet::new([0; 32], [0; 33])));
@@ -100,7 +100,7 @@ pub fn new(haste_multiplier: u64) -> SaitoWasm {
     let (sender_to_consensus, receiver_in_mempool) = tokio::sync::mpsc::channel(channel_size);
     let (sender_to_blockchain, receiver_in_blockchain) = tokio::sync::mpsc::channel(channel_size);
     let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(channel_size);
-    let (sender_to_stat, _receiver_in_stats) = tokio::sync::mpsc::channel(channel_size);
+    let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(channel_size);
     let (sender_to_verification, receiver_in_verification) =
         tokio::sync::mpsc::channel(channel_size);
     let date = js_sys::Date::new_0();
@@ -201,6 +201,11 @@ pub fn new(haste_multiplier: u64) -> SaitoWasm {
             ),
             stat_sender: sender_to_stat.clone(),
         },
+        stat_thread: StatThread {
+            stat_queue: Default::default(),
+            io_interface: Box::new(WasmIoHandler {}),
+            enabled: enable_stats,
+        },
         receiver_for_router: receiver_in_blockchain,
         receiver_for_consensus: receiver_in_mempool,
         receiver_for_miner: receiver_in_miner,
@@ -219,6 +224,7 @@ pub fn new(haste_multiplier: u64) -> SaitoWasm {
             blockchain_lock: context.blockchain_lock.clone(),
         },
         context,
+        receiver_for_stats: receiver_in_stats,
     }
 }
 
@@ -243,6 +249,8 @@ pub async fn initialize(
     trace!("trace test");
     debug!("debug test");
     info!("initializing saito-wasm");
+
+    let mut enable_stats = true;
     {
         info!("setting configs...");
         let mut configs = CONFIGS.write().await;
@@ -255,6 +263,9 @@ pub async fn initialize(
             error!("failed parsing configs. {:?}", config.err().unwrap());
         } else {
             let config = config.unwrap();
+            if config.is_browser() {
+                enable_stats = false;
+            }
             info!("config : {:?}", config);
             configs.replace(&config);
         }
@@ -262,7 +273,7 @@ pub async fn initialize(
 
     let mut saito = SAITO.lock().await;
 
-    saito.replace(new(hasten_multiplier));
+    saito.replace(new(hasten_multiplier, enable_stats));
 
     let private_key: SaitoPrivateKey = string_to_hex(private_key).or(Err(JsValue::from(
         "Failed parsing private key string to key",
@@ -280,6 +291,7 @@ pub async fn initialize(
     saito.as_mut().unwrap().consensus_thread.on_init().await;
     saito.as_mut().unwrap().verification_thread.on_init().await;
     saito.as_mut().unwrap().routing_thread.on_init().await;
+    saito.as_mut().unwrap().stat_thread.on_init().await;
 
     Ok(JsValue::from("initialized"))
 }
@@ -557,7 +569,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         .as_mut()
         .unwrap()
         .verification_thread
-        .process_timer_event(duration.clone())
+        .process_timer_event(duration)
         .await;
 
     while let Ok(event) = saito.as_mut().unwrap().receiver_for_miner.try_recv() {
@@ -579,6 +591,61 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         .unwrap()
         .mining_thread
         .process_timer_event(duration)
+        .await;
+
+    event_counter = 0;
+
+    saito
+        .as_mut()
+        .unwrap()
+        .stat_thread
+        .process_timer_event(duration)
+        .await;
+
+    while let Ok(event) = saito.as_mut().unwrap().receiver_for_stats.try_recv() {
+        let _result = saito
+            .as_mut()
+            .unwrap()
+            .stat_thread
+            .process_event(event)
+            .await;
+        event_counter += 1;
+        if event_counter >= EVENT_LIMIT {
+            break;
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub async fn process_stat_interval(current_time: Timestamp) {
+    let mut saito = SAITO.lock().await;
+
+    saito
+        .as_mut()
+        .unwrap()
+        .routing_thread
+        .on_stat_interval(current_time)
+        .await;
+
+    saito
+        .as_mut()
+        .unwrap()
+        .consensus_thread
+        .on_stat_interval(current_time)
+        .await;
+
+    saito
+        .as_mut()
+        .unwrap()
+        .verification_thread
+        .on_stat_interval(current_time)
+        .await;
+
+    saito
+        .as_mut()
+        .unwrap()
+        .mining_thread
+        .on_stat_interval(current_time)
         .await;
 }
 
@@ -950,7 +1017,7 @@ pub async fn write_issuance_file(threshold: Currency) {
 
     storage
         .io_interface
-        .write_value(issuance_path.as_str(), buffer.as_slice(), false)
+        .write_value(issuance_path.as_str(), buffer.as_slice())
         .await
         .expect("issuance file should be written");
 

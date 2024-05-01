@@ -1,12 +1,13 @@
+use ahash::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::fs;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::path::Path;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use log::{debug, error};
-use tokio::fs::File;
+use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
@@ -20,7 +21,6 @@ use saito_core::core::util::configuration::PeerConfig;
 use crate::io_event::IoEvent;
 
 lazy_static! {
-    // pub static ref SHARED_CONTEXT: Mutex<IoContext> = Mutex::new(IoContext::new());
     pub static ref BLOCKS_DIR_PATH: String = configure_storage();
     pub static ref WALLET_DIR_PATH: String = String::from("./data/wallet");
 }
@@ -32,42 +32,20 @@ pub fn configure_storage() -> String {
     }
 }
 
-// pub enum FutureState {
-//     DataSent(Vec<u8>),
-//     PeerConnectionResult(Result<u64, Error>),
-// }
-
 pub struct RustIOHandler {
     sender: Sender<IoEvent>,
     handler_id: u8,
+    open_files: HashMap<String, File>,
 }
 
 impl RustIOHandler {
     pub fn new(sender: Sender<IoEvent>, handler_id: u8) -> RustIOHandler {
-        RustIOHandler { sender, handler_id }
+        RustIOHandler {
+            sender,
+            handler_id,
+            open_files: Default::default(),
+        }
     }
-
-    // // TODO : delete this if not required
-    // pub fn set_event_response(event_id: u64, response: FutureState) {
-    //     // debug!("setting event response for : {:?}", event_id,);
-    //     if event_id == 0 {
-    //         return;
-    //     }
-    //     let waker;
-    //     {
-    //         let mut context = SHARED_CONTEXT.lock().unwrap();
-    //         context.future_states.insert(event_id, response);
-    //         waker = context.future_wakers.remove(&event_id);
-    //     }
-    //     if waker.is_some() {
-    //         // debug!("waking future on event: {:?}", event_id,);
-    //         let waker = waker.unwrap();
-    //         waker.wake();
-    //         // debug!("waker invoked on event: {:?}", event_id);
-    //     } else {
-    //         warn!("waker not found for event: {:?}", event_id);
-    //     }
-    // }
 }
 
 impl Debug for RustIOHandler {
@@ -157,7 +135,7 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn write_value(&self, key: &str, value: &[u8], append: bool) -> Result<(), Error> {
+    async fn write_value(&self, key: &str, value: &[u8]) -> Result<(), Error> {
         debug!("writing value to disk : {:?}", key);
         let filename = key;
         let path = Path::new(filename);
@@ -171,7 +149,7 @@ impl InterfaceIO for RustIOHandler {
             return Err(result.err().unwrap());
         }
         let mut file = result.unwrap();
-        let result = file.write_all(&value).await;
+        let result = file.write_all(value).await;
         if result.is_err() {
             return Err(result.err().unwrap());
         }
@@ -179,8 +157,43 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn flush_data(&self, key: &str) -> Result<(), Error> {
-        todo!()
+    async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error> {
+        debug!("appending value to disk : {:?}", key);
+
+        if !self.open_files.contains_key(key) {
+            debug!("file is not yet opened. opening file : {:?}", key);
+            let file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(key)
+                .await?;
+            self.open_files.insert(key.to_string(), file);
+        }
+
+        let file = self.open_files.get_mut(key).unwrap();
+
+        let result = file.write_all(value).await;
+        if result.is_err() {
+            return Err(result.err().unwrap());
+        }
+        Ok(())
+    }
+
+    async fn flush_data(&mut self, key: &str) -> Result<(), Error> {
+        debug!("flushing values to disk : {:?}", key);
+
+        if !self.open_files.contains_key(key) {
+            debug!("file : {:?} is not yet opened so cannot be flushed.", key);
+            return Err(Error::from(ErrorKind::Unsupported));
+        }
+
+        let file = self.open_files.get_mut(key).unwrap();
+
+        let result = file.flush().await;
+        if result.is_err() {
+            return Err(result.err().unwrap());
+        }
+        Ok(())
     }
 
     async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error> {
@@ -272,7 +285,7 @@ impl InterfaceIO for RustIOHandler {
 
     async fn save_wallet(&self, wallet: &mut Wallet) -> Result<(), Error> {
         let buffer = wallet.serialize_for_disk();
-        self.write_value(WALLET_DIR_PATH.as_str(), buffer.as_slice(), false)
+        self.write_value(WALLET_DIR_PATH.as_str(), buffer.as_slice())
             .await
     }
 
@@ -302,7 +315,7 @@ mod tests {
         let io_handler = RustIOHandler::new(sender, 0);
 
         let result = io_handler
-            .write_value("./data/test/KEY", [1, 2, 3, 4].as_slice(), false)
+            .write_value("./data/test/KEY", [1, 2, 3, 4].as_slice())
             .await;
         assert!(result.is_ok(), "{:?}", result.err().unwrap().to_string());
         let result = io_handler.read_value("./data/test/KEY").await;

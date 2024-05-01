@@ -102,7 +102,7 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn write_value(&self, key: &str, value: &[u8], append: bool) -> Result<(), Error> {
+    async fn write_value(&self, key: &str, value: &[u8]) -> Result<(), Error> {
         let array = js_sys::Uint8Array::new_with_length(value.len() as u32);
         array.copy_from(value);
 
@@ -112,8 +112,20 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn flush_data(&self, key: &str) -> Result<(), Error> {
-        todo!()
+    async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error> {
+        let array = js_sys::Uint8Array::new_with_length(value.len() as u32);
+        array.copy_from(value);
+
+        MsgHandler::append_value(key.to_string(), &array);
+        drop(array);
+
+        Ok(())
+    }
+
+    async fn flush_data(&mut self, key: &str) -> Result<(), Error> {
+        MsgHandler::flush_data(key.to_string());
+
+        Ok(())
     }
 
     async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error> {
@@ -312,6 +324,12 @@ extern "C" {
     pub fn connect_to_peer(peer_data: JsValue) -> Result<JsValue, js_sys::Error>;
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn write_value(key: String, value: &Uint8Array);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn append_value(key: String, value: &Uint8Array);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn flush_data(key: String);
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn ensure_block_directory_exists(path: String) -> Result<(), js_sys::Error>;

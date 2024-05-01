@@ -688,7 +688,6 @@ pub async fn run_network_controller(
                         }
                     }
                     _ = stat_interval.tick() => {
-                        #[cfg(feature = "with-stats")]
                         {
                             if Instant::now().duration_since(last_stat_on)
                                 > Duration::from_millis(stat_timer_in_ms)

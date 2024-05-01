@@ -62,7 +62,7 @@ pub mod test {
             todo!()
         }
 
-        async fn write_value(&self, key: &str, value: &[u8], append: bool) -> Result<(), Error> {
+        async fn write_value(&self, key: &str, value: &[u8]) -> Result<(), Error> {
             debug!("writing value to disk : {:?}", key);
             let filename = key;
             let path = Path::new(filename);
@@ -82,7 +82,11 @@ pub mod test {
             Ok(())
         }
 
-        async fn flush_data(&self, key: &str) -> Result<(), Error> {
+        async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error> {
+            todo!()
+        }
+
+        async fn flush_data(&mut self, key: &str) -> Result<(), Error> {
             todo!()
         }
 

@@ -97,9 +97,9 @@ pub trait InterfaceIO: Debug {
     /// ```
     ///
     /// ```
-    async fn write_value(&self, key: &str, value: &[u8], append: bool) -> Result<(), Error>;
-
-    async fn flush_data(&self, key: &str) -> Result<(), Error>;
+    async fn write_value(&self, key: &str, value: &[u8]) -> Result<(), Error>;
+    async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error>;
+    async fn flush_data(&mut self, key: &str) -> Result<(), Error>;
 
     /// Reads a value with the given key from a persistent storage
     ///

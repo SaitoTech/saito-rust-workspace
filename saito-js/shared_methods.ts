@@ -11,6 +11,10 @@ export default interface SharedMethods {
 
   writeValue(key: string, value: Uint8Array): void;
 
+  appendValue(key: string, value: Uint8Array): void;
+
+  flushData(key: string): void;
+
   ensureBlockDirExists(path: string): void;
 
   readValue(key: string): Uint8Array;

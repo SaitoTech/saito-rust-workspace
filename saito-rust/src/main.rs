@@ -134,7 +134,6 @@ where
                                .await;
                     }
                     _ = stat_interval.tick()=>{
-                        #[cfg(feature = "with-stats")]
                         {
                             let current_instant = Instant::now();
 
@@ -201,7 +200,6 @@ async fn run_verification_thread(
 
                         }
                         _ = stat_interval.tick()=>{
-                            #[cfg(feature = "with-stats")]
                             {
                                 let current_instant = Instant::now();
                                 let duration = current_instant.duration_since(stat_timer);
@@ -513,7 +511,6 @@ fn run_loop_thread(
                         }
                     }
                     _ = stat_interval.tick()=>{
-                        #[cfg(feature = "with-stats")]
                         {
                             if Instant::now().duration_since(last_stat_on)
                                 > Duration::from_millis(stat_timer_in_ms)

@@ -15,6 +15,14 @@ class MsgHandler {
     return global.shared_methods.write_value(key, value);
   }
 
+  static append_value(key, value) {
+    return global.shared_methods.append_value(key, value);
+  }
+
+  static flush_data(key) {
+    return global.shared_methods.flush_data(key);
+  }
+
   static ensure_block_directory_exists(path) {
     return global.shared_methods.ensure_block_directory_exists(path);
   }
