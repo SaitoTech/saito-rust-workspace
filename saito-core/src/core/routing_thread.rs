@@ -307,7 +307,7 @@ impl RoutingThread {
         let buffer = Message::GhostChain(ghost).serialize();
         self.network
             .io_interface
-            .send_message(peer_index, buffer)
+            .send_message(peer_index, buffer.as_slice())
             .await
             .unwrap();
     }
@@ -368,7 +368,7 @@ impl RoutingThread {
             let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
-                .send_message(peer_index, buffer)
+                .send_message(peer_index, buffer.as_slice())
                 .await
                 .unwrap();
         }

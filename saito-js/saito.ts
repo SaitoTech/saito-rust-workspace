@@ -52,6 +52,12 @@ export default class Saito {
       write_value: (key: string, value: Uint8Array) => {
         return sharedMethods.writeValue(key, value);
       },
+      append_value: (key: string, value: Uint8Array) => {
+        return sharedMethods.appendValue(key, value);
+      },
+      flush_data: (key: string) => {
+        return sharedMethods.flushData(key);
+      },
       ensure_block_directory_exists: (path: string) => {
         return sharedMethods.ensureBlockDirExists(path);
       },
@@ -149,6 +155,7 @@ export default class Saito {
     console.log("starting saito threads");
     let intervalTime = 100;
     Saito.getInstance().call_timed_functions(intervalTime, Date.now() - intervalTime);
+    Saito.getInstance().call_stat_functions(5000, Date.now() - 5000);
   }
 
   public call_timed_functions(interval: number, lastCalledTime: number) {
@@ -158,6 +165,17 @@ export default class Saito {
         .process_timer_event(BigInt(time - lastCalledTime))
         .then(() => {
           this.call_timed_functions(interval, time);
+        });
+    }, interval);
+  }
+
+  public call_stat_functions(interval: number, lastCalledTime: number) {
+    setTimeout(() => {
+      let time = Date.now();
+      Saito.getLibInstance()
+        .process_stat_interval(BigInt(time))
+        .then(() => {
+          this.call_stat_functions(interval, time);
         });
     }, interval);
   }

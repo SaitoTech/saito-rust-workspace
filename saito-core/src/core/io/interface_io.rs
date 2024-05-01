@@ -21,7 +21,7 @@ pub enum InterfaceEvent {
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way
 #[async_trait]
 pub trait InterfaceIO: Debug {
-    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error>;
+    async fn send_message(&self, peer_index: u64, buffer: &[u8]) -> Result<(), Error>;
 
     /// Sends the given message buffer to all the peers except the ones specified
     ///
@@ -40,7 +40,7 @@ pub trait InterfaceIO: Debug {
     /// ```
     async fn send_message_to_all(
         &self,
-        buffer: Vec<u8>,
+        buffer: &[u8],
         excluded_peers: Vec<u64>,
     ) -> Result<(), Error>;
     /// Connects to the peer with given configuration
@@ -79,7 +79,7 @@ pub trait InterfaceIO: Debug {
         &self,
         block_hash: SaitoHash,
         peer_index: u64,
-        url: String,
+        url: &str,
         block_id: BlockId,
     ) -> Result<(), Error>;
 
@@ -97,7 +97,10 @@ pub trait InterfaceIO: Debug {
     /// ```
     ///
     /// ```
-    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error>;
+    async fn write_value(&self, key: &str, value: &[u8]) -> Result<(), Error>;
+    async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error>;
+    async fn flush_data(&mut self, key: &str) -> Result<(), Error>;
+
     /// Reads a value with the given key from a persistent storage
     ///
     /// # Arguments
@@ -111,17 +114,17 @@ pub trait InterfaceIO: Debug {
     /// ```
     ///
     /// ```
-    async fn read_value(&self, key: String) -> Result<Vec<u8>, Error>;
+    async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error>;
 
     /// Loads the block path list from the persistent storage
     async fn load_block_file_list(&self) -> Result<Vec<String>, Error>;
-    async fn is_existing_file(&self, key: String) -> bool;
+    async fn is_existing_file(&self, key: &str) -> bool;
     /// Removes the value with the given key from the persistent storage
-    async fn remove_value(&self, key: String) -> Result<(), Error>;
+    async fn remove_value(&self, key: &str) -> Result<(), Error>;
     /// Retrieve the prefix for all the keys for blocks
     fn get_block_dir(&self) -> String;
 
-    fn ensure_block_directory_exists(&self, block_dir: String) -> Result<(), Error>;
+    fn ensure_block_directory_exists(&self, block_dir: &str) -> Result<(), Error>;
 
     async fn process_api_call(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);
     async fn process_api_success(&self, buffer: Vec<u8>, msg_index: u32, peer_index: PeerIndex);

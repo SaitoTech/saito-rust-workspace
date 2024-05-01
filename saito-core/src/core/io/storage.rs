@@ -40,7 +40,7 @@ impl Storage {
     }
     /// read from a path to a Vec<u8>
     pub async fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
-        let buffer = self.io_interface.read_value(path.to_string()).await;
+        let buffer = self.io_interface.read_value(path).await;
         if buffer.is_err() {
             let err = buffer.err().unwrap();
             error!("reading failed : {:?}", err);
@@ -50,17 +50,15 @@ impl Storage {
         Ok(buffer)
     }
 
-    pub async fn write(&mut self, data: Vec<u8>, filename: &str) {
+    pub async fn write(&mut self, data: &[u8], filename: &str) {
         self.io_interface
-            .write_value(filename.to_string(), data)
+            .write_value(filename, data)
             .await
             .expect("writing to storage failed");
     }
 
     pub async fn file_exists(&self, filename: &str) -> bool {
-        self.io_interface
-            .is_existing_file(filename.to_string())
-            .await
+        self.io_interface.is_existing_file(filename).await
     }
 
     pub fn generate_block_filepath(&self, block: &Block) -> String {
@@ -72,13 +70,12 @@ impl Storage {
 
         let result = self
             .io_interface
-            .write_value(filename.clone(), buffer)
+            .write_value(filename.as_str(), buffer.as_slice())
             .await;
         if result.is_err() {
             let err = result.err().unwrap();
             // TODO : panicking currently to make sure we can serve any blocks for which we have propagated the header for
             panic!("failed writing block to disk. {:?}", err);
-            return "".to_string();
         }
         filename
     }
@@ -88,7 +85,7 @@ impl Storage {
 
         match self
             .io_interface
-            .ensure_block_directory_exists(block_dir_path)
+            .ensure_block_directory_exists(block_dir_path.as_str())
         {
             Ok(()) => debug!("Block directory created"),
             Err(err) => {
@@ -122,7 +119,7 @@ impl Storage {
             let file_name = file_name.clone();
             let result = self
                 .io_interface
-                .read_value(self.io_interface.get_block_dir() + file_name.as_str())
+                .read_value((self.io_interface.get_block_dir() + file_name.as_str()).as_str())
                 .await;
             if result.is_err() {
                 error!(
@@ -156,7 +153,7 @@ impl Storage {
         debug!("blocks loaded to mempool");
     }
 
-    pub async fn load_block_from_disk(&self, file_name: String) -> Result<Block, std::io::Error> {
+    pub async fn load_block_from_disk(&self, file_name: &str) -> Result<Block, std::io::Error> {
         debug!("loading block {:?} from disk", file_name);
         let result = self.io_interface.read_value(file_name).await;
         if result.is_err() {
@@ -170,7 +167,7 @@ impl Storage {
         Block::deserialize_from_net(buffer)
     }
 
-    pub async fn delete_block_from_disk(&self, filename: String) -> bool {
+    pub async fn delete_block_from_disk(&self, filename: &str) -> bool {
         self.io_interface.remove_value(filename).await.is_ok()
     }
 
@@ -183,11 +180,7 @@ impl Storage {
         let mut tokens_issued = 0;
         //
         if self.file_exists(issuance_file).await {
-            if let Ok(lines) = self
-                .io_interface
-                .read_value(issuance_file.to_string())
-                .await
-            {
+            if let Ok(lines) = self.io_interface.read_value(issuance_file).await {
                 let mut contents = String::from_utf8(lines).unwrap();
                 contents = contents.trim_end_matches('\r').to_string();
                 let lines: Vec<&str> = contents.split("\n").collect();
@@ -378,7 +371,7 @@ mod test {
 
         let filename = t.storage.write_block_to_disk(&mut block).await;
         trace!("block written to file : {}", filename);
-        let retrieved_block = t.storage.load_block_from_disk(filename).await;
+        let retrieved_block = t.storage.load_block_from_disk(filename.as_str()).await;
         let mut actual_retrieved_block = retrieved_block.unwrap();
         actual_retrieved_block.generate();
 
@@ -399,7 +392,7 @@ mod test {
         );
         let filename = std::env::current_dir().unwrap().to_str().unwrap().to_string() +
             "/data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai";
-        let retrieved_block = t.storage.load_block_from_disk(filename).await;
+        let retrieved_block = t.storage.load_block_from_disk(filename.as_str()).await;
         let mut block = retrieved_block.unwrap();
         block.generate();
 

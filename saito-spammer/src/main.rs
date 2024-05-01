@@ -33,12 +33,12 @@ use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
+use saito_core::core::stat_thread::StatThread;
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_rust::io_event::IoEvent;
 use saito_rust::network_controller::run_network_controller;
 use saito_rust::rust_io_handler::RustIOHandler;
-use saito_rust::stat_thread::StatThread;
 use saito_rust::time_keeper::TimeKeeper;
 use saito_spammer::config_handler::{ConfigHandler, SpammerConfigs};
 use saito_spammer::spammer::run_spammer;
@@ -101,7 +101,6 @@ where
                 work_done = true;
             }
 
-            #[cfg(feature = "with-stats")]
             {
                 let duration = current_instant.duration_since(stat_timer);
                 if duration > Duration::from_millis(stat_timer_in_ms) {
@@ -575,7 +574,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let stat_thread = Box::new(StatThread::new().await);
+    let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
+    let stat_thread = Box::new(StatThread::new(Box::new(RustIOHandler::new(sender, 1))).await);
     let stat_handle = run_thread(
         stat_thread,
         None,

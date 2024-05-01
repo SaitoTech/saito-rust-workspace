@@ -39,8 +39,7 @@ criterion = "0.5.1"
 panic = "unwind"
 
 [features]
-default = ["with-stats", "saito-core/with-rayon"]
-with-stats = ["saito-core/with-stats"]
+default = ["saito-core/with-rayon"]
 
 [profile.release]
 debug = true

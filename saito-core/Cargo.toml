@@ -39,7 +39,6 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [features]
 default = []
-with-stats = []
 with-rayon = []
 
 [[bench]]

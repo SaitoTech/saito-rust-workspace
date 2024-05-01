@@ -142,8 +142,15 @@ export default class WebSharedMethods extends CustomSharedMethods {
     }
   }
 
-  sendInterfaceEvent(event: String, peerIndex: bigint) {
+  appendValue(key: string, value: Uint8Array): void {
     throw new Error("Method not implemented.");
   }
 
+  flushData(key: string): void {
+    throw new Error("Method not implemented.");
+  }
+
+  sendInterfaceEvent(event: String, peerIndex: bigint) {
+    throw new Error("Method not implemented.");
+  }
 }
