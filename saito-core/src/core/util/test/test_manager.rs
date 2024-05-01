@@ -55,7 +55,7 @@ pub mod test {
     use crate::core::io::network::Network;
     use crate::core::io::storage::Storage;
     use crate::core::mining_thread::MiningEvent;
-    use crate::core::process::keep_time::KeepTime;
+    use crate::core::process::keep_time::{KeepTime, Timer};
     use crate::core::util::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
     use crate::core::util::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
@@ -115,7 +115,11 @@ pub mod test {
                     peers.clone(),
                     wallet_lock.clone(),
                     configs.clone(),
-                    Box::new(TestTimeKeeper {}),
+                    Timer {
+                        time_reader: Arc::new(TestTimeKeeper {}),
+                        hasten_multiplier: 1,
+                        start_time: 0,
+                    },
                 ),
                 peer_lock: peers.clone(),
                 storage: Storage::new(Box::new(TestIOHandler::new())),

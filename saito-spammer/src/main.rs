@@ -28,17 +28,17 @@ use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
-use saito_core::core::process::keep_time::KeepTime;
+use saito_core::core::process::keep_time::{KeepTime, Timer};
 use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::routing_thread::{
     PeerState, RoutingEvent, RoutingStats, RoutingThread, StaticPeer,
 };
+use saito_core::core::stat_thread::StatThread;
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use saito_rust::io_event::IoEvent;
 use saito_rust::network_controller::run_network_controller;
 use saito_rust::rust_io_handler::RustIOHandler;
-use saito_rust::stat_thread::StatThread;
 use saito_rust::time_keeper::TimeKeeper;
 use saito_spammer::config_handler::{ConfigHandler, SpammerConfigs};
 use saito_spammer::spammer::run_spammer;
@@ -101,7 +101,6 @@ where
                 work_done = true;
             }
 
-            #[cfg(feature = "with-stats")]
             {
                 let duration = current_instant.duration_since(stat_timer);
                 if duration > Duration::from_millis(stat_timer_in_ms) {
@@ -131,11 +130,12 @@ async fn run_mining_event_processor(
     thread_sleep_time_in_ms: u64,
     sender_to_stat: Sender<String>,
     config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    timer: &Timer,
 ) -> JoinHandle<()> {
     let mining_event_processor = MiningThread {
         wallet_lock: context.wallet_lock.clone(),
         sender_to_mempool: sender_to_mempool.clone(),
-        time_keeper: Box::new(TimeKeeper {}),
+        timer: timer.clone(),
         miner_active: false,
         target: [0; 32],
         difficulty: 0,
@@ -168,6 +168,7 @@ async fn run_consensus_event_processor(
     stat_timer_in_ms: u64,
     thread_sleep_time_in_ms: u64,
     sender_to_stat: Sender<String>,
+    timer: &Timer,
 ) -> JoinHandle<()> {
     let result = std::env::var("GEN_TX");
     let mut create_test_tx = false;
@@ -189,7 +190,7 @@ async fn run_consensus_event_processor(
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
-        time_keeper: Box::new(TimeKeeper {}),
+        timer: timer.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_network_controller.clone(),
@@ -198,7 +199,7 @@ async fn run_consensus_event_processor(
             peer_lock.clone(),
             context.wallet_lock.clone(),
             context.config_lock.clone(),
-            Box::new(TimeKeeper {}),
+            timer.clone(),
         ),
         block_producing_timer: 0,
         storage: Storage::new(Box::new(RustIOHandler::new(
@@ -296,13 +297,14 @@ async fn run_routing_event_processor(
     channel_size: usize,
     sender_to_stat: Sender<String>,
     fetch_batch_size: usize,
+    timer: &Timer,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
     let mut routing_event_processor = RoutingThread {
         blockchain_lock: context.blockchain_lock.clone(),
         mempool_lock: context.mempool_lock.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
-        time_keeper: Box::new(TimeKeeper {}),
+        timer: timer.clone(),
         static_peers: vec![],
         config_lock: configs_lock.clone(),
         wallet_lock: context.wallet_lock.clone(),
@@ -314,7 +316,7 @@ async fn run_routing_event_processor(
             peers_lock.clone(),
             context.wallet_lock.clone(),
             context.config_lock.clone(),
-            Box::new(TimeKeeper {}),
+            timer.clone(),
         ),
         reconnection_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
@@ -477,6 +479,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
     }
 
+    let timer = Timer {
+        time_reader: Arc::new(TimeKeeper {}),
+        hasten_multiplier: 1,
+        start_time: TimeKeeper {}.get_timestamp_in_ms(),
+    };
+
     let configs_clone: Arc<RwLock<dyn Configuration + Send + Sync>> =
         Arc::new(RwLock::new(config.clone()));
 
@@ -536,6 +544,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         channel_size,
         sender_to_stat.clone(),
         fetch_batch_size,
+        &timer,
     )
     .await;
 
@@ -549,6 +558,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_timer_in_ms,
         thread_sleep_time_in_ms,
         sender_to_stat.clone(),
+        &timer,
     )
     .await;
 
@@ -560,10 +570,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         thread_sleep_time_in_ms,
         sender_to_stat.clone(),
         configs_lock.clone(),
+        &timer,
     )
     .await;
 
-    let stat_thread = Box::new(StatThread::new().await);
+    let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
+    let stat_thread = Box::new(StatThread::new(Box::new(RustIOHandler::new(sender, 1))).await);
     let stat_handle = run_thread(
         stat_thread,
         None,
@@ -587,6 +599,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         sender_to_stat.clone(),
         peers_lock.clone(),
         sender_to_network_controller.clone(),
+        &timer,
     )
     .await;
 

@@ -19,11 +19,11 @@ pub struct WasmIoHandler {}
 
 #[async_trait]
 impl InterfaceIO for WasmIoHandler {
-    async fn send_message(&self, peer_index: u64, buffer: Vec<u8>) -> Result<(), Error> {
+    async fn send_message(&self, peer_index: u64, buffer: &[u8]) -> Result<(), Error> {
         trace!("WasmIoHandler::send_message : {:?}", peer_index);
 
         let array = js_sys::Uint8Array::new_with_length(buffer.len() as u32);
-        array.copy_from(buffer.as_slice());
+        array.copy_from(buffer);
 
         // let async_fn =
         MsgHandler::send_message(js_sys::BigInt::from(peer_index), &array);
@@ -36,11 +36,11 @@ impl InterfaceIO for WasmIoHandler {
 
     async fn send_message_to_all(
         &self,
-        buffer: Vec<u8>,
+        buffer: &[u8],
         peer_exceptions: Vec<u64>,
     ) -> Result<(), Error> {
         let array = js_sys::Uint8Array::new_with_length(buffer.len() as u32);
-        array.copy_from(buffer.as_slice());
+        array.copy_from(buffer);
 
         let arr2 = js_sys::Array::new_with_length(peer_exceptions.len() as u32);
 
@@ -79,7 +79,7 @@ impl InterfaceIO for WasmIoHandler {
         &self,
         block_hash: SaitoHash,
         peer_index: u64,
-        url: String,
+        url: &str,
         block_id: BlockId,
     ) -> Result<(), Error> {
         let hash = js_sys::Uint8Array::new_with_length(32);
@@ -87,7 +87,7 @@ impl InterfaceIO for WasmIoHandler {
         let result = MsgHandler::fetch_block_from_peer(
             &hash,
             BigInt::from(peer_index),
-            url,
+            url.to_string(),
             BigInt::from(block_id),
         );
         if result.is_err() {
@@ -102,18 +102,34 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
+    async fn write_value(&self, key: &str, value: &[u8]) -> Result<(), Error> {
         let array = js_sys::Uint8Array::new_with_length(value.len() as u32);
-        array.copy_from(value.as_slice());
+        array.copy_from(value);
 
-        MsgHandler::write_value(key, &array);
+        MsgHandler::write_value(key.to_string(), &array);
         drop(array);
 
         Ok(())
     }
 
-    async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
-        let result = MsgHandler::read_value(key.clone());
+    async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error> {
+        let array = js_sys::Uint8Array::new_with_length(value.len() as u32);
+        array.copy_from(value);
+
+        MsgHandler::append_value(key.to_string(), &array);
+        drop(array);
+
+        Ok(())
+    }
+
+    async fn flush_data(&mut self, key: &str) -> Result<(), Error> {
+        MsgHandler::flush_data(key.to_string());
+
+        Ok(())
+    }
+
+    async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error> {
+        let result = MsgHandler::read_value(key.to_string());
         if result.is_err() {
             error!("couldn't read value for key: {:?}", key);
             return Err(Error::from(ErrorKind::Other));
@@ -148,8 +164,8 @@ impl InterfaceIO for WasmIoHandler {
         Ok(v)
     }
 
-    async fn is_existing_file(&self, key: String) -> bool {
-        let result = MsgHandler::is_existing_file(key);
+    async fn is_existing_file(&self, key: &str) -> bool {
+        let result = MsgHandler::is_existing_file(key.to_string());
         if result.is_err() {
             return false;
         }
@@ -158,8 +174,8 @@ impl InterfaceIO for WasmIoHandler {
         result.into()
     }
 
-    async fn remove_value(&self, key: String) -> Result<(), Error> {
-        let _ = MsgHandler::remove_value(key);
+    async fn remove_value(&self, key: &str) -> Result<(), Error> {
+        let _ = MsgHandler::remove_value(key.to_string());
 
         Ok(())
     }
@@ -168,8 +184,8 @@ impl InterfaceIO for WasmIoHandler {
         "data/blocks/".to_string()
     }
 
-    fn ensure_block_directory_exists(&self, block_dir_path: String) -> Result<(), std::io::Error> {
-        let result = MsgHandler::ensure_block_directory_exists(block_dir_path);
+    fn ensure_block_directory_exists(&self, block_dir_path: &str) -> Result<(), std::io::Error> {
+        let result = MsgHandler::ensure_block_directory_exists(block_dir_path.to_string());
         if result.is_err() {
             error!("{:?}", result.err().unwrap());
             return Err(Error::from(ErrorKind::Other));
@@ -308,6 +324,12 @@ extern "C" {
     pub fn connect_to_peer(peer_data: JsValue) -> Result<JsValue, js_sys::Error>;
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn write_value(key: String, value: &Uint8Array);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn append_value(key: String, value: &Uint8Array);
+
+    #[wasm_bindgen(static_method_of = MsgHandler)]
+    pub fn flush_data(key: String);
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
     pub fn ensure_block_directory_exists(path: String) -> Result<(), js_sys::Error>;

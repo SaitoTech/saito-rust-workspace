@@ -7,7 +7,6 @@ import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
-
 export enum LogLevel {
   Error = 0,
   Warn,
@@ -33,7 +32,8 @@ export default class Saito {
     sharedMethods: SharedMethods,
     factory = new Factory(),
     privateKey: string,
-    logLevel: LogLevel
+    logLevel: LogLevel,
+    haste_multiplier: bigint
   ) {
     console.log("initializing saito lib");
     Saito.instance = new Saito(factory);
@@ -51,6 +51,12 @@ export default class Saito {
       },
       write_value: (key: string, value: Uint8Array) => {
         return sharedMethods.writeValue(key, value);
+      },
+      append_value: (key: string, value: Uint8Array) => {
+        return sharedMethods.appendValue(key, value);
+      },
+      flush_data: (key: string) => {
+        return sharedMethods.flushData(key);
       },
       ensure_block_directory_exists: (path: string) => {
         return sharedMethods.ensureBlockDirExists(path);
@@ -70,20 +76,32 @@ export default class Saito {
       disconnect_from_peer: (peer_index: bigint) => {
         return sharedMethods.disconnectFromPeer(peer_index);
       },
-      fetch_block_from_peer: (hash: Uint8Array, peer_index: bigint, url: string, block_id: bigint) => {
-        sharedMethods.fetchBlockFromPeer(url)
+      fetch_block_from_peer: (
+        hash: Uint8Array,
+        peer_index: bigint,
+        url: string,
+        block_id: bigint
+      ) => {
+        sharedMethods
+          .fetchBlockFromPeer(url)
           .then((buffer: Uint8Array) => {
             return Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
           })
           .catch((error: any) => {
-            console.log("failed fetching block for url : " + url + " from peer : " + peer_index + ", block id = " + block_id);
+            console.log(
+              "failed fetching block for url : " +
+                url +
+                " from peer : " +
+                peer_index +
+                ", block id = " +
+                block_id
+            );
             console.error(error);
             return Saito.getLibInstance().process_failed_block_fetch(hash, block_id, peer_index);
           });
       },
       process_api_call: (buffer: Uint8Array, msgIndex: number, peerIndex: bigint) => {
-        return sharedMethods.processApiCall(buffer, msgIndex, peerIndex).then(() => {
-        });
+        return sharedMethods.processApiCall(buffer, msgIndex, peerIndex).then(() => {});
       },
       process_api_success: (buffer: Uint8Array, msgIndex: number, peerIndex: bigint) => {
         return sharedMethods.processApiSuccess(buffer, msgIndex, peerIndex);
@@ -117,14 +135,14 @@ export default class Saito {
       },
       send_new_version_alert: (major: number, minor: number, patch: number, peerIndex: bigint) => {
         return sharedMethods.sendNewVersionAlert(major, minor, patch, peerIndex);
-      }
+      },
     };
     if (privateKey === "") {
       privateKey = DefaultEmptyPrivateKey;
     }
 
     let configStr = JSON.stringify(configs);
-    await Saito.getLibInstance().initialize(configStr, privateKey, logLevel);
+    await Saito.getLibInstance().initialize(configStr, privateKey, logLevel, haste_multiplier);
 
     let blockchain = await Saito.getInstance().getBlockchain();
     console.log("last callback block id set as : " + configs.blockchain.last_block_id);
@@ -137,6 +155,7 @@ export default class Saito {
     console.log("starting saito threads");
     let intervalTime = 100;
     Saito.getInstance().call_timed_functions(intervalTime, Date.now() - intervalTime);
+    Saito.getInstance().call_stat_functions(5000, Date.now() - 5000);
   }
 
   public call_timed_functions(interval: number, lastCalledTime: number) {
@@ -146,6 +165,17 @@ export default class Saito {
         .process_timer_event(BigInt(time - lastCalledTime))
         .then(() => {
           this.call_timed_functions(interval, time);
+        });
+    }, interval);
+  }
+
+  public call_stat_functions(interval: number, lastCalledTime: number) {
+    setTimeout(() => {
+      let time = Date.now();
+      Saito.getLibInstance()
+        .process_stat_interval(BigInt(time))
+        .then(() => {
+          this.call_stat_functions(interval, time);
         });
     }, interval);
   }
@@ -209,7 +239,6 @@ export default class Saito {
     }
   }
 
-
   public async processNewPeer(index: bigint, peer_config: any): Promise<void> {
     return Saito.getLibInstance().process_new_peer(index, peer_config);
   }
@@ -263,8 +292,16 @@ export default class Saito {
     return tx;
   }
 
-  public async createTransactionWithMultiplePayments<T extends Transaction>(keys: string[], amounts: bigint[], fee: bigint): Promise<T> {
-    let wasmTx = await Saito.getLibInstance().create_transaction_with_multiple_payments(keys, amounts, fee);
+  public async createTransactionWithMultiplePayments<T extends Transaction>(
+    keys: string[],
+    amounts: bigint[],
+    fee: bigint
+  ): Promise<T> {
+    let wasmTx = await Saito.getLibInstance().create_transaction_with_multiple_payments(
+      keys,
+      amounts,
+      fee
+    );
 
     let tx = Saito.getInstance().factory.createTransaction(wasmTx) as T;
     tx.timestamp = new Date().getTime();
@@ -310,7 +347,7 @@ export default class Saito {
       return new Promise((resolve, reject) => {
         this.promises.set(callbackIndex, {
           resolve,
-          reject
+          reject,
         });
         Saito.getLibInstance().send_api_call(buffer, callbackIndex, peerIndex);
       });
@@ -370,7 +407,7 @@ export default class Saito {
     let tx = await this.createTransaction(publicKey, BigInt(0), BigInt(0));
     tx.msg = {
       request: message,
-      data: data
+      data: data,
     };
     tx.packData();
     return this.sendTransactionWithCallback(

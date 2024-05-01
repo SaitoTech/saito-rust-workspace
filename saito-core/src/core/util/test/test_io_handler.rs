@@ -26,7 +26,7 @@ pub mod test {
 
     #[async_trait]
     impl InterfaceIO for TestIOHandler {
-        async fn send_message(&self, _peer_index: u64, _buffer: Vec<u8>) -> Result<(), Error> {
+        async fn send_message(&self, _peer_index: u64, _buffer: &[u8]) -> Result<(), Error> {
             // TODO : implement a way to check sent messages
 
             Ok(())
@@ -34,7 +34,7 @@ pub mod test {
 
         async fn send_message_to_all(
             &self,
-            _buffer: Vec<u8>,
+            _buffer: &[u8],
             _peer_exceptions: Vec<u64>,
         ) -> Result<(), Error> {
             // debug!("send message to all");
@@ -56,15 +56,15 @@ pub mod test {
             &self,
             _block_hash: SaitoHash,
             _peer_index: u64,
-            _url: String,
+            _url: &str,
             _block_id: BlockId,
         ) -> Result<(), Error> {
             todo!()
         }
 
-        async fn write_value(&self, key: String, value: Vec<u8>) -> Result<(), Error> {
+        async fn write_value(&self, key: &str, value: &[u8]) -> Result<(), Error> {
             debug!("writing value to disk : {:?}", key);
-            let filename = key.as_str();
+            let filename = key;
             let path = Path::new(filename);
             if path.parent().is_some() {
                 let _ = tokio::fs::create_dir_all(path.parent().unwrap()).await;
@@ -82,7 +82,15 @@ pub mod test {
             Ok(())
         }
 
-        async fn read_value(&self, key: String) -> Result<Vec<u8>, Error> {
+        async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error> {
+            todo!()
+        }
+
+        async fn flush_data(&mut self, key: &str) -> Result<(), Error> {
+            todo!()
+        }
+
+        async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error> {
             let result = File::open(key.clone()).await;
             if result.is_err() {
                 error!(
@@ -133,7 +141,7 @@ pub mod test {
 
             Ok(filenames)
         }
-        async fn is_existing_file(&self, key: String) -> bool {
+        async fn is_existing_file(&self, key: &str) -> bool {
             let result = tokio::fs::File::open(key).await;
             if result.is_ok() {
                 return true;
@@ -141,7 +149,7 @@ pub mod test {
             return false;
         }
 
-        async fn remove_value(&self, key: String) -> Result<(), Error> {
+        async fn remove_value(&self, key: &str) -> Result<(), Error> {
             let result = tokio::fs::remove_file(key).await;
             return result;
         }
@@ -150,7 +158,7 @@ pub mod test {
             "./data/blocks/".to_string()
         }
 
-        fn ensure_block_directory_exists(&self, block_dir_path: String) -> std::io::Result<()> {
+        fn ensure_block_directory_exists(&self, block_dir_path: &str) -> std::io::Result<()> {
             if !Path::new(&block_dir_path).exists() {
                 fs::create_dir_all(block_dir_path.to_string())?;
             }

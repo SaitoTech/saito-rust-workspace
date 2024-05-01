@@ -52,7 +52,7 @@ impl Peer {
         self.challenge_for_peer = Some(challenge.challenge);
         let message = Message::HandshakeChallenge(challenge);
         io_handler
-            .send_message(self.index, message.serialize())
+            .send_message(self.index, message.serialize().as_slice())
             .await
             .unwrap();
         debug!("handshake challenge sent for peer: {:?}", self.index);
@@ -93,7 +93,10 @@ impl Peer {
 
         self.challenge_for_peer = Some(response.challenge);
         io_handler
-            .send_message(self.index, Message::HandshakeResponse(response).serialize())
+            .send_message(
+                self.index,
+                Message::HandshakeResponse(response).serialize().as_slice(),
+            )
             .await
             .unwrap();
         debug!("handshake response sent for peer: {:?}", self.index);
@@ -177,7 +180,10 @@ impl Peer {
                 version: wallet.version.clone(),
             };
             io_handler
-                .send_message(self.index, Message::HandshakeResponse(response).serialize())
+                .send_message(
+                    self.index,
+                    Message::HandshakeResponse(response).serialize().as_slice(),
+                )
                 .await
                 .unwrap();
             debug!("handshake response sent for peer: {:?}", self.index);
@@ -230,7 +236,7 @@ impl Peer {
             self.last_msg_at = current_time;
             // trace!("sending ping to peer : {:?}", self.index);
             io_handler
-                .send_message(self.index, Message::Ping().serialize())
+                .send_message(self.index, Message::Ping().serialize().as_slice())
                 .await
                 .unwrap();
         }

@@ -146,7 +146,12 @@ impl WasmWallet {
         let key_list: Vec<SaitoPublicKey> = string_array_to_base58_keys(key_list);
 
         let mut saito = SAITO.lock().await;
-        saito.routing_thread.set_my_key_list(key_list).await;
+        saito
+            .as_mut()
+            .unwrap()
+            .routing_thread
+            .set_my_key_list(key_list)
+            .await;
     }
 }
 
@@ -161,7 +166,7 @@ impl WasmWallet {
 
 impl WasmWalletSlip {
     pub fn new(slip: WalletSlip) -> WasmWalletSlip {
-        WasmWalletSlip { slip: slip }
+        WasmWalletSlip { slip }
     }
 }
 

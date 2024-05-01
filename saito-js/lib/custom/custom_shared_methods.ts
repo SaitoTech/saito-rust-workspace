@@ -3,6 +3,14 @@ import Saito from "../../saito";
 import PeerServiceList from "../peer_service_list";
 
 export default class CustomSharedMethods implements SharedMethods {
+  flushData(key: string): void {
+    throw new Error("Method not implemented.");
+  }
+
+  appendValue(key: string, value: Uint8Array): void {
+    throw new Error("Method not implemented.");
+  }
+
   sendWalletUpdate(): void {
     throw new Error("Method not implemented.");
   }
@@ -61,10 +69,10 @@ export default class CustomSharedMethods implements SharedMethods {
     }
   }
 
-
   ensureBlockDirExists(path: string): void {
-    throw new Error("Method not implemented")
+    throw new Error("Method not implemented");
   }
+
   readValue(key: string): Uint8Array {
     throw new Error("Method not implemented.");
   }
@@ -108,5 +116,4 @@ export default class CustomSharedMethods implements SharedMethods {
   sendNewVersionAlert(major: number, minor: number, patch: number, peerIndex: bigint): void {
     throw new Error("Method not implemented");
   }
-
 }

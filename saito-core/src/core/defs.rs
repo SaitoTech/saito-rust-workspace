@@ -144,14 +144,12 @@ impl StatVariable {
         }
     }
     pub fn increment(&mut self) {
-        #[cfg(feature = "with-stats")]
         {
             self.total += 1;
             self.count_since_last_stat += 1;
         }
     }
     pub fn increment_by(&mut self, amount: u64) {
-        #[cfg(feature = "with-stats")]
         {
             self.total += amount;
             self.count_since_last_stat += amount;
@@ -181,7 +179,6 @@ impl StatVariable {
         if self.avg < self.min_avg {
             self.min_avg = self.avg;
         }
-        #[cfg(feature = "with-stats")]
         self.sender
             .send(self.print(current_time_in_ms))
             .await

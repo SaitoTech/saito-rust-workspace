@@ -22,7 +22,7 @@ use crate::core::mining_thread::MiningEvent;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::msg::message::Message;
-use crate::core::process::keep_time::KeepTime;
+use crate::core::process::keep_time::Timer;
 use crate::core::process::process_event::ProcessEvent;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
@@ -85,7 +85,7 @@ pub struct RoutingThread {
     // TODO : remove this if not needed
     pub static_peers: Vec<StaticPeer>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
-    pub time_keeper: Box<dyn KeepTime + Send + Sync>,
+    pub timer: Timer,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub network: Network,
     pub reconnection_timer: Timestamp,
@@ -307,7 +307,7 @@ impl RoutingThread {
         let buffer = Message::GhostChain(ghost).serialize();
         self.network
             .io_interface
-            .send_message(peer_index, buffer)
+            .send_message(peer_index, buffer.as_slice())
             .await
             .unwrap();
     }
@@ -368,7 +368,7 @@ impl RoutingThread {
             let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
             self.network
                 .io_interface
-                .send_message(peer_index, buffer)
+                .send_message(peer_index, buffer.as_slice())
                 .await
                 .unwrap();
         }
@@ -711,5 +711,26 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         for stat in stats {
             self.stat_sender.send(stat).await.unwrap();
         }
+
+        let peers = self.network.peer_lock.read().await;
+        let mut peer_count = 0;
+        let mut peers_in_handshake = 0;
+
+        for (_, peer) in peers.index_to_peers.iter() {
+            peer_count += 1;
+
+            if peer.challenge_for_peer.is_some() {
+                peers_in_handshake += 1;
+            }
+        }
+
+        let stat = format!(
+            "{} - {} - total peers : {:?}. in handshake : {:?}",
+            StatVariable::format_timestamp(current_time),
+            format!("{:width$}", "peers::state", width = 40),
+            peer_count,
+            peers_in_handshake,
+        );
+        self.stat_sender.send(stat).await.unwrap();
     }
 }

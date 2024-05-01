@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use reqwest::Client;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -30,12 +30,11 @@ use saito_core::core::defs::{
     STAT_BIN_COUNT,
 };
 use saito_core::core::io::network_event::NetworkEvent;
-use saito_core::core::process::keep_time::KeepTime;
+use saito_core::core::process::keep_time::{KeepTime, Timer};
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
 
 use crate::io_event::IoEvent;
 use crate::rust_io_handler::BLOCKS_DIR_PATH;
-use crate::time_keeper::TimeKeeper;
 
 // use crate::{IoEvent, NetworkEvent, TimeKeeper};
 
@@ -520,6 +519,7 @@ pub async fn run_network_controller(
     sender_to_stat: Sender<String>,
     peers_lock: Arc<RwLock<PeerCollection>>,
     sender_to_network: Sender<IoEvent>,
+    timer: &Timer,
 ) -> (JoinHandle<()>, JoinHandle<()>) {
     info!("running network handler");
     let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
@@ -565,6 +565,8 @@ pub async fn run_network_controller(
         public_key,
         peers_lock,
     );
+
+    let time_keeper = timer.clone();
 
     let controller_handle = tokio::task::Builder::new()
         .name("saito-io-controller")
@@ -686,20 +688,19 @@ pub async fn run_network_controller(
                         }
                     }
                     _ = stat_interval.tick() => {
-                        #[cfg(feature = "with-stats")]
                         {
                             if Instant::now().duration_since(last_stat_on)
                                 > Duration::from_millis(stat_timer_in_ms)
                             {
                                 last_stat_on = Instant::now();
                                 outgoing_messages
-                                    .calculate_stats(TimeKeeper {}.get_timestamp_in_ms())
+                                    .calculate_stats(time_keeper.get_timestamp_in_ms())
                                     .await;
                                 let network_controller = network_controller_lock.read().await;
 
                                 let stat = format!(
                                     "{} - {} - capacity : {:?} / {:?}",
-                                    StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                                    StatVariable::format_timestamp(time_keeper.get_timestamp_in_ms()),
                                     format!("{:width$}", "network::queue_to_core", width = 40),
                                     network_controller.sender_to_saito_controller.capacity(),
                                     network_controller.sender_to_saito_controller.max_capacity()
@@ -708,7 +709,7 @@ pub async fn run_network_controller(
 
                                 let stat = format!(
                                     "{} - {} - capacity : {:?} / {:?}",
-                                    StatVariable::format_timestamp(TimeKeeper {}.get_timestamp_in_ms()),
+                                    StatVariable::format_timestamp(time_keeper.get_timestamp_in_ms()),
                                     format!("{:width$}", "network::queue_outgoing", width = 40),
                                     sender_to_network.capacity(),
                                     sender_to_network.max_capacity()
@@ -827,7 +828,7 @@ fn run_websocket_server(
                     }
                     drop(file);
 
-                    let buffer_len = buffer.len();
+                    let _buffer_len = buffer.len();
                     let result = Ok(warp::reply::with_status(buffer, StatusCode::OK));
                     // debug!("served block with : {:?} length", buffer_len);
                     result
@@ -958,4 +959,50 @@ fn run_websocket_server(
             warp::serve(routes).run(address).await;
         })
         .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+
+    use log::info;
+
+    use tokio_tungstenite::connect_async;
+
+    #[ignore]
+    #[tokio::test]
+    async fn multi_peer_perf_test() {
+        // pretty_env_logger::init();
+        let url = "ws://152.42.181.221:12101/wsopen";
+
+        info!("url = {:?}", url);
+
+        let mut sockets = vec![];
+        let it = 10000;
+        for i in 0..it {
+            let result = connect_async(url).await;
+            if result.is_err() {
+                println!("{:?}", result.err().unwrap());
+                return;
+            }
+            let result = result.unwrap();
+            let socket = result.0;
+
+            // let challenge = HandshakeChallenge {
+            //     challenge: generate_random_bytes(32).try_into().unwrap(),
+            // };
+            // // challenge_for_peer = Some(challenge.challenge);
+            // let message = Message::HandshakeChallenge(challenge);
+            //
+            // socket
+            //     .send(tokio_tungstenite::tungstenite::Message::Binary(
+            //         message.serialize(),
+            //     ))
+            //     .unwrap();
+
+            sockets.push(socket);
+
+            // let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
+            info!("connecting ... : {:?}", i);
+        }
+    }
 }

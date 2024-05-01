@@ -1025,7 +1025,7 @@ impl Block {
             // load that block
             if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
                 let result = storage
-                    .load_block_from_disk(storage.generate_block_filepath(pruned_block))
+                    .load_block_from_disk(storage.generate_block_filepath(pruned_block).as_str())
                     .await;
                 if result.is_err() {
                     error!(
@@ -1530,7 +1530,7 @@ impl Block {
                 return false;
             }
             let new_block = storage
-                .load_block_from_disk(storage.generate_block_filepath(&self))
+                .load_block_from_disk(storage.generate_block_filepath(&self).as_str())
                 .await;
             if new_block.is_err() {
                 error!(
