@@ -173,6 +173,13 @@ impl Mempool {
                 None => 0,
                 Some(block) => block.timestamp,
             };
+
+            assert!(
+                current_timestamp > previous_block_timestamp,
+                "current timestamp = {:?} should be larger than previous block timestamp : {:?}",
+                current_timestamp,
+                previous_block_timestamp
+            );
             block_timestamp_gap =
                 Duration::from_millis(current_timestamp - previous_block_timestamp).as_secs();
             public_key = wallet.public_key;
