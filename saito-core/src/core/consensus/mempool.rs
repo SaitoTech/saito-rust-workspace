@@ -15,7 +15,7 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
+    Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, StatVariable, Timestamp,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -177,8 +177,8 @@ impl Mempool {
             assert!(
                 current_timestamp > previous_block_timestamp,
                 "current timestamp = {:?} should be larger than previous block timestamp : {:?}",
-                current_timestamp,
-                previous_block_timestamp
+                StatVariable::format_timestamp(current_timestamp),
+                StatVariable::format_timestamp(previous_block_timestamp)
             );
             block_timestamp_gap =
                 Duration::from_millis(current_timestamp - previous_block_timestamp).as_secs();
