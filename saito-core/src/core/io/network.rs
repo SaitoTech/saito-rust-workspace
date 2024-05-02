@@ -369,7 +369,7 @@ impl Network {
     }
 
     pub async fn send_key_list(&self, key_list: &Vec<SaitoPublicKey>) {
-        debug!("sending key list to all the peers");
+        debug!("sending key list to all the peers {:?}", key_list);
         self.io_interface
             .send_message_to_all(
                 Message::KeyListUpdate(key_list.clone())
