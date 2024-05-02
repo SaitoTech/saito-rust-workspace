@@ -203,7 +203,6 @@ impl RoutingThread {
                     .await;
             }
             Message::KeyListUpdate(key_list) => {
-                debug!("here are the keylists received {:?}", key_list);
                 self.network
                     .handle_received_key_list(peer_index, key_list)
                     .await;
