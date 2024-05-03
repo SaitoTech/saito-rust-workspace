@@ -471,6 +471,14 @@ impl Network {
             let peers = self.peer_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
+                let result = peer
+                    .compare_versions(block_hash, self.wallet_lock.clone())
+                    .await;
+
+                if result.is_none() {
+                    return None;
+                }
+
                 if peer.block_fetch_url.is_empty() {
                     debug!(
                         "won't fetch block : {:?} from peer : {:?} since no url found",
