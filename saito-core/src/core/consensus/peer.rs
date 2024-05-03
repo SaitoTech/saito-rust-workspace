@@ -254,6 +254,28 @@ impl Peer {
         }
         self.static_peer_config.as_ref().unwrap().is_main
     }
+
+    pub async fn compare_versions(
+        &self,
+        peer: Peer,
+        block_hash: SaitoHash,
+        wallet_lock: Arc<RwLock<Wallet>>,
+    ) -> Option<()> {
+        let wallet = wallet_lock.read().await;
+        if wallet.version > peer.version {
+            warn!(
+                "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
+                block_hash, peer.index, wallet.version, peer.version
+            );
+            return None;
+        } else {
+            warn!(
+                "Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
+                block_hash, peer.index, wallet.version, peer.version
+            );
+        }
+        Some(())
+    }
 }
 
 #[cfg(test)]
