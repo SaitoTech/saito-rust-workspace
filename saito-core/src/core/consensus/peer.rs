@@ -267,11 +267,6 @@ impl Peer {
                 block_hash, self.index, wallet.version, self.version
             );
             return None;
-        } else {
-            warn!(
-                "Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
-                block_hash, self.index, wallet.version, self.version
-            );
         }
         Some(())
     }
