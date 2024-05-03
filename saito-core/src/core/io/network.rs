@@ -497,16 +497,12 @@ impl Network {
             let peers = self.peer_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
-                let my_peer = peers.find_peer_by_address(&wallet.public_key).unwrap();
-                let result = my_peer
-                    .compare_versions(peer.clone(), block_hash, self.wallet_lock.clone())
+                let result = peer
+                    .compare_versions(block_hash, self.wallet_lock.clone())
                     .await;
 
                 if result.is_none() {
-                    warn!("Not fetching shit");
                     return None;
-                } else {
-                    warn!("will fetch",);
                 }
 
                 if peer.block_fetch_url.is_empty() {
