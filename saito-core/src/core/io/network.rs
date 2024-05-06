@@ -508,7 +508,8 @@ impl Network {
         }
 
         debug!(
-            "fetching block for incoming hash : {:?}",
+            "fetching block for incoming hash : {:?}-{:?}",
+            block_id,
             block_hash.to_hex()
         );
 

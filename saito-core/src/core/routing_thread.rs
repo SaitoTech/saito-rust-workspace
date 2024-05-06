@@ -303,7 +303,7 @@ impl RoutingThread {
         }
 
         debug!("sending ghost chain to peer : {:?}", peer_index);
-        debug!("ghost : {:?}", ghost);
+        // debug!("ghost : {:?}", ghost);
         let buffer = Message::GhostChain(ghost).serialize();
         self.network
             .io_interface
@@ -432,7 +432,6 @@ impl RoutingThread {
         work_done
     }
     async fn send_to_verification_thread(&mut self, request: VerifyRequest) {
-        // trace!("sending verification request to thread");
         // waiting till we get an acceptable sender
         let sender_count = self.senders_to_verification.len();
         let mut trials = 0;
@@ -447,10 +446,7 @@ impl RoutingThread {
 
             if sender.capacity() > 0 {
                 sender.send(request).await.unwrap();
-                // trace!(
-                //     "verification request sent to verification thread : {:?}",
-                //     sender_index
-                // );
+
                 return;
             }
             if trials == sender_count {
@@ -461,7 +457,6 @@ impl RoutingThread {
     }
     async fn process_ghost_chain(&mut self, chain: GhostChainSync, peer_index: u64) {
         debug!("processing ghost chain from peer : {:?}", peer_index);
-        debug!("ghost : {:?}", chain);
 
         let mut previous_block_hash = chain.start;
         let mut blockchain = self.blockchain_lock.write().await;
@@ -474,8 +469,9 @@ impl RoutingThread {
             let block_hash = hash(&buf);
             if chain.txs[i] {
                 debug!(
-                    "ghost block : {:?} has txs for me. fetching",
-                    block_hash.to_hex()
+                    "ghost block : {:?} has txs for me. fetching from peer : {:?}",
+                    block_hash.to_hex(),
+                    peer_index
                 );
                 self.blockchain_sync_state
                     .add_entry(
@@ -519,7 +515,6 @@ impl RoutingThread {
 #[async_trait]
 impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
-        // trace!("processing new interface event");
         match event {
             NetworkEvent::OutgoingNetworkMessage {
                 peer_index: _,
@@ -529,11 +524,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 unreachable!()
             }
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                // trace!(
-                //     "incoming message received from peer : {:?} buffer_len : {:?}",
-                //     peer_index,
-                //     buffer.len()
-                // );
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {

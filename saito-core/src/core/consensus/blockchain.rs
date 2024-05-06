@@ -149,7 +149,6 @@ impl Blockchain {
         let block_hash = block.hash;
         let block_id = block.id;
         let latest_block_hash = self.blockring.get_latest_block_hash();
-        // let previous_block_hash = block.previous_block_hash;
 
         // sanity checks
         if self.blocks.contains_key(&block_hash) {
@@ -1636,6 +1635,7 @@ impl Blockchain {
         gt: bool,
         hash: SaitoHash,
     ) {
+        debug!("adding ghost block : {:?}-{:?}", id, hash.to_hex());
         let mut block = Block::new();
         block.id = id;
         block.previous_block_hash = previous_block_hash;
