@@ -264,7 +264,7 @@ impl Peer {
         if wallet.version > self.version {
             warn!(
                 "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
-                block_hash, self.index, wallet.version, self.version
+                block_hash.to_hex(), self.index, wallet.version, self.version
             );
             return None;
         }
