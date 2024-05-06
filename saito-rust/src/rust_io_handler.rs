@@ -119,7 +119,7 @@ impl InterfaceIO for RustIOHandler {
             return Ok(());
         }
 
-        debug!("fetching block from peer : {:?}", url);
+        debug!("fetching block : {:?} from peer : {:?}", block_id, url);
         let event = IoEvent::new(NetworkEvent::BlockFetchRequest {
             block_hash,
             peer_index,

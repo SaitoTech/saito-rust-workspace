@@ -102,7 +102,7 @@ impl Network {
 
         if transaction
             .from
-            .get(0)
+            .first()
             .expect("from slip should exist")
             .public_key
             == public_key
@@ -134,55 +134,55 @@ impl Network {
         }
     }
 
-    pub async fn fetch_missing_block(
-        &self,
-        block_hash: SaitoHash,
-        public_key: &SaitoPublicKey,
-        block_id: BlockId,
-    ) -> Result<(), Error> {
-        debug!(
-            "fetch missing block : block : {:?} from : {:?}",
-            block_hash.to_hex(),
-            public_key.to_base58()
-        );
-
-        let peer_index;
-        let url;
-        let my_public_key;
-        {
-            let configs = self.config_lock.read().await;
-            let peers = self.peer_lock.read().await;
-            {
-                let wallet = self.wallet_lock.read().await;
-                my_public_key = wallet.public_key;
-            }
-
-            let peer = peers.find_peer_by_address(public_key);
-            if peer.is_none() {
-                debug!("peer count = {:?}", peers.address_to_peers.len());
-                error!(
-                    "peer : {:?} not found to fetch missing block : {:?}",
-                    public_key.to_base58(),
-                    block_hash.to_hex()
-                );
-                return Err(Error::from(ErrorKind::NotFound));
-            }
-            let peer = peer.unwrap();
-            if peer.block_fetch_url.is_empty() {
-                warn!(
-                    "won't fetch block : {:?} from peer : {:?} since no url found",
-                    block_hash.to_hex(),
-                    peer.index
-                );
-                return Err(Error::from(ErrorKind::AddrNotAvailable));
-            }
-            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
-            peer_index = peer.index;
-        }
-        self.io_interface
-            .fetch_block_from_peer(block_hash, peer_index, url.as_str(), block_id)
-            .await
-    }
+    // pub async fn fetch_missing_block(
+    //     &self,
+    //     block_hash: SaitoHash,
+    //     public_key: &SaitoPublicKey,
+    //     block_id: BlockId,
+    // ) -> Result<(), Error> {
+    //     debug!(
+    //         "fetch missing block : block : {:?} from : {:?}",
+    //         block_hash.to_hex(),
+    //         public_key.to_base58()
+    //     );
+    //
+    //     let peer_index;
+    //     let url;
+    //     let my_public_key;
+    //     {
+    //         let configs = self.config_lock.read().await;
+    //         let peers = self.peer_lock.read().await;
+    //         {
+    //             let wallet = self.wallet_lock.read().await;
+    //             my_public_key = wallet.public_key;
+    //         }
+    //
+    //         let peer = peers.find_peer_by_address(public_key);
+    //         if peer.is_none() {
+    //             debug!("peer count = {:?}", peers.address_to_peers.len());
+    //             error!(
+    //                 "peer : {:?} not found to fetch missing block : {:?}",
+    //                 public_key.to_base58(),
+    //                 block_hash.to_hex()
+    //             );
+    //             return Err(Error::from(ErrorKind::NotFound));
+    //         }
+    //         let peer = peer.unwrap();
+    //         if peer.block_fetch_url.is_empty() {
+    //             warn!(
+    //                 "won't fetch block : {:?} from peer : {:?} since no url found",
+    //                 block_hash.to_hex(),
+    //                 peer.index
+    //             );
+    //             return Err(Error::from(ErrorKind::AddrNotAvailable));
+    //         }
+    //         url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
+    //         peer_index = peer.index;
+    //     }
+    //     self.io_interface
+    //         .fetch_block_from_peer(block_hash, peer_index, url.as_str(), block_id)
+    //         .await
+    // }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
 
@@ -208,17 +208,10 @@ impl Network {
             if peer.static_peer_config.is_some() {
                 // This means the connection has been initiated from this side, therefore we must
                 // try to re-establish the connection again
-                // TODO : Add a delay so that there won't be a runaway issue with connects and
-                // disconnects, check the best place to add (here or network_controller)
                 info!(
                     "Static peer disconnected, reconnecting .., Peer ID = {}",
                     peer.index
                 );
-
-                // self.io_interface
-                //     .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
-                //     .await
-                //     .unwrap();
 
                 // setting to immediately reconnect. if failed, it will connect after a time
                 self.static_peer_configs

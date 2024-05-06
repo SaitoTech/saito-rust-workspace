@@ -856,8 +856,6 @@ impl Block {
     }
 
     pub fn generate_merkle_root(&self, is_browser: bool, is_spv: bool) -> SaitoHash {
-        debug!("generating the merkle root");
-
         if self.transactions.is_empty() && (is_browser || is_spv) {
             return self.merkle_root;
         }
@@ -1559,8 +1557,9 @@ impl Block {
 
     pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
         debug!(
-            "generating lite block for keys : {:?}",
-            keylist.iter().map(hex::encode).collect::<Vec<String>>()
+            "generating lite block for keys : {:?} for block : {:?}",
+            keylist.iter().map(hex::encode).collect::<Vec<String>>(),
+            self.hash.to_hex()
         );
 
         let mut pruned_txs: Vec<Transaction> = iterate!(&self.transactions, 10)

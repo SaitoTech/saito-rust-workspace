@@ -103,12 +103,11 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
     let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(channel_size);
     let (sender_to_verification, receiver_in_verification) =
         tokio::sync::mpsc::channel(channel_size);
-    let date = js_sys::Date::new_0();
 
     let timer = Timer {
         time_reader: Arc::new(WasmTimeKeeper {}),
         hasten_multiplier: haste_multiplier,
-        start_time: date.get_time() as Timestamp,
+        start_time: js_sys::Date::now() as Timestamp,
     };
 
     SaitoWasm {
