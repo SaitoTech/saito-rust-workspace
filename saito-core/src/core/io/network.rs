@@ -493,7 +493,6 @@ impl Network {
         }
         let url;
         {
-            let wallet = self.wallet_lock.read().await;
             let peers = self.peer_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
