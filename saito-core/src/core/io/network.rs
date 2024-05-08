@@ -63,6 +63,9 @@ impl Network {
 
         let mut excluded_peers = vec![];
         // finding block sender to avoid resending the block to that node
+        if let Some(index) = block.routed_from_peer.as_ref() {
+            excluded_peers.push(*index);
+        }
 
         {
             let peers = self.peer_lock.read().await;
@@ -70,15 +73,6 @@ impl Network {
                 if peer.public_key.is_none() {
                     excluded_peers.push(*index);
                     continue;
-                }
-                if block.source_connection_id.is_some() {
-                    let peer = peers
-                        .address_to_peers
-                        .get(&block.source_connection_id.unwrap());
-                    if peer.is_some() {
-                        excluded_peers.push(*peer.unwrap());
-                        continue;
-                    }
                 }
             }
         }
@@ -89,7 +83,6 @@ impl Network {
             .send_message_to_all(message.serialize().as_slice(), excluded_peers)
             .await
             .unwrap();
-        // trace!("block sent via io interface");
     }
 
     pub async fn propagate_transaction(&self, transaction: &Transaction) {
@@ -361,11 +354,11 @@ impl Network {
         peer.key_list = key_list;
     }
 
-    pub async fn send_key_list(&self, key_list: &Vec<SaitoPublicKey>) {
+    pub async fn send_key_list(&self, key_list: &[SaitoPublicKey]) {
         debug!("sending key list to all the peers");
         self.io_interface
             .send_message_to_all(
-                Message::KeyListUpdate(key_list.clone())
+                Message::KeyListUpdate(key_list.to_vec())
                     .serialize()
                     .as_slice(),
                 vec![],
@@ -381,20 +374,14 @@ impl Network {
     ) {
         info!("requesting blockchain from peer : {:?}", peer_index);
 
-        // TODO : should this be moved inside peer ?
-        let fork_id;
-        {
-            // TODO : will this create a race condition if we release the lock after reading fork id ?
-            let blockchain = blockchain_lock.read().await;
-            fork_id = *blockchain.get_fork_id();
-        }
-
         let configs = self.config_lock.read().await;
+        let blockchain = blockchain_lock.read().await;
+        let fork_id = *blockchain.get_fork_id();
+        let buffer: Vec<u8>;
+
         if configs.is_spv_mode() {
             let request;
             {
-                let blockchain = blockchain_lock.read().await;
-
                 if blockchain.last_block_id > blockchain.get_latest_block_id() {
                     debug!(
                         "blockchain request 1 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
@@ -422,34 +409,30 @@ impl Network {
                 }
             }
             debug!("sending ghost chain request to peer : {:?}", peer_index);
-            let buffer = Message::GhostChainRequest(
+            buffer = Message::GhostChainRequest(
                 request.latest_block_id,
                 request.latest_block_hash,
                 request.fork_id,
             )
             .serialize();
-            self.io_interface
-                .send_message(peer_index, buffer.as_slice())
-                .await
-                .unwrap();
         } else {
-            let request;
-            {
-                let blockchain = blockchain_lock.read().await;
-
-                request = BlockchainRequest {
-                    latest_block_id: blockchain.get_latest_block_id(),
-                    latest_block_hash: blockchain.get_latest_block_hash(),
-                    fork_id,
-                };
-            }
+            let request = BlockchainRequest {
+                latest_block_id: blockchain.get_latest_block_id(),
+                latest_block_hash: blockchain.get_latest_block_hash(),
+                fork_id,
+            };
             debug!("sending blockchain request to peer : {:?}", peer_index);
-            let buffer = Message::BlockchainRequest(request).serialize();
-            self.io_interface
-                .send_message(peer_index, buffer.as_slice())
-                .await
-                .unwrap();
+            buffer = Message::BlockchainRequest(request).serialize();
         }
+        // need to drop the reference here to avoid deadlocks.
+        // We need blockchain lock till here to avoid integrity issues
+        drop(blockchain);
+        drop(configs);
+
+        self.io_interface
+            .send_message(peer_index, buffer.as_slice())
+            .await
+            .unwrap();
     }
     pub async fn process_incoming_block_hash(
         &mut self,

@@ -85,7 +85,7 @@ export default class Saito {
         sharedMethods
           .fetchBlockFromPeer(url)
           .then((buffer: Uint8Array) => {
-            return Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
+            return Saito.getLibInstance().process_fetched_block(buffer, hash, block_id, peer_index);
           })
           .catch((error: any) => {
             console.log(
@@ -254,9 +254,10 @@ export default class Saito {
   public async processFetchedBlock(
     buffer: Uint8Array,
     hash: Uint8Array,
+    block_id: bigint,
     peer_index: bigint
   ): Promise<void> {
-    return Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
+    return Saito.getLibInstance().process_fetched_block(buffer, hash, block_id, peer_index);
   }
 
   public async processTimerEvent(duration_in_ms: bigint): Promise<void> {

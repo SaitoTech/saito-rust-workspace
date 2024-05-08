@@ -327,7 +327,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         return Some(());
                     }
                     debug!(
-                        "adding fetched block : {:?} to mempool",
+                        "adding fetched block : {:?}-{:?} to mempool",
+                        block.id,
                         block.hash.to_hex()
                     );
                     let mut mempool = self.mempool_lock.write().await;

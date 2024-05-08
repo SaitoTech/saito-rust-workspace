@@ -95,7 +95,7 @@ impl Message {
                 Ok(Message::HandshakeResponse(result))
             }
             3 => {
-                let block = Block::deserialize_from_net(buffer)?;
+                let block = Block::deserialize_from_net(&buffer)?;
                 Ok(Message::Block(block))
             }
             4 => {
@@ -199,7 +199,6 @@ impl Message {
 
                     keylist.push(key);
                 }
-                debug!("keylists  {:?}", keylist);
                 Ok(Message::KeyListUpdate(keylist))
             }
             _ => {

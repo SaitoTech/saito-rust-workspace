@@ -569,16 +569,18 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             }
             NetworkEvent::BlockFetched {
                 block_hash,
+                block_id,
                 peer_index,
                 buffer,
             } => {
                 debug!("block received : {:?}", block_hash.to_hex());
 
-                self.send_to_verification_thread(VerifyRequest::Block(buffer, peer_index))
-                    .await;
+                self.send_to_verification_thread(VerifyRequest::Block(
+                    buffer, peer_index, block_hash, block_id,
+                ))
+                .await;
 
-                self.blockchain_sync_state
-                    .mark_as_fetched(peer_index, block_hash);
+                self.blockchain_sync_state.mark_as_fetched(block_hash);
 
                 self.fetch_next_blocks().await;
 

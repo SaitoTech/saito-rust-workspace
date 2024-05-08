@@ -327,6 +327,7 @@ impl NetworkController {
                 event_id,
                 event: NetworkEvent::BlockFetched {
                     block_hash,
+                    block_id,
                     peer_index,
                     buffer,
                 },
@@ -936,7 +937,7 @@ fn run_websocket_server(
                         }
                         drop(file);
 
-                        let block = Block::deserialize_from_net(buffer);
+                        let block = Block::deserialize_from_net(&buffer);
                         if block.is_err() {
                             error!("failed parsing buffer into a block");
                             return Err(warp::reject::not_found());

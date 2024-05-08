@@ -259,28 +259,22 @@ impl BlockchainSyncState {
     /// ```
     ///
     /// ```
-    pub fn mark_as_fetched(&mut self, peer_index: PeerIndex, hash: SaitoHash) {
-        let res = self.blocks_to_fetch.get_mut(&peer_index);
-        if res.is_none() {
-            trace!(
-                "block : {:?} for peer : {:?} not found to mark as fetched",
-                hash.to_hex(),
-                peer_index
-            );
-            return;
-        }
-        let res = res.unwrap();
-        for block_data in res {
-            if hash.eq(&block_data.block_hash) {
-                block_data.status = BlockStatus::Fetched;
-                trace!(
-                    "block : {:?} marked as fetched from peer : {:?}",
-                    block_data.block_hash.to_hex(),
-                    peer_index
-                );
-                break;
+    pub fn mark_as_fetched(&mut self, hash: SaitoHash) {
+        debug!("marking block : {:?} as fetched", hash.to_hex());
+        for (peer_index, deq) in self.blocks_to_fetch.iter_mut() {
+            for block_data in deq {
+                if hash.eq(&block_data.block_hash) {
+                    block_data.status = BlockStatus::Fetched;
+                    trace!(
+                        "block : {:?} marked as fetched from peer : {:?}",
+                        block_data.block_hash.to_hex(),
+                        peer_index
+                    );
+                    break;
+                }
             }
         }
+
         self.remove_fetched_blocks();
     }
 
