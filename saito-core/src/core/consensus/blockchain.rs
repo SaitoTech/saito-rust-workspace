@@ -3069,8 +3069,8 @@ mod tests {
         // pretty_env_logger::init();
         let mut t = TestManager::default();
         let block1;
-        let mut parent_block_hash;
-        let mut parent_block_id;
+        let parent_block_hash;
+        let parent_block_id;
         let mut ts;
 
         // block 1

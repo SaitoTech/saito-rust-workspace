@@ -197,7 +197,7 @@ impl InterfaceIO for RustIOHandler {
     }
 
     async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error> {
-        let result = File::open(key.clone()).await;
+        let result = File::open(key).await;
         if result.is_err() {
             let err = result.err().unwrap();
             error!("couldn't open file for : {:?}. {:?}", key, err);

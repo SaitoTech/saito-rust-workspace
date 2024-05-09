@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::io::{Error, ErrorKind};
 
-use log::{debug, error, warn};
+use log::{error, warn};
 
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::peer_service::PeerService;
