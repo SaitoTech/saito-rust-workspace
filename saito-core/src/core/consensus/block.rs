@@ -659,15 +659,12 @@ impl Block {
         let winner_pubkey: SaitoPublicKey;
 
         // find winning nolan
-        //
         let x = primitive_types::U256::from_big_endian(&random_number);
         // fee calculation should be the same used in block when
         // generating the fee transaction.
-        //
         let y = self.total_fees;
 
         // if there are no fees, payout to burn address
-        //
         if y == 0 {
             winner_pubkey = [0; 33];
             return winner_pubkey;
@@ -684,7 +681,6 @@ impl Block {
         // winning TX contains the winning nolan
         //
         // either a fee-paying transaction or an ATR transaction
-        //
         winning_tx = &self.transactions[0];
         for transaction in &self.transactions {
             if transaction.cumulative_fees > winning_nolan {
@@ -694,7 +690,6 @@ impl Block {
         }
 
         // if winner is atr, we take inside TX
-        //
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.data.to_vec();
             winning_tx_placeholder =
@@ -703,7 +698,6 @@ impl Block {
         }
 
         // hash random number to pick routing node
-        //
         winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
         winner_pubkey
     }
