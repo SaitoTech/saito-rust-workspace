@@ -30,7 +30,7 @@ use saito_core::core::defs::{
     STAT_BIN_COUNT,
 };
 use saito_core::core::io::network_event::NetworkEvent;
-use saito_core::core::process::keep_time::{KeepTime, Timer};
+use saito_core::core::process::keep_time::Timer;
 use saito_core::core::util::configuration::{Configuration, PeerConfig};
 
 use crate::io_event::IoEvent;
@@ -849,7 +849,7 @@ fn run_websocket_server(
                           peer_lock: Arc<RwLock<PeerCollection>>| async move {
                         // debug!("serving lite block : {:?}", block_hash);
 
-                        let mut key1 = String::from("");
+                        let mut key1;
                         if key.is_some() {
                             key1 = key.unwrap();
                         } else {

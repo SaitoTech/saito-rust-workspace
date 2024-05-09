@@ -69,8 +69,6 @@ impl MerkleTree {
             return None;
         }
 
-        debug!("Generating merkle tree");
-
         let mut leaves: LinkedList<Box<MerkleTreeNode>> = LinkedList::new();
 
         // Create leaves for the Merkle tree
