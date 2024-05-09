@@ -18,7 +18,7 @@ use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
-use crate::core::process::keep_time::{KeepTime, Timer};
+use crate::core::process::keep_time::Timer;
 use crate::core::util::configuration::{Configuration, PeerConfig};
 
 // #[derive(Debug)]
