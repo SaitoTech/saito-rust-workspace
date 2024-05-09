@@ -1,4 +1,3 @@
-use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 use log::{debug, error, info, trace, warn};
@@ -63,6 +62,9 @@ impl Network {
 
         let mut excluded_peers = vec![];
         // finding block sender to avoid resending the block to that node
+        if let Some(index) = block.routed_from_peer.as_ref() {
+            excluded_peers.push(*index);
+        }
 
         {
             let peers = self.peer_lock.read().await;
@@ -70,15 +72,6 @@ impl Network {
                 if peer.public_key.is_none() {
                     excluded_peers.push(*index);
                     continue;
-                }
-                if block.source_connection_id.is_some() {
-                    let peer = peers
-                        .address_to_peers
-                        .get(&block.source_connection_id.unwrap());
-                    if peer.is_some() {
-                        excluded_peers.push(*peer.unwrap());
-                        continue;
-                    }
                 }
             }
         }
@@ -89,7 +82,6 @@ impl Network {
             .send_message_to_all(message.serialize().as_slice(), excluded_peers)
             .await
             .unwrap();
-        // trace!("block sent via io interface");
     }
 
     pub async fn propagate_transaction(&self, transaction: &Transaction) {
@@ -102,7 +94,7 @@ impl Network {
 
         if transaction
             .from
-            .get(0)
+            .first()
             .expect("from slip should exist")
             .public_key
             == public_key
@@ -134,55 +126,55 @@ impl Network {
         }
     }
 
-    pub async fn fetch_missing_block(
-        &self,
-        block_hash: SaitoHash,
-        public_key: &SaitoPublicKey,
-        block_id: BlockId,
-    ) -> Result<(), Error> {
-        debug!(
-            "fetch missing block : block : {:?} from : {:?}",
-            block_hash.to_hex(),
-            public_key.to_base58()
-        );
-
-        let peer_index;
-        let url;
-        let my_public_key;
-        {
-            let configs = self.config_lock.read().await;
-            let peers = self.peer_lock.read().await;
-            {
-                let wallet = self.wallet_lock.read().await;
-                my_public_key = wallet.public_key;
-            }
-
-            let peer = peers.find_peer_by_address(public_key);
-            if peer.is_none() {
-                debug!("peer count = {:?}", peers.address_to_peers.len());
-                error!(
-                    "peer : {:?} not found to fetch missing block : {:?}",
-                    public_key.to_base58(),
-                    block_hash.to_hex()
-                );
-                return Err(Error::from(ErrorKind::NotFound));
-            }
-            let peer = peer.unwrap();
-            if peer.block_fetch_url.is_empty() {
-                warn!(
-                    "won't fetch block : {:?} from peer : {:?} since no url found",
-                    block_hash.to_hex(),
-                    peer.index
-                );
-                return Err(Error::from(ErrorKind::AddrNotAvailable));
-            }
-            url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
-            peer_index = peer.index;
-        }
-        self.io_interface
-            .fetch_block_from_peer(block_hash, peer_index, url.as_str(), block_id)
-            .await
-    }
+    // pub async fn fetch_missing_block(
+    //     &self,
+    //     block_hash: SaitoHash,
+    //     public_key: &SaitoPublicKey,
+    //     block_id: BlockId,
+    // ) -> Result<(), Error> {
+    //     debug!(
+    //         "fetch missing block : block : {:?} from : {:?}",
+    //         block_hash.to_hex(),
+    //         public_key.to_base58()
+    //     );
+    //
+    //     let peer_index;
+    //     let url;
+    //     let my_public_key;
+    //     {
+    //         let configs = self.config_lock.read().await;
+    //         let peers = self.peer_lock.read().await;
+    //         {
+    //             let wallet = self.wallet_lock.read().await;
+    //             my_public_key = wallet.public_key;
+    //         }
+    //
+    //         let peer = peers.find_peer_by_address(public_key);
+    //         if peer.is_none() {
+    //             debug!("peer count = {:?}", peers.address_to_peers.len());
+    //             error!(
+    //                 "peer : {:?} not found to fetch missing block : {:?}",
+    //                 public_key.to_base58(),
+    //                 block_hash.to_hex()
+    //             );
+    //             return Err(Error::from(ErrorKind::NotFound));
+    //         }
+    //         let peer = peer.unwrap();
+    //         if peer.block_fetch_url.is_empty() {
+    //             warn!(
+    //                 "won't fetch block : {:?} from peer : {:?} since no url found",
+    //                 block_hash.to_hex(),
+    //                 peer.index
+    //             );
+    //             return Err(Error::from(ErrorKind::AddrNotAvailable));
+    //         }
+    //         url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
+    //         peer_index = peer.index;
+    //     }
+    //     self.io_interface
+    //         .fetch_block_from_peer(block_hash, peer_index, url.as_str(), block_id)
+    //         .await
+    // }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
 
@@ -208,17 +200,10 @@ impl Network {
             if peer.static_peer_config.is_some() {
                 // This means the connection has been initiated from this side, therefore we must
                 // try to re-establish the connection again
-                // TODO : Add a delay so that there won't be a runaway issue with connects and
-                // disconnects, check the best place to add (here or network_controller)
                 info!(
                     "Static peer disconnected, reconnecting .., Peer ID = {}",
                     peer.index
                 );
-
-                // self.io_interface
-                //     .connect_to_peer(peer.static_peer_config.as_ref().unwrap().clone())
-                //     .await
-                //     .unwrap();
 
                 // setting to immediately reconnect. if failed, it will connect after a time
                 self.static_peer_configs
@@ -368,11 +353,11 @@ impl Network {
         peer.key_list = key_list;
     }
 
-    pub async fn send_key_list(&self, key_list: &Vec<SaitoPublicKey>) {
+    pub async fn send_key_list(&self, key_list: &[SaitoPublicKey]) {
         debug!("sending key list to all the peers");
         self.io_interface
             .send_message_to_all(
-                Message::KeyListUpdate(key_list.clone())
+                Message::KeyListUpdate(key_list.to_vec())
                     .serialize()
                     .as_slice(),
                 vec![],
@@ -388,20 +373,14 @@ impl Network {
     ) {
         info!("requesting blockchain from peer : {:?}", peer_index);
 
-        // TODO : should this be moved inside peer ?
-        let fork_id;
-        {
-            // TODO : will this create a race condition if we release the lock after reading fork id ?
-            let blockchain = blockchain_lock.read().await;
-            fork_id = *blockchain.get_fork_id();
-        }
-
         let configs = self.config_lock.read().await;
+        let blockchain = blockchain_lock.read().await;
+        let fork_id = *blockchain.get_fork_id();
+        let buffer: Vec<u8>;
+
         if configs.is_spv_mode() {
             let request;
             {
-                let blockchain = blockchain_lock.read().await;
-
                 if blockchain.last_block_id > blockchain.get_latest_block_id() {
                     debug!(
                         "blockchain request 1 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
@@ -429,34 +408,30 @@ impl Network {
                 }
             }
             debug!("sending ghost chain request to peer : {:?}", peer_index);
-            let buffer = Message::GhostChainRequest(
+            buffer = Message::GhostChainRequest(
                 request.latest_block_id,
                 request.latest_block_hash,
                 request.fork_id,
             )
             .serialize();
-            self.io_interface
-                .send_message(peer_index, buffer.as_slice())
-                .await
-                .unwrap();
         } else {
-            let request;
-            {
-                let blockchain = blockchain_lock.read().await;
-
-                request = BlockchainRequest {
-                    latest_block_id: blockchain.get_latest_block_id(),
-                    latest_block_hash: blockchain.get_latest_block_hash(),
-                    fork_id,
-                };
-            }
+            let request = BlockchainRequest {
+                latest_block_id: blockchain.get_latest_block_id(),
+                latest_block_hash: blockchain.get_latest_block_hash(),
+                fork_id,
+            };
             debug!("sending blockchain request to peer : {:?}", peer_index);
-            let buffer = Message::BlockchainRequest(request).serialize();
-            self.io_interface
-                .send_message(peer_index, buffer.as_slice())
-                .await
-                .unwrap();
+            buffer = Message::BlockchainRequest(request).serialize();
         }
+        // need to drop the reference here to avoid deadlocks.
+        // We need blockchain lock till here to avoid integrity issues
+        drop(blockchain);
+        drop(configs);
+
+        self.io_interface
+            .send_message(peer_index, buffer.as_slice())
+            .await
+            .unwrap();
     }
     pub async fn process_incoming_block_hash(
         &mut self,
@@ -515,7 +490,8 @@ impl Network {
         }
 
         debug!(
-            "fetching block for incoming hash : {:?}",
+            "fetching block for incoming hash : {:?}-{:?}",
+            block_id,
             block_hash.to_hex()
         );
 

@@ -15,7 +15,7 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, Timestamp,
+    Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, StatVariable, Timestamp,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -173,6 +173,13 @@ impl Mempool {
                 None => 0,
                 Some(block) => block.timestamp,
             };
+
+            assert!(
+                current_timestamp > previous_block_timestamp,
+                "current timestamp = {:?} should be larger than previous block timestamp : {:?}",
+                StatVariable::format_timestamp(current_timestamp),
+                StatVariable::format_timestamp(previous_block_timestamp)
+            );
             block_timestamp_gap =
                 Duration::from_millis(current_timestamp - previous_block_timestamp).as_secs();
             public_key = wallet.public_key;
@@ -182,10 +189,11 @@ impl Mempool {
             .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs, &public_key)
             .await?;
         info!(
-            "bundling block with {:?} txs with work : {:?} with a gap of {:?} seconds",
+            "bundling block with {:?} txs with work : {:?} with a gap of {:?} seconds. timestamp : {:?}",
             self.transactions.len(),
             mempool_work,
-            block_timestamp_gap
+            block_timestamp_gap,
+            current_timestamp
         );
         let mut block = Block::create(
             &mut self.transactions,

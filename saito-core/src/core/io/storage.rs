@@ -131,7 +131,7 @@ impl Storage {
             debug!("file : {:?} loaded", file_name);
             let buffer: Vec<u8> = result.unwrap();
             let buffer_len = buffer.len();
-            let result = Block::deserialize_from_net(buffer);
+            let result = Block::deserialize_from_net(&buffer);
             if result.is_err() {
                 // ideally this shouldn't happen since we only write blocks which are valid to disk
                 warn!(
@@ -164,7 +164,7 @@ impl Storage {
             return Err(Error::from(ErrorKind::NotFound));
         }
         let buffer = result.unwrap();
-        Block::deserialize_from_net(buffer)
+        Block::deserialize_from_net(&buffer)
     }
 
     pub async fn delete_block_from_disk(&self, filename: &str) -> bool {

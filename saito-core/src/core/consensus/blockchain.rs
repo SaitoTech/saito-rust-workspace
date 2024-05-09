@@ -149,7 +149,6 @@ impl Blockchain {
         let block_hash = block.hash;
         let block_id = block.id;
         let latest_block_hash = self.blockring.get_latest_block_hash();
-        // let previous_block_hash = block.previous_block_hash;
 
         // sanity checks
         if self.blocks.contains_key(&block_hash) {
@@ -173,7 +172,7 @@ impl Blockchain {
                     "hash is empty for parent of block : {:?}",
                     block.hash.to_hex()
                 );
-            } else if block.source_connection_id.is_some() {
+            } else if block.routed_from_peer.is_some() {
                 let previous_block_hash = block.previous_block_hash;
 
                 let previous_block_fetched;
@@ -190,7 +189,7 @@ impl Blockchain {
                     sender_to_router
                         .unwrap()
                         .send(RoutingEvent::BlockFetchRequest(
-                            0,
+                            block.routed_from_peer.unwrap(),
                             previous_block_hash,
                             block.id - 1,
                         ))
@@ -214,17 +213,22 @@ impl Blockchain {
                     "block : {:?} source connection id not set",
                     block.hash.to_hex()
                 );
+
+                sender_to_router
+                    .unwrap()
+                    .send(RoutingEvent::BlockFetchRequest(
+                        0,
+                        block.previous_block_hash,
+                        block.id - 1,
+                    ))
+                    .await
+                    .unwrap();
             }
-        } else {
-            // debug!(
-            //     "previous block : {:?} exists in blockchain",
-            //     block.previous_block_hash.to_hex()
-            // );
         }
 
         // pre-validation
         //
-        // this would be a great place to put in a prevalidation check
+        // this would be a great place to put in a pre-validation check
         // once we are finished implementing Saito Classic. Goal would
         // be a fast form of lite-validation just to determine that it
         // is worth going through the more general effort of evaluating
@@ -825,10 +829,7 @@ impl Blockchain {
     }
 
     pub fn is_block_indexed(&self, block_hash: SaitoHash) -> bool {
-        if self.blocks.contains_key(&block_hash) {
-            return true;
-        }
-        false
+        self.blocks.contains_key(&block_hash)
     }
 
     pub fn contains_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
@@ -1627,21 +1628,30 @@ impl Blockchain {
 
         blockchain_updated
     }
+
     pub fn add_ghost_block(
         &mut self,
         id: u64,
         previous_block_hash: SaitoHash,
         ts: Timestamp,
-        prehash: SaitoHash,
+        pre_hash: SaitoHash,
         gt: bool,
         hash: SaitoHash,
     ) {
+        debug!(
+            "adding ghost block : {:?}-{:?} prev_block : {:?} ts : {:?}",
+            id,
+            hash.to_hex(),
+            previous_block_hash.to_hex(),
+            ts
+        );
+
         let mut block = Block::new();
         block.id = id;
         block.previous_block_hash = previous_block_hash;
         block.timestamp = ts;
         block.has_golden_ticket = gt;
-        block.pre_hash = prehash;
+        block.pre_hash = pre_hash;
         block.hash = hash;
         block.block_type = BlockType::Ghost;
 
@@ -1652,10 +1662,9 @@ impl Blockchain {
         if !self.blockring.contains_block_hash_at_block_id(id, hash) {
             self.blockring.add_block(&block);
         }
-        if !self.is_block_indexed(hash) {
-            self.blocks.insert(hash, block);
-        }
+        self.blocks.insert(hash, block);
     }
+
     pub async fn reset(&mut self) {
         self.last_burnfee = 0;
         self.last_timestamp = 0;
@@ -1749,7 +1758,7 @@ mod tests {
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{PrintForLog, SaitoPublicKey};
     use crate::core::io::storage::Storage;
-    use crate::core::util::crypto::generate_keys;
+    use crate::core::util::crypto::{generate_keys, hash};
     use crate::core::util::test::test_manager::test::TestManager;
 
     // fn init_testlog() {
@@ -3051,6 +3060,55 @@ mod tests {
         {
             let blockchain = t.blockchain_lock.read().await;
             assert_eq!(blockchain.blocks.len(), 6);
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn ghost_chain_hash_test() {
+        // pretty_env_logger::init();
+        let mut t = TestManager::default();
+        let block1;
+        let parent_block_hash;
+        let parent_block_id;
+        let mut ts;
+
+        // block 1
+        t.initialize(100, 1_000_000_000).await;
+
+        {
+            let blockchain = t.blockchain_lock.write().await;
+
+            block1 = blockchain.get_latest_block().unwrap();
+            parent_block_hash = block1.hash;
+            parent_block_id = block1.id;
+            ts = block1.timestamp;
+        }
+
+        for _i in 0..10 {
+            let mut block2 = t
+                .create_block(
+                    parent_block_hash, // hash of parent block
+                    ts + 120000,       // timestamp
+                    10,                // num transactions
+                    0,                 // amount
+                    0,                 // fee
+                    false,             // mine golden ticket
+                )
+                .await;
+            block2.id = parent_block_id + 1;
+            info!("block generate : {:?}", block2.id);
+            block2.generate(); // generate hashes
+            block2.sign(&t.wallet_lock.read().await.private_key);
+            ts = block2.timestamp;
+
+            let buf = [
+                block2.previous_block_hash.as_slice(),
+                block2.pre_hash.as_slice(),
+            ]
+            .concat();
+            let calculate_hash = hash(&buf);
+            assert_eq!(block2.hash, calculate_hash);
         }
     }
 }

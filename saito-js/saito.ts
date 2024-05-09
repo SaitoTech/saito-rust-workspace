@@ -85,7 +85,7 @@ export default class Saito {
         sharedMethods
           .fetchBlockFromPeer(url)
           .then((buffer: Uint8Array) => {
-            return Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
+            return Saito.getLibInstance().process_fetched_block(buffer, hash, block_id, peer_index);
           })
           .catch((error: any) => {
             console.log(
@@ -155,7 +155,7 @@ export default class Saito {
     console.log("starting saito threads");
     let intervalTime = 100;
     Saito.getInstance().call_timed_functions(intervalTime, Date.now() - intervalTime);
-    Saito.getInstance().call_stat_functions(5000, Date.now() - 5000);
+    Saito.getInstance().call_stat_functions(5000);
   }
 
   public call_timed_functions(interval: number, lastCalledTime: number) {
@@ -169,13 +169,13 @@ export default class Saito {
     }, interval);
   }
 
-  public call_stat_functions(interval: number, lastCalledTime: number) {
+  public call_stat_functions(interval: number) {
     setTimeout(() => {
       let time = Date.now();
       Saito.getLibInstance()
         .process_stat_interval(BigInt(time))
         .then(() => {
-          this.call_stat_functions(interval, time);
+          this.call_stat_functions(interval);
         });
     }, interval);
   }
@@ -254,9 +254,10 @@ export default class Saito {
   public async processFetchedBlock(
     buffer: Uint8Array,
     hash: Uint8Array,
+    block_id: bigint,
     peer_index: bigint
   ): Promise<void> {
-    return Saito.getLibInstance().process_fetched_block(buffer, hash, peer_index);
+    return Saito.getLibInstance().process_fetched_block(buffer, hash, block_id, peer_index);
   }
 
   public async processTimerEvent(duration_in_ms: bigint): Promise<void> {

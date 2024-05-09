@@ -14,7 +14,7 @@ use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::Transaction;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{PrintForLog, StatVariable, Timestamp};
+use crate::core::defs::{BlockHash, BlockId, PeerIndex, PrintForLog, StatVariable, Timestamp};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::process_event::ProcessEvent;
 use crate::drain;
@@ -23,7 +23,7 @@ use crate::drain;
 pub enum VerifyRequest {
     Transaction(Transaction),
     Transactions(VecDeque<Transaction>),
-    Block(Vec<u8>, u64),
+    Block(Vec<u8>, PeerIndex, BlockHash, BlockId),
 }
 
 pub struct VerificationThread {
@@ -90,9 +90,10 @@ impl VerificationThread {
                             transaction.signature.to_hex()
                         );
 
-                        return None;
+                        None
+                    } else {
+                        Some(transaction)
                     }
-                    return Some(transaction);
                 })
                 .collect();
         }
@@ -106,8 +107,14 @@ impl VerificationThread {
         }
         self.invalid_txs.increment_by(invalid_txs as u64);
     }
-    pub async fn verify_block(&mut self, buffer: Vec<u8>, peer_index: u64) {
-        // trace!("verifying block buffer of size : {:?}", buffer.len());
+    pub async fn verify_block(
+        &mut self,
+        buffer: &[u8],
+        peer_index: PeerIndex,
+        block_hash: BlockHash,
+        block_id: BlockId,
+    ) {
+        // debug!("verifying block buffer of size : {:?}", buffer.len());
         let buffer_len = buffer.len();
         let result = Block::deserialize_from_net(buffer);
         if result.is_err() {
@@ -117,15 +124,30 @@ impl VerificationThread {
             );
             return;
         }
-        let peers = self.peer_lock.read().await;
 
         let mut block = result.unwrap();
-        let peer = peers.index_to_peers.get(&peer_index);
-        if peer.is_some() {
-            let peer = peer.unwrap();
-            block.source_connection_id = peer.public_key.clone();
-        }
+        block.routed_from_peer = Some(peer_index);
+
         block.generate();
+
+        if block.id != block_id || block.hash != block_hash {
+            warn!(
+                "block : {:?}-{:?} fetched. but deserialized block's hash is : {:?}-{:?}",
+                block.id,
+                block.hash.to_hex(),
+                block_id,
+                block_hash.to_hex()
+            );
+            return;
+        }
+
+        debug!(
+            "block : {:?}-{:?} deserialized from buffer from peer : {:?}",
+            block.id,
+            block.hash.to_hex(),
+            peer_index
+        );
+
         self.processed_blocks.increment();
         self.processed_msgs.increment();
 
@@ -151,8 +173,9 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
             VerifyRequest::Transaction(transaction) => {
                 self.verify_tx(transaction).await;
             }
-            VerifyRequest::Block(block, peer_index) => {
-                self.verify_block(block, peer_index).await;
+            VerifyRequest::Block(block, peer_index, block_hash, block_id) => {
+                self.verify_block(block.as_slice(), peer_index, block_hash, block_id)
+                    .await;
             }
             VerifyRequest::Transactions(mut txs) => {
                 self.verify_txs(&mut txs).await;
