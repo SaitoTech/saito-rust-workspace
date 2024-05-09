@@ -82,16 +82,16 @@ pub mod test {
             Ok(())
         }
 
-        async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error> {
+        async fn append_value(&mut self, _key: &str, _value: &[u8]) -> Result<(), Error> {
             todo!()
         }
 
-        async fn flush_data(&mut self, key: &str) -> Result<(), Error> {
+        async fn flush_data(&mut self, _key: &str) -> Result<(), Error> {
             todo!()
         }
 
         async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error> {
-            let result = File::open(key.clone()).await;
+            let result = File::open(key).await;
             if result.is_err() {
                 error!(
                     "error : path {:?} \r\n : {:?}",

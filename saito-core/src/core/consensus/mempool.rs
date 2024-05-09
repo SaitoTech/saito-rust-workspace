@@ -189,10 +189,11 @@ impl Mempool {
             .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs, &public_key)
             .await?;
         info!(
-            "bundling block with {:?} txs with work : {:?} with a gap of {:?} seconds",
+            "bundling block with {:?} txs with work : {:?} with a gap of {:?} seconds. timestamp : {:?}",
             self.transactions.len(),
             mempool_work,
-            block_timestamp_gap
+            block_timestamp_gap,
+            current_timestamp
         );
         let mut block = Block::create(
             &mut self.transactions,

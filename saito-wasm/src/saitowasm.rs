@@ -27,8 +27,8 @@ use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, Timestamp,
-    PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
+    BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
+    Timestamp, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -103,12 +103,11 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
     let (sender_to_stat, receiver_in_stats) = tokio::sync::mpsc::channel(channel_size);
     let (sender_to_verification, receiver_in_verification) =
         tokio::sync::mpsc::channel(channel_size);
-    let date = js_sys::Date::new_0();
 
     let timer = Timer {
         time_reader: Arc::new(WasmTimeKeeper {}),
         hasten_multiplier: haste_multiplier,
-        start_time: date.get_time() as Timestamp,
+        start_time: js_sys::Date::now() as Timestamp,
     };
 
     SaitoWasm {
@@ -471,7 +470,8 @@ pub async fn process_msg_buffer_from_peer(buffer: js_sys::Uint8Array, peer_index
 pub async fn process_fetched_block(
     buffer: js_sys::Uint8Array,
     hash: js_sys::Uint8Array,
-    peer_index: u64,
+    block_id: BlockId,
+    peer_index: PeerIndex,
 ) {
     let mut saito = SAITO.lock().await;
     saito
@@ -480,6 +480,7 @@ pub async fn process_fetched_block(
         .routing_thread
         .process_network_event(NetworkEvent::BlockFetched {
             block_hash: hash.to_vec().try_into().unwrap(),
+            block_id,
             peer_index,
             buffer: buffer.to_vec(),
         })
@@ -521,7 +522,6 @@ pub async fn process_timer_event(duration_in_ms: u64) {
             break;
         }
     }
-    event_counter = 0;
 
     saito
         .as_mut()
@@ -530,6 +530,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         .process_timer_event(duration)
         .await;
 
+    event_counter = 0;
     while let Ok(event) = saito.as_mut().unwrap().receiver_for_consensus.try_recv() {
         let _result = saito
             .as_mut()
@@ -542,7 +543,6 @@ pub async fn process_timer_event(duration_in_ms: u64) {
             break;
         }
     }
-    event_counter = 0;
 
     saito
         .as_mut()
@@ -551,6 +551,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         .process_timer_event(duration)
         .await;
 
+    event_counter = 0;
     while let Ok(event) = saito.as_mut().unwrap().receiver_for_verification.try_recv() {
         let _result = saito
             .as_mut()
@@ -563,7 +564,6 @@ pub async fn process_timer_event(duration_in_ms: u64) {
             break;
         }
     }
-    event_counter = 0;
 
     saito
         .as_mut()
@@ -572,6 +572,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         .process_timer_event(duration)
         .await;
 
+    event_counter = 0;
     while let Ok(event) = saito.as_mut().unwrap().receiver_for_miner.try_recv() {
         let _result = saito
             .as_mut()
@@ -584,7 +585,6 @@ pub async fn process_timer_event(duration_in_ms: u64) {
             break;
         }
     }
-    event_counter = 0;
 
     saito
         .as_mut()
@@ -593,8 +593,6 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         .process_timer_event(duration)
         .await;
 
-    event_counter = 0;
-
     saito
         .as_mut()
         .unwrap()
@@ -602,6 +600,7 @@ pub async fn process_timer_event(duration_in_ms: u64) {
         .process_timer_event(duration)
         .await;
 
+    event_counter = 0;
     while let Ok(event) = saito.as_mut().unwrap().receiver_for_stats.try_recv() {
         let _result = saito
             .as_mut()

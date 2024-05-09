@@ -17,8 +17,8 @@ use crate::core::consensus::merkle::MerkleTree;
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::core::defs::{
-    BlockId, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
+    BlockId, Currency, PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey,
+    SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -239,9 +239,8 @@ pub struct Block {
     pub slips_spent_this_block: AHashMap<SaitoUTXOSetKey, u64>,
     #[serde(skip)]
     pub created_hashmap_of_slips_spent_this_block: bool,
-    // the peer's connection ID who sent us this block
     #[serde(skip)]
-    pub source_connection_id: Option<SaitoPublicKey>,
+    pub routed_from_peer: Option<PeerIndex>,
     #[serde(skip)]
     pub transaction_map: AHashMap<SaitoPublicKey, bool>,
     #[serde(skip)]
@@ -287,7 +286,7 @@ impl Block {
             // hashmap of all SaitoUTXOSetKeys of the slips in the block
             slips_spent_this_block: AHashMap::new(),
             created_hashmap_of_slips_spent_this_block: false,
-            source_connection_id: None,
+            routed_from_peer: None,
             transaction_map: Default::default(),
             cv: ConsensusValues::default(),
             force_loaded: false,
@@ -461,9 +460,7 @@ impl Block {
         }
 
         // generate merkle root
-        let block_merkle_root =
-            block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
-        block.merkle_root = block_merkle_root;
+        block.merkle_root = block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
 
         block.avg_income = cv.avg_income;
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
@@ -500,7 +497,7 @@ impl Block {
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
-    pub fn deserialize_from_net(bytes: Vec<u8>) -> Result<Block, Error> {
+    pub fn deserialize_from_net(bytes: &[u8]) -> Result<Block, Error> {
         if bytes.len() < BLOCK_HEADER_SIZE {
             warn!(
                 "block buffer is smaller than header length. length : {:?}",
@@ -662,15 +659,12 @@ impl Block {
         let winner_pubkey: SaitoPublicKey;
 
         // find winning nolan
-        //
         let x = primitive_types::U256::from_big_endian(&random_number);
         // fee calculation should be the same used in block when
         // generating the fee transaction.
-        //
         let y = self.total_fees;
 
         // if there are no fees, payout to burn address
-        //
         if y == 0 {
             winner_pubkey = [0; 33];
             return winner_pubkey;
@@ -687,7 +681,6 @@ impl Block {
         // winning TX contains the winning nolan
         //
         // either a fee-paying transaction or an ATR transaction
-        //
         winning_tx = &self.transactions[0];
         for transaction in &self.transactions {
             if transaction.cumulative_fees > winning_nolan {
@@ -697,7 +690,6 @@ impl Block {
         }
 
         // if winner is atr, we take inside TX
-        //
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.data.to_vec();
             winning_tx_placeholder =
@@ -706,7 +698,6 @@ impl Block {
         }
 
         // hash random number to pick routing node
-        //
         winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
         winner_pubkey
     }
@@ -724,19 +715,9 @@ impl Block {
     // cumulative block fees they contain.
     //
     pub fn generate(&mut self) -> bool {
-        // trace!(" ... block.prevalid - pre hash:  {:?}", create_timestamp());
-
-        //
-        // ensure block hashes correct
-        //
-        self.generate_pre_hash();
-        self.generate_hash();
-
         let creator_public_key = &self.creator;
 
-        //
         // allow transactions to generate themselves
-        //
         let _transactions_pre_calculated = &self
             .transactions
             .iter_mut()
@@ -745,11 +726,17 @@ impl Block {
 
         self.generate_transaction_hashmap();
 
+        if self.merkle_root == [0; 32] {
+            self.merkle_root = self.generate_merkle_root(false, false);
+        }
+
+        self.generate_pre_hash();
+        self.generate_hash();
+
         // trace!(" ... block.prevalid - pst hash:  {:?}", create_timestamp());
 
         // we need to calculate the cumulative figures AFTER the
         // original figures.
-        //
         let mut cumulative_fees = 0;
         let mut total_work = 0;
 
@@ -838,12 +825,7 @@ impl Block {
         self.issuance_transaction_index = issuance_transaction_index;
 
         // update block with total fees
-        //
         self.total_fees = cumulative_fees;
-        // println!(
-        //     "updating block with total cumulative fees: {:?}",
-        //     self.total_fees
-        // );
         self.total_work = total_work;
 
         true
@@ -856,17 +838,15 @@ impl Block {
     }
 
     pub fn generate_merkle_root(&self, is_browser: bool, is_spv: bool) -> SaitoHash {
-        debug!("generating the merkle root");
-
         if self.transactions.is_empty() && (is_browser || is_spv) {
             return self.merkle_root;
         }
 
-        let merkle_root_hash;
+        let merkle_root_hash: SaitoHash;
         if let Some(tree) = MerkleTree::generate(&self.transactions) {
             merkle_root_hash = tree.get_root_hash();
         } else {
-            merkle_root_hash = [0u8; 32];
+            merkle_root_hash = [0; 32];
         }
 
         debug!(
@@ -1353,8 +1333,7 @@ impl Block {
     }
 
     pub fn generate_pre_hash(&mut self) {
-        let hash_for_signature = hash(&self.serialize_for_signature());
-        self.pre_hash = hash_for_signature;
+        self.pre_hash = hash(&self.serialize_for_signature());
     }
 
     pub fn on_chain_reorganization(&mut self, utxoset: &mut UtxoSet, longest_chain: bool) -> bool {
@@ -1381,12 +1360,11 @@ impl Block {
     // serialize the pre_hash and the signature_for_source into a
     // bytes array that can be hashed and then have the hash set.
     pub fn serialize_for_hash(&self) -> Vec<u8> {
-        let vbytes: Vec<u8> = [
+        [
             self.previous_block_hash.as_slice(),
             self.pre_hash.as_slice(),
         ]
-        .concat();
-        vbytes
+        .concat()
     }
 
     // serialize major block components for block signature
@@ -1540,10 +1518,6 @@ impl Block {
                 return false;
             }
             let mut new_block = new_block.unwrap();
-            let hash_for_signature = hash(&new_block.serialize_for_signature());
-            new_block.pre_hash = hash_for_signature;
-            let hash_for_hash = hash(&new_block.serialize_for_hash());
-            new_block.hash = hash_for_hash;
 
             // in-memory swap copying txs in block from mempool
             mem::swap(&mut new_block.transactions, &mut self.transactions);
@@ -1559,8 +1533,10 @@ impl Block {
 
     pub fn generate_lite_block(&self, keylist: Vec<SaitoPublicKey>) -> Block {
         debug!(
-            "generating lite block for keys : {:?}",
-            keylist.iter().map(hex::encode).collect::<Vec<String>>()
+            "generating lite block for keys : {:?} for block : {:?}-{:?}",
+            keylist.iter().map(hex::encode).collect::<Vec<String>>(),
+            self.id,
+            self.hash.to_hex()
         );
 
         let mut pruned_txs: Vec<Transaction> = iterate!(&self.transactions, 10)
@@ -1629,9 +1605,12 @@ impl Block {
         block.treasury = self.treasury;
         block.signature = self.signature;
         block.avg_income = self.avg_income;
+        block.avg_fee_per_byte = self.avg_fee_per_byte;
+        block.previous_block_unpaid = self.previous_block_unpaid;
+        block.avg_nolan_rebroadcast_per_block = self.avg_nolan_rebroadcast_per_block;
         block.hash = self.hash;
 
-        block.merkle_root = self.generate_merkle_root(false, false);
+        block.merkle_root = self.generate_merkle_root(true, true);
 
         block
     }
@@ -1909,9 +1888,7 @@ impl Block {
             return false;
         }
 
-        //
         // validate merkle root
-        //
         if self.merkle_root == [0; 32]
             && self.merkle_root
                 != self.generate_merkle_root(configs.is_browser(), configs.is_spv_mode())
@@ -2042,7 +2019,6 @@ impl Block {
 mod tests {
     use ahash::AHashMap;
     use futures::future::join_all;
-    use hex::FromHex;
     use log::info;
 
     use crate::core::consensus::block::{Block, BlockType};
@@ -2050,7 +2026,9 @@ mod tests {
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{Currency, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD};
+    use crate::core::defs::{
+        Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
+    };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
     use crate::core::util::test::test_manager::test::TestManager;
@@ -2085,7 +2063,7 @@ mod tests {
         assert_eq!(block.block_type, BlockType::Full);
         assert_eq!(block.slips_spent_this_block, AHashMap::new());
         assert_eq!(block.created_hashmap_of_slips_spent_this_block, false);
-        assert_eq!(block.source_connection_id, None);
+        assert_eq!(block.routed_from_peer, None);
     }
 
     #[test]
@@ -2173,19 +2151,20 @@ mod tests {
         block.timestamp = timestamp;
         block.previous_block_hash = [1; 32];
         block.creator = [2; 33];
-        block.merkle_root = [3; 32];
+        block.merkle_root = [0; 32];
         block.signature = [4; 64];
         block.limbo = 1_000_000;
         block.burnfee = 2;
         block.difficulty = 3;
         block.transactions = vec![mock_tx, mock_tx2];
+        block.generate();
 
         let serialized_block = block.serialize_for_net(BlockType::Full);
-        let deserialized_block = Block::deserialize_from_net(serialized_block).unwrap();
+        let deserialized_block = Block::deserialize_from_net(&serialized_block).unwrap();
 
         let serialized_block_header = block.serialize_for_net(BlockType::Header);
         let deserialized_block_header =
-            Block::deserialize_from_net(serialized_block_header).unwrap();
+            Block::deserialize_from_net(&serialized_block_header).unwrap();
 
         assert_eq!(
             block.serialize_for_net(BlockType::Full),
@@ -2196,7 +2175,7 @@ mod tests {
         assert_eq!(deserialized_block.timestamp, timestamp);
         assert_eq!(deserialized_block.previous_block_hash, [1; 32]);
         assert_eq!(deserialized_block.creator, [2; 33]);
-        assert_eq!(deserialized_block.merkle_root, [3; 32]);
+        assert_ne!(deserialized_block.merkle_root, [0; 32]);
         assert_eq!(deserialized_block.signature, [4; 64]);
         assert_eq!(deserialized_block.limbo, 1_000_000);
         assert_eq!(deserialized_block.burnfee, 2);
@@ -2211,11 +2190,39 @@ mod tests {
         assert_eq!(deserialized_block_header.timestamp, timestamp);
         assert_eq!(deserialized_block_header.previous_block_hash, [1; 32]);
         assert_eq!(deserialized_block_header.creator, [2; 33]);
-        assert_eq!(deserialized_block_header.merkle_root, [3; 32]);
+        assert_ne!(deserialized_block_header.merkle_root, [0; 32]);
         assert_eq!(deserialized_block_header.signature, [4; 64]);
         assert_eq!(deserialized_block_header.limbo, 1_000_000);
         assert_eq!(deserialized_block_header.burnfee, 2);
         assert_eq!(deserialized_block_header.difficulty, 3);
+
+        let mut lite_block = block.generate_lite_block(vec![]);
+        lite_block.generate();
+        assert_eq!(block.id, lite_block.id);
+        assert_eq!(block.timestamp, lite_block.timestamp);
+        assert_eq!(
+            block.previous_block_hash.to_hex(),
+            lite_block.previous_block_hash.to_hex()
+        );
+        assert_eq!(block.creator, lite_block.creator);
+        assert_eq!(block.limbo, lite_block.limbo);
+        assert_eq!(block.treasury, lite_block.treasury);
+        assert_eq!(block.burnfee, lite_block.burnfee);
+        assert_eq!(block.difficulty, lite_block.difficulty);
+        assert_eq!(block.avg_income, lite_block.avg_income);
+        assert_eq!(block.avg_fee_per_byte, lite_block.avg_fee_per_byte);
+        assert_eq!(
+            block.avg_nolan_rebroadcast_per_block,
+            lite_block.avg_nolan_rebroadcast_per_block
+        );
+        assert_eq!(
+            block.previous_block_unpaid,
+            lite_block.previous_block_unpaid
+        );
+        assert_eq!(block.merkle_root.to_hex(), lite_block.merkle_root.to_hex());
+
+        assert_eq!(block.pre_hash.to_hex(), lite_block.pre_hash.to_hex());
+        assert_eq!(block.hash.to_hex(), lite_block.hash.to_hex());
     }
 
     #[test]
@@ -2322,6 +2329,7 @@ mod tests {
             public_key = wallet.public_key;
         }
         let lite_block = block1.generate_lite_block(vec![public_key]);
+        assert_eq!(lite_block.hash, block1.hash);
         assert_eq!(lite_block.signature, block1.signature);
 
         // Second Block
@@ -2334,8 +2342,19 @@ mod tests {
             .await
             .unwrap();
         let block2 = t.get_latest_block().await;
-        let lite_block2 = block2.generate_lite_block(vec![to_public_key]);
+        let mut lite_block2 = block2.generate_lite_block(vec![to_public_key]);
         assert_eq!(lite_block2.signature, block2.clone().signature);
+        assert_eq!(lite_block2.hash, block2.hash);
+
+        lite_block2.generate();
+        assert_eq!(lite_block2.signature, block2.clone().signature);
+        assert_eq!(lite_block2.hash, block2.hash);
+
+        let buffer = lite_block2.serialize_for_net(BlockType::Pruned);
+        let mut block2 = Block::deserialize_from_net(&buffer).unwrap();
+        block2.generate();
+        assert_eq!(lite_block2.signature, block2.clone().signature);
+        assert_eq!(lite_block2.hash, block2.hash);
 
         // block 3
         // Perform no transaction
