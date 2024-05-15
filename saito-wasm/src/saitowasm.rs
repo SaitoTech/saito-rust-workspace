@@ -286,11 +286,11 @@ pub async fn initialize(
         }
     }
 
+    saito.as_mut().unwrap().stat_thread.on_init().await;
     saito.as_mut().unwrap().mining_thread.on_init().await;
-    saito.as_mut().unwrap().consensus_thread.on_init().await;
     saito.as_mut().unwrap().verification_thread.on_init().await;
     saito.as_mut().unwrap().routing_thread.on_init().await;
-    saito.as_mut().unwrap().stat_thread.on_init().await;
+    saito.as_mut().unwrap().consensus_thread.on_init().await;
 
     Ok(JsValue::from("initialized"))
 }
