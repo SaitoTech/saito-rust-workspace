@@ -702,7 +702,7 @@ pub async fn run_network_controller(
                                 let stat = format!(
                                     "{} - {} - capacity : {:?} / {:?}",
                                     StatVariable::format_timestamp(time_keeper.get_timestamp_in_ms()),
-                                    format!("{:width$}", "network::queue_to_core", width = 40),
+                                    format!("{:width$}", "network::channel_to_core", width = 40),
                                     network_controller.sender_to_saito_controller.capacity(),
                                     network_controller.sender_to_saito_controller.max_capacity()
                                 );
@@ -711,7 +711,7 @@ pub async fn run_network_controller(
                                 let stat = format!(
                                     "{} - {} - capacity : {:?} / {:?}",
                                     StatVariable::format_timestamp(time_keeper.get_timestamp_in_ms()),
-                                    format!("{:width$}", "network::queue_outgoing", width = 40),
+                                    format!("{:width$}", "network::channel_outgoing", width = 40),
                                     sender_to_network.capacity(),
                                     sender_to_network.max_capacity()
                                 );
@@ -964,16 +964,19 @@ fn run_websocket_server(
 
 #[cfg(test)]
 mod tests {
-
+    use futures::SinkExt;
     use log::info;
 
+    use saito_core::core::msg::handshake::HandshakeChallenge;
+    use saito_core::core::msg::message::Message;
+    use saito_core::core::util::crypto::generate_random_bytes;
     use tokio_tungstenite::connect_async;
 
     #[ignore]
     #[tokio::test]
     async fn multi_peer_perf_test() {
         // pretty_env_logger::init();
-        let url = "ws://152.42.181.221:12101/wsopen";
+        let url = "ws://127.0.0.1:12101/wsopen";
 
         info!("url = {:?}", url);
 
@@ -986,19 +989,20 @@ mod tests {
                 return;
             }
             let result = result.unwrap();
-            let socket = result.0;
+            let mut socket = result.0;
 
-            // let challenge = HandshakeChallenge {
-            //     challenge: generate_random_bytes(32).try_into().unwrap(),
-            // };
-            // // challenge_for_peer = Some(challenge.challenge);
-            // let message = Message::HandshakeChallenge(challenge);
-            //
-            // socket
-            //     .send(tokio_tungstenite::tungstenite::Message::Binary(
-            //         message.serialize(),
-            //     ))
-            //     .unwrap();
+            let challenge = HandshakeChallenge {
+                challenge: generate_random_bytes(32).try_into().unwrap(),
+            };
+            // challenge_for_peer = Some(challenge.challenge);
+            let message = Message::HandshakeChallenge(challenge);
+
+            socket
+                .send(tokio_tungstenite::tungstenite::Message::Binary(
+                    message.serialize(),
+                ))
+                .await
+                .unwrap();
 
             sockets.push(socket);
 

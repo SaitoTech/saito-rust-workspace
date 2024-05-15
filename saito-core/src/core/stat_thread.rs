@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use log::info;
 
 use crate::core::defs::Timestamp;
 use crate::core::io::interface_io::InterfaceIO;
@@ -62,7 +63,9 @@ impl ProcessEvent<String> for StatThread {
     }
 
     async fn on_init(&mut self) {
+        info!("initializing stat thread");
         if !self.enabled {
+            info!("stat thread is off");
             return;
         }
         self.io_interface

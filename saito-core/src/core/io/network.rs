@@ -176,7 +176,7 @@ impl Network {
     //         .await
     // }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
-        trace!("handling peer disconnect, peer_index = {}", peer_index);
+        debug!("handling peer disconnect, peer_index = {}", peer_index);
 
         self.io_interface
             .disconnect_from_peer(peer_index)

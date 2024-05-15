@@ -537,5 +537,15 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             self.stat_sender.send(stat).await.unwrap();
         }
+        {
+            let stat = format!(
+                "{} - {} - capacity : {:?} / {:?}",
+                StatVariable::format_timestamp(current_time),
+                format!("{:width$}", "router::channel", width = 40),
+                self.sender_to_router.capacity(),
+                self.sender_to_router.max_capacity()
+            );
+            self.stat_sender.send(stat).await.unwrap();
+        }
     }
 }

@@ -207,6 +207,7 @@ export default class Saito {
   public addNewSocket(socket: any): bigint {
     this.nextIndex++;
     this.sockets.set(this.nextIndex, socket);
+    console.log("adding socket : " + this.nextIndex + ". total sockets : " + this.sockets.size);
     return this.nextIndex;
   }
 
@@ -215,10 +216,19 @@ export default class Saito {
   }
 
   public removeSocket(index: bigint) {
-    console.log("Removing socket for : " + index);
-    let socket = this.sockets.get(index);
-    this.sockets.delete(index);
-    socket.close();
+    console.log(
+      "Removing socket for : " + index + " out of " + this.sockets.size + " total sockets"
+    );
+
+    try {
+      let socket = this.sockets.get(index);
+      this.sockets.delete(index);
+      if (socket) {
+        socket.close();
+      }
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   public async initialize(configs: any): Promise<any> {
