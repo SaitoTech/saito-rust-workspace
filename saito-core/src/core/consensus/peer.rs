@@ -10,6 +10,7 @@ use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KE
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
+use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
@@ -25,6 +26,7 @@ pub struct Peer {
     pub key_list: Vec<SaitoPublicKey>,
     pub services: Vec<PeerService>,
     pub last_msg_at: Timestamp,
+    pub version: Version,
 }
 
 impl Peer {
@@ -38,6 +40,7 @@ impl Peer {
             key_list: vec![],
             services: vec![],
             last_msg_at: 0,
+            version: Version::default(),
         }
     }
     pub async fn initiate_handshake(
@@ -151,6 +154,7 @@ impl Peer {
         self.public_key = Some(response.public_key);
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
+        self.version = response.version.clone();
 
         let wallet = wallet_lock.read().await;
 
@@ -249,6 +253,22 @@ impl Peer {
             return false;
         }
         self.static_peer_config.as_ref().unwrap().is_main
+    }
+
+    pub async fn compare_versions(
+        &self,
+        block_hash: SaitoHash,
+        wallet_lock: Arc<RwLock<Wallet>>,
+    ) -> Option<()> {
+        let wallet = wallet_lock.read().await;
+        if wallet.version > self.version {
+            warn!(
+                "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
+                block_hash.to_hex(), self.index, wallet.version, self.version
+            );
+            return None;
+        }
+        Some(())
     }
 }
 

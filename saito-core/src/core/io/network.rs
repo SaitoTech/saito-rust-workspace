@@ -354,7 +354,7 @@ impl Network {
     }
 
     pub async fn send_key_list(&self, key_list: &[SaitoPublicKey]) {
-        debug!("sending key list to all the peers");
+        debug!("sending key list to all the peers {:?}", key_list);
         self.io_interface
             .send_message_to_all(
                 Message::KeyListUpdate(key_list.to_vec())
@@ -471,6 +471,9 @@ impl Network {
             let peers = self.peer_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
+                peer.compare_versions(block_hash, self.wallet_lock.clone())
+                    .await?;
+
                 if peer.block_fetch_url.is_empty() {
                     debug!(
                         "won't fetch block : {:?} from peer : {:?} since no url found",

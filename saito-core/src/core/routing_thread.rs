@@ -385,6 +385,22 @@ impl RoutingThread {
             peer_index
         );
 
+        let peers = self.network.peer_lock.read().await;
+        let wallet = self.wallet_lock.read().await;
+
+        if let Some(peer) = peers.index_to_peers.get(&peer_index) {
+            let result = peer
+                .compare_versions(block_hash, self.wallet_lock.clone())
+                .await;
+
+            if result.is_none() {
+                return;
+            }
+        }
+
+        drop(peers);
+        drop(wallet);
+
         self.blockchain_sync_state
             .add_entry(
                 block_hash,
@@ -396,6 +412,7 @@ impl RoutingThread {
 
         self.fetch_next_blocks().await;
     }
+
     async fn fetch_next_blocks(&mut self) -> bool {
         // trace!("fetching next blocks from peers");
         let mut work_done = false;
