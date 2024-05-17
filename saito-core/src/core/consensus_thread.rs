@@ -18,7 +18,7 @@ use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
-use crate::core::process::keep_time::{KeepTime, Timer};
+use crate::core::process::keep_time::Timer;
 use crate::core::process::process_event::ProcessEvent;
 use crate::core::routing_thread::RoutingEvent;
 use crate::core::util::configuration::Configuration;
@@ -535,6 +535,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 );
             }
 
+            self.stat_sender.send(stat).await.unwrap();
+        }
+        {
+            let stat = format!(
+                "{} - {} - capacity : {:?} / {:?}",
+                StatVariable::format_timestamp(current_time),
+                format!("{:width$}", "router::channel", width = 40),
+                self.sender_to_router.capacity(),
+                self.sender_to_router.max_capacity()
+            );
             self.stat_sender.send(stat).await.unwrap();
         }
     }

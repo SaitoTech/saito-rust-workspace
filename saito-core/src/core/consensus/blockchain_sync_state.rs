@@ -604,12 +604,14 @@ mod tests {
                 .await;
         }
         for i in 4..state.batch_size + 50 {
-            state.add_entry(
-                [(i + 101) as u8; 32],
-                (i + 1) as BlockId,
-                1,
-                t.peer_lock.clone(),
-            );
+            state
+                .add_entry(
+                    [(i + 101) as u8; 32],
+                    (i + 1) as BlockId,
+                    1,
+                    t.peer_lock.clone(),
+                )
+                .await;
         }
 
         state.build_peer_block_picture(t.blockchain_lock.read().await.deref());
