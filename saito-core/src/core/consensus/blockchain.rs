@@ -186,15 +186,18 @@ impl Blockchain {
                         block.id - 1,
                         previous_block_hash.to_hex()
                     );
-                    sender_to_router
-                        .unwrap()
-                        .send(RoutingEvent::BlockFetchRequest(
-                            block.routed_from_peer.unwrap(),
-                            previous_block_hash,
-                            block.id - 1,
-                        ))
-                        .await
-                        .unwrap();
+                    if sender_to_router.is_some() {
+                        sender_to_router
+                            .as_ref()
+                            .unwrap()
+                            .send(RoutingEvent::BlockFetchRequest(
+                                block.routed_from_peer.unwrap(),
+                                previous_block_hash,
+                                block.id - 1,
+                            ))
+                            .await
+                            .unwrap();
+                    }
                 } else {
                     debug!(
                         "previous block : {:?} is in the mempool. not fetching",
@@ -208,21 +211,23 @@ impl Blockchain {
                 // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
                 mempool.add_block(block);
                 return AddBlockResult::FailedButRetry;
-            } else {
+            } else if sender_to_router.is_some() {
                 debug!(
-                    "block : {:?} source connection id not set",
-                    block.hash.to_hex()
+                    "block : {:?}-{:?} source connection id not set",
+                    block.id,
+                    block.hash.to_hex(),
                 );
 
                 sender_to_router
-                    .unwrap()
+                    .as_ref()
+                    .expect("sender to router is not set")
                     .send(RoutingEvent::BlockFetchRequest(
                         0,
                         block.previous_block_hash,
                         block.id - 1,
                     ))
                     .await
-                    .unwrap();
+                    .expect("sending block fetch request failed");
             }
         }
 

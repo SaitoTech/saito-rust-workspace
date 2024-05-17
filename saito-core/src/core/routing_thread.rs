@@ -696,7 +696,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         let stat = format!(
             "{} - {} - capacity : {:?} / {:?}",
             StatVariable::format_timestamp(current_time),
-            format!("{:width$}", "consensus::queue", width = 40),
+            format!("{:width$}", "consensus::channel", width = 40),
             self.sender_to_consensus.capacity(),
             self.sender_to_consensus.max_capacity()
         );
@@ -707,7 +707,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 StatVariable::format_timestamp(current_time),
                 format!(
                     "{:width$}",
-                    format!("verification_{:?}::queue", index),
+                    format!("verification_{:?}::channel", index),
                     width = 40
                 ),
                 sender.capacity(),
