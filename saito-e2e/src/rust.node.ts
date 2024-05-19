@@ -1,7 +1,7 @@
 import { type Page, type Locator } from "@playwright/test";
 import SaitoNode from "./saito_node";
 
-export default class SlrNode extends SaitoNode {
+export default class RustNode extends SaitoNode {
   onStartNode(): Promise<void> {
     throw new Error("Method not implemented.");
   }
