@@ -2,8 +2,11 @@ import { test } from "@playwright/test";
 
 let fs = require("fs");
 let process = require("process");
+let { exec } = require("child_process");
 
-test("issuance file generation @consensus", async ({ page }, testInfo) => {
+test("issuance file generation @consensus", async ({ page, browserName }, testInfo) => {
+  console.log("browserName : " + browserName);
+  
   testInfo.setTimeout(0);
   let dir = "./temp";
   if (fs.existsSync(dir)) {
@@ -14,7 +17,7 @@ test("issuance file generation @consensus", async ({ page }, testInfo) => {
   }
 
   // generate some blocks
-  process.exec();
+  exec();
 
   // run utxo file generation in SLR
 
