@@ -25,12 +25,12 @@ export default defineConfig({
       name: "webkit",
       use: { ...devices["Desktop Safari"] },
     },
-    {
-      name: "consensus",
-      use: {
-        // used for consensus testing and server only tests
-      },
-    },
+    // {
+    //   name: "consensus",
+    //   use: {
+    //     // used for consensus testing and server only tests
+    //   },
+    // },
   ],
   timeout: 30000,
   // Uncomment and adjust if you need to start a server as part of your tes

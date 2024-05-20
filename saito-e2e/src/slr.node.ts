@@ -1,39 +1,46 @@
 import { type Page, type Locator } from "@playwright/test";
 import SaitoNode from "./saito_node";
+import { execFile, execSync } from "node:child_process";
 
 let process = require("process");
 let fs = require("fs");
 
 export default class SlrNode extends SaitoNode {
-  onResetNode(): Promise<void> {
-    let originalDir = process.cwd();
+  protected async onResetNode(): Promise<void> {
+    // let originalDir = process.cwd();
 
-    process.chdir(this.nodeDir);
+    // process.chdir(this.nodeDir);
 
     let beforeTime = Date.now();
-    process.exec("npm reset dev");
+    let buffer = execSync("npm run reset --verbose --script-shell bash", {
+      cwd: this.nodeDir,
+    });
+
+    console.log("buffer : " + buffer.toString("utf-8"));
     let afterTime = Date.now();
 
     console.log("resetting the node took : " + (afterTime - beforeTime) + "ms");
 
-    process.chdir(originalDir);
+    // process.chdir(originalDir);
+    // throw new Error("Method not implemented.");
+  }
+
+  protected onStartNode(): Promise<void> {
     throw new Error("Method not implemented.");
   }
 
-  onStartNode(): Promise<void> {
+  protected onStopNode(): Promise<void> {
     throw new Error("Method not implemented.");
   }
 
-  onStopNode(): Promise<void> {
-    throw new Error("Method not implemented.");
-  }
-
-  onSetIssuance(issuance: string[]): Promise<void> {
+  protected onSetIssuance(issuance: string[]): Promise<void> {
     throw new Error("Method not implemented.");
   }
 
   constructor() {
     super();
+    console.log("cwd : " + process.cwd());
+
     this.nodeDir = "../../saito-lite-rust";
     if (!fs.existsSync(this.nodeDir)) {
       console.log("SLR Dir : " + this.nodeDir);

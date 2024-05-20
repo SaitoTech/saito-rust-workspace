@@ -24,13 +24,13 @@ export default abstract class SaitoNode {
     return this.onStartNode();
   }
 
-  abstract onStartNode(): Promise<void>;
+  protected abstract onStartNode(): Promise<void>;
 
   async stopNode() {
     return this.onStopNode();
   }
 
-  abstract onStopNode(): Promise<void>;
+  protected abstract onStopNode(): Promise<void>;
 
   async cleanDataFolder() {
     throw new Error("NotImplemented");
@@ -40,11 +40,11 @@ export default abstract class SaitoNode {
     return this.onSetIssuance(issuance);
   }
 
-  abstract onSetIssuance(issuance: string[]): Promise<void>;
+  protected abstract onSetIssuance(issuance: string[]): Promise<void>;
 
   async resetNode() {
     return this.onResetNode();
   }
 
-  abstract onResetNode(): Promise<void>;
+  protected abstract onResetNode(): Promise<void>;
 }
