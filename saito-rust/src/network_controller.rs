@@ -849,7 +849,7 @@ fn run_websocket_server(
                           peer_lock: Arc<RwLock<PeerCollection>>| async move {
                         // debug!("serving lite block : {:?}", block_hash);
 
-                        let mut key1;
+                        let key1;
                         if key.is_some() {
                             key1 = key.unwrap();
                         } else {
