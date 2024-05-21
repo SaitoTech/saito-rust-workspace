@@ -627,6 +627,10 @@ impl Blockchain {
         }
 
         let mut block = block.unwrap();
+        self.add_block_transactions_back(mempool, &mut block).await;
+    }
+
+    async fn add_block_transactions_back(&mut self, mempool: &mut Mempool, block: &mut Block) {
         let public_key;
         {
             let wallet = mempool.wallet_lock.read().await;
