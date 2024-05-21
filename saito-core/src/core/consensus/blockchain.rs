@@ -305,7 +305,6 @@ impl Blockchain {
         let mut am_i_the_longest_chain = false;
 
         while !shared_ancestor_found {
-            // trace!("checking new chain hash : {:?}", new_chain_hash.to_hex());
             if let Some(block) = self.blocks.get(&new_chain_hash) {
                 if block.in_longest_chain {
                     shared_ancestor_found = true;
@@ -367,14 +366,12 @@ impl Blockchain {
                 // behavior. we have the comparison here to separate expected from
                 // unexpected / edge-case issues around block receipt.
             } else {
-                //
                 // TODO - implement logic to handle once nodes can connect
                 //
                 // if this not our first block, handle edge-case around receiving
                 // block 503 before block 453 when block 453 is our expected proper
                 // next block and we are getting blocks out-of-order because of
                 // connection or network issues.
-
                 if latest_block_hash != [0; 32] && latest_block_hash == self.get_latest_block_hash()
                 {
                     info!("blocks received out-of-order issue. handling edge case...");
