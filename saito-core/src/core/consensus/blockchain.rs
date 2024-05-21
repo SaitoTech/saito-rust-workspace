@@ -818,7 +818,7 @@ impl Blockchain {
         }
         None
     }
-    pub fn print(&self, count: u64) {
+    fn print(&self, count: u64) {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
@@ -880,7 +880,7 @@ impl Blockchain {
             .contains_block_hash_at_block_id(block_id, block_hash)
     }
 
-    pub fn is_new_chain_the_longest_chain(
+    fn is_new_chain_the_longest_chain(
         &self,
         new_chain: &[SaitoHash],
         old_chain: &[SaitoHash],
@@ -937,7 +937,6 @@ impl Blockchain {
         old_chain.len() < new_chain.len() && old_bf <= new_bf
     }
 
-    //
     // when new_chain and old_chain are generated the block_hashes are added
     // to their vectors from tip-to-shared-ancestors. if the shared ancestors
     // is at position [0] in our blockchain for instance, we may receive:
@@ -952,7 +951,7 @@ impl Blockchain {
     // winding requires starting from th END of the vector. the loops move
     // in opposite directions.
     //
-    pub async fn validate(
+    async fn validate(
         &mut self,
         new_chain: &[SaitoHash],
         old_chain: &[SaitoHash],
@@ -1133,7 +1132,7 @@ impl Blockchain {
     // position in the vector NOT the ordinal number of the block_hash
     // being processed. we start winding with current_wind_index 4 not 0.
     //
-    pub async fn wind_chain(
+    async fn wind_chain(
         &mut self,
         new_chain: &[SaitoHash],
         old_chain: &[SaitoHash],
@@ -1340,7 +1339,7 @@ impl Blockchain {
     // block we have to remove in the old_chain is thus at position 0, and
     // walking up the vector from there until we reach the end.
     //
-    pub async fn unwind_chain(
+    async fn unwind_chain(
         &mut self,
         new_chain: &[SaitoHash],
         old_chain: &[SaitoHash],
@@ -1452,7 +1451,7 @@ impl Blockchain {
         self.downgrade_blockchain_data(configs.is_spv_mode()).await;
     }
 
-    pub async fn update_genesis_period(&mut self, storage: &Storage, network: Option<&Network>) {
+    async fn update_genesis_period(&mut self, storage: &Storage, network: Option<&Network>) {
         // we need to make sure this is not a random block that is disconnected
         // from our previous genesis_id. If there is no connection between it
         // and us, then we cannot delete anything as otherwise the provision of
@@ -1483,7 +1482,7 @@ impl Blockchain {
     //
     // deletes all blocks at a single block_id
     //
-    pub async fn delete_blocks(
+    async fn delete_blocks(
         &mut self,
         delete_block_id: u64,
         storage: &Storage,
@@ -1514,7 +1513,7 @@ impl Blockchain {
     //
     // deletes a single block
     //
-    pub async fn delete_block(
+    async fn delete_block(
         &mut self,
         delete_block_id: u64,
         delete_block_hash: SaitoHash,
@@ -1563,7 +1562,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
+    async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
         trace!("downgrading blockchain data");
         //
         // downgrade blocks still on the chain
@@ -1768,19 +1767,6 @@ impl Blockchain {
 
         snapshot
     }
-
-    // TODO : this set of methods make things confusing since sync state functions also have same names. need to refactor
-    // pub fn mark_as_fetching(&mut self, block_hash: SaitoHash) {
-    //     debug!("marking block : {:?} as fetching", block_hash.to_hex());
-    //     self.blocks_fetching.insert(block_hash);
-    // }
-    // pub fn unmark_as_fetching(&mut self, block_hash: &SaitoHash) {
-    //     debug!("unmarking block : {:?} as fetching", block_hash.to_hex());
-    //     self.blocks_fetching.remove(block_hash);
-    // }
-    // pub fn is_block_fetching(&self, block_hash: &SaitoHash) -> bool {
-    //     self.blocks_fetching.contains(block_hash)
-    // }
 }
 
 #[cfg(test)]
