@@ -40,6 +40,10 @@ pub fn bit_unpack(packed: u64) -> (u32, u32) {
     (top, bottom)
 }
 
+const FORK_ID_WEIGHTS: [u64; 16] = [
+    0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
+];
+
 #[derive(Debug)]
 pub enum AddBlockResult {
     BlockAdded,
@@ -512,7 +516,7 @@ impl Blockchain {
         };
     }
 
-    pub async fn add_block_success(
+    async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
         network: Option<&Network>,
@@ -612,7 +616,7 @@ impl Blockchain {
         }
     }
 
-    pub async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
+    async fn add_block_failure(&mut self, block_hash: &SaitoHash, mempool: &mut Mempool) {
         info!("add block failed : {:?}", block_hash.to_hex());
 
         mempool.delete_block(block_hash);
@@ -668,12 +672,9 @@ impl Blockchain {
 
         // roll back to last even 10 blocks
         current_block_id = current_block_id - (current_block_id % 10);
-        let weights = [
-            0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
-        ];
 
         // loop backwards through blockchain
-        for (i, weight) in weights.iter().enumerate() {
+        for (i, weight) in FORK_ID_WEIGHTS.iter().enumerate() {
             if current_block_id <= *weight {
                 debug!(
                     "generating fork id for block : {:?}. current_id : {:?} is less than weight : {:?}",
@@ -706,95 +707,119 @@ impl Blockchain {
     ) -> u64 {
         let my_latest_block_id = self.get_latest_block_id();
 
-        let mut peer_block_id = peer_latest_block_id;
-        let mut my_block_id = my_latest_block_id;
-
         debug!(
             "generate last shared ancestor : peer_latest_id : {:?}, fork_id : {:?} my_latest_id : {:?}",
             peer_latest_block_id,
             fork_id.to_hex(),
             my_latest_block_id
         );
-        let weights = [
-            0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
-        ];
+
         if peer_latest_block_id >= my_latest_block_id {
-            // roll back to last even 10 blocks
-            peer_block_id = peer_block_id - (peer_block_id % 10);
-            debug!(
-                "peer_block_id : {:?}, my_block_id : {:?}",
-                peer_block_id, my_latest_block_id
-            );
-
-            // their fork id
-            for (index, weight) in weights.iter().enumerate() {
-                if peer_block_id < *weight {
-                    debug!(
-                        "peer_block_id : {:?} is less than weight : {:?}",
-                        peer_block_id, weight
-                    );
-                    return 0;
-                }
-                peer_block_id -= weight;
-
-                if peer_block_id >= my_block_id {
-                    continue;
-                }
-
-                // index in fork_id hash
-                let index = 2 * index;
-
-                // compare input hash to my hash
-                let block_hash = self
-                    .blockring
-                    .get_longest_chain_block_hash_at_block_id(peer_block_id);
-                if fork_id[index] == block_hash[index]
-                    && fork_id[index + 1] == block_hash[index + 1]
-                {
-                    return peer_block_id;
-                }
+            if let Some(value) = self.generate_last_shared_ancestor_when_peer_infront(
+                peer_latest_block_id,
+                fork_id,
+                my_latest_block_id,
+            ) {
+                return value;
             }
-        } else {
-            my_block_id = my_block_id - (my_block_id % 10);
-
-            debug!("my_block_id after rounding : {:?}", my_block_id);
-            for (index, weight) in weights.iter().enumerate() {
-                if my_block_id < *weight {
-                    debug!(
-                        "my_block_id : {:?} is less than weight : {:?}",
-                        my_block_id, weight
-                    );
-                    return 0;
-                }
-                my_block_id -= weight;
-
-                // do not loop around if block id < 0
-                if my_block_id > peer_latest_block_id {
-                    debug!(
-                        "my_block_id {:?} > peer_latest_block_id : {:?}",
-                        my_block_id, peer_latest_block_id
-                    );
-                    continue;
-                }
-
-                // index in fork_id hash
-                let index = 2 * index;
-
-                // compare input hash to my hash
-                let block_hash = self
-                    .blockring
-                    .get_longest_chain_block_hash_at_block_id(my_block_id);
-                if fork_id[index] == block_hash[index]
-                    && fork_id[index + 1] == block_hash[index + 1]
-                {
-                    return my_block_id;
-                }
-            }
+        } else if let Some(value) = self.generate_last_shared_ancestor_when_peer_behind(
+            peer_latest_block_id,
+            fork_id,
+            my_latest_block_id,
+        ) {
+            return value;
         }
 
         debug!("no shared ancestor found. returning 0");
         // no match? return 0 -- no shared ancestor
         0
+    }
+
+    fn generate_last_shared_ancestor_when_peer_behind(
+        &self,
+        peer_latest_block_id: u64,
+        fork_id: SaitoHash,
+        my_latest_block_id: u64,
+    ) -> Option<u64> {
+        let mut my_block_id = my_latest_block_id;
+        my_block_id = my_block_id - (my_block_id % 10);
+
+        debug!("my_block_id after rounding : {:?}", my_block_id);
+        for (index, weight) in FORK_ID_WEIGHTS.iter().enumerate() {
+            if my_block_id < *weight {
+                debug!(
+                    "my_block_id : {:?} is less than weight : {:?}",
+                    my_block_id, weight
+                );
+                return Some(0);
+            }
+            my_block_id -= weight;
+
+            // do not loop around if block id < 0
+            if my_block_id > peer_latest_block_id {
+                debug!(
+                    "my_block_id {:?} > peer_latest_block_id : {:?}",
+                    my_block_id, peer_latest_block_id
+                );
+                continue;
+            }
+
+            // index in fork_id hash
+            let index = 2 * index;
+
+            // compare input hash to my hash
+            let block_hash = self
+                .blockring
+                .get_longest_chain_block_hash_at_block_id(my_block_id);
+            if fork_id[index] == block_hash[index] && fork_id[index + 1] == block_hash[index + 1] {
+                return Some(my_block_id);
+            }
+        }
+        None
+    }
+
+    fn generate_last_shared_ancestor_when_peer_infront(
+        &self,
+        peer_latest_block_id: u64,
+        fork_id: SaitoHash,
+        my_latest_block_id: u64,
+    ) -> Option<u64> {
+        let mut peer_block_id = peer_latest_block_id;
+        let my_block_id = my_latest_block_id;
+        // roll back to last even 10 blocks
+        peer_block_id = peer_block_id - (peer_block_id % 10);
+        debug!(
+            "peer_block_id : {:?}, my_block_id : {:?}",
+            peer_block_id, my_latest_block_id
+        );
+
+        // their fork id
+        for (index, weight) in FORK_ID_WEIGHTS.iter().enumerate() {
+            if peer_block_id < *weight {
+                debug!(
+                    "peer_block_id : {:?} is less than weight : {:?}",
+                    peer_block_id, weight
+                );
+                return Some(0);
+            }
+            peer_block_id -= weight;
+
+            if peer_block_id >= my_block_id {
+                continue;
+            }
+
+            // index in fork_id hash
+            let index = 2 * index;
+
+            // compare input hash to my hash
+            let block_hash = self
+                .blockring
+                .get_longest_chain_block_hash_at_block_id(peer_block_id);
+            if fork_id[index] == block_hash[index] && fork_id[index + 1] == block_hash[index + 1] {
+                return Some(peer_block_id);
+            }
+        }
+        None
     }
     pub fn print(&self, count: u64) {
         let latest_block_id = self.get_latest_block_id();
