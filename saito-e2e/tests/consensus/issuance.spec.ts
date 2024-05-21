@@ -25,6 +25,8 @@ test("issuance file generation @consensus", async ({ page, browserName }, testIn
 
   await node.startNode();
 
+  await page.waitForTimeout(10000);
+
   await node.stopNode();
   // generate some blocks
 
