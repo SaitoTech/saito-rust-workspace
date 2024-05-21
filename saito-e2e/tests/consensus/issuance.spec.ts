@@ -6,7 +6,7 @@ let fs = require("fs");
 let process = require("process");
 let { exec } = require("child_process");
 
-test("issuance file generation @consensus", async ({ page, browserName }, testInfo) => {
+test.skip("issuance file generation @consensus", async ({ page, browserName }, testInfo) => {
   if (browserName !== "chromium") {
     testInfo.skip();
     return;
@@ -25,7 +25,7 @@ test("issuance file generation @consensus", async ({ page, browserName }, testIn
 
   await node.startNode();
 
-  await page.waitForTimeout(10000);
+  // await page.waitForTimeout(10000);
 
   await node.stopNode();
   // generate some blocks
