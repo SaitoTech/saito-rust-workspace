@@ -19,9 +19,9 @@ export default class SlrNode extends SaitoNode {
     //   cwd: this.nodeDir,
     // });
 
-    fs.rmdirSync(this.nodeDir + "/data/blocks", { recursive: true, force: true });
+    fs.rmSync(this.nodeDir + "/data/blocks", { recursive: true, force: true });
     fs.mkdirSync(this.nodeDir + "/data/blocks", { recursive: true });
-    
+
     // console.log("buffer : " + buffer.toString("utf-8"));
     let afterTime = Date.now();
 

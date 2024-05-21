@@ -29,7 +29,6 @@ test("issuance file generation @consensus", async ({ page, browserName }, testIn
   // generate some blocks
 
   // run utxo file generation in SLR
-  execSync("");
 
   // check the entries in the generated issuance file
 });
