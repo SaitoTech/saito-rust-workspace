@@ -1,6 +1,5 @@
 use std::collections::LinkedList;
 
-
 use rayon::prelude::*;
 
 use crate::core::consensus::transaction::Transaction;
