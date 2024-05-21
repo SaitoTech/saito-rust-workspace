@@ -129,18 +129,17 @@ impl Blockchain {
     ) -> AddBlockResult {
         block.generate();
 
-        let non_spv_txs = block
-            .transactions
-            .iter()
-            .filter(|tx| tx.transaction_type != TransactionType::SPV)
-            .count();
         debug!(
             "adding block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count (spv/total) : {:?}/{:?}",
             block.hash.to_hex(),
             block.block_type,
             block.id,
             self.get_latest_block_id(),
-            non_spv_txs,
+            block
+            .transactions
+            .iter()
+            .filter(|tx| tx.transaction_type != TransactionType::SPV)
+            .count(),
             block.transactions.len()
         );
 
@@ -352,14 +351,12 @@ impl Blockchain {
                 latest_block_hash.to_hex()
             );
 
-            //
             // we have a block without a parent.
             //
             // if this is our first block, the blockring will have no entry yet
             // and block_ring_lc_pos (longest_chain_position) will be pointing
             // at None. We use this to determine if we are a new chain instead
             // of creating a separate variable to manually track entries.
-            //
             if self.blockring.is_empty() {
 
                 // no need for action as fall-through will result in proper default
@@ -1115,7 +1112,6 @@ impl Blockchain {
         true
     }
 
-    //
     // when new_chain and old_chain are generated the block_hashes are added
     // to their vectors from tip-to-shared-ancestors. if the shared ancestors
     // is at position [0] for instance, we may receive:
@@ -1131,7 +1127,6 @@ impl Blockchain {
     // in opposite directions. the argument current_wind_index is the
     // position in the vector NOT the ordinal number of the block_hash
     // being processed. we start winding with current_wind_index 4 not 0.
-    //
     async fn wind_chain(
         &mut self,
         new_chain: &[SaitoHash],
@@ -1215,7 +1210,6 @@ impl Blockchain {
 
             WindingResult::Wind(current_wind_index - 1, false)
         } else {
-            //
             // we have had an error while winding the chain. this requires us to
             // unwind any blocks we have already wound, and rewind any blocks we
             // have unwound.
