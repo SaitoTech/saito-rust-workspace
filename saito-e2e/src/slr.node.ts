@@ -10,12 +10,19 @@ export default class SlrNode extends SaitoNode {
 
   protected async onResetNode(): Promise<void> {
     let beforeTime = Date.now();
-    let buffer = execSync("npm run reset --script-shell bash", {
-      cwd: this.nodeDir,
-      // shell: "bash",
-    });
+    // let buffer = execSync("npm run reset --script-shell bash", {
+    //   cwd: this.nodeDir,
+    //   // shell: "bash",
+    // });
+    //
+    // let buffer = execSync("rm -rf data/blocks", {
+    //   cwd: this.nodeDir,
+    // });
 
-    console.log("buffer : " + buffer.toString("utf-8"));
+    fs.rmdirSync(this.nodeDir + "/data/blocks", { recursive: true, force: true });
+    fs.mkdirSync(this.nodeDir + "/data/blocks", { recursive: true });
+    
+    // console.log("buffer : " + buffer.toString("utf-8"));
     let afterTime = Date.now();
 
     console.log("resetting the node took : " + (afterTime - beforeTime) + "ms");
