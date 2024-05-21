@@ -2345,6 +2345,10 @@ mod tests {
         let mut lite_block2 = block2.generate_lite_block(vec![to_public_key]);
         assert_eq!(lite_block2.signature, block2.clone().signature);
         assert_eq!(lite_block2.hash, block2.hash);
+        assert_eq!(lite_block2.merkle_root, block2.merkle_root);
+        assert_eq!(lite_block2.difficulty, block2.difficulty);
+        assert_eq!(lite_block2.id, block2.id);
+        assert_eq!(lite_block2.block_type, BlockType::Full);
 
         lite_block2.generate();
         assert_eq!(lite_block2.signature, block2.clone().signature);
