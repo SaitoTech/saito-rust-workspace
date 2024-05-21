@@ -1,36 +1,42 @@
 import { type Page, type Locator } from "@playwright/test";
 import SaitoNode from "./saito_node";
-import { execFile, execSync } from "node:child_process";
+import { ChildProcess, execFile, execSync } from "node:child_process";
 
 let process = require("process");
 let fs = require("fs");
 
 export default class SlrNode extends SaitoNode {
+  node: ChildProcess;
+
   protected async onResetNode(): Promise<void> {
-    // let originalDir = process.cwd();
-
-    // process.chdir(this.nodeDir);
-
     let beforeTime = Date.now();
-    let buffer = execSync("npm run reset --verbose --script-shell bash", {
+    let buffer = execSync("npm run reset --script-shell bash", {
       cwd: this.nodeDir,
+      // shell: "bash",
     });
 
     console.log("buffer : " + buffer.toString("utf-8"));
     let afterTime = Date.now();
 
     console.log("resetting the node took : " + (afterTime - beforeTime) + "ms");
-
-    // process.chdir(originalDir);
-    // throw new Error("Method not implemented.");
   }
 
-  protected onStartNode(): Promise<void> {
-    throw new Error("Method not implemented.");
+  protected async onStartNode(): Promise<void> {
+    let beforeTime = Date.now();
+    this.node = execFile("npm", ["run dev"], (error, stdout, stderr) => {
+      console.error(error);
+      console.log(stdout);
+      console.error(stderr);
+    });
+    let afterTime = Date.now();
+    console.log("starting the node took : " + (afterTime - beforeTime) + "ms");
   }
 
-  protected onStopNode(): Promise<void> {
-    throw new Error("Method not implemented.");
+  protected async onStopNode(): Promise<void> {
+    let beforeTime = Date.now();
+    this.node.kill();
+    let afterTime = Date.now();
+    console.log("stopping the node took : " + (afterTime - beforeTime) + "ms");
   }
 
   protected onSetIssuance(issuance: string[]): Promise<void> {

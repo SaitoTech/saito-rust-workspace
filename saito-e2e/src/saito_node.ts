@@ -21,12 +21,14 @@ export default abstract class SaitoNode {
   }
 
   async startNode() {
+    console.log("starting the node...");
     return this.onStartNode();
   }
 
   protected abstract onStartNode(): Promise<void>;
 
   async stopNode() {
+    console.log("stopping the node...");
     return this.onStopNode();
   }
 
@@ -43,6 +45,7 @@ export default abstract class SaitoNode {
   protected abstract onSetIssuance(issuance: string[]): Promise<void>;
 
   async resetNode() {
+    console.log("resetting the node");
     return this.onResetNode();
   }
 

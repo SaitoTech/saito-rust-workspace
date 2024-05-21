@@ -1,5 +1,6 @@
 import { test } from "@playwright/test";
 import SlrNode from "../../src/slr.node";
+import { execSync } from "child_process";
 
 let fs = require("fs");
 let process = require("process");
@@ -21,11 +22,14 @@ test("issuance file generation @consensus", async ({ page, browserName }, testIn
 
   let node = new SlrNode();
   await node.resetNode();
-  
+
+  await node.startNode();
+
+  await node.stopNode();
   // generate some blocks
 
   // run utxo file generation in SLR
+  execSync("");
 
   // check the entries in the generated issuance file
-  console.log("cwd = " + process.cwd());
 });
