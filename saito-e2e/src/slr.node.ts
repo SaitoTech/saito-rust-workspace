@@ -23,7 +23,7 @@ export default class SlrNode extends SaitoNode {
 
   protected async onStartNode(): Promise<void> {
     let beforeTime = Date.now();
-    this.node = execFile("npm", ["run dev"], (error, stdout, stderr) => {
+    this.node = execFile("npm run dev", [], (error, stdout, stderr) => {
       console.error(error);
       console.log(stdout);
       console.error(stderr);
