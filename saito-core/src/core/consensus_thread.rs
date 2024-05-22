@@ -130,7 +130,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn process_timer_event(&mut self, duration: Duration) -> Option<()> {
-        // println!("processing timer event : {:?}", duration.as_micros());
         let mut work_done = false;
         let timestamp = self.timer.get_timestamp_in_ms();
         let duration_value = duration.as_millis() as u64;
@@ -159,17 +158,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         .await;
 
                     let _res = blockchain
-                        .add_block(
-                            block,
-                            &mut self.storage,
-                            None,
-                            &mut mempool,
-                            configs.deref(),
-                        )
+                        .add_block(block, &mut self.storage, &mut mempool, configs.deref())
                         .await;
                 }
 
-                // println!("{} addblock result", result)
                 self.generate_genesis_block = false;
                 return Some(());
             }
@@ -195,10 +187,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
             self.block_producing_timer = 0;
 
-            // trace!(
-            //     "mempool size before bundling : {:?}",
-            //     mempool.transactions.len()
-            // );
             let mut gt_result = None;
             let mut gt_propagated = false;
             {

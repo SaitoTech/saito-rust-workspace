@@ -52,7 +52,7 @@ pub enum AddBlockResult {
         WalletUpdateStatus,
     ),
     BlockAlreadyExists,
-    FailedButRetry,
+    FailedButRetry(Block, bool /*fetch previous block*/),
     FailedNotValid,
 }
 
@@ -125,7 +125,6 @@ impl Blockchain {
         &mut self,
         mut block: Block,
         storage: &mut Storage,
-        sender_to_router: Option<Sender<RoutingEvent>>,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
     ) -> AddBlockResult {
@@ -174,70 +173,25 @@ impl Blockchain {
                     "hash is empty for parent of block : {:?}",
                     block.hash.to_hex()
                 );
-            } else if block.routed_from_peer.is_some() {
-                let previous_block_hash = block.previous_block_hash;
+            } else {
+                let previous_block_fetched = iterate!(mempool.blocks_queue, 100)
+                    .any(|b| block.previous_block_hash == b.hash);
 
-                let previous_block_fetched;
-                {
-                    previous_block_fetched =
-                        iterate!(mempool.blocks_queue, 100).any(|b| previous_block_hash == b.hash);
-                }
-                if !previous_block_fetched && block.id > 1 {
+                return if !previous_block_fetched && block.id > 1 {
                     debug!(
                         "need to fetch previous block : {:?}-{:?}",
                         block.id - 1,
-                        previous_block_hash.to_hex()
+                        block.previous_block_hash.to_hex()
                     );
-                    if sender_to_router.is_some() {
-                        sender_to_router
-                            .as_ref()
-                            .unwrap()
-                            .send(RoutingEvent::BlockFetchRequest(
-                                block.routed_from_peer.unwrap(),
-                                previous_block_hash,
-                                block.id - 1,
-                            ))
-                            .await
-                            .unwrap();
-                    }
+
+                    AddBlockResult::FailedButRetry(block, true)
                 } else {
                     debug!(
                         "previous block : {:?} is in the mempool. not fetching",
-                        previous_block_hash.to_hex()
+                        block.previous_block_hash.to_hex()
                     );
-                }
-
-                debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
-                                    block.hash.to_hex(),
-                                    block.previous_block_hash.to_hex());
-                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
-                mempool.add_block(block);
-                return AddBlockResult::FailedButRetry;
-            } else if sender_to_router.is_some() {
-                debug!(
-                    "block : {:?}-{:?} source connection id not set",
-                    block.id,
-                    block.hash.to_hex(),
-                );
-
-                sender_to_router
-                    .as_ref()
-                    .expect("sender to router is not set")
-                    .send(RoutingEvent::BlockFetchRequest(
-                        0,
-                        block.previous_block_hash,
-                        block.id - 1,
-                    ))
-                    .await
-                    .expect("sending block fetch request failed");
-
-                debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
-                                    block.hash.to_hex(),
-                                    block.previous_block_hash.to_hex());
-                // TODO : mempool can grow if an attacker keep sending blocks with non existing parents. need to fix. can use an expiry time perhaps?
-                mempool.add_block(block);
-
-                return AddBlockResult::FailedButRetry;
+                    AddBlockResult::FailedButRetry(block, false)
+                };
             }
         }
 
@@ -423,7 +377,7 @@ impl Blockchain {
                 );
                 self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = false;
                 self.add_block_failure(&block_hash, mempool).await;
-                AddBlockResult::FailedButRetry
+                AddBlockResult::FailedNotValid
             }
         } else {
             debug!("this is not the longest chain");
@@ -1597,15 +1551,7 @@ impl Blockchain {
                 if blocks.is_empty() {
                     sender = sender_to_miner.clone();
                 }
-                let result = self
-                    .add_block(
-                        block,
-                        storage,
-                        sender_to_router.clone(),
-                        &mut mempool,
-                        configs,
-                    )
-                    .await;
+                let result = self.add_block(block, storage, &mut mempool, configs).await;
                 match result {
                     AddBlockResult::BlockAddedSuccessfully(
                         block_hash,
@@ -1653,7 +1599,25 @@ impl Blockchain {
                         }
                     }
                     AddBlockResult::BlockAlreadyExists => {}
-                    AddBlockResult::FailedButRetry => {}
+                    AddBlockResult::FailedButRetry(block, fetch_prev_block) => {
+                        debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
+                                    block.hash.to_hex(),
+                                    block.previous_block_hash.to_hex());
+
+                        if fetch_prev_block && sender_to_router.is_some() {
+                            sender_to_router
+                                .as_ref()
+                                .unwrap()
+                                .send(RoutingEvent::BlockFetchRequest(
+                                    block.routed_from_peer.unwrap_or(0),
+                                    block.previous_block_hash,
+                                    block.id - 1,
+                                ))
+                                .await
+                                .expect("sending block fetch request failed");
+                        }
+                        mempool.add_block(block);
+                    }
                     AddBlockResult::FailedNotValid => {}
                 }
             }
