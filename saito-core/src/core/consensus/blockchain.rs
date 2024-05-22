@@ -638,7 +638,7 @@ impl Blockchain {
         );
 
         if peer_latest_block_id >= my_latest_block_id {
-            if let Some(value) = self.generate_last_shared_ancestor_when_peer_infront(
+            if let Some(value) = self.generate_last_shared_ancestor_when_peer_ahead(
                 peer_latest_block_id,
                 fork_id,
                 my_latest_block_id,
@@ -701,7 +701,7 @@ impl Blockchain {
         None
     }
 
-    fn generate_last_shared_ancestor_when_peer_infront(
+    fn generate_last_shared_ancestor_when_peer_ahead(
         &self,
         peer_latest_block_id: u64,
         fork_id: SaitoHash,
