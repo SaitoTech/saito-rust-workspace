@@ -215,9 +215,7 @@ pub mod test {
                 let _ = blockchain
                     .add_block(
                         block,
-                        Some(&self.network),
                         &mut self.storage,
-                        None,
                         None,
                         &mut mempool,
                         configs.deref(),
@@ -927,9 +925,7 @@ pub mod test {
             let _res = blockchain
                 .add_block(
                     genblock,
-                    Some(&self.network),
                     &mut self.storage,
-                    Some(self.sender_to_miner.clone()),
                     None,
                     &mut mempool,
                     configs.deref(),
