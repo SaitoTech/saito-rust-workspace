@@ -18,6 +18,10 @@ use crate::core::util::crypto::{generate_keys, hash, sign};
 
 pub const WALLET_SIZE: usize = 65;
 
+pub type WalletUpdateStatus = bool;
+pub const WALLET_UPDATED: WalletUpdateStatus = true;
+pub const WALLET_NOT_UPDATED: WalletUpdateStatus = false;
+
 /// The `WalletSlip` stores the essential information needed to track which
 /// slips are spendable and managing them as they move onto and off of the
 /// longest-chain.
@@ -130,19 +134,19 @@ impl Wallet {
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
-    pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool, network: Option<&Network>) {
-        let mut wallet_changed = false;
+    pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) -> WalletUpdateStatus {
+        let mut wallet_changed = WALLET_NOT_UPDATED;
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        wallet_changed = true;
+                        wallet_changed = WALLET_UPDATED;
                         self.delete_slip(input, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        wallet_changed = true;
+                        wallet_changed = WALLET_UPDATED;
                         self.add_slip(block.id, index as u64, output, true, None);
                     }
                 }
@@ -151,34 +155,29 @@ impl Wallet {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        wallet_changed = true;
+                        wallet_changed = WALLET_UPDATED;
                         self.add_slip(block.id, index as u64, input, true, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        wallet_changed = true;
+                        wallet_changed = WALLET_UPDATED;
                         self.delete_slip(output, None);
                     }
                 }
             }
         }
-        if wallet_changed {
-            if let Some(network) = network {
-                network
-                    .io_interface
-                    .send_interface_event(InterfaceEvent::WalletUpdate());
-            }
-        }
+
+        wallet_changed
     }
 
     // removes all slips in block when pruned / deleted
-    pub fn delete_block(&mut self, block: &Block, network: Option<&Network>) {
-        let mut wallet_changed = false;
+    pub fn delete_block(&mut self, block: &Block) -> WalletUpdateStatus {
+        let mut wallet_changed = WALLET_NOT_UPDATED;
         for tx in block.transactions.iter() {
             for input in tx.from.iter() {
                 if input.public_key == self.public_key {
-                    wallet_changed = true;
+                    wallet_changed = WALLET_UPDATED;
                 }
                 self.delete_slip(input, None);
             }
@@ -188,13 +187,8 @@ impl Wallet {
                 }
             }
         }
-        if wallet_changed {
-            if let Some(network) = network {
-                network
-                    .io_interface
-                    .send_interface_event(InterfaceEvent::WalletUpdate());
-            }
-        }
+
+        wallet_changed
     }
 
     pub fn add_slip(

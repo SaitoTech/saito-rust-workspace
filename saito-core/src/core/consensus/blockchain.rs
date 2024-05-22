@@ -14,7 +14,7 @@ use crate::core::consensus::blockring::BlockRing;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
-use crate::core::consensus::wallet::Wallet;
+use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDATED};
 use crate::core::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD,
     MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
@@ -54,8 +54,8 @@ pub enum AddBlockResult {
 
 #[derive(Debug)]
 pub enum WindingResult {
-    Wind(usize, bool),
-    Unwind(usize, bool, Vec<SaitoHash>),
+    Wind(usize, bool, WalletUpdateStatus),
+    Unwind(usize, bool, Vec<SaitoHash>, WalletUpdateStatus),
     FinishWithSuccess,
     FinishWithFailure,
 }
@@ -142,9 +142,6 @@ impl Blockchain {
             .count(),
             block.transactions.len()
         );
-
-        // since we already have the block we unset the fetching state
-        // self.unmark_as_fetching(&block.hash);
 
         // start by extracting some variables that we will use
         // repeatedly in the course of adding this block to the
@@ -259,7 +256,6 @@ impl Blockchain {
         // the block faster serving it off-disk instead of fetching it
         // repeatedly from memory. Exactly when to do this is left as an
         // optimization exercise.
-        //
 
         // insert block into hashmap and index
         //
@@ -271,7 +267,6 @@ impl Blockchain {
         // we are going to transfer ownership of the block into the HashMap that stores
         // the block next, so we insert it into our BlockRing first as that will avoid
         // needing to borrow the value back for insertion into the BlockRing.
-        //
         // TODO : check if this "if" condition can be moved to an assert
         if !self
             .blockring
@@ -295,55 +290,15 @@ impl Blockchain {
         }
 
         // find shared ancestor of new_block with old_chain
-        //
-        let mut new_chain: Vec<[u8; 32]> = Vec::new();
         let mut old_chain: Vec<[u8; 32]> = Vec::new();
-        let mut shared_ancestor_found = false;
-        let mut new_chain_hash = block_hash;
-        let mut old_chain_hash = latest_block_hash;
         let mut am_i_the_longest_chain = false;
 
-        while !shared_ancestor_found {
-            if let Some(block) = self.blocks.get(&new_chain_hash) {
-                if block.in_longest_chain {
-                    shared_ancestor_found = true;
-                    trace!(
-                        "shared ancestor found : {:?} at id : {:?}",
-                        new_chain_hash.to_hex(),
-                        block.id
-                    );
-                    break;
-                } else if new_chain_hash == [0; 32] {
-                    break;
-                }
-                new_chain.push(new_chain_hash);
-                new_chain_hash = self
-                    .blocks
-                    .get(&new_chain_hash)
-                    .unwrap()
-                    .previous_block_hash;
-            } else {
-                break;
-            }
-        }
+        let (shared_ancestor_found, new_chain_hash, mut new_chain) =
+            self.calculate_new_chain_for_add_block(block_hash);
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
-            while new_chain_hash != old_chain_hash {
-                if self.blocks.contains_key(&old_chain_hash) {
-                    old_chain.push(old_chain_hash);
-                    old_chain_hash = self
-                        .blocks
-                        .get(&old_chain_hash)
-                        .unwrap()
-                        .previous_block_hash;
-                    if old_chain_hash == [0; 32] {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
+            old_chain = self.calculate_old_chain_for_add_block(latest_block_hash, new_chain_hash);
         } else {
             debug!(
                 "block without parent. block : {:?}, latest : {:?}",
@@ -442,15 +397,18 @@ impl Blockchain {
                     .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
                     .count()
             );
-            let does_new_chain_validate = self
-                .validate(
-                    new_chain.as_slice(),
-                    old_chain.as_slice(),
-                    storage,
-                    configs,
-                    network,
-                )
+            let (does_new_chain_validate, wallet_updated) = self
+                .validate(new_chain.as_slice(), old_chain.as_slice(), storage, configs)
                 .await;
+
+            if wallet_updated {
+                if let Some(network) = network {
+                    network
+                        .io_interface
+                        .send_interface_event(InterfaceEvent::WalletUpdate());
+                }
+            }
+
             debug!(
                 "Full block count after= {:?}",
                 self.blocks
@@ -508,6 +466,68 @@ impl Blockchain {
             .await;
             AddBlockResult::BlockAdded
         };
+    }
+
+    fn calculate_old_chain_for_add_block(
+        &mut self,
+        latest_block_hash: SaitoHash,
+        new_chain_hash: SaitoHash,
+    ) -> Vec<SaitoHash> {
+        let mut old_chain: Vec<[u8; 32]> = Vec::new();
+        let mut old_chain_hash = latest_block_hash;
+
+        while new_chain_hash != old_chain_hash {
+            if self.blocks.contains_key(&old_chain_hash) {
+                old_chain.push(old_chain_hash);
+                old_chain_hash = self
+                    .blocks
+                    .get(&old_chain_hash)
+                    .unwrap()
+                    .previous_block_hash;
+                if old_chain_hash == [0; 32] {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        old_chain
+    }
+
+    fn calculate_new_chain_for_add_block(
+        &mut self,
+        block_hash: SaitoHash,
+    ) -> (bool, SaitoHash, Vec<SaitoHash>) {
+        let mut new_chain: Vec<SaitoHash> = Vec::new();
+        let mut shared_ancestor_found = false;
+        let mut new_chain_hash = block_hash;
+
+        while !shared_ancestor_found {
+            if let Some(block) = self.blocks.get(&new_chain_hash) {
+                if block.in_longest_chain {
+                    shared_ancestor_found = true;
+                    trace!(
+                        "shared ancestor found : {:?} at id : {:?}",
+                        new_chain_hash.to_hex(),
+                        block.id
+                    );
+                    break;
+                } else if new_chain_hash == [0; 32] {
+                    break;
+                }
+                new_chain.push(new_chain_hash);
+                new_chain_hash = self
+                    .blocks
+                    .get(&new_chain_hash)
+                    .unwrap()
+                    .previous_block_hash;
+            } else {
+                break;
+            }
+        }
+
+        return (shared_ancestor_found, new_chain_hash, new_chain);
     }
 
     async fn add_block_success(
@@ -954,11 +974,11 @@ impl Blockchain {
         old_chain: &[SaitoHash],
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
-        network: Option<&Network>,
-    ) -> bool {
+    ) -> (bool, WalletUpdateStatus) {
         debug!("validating chains");
 
         let previous_block_hash;
+        let mut wallet_update_status = WALLET_NOT_UPDATED;
         let has_gt;
         {
             let block = self.blocks.get(new_chain[0].as_ref()).unwrap();
@@ -975,14 +995,17 @@ impl Blockchain {
             configs.is_browser(),
             configs.is_spv_mode(),
         ) {
-            return false;
+            return (false, WALLET_NOT_UPDATED);
         }
 
         if old_chain.is_empty() {
-            let mut result: WindingResult = WindingResult::Wind(new_chain.len() - 1, false);
+            let mut result: WindingResult =
+                WindingResult::Wind(new_chain.len() - 1, false, WALLET_NOT_UPDATED);
             loop {
                 match result {
-                    WindingResult::Wind(current_wind_index, wind_failure) => {
+                    WindingResult::Wind(current_wind_index, wind_failure, wallet_status) => {
+                        wallet_update_status |= wallet_status;
+
                         result = self
                             .wind_chain(
                                 new_chain,
@@ -991,11 +1014,16 @@ impl Blockchain {
                                 wind_failure,
                                 storage,
                                 configs,
-                                network,
                             )
                             .await;
                     }
-                    WindingResult::Unwind(current_unwind_index, wind_failure, old_chain) => {
+                    WindingResult::Unwind(
+                        current_unwind_index,
+                        wind_failure,
+                        old_chain,
+                        wallet_status,
+                    ) => {
+                        wallet_update_status |= wallet_status;
                         result = self
                             .unwind_chain(
                                 new_chain,
@@ -1004,20 +1032,20 @@ impl Blockchain {
                                 wind_failure,
                                 storage,
                                 configs,
-                                network,
                             )
                             .await;
                     }
-                    WindingResult::FinishWithSuccess => return true,
-                    WindingResult::FinishWithFailure => return false,
+                    WindingResult::FinishWithSuccess => return (true, wallet_update_status),
+                    WindingResult::FinishWithFailure => return (false, wallet_update_status),
                 }
             }
         } else if !new_chain.is_empty() {
             let _starting_index = 0;
-            let mut result = WindingResult::Unwind(0, true, old_chain.to_vec());
+            let mut result = WindingResult::Unwind(0, true, old_chain.to_vec(), WALLET_NOT_UPDATED);
             loop {
                 match result {
-                    WindingResult::Wind(current_wind_index, wind_failure) => {
+                    WindingResult::Wind(current_wind_index, wind_failure, wallet_status) => {
+                        wallet_update_status |= wallet_status;
                         result = self
                             .wind_chain(
                                 new_chain,
@@ -1026,11 +1054,16 @@ impl Blockchain {
                                 wind_failure,
                                 storage,
                                 configs,
-                                network,
                             )
                             .await;
                     }
-                    WindingResult::Unwind(current_wind_index, wind_failure, old_chain) => {
+                    WindingResult::Unwind(
+                        current_wind_index,
+                        wind_failure,
+                        old_chain,
+                        wallet_status,
+                    ) => {
+                        wallet_update_status |= wallet_status;
                         result = self
                             .unwind_chain(
                                 new_chain,
@@ -1039,21 +1072,20 @@ impl Blockchain {
                                 wind_failure,
                                 storage,
                                 configs,
-                                network,
                             )
                             .await;
                     }
                     WindingResult::FinishWithSuccess => {
-                        return true;
+                        return (true, wallet_update_status);
                     }
                     WindingResult::FinishWithFailure => {
-                        return false;
+                        return (false, wallet_update_status);
                     }
                 }
             }
         } else {
             warn!("lengths are inappropriate");
-            false
+            (false, wallet_update_status)
         }
     }
 
@@ -1135,7 +1167,6 @@ impl Blockchain {
         wind_failure: bool,
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
-        network: Option<&Network>,
     ) -> WindingResult {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
@@ -1164,6 +1195,7 @@ impl Blockchain {
 
         let does_block_validate =
             current_wind_index == 0 || block.validate(self, &self.utxoset, configs, storage).await;
+        let mut wallet_updated = WALLET_NOT_UPDATED;
 
         return if does_block_validate {
             // blockring update
@@ -1175,12 +1207,9 @@ impl Blockchain {
             // updating their wallets by default. wallet processing can be
             // more efficiently handled by lite-nodes.
             {
-                // trace!(" ... wallet processing start:    {}", create_timestamp());
                 let mut wallet = self.wallet_lock.write().await;
 
-                wallet.on_chain_reorganization(block, true, network);
-
-                // trace!(" ... wallet processing stop:     {}", create_timestamp());
+                wallet_updated |= wallet.on_chain_reorganization(block, true);
             }
             let block_id = block.id;
 
@@ -1190,7 +1219,8 @@ impl Blockchain {
                 block.on_chain_reorganization(&mut self.utxoset, true);
             }
 
-            self.on_chain_reorganization(block_id, *block_hash, true, storage, configs, network)
+            wallet_updated |= self
+                .on_chain_reorganization(block_id, *block_hash, true, storage, configs)
                 .await;
 
             // we have received the first entry in new_blocks() which means we
@@ -1208,7 +1238,7 @@ impl Blockchain {
                 return WindingResult::FinishWithSuccess;
             }
 
-            WindingResult::Wind(current_wind_index - 1, false)
+            WindingResult::Wind(current_wind_index - 1, false, wallet_updated)
         } else {
             // we have had an error while winding the chain. this requires us to
             // unwind any blocks we have already wound, and rewind any blocks we
@@ -1245,7 +1275,7 @@ impl Blockchain {
                 // which requires us to start at the END of the new chain vector.
                 if !old_chain.is_empty() {
                     info!("old chain len: {}", old_chain.len());
-                    WindingResult::Wind(old_chain.len() - 1, true)
+                    WindingResult::Wind(old_chain.len() - 1, true, wallet_updated)
                 } else {
                     info!("old chain is empty. finishing with failure");
                     WindingResult::FinishWithFailure
@@ -1267,7 +1297,7 @@ impl Blockchain {
                 //  [3] [2] [1]
                 //
                 // unwinding starts from the BEGINNING of the vector
-                WindingResult::Unwind(0, true, chain_to_unwind)
+                WindingResult::Unwind(0, true, chain_to_unwind, wallet_updated)
             }
         };
     }
@@ -1341,10 +1371,10 @@ impl Blockchain {
         wind_failure: bool,
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
-        network: Option<&Network>,
     ) -> WindingResult {
         let block_id;
         let block_hash;
+        let mut wallet_updated = WALLET_NOT_UPDATED;
         {
             let block = self
                 .blocks
@@ -1365,9 +1395,10 @@ impl Blockchain {
 
             // wallet update
             let mut wallet = self.wallet_lock.write().await;
-            wallet.on_chain_reorganization(block, false, network);
+            wallet_updated |= wallet.on_chain_reorganization(block, false);
         }
-        self.on_chain_reorganization(block_id, block_hash, false, storage, configs, network)
+        wallet_updated |= self
+            .on_chain_reorganization(block_id, block_hash, false, storage, configs)
             .await;
         if current_unwind_index == old_chain.len() - 1 {
             // start winding new chain
@@ -1380,13 +1411,18 @@ impl Blockchain {
             //
             // winding requires starting at the END of the vector and rolling
             // backwards until we have added block #5, etc.
-            WindingResult::Wind(new_chain.len() - 1, wind_failure)
+            WindingResult::Wind(new_chain.len() - 1, wind_failure, wallet_updated)
         } else {
             // continue unwinding,, which means
             //
             // unwinding requires moving FORWARD in our vector (and backwards in
             // the blockchain). So we increment our unwind index.
-            WindingResult::Unwind(current_unwind_index + 1, wind_failure, old_chain.to_vec())
+            WindingResult::Unwind(
+                current_unwind_index + 1,
+                wind_failure,
+                old_chain.to_vec(),
+                wallet_updated,
+            )
         }
     }
 
@@ -1400,13 +1436,14 @@ impl Blockchain {
         longest_chain: bool,
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
-        network: Option<&Network>,
-    ) {
+    ) -> WalletUpdateStatus {
         debug!(
             "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
             block_id,
             block_hash.to_hex()
         );
+
+        let mut wallet_updated: WalletUpdateStatus = WALLET_NOT_UPDATED;
         // skip out if earlier than we need to be vis-a-vis last_block_id
         if self.last_block_id >= block_id {
             debug!(
@@ -1414,7 +1451,7 @@ impl Blockchain {
                 self.last_block_id, block_id
             );
             self.downgrade_blockchain_data(configs.is_spv_mode()).await;
-            return;
+            return wallet_updated;
         }
 
         if longest_chain {
@@ -1435,7 +1472,7 @@ impl Blockchain {
             }
 
             // update genesis period, purge old data
-            self.update_genesis_period(storage, network).await;
+            wallet_updated = self.update_genesis_period(storage).await;
 
             // generate fork_id
             let fork_id = self.generate_fork_id(block_id);
@@ -1443,9 +1480,11 @@ impl Blockchain {
         }
 
         self.downgrade_blockchain_data(configs.is_spv_mode()).await;
+
+        wallet_updated
     }
 
-    async fn update_genesis_period(&mut self, storage: &Storage, network: Option<&Network>) {
+    async fn update_genesis_period(&mut self, storage: &Storage) -> WalletUpdateStatus {
         // we need to make sure this is not a random block that is disconnected
         // from our previous genesis_id. If there is no connection between it
         // and us, then we cannot delete anything as otherwise the provision of
@@ -1465,23 +1504,21 @@ impl Blockchain {
             // lowest_block_id that we have found. we use the purge_id to
             // handle purges.
             if purge_bid > 0 {
-                self.delete_blocks(purge_bid, storage, network).await;
+                return self.delete_blocks(purge_bid, storage).await;
             }
         }
 
+        WALLET_NOT_UPDATED
         //TODO: we already had in update_genesis_period() in self method - maybe no need to call here?
         // self.downgrade_blockchain_data().await;
     }
 
-    //
-    // deletes all blocks at a single block_id
-    //
+    /// deletes all blocks at a single block_id
     async fn delete_blocks(
         &mut self,
         delete_block_id: u64,
         storage: &Storage,
-        network: Option<&Network>,
-    ) {
+    ) -> WalletUpdateStatus {
         trace!(
             "removing data including from disk at id {}",
             delete_block_id
@@ -1498,62 +1535,52 @@ impl Blockchain {
 
         trace!("number of hashes to remove {}", block_hashes_copy.len());
 
+        let mut wallet_update_status = WALLET_NOT_UPDATED;
         for hash in block_hashes_copy {
-            self.delete_block(delete_block_id, hash, storage, network)
-                .await;
+            let status = self.delete_block(delete_block_id, hash, storage).await;
+            wallet_update_status |= status;
         }
+        wallet_update_status
     }
 
-    //
-    // deletes a single block
-    //
+    /// deletes a single block
     async fn delete_block(
         &mut self,
         delete_block_id: u64,
         delete_block_hash: SaitoHash,
         storage: &Storage,
-        network: Option<&Network>,
-    ) {
-        //
+    ) -> WalletUpdateStatus {
+        let wallet_update_status;
         // ask block to delete itself / utxo-wise
-        //
         {
-            let pblock = self.blocks.get(&delete_block_hash).unwrap();
-            let pblock_filename = storage.generate_block_filepath(pblock);
+            let block = self.blocks.get(&delete_block_hash).unwrap();
+            let block_filename = storage.generate_block_filepath(block);
 
-            //
             // remove slips from wallet
-            //
             {
                 let mut wallet = self.wallet_lock.write().await;
 
-                wallet.delete_block(pblock, network);
+                wallet_update_status = wallet.delete_block(block);
             }
-            //
             // removes utxoset data
-            //
-            pblock.delete(&mut self.utxoset).await;
+            block.delete(&mut self.utxoset).await;
 
-            //
             // deletes block from disk
-            //
             storage
-                .delete_block_from_disk(pblock_filename.as_str())
+                .delete_block_from_disk(block_filename.as_str())
                 .await;
         }
 
-        //
         // ask blockring to remove
-        //
         self.blockring
             .delete_block(delete_block_id, delete_block_hash);
 
-        //
         // remove from block index
-        //
         if self.blocks.contains_key(&delete_block_hash) {
             self.blocks.remove_entry(&delete_block_hash);
         }
+
+        wallet_update_status
     }
 
     async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
