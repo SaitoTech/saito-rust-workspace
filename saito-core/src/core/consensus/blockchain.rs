@@ -16,9 +16,9 @@ use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDATED};
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD,
-    MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
-    PRUNE_AFTER_BLOCKS,
+    BlockHash, Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet,
+    GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
+    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -46,7 +46,11 @@ const FORK_ID_WEIGHTS: [u64; 16] = [
 
 #[derive(Debug)]
 pub enum AddBlockResult {
-    BlockAdded,
+    BlockAddedSuccessfully(
+        BlockHash,
+        bool, /*is in the longest chain ?*/
+        WalletUpdateStatus,
+    ),
     BlockAlreadyExists,
     FailedButRetry,
     FailedNotValid,
@@ -120,9 +124,7 @@ impl Blockchain {
     pub async fn add_block(
         &mut self,
         mut block: Block,
-        network: Option<&Network>,
         storage: &mut Storage,
-        sender_to_miner: Option<Sender<MiningEvent>>,
         sender_to_router: Option<Sender<RoutingEvent>>,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
@@ -401,14 +403,6 @@ impl Blockchain {
                 .validate(new_chain.as_slice(), old_chain.as_slice(), storage, configs)
                 .await;
 
-            if wallet_updated {
-                if let Some(network) = network {
-                    network
-                        .io_interface
-                        .send_interface_event(InterfaceEvent::WalletUpdate());
-                }
-            }
-
             debug!(
                 "Full block count after= {:?}",
                 self.blocks
@@ -418,32 +412,10 @@ impl Blockchain {
             );
 
             if does_new_chain_validate {
-                self.add_block_success(
-                    block_hash,
-                    network,
-                    storage,
-                    mempool,
-                    configs,
-                    sender_to_miner.is_some(),
-                )
-                .await;
+                self.add_block_success(block_hash, storage, mempool, configs)
+                    .await;
 
-                let difficulty = self.blocks.get(&block_hash).unwrap().difficulty;
-
-                if sender_to_miner.is_some() {
-                    debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?} channel_capacity : {:?}", block_hash.to_hex(), difficulty,sender_to_miner.as_ref().unwrap().capacity());
-                    sender_to_miner
-                        .unwrap()
-                        .send(MiningEvent::LongestChainBlockAdded {
-                            hash: block_hash,
-                            difficulty,
-                            block_id,
-                        })
-                        .await
-                        .unwrap();
-                }
-
-                AddBlockResult::BlockAdded
+                AddBlockResult::BlockAddedSuccessfully(block_hash, true, wallet_updated)
             } else {
                 warn!(
                     "new chain doesn't validate with hash : {:?}",
@@ -455,16 +427,13 @@ impl Blockchain {
             }
         } else {
             debug!("this is not the longest chain");
-            self.add_block_success(
+            self.add_block_success(block_hash, storage, mempool, configs)
+                .await;
+            AddBlockResult::BlockAddedSuccessfully(
                 block_hash,
-                network,
-                storage,
-                mempool,
-                configs,
-                sender_to_miner.is_some(),
+                false, /*not in longest_chain*/
+                WALLET_NOT_UPDATED,
             )
-            .await;
-            AddBlockResult::BlockAdded
         };
     }
 
@@ -527,31 +496,23 @@ impl Blockchain {
             }
         }
 
-        return (shared_ancestor_found, new_chain_hash, new_chain);
+        (shared_ancestor_found, new_chain_hash, new_chain)
     }
 
     async fn add_block_success(
         &mut self,
         block_hash: SaitoHash,
-        network: Option<&Network>,
         storage: &mut Storage,
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
-        notify_miner: bool,
     ) {
         debug!("add_block_success : {:?}", block_hash.to_hex());
-
-        // print blockring longest_chain_block_hash infor
-        if notify_miner {
-            // we only print blockchain after block queue is added to reduce the clutter in logs
-            self.print(10);
-        }
 
         let mut block_id = 0;
         let mut block_type = BlockType::Pruned;
         let mut tx_count = 0;
         // save to disk
-        if network.is_some() {
+        {
             let block = self.get_block(&block_hash).unwrap();
             block_id = block.id;
             block_type = block.block_type;
@@ -569,7 +530,6 @@ impl Blockchain {
                     block.block_type
                 );
             }
-            network.unwrap().propagate_block(block, configs).await;
         }
 
         // TODO: clean up mempool - I think we shouldn't cleanup mempool here.
@@ -587,11 +547,6 @@ impl Blockchain {
             block_type,
             tx_count
         );
-        if let Some(network) = network {
-            network
-                .io_interface
-                .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block_id));
-        }
     }
 
     fn remove_block_transactions(&self, block_hash: &SaitoHash, mempool: &mut Mempool) {
@@ -1638,26 +1593,58 @@ impl Blockchain {
 
             debug!("blocks to add : {:?}", blocks.len());
             while let Some(block) = blocks.pop_front() {
-                // info!("adding block : {:?}", block.id);
                 let mut sender = None;
                 if blocks.is_empty() {
                     sender = sender_to_miner.clone();
                 }
-                let block_hash = block.hash;
                 let result = self
                     .add_block(
                         block,
-                        network,
                         storage,
-                        sender,
                         sender_to_router.clone(),
                         &mut mempool,
                         configs,
                     )
                     .await;
                 match result {
-                    AddBlockResult::BlockAdded => {
+                    AddBlockResult::BlockAddedSuccessfully(
+                        block_hash,
+                        in_longest_chain,
+                        wallet_updated,
+                    ) => {
                         blockchain_updated = true;
+                        let block = self
+                            .blocks
+                            .get(&block_hash)
+                            .expect("block should be here since it was added successfully");
+
+                        if sender.is_some() && in_longest_chain {
+                            debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?} channel_capacity : {:?}", block_hash.to_hex(), block.difficulty, sender_to_miner.as_ref().unwrap().capacity());
+                            sender
+                                .unwrap()
+                                .send(MiningEvent::LongestChainBlockAdded {
+                                    hash: block_hash,
+                                    difficulty: block.difficulty,
+                                    block_id: block.id,
+                                })
+                                .await
+                                .unwrap();
+                        }
+
+                        if let Some(network) = network {
+                            network.io_interface.send_interface_event(
+                                InterfaceEvent::BlockAddSuccess(block_hash, block.id),
+                            );
+
+                            if wallet_updated {
+                                network
+                                    .io_interface
+                                    .send_interface_event(InterfaceEvent::WalletUpdate());
+                            }
+
+                            network.propagate_block(block, configs).await;
+                        }
+
                         if let Some(sender) = sender_to_router.clone() {
                             sender
                                 .send(RoutingEvent::BlockchainUpdated(block_hash))
@@ -1669,11 +1656,9 @@ impl Blockchain {
                     AddBlockResult::FailedButRetry => {}
                     AddBlockResult::FailedNotValid => {}
                 }
-                if !blockchain_updated {
-                    if let AddBlockResult::BlockAdded = result {
-                        blockchain_updated = true;
-                    }
-                }
+            }
+            if sender_to_miner.is_some() {
+                self.print(10);
             }
 
             debug!(
