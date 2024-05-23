@@ -863,20 +863,19 @@ impl Blockchain {
         old_chain.len() < new_chain.len() && old_bf <= new_bf
     }
 
-    // when new_chain and old_chain are generated the block_hashes are added
-    // to their vectors from tip-to-shared-ancestors. if the shared ancestors
-    // is at position [0] in our blockchain for instance, we may receive:
-    //
-    // new_chain --> adds the hashes in this order
-    //   [5] [4] [3] [2] [1]
-    //
-    // old_chain --> adds the hashes in this order
-    //   [4] [3] [2] [1]
-    //
-    // unwinding requires starting from the BEGINNING of the vector, while
-    // winding requires starting from th END of the vector. the loops move
-    // in opposite directions.
-    //
+    /// when new_chain and old_chain are generated the block_hashes are added
+    /// to their vectors from tip-to-shared-ancestors. if the shared ancestors
+    /// is at position [0] in our blockchain for instance, we may receive:
+    ///
+    /// new_chain --> adds the hashes in this order
+    /// [5] [4] [3] [2] [1]
+    ///
+    /// old_chain --> adds the hashes in this order
+    /// [4] [3] [2] [1]
+    ///
+    /// unwinding requires starting from the BEGINNING of the vector, while
+    /// winding requires starting from th END of the vector. the loops move
+    /// in opposite directions.
     async fn validate(
         &mut self,
         new_chain: &[SaitoHash],
@@ -894,10 +893,10 @@ impl Blockchain {
             previous_block_hash = block.previous_block_hash;
             has_gt = block.has_golden_ticket;
         }
+
         // ensure new chain has adequate mining support to be considered as
         // a viable chain. we handle this check here as opposed to handling
         // it in wind_chain as we only need to check once for the entire chain
-        //
         if !self.is_golden_ticket_count_valid(
             previous_block_hash,
             has_gt,
