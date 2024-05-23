@@ -261,6 +261,12 @@ impl Peer {
         wallet_lock: Arc<RwLock<Wallet>>,
     ) -> Option<()> {
         let wallet = wallet_lock.read().await;
+
+        if !wallet.version.is_set() || !self.version.is_set() {
+            // TODO : this is a temporary fix to make sure rust node which does not know about wallet.ts's version sync with a SLR node
+            return Some(());
+        }
+
         if wallet.version > self.version {
             warn!(
                 "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
