@@ -12,6 +12,12 @@ pub struct Version {
     pub patch: u16,
 }
 
+impl Version {
+    pub fn is_set(&self) -> bool {
+        self.major != 0 || self.minor != 0 || self.patch != 0
+    }
+}
+
 impl Serialize<Self> for Version {
     fn serialize(&self) -> Vec<u8> {
         let mut v = [self.major, self.minor].to_vec();
