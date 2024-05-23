@@ -7,7 +7,7 @@ use ahash::{AHashMap, HashMap};
 use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockWriteGuard};
 
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockring::BlockRing;
@@ -1534,9 +1534,8 @@ impl Blockchain {
         sender_to_miner: Option<Sender<MiningEvent>>,
         sender_to_router: Option<Sender<RoutingEvent>>,
         configs: &(dyn Configuration + Send + Sync),
-    ) -> bool {
+    ) {
         debug!("adding blocks from mempool to blockchain");
-        let mut blockchain_updated = false;
         let mut blocks: VecDeque<Block>;
         {
             let mut mempool = mempool_lock.write().await;
@@ -1557,65 +1556,31 @@ impl Blockchain {
                         in_longest_chain,
                         wallet_updated,
                     ) => {
-                        blockchain_updated = true;
-                        let block = self
-                            .blocks
-                            .get(&block_hash)
-                            .expect("block should be here since it was added successfully");
-
-                        if sender.is_some() && in_longest_chain {
-                            debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?} channel_capacity : {:?}", block_hash.to_hex(), block.difficulty, sender_to_miner.as_ref().unwrap().capacity());
-                            sender
-                                .unwrap()
-                                .send(MiningEvent::LongestChainBlockAdded {
-                                    hash: block_hash,
-                                    difficulty: block.difficulty,
-                                    block_id: block.id,
-                                })
-                                .await
-                                .unwrap();
-                        }
-
-                        if let Some(network) = network {
-                            network.io_interface.send_interface_event(
-                                InterfaceEvent::BlockAddSuccess(block_hash, block.id),
-                            );
-
-                            if wallet_updated {
-                                network
-                                    .io_interface
-                                    .send_interface_event(InterfaceEvent::WalletUpdate());
-                            }
-
-                            network.propagate_block(block, configs).await;
-                        }
-
-                        if let Some(sender) = sender_to_router.clone() {
-                            sender
-                                .send(RoutingEvent::BlockchainUpdated(block_hash))
-                                .await
-                                .unwrap();
-                        }
+                        let sender_to_miner = if blocks.is_empty() {
+                            sender_to_miner.clone()
+                        } else {
+                            None
+                        };
+                        self.handle_successful_block_addition(
+                            network,
+                            sender_to_miner,
+                            sender_to_router.clone(),
+                            configs.is_spv_mode(),
+                            block_hash,
+                            in_longest_chain,
+                            wallet_updated,
+                        )
+                        .await;
                     }
                     AddBlockResult::BlockAlreadyExists => {}
                     AddBlockResult::FailedButRetry(block, fetch_prev_block) => {
-                        debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
-                                    block.hash.to_hex(),
-                                    block.previous_block_hash.to_hex());
-
-                        if fetch_prev_block && sender_to_router.is_some() {
-                            sender_to_router
-                                .as_ref()
-                                .unwrap()
-                                .send(RoutingEvent::BlockFetchRequest(
-                                    block.routed_from_peer.unwrap_or(0),
-                                    block.previous_block_hash,
-                                    block.id - 1,
-                                ))
-                                .await
-                                .expect("sending block fetch request failed");
-                        }
-                        mempool.add_block(block);
+                        Self::handle_failed_block_to_be_retried(
+                            sender_to_router.clone(),
+                            &mut mempool,
+                            block,
+                            fetch_prev_block,
+                        )
+                        .await;
                     }
                     AddBlockResult::FailedNotValid => {}
                 }
@@ -1632,8 +1597,84 @@ impl Blockchain {
 
         let mut wallet = self.wallet_lock.write().await;
         Wallet::save(&mut wallet, storage.io_interface.as_ref()).await;
+    }
 
-        blockchain_updated
+    async fn handle_successful_block_addition(
+        &mut self,
+        network: Option<&Network>,
+        sender_to_miner: Option<Sender<MiningEvent>>,
+        sender_to_router: Option<Sender<RoutingEvent>>,
+        is_spv_mode: bool,
+        block_hash: BlockHash,
+        in_longest_chain: bool,
+        wallet_updated: WalletUpdateStatus,
+    ) {
+        let block = self
+            .blocks
+            .get(&block_hash)
+            .expect("block should be here since it was added successfully");
+
+        if sender_to_miner.is_some() && in_longest_chain {
+            debug!("sending longest chain block added event to miner : hash : {:?} difficulty : {:?} channel_capacity : {:?}",
+                block_hash.to_hex(), block.difficulty, sender_to_miner.as_ref().unwrap().capacity());
+            sender_to_miner
+                .unwrap()
+                .send(MiningEvent::LongestChainBlockAdded {
+                    hash: block_hash,
+                    difficulty: block.difficulty,
+                    block_id: block.id,
+                })
+                .await
+                .unwrap();
+        }
+
+        if let Some(network) = network {
+            network
+                .io_interface
+                .send_interface_event(InterfaceEvent::BlockAddSuccess(block_hash, block.id));
+
+            if wallet_updated {
+                network
+                    .io_interface
+                    .send_interface_event(InterfaceEvent::WalletUpdate());
+            }
+
+            if !is_spv_mode {
+                network.propagate_block(block).await;
+            }
+        }
+
+        if let Some(sender) = sender_to_router {
+            sender
+                .send(RoutingEvent::BlockchainUpdated(block_hash))
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn handle_failed_block_to_be_retried(
+        sender_to_router: Option<Sender<RoutingEvent>>,
+        mempool: &mut Mempool,
+        block: Block,
+        fetch_prev_block: bool,
+    ) {
+        debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
+                                    block.hash.to_hex(),
+                                    block.previous_block_hash.to_hex());
+
+        if fetch_prev_block && sender_to_router.is_some() {
+            sender_to_router
+                .as_ref()
+                .unwrap()
+                .send(RoutingEvent::BlockFetchRequest(
+                    block.routed_from_peer.unwrap_or(0),
+                    block.previous_block_hash,
+                    block.id - 1,
+                ))
+                .await
+                .expect("sending block fetch request failed");
+        }
+        mempool.add_block(block);
     }
 
     pub fn add_ghost_block(
