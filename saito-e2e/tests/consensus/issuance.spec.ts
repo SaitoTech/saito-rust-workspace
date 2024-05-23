@@ -1,9 +1,16 @@
 import { test } from "@playwright/test";
+import SlrNode from "../../src/slr.node";
+import { execSync } from "child_process";
 
 let fs = require("fs");
 let process = require("process");
+let { exec } = require("child_process");
 
-test("issuance file generation @consensus", async ({ page }, testInfo) => {
+test.skip("issuance file generation @consensus", async ({ page, browserName }, testInfo) => {
+  if (browserName !== "chromium") {
+    testInfo.skip();
+    return;
+  }
   testInfo.setTimeout(0);
   let dir = "./temp";
   if (fs.existsSync(dir)) {
@@ -13,11 +20,17 @@ test("issuance file generation @consensus", async ({ page }, testInfo) => {
     fs.mkdirSync(dir);
   }
 
+  let node = new SlrNode();
+  await node.resetNode();
+
+  await node.startNode();
+
+  // await page.waitForTimeout(10000);
+
+  await node.stopNode();
   // generate some blocks
-  process.exec();
 
   // run utxo file generation in SLR
 
   // check the entries in the generated issuance file
-  console.log("cwd = " + process.cwd());
 });
