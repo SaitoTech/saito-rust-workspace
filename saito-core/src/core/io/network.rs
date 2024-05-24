@@ -272,7 +272,6 @@ impl Network {
             peer_index
         );
         let mut peers = self.peer_lock.write().await;
-
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             error!(
@@ -282,6 +281,16 @@ impl Network {
             return;
         }
         let peer = peer.unwrap();
+        if !peer.rate_limiter.check(peer_index) {
+            warn!("peer {:?} exceeded rate limit for key list", peer_index);
+            return;
+        }
+
+        debug!(
+            "handling received keylist of length : {:?} from peer : {:?}",
+            key_list.len(),
+            peer_index
+        );
 
         peer.key_list = key_list;
     }

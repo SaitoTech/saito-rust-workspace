@@ -15,6 +15,7 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
+use crate::core::util::rate_limiter::RateLimiter;
 
 #[derive(Clone, Debug)]
 pub enum PeerStatus {
