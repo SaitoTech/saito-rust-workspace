@@ -389,11 +389,12 @@ impl RoutingThread {
         let wallet = self.wallet_lock.read().await;
 
         if let Some(peer) = peers.index_to_peers.get(&peer_index) {
-            let result = peer
-                .compare_versions(block_hash, self.wallet_lock.clone())
-                .await;
-
-            if result.is_none() {
+            // TODO : check if this check can be removed from here, since network.rs also have the same check
+            if wallet.version > peer.version {
+                warn!(
+                    "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
+                    block_hash.to_hex(), peer.index, wallet.version, peer.version
+                );
                 return;
             }
         }

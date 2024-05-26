@@ -16,6 +16,14 @@ impl Version {
     pub fn is_set(&self) -> bool {
         self.major != 0 || self.minor != 0 || self.patch != 0
     }
+
+    pub fn new(major: u8, minor: u8, patch: u16) -> Self {
+        Version {
+            major,
+            minor,
+            patch,
+        }
+    }
 }
 
 impl Serialize<Self> for Version {

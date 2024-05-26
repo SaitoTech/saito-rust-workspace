@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -45,7 +46,7 @@ impl Peer {
     }
     pub async fn initiate_handshake(
         &mut self,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        io_handler: &(dyn InterfaceIO + Send + Sync),
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.index);
 
@@ -255,32 +256,21 @@ impl Peer {
         self.static_peer_config.as_ref().unwrap().is_main
     }
 
-    pub async fn compare_versions(
-        &self,
-        block_hash: SaitoHash,
-        wallet_lock: Arc<RwLock<Wallet>>,
-    ) -> Option<()> {
-        let wallet = wallet_lock.read().await;
-
-        if !wallet.version.is_set() || !self.version.is_set() {
-            // TODO : this is a temporary fix to make sure rust node which does not know about wallet.ts's version sync with a SLR node
-            return Some(());
+    pub fn compare_version(&self, version: &Version) -> Option<Ordering> {
+        // for peer versions, if the version is not set we still consider it as a valid peer
+        // TODO : this could lead to an attack. need to provide different versions for different layer components
+        if !version.is_set() || !self.version.is_set() {
+            return Some(Ordering::Equal);
         }
-
-        if wallet.version > self.version {
-            warn!(
-                "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
-                block_hash.to_hex(), self.index, wallet.version, self.version
-            );
-            return None;
-        }
-        Some(())
+        self.version.partial_cmp(version)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::core::consensus::peer::Peer;
+    use crate::core::process::version::Version;
+    use std::cmp::Ordering;
 
     #[test]
     fn peer_new_test() {
@@ -291,5 +281,57 @@ mod tests {
         assert_eq!(peer.block_fetch_url, "".to_string());
         assert_eq!(peer.static_peer_config, None);
         assert_eq!(peer.challenge_for_peer, None);
+    }
+
+    #[test]
+    fn peer_compare_test() {
+        let mut peer_1 = Peer::new(1);
+        let mut peer_2 = Peer::new(2);
+        let mut peer_3 = Peer::new(3);
+        let mut peer_4 = Peer::new(4);
+
+        assert_eq!(peer_1.version, Version::new(0, 0, 0));
+
+        peer_2.version = Version::new(0, 0, 1);
+
+        peer_3.version = Version::new(0, 1, 0);
+
+        peer_4.version = Version::new(1, 0, 0);
+
+        assert_eq!(
+            peer_1.compare_version(&peer_2.version),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(
+            peer_2.compare_version(&peer_1.version),
+            Some(Ordering::Equal)
+        );
+
+        assert_eq!(
+            peer_3.compare_version(&peer_2.version),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            peer_2.compare_version(&peer_3.version),
+            Some(Ordering::Less)
+        );
+
+        assert_eq!(
+            peer_3.compare_version(&peer_4.version),
+            Some(Ordering::Less)
+        );
+        assert_eq!(
+            peer_4.compare_version(&peer_3.version),
+            Some(Ordering::Greater)
+        );
+
+        assert_eq!(
+            peer_3.compare_version(&peer_3.version),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(
+            peer_1.compare_version(&peer_1.version),
+            Some(Ordering::Equal)
+        );
     }
 }

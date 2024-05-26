@@ -7,7 +7,7 @@ use ahash::{AHashMap, HashMap};
 use log::{debug, error, info, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::{RwLock, RwLockWriteGuard};
+use tokio::sync::RwLock;
 
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockring::BlockRing;
@@ -948,7 +948,6 @@ impl Blockchain {
                 }
             }
         } else if !new_chain.is_empty() {
-            let _starting_index = 0;
             let mut result = WindingResult::Unwind(0, true, old_chain.to_vec(), WALLET_NOT_UPDATED);
             loop {
                 match result {
@@ -1079,7 +1078,7 @@ impl Blockchain {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
         // if we are winding a non-existent chain with a wind_failure it
-        // means our wind attempt failed and we should move directly into
+        // means our wind attempt failed, and we should move directly into
         // add_block_failure() by returning false.
         if wind_failure && new_chain.is_empty() {
             return WindingResult::FinishWithFailure;

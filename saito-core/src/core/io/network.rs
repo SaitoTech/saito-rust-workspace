@@ -223,7 +223,9 @@ impl Network {
 
         if peer.static_peer_config.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-            peer.initiate_handshake(&self.io_interface).await.unwrap();
+            peer.initiate_handshake(self.io_interface.as_ref())
+                .await
+                .unwrap();
         } else {
             debug!(
                 "removing static peer config : {:?}",
@@ -461,10 +463,16 @@ impl Network {
         let url;
         {
             let peers = self.peer_lock.read().await;
+            let wallet = self.wallet_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
-                peer.compare_versions(block_hash, self.wallet_lock.clone())
-                    .await?;
+                if wallet.version > peer.version {
+                    warn!(
+                    "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
+                    block_hash.to_hex(), peer.index, wallet.version, peer.version
+                );
+                    return None;
+                }
 
                 if peer.block_fetch_url.is_empty() {
                     debug!(
