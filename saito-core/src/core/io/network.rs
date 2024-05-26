@@ -551,7 +551,8 @@ impl Network {
         let current_time = self.timer.get_timestamp_in_ms();
         let mut peers = self.peer_lock.write().await;
         for (_, peer) in peers.index_to_peers.iter_mut() {
-            peer.send_ping(current_time, &self.io_interface).await;
+            peer.send_ping(current_time, self.io_interface.as_ref())
+                .await;
         }
     }
 

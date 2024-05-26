@@ -235,7 +235,7 @@ impl Peer {
     pub async fn send_ping(
         &mut self,
         current_time: Timestamp,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        io_handler: &(dyn InterfaceIO + Send + Sync),
     ) {
         if self.last_msg_at + WS_KEEP_ALIVE_PERIOD < current_time {
             self.last_msg_at = current_time;
@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn peer_compare_test() {
-        let mut peer_1 = Peer::new(1);
+        let peer_1 = Peer::new(1);
         let mut peer_2 = Peer::new(2);
         let mut peer_3 = Peer::new(3);
         let mut peer_4 = Peer::new(4);
