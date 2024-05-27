@@ -224,6 +224,7 @@ export default class Saito {
       let socket = this.sockets.get(index);
       this.sockets.delete(index);
       if (socket) {
+        console.log("closing socket for peer index : " + index);
         socket.close();
       }
     } catch (error) {

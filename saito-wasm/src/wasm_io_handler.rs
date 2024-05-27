@@ -69,7 +69,7 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+    async fn disconnect_from_peer(&self, peer_index: u64) -> Result<(), Error> {
         trace!("disconnect from peer : {:?}", peer_index);
         MsgHandler::disconnect_from_peer(js_sys::BigInt::from(peer_index))
             .expect("TODO: panic message");

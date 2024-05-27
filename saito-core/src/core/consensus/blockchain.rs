@@ -1544,10 +1544,6 @@ impl Blockchain {
 
             debug!("blocks to add : {:?}", blocks.len());
             while let Some(block) = blocks.pop_front() {
-                let mut sender = None;
-                if blocks.is_empty() {
-                    sender = sender_to_miner.clone();
-                }
                 let result = self.add_block(block, storage, &mut mempool, configs).await;
                 match result {
                     AddBlockResult::BlockAddedSuccessfully(
