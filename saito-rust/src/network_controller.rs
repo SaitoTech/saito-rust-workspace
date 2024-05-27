@@ -458,7 +458,7 @@ impl NetworkController {
                                 };
                                 sender.send(message).await.expect("sending failed");
                             }
-                            tokio_tungstenite::tungstenite::Message::Close(x) => {
+                            tokio_tungstenite::tungstenite::Message::Close(_) => {
                                 info!("socket for peer : {:?} was closed", peer_index);
                                 NetworkController::send_peer_disconnect(sender, peer_index).await;
                                 sockets.lock().await.remove(&peer_index);
