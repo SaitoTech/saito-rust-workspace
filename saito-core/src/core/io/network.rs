@@ -263,7 +263,7 @@ impl Network {
         let peer = peer.unwrap();
         peer.handle_handshake_challenge(
             challenge,
-            &self.io_interface,
+            self.io_interface.as_ref(),
             wallet_lock.clone(),
             config_lock,
         )
@@ -293,7 +293,7 @@ impl Network {
         let result = peer
             .handle_handshake_response(
                 response,
-                &self.io_interface,
+                self.io_interface.as_ref(),
                 wallet_lock.clone(),
                 configs_lock.clone(),
             )
@@ -466,10 +466,10 @@ impl Network {
             let wallet = self.wallet_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
-                if wallet.version > peer.version {
+                if wallet.wallet_version > peer.app_version {
                     warn!(
                     "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
-                    block_hash.to_hex(), peer.index, wallet.version, peer.version
+                    block_hash.to_hex(), peer.index, wallet.wallet_version, peer.app_version
                 );
                     return None;
                 }

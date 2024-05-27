@@ -5,6 +5,25 @@ use std::io::{Error, ErrorKind};
 
 const VERSION_SIZE: u8 = 4;
 
+pub fn read_pkg_version() -> Version {
+    let v = env!("CARGO_PKG_VERSION");
+
+    let tokens: Vec<&str> = v.split('.').collect();
+    if tokens.len() != 3 {
+        return Default::default();
+    }
+
+    let major = tokens[0].parse();
+    let minor = tokens[1].parse();
+    let patch = tokens[2].parse();
+
+    if major.is_err() || minor.is_err() || patch.is_err() {
+        return Default::default();
+    }
+
+    Version::new(major.unwrap(), minor.unwrap(), patch.unwrap())
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Version {
     pub major: u8,
@@ -41,11 +60,13 @@ impl Serialize<Self> for Version {
             );
             return Err(Error::from(ErrorKind::InvalidData));
         }
-        // TODO : refactor and optimize this
         let ver = Version {
-            major: *buffer.get(0).unwrap(),
-            minor: *buffer.get(1).unwrap(),
-            patch: u16::from_be_bytes([*buffer.get(2).unwrap(), *buffer.get(3).unwrap()]),
+            major: *buffer.get(0).ok_or(Error::from(ErrorKind::InvalidInput))?,
+            minor: *buffer.get(1).ok_or(Error::from(ErrorKind::InvalidInput))?,
+            patch: u16::from_be_bytes([
+                *buffer.get(2).ok_or(Error::from(ErrorKind::InvalidInput))?,
+                *buffer.get(3).ok_or(Error::from(ErrorKind::InvalidInput))?,
+            ]),
         };
 
         Ok(ver)

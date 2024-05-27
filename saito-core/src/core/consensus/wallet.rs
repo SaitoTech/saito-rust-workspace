@@ -12,7 +12,7 @@ use crate::core::defs::{
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::io::network::Network;
 use crate::core::io::storage::Storage;
-use crate::core::process::version::Version;
+use crate::core::process::version::{read_pkg_version, Version};
 use crate::core::util::balance_snapshot::BalanceSnapshot;
 use crate::core::util::crypto::{generate_keys, hash, sign};
 
@@ -57,7 +57,8 @@ pub struct Wallet {
     available_balance: Currency,
     pub pending_txs: AHashMap<SaitoHash, Transaction>,
     // TODO : this version should be removed. only added as a temporary hack to allow SLR app version to be easily upgraded in browsers
-    pub version: Version,
+    pub wallet_version: Version,
+    pub core_version: Version,
     pub key_list: Vec<SaitoPublicKey>,
 }
 
@@ -75,7 +76,8 @@ impl Wallet {
             filepass: "password".to_string(),
             available_balance: 0,
             pending_txs: Default::default(),
-            version: Default::default(),
+            wallet_version: Default::default(),
+            core_version: read_pkg_version(),
             key_list: vec![],
         }
     }

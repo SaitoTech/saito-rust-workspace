@@ -12,7 +12,6 @@ pub struct HandshakeChallenge {
     pub challenge: SaitoHash,
 }
 
-// TODO : can we drop other 2 structs and only use this ? need to confirm with more fields being added
 #[derive(Debug)]
 pub struct HandshakeResponse {
     pub public_key: SaitoPublicKey,
@@ -21,8 +20,8 @@ pub struct HandshakeResponse {
     pub block_fetch_url: String,
     pub challenge: SaitoHash,
     pub services: Vec<PeerService>,
-    /// core version
-    pub version: Version,
+    pub wallet_version: Version,
+    pub core_version: Version,
 }
 
 impl Serialize<Self> for HandshakeChallenge {
@@ -40,7 +39,10 @@ impl Serialize<Self> for HandshakeChallenge {
         }
 
         let mut challenge = HandshakeChallenge { challenge: [0; 32] };
-        challenge.challenge = buffer[0..32].to_vec().try_into().unwrap();
+        challenge.challenge = buffer[0..32]
+            .to_vec()
+            .try_into()
+            .or(Err(Error::from(ErrorKind::InvalidInput)))?;
 
         Ok(challenge)
     }
@@ -49,7 +51,8 @@ impl Serialize<Self> for HandshakeChallenge {
 impl Serialize<Self> for HandshakeResponse {
     fn serialize(&self) -> Vec<u8> {
         [
-            self.version.serialize(),
+            self.core_version.serialize(),
+            self.wallet_version.serialize(),
             self.public_key.to_vec(),
             self.signature.to_vec(),
             self.challenge.to_vec(),
@@ -63,9 +66,9 @@ impl Serialize<Self> for HandshakeResponse {
     fn deserialize(buffer: &Vec<u8>) -> Result<Self, Error> {
         trace!("deserializing handshake buffer : {:?}", buffer.len());
 
-        const MIN_LEN: usize = 138;
+        const MIN_LEN: usize = 142;
 
-        if buffer.len() < 138 {
+        if buffer.len() < MIN_LEN {
             warn!(
                 "Deserializing failed for handshake response, buffer size is :{:?}",
                 buffer.len()
@@ -74,16 +77,29 @@ impl Serialize<Self> for HandshakeResponse {
         }
 
         let mut response = HandshakeResponse {
-            // TODO : check version first and then deserialize other variables
-            version: Version::deserialize(&buffer[0..4].to_vec()).unwrap(),
-            public_key: buffer[4..37].to_vec().try_into().unwrap(),
-            signature: buffer[37..101].to_vec().try_into().unwrap(),
-            challenge: buffer[101..133].to_vec().try_into().unwrap(),
-            is_lite: buffer[133] != 0,
+            core_version: Version::deserialize(&buffer[0..4].to_vec())?,
+            wallet_version: Version::deserialize(&buffer[4..8].to_vec())?,
+            public_key: buffer[8..41]
+                .to_vec()
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidInput)))?,
+            signature: buffer[41..105]
+                .to_vec()
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidInput)))?,
+            challenge: buffer[105..137]
+                .to_vec()
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidInput)))?,
+            is_lite: buffer[137] != 0,
             block_fetch_url: "".to_string(),
             services: vec![],
         };
-        let url_length = u32::from_be_bytes(buffer[134..138].try_into().unwrap()) as usize;
+        let url_length = u32::from_be_bytes(
+            buffer[138..142]
+                .try_into()
+                .or(Err(Error::from(ErrorKind::InvalidInput)))?,
+        ) as usize;
 
         // if we detect a block fetch url, we will retrieve it
         if url_length > 0 {
@@ -108,6 +124,7 @@ impl Serialize<Self> for HandshakeResponse {
             response.block_fetch_url = result.unwrap();
             trace!("block fetch url read as : {:?}", response.block_fetch_url);
         }
+
         // if we detect services, we deserialize that too
         if buffer.len() > (MIN_LEN + url_length) {
             trace!("reading peer services");
@@ -117,8 +134,7 @@ impl Serialize<Self> for HandshakeResponse {
             if services.is_err() {
                 let len = buffer.len() - (MIN_LEN + url_length);
                 warn!(
-                "Deserializing failed for handshake response, remaining buffer of size :{:?} cannot be parsed for peer services",
-                len);
+                "Deserializing failed for handshake response, remaining buffer of size :{:?} cannot be parsed for peer services", len);
                 return Err(Error::from(ErrorKind::InvalidData));
             }
             let services = services.unwrap();
@@ -163,20 +179,22 @@ mod tests {
             is_lite: false,
             block_fetch_url: "http://url/test2".to_string(),
             services: vec![],
-            version: Version {
+            wallet_version: Version {
                 major: 1,
                 minor: 2,
                 patch: 3,
             },
+            core_version: Version::new(10, 20, 30),
         };
         let buffer = response.serialize();
-        assert_eq!(buffer.len(), 154);
+        assert_eq!(buffer.len(), 158);
         let response2 = HandshakeResponse::deserialize(&buffer).expect("deserialization failed");
         assert_eq!(response.challenge, response2.challenge);
         assert_eq!(response.public_key, response2.public_key);
         assert_eq!(response.block_fetch_url, response2.block_fetch_url);
 
         assert_eq!(response.signature, response2.signature);
-        assert_eq!(response.version, response2.version);
+        assert_eq!(response.wallet_version, response2.wallet_version);
+        assert_eq!(response.core_version, response2.core_version);
     }
 }

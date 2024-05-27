@@ -79,6 +79,7 @@ pub fn generate_random_bytes(len: u64) -> Vec<u8> {
         let x: Vec<u8> = vec![];
         return x;
     }
+    // Don't have to be cryptographically secure, since we only need a random hash and only check the signature of that in return
     let mut rng = thread_rng();
 
     (0..len).map(|_| rng.gen::<u8>()).collect()

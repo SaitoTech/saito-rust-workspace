@@ -620,6 +620,7 @@ async fn run_node(
             )),
         )
         .await;
+        info!("current core version : {:?}", wallet.core_version);
     }
 
     let time_keeper = Timer {

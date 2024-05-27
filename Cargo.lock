@@ -2046,6 +2046,7 @@ dependencies = [
  "futures",
  "getrandom",
  "hex",
+ "lazy_static",
  "log",
  "merkle",
  "num-derive",
