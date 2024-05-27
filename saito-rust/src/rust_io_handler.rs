@@ -98,7 +98,7 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn disconnect_from_peer(&mut self, peer_index: u64) -> Result<(), Error> {
+    async fn disconnect_from_peer(&self, peer_index: u64) -> Result<(), Error> {
         self.sender
             .send(IoEvent::new(NetworkEvent::DisconnectFromPeer {
                 peer_index,

@@ -94,8 +94,8 @@ impl Peer {
             is_lite,
             block_fetch_url,
             services: io_handler.get_my_services(),
-            wallet_version: wallet.wallet_version.clone(),
-            core_version: wallet.core_version.clone(),
+            wallet_version: wallet.wallet_version,
+            core_version: wallet.core_version,
         };
 
         self.challenge_for_peer = Some(response.challenge);
@@ -127,6 +127,7 @@ impl Peer {
                 "core version is not set in handshake response. expected : {:?}",
                 wallet_lock.read().await.core_version
             );
+            io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
         if self.challenge_for_peer.is_none() {
@@ -134,6 +135,7 @@ impl Peer {
                 "we don't have a challenge to verify for peer : {:?}",
                 self.index
             );
+            io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
         // TODO : validate block fetch URL
@@ -146,6 +148,7 @@ impl Peer {
                 response.signature.to_hex(),
                 response.public_key.to_base58()
             );
+            io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
 
@@ -173,7 +176,7 @@ impl Peer {
                 self.index,
                 response.wallet_version,
             ));
-
+            io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
 

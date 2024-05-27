@@ -53,7 +53,7 @@ impl TransactionGenerator {
         tx_payment: Currency,
         tx_fee: Currency,
     ) -> Self {
-        let mut tx_size = 10;
+        let tx_size;
         let tx_count;
         {
             let configs = configuration_lock.read().await;

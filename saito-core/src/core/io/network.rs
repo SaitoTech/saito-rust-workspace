@@ -118,55 +118,6 @@ impl Network {
         }
     }
 
-    // pub async fn fetch_missing_block(
-    //     &self,
-    //     block_hash: SaitoHash,
-    //     public_key: &SaitoPublicKey,
-    //     block_id: BlockId,
-    // ) -> Result<(), Error> {
-    //     debug!(
-    //         "fetch missing block : block : {:?} from : {:?}",
-    //         block_hash.to_hex(),
-    //         public_key.to_base58()
-    //     );
-    //
-    //     let peer_index;
-    //     let url;
-    //     let my_public_key;
-    //     {
-    //         let configs = self.config_lock.read().await;
-    //         let peers = self.peer_lock.read().await;
-    //         {
-    //             let wallet = self.wallet_lock.read().await;
-    //             my_public_key = wallet.public_key;
-    //         }
-    //
-    //         let peer = peers.find_peer_by_address(public_key);
-    //         if peer.is_none() {
-    //             debug!("peer count = {:?}", peers.address_to_peers.len());
-    //             error!(
-    //                 "peer : {:?} not found to fetch missing block : {:?}",
-    //                 public_key.to_base58(),
-    //                 block_hash.to_hex()
-    //             );
-    //             return Err(Error::from(ErrorKind::NotFound));
-    //         }
-    //         let peer = peer.unwrap();
-    //         if peer.block_fetch_url.is_empty() {
-    //             warn!(
-    //                 "won't fetch block : {:?} from peer : {:?} since no url found",
-    //                 block_hash.to_hex(),
-    //                 peer.index
-    //             );
-    //             return Err(Error::from(ErrorKind::AddrNotAvailable));
-    //         }
-    //         url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
-    //         peer_index = peer.index;
-    //     }
-    //     self.io_interface
-    //         .fetch_block_from_peer(block_hash, peer_index, url.as_str(), block_id)
-    //         .await
-    // }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         debug!("handling peer disconnect, peer_index = {}", peer_index);
 
