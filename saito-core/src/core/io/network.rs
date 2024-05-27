@@ -279,7 +279,7 @@ impl Network {
         key_list: Vec<SaitoPublicKey>,
     ) {
         debug!(
-            "handling received keylist of length : {:?} from peer : {:?}",
+            "handling received key list of length : {:?} from peer : {:?}",
             key_list.len(),
             peer_index
         );
@@ -288,7 +288,7 @@ impl Network {
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             error!(
-                "peer not found for index : {:?}. cannot handle handshake response",
+                "peer not found for index : {:?}. cannot handle received key list",
                 peer_index
             );
             return;

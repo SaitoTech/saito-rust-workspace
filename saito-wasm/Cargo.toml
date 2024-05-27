@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 saito-core = { path = "../saito-core" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-futures = "0.4.42"
-serde = { version = "1.0.200", features = ["derive"] }
+serde = { version = "1.0.203", features = ["derive"] }
 serde-wasm-bindgen = { version = "0.6.5" }
 web-sys = "0.3.69"
 async-trait = "0.1.80"
@@ -21,14 +21,14 @@ js-sys = { version = "0.3.69" }
 lazy_static = "1.4.0"
 console_log = { version = "1.0.0", features = ["color"] }
 log = "0.4.21"
-getrandom = { version = "0.2.14", features = ["js", "std"] }
+getrandom = { version = "0.2.15", features = ["js", "std"] }
 rand = { version = "0.8.5", features = ["getrandom"] }
-secp256k1 = { version = "0.28.2", features = ["hashes", "global-context", "serde"] }
+secp256k1 = { version = "0.29.0", features = ["hashes", "global-context", "serde"] }
 bs58 = "0.5.0"
 figment = { version = "0.10.12", features = ["json"] }
 serde_json = { version = "1.0.108" }
 num-derive = { version = "0.4.2" }
-num-traits = { version = "0.2.17" }
+num-traits = { version = "0.2.19" }
 wee_alloc = "0.4.5"
 
 [package.metadata.wasm-pack.profile.release]
