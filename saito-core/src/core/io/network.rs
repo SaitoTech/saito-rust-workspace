@@ -49,16 +49,8 @@ impl Network {
             timer,
         }
     }
-    pub async fn propagate_block(
-        &self,
-        block: &Block,
-        configs: &(dyn Configuration + Send + Sync),
-    ) {
+    pub async fn propagate_block(&self, block: &Block) {
         debug!("propagating block : {:?}", block.hash.to_hex());
-        if configs.is_spv_mode() {
-            trace!("not propagating block since we are in spv mode");
-            return;
-        }
 
         let mut excluded_peers = vec![];
         // finding block sender to avoid resending the block to that node
@@ -126,55 +118,6 @@ impl Network {
         }
     }
 
-    // pub async fn fetch_missing_block(
-    //     &self,
-    //     block_hash: SaitoHash,
-    //     public_key: &SaitoPublicKey,
-    //     block_id: BlockId,
-    // ) -> Result<(), Error> {
-    //     debug!(
-    //         "fetch missing block : block : {:?} from : {:?}",
-    //         block_hash.to_hex(),
-    //         public_key.to_base58()
-    //     );
-    //
-    //     let peer_index;
-    //     let url;
-    //     let my_public_key;
-    //     {
-    //         let configs = self.config_lock.read().await;
-    //         let peers = self.peer_lock.read().await;
-    //         {
-    //             let wallet = self.wallet_lock.read().await;
-    //             my_public_key = wallet.public_key;
-    //         }
-    //
-    //         let peer = peers.find_peer_by_address(public_key);
-    //         if peer.is_none() {
-    //             debug!("peer count = {:?}", peers.address_to_peers.len());
-    //             error!(
-    //                 "peer : {:?} not found to fetch missing block : {:?}",
-    //                 public_key.to_base58(),
-    //                 block_hash.to_hex()
-    //             );
-    //             return Err(Error::from(ErrorKind::NotFound));
-    //         }
-    //         let peer = peer.unwrap();
-    //         if peer.block_fetch_url.is_empty() {
-    //             warn!(
-    //                 "won't fetch block : {:?} from peer : {:?} since no url found",
-    //                 block_hash.to_hex(),
-    //                 peer.index
-    //             );
-    //             return Err(Error::from(ErrorKind::AddrNotAvailable));
-    //         }
-    //         url = peer.get_block_fetch_url(block_hash, configs.is_spv_mode(), my_public_key);
-    //         peer_index = peer.index;
-    //     }
-    //     self.io_interface
-    //         .fetch_block_from_peer(block_hash, peer_index, url.as_str(), block_id)
-    //         .await
-    // }
     pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
         debug!("handling peer disconnect, peer_index = {}", peer_index);
 
@@ -231,7 +174,9 @@ impl Network {
 
         if peer.static_peer_config.is_none() {
             // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-            peer.initiate_handshake(&self.io_interface).await.unwrap();
+            peer.initiate_handshake(self.io_interface.as_ref())
+                .await
+                .unwrap();
         } else {
             debug!(
                 "removing static peer config : {:?}",
@@ -269,7 +214,7 @@ impl Network {
         let peer = peer.unwrap();
         peer.handle_handshake_challenge(
             challenge,
-            &self.io_interface,
+            self.io_interface.as_ref(),
             wallet_lock.clone(),
             config_lock,
         )
@@ -299,7 +244,7 @@ impl Network {
         let result = peer
             .handle_handshake_response(
                 response,
-                &self.io_interface,
+                self.io_interface.as_ref(),
                 wallet_lock.clone(),
                 configs_lock.clone(),
             )
@@ -334,7 +279,7 @@ impl Network {
         key_list: Vec<SaitoPublicKey>,
     ) {
         debug!(
-            "handling received keylist of length : {:?} from peer : {:?}",
+            "handling received key list of length : {:?} from peer : {:?}",
             key_list.len(),
             peer_index
         );
@@ -343,7 +288,7 @@ impl Network {
         let peer = peers.index_to_peers.get_mut(&peer_index);
         if peer.is_none() {
             error!(
-                "peer not found for index : {:?}. cannot handle handshake response",
+                "peer not found for index : {:?}. cannot handle received key list",
                 peer_index
             );
             return;
@@ -469,10 +414,16 @@ impl Network {
         let url;
         {
             let peers = self.peer_lock.read().await;
+            let wallet = self.wallet_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
-                peer.compare_versions(block_hash, self.wallet_lock.clone())
-                    .await?;
+                if wallet.wallet_version > peer.wallet_version {
+                    warn!(
+                    "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
+                    block_hash.to_hex(), peer.index, wallet.wallet_version, peer.wallet_version
+                );
+                    return None;
+                }
 
                 if peer.block_fetch_url.is_empty() {
                     debug!(
@@ -551,7 +502,8 @@ impl Network {
         let current_time = self.timer.get_timestamp_in_ms();
         let mut peers = self.peer_lock.write().await;
         for (_, peer) in peers.index_to_peers.iter_mut() {
-            peer.send_ping(current_time, &self.io_interface).await;
+            peer.send_ping(current_time, self.io_interface.as_ref())
+                .await;
         }
     }
 

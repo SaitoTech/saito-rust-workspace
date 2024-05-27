@@ -207,7 +207,7 @@ impl NetworkController {
 
         for entry in sockets.iter_mut() {
             let peer_index = entry.0;
-            if exceptions.contains(&peer_index) {
+            if exceptions.contains(peer_index) {
                 continue;
             }
             let socket = entry.1;
@@ -419,11 +419,7 @@ impl NetworkController {
 
                         if result.is_binary() {
                             let buffer = result.into_bytes();
-                            // trace!(
-                            //     "message buffer with size : {:?} received from peer : {:?}",
-                            //     buffer.len(),
-                            //     peer_index
-                            // );
+
                             let message = IoEvent {
                                 event_processor_id: 1,
                                 event_id: 0,
@@ -435,8 +431,6 @@ impl NetworkController {
                             NetworkController::send_peer_disconnect(sender, peer_index).await;
                             sockets.lock().await.remove(&peer_index);
                             break;
-                        } else {
-                            // warn!("unhandled type");
                         }
                     },
                     PeerReceiver::Tungstenite(mut receiver) => loop {
@@ -454,11 +448,6 @@ impl NetworkController {
                         let result = result.unwrap();
                         match result {
                             tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
-                                // trace!(
-                                //     "message buffer with size : {:?} received from peer : {:?}",
-                                //     buffer.len(),
-                                //     peer_index
-                                // );
                                 let message = IoEvent {
                                     event_processor_id: 1,
                                     event_id: 0,
@@ -468,6 +457,12 @@ impl NetworkController {
                                     },
                                 };
                                 sender.send(message).await.expect("sending failed");
+                            }
+                            tokio_tungstenite::tungstenite::Message::Close(_) => {
+                                info!("socket for peer : {:?} was closed", peer_index);
+                                NetworkController::send_peer_disconnect(sender, peer_index).await;
+                                sockets.lock().await.remove(&peer_index);
+                                break;
                             }
                             _ => {
                                 // Not handling these scenarios
