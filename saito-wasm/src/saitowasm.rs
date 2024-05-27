@@ -17,6 +17,7 @@ use secp256k1::SECP256K1;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
+use web_sys::console::info;
 
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
@@ -284,6 +285,7 @@ pub async fn initialize(
             wallet.private_key = keys.1;
             wallet.public_key = keys.0;
         }
+        info!("current core version : {:?}", wallet.core_version);
     }
 
     saito.as_mut().unwrap().stat_thread.on_init().await;
@@ -943,7 +945,7 @@ pub async fn get_mempool_txs() -> js_sys::Array {
 pub async fn set_wallet_version(major: u8, minor: u8, patch: u16) {
     let saito = SAITO.lock().await;
     let mut wallet = saito.as_ref().unwrap().wallet.wallet.write().await;
-    wallet.version = Version {
+    wallet.wallet_version = Version {
         major,
         minor,
         patch,

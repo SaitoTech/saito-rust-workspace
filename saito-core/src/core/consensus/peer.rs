@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -26,7 +27,8 @@ pub struct Peer {
     pub key_list: Vec<SaitoPublicKey>,
     pub services: Vec<PeerService>,
     pub last_msg_at: Timestamp,
-    pub version: Version,
+    pub wallet_version: Version,
+    pub core_version: Version,
 }
 
 impl Peer {
@@ -40,12 +42,13 @@ impl Peer {
             key_list: vec![],
             services: vec![],
             last_msg_at: 0,
-            version: Version::default(),
+            wallet_version: Default::default(),
+            core_version: Default::default(),
         }
     }
     pub async fn initiate_handshake(
         &mut self,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        io_handler: &(dyn InterfaceIO + Send + Sync),
     ) -> Result<(), Error> {
         debug!("initiating handshake : {:?}", self.index);
 
@@ -65,7 +68,7 @@ impl Peer {
     pub async fn handle_handshake_challenge(
         &mut self,
         challenge: HandshakeChallenge,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        io_handler: &(dyn InterfaceIO + Send + Sync),
         wallet_lock: Arc<RwLock<Wallet>>,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
@@ -91,7 +94,8 @@ impl Peer {
             is_lite,
             block_fetch_url,
             services: io_handler.get_my_services(),
-            version: wallet.version.clone(),
+            wallet_version: wallet.wallet_version.clone(),
+            core_version: wallet.core_version.clone(),
         };
 
         self.challenge_for_peer = Some(response.challenge);
@@ -109,7 +113,7 @@ impl Peer {
     pub async fn handle_handshake_response(
         &mut self,
         response: HandshakeResponse,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        io_handler: &(dyn InterfaceIO + Send + Sync),
         wallet_lock: Arc<RwLock<Wallet>>,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
@@ -118,6 +122,13 @@ impl Peer {
             self.index,
             response.public_key.to_base58()
         );
+        if !response.core_version.is_set() {
+            debug!(
+                "core version is not set in handshake response. expected : {:?}",
+                wallet_lock.read().await.core_version
+            );
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
         if self.challenge_for_peer.is_none() {
             warn!(
                 "we don't have a challenge to verify for peer : {:?}",
@@ -150,22 +161,37 @@ impl Peer {
                 block_fetch_url = configs.get_block_fetch_url();
             }
         }
+        let wallet = wallet_lock.read().await;
+
+        if !wallet
+            .core_version
+            .is_same_minor_version(&self.core_version)
+        {
+            warn!("peer : {:?} core version is not compatible. current core version : {:?} peer core version : {:?}",
+                self.index, wallet.core_version, response.core_version);
+            io_handler.send_interface_event(InterfaceEvent::NewVersionDetected(
+                self.index,
+                response.wallet_version,
+            ));
+
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
+
         self.challenge_for_peer = None;
         self.public_key = Some(response.public_key);
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
-        self.version = response.version.clone();
-
-        let wallet = wallet_lock.read().await;
+        self.wallet_version = response.wallet_version;
+        self.core_version = response.core_version;
 
         info!(
             "my version : {:?} peer version : {:?}",
-            wallet.version, response.version
+            wallet.wallet_version, response.wallet_version
         );
-        if wallet.version < response.version {
+        if wallet.wallet_version < response.wallet_version {
             io_handler.send_interface_event(InterfaceEvent::NewVersionDetected(
                 self.index,
-                response.version,
+                response.wallet_version,
             ));
         }
 
@@ -181,7 +207,8 @@ impl Peer {
                 block_fetch_url: block_fetch_url.to_string(),
                 challenge: generate_random_bytes(32).try_into().unwrap(),
                 services: io_handler.get_my_services(),
-                version: wallet.version.clone(),
+                wallet_version: wallet.wallet_version,
+                core_version: wallet.core_version,
             };
             io_handler
                 .send_message(
@@ -234,7 +261,7 @@ impl Peer {
     pub async fn send_ping(
         &mut self,
         current_time: Timestamp,
-        io_handler: &Box<dyn InterfaceIO + Send + Sync>,
+        io_handler: &(dyn InterfaceIO + Send + Sync),
     ) {
         if self.last_msg_at + WS_KEEP_ALIVE_PERIOD < current_time {
             self.last_msg_at = current_time;
@@ -255,32 +282,21 @@ impl Peer {
         self.static_peer_config.as_ref().unwrap().is_main
     }
 
-    pub async fn compare_versions(
-        &self,
-        block_hash: SaitoHash,
-        wallet_lock: Arc<RwLock<Wallet>>,
-    ) -> Option<()> {
-        let wallet = wallet_lock.read().await;
-
-        if !wallet.version.is_set() || !self.version.is_set() {
-            // TODO : this is a temporary fix to make sure rust node which does not know about wallet.ts's version sync with a SLR node
-            return Some(());
+    pub fn compare_version(&self, version: &Version) -> Option<Ordering> {
+        // for peer versions, if the version is not set we still consider it as a valid peer
+        // TODO : this could lead to an attack. need to provide different versions for different layer components
+        if !version.is_set() || !self.wallet_version.is_set() {
+            return Some(Ordering::Equal);
         }
-
-        if wallet.version > self.version {
-            warn!(
-                "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
-                block_hash.to_hex(), self.index, wallet.version, self.version
-            );
-            return None;
-        }
-        Some(())
+        self.wallet_version.partial_cmp(version)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::core::consensus::peer::Peer;
+    use crate::core::process::version::Version;
+    use std::cmp::Ordering;
 
     #[test]
     fn peer_new_test() {
@@ -291,5 +307,57 @@ mod tests {
         assert_eq!(peer.block_fetch_url, "".to_string());
         assert_eq!(peer.static_peer_config, None);
         assert_eq!(peer.challenge_for_peer, None);
+    }
+
+    #[test]
+    fn peer_compare_test() {
+        let peer_1 = Peer::new(1);
+        let mut peer_2 = Peer::new(2);
+        let mut peer_3 = Peer::new(3);
+        let mut peer_4 = Peer::new(4);
+
+        assert_eq!(peer_1.wallet_version, Version::new(0, 0, 0));
+
+        peer_2.wallet_version = Version::new(0, 0, 1);
+
+        peer_3.wallet_version = Version::new(0, 1, 0);
+
+        peer_4.wallet_version = Version::new(1, 0, 0);
+
+        assert_eq!(
+            peer_1.compare_version(&peer_2.wallet_version),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(
+            peer_2.compare_version(&peer_1.wallet_version),
+            Some(Ordering::Equal)
+        );
+
+        assert_eq!(
+            peer_3.compare_version(&peer_2.wallet_version),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            peer_2.compare_version(&peer_3.wallet_version),
+            Some(Ordering::Less)
+        );
+
+        assert_eq!(
+            peer_3.compare_version(&peer_4.wallet_version),
+            Some(Ordering::Less)
+        );
+        assert_eq!(
+            peer_4.compare_version(&peer_3.wallet_version),
+            Some(Ordering::Greater)
+        );
+
+        assert_eq!(
+            peer_3.compare_version(&peer_3.wallet_version),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(
+            peer_1.compare_version(&peer_1.wallet_version),
+            Some(Ordering::Equal)
+        );
     }
 }

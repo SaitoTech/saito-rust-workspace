@@ -5,7 +5,26 @@ use std::io::{Error, ErrorKind};
 
 const VERSION_SIZE: u8 = 4;
 
-#[derive(Debug, Default, Clone)]
+pub fn read_pkg_version() -> Version {
+    let v = env!("CARGO_PKG_VERSION");
+
+    let tokens: Vec<&str> = v.split('.').collect();
+    if tokens.len() != 3 {
+        return Default::default();
+    }
+
+    let major = tokens[0].parse();
+    let minor = tokens[1].parse();
+    let patch = tokens[2].parse();
+
+    if major.is_err() || minor.is_err() || patch.is_err() {
+        return Default::default();
+    }
+
+    Version::new(major.unwrap(), minor.unwrap(), patch.unwrap())
+}
+
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Version {
     pub major: u8,
     pub minor: u8,
@@ -14,7 +33,32 @@ pub struct Version {
 
 impl Version {
     pub fn is_set(&self) -> bool {
-        self.major != 0 || self.minor != 0 || self.patch != 0
+        !(self.major == 0 && self.minor == 0 && self.patch == 0)
+    }
+
+    pub fn new(major: u8, minor: u8, patch: u16) -> Self {
+        Version {
+            major,
+            minor,
+            patch,
+        }
+    }
+
+    /// Same minor version nodes should be able to work without any issues
+    ///
+    /// # Arguments
+    ///
+    /// * `version`:
+    ///
+    /// returns: bool
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    pub fn is_same_minor_version(&self, version: &Version) -> bool {
+        self.is_set() && self.major == version.major && self.minor == version.minor
     }
 }
 
@@ -33,11 +77,13 @@ impl Serialize<Self> for Version {
             );
             return Err(Error::from(ErrorKind::InvalidData));
         }
-        // TODO : refactor and optimize this
         let ver = Version {
-            major: *buffer.get(0).unwrap(),
-            minor: *buffer.get(1).unwrap(),
-            patch: u16::from_be_bytes([*buffer.get(2).unwrap(), *buffer.get(3).unwrap()]),
+            major: *buffer.get(0).ok_or(Error::from(ErrorKind::InvalidInput))?,
+            minor: *buffer.get(1).ok_or(Error::from(ErrorKind::InvalidInput))?,
+            patch: u16::from_be_bytes([
+                *buffer.get(2).ok_or(Error::from(ErrorKind::InvalidInput))?,
+                *buffer.get(3).ok_or(Error::from(ErrorKind::InvalidInput))?,
+            ]),
         };
 
         Ok(ver)

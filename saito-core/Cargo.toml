@@ -1,6 +1,6 @@
 [package]
 name = "saito-core"
-version = "0.1.7"
+version = "0.2.7"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,6 +30,7 @@ futures = { version = "0.3.29" }
 log = "0.4.20"
 bs58 = "0.5.0"
 chrono = "0.4.35"
+lazy_static = "1.4.0"
 
 [dev-dependencies]
 serial_test = "3.0.0"
