@@ -116,11 +116,6 @@ impl RoutingThread {
     ///
     /// ```
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
-        // trace!(
-        //     "processing incoming message type : {:?} from peer : {:?}",
-        //     message.get_type_value(),
-        //     peer_index
-        // );
         self.network.update_peer_timer(peer_index).await;
 
         match message {
@@ -326,7 +321,7 @@ impl RoutingThread {
         self.network.handle_peer_disconnect(peer_index).await;
     }
     pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
-        let mut wallet: tokio::sync::RwLockWriteGuard<'_, Wallet> = self.wallet_lock.write().await;
+        let mut wallet = self.wallet_lock.write().await;
 
         wallet.set_key_list(key_list);
         self.network.send_key_list(&wallet.key_list).await;
