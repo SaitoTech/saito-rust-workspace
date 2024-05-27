@@ -466,10 +466,10 @@ impl Network {
             let wallet = self.wallet_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
-                if wallet.wallet_version > peer.app_version {
+                if wallet.wallet_version > peer.wallet_version {
                     warn!(
                     "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
-                    block_hash.to_hex(), peer.index, wallet.wallet_version, peer.app_version
+                    block_hash.to_hex(), peer.index, wallet.wallet_version, peer.wallet_version
                 );
                     return None;
                 }

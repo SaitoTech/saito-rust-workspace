@@ -390,10 +390,10 @@ impl RoutingThread {
 
         if let Some(peer) = peers.index_to_peers.get(&peer_index) {
             // TODO : check if this check can be removed from here, since network.rs also have the same check
-            if wallet.wallet_version > peer.app_version {
+            if wallet.wallet_version > peer.wallet_version {
                 warn!(
                     "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
-                    block_hash.to_hex(), peer.index, wallet.wallet_version, peer.app_version
+                    block_hash.to_hex(), peer.index, wallet.wallet_version, peer.wallet_version
                 );
                 return;
             }

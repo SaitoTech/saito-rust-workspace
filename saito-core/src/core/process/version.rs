@@ -24,7 +24,7 @@ pub fn read_pkg_version() -> Version {
     Version::new(major.unwrap(), minor.unwrap(), patch.unwrap())
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Version {
     pub major: u8,
     pub minor: u8,
@@ -33,7 +33,7 @@ pub struct Version {
 
 impl Version {
     pub fn is_set(&self) -> bool {
-        self.major != 0 || self.minor != 0 || self.patch != 0
+        !(self.major == 0 && self.minor == 0 && self.patch == 0)
     }
 
     pub fn new(major: u8, minor: u8, patch: u16) -> Self {
@@ -42,6 +42,23 @@ impl Version {
             minor,
             patch,
         }
+    }
+
+    /// Same minor version nodes should be able to work without any issues
+    ///
+    /// # Arguments
+    ///
+    /// * `version`:
+    ///
+    /// returns: bool
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    pub fn is_same_minor_version(&self, version: &Version) -> bool {
+        self.is_set() && self.major == version.major && self.minor == version.minor
     }
 }
 
