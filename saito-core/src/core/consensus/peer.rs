@@ -168,7 +168,7 @@ impl Peer {
 
         if !wallet
             .core_version
-            .is_same_minor_version(&self.core_version)
+            .is_same_minor_version(&response.core_version)
         {
             warn!("peer : {:?} core version is not compatible. current core version : {:?} peer core version : {:?}",
                 self.index, wallet.core_version, response.core_version);

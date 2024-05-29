@@ -175,5 +175,15 @@ mod tests {
                 patch: 40,
             }
         );
+
+        assert!(Version::new(0, 1, 7).is_same_minor_version(&Version::new(0, 1, 10)));
+        assert!(Version::new(0, 1, 7).is_same_minor_version(&Version::new(0, 1, 7)));
+        assert!(!Version::new(0, 1, 7).is_same_minor_version(&Version::new(0, 2, 7)));
+        assert!(!Version::new(0, 1, 7).is_same_minor_version(&Version::new(1, 1, 7)));
+        assert!(!Version::new(0, 1, 7).is_same_minor_version(&Version::new(1, 0, 7)));
+        assert!(!Version::new(0, 1, 7).is_same_minor_version(&Version::new(1, 0, 1)));
+        assert!(!Version::new(0, 0, 0).is_same_minor_version(&Version::new(1, 0, 1)));
+        assert!(!Version::new(0, 1, 7).is_same_minor_version(&Version::new(0, 0, 0)));
+        assert!(!Version::new(0, 0, 0).is_same_minor_version(&Version::new(0, 0, 0)));
     }
 }
