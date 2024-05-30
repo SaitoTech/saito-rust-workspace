@@ -9,7 +9,6 @@ use saito_core::core::defs::{PeerIndex, PrintForLog};
 
 #[wasm_bindgen]
 #[derive(Clone)]
-
 pub struct WasmPeer {
     peer: Peer,
 }

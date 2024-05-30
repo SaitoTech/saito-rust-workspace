@@ -880,11 +880,6 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
-
-    // Initialize the logger
-    wasm_logger::init(wasm_logger::Config::default());
-    log::info!("WASM module initialized");
     let matches = App::new("saito-rust")
         .version(crate_version!())
         .arg(
