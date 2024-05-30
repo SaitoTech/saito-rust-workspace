@@ -298,7 +298,7 @@ pub mod test {
                         assert_eq!(*value, *value2);
                     }
                     None => {
-                        let slip = Slip::parse_slip_from_utxokey(key);
+                        let slip = Slip::parse_slip_from_utxokey(key).unwrap();
                         info!(
                             "block : {:?} tx : {:?} amount : {:?} type : {:?}",
                             slip.block_id, slip.tx_ordinal, slip.amount, slip.slip_type

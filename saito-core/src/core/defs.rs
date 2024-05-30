@@ -16,7 +16,8 @@ pub type BlockHash = SaitoHash;
 
 pub type ForkId = SaitoHash;
 // pub type SlipUuid = [u8; 17];
-pub type SaitoUTXOSetKey = [u8; 58];
+pub const UTXO_KEY_LENGTH: usize = 59;
+pub type SaitoUTXOSetKey = [u8; UTXO_KEY_LENGTH];
 pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 pub type PeerIndex = u64;
 pub type BlockId = u64;

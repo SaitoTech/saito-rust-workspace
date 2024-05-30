@@ -3,11 +3,11 @@ use log::{info, trace, warn};
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::golden_ticket::GoldenTicket;
-use crate::core::consensus::slip::Slip;
+use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-    SaitoUTXOSetKey,
+    SaitoUTXOSetKey, UTXO_KEY_LENGTH,
 };
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::io::network::Network;
@@ -42,6 +42,7 @@ pub struct WalletSlip {
     pub lc: bool,
     pub slip_index: u8,
     pub spent: bool,
+    pub slip_type: SlipType,
 }
 
 /// The `Wallet` manages the public and private keypair of the node and holds the
@@ -393,7 +394,7 @@ impl Wallet {
         self.available_balance = 0;
 
         snapshot.slips.iter().for_each(|slip| {
-            assert_ne!(slip.utxoset_key, [0; 58]);
+            assert_ne!(slip.utxoset_key, [0; UTXO_KEY_LENGTH]);
             let wallet_slip = WalletSlip {
                 utxokey: slip.utxoset_key,
                 amount: slip.amount,
@@ -402,6 +403,7 @@ impl Wallet {
                 lc: true,
                 slip_index: slip.slip_index,
                 spent: false,
+                slip_type: slip.slip_type,
             };
             let result = self.slips.insert(slip.utxoset_key, wallet_slip);
             if result.is_none() {
@@ -434,13 +436,14 @@ impl WalletSlip {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         WalletSlip {
-            utxokey: [0; 58],
+            utxokey: [0; UTXO_KEY_LENGTH],
             amount: 0,
             block_id: 0,
             tx_ordinal: 0,
             lc: true,
             slip_index: 0,
             spent: false,
+            slip_type: SlipType::Normal,
         }
     }
 }

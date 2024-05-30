@@ -124,7 +124,7 @@ impl WasmWallet {
     pub async fn add_slip(&mut self, slip: WasmWalletSlip) {
         let wallet_slip = slip.slip;
         let mut wallet = self.wallet.write().await;
-        let slip = Slip::parse_slip_from_utxokey(&wallet_slip.utxokey);
+        let slip = Slip::parse_slip_from_utxokey(&wallet_slip.utxokey).unwrap();
         wallet.add_slip(
             slip.block_id,
             slip.tx_ordinal,

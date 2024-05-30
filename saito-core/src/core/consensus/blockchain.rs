@@ -1731,9 +1731,8 @@ impl Blockchain {
             if !value {
                 return;
             }
-            let slip = Slip::parse_slip_from_utxokey(key);
+            let slip = Slip::parse_slip_from_utxokey(key).unwrap();
             *data.entry(slip.public_key).or_default() += slip.amount;
-            // data.insert(slip.public_key, slip.amount);
         });
         data
     }
@@ -1743,7 +1742,7 @@ impl Blockchain {
             .iter()
             .filter(|(_, value)| **value)
             .for_each(|(key, _)| {
-                let slip = Slip::parse_slip_from_utxokey(key);
+                let slip = Slip::parse_slip_from_utxokey(key).unwrap();
                 if slip.public_key == public_key {
                     slips.push(slip);
                 }
@@ -1762,7 +1761,7 @@ impl Blockchain {
             .iter()
             .filter(|(_, value)| **value)
             .for_each(|(key, _)| {
-                let slip = Slip::parse_slip_from_utxokey(key);
+                let slip = Slip::parse_slip_from_utxokey(key).unwrap();
 
                 // if no keys provided we get the full picture
                 if keys.is_empty() || keys.contains(&slip.public_key) {

@@ -32,7 +32,7 @@ pub enum TransactionType {
     SPV = 5,
     /// Issues funds for an address at the start of the network
     Issuance = 6,
-    Other = 7,
+    BlockStake = 7,
 }
 
 #[serde_with::serde_as]
