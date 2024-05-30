@@ -4,45 +4,48 @@ use tokio::time::{self, Duration, Instant};
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
     limits: HashMap<u64, TokenBucket>,
+    tokens: u64,
 }
 
 impl RateLimiter {
-    pub fn new() -> Self {
+    pub fn default(tokens: u64) -> Self {
         Self {
             limits: HashMap::new(),
+            tokens,
         }
     }
 
-    pub fn check(&mut self, peer_index: u64) -> bool {
+    pub fn can_process_more(&mut self, peer_index: u64) -> bool {
+        let tokens = self.tokens;
+        let now = Instant::now();
         let entry = self
             .limits
             .entry(peer_index)
-            .or_insert_with(TokenBucket::new);
-        entry.try_consume()
+            .or_insert_with(|| TokenBucket::default(tokens, Instant::now()));
+        entry.consume_token_if_available(now)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct TokenBucket {
-    tokens: usize,
+    tokens: u64,
     last_refill: Instant,
 }
 
 impl TokenBucket {
-    pub fn new() -> Self {
+    pub fn default(tokens: u64, now: Instant) -> Self {
         Self {
-            tokens: 20,
-            last_refill: Instant::now(),
+            tokens,
+            last_refill: now,
         }
     }
 
-    pub fn try_consume(&mut self) -> bool {
-        let now = Instant::now();
-        let elapsed = now.duration_since(self.last_refill);
+    pub fn consume_token_if_available(&mut self, current_time: Instant) -> bool {
+        let elapsed = current_time.duration_since(self.last_refill);
 
         if elapsed >= Duration::from_secs(60) {
-            self.tokens = 10;
-            self.last_refill = now;
+            self.tokens = self.tokens;
+            self.last_refill = current_time;
         }
 
         if self.tokens > 0 {
