@@ -15,7 +15,6 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use crate::core::util::rate_limiter::RateLimiter;
 
 #[derive(Debug, Clone)]
 pub struct Peer {
@@ -30,7 +29,6 @@ pub struct Peer {
     pub last_msg_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
-    pub rate_limiter: RateLimiter,
 }
 
 impl Peer {
@@ -46,7 +44,6 @@ impl Peer {
             last_msg_at: 0,
             wallet_version: Default::default(),
             core_version: Default::default(),
-            rate_limiter: RateLimiter::default(20),
         }
     }
     pub async fn initiate_handshake(
