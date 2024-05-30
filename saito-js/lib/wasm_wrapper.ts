@@ -1,6 +1,6 @@
-let registry = new FinalizationRegistry((heldValue: any) => {
-  heldValue.free();
-});
+// let registry = new FinalizationRegistry((heldValue: any) => {
+//   heldValue.free();
+// });
 
 export default class WasmWrapper<T> {
   public instance: T;
@@ -23,8 +23,8 @@ export default class WasmWrapper<T> {
   }
 
 
-  free() {
-    // @ts-ignore
-    this.instance.free();
-  }
+  // free() {
+  //   // @ts-ignore
+  //   this.instance.free();
+  // }
 }
