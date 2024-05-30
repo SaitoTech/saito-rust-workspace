@@ -276,6 +276,7 @@ pub async fn initialize(
             wallet.private_key = keys.1;
             wallet.public_key = keys.0;
         }
+        info!("current core version : {:?}", wallet.core_version);
     }
 
     saito.as_mut().unwrap().stat_thread.on_init().await;
