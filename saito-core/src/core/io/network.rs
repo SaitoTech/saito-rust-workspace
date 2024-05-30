@@ -36,6 +36,7 @@ pub struct Network {
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     pub timer: Timer,
+    pub rate_limiter: Arc<RwLock<RateLimiter>>,
 }
 
 impl Network {
@@ -52,6 +53,7 @@ impl Network {
             wallet_lock,
             config_lock,
             timer,
+            rate_limiter: Arc::new(RwLock::new(RateLimiter::default(10))),
         }
     }
     pub async fn propagate_block(&self, block: &Block) {
@@ -273,32 +275,39 @@ impl Network {
             key_list.len(),
             peer_index
         );
-        let mut peers = self.peer_lock.write().await;
-        let peer = peers.index_to_peers.get_mut(&peer_index);
 
-        if peer.is_none() {
-            error!(
-                "peer not found for index : {:?}. cannot handle received key list",
-                peer_index
-            );
-            return Err(Error::from(ErrorKind::NotFound));
+        {
+            let peers = self.peer_lock.read().await;
+            let peer = peers.index_to_peers.get(&peer_index);
+
+            if peer.is_none() {
+                error!(
+                    "peer not found for index : {:?}. cannot handle received key list",
+                    peer_index
+                );
+                return Err(Error::from(ErrorKind::NotFound));
+            }
         }
-        let peer = peer.unwrap();
-        if !peer.rate_limiter.can_process_more(peer_index) {
+
+        // Check rate limit
+        if !self.check_rate_limit(peer_index).await {
             dbg!("peer {:?} exceeded rate limit for key list", peer_index);
             return Err(Error::from(ErrorKind::Other));
         }
 
-        debug!(
-            "handling received keylist of length : {:?} from peer : {:?}",
-            key_list.len(),
-            peer_index
-        );
+        // Lock the peers again to update the key list
+        let mut peers = self.peer_lock.write().await;
+        if let Some(peer) = peers.index_to_peers.get_mut(&peer_index) {
+            debug!(
+                "handling received keylist of length : {:?} from peer : {:?}",
+                key_list.len(),
+                peer_index
+            );
 
-        peer.key_list = key_list;
+            peer.key_list = key_list;
+        }
         Ok(())
     }
-
     pub async fn send_key_list(&self, key_list: &[SaitoPublicKey]) {
 
         debug!(
@@ -536,6 +545,21 @@ impl Network {
         }
     }
 
+    pub async fn check_rate_limit(&mut self, peer_index: u64) -> bool {
+        let current_time = self.timer.get_timestamp_in_ms();
+        {
+            let mut rate_limiter = self.rate_limiter.write().await;
+            if !rate_limiter.can_process_more(peer_index, current_time) {
+                error!("peer {:?} exceeded rate limit for key list", peer_index);
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+        // self.rate_limiter.can_process_more(peer_index, current_time)
+    }
+
     pub async fn update_peer_timer(&mut self, peer_index: PeerIndex) {
         let mut peers = self.peer_lock.write().await;
         let peer = peers.index_to_peers.get_mut(&peer_index);
@@ -547,35 +571,27 @@ impl Network {
     }
 }
 
+#[cfg(test)]
 mod tests {
-    use crate::core::consensus::peer::Peer;
-    use crate::core::defs::SaitoPublicKey;
-    use crate::core::util::configuration::PeerConfig;
-    use crate::core::util::rate_limiter::RateLimiter;
+    use super::*;
     use crate::core::util::test::test_manager;
-    use log::debug;
     use rand::Rng;
-
     use std::sync::Arc;
     use tokio::sync::RwLock;
-    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_keylist_rate_limiter() {
         let mut t1 = test_manager::test::TestManager::default();
-        // let mut t2 = test_manager::test::TestManager::default();
 
-        let TOKENS = 30;
-        // connect peer to to t1
-        let peer2_index = 0;
+        let TOKENS: u64 = 20;
+        let peer2_index: u64 = 0;
+
         {
             let mut peers = t1.network.peer_lock.write().await;
-
             let mut peer2 = Peer::new(peer2_index);
 
-            // set rate number of tokens available
-
-            peer2.rate_limiter = RateLimiter::default(TOKENS);
+            // Set the rate limiter with a specific number of tokens available
+            t1.network.rate_limiter = Arc::new(RwLock::new(RateLimiter::default(TOKENS)));
 
             let peer_data = PeerConfig {
                 host: String::from(""),
@@ -587,30 +603,10 @@ mod tests {
 
             peer2.static_peer_config = Some(peer_data);
             peers.index_to_peers.insert(peer2_index, peer2);
-            print!("current peer count = {:?}", peers.index_to_peers.len());
+            println!("Current peer count = {:?}", peers.index_to_peers.len());
         }
 
-        // connect peer2 to to peer1
-        // let peer1_index = 0;
-        // {
-        //     let mut peers = t2.network.peer_lock.write().await;
-
-        //     let mut peer1 = Peer::new(peer1_index);
-        //     let peer_data = PeerConfig {
-        //         host: String::from(""),
-        //         port: 8080,
-        //         protocol: String::from(""),
-        //         synctype: String::from(""),
-        //         is_main: true,
-        //     };
-
-        //     peer1.static_peer_config = Some(peer_data);
-
-        //     peers.index_to_peers.insert(peer1_index, peer1);
-        //     print!("current peer count = {:?}", peers.index_to_peers.len());
-        // }
-
-        for i in 0..30 {
+        for i in 0..40 {
             let key_list: Vec<SaitoPublicKey> = (0..10)
                 .map(|_| {
                     let mut key = [0u8; 33];
@@ -625,7 +621,7 @@ mod tests {
                 .handle_received_key_list(peer2_index, key_list)
                 .await;
 
-            if i < TOKENS {
+            if i < TOKENS as usize {
                 // Assert that the first x calls succeed
                 assert!(result.is_ok(), "Expected Ok, got {:?}", result);
             } else {
@@ -633,5 +629,25 @@ mod tests {
                 assert!(result.is_err(), "Expected Err, got {:?}", result);
             }
         }
+    }
+    #[tokio::test]
+
+    async fn test_rate_limter_token_refill() {
+        let TOKENS: u64 = 10;
+        let peer_index: u64 = 1;
+        let initial_time: u64 = 100000;
+        let refill_time: u64 = initial_time + 60000; // 1 minute later
+
+        let mut rate_limiter = RateLimiter::default(TOKENS);
+
+        // Consume all tokens
+        for _ in 0..TOKENS {
+            assert!(rate_limiter.can_process_more(peer_index, initial_time));
+        }
+
+        assert!(!rate_limiter.can_process_more(peer_index, initial_time));
+
+        // Simulate the passage of time and refill tokens
+        assert!(rate_limiter.can_process_more(peer_index, refill_time));
     }
 }

@@ -1,50 +1,50 @@
 use std::collections::HashMap;
-use tokio::time::{self, Duration, Instant};
 
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
     limits: HashMap<u64, TokenBucket>,
-    tokens: u64,
+    max_tokens: u64,
 }
 
 impl RateLimiter {
-    pub fn default(tokens: u64) -> Self {
+    pub fn default(max_tokens: u64) -> Self {
         Self {
             limits: HashMap::new(),
-            tokens,
+            max_tokens,
         }
     }
 
-    pub fn can_process_more(&mut self, peer_index: u64) -> bool {
-        let tokens = self.tokens;
-        let now = Instant::now();
+    pub fn can_process_more(&mut self, peer_index: u64, current_time: u64) -> bool {
+        let max_tokens = self.max_tokens;
         let entry = self
             .limits
             .entry(peer_index)
-            .or_insert_with(|| TokenBucket::default(tokens, Instant::now()));
-        entry.consume_token_if_available(now)
+            .or_insert_with(|| TokenBucket::default(max_tokens, current_time));
+        entry.consume_token_if_available(current_time)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct TokenBucket {
     tokens: u64,
-    last_refill: Instant,
+    max_tokens: u64,
+    last_refill: u64,
 }
 
 impl TokenBucket {
-    pub fn default(tokens: u64, now: Instant) -> Self {
+    pub fn default(max_tokens: u64, current_time: u64) -> Self {
         Self {
-            tokens,
-            last_refill: now,
+            tokens: max_tokens,
+            max_tokens,
+            last_refill: current_time,
         }
     }
 
-    pub fn consume_token_if_available(&mut self, current_time: Instant) -> bool {
-        let elapsed = current_time.duration_since(self.last_refill);
+    pub fn consume_token_if_available(&mut self, current_time: u64) -> bool {
+        let elapsed = current_time - self.last_refill;
 
-        if elapsed >= Duration::from_secs(60) {
-            self.tokens = self.tokens;
+        if elapsed >= 60000 {
+            self.tokens = self.max_tokens;
             self.last_refill = current_time;
         }
 
