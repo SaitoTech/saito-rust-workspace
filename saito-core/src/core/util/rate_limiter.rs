@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
-    limits: HashMap<u64, TokenBucket>,
+    limits: HashMap<u64, TokenCounter>,
     max_tokens: u64,
 }
 
@@ -19,19 +19,19 @@ impl RateLimiter {
         let entry = self
             .limits
             .entry(peer_index)
-            .or_insert_with(|| TokenBucket::default(max_tokens, current_time));
+            .or_insert_with(|| TokenCounter::default(max_tokens, current_time));
         entry.consume_token_if_available(current_time)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct TokenBucket {
+pub struct TokenCounter {
     tokens: u64,
     max_tokens: u64,
     last_refill: u64,
 }
 
-impl TokenBucket {
+impl TokenCounter {
     pub fn default(max_tokens: u64, current_time: u64) -> Self {
         Self {
             tokens: max_tokens,
