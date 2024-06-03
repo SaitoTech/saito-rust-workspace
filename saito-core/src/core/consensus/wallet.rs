@@ -1,12 +1,13 @@
 use ahash::{AHashMap, AHashSet};
-use log::{info, trace, warn};
+use log::{debug, info, trace, warn};
+use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    BlockId, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
     SaitoUTXOSetKey, UTXO_KEY_LENGTH,
 };
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
@@ -53,6 +54,7 @@ pub struct Wallet {
     pub private_key: SaitoPrivateKey,
     pub slips: AHashMap<SaitoUTXOSetKey, WalletSlip>,
     unspent_slips: AHashSet<SaitoUTXOSetKey>,
+    staking_slips: AHashSet<SaitoUTXOSetKey>,
     pub filename: String,
     pub filepass: String,
     available_balance: Currency,
@@ -73,6 +75,7 @@ impl Wallet {
             private_key,
             slips: AHashMap::new(),
             unspent_slips: AHashSet::new(),
+            staking_slips: Default::default(),
             filename: "default".to_string(),
             filepass: "password".to_string(),
             available_balance: 0,
@@ -110,6 +113,7 @@ impl Wallet {
         self.available_balance = 0;
         self.slips.clear();
         self.unspent_slips.clear();
+        self.staking_slips.clear();
         if let Some(network) = network {
             network
                 .io_interface
@@ -213,9 +217,15 @@ impl Wallet {
         wallet_slip.block_id = block_id;
         wallet_slip.tx_ordinal = tx_index;
         wallet_slip.lc = lc;
+        wallet_slip.slip_type = slip.slip_type;
 
-        self.unspent_slips.insert(wallet_slip.utxokey);
-        self.available_balance += slip.amount;
+        if let SlipType::BlockStake = slip.slip_type {
+            self.staking_slips.insert(wallet_slip.utxokey);
+        } else {
+            self.available_balance += slip.amount;
+            self.unspent_slips.insert(wallet_slip.utxokey);
+        }
+
         trace!(
             "adding slip : {:?} with value : {:?} to wallet",
             wallet_slip.utxokey.to_hex(),
@@ -235,11 +245,12 @@ impl Wallet {
             slip.utxoset_key.to_hex(),
             slip.amount
         );
-        let result = self.slips.remove(&slip.utxoset_key);
-        let in_unspent_list = self.unspent_slips.remove(&slip.utxoset_key);
-        if let Some(removed_slip) = result {
+        if let Some(removed_slip) = self.slips.remove(&slip.utxoset_key) {
+            let in_unspent_list = self.unspent_slips.remove(&slip.utxoset_key);
             if in_unspent_list {
                 self.available_balance -= removed_slip.amount;
+            } else {
+                self.staking_slips.remove(&slip.utxoset_key);
             }
             if let Some(network) = network {
                 network
@@ -430,6 +441,106 @@ impl Wallet {
     pub fn set_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
         self.key_list = key_list;
     }
+
+    pub fn create_staking_transaction(
+        &mut self,
+        staking_amount: Currency,
+        latest_unlocked_block_id: BlockId,
+    ) -> Result<Transaction, std::io::Error> {
+        debug!(
+            "creating staking transaction with amount : {:?}",
+            staking_amount
+        );
+
+        let mut transaction: Transaction = Transaction {
+            transaction_type: TransactionType::BlockStake,
+            ..Default::default()
+        };
+
+        let (inputs, output) =
+            self.find_slips_for_staking(staking_amount, latest_unlocked_block_id)?;
+
+        for input in inputs {
+            transaction.add_from_slip(input);
+        }
+        transaction.add_to_slip(output);
+
+        let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
+        transaction.hash_for_signature = Some(hash_for_signature);
+
+        transaction.sign(&self.private_key);
+
+        Ok(transaction)
+    }
+
+    fn find_slips_for_staking(
+        &mut self,
+        staking_amount: Currency,
+        latest_unlocked_block_id: BlockId,
+    ) -> Result<(Vec<Slip>, Slip), std::io::Error> {
+        trace!("finding slips for staking : {:?}", staking_amount);
+
+        let mut inputs: Vec<Slip> = vec![];
+        let mut collected_amount: Currency = 0;
+        let mut keys_to_remove = vec![];
+
+        for key in self.staking_slips.iter() {
+            let slip = self.slips.get(key).unwrap();
+            if !slip.is_staking_slip_unlocked(latest_unlocked_block_id) {
+                // slip cannot be used for staking yet
+                continue;
+            }
+
+            collected_amount += slip.amount;
+
+            keys_to_remove.push(*key);
+            inputs.push(slip.to_slip());
+
+            if collected_amount >= staking_amount {
+                break;
+            }
+        }
+
+        if collected_amount < staking_amount {
+            let required_from_unspent = staking_amount - collected_amount;
+            let mut collected_from_unspent: Currency = 0;
+            let mut keys_to_remove = vec![];
+
+            for key in self.unspent_slips.iter() {
+                let slip = self.slips.get(key).unwrap();
+
+                collected_from_unspent += slip.amount;
+
+                inputs.push(slip.to_slip());
+                keys_to_remove.push(*key);
+
+                if collected_from_unspent >= required_from_unspent {
+                    break;
+                }
+            }
+
+            if collected_from_unspent < required_from_unspent {
+                info!("couldn't collect enough funds upto requested staking amount. requested: {:?}, collected: {:?}", staking_amount,collected_amount);
+                return Err(Error::from(ErrorKind::NotFound));
+            }
+
+            for key in keys_to_remove {
+                self.unspent_slips.remove(&key);
+            }
+            collected_amount += collected_from_unspent;
+        }
+
+        for key in keys_to_remove {
+            self.staking_slips.remove(&key);
+        }
+
+        let mut output: Slip = Default::default();
+        output.amount = collected_amount;
+        output.slip_type = SlipType::BlockStake;
+        output.public_key = self.public_key;
+
+        Ok((inputs, output))
+    }
 }
 
 impl WalletSlip {
@@ -445,6 +556,28 @@ impl WalletSlip {
             spent: false,
             slip_type: SlipType::Normal,
         }
+    }
+
+    /// Checks if this staking slip is unlocked and can be used again
+    ///
+    /// # Arguments
+    ///
+    /// * `latest_unlocked_block_id`: latest block id for which the staking slips are unlocked
+    ///
+    /// returns: bool True if this is a staking slip AND can be staked again
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    pub fn is_staking_slip_unlocked(&self, latest_unlocked_block_id: BlockId) -> bool {
+        matches!(self.slip_type, SlipType::BlockStake) && self.block_id <= latest_unlocked_block_id
+    }
+
+    fn to_slip(&self) -> Slip {
+        Slip::parse_slip_from_utxokey(&self.utxokey)
+            .expect("since we already have a wallet slip, utxo key should be valid")
     }
 }
 

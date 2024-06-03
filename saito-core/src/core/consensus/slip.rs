@@ -6,7 +6,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet, UTXO_KEY_LENGTH,
+    BlockId, Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet, UTXO_KEY_LENGTH,
 };
 
 /// The size of a serialized slip in bytes.
@@ -132,6 +132,9 @@ impl Slip {
         slip.slip_index = key[49];
         slip.amount = u64::from_be_bytes(key[50..58].try_into().unwrap());
         slip.slip_type = SlipType::from_u8(key[58]).ok_or(Error::from(ErrorKind::InvalidData))?;
+
+        slip.utxoset_key = key.clone();
+        slip.is_utxoset_key_set = true;
 
         Ok(slip)
     }
