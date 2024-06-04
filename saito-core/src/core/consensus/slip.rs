@@ -294,7 +294,7 @@ mod tests {
 
         assert_eq!(slip.slip_type, slip2.slip_type);
         assert_eq!(slip.amount, slip2.amount);
-        assert!(!slip2.is_utxoset_key_set);
+        assert!(slip2.is_utxoset_key_set);
         assert_eq!(slip.block_id, slip2.block_id);
         assert_eq!(slip.tx_ordinal, slip2.tx_ordinal);
         assert_eq!(slip.slip_index, slip2.slip_index);
