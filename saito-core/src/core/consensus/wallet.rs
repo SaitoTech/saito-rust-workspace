@@ -691,7 +691,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial_test::serial]
     async fn find_staking_slips_with_normal_slips() {
         let t = TestManager::default();
 
@@ -700,6 +699,7 @@ mod tests {
         let mut slip = Slip {
             public_key: wallet.public_key,
             amount: 1_000_000,
+            slip_type: SlipType::Normal,
             ..Slip::default()
         };
         slip.generate_utxoset_key();
@@ -735,6 +735,40 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(wallet.staking_slips.len(), 0);
         assert_eq!(wallet.unspent_slips.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn find_staking_slips_with_staking_slips() {
+        let t = TestManager::default();
+
+        let mut wallet = t.wallet_lock.write().await;
+
+        let mut slip = Slip {
+            public_key: wallet.public_key,
+            amount: 1_000_000,
+            slip_type: SlipType::BlockStake,
+            ..Slip::default()
+        };
+        slip.generate_utxoset_key();
+        wallet.add_slip(1, 1, &slip, true, Some(&t.network));
+        assert_eq!(wallet.available_balance, 0);
+
+        let result = wallet.find_slips_for_staking(1_000_000, 1);
+        assert!(result.is_ok());
+        let (inputs, output) = result.unwrap();
+        assert_eq!(inputs.len(), 1);
+        assert_eq!(output.amount, 1_000_000);
+        assert_eq!(output.slip_type, SlipType::BlockStake);
+
+        assert_eq!(wallet.staking_slips.len(), 0);
+        assert_eq!(wallet.unspent_slips.len(), 0);
+        assert_eq!(wallet.available_balance, 0);
+
+        let result = wallet.find_slips_for_staking(1_000, 2);
+        assert!(result.is_err());
+
+        assert_eq!(wallet.staking_slips.len(), 0);
+        assert_eq!(wallet.unspent_slips.len(), 0);
     }
 
     // #[tokio::test]
