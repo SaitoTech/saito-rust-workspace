@@ -15,7 +15,11 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDATED};
-use crate::core::defs::{BlockHash, Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS, NOLAN_PER_SAITO};
+use crate::core::defs::{
+    BlockHash, BlockId, Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet,
+    GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
+    MIN_GOLDEN_TICKETS_NUMERATOR, NOLAN_PER_SAITO, PRUNE_AFTER_BLOCKS,
+};
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
 use crate::core::io::storage::Storage;
@@ -40,8 +44,8 @@ const FORK_ID_WEIGHTS: [u64; 16] = [
     0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
 ];
 
-const DEFAULT_SOCIAL_STAKE:Currency = 2_000_000 * NOLAN_PER_SAITO;
-const DEFAULT_SOCIAL_STAKE_PERIOD:u64=100;
+const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
+const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 100;
 
 #[derive(Debug)]
 pub enum AddBlockResult {
@@ -82,8 +86,8 @@ pub struct Blockchain {
     pub lowest_acceptable_block_hash: SaitoHash,
     pub lowest_acceptable_block_id: u64,
 
-    social_stake_amount:Currency,
-    social_stake_period:u64,
+    pub social_stake_amount: Currency,
+    pub social_stake_period: u64,
 }
 
 impl Blockchain {
@@ -784,7 +788,7 @@ impl Blockchain {
         self.blockring.get_latest_block_hash()
     }
 
-    pub fn get_latest_block_id(&self) -> u64 {
+    pub fn get_latest_block_id(&self) -> BlockId {
         self.blockring.get_latest_block_id()
     }
 

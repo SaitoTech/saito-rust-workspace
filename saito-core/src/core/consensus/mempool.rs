@@ -195,6 +195,21 @@ impl Mempool {
             block_timestamp_gap,
             current_timestamp
         );
+
+        let staking_tx;
+        {
+            let mut wallet = self.wallet_lock.write().await;
+            let latest_block_id = blockchain.get_latest_block_id();
+
+            staking_tx = wallet
+                .create_staking_transaction(
+                    blockchain.social_stake_amount,
+                    latest_block_id - blockchain.social_stake_period,
+                )
+                .ok()?;
+        }
+        self.add_transaction(staking_tx).await;
+
         let mut block = Block::create(
             &mut self.transactions,
             previous_block_hash,
