@@ -1,55 +1,44 @@
 use std::collections::HashMap;
 
+
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
-    limits: HashMap<u64, TokenCounter>,
-    max_tokens: u64,
+    limits: HashMap<String, usize>,
+    windows: HashMap<String, u64>, // Use u64 for duration in milliseconds
+    request_counts: HashMap<String, usize>,
+    last_request_times: HashMap<String, u64>, // Use u64 for timestamps
 }
 
 impl RateLimiter {
-    pub fn default(max_tokens: u64) -> Self {
-        Self {
+    pub fn new() -> Self {
+        RateLimiter {
             limits: HashMap::new(),
-            max_tokens,
+            windows: HashMap::new(),
+            request_counts: HashMap::new(),
+            last_request_times: HashMap::new(),
         }
     }
 
-    pub fn can_process_more(&mut self, peer_index: u64, current_time: u64) -> bool {
-        let max_tokens = self.max_tokens;
-        let entry = self
-            .limits
-            .entry(peer_index)
-            .or_insert_with(|| TokenCounter::default(max_tokens, current_time));
-        entry.consume_token_if_available(current_time)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct TokenCounter {
-    tokens: u64,
-    max_tokens: u64,
-    last_refill: u64,
-}
-
-impl TokenCounter {
-    pub fn default(max_tokens: u64, current_time: u64) -> Self {
-        Self {
-            tokens: max_tokens,
-            max_tokens,
-            last_refill: current_time,
-        }
+    pub fn set_limit(&mut self, action: &str, limit: usize, window: u64) {
+        self.limits.insert(action.to_string(), limit);
+        self.windows.insert(action.to_string(), window);
+        self.request_counts.insert(action.to_string(), 0);
+        self.last_request_times.insert(action.to_string(), 0);
     }
 
-    pub fn consume_token_if_available(&mut self, current_time: u64) -> bool {
-        let elapsed = current_time - self.last_refill;
+    pub fn can_make_request(&mut self, action: &str, current_time: u64) -> bool {
+        let limit = self.limits.get(action).unwrap();
+        let window = self.windows.get(action).unwrap();
+        let request_count = self.request_counts.get_mut(action).unwrap();
+        let last_request_time = self.last_request_times.get_mut(action).unwrap();
 
-        if elapsed >= 60000 {
-            self.tokens = self.max_tokens;
-            self.last_refill = current_time;
+        if current_time.saturating_sub(*last_request_time) > *window {
+            *request_count = 0;
+            *last_request_time = current_time;
         }
 
-        if self.tokens > 0 {
-            self.tokens -= 1;
+        if *request_count < *limit {
+            *request_count += 1;
             true
         } else {
             false
