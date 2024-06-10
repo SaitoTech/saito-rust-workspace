@@ -16,6 +16,7 @@ use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
+use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey,
     SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
@@ -1621,6 +1622,7 @@ impl Block {
         utxoset: &UtxoSet,
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
+        wallet: &Wallet,
     ) -> bool {
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
         assert!(self.id > 0);
@@ -1641,13 +1643,25 @@ impl Block {
             return false;
         }
 
+        let staking_tx = self
+            .transactions
+            .iter()
+            .find(|tx| matches!(tx.transaction_type, TransactionType::BlockStake));
+
+        if staking_tx.is_none() && self.id > 1 {
+            error!(
+                "block : {:?} does not have a staking transaction",
+                self.hash.to_hex()
+            );
+            return false;
+        }
+
         // verify block is signed by creator
         if !verify_signature(&self.pre_hash, &self.signature, &self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
 
-        //
         // verify "Consensus Values"
         //
         // consensus data refers to the info in the proposed block that depends
@@ -1659,12 +1673,9 @@ impl Block {
         // used by the block creator to create this block, so consensus rules allow us
         // to validate it by checking the variables we can see in our block with what
         // they should be given this function.
-        //
         let cv = self.generate_consensus_values(blockchain, storage).await;
 
-        //
         // the average number of fees in the block
-        //
         if cv.avg_income != self.avg_income {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
@@ -1673,7 +1684,6 @@ impl Block {
             return false;
         }
 
-        //
         // validate difficulty
         //
         // difficulty here refers the difficulty of generating a golden ticket
@@ -1685,7 +1695,6 @@ impl Block {
         // already examined and validated above. producing a block requires a
         // certain amount of golden ticket solutions over-time, so the
         // distinction is in practice less clean.
-        //
         if cv.expected_difficulty != self.difficulty {
             error!(
                 "ERROR 202392: difficulty is invalid. expected: {:?} vs actual : {:?}",
@@ -1694,13 +1703,11 @@ impl Block {
             return false;
         }
 
-        //
         // validate burnfee
         //
         // this is the amount of routing work that is needed to produce a block,
         // as derived from the fees in the block and modified by the length of the
         // routing path for each fee-bearing transaction.
-        //
         if cv.expected_burnfee != self.burnfee {
             error!(
                 "block is misreporting its burnfee. current : {:?} expected : {:?}",
@@ -1713,29 +1720,24 @@ impl Block {
             return false;
         }
 
-        //
         // only block #1 can have an issuance transaction
-        //
         if cv.it_num > 0 && self.id > 1 {
             error!("ERROR: blockchain contains issuance after block 1 in chain",);
             return false;
         }
 
-        //
         // many kinds of validation like the burn fee and the golden ticket solution
         // require the existence of the previous block in order to validate. we put all
         // of these validation steps below so they will have access to the previous block
         //
         // if no previous block exists, we are valid only in a limited number of
         // circumstances, such as this being the first block we are adding to our chain.
-        //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
             if let BlockType::Ghost = previous_block.block_type {
                 return true;
             }
 
             // staking treasury
-            //
             let mut expected_staking_treasury = previous_block.treasury;
             expected_staking_treasury += cv.staking_payout;
             if expected_staking_treasury >= cv.total_rebroadcast_staking_payouts_nolan {
@@ -1756,7 +1758,6 @@ impl Block {
             // for now as it is a good place to put any NOLAN that get removed because
             // of deflationary pressures or attacks that push consensus into not issuing
             // a full payout.
-            //
             if self.limbo != 0 {
                 error!(
                     "ERROR 123243: treasury is positive. expected : {:?} + {:?} = {:?} actual : {:?} found",
@@ -1769,12 +1770,10 @@ impl Block {
 
             // trace!(" ... burn fee in blk validated:  {:?}", create_timestamp());
 
-            //
             // validate routing work required
             //
             // this checks the total amount of fees that need to be burned in this
             // block to be considered valid according to consensus criteria.
-            //
             let amount_of_routing_work_needed: Currency =
                 BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
                     previous_block.burnfee,
@@ -1788,7 +1787,6 @@ impl Block {
 
             // trace!(" ... done routing work required: {:?}", create_timestamp());
 
-            //
             // validate golden ticket
             //
             // the golden ticket is a special kind of transaction that stores the
@@ -1801,26 +1799,21 @@ impl Block {
             // the validation process we have already examined the fee transaction
             // which was generated using this solution. If the solution is invalid
             // we find that out now, and it invalidates the block.
-            //
             if let Some(gt_index) = cv.gt_index {
                 let golden_ticket: GoldenTicket =
                     GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
-                //
                 // we already have a golden ticket, but create a new one pulling the
                 // target hash from our previous block to ensure that this ticket is
                 // actually valid in the context of our blockchain, and not just
                 // internally consistent in the blockchain of the sender.
-                //
                 let gt = GoldenTicket::create(
                     previous_block.hash,
                     golden_ticket.random,
                     golden_ticket.public_key,
                 );
 
-                //
                 // if there is a golden ticket, our previous_block_unpaid should be
                 // zero, as we will have issued payment in this block.
-                //
                 if self.previous_block_unpaid != 0 {
                     error!("ERROR 720351: golden ticket but previous block incorrect");
                     return false;
@@ -1846,12 +1839,10 @@ impl Block {
                     return false;
                 }
             } else {
-                //
                 // if there is no golden ticket, our previous block's total_fees will
                 // be stored in this block as previous_block_unpaid. this simplifies
                 // smoothing payouts, and assists with monitoring that the total token
                 // supply has not changed.
-                //
                 if self.previous_block_unpaid != previous_block.total_fees {
                     error!("ERROR 572983: previous_block_unpaid value incorrect");
                     return false;
@@ -1862,7 +1853,6 @@ impl Block {
 
         // trace!(" ... block.validate: (merkle rt) {:?}", create_timestamp());
 
-        //
         // validate atr
         //
         // Automatic Transaction Rebroadcasts are removed programmatically from
@@ -1874,7 +1864,6 @@ impl Block {
         // we do this by comparing the total number of ATR slips and nolan
         // which we counted in the generate_metadata() function, with the
         // expected number given the consensus values we calculated earlier.
-        //
         if cv.total_rebroadcast_slips != self.total_rebroadcast_slips {
             error!("ERROR 624442: rebroadcast slips total incorrect");
             return false;
@@ -1899,21 +1888,17 @@ impl Block {
 
         // trace!(" ... block.validate: (cv-data)   {:?}", create_timestamp());
 
-        //
         // validate fee transactions
         //
         // because the fee transaction that is created by generate_consensus_values is
         // produced without knowledge of the block in which it will be put, we need to
         // update that transaction with this information prior to hashing it in order
         // for the hash-comparison to work.
-        //
         if cv.ft_num > 0 {
             if let (Some(ft_index), Some(fee_transaction_expected)) =
                 (cv.ft_index, cv.fee_transaction)
             {
-                //
                 // no golden ticket? invalid
-                //
                 if cv.gt_index.is_none() {
                     error!(
                         "ERROR 48203: block appears to have fee transaction without golden ticket"
@@ -1921,9 +1906,7 @@ impl Block {
                     return false;
                 }
 
-                //
                 // the fee transaction is hashed to compare it with the one in the block
-                //
                 let fee_transaction_in_block = self.transactions.get(ft_index).unwrap();
                 let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
                 let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
@@ -1941,7 +1924,6 @@ impl Block {
 
         // trace!(" ... block.validate: (txs valid) {:?}", create_timestamp());
 
-        //
         // validate transactions
         //
         // validating transactions requires checking that the signatures are valid,
@@ -1960,10 +1942,9 @@ impl Block {
         // class, and the validation logic for slips is contained in the slips
         // class. Note that we are passing in a read-only copy of our UTXOSet so
         // as to determine spendability.
-        //
 
-        let transactions_valid =
-            iterate!(self.transactions, 100).all(|tx: &Transaction| tx.validate(utxoset));
+        let transactions_valid = iterate!(self.transactions, 100)
+            .all(|tx: &Transaction| tx.validate(utxoset, wallet, blockchain));
 
         // let mut transactions_valid = true;
         // for tx in self.transactions.iter() {

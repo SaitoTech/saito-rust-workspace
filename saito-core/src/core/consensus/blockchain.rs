@@ -168,11 +168,6 @@ impl Blockchain {
             return AddBlockResult::BlockAlreadyExists;
         }
 
-        // TODO -- david review -- should be no need for recursive fetch
-        // as each block will fetch the parent on arrival and processing
-        // and we may want to tag and use the degree of distance to impose
-        // penalties on routing peers.
-        //
         // get missing block
         if !self.blockring.is_empty() && self.get_block(&block.previous_block_hash).is_none() {
             if block.previous_block_hash == [0; 32] {
@@ -256,12 +251,13 @@ impl Blockchain {
         let mut old_chain: Vec<[u8; 32]> = Vec::new();
         let mut am_i_the_longest_chain = false;
 
-        let (shared_ancestor_found, new_chain_hash, mut new_chain) =
+        let (shared_ancestor_found, shared_block_hash, mut new_chain) =
             self.calculate_new_chain_for_add_block(block_hash);
 
         // and get existing current chain for comparison
         if shared_ancestor_found {
-            old_chain = self.calculate_old_chain_for_add_block(latest_block_hash, new_chain_hash);
+            old_chain =
+                self.calculate_old_chain_for_add_block(latest_block_hash, shared_block_hash);
         } else {
             debug!(
                 "block without parent. block : {:?}, latest : {:?}",
@@ -348,7 +344,6 @@ impl Blockchain {
         // the function on_chain_reorganization is triggered in blocks and
         // with the BlockRing. We fail if the newly-preferred chain is not
         // viable.
-        //
         return if am_i_the_longest_chain {
             debug!("this is the longest chain");
             self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
@@ -360,6 +355,7 @@ impl Blockchain {
                     .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
                     .count()
             );
+
             let (does_new_chain_validate, wallet_updated) = self
                 .validate(new_chain.as_slice(), old_chain.as_slice(), storage, configs)
                 .await;
@@ -401,12 +397,12 @@ impl Blockchain {
     fn calculate_old_chain_for_add_block(
         &mut self,
         latest_block_hash: SaitoHash,
-        new_chain_hash: SaitoHash,
+        shared_block_hash: SaitoHash,
     ) -> Vec<SaitoHash> {
         let mut old_chain: Vec<[u8; 32]> = Vec::new();
         let mut old_chain_hash = latest_block_hash;
 
-        while new_chain_hash != old_chain_hash {
+        while shared_block_hash != old_chain_hash {
             if self.blocks.contains_key(&old_chain_hash) {
                 old_chain.push(old_chain_hash);
                 old_chain_hash = self
@@ -447,11 +443,7 @@ impl Blockchain {
                     break;
                 }
                 new_chain.push(new_chain_hash);
-                new_chain_hash = self
-                    .blocks
-                    .get(&new_chain_hash)
-                    .unwrap()
-                    .previous_block_hash;
+                new_chain_hash = block.previous_block_hash;
             } else {
                 break;
             }
@@ -566,19 +558,18 @@ impl Blockchain {
 
     async fn add_block_transactions_back(&mut self, mempool: &mut Mempool, block: &mut Block) {
         let public_key;
-        {
-            let wallet = mempool.wallet_lock.read().await;
-            public_key = wallet.public_key;
-        }
+        let wallet = mempool.wallet_lock.read().await;
+        public_key = wallet.public_key;
         if block.creator == public_key {
             let transactions = &mut block.transactions;
             let prev_count = transactions.len();
+
             let transactions: Vec<Transaction> = drain!(transactions, 10)
                 .filter(|tx| {
                     // TODO : what other types should be added back to the mempool
                     if tx.transaction_type == TransactionType::Normal {
                         // TODO : is there a way to not validate these again ?
-                        return tx.validate(&self.utxoset);
+                        return tx.validate(&self.utxoset, &wallet, &self);
                     }
                     false
                 })
@@ -1084,6 +1075,11 @@ impl Blockchain {
     ) -> WindingResult {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
+        info!(
+            "index : {:?} failed : {:?}",
+            current_wind_index, wind_failure
+        );
+
         // if we are winding a non-existent chain with a wind_failure it
         // means our wind attempt failed, and we should move directly into
         // add_block_failure() by returning false.
@@ -1106,9 +1102,15 @@ impl Blockchain {
             .await;
 
         let block = self.blocks.get(block_hash).unwrap();
+        let does_block_validate;
+        {
+            let wallet = self.wallet_lock.read().await;
+            does_block_validate = current_wind_index == 0
+                || block
+                    .validate(self, &self.utxoset, configs, storage, &wallet)
+                    .await;
+        }
 
-        let does_block_validate =
-            current_wind_index == 0 || block.validate(self, &self.utxoset, configs, storage).await;
         let mut wallet_updated = WALLET_NOT_UPDATED;
 
         return if does_block_validate {
@@ -1162,7 +1164,6 @@ impl Blockchain {
             // the process of rewinding the old-chain, our wind_chain function
             // will know it has rewound the old chain successfully instead of
             // successfully added the new chain.
-            //
             error!(
                 "ERROR: this block : {:?} : {:?} does not validate!",
                 block.id,
@@ -1239,6 +1240,10 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
         block_hash: &SaitoHash,
     ) {
+        debug!(
+            "upgrading blocks for wind chain... : {:?}",
+            block_hash.to_hex()
+        );
         let block = self.get_mut_block(block_hash).unwrap();
 
         block
@@ -2616,18 +2621,16 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
-    //
     // add 6 blocks including 4 block reorg
-    //
     async fn basic_longest_chain_reorg_test() {
+        pretty_env_logger::init();
+
         let mut t = TestManager::default();
         let block1;
         let block1_hash;
         let ts;
 
-        //
         // block 1
-        //
         t.initialize(100, 1_000_000_000).await;
 
         {
@@ -2638,9 +2641,7 @@ mod tests {
             ts = block1.timestamp;
         }
 
-        //
         // block 2
-        //
         let mut block2 = t
             .create_block(
                 block1_hash, // hash of parent block
@@ -2651,6 +2652,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
+
         block2.generate(); // generate hashes
 
         let block2_hash = block2.hash;
@@ -2665,9 +2667,7 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_id(), block2_id);
         }
 
-        //
         // block 3
-        //
         let mut block3 = t
             .create_block(
                 block2_hash, // hash of parent block
@@ -2683,9 +2683,7 @@ mod tests {
         let _block3_id = block3.id;
         t.add_block(block3).await;
 
-        //
         // block 4
-        //
         let mut block4 = t
             .create_block(
                 block3_hash, // hash of parent block
@@ -2701,9 +2699,7 @@ mod tests {
         let _block4_id = block4.id;
         t.add_block(block4).await;
 
-        //
         // block 5
-        //
         let mut block5 = t
             .create_block(
                 block4_hash, // hash of parent block
@@ -2726,9 +2722,7 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_id(), block5_id);
         }
 
-        //
         //  block3-2
-        //
         let mut block3_2 = t
             .create_block(
                 block2_hash, // hash of parent block
@@ -2751,9 +2745,7 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_id(), block5_id);
         }
 
-        //
         //  block4-2
-        //
         let mut block4_2 = t
             .create_block(
                 block3_2_hash, // hash of parent block
@@ -2776,9 +2768,7 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_id(), block5_id);
         }
 
-        //
         //  block5-2
-        //
         let mut block5_2 = t
             .create_block(
                 block4_2_hash, // hash of parent block
@@ -2801,9 +2791,7 @@ mod tests {
             assert_eq!(blockchain.get_latest_block_id(), block5_id);
         }
 
-        //
         //  block6_2
-        //
         let mut block6_2 = t
             .create_block(
                 block5_2_hash, // hash of parent block

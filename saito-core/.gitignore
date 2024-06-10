@@ -2,3 +2,6 @@
 Cargo.lock
 data/blocks/*
 data/
+/temp_test_directory/issuance-1.txt
+/temp_test_directory/issuance-2.txt
+/temp_test_directory/issuance_counter.txt

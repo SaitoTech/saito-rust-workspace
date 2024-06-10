@@ -478,7 +478,7 @@ impl Wallet {
         staking_amount: Currency,
         latest_unlocked_block_id: BlockId,
     ) -> Result<(Vec<Slip>, Slip), std::io::Error> {
-        trace!("finding slips for staking : {:?}", staking_amount);
+        debug!("finding slips for staking : {:?}", staking_amount);
 
         let mut inputs: Vec<Slip> = vec![];
         let mut collected_amount: Currency = 0;
@@ -502,6 +502,7 @@ impl Wallet {
         }
 
         if collected_amount < staking_amount {
+            debug!("not enough funds in staking slips. searching in normal slips. current_balance : {:?}",self.available_balance);
             let required_from_unspent = staking_amount - collected_amount;
             let mut collected_from_unspent: Currency = 0;
             let mut keys_to_remove = vec![];
@@ -541,6 +542,28 @@ impl Wallet {
         output.public_key = self.public_key;
 
         Ok((inputs, output))
+    }
+
+    pub fn is_slip_unlocked(
+        &self,
+        utxo_key: &SaitoUTXOSetKey,
+        latest_unlocked_block_id: BlockId,
+    ) -> bool {
+        let slip = self.slips.get(utxo_key);
+        if slip.is_none() {
+            return false;
+        }
+        let slip = slip.unwrap();
+        if !slip.lc {
+            return false;
+        }
+        if let SlipType::BlockStake = slip.slip_type {
+            if slip.block_id > latest_unlocked_block_id {
+                return false;
+            }
+        }
+
+        true
     }
 }
 

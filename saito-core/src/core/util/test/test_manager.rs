@@ -94,13 +94,11 @@ pub mod test {
         fn default() -> Self {
             let keys = generate_keys();
             let wallet = Wallet::new(keys.1, keys.0);
-            let _public_key = wallet.public_key.clone();
-            let _private_key = wallet.private_key.clone();
             let peers = Arc::new(RwLock::new(PeerCollection::new()));
             let wallet_lock = Arc::new(RwLock::new(wallet));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
-            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
+            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
             let configs = Arc::new(RwLock::new(TestConfiguration {}));
 
             let issuance_path = TestManager::get_test_issuance_file().unwrap();
@@ -207,17 +205,15 @@ pub mod test {
         pub async fn add_block(&mut self, block: Block) {
             debug!("adding block to test manager blockchain");
 
-            {
-                let configs = self.config_lock.write().await;
-                let mut blockchain = self.blockchain_lock.write().await;
-                let mut mempool = self.mempool_lock.write().await;
+            let configs = self.config_lock.write().await;
+            let mut blockchain = self.blockchain_lock.write().await;
+            let mut mempool = self.mempool_lock.write().await;
 
-                let _ = blockchain
-                    .add_block(block, &mut self.storage, &mut mempool, configs.deref())
-                    .await;
+            let _ = blockchain
+                .add_block(block, &mut self.storage, &mut mempool, configs.deref())
+                .await;
 
-                self.latest_block_hash = blockchain.last_block_hash;
-            }
+            self.latest_block_hash = blockchain.last_block_hash;
         }
 
         // check that the blockchain connects properly

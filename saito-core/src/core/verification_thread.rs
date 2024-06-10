@@ -41,23 +41,18 @@ pub struct VerificationThread {
 impl VerificationThread {
     pub async fn verify_tx(&mut self, mut transaction: Transaction) {
         let public_key;
-        {
-            let wallet = self.wallet_lock.read().await;
-            public_key = wallet.public_key;
-        }
-        {
-            transaction.generate(&public_key, 0, 0);
+        let blockchain = self.blockchain_lock.read().await;
+        let wallet = self.wallet_lock.read().await;
+        public_key = wallet.public_key;
+        transaction.generate(&public_key, 0, 0);
 
-            let blockchain = self.blockchain_lock.read().await;
-
-            if !transaction.validate(&blockchain.utxoset) {
-                debug!(
-                    "transaction : {:?} not valid",
-                    transaction.signature.to_hex()
-                );
-                self.processed_txs.increment();
-                return;
-            }
+        if !transaction.validate(&blockchain.utxoset, &wallet, &blockchain) {
+            debug!(
+                "transaction : {:?} not valid",
+                transaction.signature.to_hex()
+            );
+            self.processed_txs.increment();
+            return;
         }
 
         self.processed_txs.increment();
@@ -76,15 +71,13 @@ impl VerificationThread {
             let blockchain = self.blockchain_lock.read().await;
 
             let public_key;
-            {
-                let wallet = self.wallet_lock.read().await;
-                public_key = wallet.public_key;
-            }
+            let wallet = self.wallet_lock.read().await;
+            public_key = wallet.public_key;
             txs = drain!(transactions, 10)
                 .filter_map(|mut transaction| {
                     transaction.generate(&public_key, 0, 0);
 
-                    if !transaction.validate(&blockchain.utxoset) {
+                    if !transaction.validate(&blockchain.utxoset, &wallet, &blockchain) {
                         debug!(
                             "transaction : {:?} not valid",
                             transaction.signature.to_hex()

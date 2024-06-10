@@ -107,14 +107,17 @@ impl Mempool {
             transaction.signature.to_hex()
         );
         let public_key;
+        let tx_valid;
         {
             let wallet = self.wallet_lock.read().await;
             public_key = wallet.public_key;
+            transaction.generate(&public_key, 0, 0);
+
+            tx_valid = transaction.validate(&blockchain.utxoset, &wallet, &blockchain);
         }
 
-        transaction.generate(&public_key, 0, 0);
         // validate
-        if transaction.validate(&blockchain.utxoset) {
+        if tx_valid {
             self.add_transaction(transaction).await;
         } else {
             debug!(
