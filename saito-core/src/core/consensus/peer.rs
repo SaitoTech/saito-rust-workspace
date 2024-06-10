@@ -15,6 +15,7 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
+use crate::core::util::rate_limiter::RateLimiter;
 
 #[derive(Clone, Debug)]
 pub enum PeerStatus {
@@ -39,10 +40,16 @@ pub struct Peer {
     pub last_msg_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
+    pub rate_limiter: RateLimiter
 }
 
 impl Peer {
     pub fn new(peer_index: u64) -> Peer {
+        
+        let mut rate_limiter = RateLimiter::new();
+        rate_limiter.set_limit("key_list", 10, 60_000);  
+        rate_limiter.set_limit("handshake", 5, 60_000); 
+
         Peer {
             index: peer_index,
             peer_status: PeerStatus::Disconnected(0, 1_000),
@@ -54,7 +61,9 @@ impl Peer {
             last_msg_at: 0,
             wallet_version: Default::default(),
             core_version: Default::default(),
+            rate_limiter: rate_limiter
         }
+        
     }
 
     pub fn get_url(&self) -> String {
@@ -96,6 +105,10 @@ impl Peer {
         debug!("handshake challenge sent for peer: {:?}", self.index);
 
         Ok(())
+    }
+
+    pub fn can_make_request(&mut self, action: &str, current_time: u64) -> bool {
+        self.rate_limiter.can_make_request(action, current_time)
     }
     pub async fn handle_handshake_challenge(
         &mut self,
