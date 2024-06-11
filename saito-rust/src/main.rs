@@ -499,14 +499,10 @@ fn run_loop_thread(
                                         .await
                                         .unwrap();
                                 }
-                                CONSENSUS_EVENT_PROCESSOR_ID => {
-                                    unreachable!("not expecting consensus events")
-                                }
-                                MINING_EVENT_PROCESSOR_ID => {
+
+                                _ => {
                                     unreachable!()
                                 }
-
-                                _ => {}
                             }
                         }
                     }

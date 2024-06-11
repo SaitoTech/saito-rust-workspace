@@ -30,7 +30,7 @@ use saito_core::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
     Timestamp, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
-use saito_core::core::io::network::Network;
+use saito_core::core::io::network::{Network, PeerDisconnectType};
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
@@ -450,7 +450,10 @@ pub async fn process_peer_disconnection(peer_index: u64) {
         .as_mut()
         .unwrap()
         .routing_thread
-        .process_network_event(NetworkEvent::PeerDisconnected { peer_index })
+        .process_network_event(NetworkEvent::PeerDisconnected {
+            peer_index,
+            disconnect_type: PeerDisconnectType::ExternalDisconnect,
+        })
         .await;
 }
 
