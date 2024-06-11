@@ -278,12 +278,6 @@ impl Peer {
     pub fn has_service(&self, service: String) -> bool {
         self.services.iter().any(|s| s.service == service)
     }
-    pub fn is_main_peer(&self) -> bool {
-        if self.static_peer_config.is_none() {
-            return false;
-        }
-        self.static_peer_config.as_ref().unwrap().is_main
-    }
 
     pub fn compare_version(&self, version: &Version) -> Option<Ordering> {
         // for peer versions, if the version is not set we still consider it as a valid peer
@@ -292,6 +286,16 @@ impl Peer {
             return Some(Ordering::Equal);
         }
         self.wallet_version.partial_cmp(version)
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.public_key.is_some()
+    }
+    pub fn is_static_peer(&self) -> bool {
+        self.static_peer_config.is_some()
+    }
+    pub fn mark_as_disconnected(&mut self) {
+        self.public_key = None;
     }
 }
 

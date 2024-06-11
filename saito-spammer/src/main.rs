@@ -379,13 +379,10 @@ fn run_loop_thread(
                             .await
                             .unwrap();
                     }
-                    CONSENSUS_EVENT_PROCESSOR_ID => {
+
+                    _ => {
                         unreachable!()
                     }
-                    MINING_EVENT_PROCESSOR_ID => {
-                        unreachable!()
-                    }
-                    _ => {}
                 }
             }
 

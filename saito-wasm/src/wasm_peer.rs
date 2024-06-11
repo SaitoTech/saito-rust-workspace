@@ -75,10 +75,7 @@ impl WasmPeer {
         self.peer.services = services;
     }
     pub fn has_service(&self, service: JsString) -> bool {
-        return self.peer.has_service(service.into());
-    }
-    pub fn is_main_peer(&self) -> bool {
-        self.peer.is_main_peer()
+        self.peer.has_service(service.into())
     }
 }
 

@@ -21,12 +21,20 @@ use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
 use crate::core::util::configuration::{Configuration, PeerConfig};
 
+#[derive(Debug)]
+pub enum PeerDisconnectType {
+    /// If the peer was disconnected without our intervention
+    ExternalDisconnect,
+    /// If we disconnected the peer
+    InternalDisconnect,
+}
+
 // #[derive(Debug)]
 pub struct Network {
     // TODO : manage peers from network
     pub peer_lock: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
-    static_peer_configs: Vec<(PeerConfig, Timestamp)>,
+    static_peer_configs: Vec<PeerConfig>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     pub timer: Timer,
@@ -118,21 +126,23 @@ impl Network {
         }
     }
 
-    pub async fn handle_peer_disconnect(&mut self, peer_index: u64) {
+    pub async fn handle_peer_disconnect(
+        &mut self,
+        peer_index: u64,
+        disconnect_type: PeerDisconnectType,
+    ) {
         debug!("handling peer disconnect, peer_index = {}", peer_index);
 
-        self.io_interface
-            .disconnect_from_peer(peer_index)
-            .await
-            .unwrap();
+        if let PeerDisconnectType::ExternalDisconnect = disconnect_type {
+            self.io_interface
+                .disconnect_from_peer(peer_index)
+                .await
+                .unwrap();
+        }
 
         let mut peers = self.peer_lock.write().await;
 
-        let result = peers.find_peer_by_index(peer_index);
-
-        if result.is_some() {
-            let peer = result.unwrap();
-
+        if let Some(peer) = peers.find_peer_by_index(peer_index) {
             if peer.public_key.is_some() {
                 // calling here before removing the peer from collections
                 self.io_interface
@@ -148,16 +158,29 @@ impl Network {
                     peer.index
                 );
 
-                // setting to immediately reconnect. if failed, it will connect after a time
+                assert!(
+                    !self.static_peer_configs.iter().any(|(peer_config)| {
+                        let config = peer.static_peer_config.as_ref().unwrap();
+                        config.host == peer_config.host && config.port == peer_config.port
+                    }),
+                    "static peer is already in the collection"
+                );
+                let config = peer.static_peer_config.as_ref().unwrap();
+                debug!(
+                    "adding back static peer : {:?}:{:?}",
+                    config.host, config.port
+                );
                 self.static_peer_configs
-                    .push((peer.static_peer_config.as_ref().unwrap().clone(), 0));
+                    .push(peer.static_peer_config.as_ref().unwrap().clone());
             } else if peer.public_key.is_some() {
                 info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
                 peer.index, peer.public_key.as_ref().unwrap().to_base58());
             }
 
-            if public_key.is_some() {
-                peers.address_to_peers.remove(&public_key.unwrap());
+            debug!("removing peer : {:?} from peer collection", peer_index);
+
+            if let Some(public_key) = &public_key {
+                peers.address_to_peers.remove(public_key);
             }
             peers.index_to_peers.remove(&peer_index);
         } else {
@@ -185,9 +208,7 @@ impl Network {
             let data = peer.static_peer_config.as_ref().unwrap();
 
             self.static_peer_configs
-                .retain(|(config, _reconnect_time)| {
-                    config.host != data.host || config.port != data.port
-                });
+                .retain(|(config)| config.host != data.host || config.port != data.port);
         }
 
         debug!("new peer added : {:?}", peer_index);
@@ -470,29 +491,23 @@ impl Network {
     ) {
         let configs = configs_lock.read().await;
 
+        // TODO : can create a new disconnected peer with a is_static flag set. so we don't need to keep the static peers separately
         configs
             .get_peer_configs()
             .clone()
             .drain(..)
             .for_each(|config| {
-                self.static_peer_configs.push((config, 0));
+                self.static_peer_configs.push(config);
             });
-        if !self.static_peer_configs.is_empty() {
-            self.static_peer_configs.get_mut(0).unwrap().0.is_main = true;
-        }
+
         trace!("static peers : {:?}", self.static_peer_configs);
     }
 
     pub async fn connect_to_static_peers(&mut self) {
-        let current_time = self.timer.get_timestamp_in_ms();
-        for (peer, reconnect_after) in &mut self.static_peer_configs {
-            trace!("connecting to peer : {:?}", peer);
-            if *reconnect_after > current_time {
-                continue;
-            }
-            *reconnect_after = current_time + PEER_RECONNECT_WAIT_PERIOD;
+        for peer_config in self.static_peer_configs.drain(..) {
+            debug!("connecting to static peer : {:?}", peer_config);
             self.io_interface
-                .connect_to_peer(peer.clone())
+                .connect_to_peer(peer_config)
                 .await
                 .unwrap();
         }
