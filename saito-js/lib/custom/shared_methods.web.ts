@@ -3,154 +3,155 @@ import Saito from "../../saito";
 import CustomSharedMethods from "./custom_shared_methods";
 
 export default class WebSharedMethods extends CustomSharedMethods {
-  connectToPeer(peerData: any): void {
-    let protocol = "ws";
-    if (peerData.protocol === "https") {
-      protocol = "wss";
-    }
-    let url = protocol + "://" + peerData.host + ":" + peerData.port + "/wsopen";
-
-    try {
-      console.log("connecting to " + url + "....");
-      let socket = new WebSocket(url);
-      socket.binaryType = "arraybuffer";
-      let index = Saito.getInstance().addNewSocket(socket);
-
-      socket.onmessage = (event: MessageEvent) => {
+    connectToPeer(url: string, peer_index: bigint): void {
         try {
-          Saito.getLibInstance().process_msg_buffer_from_peer(new Uint8Array(event.data), index);
-        } catch (error) {
-          console.error(error);
-        }
-      };
+            console.log("connecting to " + url + "....");
+            let socket = new WebSocket(url);
+            socket.binaryType = "arraybuffer";
+            Saito.getInstance().addNewSocket(socket, peer_index);
 
-      socket.onopen = () => {
+            socket.onmessage = (event: MessageEvent) => {
+                try {
+                    Saito.getLibInstance().process_msg_buffer_from_peer(new Uint8Array(event.data), peer_index);
+                } catch (error) {
+                    console.error(error);
+                }
+            };
+
+            socket.onopen = () => {
+                try {
+                    Saito.getLibInstance().process_new_peer(peer_index);
+                    console.log("connected to : " + url + " with peer index : " + peer_index);
+                } catch (error) {
+                    console.error(error);
+                }
+            };
+            socket.onclose = () => {
+                try {
+                    console.log("socket.onclose : " + peer_index);
+                    Saito.getLibInstance().process_peer_disconnection(peer_index);
+                } catch (error) {
+                    console.error(error);
+                }
+            };
+            socket.onerror = (error) => {
+                try {
+                    console.error(`socket.onerror ${peer_index}: `, error);
+                    Saito.getInstance().removeSocket(peer_index);
+                } catch (error) {
+                    console.error(error);
+                }
+            }
+        } catch (e) {
+            console.error("error occurred while opening socket : ", e)
+        }
+    }
+
+    disconnectFromPeer(peerIndex: bigint): void {
+        console.log("disconnect from peer : " + peerIndex);
+        Saito.getInstance().removeSocket(peerIndex);
+    }
+
+    fetchBlockFromPeer(url: string): Promise<Uint8Array> {
+        console.log("fetching block from url : " + url);
+        return fetch(url)
+            .then((res: any) => {
+                return res.arrayBuffer();
+            })
+            .then((buffer: ArrayBuffer) => {
+                console.log("block fetched from : " + url + "with size : " + buffer.byteLength);
+                return new Uint8Array(buffer);
+            })
+            .catch((err) => {
+                console.error("failed fetching block : ", err);
+                throw err;
+            });
+    }
+
+    isExistingFile(key: string): boolean {
         try {
-          Saito.getLibInstance().process_new_peer(index, peerData);
+            return !!localStorage.getItem(key);
         } catch (error) {
-          console.error(error);
+            console.error(error);
+            return false;
         }
-      };
-      socket.onclose = () => {
+    }
+
+    loadBlockFileList(): Array<string> {
         try {
-          console.log("socket.onclose : " + index);
-          Saito.getLibInstance().process_peer_disconnection(index);
-        } catch (error) {
-          console.error(error);
+            return [];
+        } catch (e) {
+            console.error(e);
+            return [];
         }
-      };
-
-      console.log("connected to : " + url + " with peer index : " + index);
-    } catch (e) {
-      console.error(e);
     }
-  }
 
-  disconnectFromPeer(peerIndex: bigint): void {
-    console.log("disconnect from peer : " + peerIndex);
-    Saito.getInstance().removeSocket(peerIndex);
-  }
-
-  fetchBlockFromPeer(url: string): Promise<Uint8Array> {
-    console.log("fetching block from url : " + url);
-    return fetch(url)
-      .then((res: any) => {
-        return res.arrayBuffer();
-      })
-      .then((buffer: ArrayBuffer) => {
-        console.log("block fetched from : " + url + "with size : " + buffer.byteLength);
-        return new Uint8Array(buffer);
-      })
-      .catch((err) => {
-        console.error("failed fetching block : ", err);
-        throw err;
-      });
-  }
-
-  isExistingFile(key: string): boolean {
-    try {
-      return !!localStorage.getItem(key);
-    } catch (error) {
-      console.error(error);
-      return false;
-    }
-  }
-
-  loadBlockFileList(): Array<string> {
-    try {
-      return [];
-    } catch (e) {
-      console.error(e);
-      return [];
-    }
-  }
-
-  readValue(key: string): Uint8Array {
-    try {
-      let data = localStorage.getItem(key);
-      if (!data) {
-        console.log("item not found for key : " + key);
+    readValue(key: string): Uint8Array {
+        try {
+            let data = localStorage.getItem(key);
+            if (!data) {
+                console.log("item not found for key : " + key);
+                return new Uint8Array();
+            }
+            let buffer = Buffer.from(data, "base64");
+            return new Uint8Array(buffer);
+        } catch (error) {
+            console.error(error);
+        }
         return new Uint8Array();
-      }
-      let buffer = Buffer.from(data, "base64");
-      return new Uint8Array(buffer);
-    } catch (error) {
-      console.error(error);
     }
-    return new Uint8Array();
-  }
 
-  removeValue(key: string): void {
-    try {
-      localStorage.removeItem(key);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  sendMessage(peerIndex: bigint, buffer: Uint8Array): void {
-    let socket = Saito.getInstance().getSocket(peerIndex);
-    if (socket) {
-      socket.send(buffer);
-    }
-  }
-
-  sendMessageToAll(buffer: Uint8Array, exceptions: Array<bigint>): void {
-    // console.debug("sending message to  all with size : " + buffer.byteLength);
-    // console.info(' --- Sending to All ---')
-    Saito.getInstance().sockets.forEach((socket, key) => {
-      if (exceptions.includes(key)) {
-        return;
-      }
-      try {
-        if (socket.readyState !== socket.OPEN) {
-          console.error("Blocked Socket Send Before Open");
-        } else {
-          socket.send(buffer);
+    removeValue(key: string): void {
+        try {
+            localStorage.removeItem(key);
+        } catch (e) {
+            console.error(e);
         }
-      } catch (err) {
-        console.error("Socket Send Error: " + err);
-      }
-    });
-  }
-
-  writeValue(key: string, value: Uint8Array): void {
-    try {
-      localStorage.setItem(key, Buffer.from(value).toString("base64"));
-    } catch (error) {
-      console.error(error);
     }
-  }
 
-  appendValue(key: string, value: Uint8Array): void {
-    throw new Error("Method not implemented.");
-  }
+    sendMessage(peerIndex: bigint, buffer: Uint8Array): void {
+        let socket = Saito.getInstance().getSocket(peerIndex);
+        if (socket) {
+            socket.send(buffer);
+        }
+    }
 
-  flushData(key: string): void {
-    throw new Error("Method not implemented.");
-  }
+    sendMessageToAll(buffer: Uint8Array, exceptions: Array<bigint>): void {
+        // console.debug("sending message to  all with size : " + buffer.byteLength);
+        // console.info(' --- Sending to All ---')
+        Saito.getInstance().sockets.forEach((socket, key) => {
+            if (exceptions.includes(key)) {
+                return;
+            }
+            try {
+                if (socket.readyState !== socket.OPEN) {
+                    console.error("Blocked Socket Send Before Open");
+                } else {
+                    socket.send(buffer);
+                }
+            } catch (err) {
+                console.error("Socket Send Error: " + err);
+            }
+        });
+    }
 
-  sendInterfaceEvent(event: String, peerIndex: bigint) {
-    throw new Error("Method not implemented.");
-  }
+    writeValue(key: string, value: Uint8Array): void {
+        try {
+            localStorage.setItem(key, Buffer.from(value).toString("base64"));
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    appendValue(key: string, value: Uint8Array): void {
+        throw new Error("Method not implemented.");
+    }
+
+    flushData(key: string): void {
+        throw new Error("Method not implemented.");
+    }
+
+    sendInterfaceEvent(event: String, peerIndex: bigint) {
+        throw new Error("Method not implemented.");
+    }
 }

@@ -1,4 +1,5 @@
 use crate::core::defs::{BlockId, PeerIndex, SaitoHash};
+use crate::core::io::network::PeerDisconnectType;
 use crate::core::util;
 
 #[derive(Debug)]
@@ -16,17 +17,18 @@ pub enum NetworkEvent {
         buffer: Vec<u8>,
     },
     ConnectToPeer {
-        peer_details: util::configuration::PeerConfig,
+        url: String,
+        peer_index: PeerIndex,
     },
     DisconnectFromPeer {
         peer_index: u64,
     },
     PeerConnectionResult {
-        peer_details: Option<util::configuration::PeerConfig>,
         result: Result<u64, std::io::Error>,
     },
     PeerDisconnected {
         peer_index: u64,
+        disconnect_type: PeerDisconnectType,
     },
     BlockFetchRequest {
         block_hash: SaitoHash,

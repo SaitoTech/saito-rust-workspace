@@ -42,8 +42,12 @@ pub mod test {
             Ok(())
         }
 
-        async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
-            debug!("connecting to peer : {:?}", peer.host);
+        async fn connect_to_peer(
+            &mut self,
+            url: String,
+            peer_index: PeerIndex,
+        ) -> Result<(), Error> {
+            debug!("connecting to peer : {:?}", peer_index);
 
             Ok(())
         }

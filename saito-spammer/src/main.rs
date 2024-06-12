@@ -305,7 +305,6 @@ async fn run_routing_event_processor(
         sender_to_consensus: sender_to_mempool.clone(),
         sender_to_miner: sender_to_miner.clone(),
         timer: timer.clone(),
-        static_peers: vec![],
         config_lock: configs_lock.clone(),
         wallet_lock: context.wallet_lock.clone(),
         network: Network::new(
@@ -324,22 +323,7 @@ async fn run_routing_event_processor(
         last_verification_thread_index: 0,
         stat_sender: sender_to_stat.clone(),
         blockchain_sync_state: BlockchainSyncState::new(fetch_batch_size),
-        initial_connection: false,
-        reconnection_wait_time: 0,
     };
-    {
-        let configs = configs_lock.read().await;
-        routing_event_processor.reconnection_wait_time =
-            configs.get_server_configs().unwrap().reconnection_wait_time;
-        let peers = configs.get_peer_configs();
-        for peer in peers {
-            routing_event_processor.static_peers.push(StaticPeer {
-                peer_details: (*peer).clone(),
-                peer_state: PeerState::Disconnected,
-                peer_index: 0,
-            });
-        }
-    }
 
     let (interface_sender_to_routing, interface_receiver_for_routing) =
         tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
@@ -379,13 +363,10 @@ fn run_loop_thread(
                             .await
                             .unwrap();
                     }
-                    CONSENSUS_EVENT_PROCESSOR_ID => {
+
+                    _ => {
                         unreachable!()
                     }
-                    MINING_EVENT_PROCESSOR_ID => {
-                        unreachable!()
-                    }
-                    _ => {}
                 }
             }
 

@@ -16,7 +16,7 @@ use crate::core::defs::{
     BlockHash, BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
     STAT_BIN_COUNT,
 };
-use crate::core::io::network::Network;
+use crate::core::io::network::{Network, PeerDisconnectType};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::msg::block_request::BlockchainRequest;
@@ -82,8 +82,6 @@ pub struct RoutingThread {
     pub mempool_lock: Arc<RwLock<Mempool>>,
     pub sender_to_consensus: Sender<ConsensusEvent>,
     pub sender_to_miner: Sender<MiningEvent>,
-    // TODO : remove this if not needed
-    pub static_peers: Vec<StaticPeer>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     pub timer: Timer,
     pub wallet_lock: Arc<RwLock<Wallet>>,
@@ -94,10 +92,6 @@ pub struct RoutingThread {
     pub last_verification_thread_index: usize,
     pub stat_sender: Sender<String>,
     pub blockchain_sync_state: BlockchainSyncState,
-    // TODO : can be removed since we are handling reconnection for each peer now
-    pub initial_connection: bool,
-    // TODO : can be removed since we are handling reconnection for each peer now
-    pub reconnection_wait_time: Timestamp,
 }
 
 impl RoutingThread {
@@ -143,9 +137,6 @@ impl RoutingThread {
                     .await;
             }
 
-            Message::Block(_) => {
-                unreachable!("received block");
-            }
             Message::Transaction(transaction) => {
                 // trace!(
                 //     "received transaction : {:?}",
@@ -202,6 +193,7 @@ impl RoutingThread {
                     .handle_received_key_list(peer_index, key_list)
                     .await;
             }
+            _ => unreachable!(),
         }
         // trace!("incoming message processed");
     }
@@ -241,7 +233,7 @@ impl RoutingThread {
             peer_public_key = peers
                 .find_peer_by_index(peer_index)
                 .unwrap()
-                .public_key
+                .get_public_key()
                 .unwrap();
         }
 
@@ -307,18 +299,20 @@ impl RoutingThread {
             .unwrap();
     }
 
-    async fn handle_new_peer(
-        &mut self,
-        peer_data: Option<util::configuration::PeerConfig>,
-        peer_index: u64,
-    ) {
+    async fn handle_new_peer(&mut self, peer_index: u64) {
         trace!("handling new peer : {:?}", peer_index);
-        self.network.handle_new_peer(peer_data, peer_index).await;
+        self.network.handle_new_peer(peer_index).await;
     }
 
-    async fn handle_peer_disconnect(&mut self, peer_index: u64) {
+    async fn handle_peer_disconnect(
+        &mut self,
+        peer_index: u64,
+        disconnect_type: PeerDisconnectType,
+    ) {
         trace!("handling peer disconnect, peer_index = {}", peer_index);
-        self.network.handle_peer_disconnect(peer_index).await;
+        self.network
+            .handle_peer_disconnect(peer_index, disconnect_type)
+            .await;
     }
     pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
         let mut wallet = self.wallet_lock.write().await;
@@ -529,13 +523,6 @@ impl RoutingThread {
 impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         match event {
-            NetworkEvent::OutgoingNetworkMessage {
-                peer_index: _,
-                buffer: _,
-            } => {
-                // TODO : remove this case if not being used
-                unreachable!()
-            }
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
@@ -557,28 +544,19 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     .await;
                 return Some(());
             }
-            NetworkEvent::PeerConnectionResult {
-                peer_details,
-                result,
-            } => {
+            NetworkEvent::PeerConnectionResult { result } => {
                 if result.is_ok() {
-                    self.handle_new_peer(peer_details, result.unwrap()).await;
+                    self.handle_new_peer(result.unwrap()).await;
                     return Some(());
                 }
             }
-            NetworkEvent::PeerDisconnected { peer_index } => {
-                self.handle_peer_disconnect(peer_index).await;
+            NetworkEvent::PeerDisconnected {
+                peer_index,
+                disconnect_type,
+            } => {
+                self.handle_peer_disconnect(peer_index, disconnect_type)
+                    .await;
                 return Some(());
-            }
-
-            NetworkEvent::OutgoingNetworkMessageForAll { .. } => {
-                unreachable!()
-            }
-            NetworkEvent::ConnectToPeer { .. } => {
-                unreachable!()
-            }
-            NetworkEvent::BlockFetchRequest { .. } => {
-                unreachable!()
             }
             NetworkEvent::BlockFetched {
                 block_hash,
@@ -609,9 +587,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 self.blockchain_sync_state
                     .mark_as_failed(block_id, block_hash, peer_index);
             }
-            NetworkEvent::DisconnectFromPeer { .. } => {
-                unreachable!()
-            }
+            _ => unreachable!(),
         }
         debug!("network event processed");
         None
@@ -623,18 +599,15 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
         let mut work_done = false;
 
-        if !self.initial_connection {
-            self.network.connect_to_static_peers().await;
-            self.initial_connection = true;
+        const RECONNECTION_PERIOD: Timestamp = 10_000;
+        self.reconnection_timer += duration_value;
+        let current_time = self.timer.get_timestamp_in_ms();
+        if self.reconnection_timer >= RECONNECTION_PERIOD {
+            self.network.connect_to_static_peers(current_time).await;
+            self.network.send_pings().await;
+            self.reconnection_timer = 0;
+            self.fetch_next_blocks().await;
             work_done = true;
-        } else if self.initial_connection {
-            self.reconnection_timer += duration_value;
-            if self.reconnection_timer >= self.reconnection_wait_time {
-                self.network.connect_to_static_peers().await;
-                self.network.send_pings().await;
-                self.reconnection_timer = 0;
-                work_done &= self.fetch_next_blocks().await;
-            }
         }
 
         if work_done {
@@ -670,6 +643,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
     async fn on_init(&mut self) {
         assert!(!self.senders_to_verification.is_empty());
+        self.reconnection_timer = self.timer.get_timestamp_in_ms();
         // connect to peers
         self.network
             .initialize_static_peers(self.config_lock.clone())
