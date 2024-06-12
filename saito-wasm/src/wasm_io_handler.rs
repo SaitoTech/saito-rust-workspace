@@ -59,12 +59,10 @@ impl InterfaceIO for WasmIoHandler {
         Ok(())
     }
 
-    async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
-        trace!("connect_to_peer : {:?}", peer.host);
+    async fn connect_to_peer(&mut self, url: String, peer_index: PeerIndex) -> Result<(), Error> {
+        trace!("connect_to_peer : {:?} with url : {:?}", peer_index, url);
 
-        let json_string = serde_json::to_string(&peer).unwrap();
-        let json = js_sys::JSON::parse(&json_string).unwrap();
-        MsgHandler::connect_to_peer(json).expect("TODO: panic message");
+        MsgHandler::connect_to_peer(url, BigInt::from(peer_index)).expect("TODO: panic message");
 
         Ok(())
     }
@@ -322,7 +320,7 @@ extern "C" {
     pub fn send_message_to_all(buffer: &Uint8Array, exceptions: &Array);
 
     #[wasm_bindgen(static_method_of = MsgHandler, catch)]
-    pub fn connect_to_peer(peer_data: JsValue) -> Result<JsValue, js_sys::Error>;
+    pub fn connect_to_peer(url: String, peer_index: BigInt) -> Result<JsValue, js_sys::Error>;
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn write_value(key: String, value: &Uint8Array);
 

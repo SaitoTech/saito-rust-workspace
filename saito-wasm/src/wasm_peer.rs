@@ -17,11 +17,11 @@ pub struct WasmPeer {
 impl WasmPeer {
     #[wasm_bindgen(getter = public_key)]
     pub fn get_public_key(&self) -> JsString {
-        if self.peer.public_key.is_none() {
+        if self.peer.get_public_key().is_none() {
             warn!("peer : {:?} public key is not set", self.peer.index);
             return JsString::from([0; 33].to_base58());
         }
-        self.peer.public_key.unwrap().to_base58().into()
+        self.peer.get_public_key().unwrap().to_base58().into()
     }
     #[wasm_bindgen(getter = key_list)]
     pub fn get_key_list(&self) -> Array {
@@ -75,10 +75,7 @@ impl WasmPeer {
         self.peer.services = services;
     }
     pub fn has_service(&self, service: JsString) -> bool {
-        return self.peer.has_service(service.into());
-    }
-    pub fn is_main_peer(&self) -> bool {
-        self.peer.is_main_peer()
+        self.peer.has_service(service.into())
     }
 }
 

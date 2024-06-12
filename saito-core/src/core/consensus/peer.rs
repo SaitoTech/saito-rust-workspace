@@ -16,10 +16,20 @@ use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
 
+#[derive(Clone, Debug)]
+pub enum PeerStatus {
+    Disconnected(
+        Timestamp, /*next connection time*/
+        Timestamp, /*reconnection period*/
+    ),
+    Connecting,
+    Connected(SaitoPublicKey),
+}
+
 #[derive(Debug, Clone)]
 pub struct Peer {
     pub index: u64,
-    pub public_key: Option<SaitoPublicKey>,
+    pub peer_status: PeerStatus,
     pub block_fetch_url: String,
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
     pub static_peer_config: Option<util::configuration::PeerConfig>,
@@ -35,7 +45,7 @@ impl Peer {
     pub fn new(peer_index: u64) -> Peer {
         Peer {
             index: peer_index,
-            public_key: None,
+            peer_status: PeerStatus::Disconnected(0, 1_000),
             block_fetch_url: "".to_string(),
             static_peer_config: None,
             challenge_for_peer: None,
@@ -45,6 +55,23 @@ impl Peer {
             wallet_version: Default::default(),
             core_version: Default::default(),
         }
+    }
+
+    pub fn get_url(&self) -> String {
+        return if let Some(config) = self.static_peer_config.as_ref() {
+            let mut protocol: String = String::from("ws");
+            if config.protocol == "https" {
+                protocol = String::from("wss");
+            }
+            protocol
+                + "://"
+                + config.host.as_str()
+                + ":"
+                + config.port.to_string().as_str()
+                + "/wsopen"
+        } else {
+            "".to_string()
+        };
     }
     pub async fn initiate_handshake(
         &mut self,
@@ -181,7 +208,7 @@ impl Peer {
         }
 
         self.challenge_for_peer = None;
-        self.public_key = Some(response.public_key);
+        self.peer_status = PeerStatus::Connected(response.public_key);
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
         self.wallet_version = response.wallet_version;
@@ -224,7 +251,7 @@ impl Peer {
         } else {
             info!(
                 "handshake completed for peer : {:?}",
-                self.public_key.as_ref().unwrap().to_base58()
+                self.get_public_key().unwrap().to_base58()
             );
         }
         io_handler.send_interface_event(InterfaceEvent::PeerHandshakeComplete(self.index));
@@ -278,12 +305,6 @@ impl Peer {
     pub fn has_service(&self, service: String) -> bool {
         self.services.iter().any(|s| s.service == service)
     }
-    pub fn is_main_peer(&self) -> bool {
-        if self.static_peer_config.is_none() {
-            return false;
-        }
-        self.static_peer_config.as_ref().unwrap().is_main
-    }
 
     pub fn compare_version(&self, version: &Version) -> Option<Ordering> {
         // for peer versions, if the version is not set we still consider it as a valid peer
@@ -293,11 +314,21 @@ impl Peer {
         }
         self.wallet_version.partial_cmp(version)
     }
+
+    pub fn is_static_peer(&self) -> bool {
+        self.static_peer_config.is_some()
+    }
+    pub fn get_public_key(&self) -> Option<SaitoPublicKey> {
+        if let PeerStatus::Connected(key) = self.peer_status {
+            return Some(key);
+        }
+        None
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::consensus::peer::Peer;
+    use crate::core::consensus::peer::{Peer, PeerStatus};
     use crate::core::process::version::Version;
     use std::cmp::Ordering;
 
@@ -306,7 +337,11 @@ mod tests {
         let peer = Peer::new(1);
 
         assert_eq!(peer.index, 1);
-        assert_eq!(peer.public_key, None);
+        assert_eq!(peer.get_public_key(), None);
+        assert!(matches!(
+            peer.peer_status,
+            PeerStatus::Disconnected(0, 1_000)
+        ));
         assert_eq!(peer.block_fetch_url, "".to_string());
         assert_eq!(peer.static_peer_config, None);
         assert_eq!(peer.challenge_for_peer, None);
