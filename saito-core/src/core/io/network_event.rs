@@ -17,13 +17,13 @@ pub enum NetworkEvent {
         buffer: Vec<u8>,
     },
     ConnectToPeer {
-        peer_details: util::configuration::PeerConfig,
+        url: String,
+        peer_index: PeerIndex,
     },
     DisconnectFromPeer {
         peer_index: u64,
     },
     PeerConnectionResult {
-        peer_details: Option<util::configuration::PeerConfig>,
         result: Result<u64, std::io::Error>,
     },
     PeerDisconnected {

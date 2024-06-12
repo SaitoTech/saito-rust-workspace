@@ -3,22 +3,16 @@ import Saito from "../../saito";
 import CustomSharedMethods from "./custom_shared_methods";
 
 export default class WebSharedMethods extends CustomSharedMethods {
-    connectToPeer(peerData: any): void {
-        let protocol = "ws";
-        if (peerData.protocol === "https") {
-            protocol = "wss";
-        }
-        let url = protocol + "://" + peerData.host + ":" + peerData.port + "/wsopen";
-
+    connectToPeer(url: string, peer_index: bigint): void {
         try {
             console.log("connecting to " + url + "....");
             let socket = new WebSocket(url);
             socket.binaryType = "arraybuffer";
-            let index = Saito.getInstance().addNewSocket(socket);
+            Saito.getInstance().addNewSocket(socket, peer_index);
 
             socket.onmessage = (event: MessageEvent) => {
                 try {
-                    Saito.getLibInstance().process_msg_buffer_from_peer(new Uint8Array(event.data), index);
+                    Saito.getLibInstance().process_msg_buffer_from_peer(new Uint8Array(event.data), peer_index);
                 } catch (error) {
                     console.error(error);
                 }
@@ -26,24 +20,24 @@ export default class WebSharedMethods extends CustomSharedMethods {
 
             socket.onopen = () => {
                 try {
-                    Saito.getLibInstance().process_new_peer(index, peerData);
-                    console.log("connected to : " + url + " with peer index : " + index);
+                    Saito.getLibInstance().process_new_peer(peer_index);
+                    console.log("connected to : " + url + " with peer index : " + peer_index);
                 } catch (error) {
                     console.error(error);
                 }
             };
             socket.onclose = () => {
                 try {
-                    console.log("socket.onclose : " + index);
-                    Saito.getLibInstance().process_peer_disconnection(index);
+                    console.log("socket.onclose : " + peer_index);
+                    Saito.getLibInstance().process_peer_disconnection(peer_index);
                 } catch (error) {
                     console.error(error);
                 }
             };
             socket.onerror = (error) => {
                 try {
-                    console.error(`socket.onerror ${index}: `, error);
-                    Saito.getInstance().removeSocket(index);
+                    console.error(`socket.onerror ${peer_index}: `, error);
+                    Saito.getInstance().removeSocket(peer_index);
                 } catch (error) {
                     console.error(error);
                 }

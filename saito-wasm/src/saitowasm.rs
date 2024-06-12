@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use figment::providers::{Format, Json};
 use figment::Figment;
-use js_sys::{Array, JsString, Uint8Array};
+use js_sys::{Array, BigInt, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
 use secp256k1::SECP256K1;
@@ -116,7 +116,6 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             mempool_lock: context.mempool_lock.clone(),
             sender_to_consensus: sender_to_consensus.clone(),
             sender_to_miner: sender_to_miner.clone(),
-            static_peers: vec![],
             config_lock: context.config_lock.clone(),
             timer: timer.clone(),
             wallet_lock: wallet.clone(),
@@ -133,8 +132,6 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             last_verification_thread_index: 0,
             stat_sender: sender_to_stat.clone(),
             blockchain_sync_state: BlockchainSyncState::new(10),
-            initial_connection: false,
-            reconnection_wait_time: 10_000,
         },
         consensus_thread: ConsensusThread {
             mempool_lock: context.mempool_lock.clone(),
@@ -403,43 +400,33 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
 }
 
 #[wasm_bindgen]
-pub async fn process_new_peer(index: u64, peer_config: JsValue) {
-    debug!("process_new_peer : {:?}", index);
+pub async fn process_new_peer(peer_index: PeerIndex) {
+    debug!("process_new_peer : {:?}", peer_index);
     let mut saito = SAITO.lock().await;
-
-    let mut peer_details = None;
-    if peer_config.is_truthy() {
-        let result = js_sys::JSON::stringify(&peer_config);
-        if result.is_err() {
-            error!("failed processing new peer. failed parsing json info");
-            error!("{:?}", result.err().unwrap());
-            return;
-        }
-        let json = result.unwrap();
-
-        let configs = Figment::new()
-            .merge(Json::string(json.as_string().unwrap().as_str()))
-            .extract::<PeerConfig>();
-        if configs.is_err() {
-            error!(
-                "failed parsing json string to configs. {:?}",
-                configs.err().unwrap()
-            );
-            return;
-        }
-        let configs = configs.unwrap();
-        peer_details = Some(configs);
-    }
 
     saito
         .as_mut()
         .unwrap()
         .routing_thread
         .process_network_event(NetworkEvent::PeerConnectionResult {
-            peer_details,
-            result: Ok(index),
+            result: Ok(peer_index),
         })
         .await;
+}
+
+#[wasm_bindgen]
+pub async fn get_next_peer_index() -> BigInt {
+    let mut saito = SAITO.lock().await;
+    let mut peers = saito
+        .as_mut()
+        .unwrap()
+        .routing_thread
+        .network
+        .peer_lock
+        .write()
+        .await;
+
+    BigInt::from(peers.peer_counter.get_next_index())
 }
 
 #[wasm_bindgen]
@@ -708,12 +695,12 @@ pub async fn get_peers() -> Array {
     let valid_peer_count = peers
         .index_to_peers
         .iter()
-        .filter(|(_index, peer)| peer.public_key.is_some())
+        .filter(|(_index, peer)| peer.get_public_key().is_some())
         .count();
     let array = Array::new_with_length(valid_peer_count as u32);
     let mut array_index = 0;
     for (_i, (_peer_index, peer)) in peers.index_to_peers.iter().enumerate() {
-        if peer.public_key.is_none() {
+        if peer.get_public_key().is_none() {
             continue;
         }
         let peer = peer.clone();
@@ -738,7 +725,7 @@ pub async fn get_peer(peer_index: u64) -> Option<WasmPeer> {
         .read()
         .await;
     let peer = peers.find_peer_by_index(peer_index);
-    if peer.is_none() || peer.unwrap().public_key.is_none() {
+    if peer.is_none() || peer.unwrap().get_public_key().is_none() {
         warn!("peer not found");
         return None;
     }
