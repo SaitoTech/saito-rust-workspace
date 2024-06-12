@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use log::{debug, error, info, trace, warn};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::mempool::Mempool;
-use crate::core::consensus::peer::Peer;
+use crate::core::consensus::peer::{Peer, PeerStatus};
 use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
@@ -34,7 +34,6 @@ pub struct Network {
     // TODO : manage peers from network
     pub peer_lock: Arc<RwLock<PeerCollection>>,
     pub io_interface: Box<dyn InterfaceIO + Send + Sync>,
-    static_peer_configs: Vec<PeerConfig>,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     pub timer: Timer,
@@ -51,7 +50,6 @@ impl Network {
         Network {
             peer_lock,
             io_interface: io_handler,
-            static_peer_configs: Default::default(),
             wallet_lock,
             config_lock,
             timer,
@@ -69,7 +67,7 @@ impl Network {
         {
             let peers = self.peer_lock.read().await;
             for (index, peer) in peers.index_to_peers.iter() {
-                if peer.public_key.is_none() {
+                if peer.get_public_key().is_none() {
                     excluded_peers.push(*index);
                     continue;
                 }
@@ -106,18 +104,15 @@ impl Network {
         }
 
         for (index, peer) in peers.index_to_peers.iter() {
-            if peer.public_key.is_none() {
+            if peer.get_public_key().is_none() {
                 continue;
             }
-            if transaction.is_in_path(peer.public_key.as_ref().unwrap()) {
+            let public_key = peer.get_public_key().unwrap();
+            if transaction.is_in_path(&public_key) {
                 continue;
             }
             let mut transaction = transaction.clone();
-            transaction.add_hop(
-                &wallet.private_key,
-                &wallet.public_key,
-                peer.public_key.as_ref().unwrap(),
-            );
+            transaction.add_hop(&wallet.private_key, &wallet.public_key, &public_key);
             let message = Message::Transaction(transaction);
             self.io_interface
                 .send_message(*index, message.serialize().as_slice())
@@ -140,81 +135,47 @@ impl Network {
                 .unwrap();
         }
 
+        let mut remove_peer = false;
         let mut peers = self.peer_lock.write().await;
-
-        if let Some(peer) = peers.find_peer_by_index(peer_index) {
-            if peer.public_key.is_some() {
+        if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
+            if peer.static_peer_config.is_none() {
+                // we remove the peer only if it's connected "from" outside
+                remove_peer = true;
+            } else {
                 // calling here before removing the peer from collections
                 self.io_interface
                     .send_interface_event(InterfaceEvent::PeerConnectionDropped(peer_index));
             }
-
-            let public_key = peer.public_key;
-            if peer.static_peer_config.is_some() {
-                // This means the connection has been initiated from this side, therefore we must
-                // try to re-establish the connection again
-                info!(
-                    "Static peer disconnected, reconnecting .., Peer ID = {}",
-                    peer.index
-                );
-
-                assert!(
-                    !self.static_peer_configs.iter().any(|(peer_config)| {
-                        let config = peer.static_peer_config.as_ref().unwrap();
-                        config.host == peer_config.host && config.port == peer_config.port
-                    }),
-                    "static peer is already in the collection"
-                );
-                let config = peer.static_peer_config.as_ref().unwrap();
-                debug!(
-                    "adding back static peer : {:?}:{:?}",
-                    config.host, config.port
-                );
-                self.static_peer_configs
-                    .push(peer.static_peer_config.as_ref().unwrap().clone());
-            } else if peer.public_key.is_some() {
-                info!("Peer disconnected, expecting a reconnection from the other side, Peer ID = {}, Public Key = {:?}",
-                peer.index, peer.public_key.as_ref().unwrap().to_base58());
+            if let PeerStatus::Disconnected(_, _) = peer.peer_status {
+            } else {
+                peer.peer_status = PeerStatus::Disconnected(0, 1_000);
             }
-
-            debug!("removing peer : {:?} from peer collection", peer_index);
-
-            if let Some(public_key) = &public_key {
-                peers.address_to_peers.remove(public_key);
-            }
-            peers.index_to_peers.remove(&peer_index);
         } else {
             error!("unknown peer : {:?} disconnected", peer_index);
         }
+        if remove_peer {
+            debug!("removing peer : {:?} from peer collection", peer_index);
+            peers.remove_peer(peer_index);
+        }
     }
-    pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
+    pub async fn handle_new_peer(&mut self, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario
         debug!("handing new peer : {:?}", peer_index);
         let mut peers = self.peer_lock.write().await;
 
-        let mut peer = Peer::new(peer_index);
-        peer.static_peer_config = peer_data;
-
-        if peer.static_peer_config.is_none() {
-            // if we don't have peer data it means this is an incoming connection. so we initiate the handshake
-            peer.initiate_handshake(self.io_interface.as_ref())
-                .await
-                .unwrap();
+        if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
+            debug!("static peer : {:?} connected", peer_index);
+            peer.peer_status = PeerStatus::Connecting;
         } else {
-            debug!(
-                "removing static peer config : {:?}",
-                peer.static_peer_config.as_ref().unwrap()
-            );
-            let data = peer.static_peer_config.as_ref().unwrap();
-
-            self.static_peer_configs
-                .retain(|(config)| config.host != data.host || config.port != data.port);
+            debug!("new peer added : {:?}", peer_index);
+            let mut peer = Peer::new(peer_index);
+            peer.peer_status = PeerStatus::Connecting;
+            peers.index_to_peers.insert(peer_index, peer);
         }
 
-        debug!("new peer added : {:?}", peer_index);
-        peers.index_to_peers.insert(peer_index, peer);
         debug!("current peer count = {:?}", peers.index_to_peers.len());
     }
+
     pub async fn handle_handshake_challenge(
         &self,
         peer_index: u64,
@@ -270,7 +231,7 @@ impl Network {
                 configs_lock.clone(),
             )
             .await;
-        if result.is_err() || peer.public_key.is_none() {
+        if result.is_err() || peer.get_public_key().is_none() {
             info!(
                 "disconnecting peer : {:?} as handshake response was not handled",
                 peer_index
@@ -281,14 +242,14 @@ impl Network {
                 .unwrap();
             return;
         }
+        let public_key = peer.get_public_key().unwrap();
         debug!(
             "peer : {:?} handshake successful for peer : {:?}",
             peer.index,
-            peer.public_key.as_ref().unwrap().to_base58()
+            public_key.to_base58()
         );
         self.io_interface
             .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
-        let public_key = peer.public_key.unwrap();
         peers.address_to_peers.insert(public_key, peer_index);
         // start block syncing here
         self.request_blockchain_from_peer(peer_index, blockchain_lock.clone())
@@ -490,6 +451,7 @@ impl Network {
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
         let configs = configs_lock.read().await;
+        let mut peers = self.peer_lock.write().await;
 
         // TODO : can create a new disconnected peer with a is_static flag set. so we don't need to keep the static peers separately
         configs
@@ -497,19 +459,41 @@ impl Network {
             .clone()
             .drain(..)
             .for_each(|config| {
-                self.static_peer_configs.push(config);
+                let mut peer = Peer::new(peers.peer_counter.get_next_index());
+
+                peer.static_peer_config = Some(config);
+
+                peers.index_to_peers.insert(peer.index, peer);
             });
 
-        trace!("static peers : {:?}", self.static_peer_configs);
+        info!("added {:?} static peers", peers.index_to_peers.len());
     }
 
-    pub async fn connect_to_static_peers(&mut self) {
-        for peer_config in self.static_peer_configs.drain(..) {
-            debug!("connecting to static peer : {:?}", peer_config);
-            self.io_interface
-                .connect_to_peer(peer_config)
-                .await
-                .unwrap();
+    pub async fn connect_to_static_peers(&mut self, current_time: Timestamp) {
+        debug!("connecting to static peers...");
+        let mut peers = self.peer_lock.write().await;
+        for (peer_index, peer) in &mut peers.index_to_peers {
+            let url = peer.get_url();
+            if let PeerStatus::Disconnected(connect_time, period) = &mut peer.peer_status {
+                if current_time < *connect_time {
+                    continue;
+                }
+                debug!("static peer : {:?} is disconnected", peer_index);
+                if let Some(config) = peer.static_peer_config.as_ref() {
+                    debug!(
+                        "trying to connect to static peer : {:?} with {:?}",
+                        peer_index, config
+                    );
+                    self.io_interface
+                        .connect_to_peer(url, peer.index)
+                        .await
+                        .unwrap();
+                    *period *= 2;
+                    *connect_time = current_time + *period;
+                } else {
+                    error!("static peer : {:?} doesn't have configs set", peer_index);
+                }
+            }
         }
     }
 
@@ -517,8 +501,10 @@ impl Network {
         let current_time = self.timer.get_timestamp_in_ms();
         let mut peers = self.peer_lock.write().await;
         for (_, peer) in peers.index_to_peers.iter_mut() {
-            peer.send_ping(current_time, self.io_interface.as_ref())
-                .await;
+            if peer.get_public_key().is_some() {
+                peer.send_ping(current_time, self.io_interface.as_ref())
+                    .await;
+            }
         }
     }
 

@@ -19,7 +19,6 @@ export default class Saito {
     private static instance: Saito;
     private static libInstance: any;
     sockets: Map<bigint, any> = new Map<bigint, any>();
-    nextIndex: bigint = BigInt(0);
     factory = new Factory();
     promises = new Map<number, any>();
     private callbackIndex: number = 1;
@@ -46,8 +45,8 @@ export default class Saito {
             send_message_to_all: (buffer: Uint8Array, exceptions: Array<bigint>) => {
                 sharedMethods.sendMessageToAll(buffer, exceptions);
             },
-            connect_to_peer: (peer_data: any) => {
-                sharedMethods.connectToPeer(peer_data);
+            connect_to_peer: (url: string, peer_index: bigint) => {
+                sharedMethods.connectToPeer(url, peer_index);
             },
             write_value: (key: string, value: Uint8Array) => {
                 return sharedMethods.writeValue(key, value);
@@ -205,11 +204,9 @@ export default class Saito {
         return Saito.wasmMemory;
     }
 
-    public addNewSocket(socket: any): bigint {
-        this.nextIndex++;
-        this.sockets.set(this.nextIndex, socket);
-        console.log("adding socket : " + this.nextIndex + ". total sockets : " + this.sockets.size);
-        return this.nextIndex;
+    public addNewSocket(socket: any, peer_index: bigint) {
+        this.sockets.set(peer_index, socket);
+        console.log("adding socket : " + peer_index + ". total sockets : " + this.sockets.size);
     }
 
     public getSocket(index: bigint): any | null {

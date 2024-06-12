@@ -32,7 +32,7 @@ use saito_core::core::defs::{
 use saito_core::core::io::network::PeerDisconnectType;
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::process::keep_time::Timer;
-use saito_core::core::util::configuration::{Configuration, PeerConfig};
+use saito_core::core::util::configuration::Configuration;
 
 use crate::io_event::IoEvent;
 use crate::rust_io_handler::BLOCKS_DIR_PATH;
@@ -44,9 +44,9 @@ type SocketReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 pub struct NetworkController {
     sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
-    peer_counter: Arc<Mutex<PeerCounter>>,
     currently_queried_urls: Arc<Mutex<HashSet<String>>>,
     pub sender_to_saito_controller: Sender<IoEvent>,
+    peers_lock: Arc<RwLock<PeerCollection>>,
 }
 
 impl NetworkController {
@@ -112,20 +112,11 @@ impl NetworkController {
     pub async fn connect_to_peer(
         event_id: u64,
         io_controller: Arc<RwLock<NetworkController>>,
-        peer: PeerConfig,
+        url: String,
+        peer_index: PeerIndex,
     ) {
         // TODO : handle connecting to an already connected (via incoming connection) node.
 
-        let mut protocol: String = String::from("ws");
-        if peer.protocol == "https" {
-            protocol = String::from("wss");
-        }
-        let url = protocol
-            + "://"
-            + peer.host.as_str()
-            + ":"
-            + peer.port.to_string().as_str()
-            + "/wsopen";
         debug!("connecting to peer : {:?}", url);
 
         let result = connect_async(url.clone()).await;
@@ -138,11 +129,6 @@ impl NetworkController {
             let sender_to_controller = network_controller.sender_to_saito_controller.clone();
             let (socket_sender, socket_receiver): (SocketSender, SocketReceiver) = socket.split();
 
-            let peer_index;
-            {
-                let mut counter = network_controller.peer_counter.lock().await;
-                peer_index = counter.get_next_index();
-            }
             info!(
                 "connected to peer : {:?} with index : {:?}",
                 url, peer_index
@@ -155,7 +141,6 @@ impl NetworkController {
                 PeerSender::Tungstenite(socket_sender),
                 PeerReceiver::Tungstenite(socket_receiver),
                 sender_to_controller,
-                Some(peer),
             )
             .await;
         } else {
@@ -319,7 +304,6 @@ impl NetworkController {
         sender: PeerSender,
         receiver: PeerReceiver,
         sender_to_core: Sender<IoEvent>,
-        peer_data: Option<PeerConfig>,
     ) {
         {
             sockets.lock().await.insert(peer_index, sender);
@@ -332,7 +316,6 @@ impl NetworkController {
                 event_processor_id: 1,
                 event_id,
                 event: NetworkEvent::PeerConnectionResult {
-                    peer_details: peer_data,
                     result: Ok(peer_index),
                 },
             })
@@ -455,17 +438,6 @@ impl NetworkController {
     }
 }
 
-pub struct PeerCounter {
-    counter: u64,
-}
-
-impl PeerCounter {
-    pub fn get_next_index(&mut self) -> u64 {
-        self.counter += 1;
-        self.counter
-    }
-}
-
 ///
 ///
 /// # Arguments
@@ -497,7 +469,6 @@ pub async fn run_network_controller(
     timer: &Timer,
 ) -> (JoinHandle<()>, JoinHandle<()>) {
     info!("running network handler");
-    let peer_index_counter = Arc::new(Mutex::new(PeerCounter { counter: 0 }));
 
     let host;
     let url;
@@ -528,8 +499,8 @@ pub async fn run_network_controller(
     let network_controller_lock = Arc::new(RwLock::new(NetworkController {
         sockets: Arc::new(Mutex::new(HashMap::new())),
         sender_to_saito_controller: sender_to_core,
-        peer_counter: peer_index_counter.clone(),
         currently_queried_urls: Arc::new(Default::default()),
+        peers_lock: peers_lock.clone(),
     }));
 
     let server_handle = run_websocket_server(
@@ -597,11 +568,11 @@ pub async fn run_network_controller(
                                     NetworkController::send_outgoing_message(sockets, index, buffer).await;
                                     outgoing_messages.increment();
                                 }
-                                NetworkEvent::ConnectToPeer { peer_details } => {
+                                NetworkEvent::ConnectToPeer {url,peer_index  } => {
                                     NetworkController::connect_to_peer(
                                         event_id,
                                         network_controller_lock.clone(),
-                                        peer_details,
+                                        url,peer_index
                                     )
                                     .await;
                                 }
@@ -711,7 +682,7 @@ fn run_websocket_server(
     port: u16,
     host: String,
     public_key: SaitoPublicKey,
-    peer_lock: Arc<RwLock<PeerCollection>>,
+    peers_lock: Arc<RwLock<PeerCollection>>,
 ) -> JoinHandle<()> {
     info!("running websocket server on {:?}", port);
     tokio::task::Builder::new()
@@ -719,12 +690,14 @@ fn run_websocket_server(
         .spawn(async move {
             info!("starting websocket server");
             let io_controller = io_controller.clone();
+            let peers_lock_1 = peers_lock.clone();
             let sender_to_io = sender_clone.clone();
             let ws_route = warp::path("wsopen")
                 .and(warp::ws())
                 .map(move |ws: warp::ws::Ws| {
                     debug!("incoming connection received");
                     let clone = io_controller.clone();
+                    let peers = peers_lock_1.clone();
                     let sender_to_io = sender_to_io.clone();
                     let ws = ws.max_message_size(10_000_000_000);
                     let ws = ws.max_frame_size(10_000_000_000);
@@ -736,8 +709,8 @@ fn run_websocket_server(
 
                         let peer_index;
                         {
-                            let mut counter = network_controller.peer_counter.lock().await;
-                            peer_index = counter.get_next_index();
+                            let mut peers = peers.write().await;
+                            peer_index = peers.peer_counter.get_next_index();
                         }
 
                         NetworkController::send_new_peer(
@@ -747,7 +720,6 @@ fn run_websocket_server(
                             PeerSender::Warp(sender),
                             PeerReceiver::Warp(receiver),
                             sender_to_io,
-                            None,
                         )
                         .await
                     })
@@ -811,7 +783,7 @@ fn run_websocket_server(
             let lite_route = warp::path!("lite-block" / String / ..)
                 .and(opt)
                 .and(warp::path::end())
-                .and(warp::any().map(move || peer_lock.clone()))
+                .and(warp::any().map(move || peers_lock.clone()))
                 .and_then(
                     move |block_hash: String,
                           key: Option<String>,

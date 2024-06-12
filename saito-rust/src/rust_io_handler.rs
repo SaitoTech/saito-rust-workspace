@@ -87,11 +87,9 @@ impl InterfaceIO for RustIOHandler {
         Ok(())
     }
 
-    async fn connect_to_peer(&mut self, peer: PeerConfig) -> Result<(), Error> {
-        debug!("connecting to peer : {:?}", peer.host);
-        let event = IoEvent::new(NetworkEvent::ConnectToPeer {
-            peer_details: peer.clone(),
-        });
+    async fn connect_to_peer(&mut self, url: String, peer_index: PeerIndex) -> Result<(), Error> {
+        debug!("connecting to peer : {:?} with url : {:?}", peer_index, url);
+        let event = IoEvent::new(NetworkEvent::ConnectToPeer { url, peer_index });
 
         self.sender.send(event).await.unwrap();
 
