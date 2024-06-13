@@ -138,18 +138,16 @@ impl Network {
         let mut remove_peer = false;
         let mut peers = self.peer_lock.write().await;
         if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
-            if peer.static_peer_config.is_none() {
-                // we remove the peer only if it's connected "from" outside
-                remove_peer = true;
-            } else {
+            if peer.get_public_key().is_some() {
                 // calling here before removing the peer from collections
                 self.io_interface
                     .send_interface_event(InterfaceEvent::PeerConnectionDropped(peer_index));
             }
-            if let PeerStatus::Disconnected(_, _) = peer.peer_status {
-            } else {
-                peer.peer_status = PeerStatus::Disconnected(0, 1_000);
+            if peer.static_peer_config.is_none() {
+                // we remove the peer only if it's connected "from" outside
+                remove_peer = true;
             }
+            peer.mark_as_disconnected();
         } else {
             error!("unknown peer : {:?} disconnected", peer_index);
         }
@@ -171,6 +169,14 @@ impl Network {
             let mut peer = Peer::new(peer_index);
             peer.peer_status = PeerStatus::Connecting;
             peers.index_to_peers.insert(peer_index, peer);
+        }
+
+        if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
+            if peer.static_peer_config.is_none() {
+                peer.initiate_handshake(self.io_interface.as_ref())
+                    .await
+                    .unwrap();
+            }
         }
 
         debug!("current peer count = {:?}", peers.index_to_peers.len());
@@ -281,7 +287,14 @@ impl Network {
     }
 
     pub async fn send_key_list(&self, key_list: &[SaitoPublicKey]) {
-        debug!("sending key list to all the peers {:?}", key_list);
+        debug!(
+            "sending key list to all the peers {:?}",
+            key_list
+                .iter()
+                .map(|key| key.to_base58())
+                .collect::<Vec<String>>()
+        );
+
         self.io_interface
             .send_message_to_all(
                 Message::KeyListUpdate(key_list.to_vec())
@@ -470,7 +483,7 @@ impl Network {
     }
 
     pub async fn connect_to_static_peers(&mut self, current_time: Timestamp) {
-        debug!("connecting to static peers...");
+        trace!("connecting to static peers...");
         let mut peers = self.peer_lock.write().await;
         for (peer_index, peer) in &mut peers.index_to_peers {
             let url = peer.get_url();
