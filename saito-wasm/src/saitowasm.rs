@@ -8,8 +8,6 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use std::time::Duration;
 
-use figment::providers::{Format, Json};
-use figment::Figment;
 use js_sys::{Array, BigInt, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
@@ -41,7 +39,7 @@ use saito_core::core::process::process_event::ProcessEvent;
 use saito_core::core::process::version::Version;
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
 use saito_core::core::stat_thread::StatThread;
-use saito_core::core::util::configuration::{Configuration, PeerConfig};
+use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 
