@@ -82,6 +82,11 @@ impl Peer {
         let challenge = HandshakeChallenge {
             challenge: generate_random_bytes(32).try_into().unwrap(),
         };
+        debug!(
+            "generated challenge : {:?} for peer : {:?}",
+            challenge.challenge.to_hex(),
+            self.index
+        );
         self.challenge_for_peer = Some(challenge.challenge);
         let message = Message::HandshakeChallenge(challenge);
         io_handler
@@ -99,7 +104,11 @@ impl Peer {
         wallet_lock: Arc<RwLock<Wallet>>,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
-        debug!("handling handshake challenge : {:?}", self.index,);
+        debug!(
+            "handling handshake challenge : {:?} for peer : {:?}",
+            challenge.challenge.to_hex(),
+            self.index,
+        );
         let block_fetch_url;
         let is_lite;
         {
@@ -124,6 +133,11 @@ impl Peer {
             wallet_version: wallet.wallet_version,
             core_version: wallet.core_version,
         };
+        debug!(
+            "handshake challenge : {:?} generated for peer : {:?}",
+            response.challenge.to_hex(),
+            self.index
+        );
 
         self.challenge_for_peer = Some(response.challenge);
         io_handler
@@ -133,7 +147,7 @@ impl Peer {
             )
             .await
             .unwrap();
-        debug!("handshake response sent for peer: {:?}", self.index);
+        debug!("first handshake response sent for peer: {:?}", self.index);
 
         Ok(())
     }
@@ -145,7 +159,8 @@ impl Peer {
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) -> Result<(), Error> {
         debug!(
-            "handling handshake response :{:?} with address : {:?}",
+            "handling handshake response :{:?} for peer : {:?} with address : {:?}",
+            response.challenge.to_hex(),
             self.index,
             response.public_key.to_base58()
         );
@@ -154,6 +169,7 @@ impl Peer {
                 "core version is not set in handshake response. expected : {:?}",
                 wallet_lock.read().await.core_version
             );
+            self.mark_as_disconnected();
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -162,6 +178,7 @@ impl Peer {
                 "we don't have a challenge to verify for peer : {:?}",
                 self.index
             );
+            self.mark_as_disconnected();
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -171,10 +188,11 @@ impl Peer {
         if !result {
             warn!(
                 "handshake failed. signature is not valid. sig : {:?} challenge : {:?} key : {:?}",
-                sent_challenge.to_hex(),
                 response.signature.to_hex(),
+                sent_challenge.to_hex(),
                 response.public_key.to_base58()
             );
+            self.mark_as_disconnected();
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -203,16 +221,16 @@ impl Peer {
                 self.index,
                 response.wallet_version,
             ));
+            self.mark_as_disconnected();
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
 
-        self.challenge_for_peer = None;
-        self.peer_status = PeerStatus::Connected(response.public_key);
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
         self.wallet_version = response.wallet_version;
         self.core_version = response.core_version;
+        self.peer_status = PeerStatus::Connected(response.public_key);
 
         info!(
             "my version : {:?} peer version : {:?}",
@@ -235,7 +253,7 @@ impl Peer {
                 signature: sign(&response.challenge, &wallet.private_key),
                 is_lite,
                 block_fetch_url: block_fetch_url.to_string(),
-                challenge: generate_random_bytes(32).try_into().unwrap(),
+                challenge: [0; 32],
                 services: io_handler.get_my_services(),
                 wallet_version: wallet.wallet_version,
                 core_version: wallet.core_version,
@@ -247,13 +265,15 @@ impl Peer {
                 )
                 .await
                 .unwrap();
-            debug!("handshake response sent for peer: {:?}", self.index);
+            debug!("second handshake response sent for peer: {:?}", self.index);
         } else {
             info!(
                 "handshake completed for peer : {:?}",
                 self.get_public_key().unwrap().to_base58()
             );
         }
+        self.challenge_for_peer = None;
+
         io_handler.send_interface_event(InterfaceEvent::PeerHandshakeComplete(self.index));
 
         Ok(())
@@ -323,6 +343,16 @@ impl Peer {
             return Some(key);
         }
         None
+    }
+
+    pub fn mark_as_disconnected(&mut self) {
+        self.challenge_for_peer = None;
+        self.services = vec![];
+
+        if let PeerStatus::Disconnected(_, _) = self.peer_status {
+        } else {
+            self.peer_status = PeerStatus::Disconnected(0, 1_000);
+        }
     }
 }
 
