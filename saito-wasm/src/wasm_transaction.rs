@@ -134,7 +134,7 @@ impl WasmTransaction {
             let wallet = saito.as_ref().unwrap().context.wallet_lock.read().await;
             self.tx.sign(&wallet.private_key);
         } else {
-            let result = string_to_key(private_key);
+            let result = string_to_hex(private_key);
             if result.is_err() {
                 error!("private key couldn't be parsed from the given string");
                 return;
