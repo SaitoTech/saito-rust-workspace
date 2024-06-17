@@ -1,11 +1,12 @@
 use js_sys::{Array, JsString, Uint8Array};
+use log::error;
 
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::core::consensus::transaction::{Transaction, TransactionType};
-use saito_core::core::defs::{Currency, PrintForLog, Timestamp};
+use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, Timestamp};
 
 use crate::saitowasm::{string_to_hex, string_to_key, SAITO};
 use crate::wasm_hop::WasmHop;
@@ -127,10 +128,20 @@ impl WasmTransaction {
         self.tx.timestamp = timestamp;
     }
 
-    pub async fn sign(&mut self) {
-        let saito = SAITO.lock().await;
-        let wallet = saito.as_ref().unwrap().context.wallet_lock.read().await;
-        self.tx.sign(&wallet.private_key);
+    pub async fn sign(&mut self, private_key: JsString) {
+        if private_key.length() == 0 {
+            let saito = SAITO.lock().await;
+            let wallet = saito.as_ref().unwrap().context.wallet_lock.read().await;
+            self.tx.sign(&wallet.private_key);
+        } else {
+            let result = string_to_hex(private_key);
+            if result.is_err() {
+                error!("private key couldn't be parsed from the given string");
+                return;
+            }
+            let private_key: SaitoPrivateKey = result.unwrap();
+            self.tx.sign(&private_key);
+        }
     }
 
     #[wasm_bindgen(getter = type)]
