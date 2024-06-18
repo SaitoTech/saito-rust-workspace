@@ -521,7 +521,9 @@ impl Wallet {
             }
 
             if collected_from_unspent < required_from_unspent {
-                info!("couldn't collect enough funds upto requested staking amount. requested: {:?}, collected: {:?}", staking_amount,collected_amount);
+                info!("couldn't collect enough funds upto requested staking amount. requested: {:?}, collected: {:?} required_from_unspent: {:?}",
+                    staking_amount,collected_amount,required_from_unspent);
+                info!("wallet balance : {:?}", self.available_balance);
                 return Err(Error::from(ErrorKind::NotFound));
             }
 
@@ -629,7 +631,7 @@ mod tests {
     #[serial_test::serial]
     async fn wallet_transfer_to_address_test() {
         let mut t = TestManager::default();
-        t.initialize(100, 100000).await;
+        t.initialize(100, 200_000_000_000_000).await;
 
         let mut last_param = 120000;
 
@@ -663,8 +665,9 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn transfer_with_insufficient_funds_failure_test() {
+        // pretty_env_logger::init();
         let mut t = TestManager::default();
-        t.initialize(100, 100000).await;
+        t.initialize(100, 200_000_000_000_000).await;
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
         let public_key = Storage::decode_str(public_key_string).unwrap();
         let mut to_public_key: SaitoPublicKey = [0u8; 33];
@@ -672,9 +675,9 @@ mod tests {
 
         // Try transferring more than what the wallet contains
         let result = t
-            .transfer_value_to_public_key(to_public_key, 1000000000, 120000)
+            .transfer_value_to_public_key(to_public_key, 200_000_000_000_000_000, 120000)
             .await;
-        assert!(result.is_err() || !result.is_ok());
+        assert!(result.is_err());
     }
 
     // tests transfer of exact amount
@@ -683,7 +686,7 @@ mod tests {
     async fn test_transfer_with_exact_funds() {
         // pretty_env_logger::init();
         let mut t = TestManager::default();
-        t.initialize(1, 500).await;
+        t.initialize(1, 200_000_000_000_000).await;
 
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
         let public_key = Storage::decode_str(public_key_string).unwrap();

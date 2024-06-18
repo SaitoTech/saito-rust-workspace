@@ -783,6 +783,14 @@ impl Blockchain {
         self.blockring.get_latest_block_id()
     }
 
+    pub fn get_latest_unlocked_stake_block_id(&self) -> BlockId {
+        if self.get_latest_block_id() > self.social_stake_period {
+            self.get_latest_block_id() - self.social_stake_period
+        } else {
+            0
+        }
+    }
+
     pub fn get_block_sync(&self, block_hash: &SaitoHash) -> Option<&Block> {
         self.blocks.get(block_hash)
     }
@@ -1076,8 +1084,8 @@ impl Blockchain {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
         info!(
-            "index : {:?} failed : {:?}",
-            current_wind_index, wind_failure
+            "wind_chain: current_wind_index : {:?} new_chain_len: {:?} old_chain_len: {:?} failed : {:?}",
+            current_wind_index,new_chain.len(),old_chain.len(), wind_failure
         );
 
         // if we are winding a non-existent chain with a wind_failure it
@@ -1105,10 +1113,13 @@ impl Blockchain {
         let does_block_validate;
         {
             let wallet = self.wallet_lock.read().await;
-            does_block_validate = current_wind_index == 0
-                || block
-                    .validate(self, &self.utxoset, configs, storage, &wallet)
-                    .await;
+            // does_block_validate = current_wind_index == 0
+            //     || block
+            //         .validate(self, &self.utxoset, configs, storage, &wallet)
+            //         .await;
+            does_block_validate = block
+                .validate(self, &self.utxoset, configs, storage, &wallet)
+                .await;
         }
 
         let mut wallet_updated = WALLET_NOT_UPDATED;
@@ -1794,7 +1805,7 @@ mod tests {
     use log::{debug, error, info};
     use tokio::sync::RwLock;
 
-    use crate::core::consensus::blockchain::{bit_pack, bit_unpack, Blockchain};
+    use crate::core::consensus::blockchain::{bit_pack, bit_unpack, AddBlockResult, Blockchain};
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{PrintForLog, SaitoPublicKey};
@@ -1893,7 +1904,7 @@ mod tests {
         //
         // block 1
         //
-        t.initialize(100, 1_000_000_000).await;
+        t.initialize(100, 200_000_000_000_000).await;
 
         {
             let blockchain = t.blockchain_lock.write().await;
@@ -1918,6 +1929,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block2.generate(); // generate hashes
@@ -1948,6 +1960,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -1980,6 +1993,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block4.generate(); // generate hashes
@@ -2014,6 +2028,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block5.generate(); // generate hashes
@@ -2072,7 +2087,7 @@ mod tests {
         //
         // block 1
         //
-        t.initialize(100, 1_000_000_000).await;
+        t.initialize(100, 200_000_000_000_000).await;
 
         {
             let blockchain = t.blockchain_lock.read().await;
@@ -2098,6 +2113,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block2.generate(); // generate hashes
@@ -2128,6 +2144,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -2160,6 +2177,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block4.generate(); // generate hashes
@@ -2194,6 +2212,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block5.generate(); // generate hashes
@@ -2230,6 +2249,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block6.generate(); // generate hashes
@@ -2277,6 +2297,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block7.generate(); // generate hashes
@@ -2315,6 +2336,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn balance_hashmap_persists_after_blockchain_reset_test() {
+        pretty_env_logger::init();
         let mut t: TestManager = TestManager::default();
         let file_path = t.issuance_path;
         let slips = t
@@ -2323,7 +2345,7 @@ mod tests {
             .await;
 
         // start blockchain with existing issuance and some value to my public key
-        t.initialize_from_slips_and_value(slips.clone(), 100000)
+        t.initialize_from_slips_and_value(slips.clone(), 200_000_000_000_000)
             .await;
 
         // add a few transactions
@@ -2388,7 +2410,7 @@ mod tests {
         let ts;
 
         // block 1
-        t.initialize(100, 1_000_000_000).await;
+        t.initialize(100, 200_000_000_000_000).await;
 
         {
             let blockchain = t.blockchain_lock.write().await;
@@ -2415,6 +2437,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block2.generate(); // generate hashes
@@ -2445,6 +2468,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -2477,6 +2501,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block4.generate(); // generate hashes
@@ -2511,6 +2536,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block5.generate(); // generate hashes
@@ -2547,6 +2573,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block6.generate(); // generate hashes
@@ -2585,6 +2612,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block7.generate(); // generate hashes
@@ -2621,9 +2649,92 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
+    async fn block_add_test_1() {
+        // pretty_env_logger::init();
+
+        let mut t = TestManager::default();
+        let block1;
+        let block1_hash;
+        let ts;
+
+        t.initialize(100, 200_000_000_000_000).await;
+
+        {
+            let blockchain = t.blockchain_lock.read().await;
+
+            assert_eq!(blockchain.blocks.len(), 1);
+
+            block1 = blockchain.get_latest_block().unwrap();
+            block1_hash = block1.hash;
+            ts = block1.timestamp;
+        }
+
+        // block 2
+        let mut block2 = t
+            .create_block(
+                block1_hash, // hash of parent block
+                ts + 120000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+                false,
+            )
+            .await;
+
+        block2.generate(); // generate hashes
+
+        let block2_hash = block2.hash;
+        assert!(!block2.has_staking_transaction);
+
+        let result = t.add_block(block2).await;
+        assert!(matches!(result, AddBlockResult::FailedNotValid));
+
+        {
+            let blockchain = t.blockchain_lock.read().await;
+            assert_eq!(blockchain.blocks.len(), 1);
+
+            assert_eq!(blockchain.get_latest_block_hash(), block1_hash);
+            assert_eq!(blockchain.get_latest_block_id(), 1);
+        }
+
+        let mut block2 = t
+            .create_block(
+                block1_hash, // hash of parent block
+                ts + 120000, // timestamp
+                0,           // num transactions
+                0,           // amount
+                0,           // fee
+                true,        // mine golden ticket
+                true,
+            )
+            .await;
+
+        block2.generate(); // generate hashes
+
+        assert!(block2.has_staking_transaction);
+
+        let block2_hash = block2.hash;
+        let result = t.add_block(block2).await;
+        assert!(matches!(
+            result,
+            AddBlockResult::BlockAddedSuccessfully(_, _, _)
+        ));
+
+        {
+            let blockchain = t.blockchain_lock.read().await;
+            assert_eq!(blockchain.blocks.len(), 2);
+
+            assert_eq!(blockchain.get_latest_block_hash(), block2_hash);
+            assert_eq!(blockchain.get_latest_block_id(), 2);
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
     // add 6 blocks including 4 block reorg
     async fn basic_longest_chain_reorg_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
 
         let mut t = TestManager::default();
         let block1;
@@ -2631,7 +2742,7 @@ mod tests {
         let ts;
 
         // block 1
-        t.initialize(100, 1_000_000_000).await;
+        t.initialize(100, 200_000_000_000_000).await;
 
         {
             let blockchain = t.blockchain_lock.read().await;
@@ -2650,6 +2761,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
 
@@ -2676,6 +2788,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -2692,6 +2805,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block4.generate(); // generate hashes
@@ -2708,6 +2822,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
+                true,
             )
             .await;
         block5.generate(); // generate hashes
@@ -2731,6 +2846,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block3_2.generate(); // generate hashes
@@ -2754,6 +2870,7 @@ mod tests {
                 0,             // amount
                 0,             // fee
                 true,          // mine golden ticket
+                true,
             )
             .await;
         block4_2.generate(); // generate hashes
@@ -2777,6 +2894,7 @@ mod tests {
                 0,             // amount
                 0,             // fee
                 false,         // mine golden ticket
+                true,
             )
             .await;
         block5_2.generate(); // generate hashes
@@ -2800,6 +2918,7 @@ mod tests {
                 0,             // amount
                 0,             // fee
                 true,          // mine golden ticket
+                true,
             )
             .await;
         block6_2.generate(); // generate hashes
@@ -2833,7 +2952,7 @@ mod tests {
         let ts;
 
         // block 1
-        t.initialize(100, 1_000_000_000).await;
+        t.initialize(100, 200_000_000_000_000).await;
 
         {
             let blockchain = t.blockchain_lock.write().await;
@@ -2853,6 +2972,7 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
+                true,
             )
             .await;
         block2.generate(); // generate hashes
@@ -2919,7 +3039,7 @@ mod tests {
         let mut block1_hash;
         let mut ts;
 
-        t.initialize_with_timestamp(100, 1_000_000_000, 10_000_000)
+        t.initialize_with_timestamp(100, 200_000_000_000_000, 10_000_000)
             .await;
 
         for _i in (0..20).step_by(1) {
@@ -2940,6 +3060,7 @@ mod tests {
                     0,           // amount
                     0,           // fee
                     true,        // mine golden ticket
+                    true,
                 )
                 .await;
             block.generate(); // generate hashes
@@ -3051,6 +3172,7 @@ mod tests {
                     0,                 // amount
                     0,                 // fee
                     false,             // mine golden ticket
+                    true,
                 )
                 .await;
             block2.id = parent_block_id + 1;
@@ -3098,7 +3220,7 @@ mod tests {
         let mut ts;
 
         // block 1
-        t.initialize(100, 1_000_000_000).await;
+        t.initialize(100, 200_000_000_000_000).await;
 
         {
             let blockchain = t.blockchain_lock.write().await;
@@ -3118,6 +3240,7 @@ mod tests {
                     0,                 // amount
                     0,                 // fee
                     false,             // mine golden ticket
+                    true,
                 )
                 .await;
             block2.id = parent_block_id + 1;

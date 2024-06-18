@@ -222,6 +222,7 @@ pub struct Block {
     pub issuance_transaction_index: u64,
     // has fee transaction
     pub has_fee_transaction: bool,
+    pub has_staking_transaction: bool,
     // golden ticket index
     pub golden_ticket_index: u64,
     // fee transaction index
@@ -274,6 +275,7 @@ impl Block {
             in_longest_chain: false,
             has_golden_ticket: false,
             has_fee_transaction: false,
+            has_staking_transaction: false,
             has_issuance_transaction: false,
             issuance_transaction_index: 0,
             golden_ticket_index: 0,
@@ -743,12 +745,12 @@ impl Block {
 
         let mut has_golden_ticket = false;
         let mut has_fee_transaction = false;
+
         let mut has_issuance_transaction = false;
         let mut issuance_transaction_index = 0;
         let mut golden_ticket_index = 0;
         let mut fee_transaction_index = 0;
 
-        //
         // we have to do a single sweep through all of the transactions in
         // non-parallel to do things like generate the cumulative order of the
         // transactions in the block for things like work and fee calculations
@@ -757,7 +759,6 @@ impl Block {
         // we take advantage of the sweep to perform other pre-validation work
         // like counting up our ATR transactions and generating the hash
         // commitment for all of our rebroadcasts.
-        //
         for i in 0..self.transactions.len() {
             let transaction = &mut self.transactions[i];
 
@@ -765,7 +766,6 @@ impl Block {
 
             total_work += transaction.total_work_for_me;
 
-            //
             // update slips_spent_this_block so that we have a record of
             // how many times input slips are spent in this block. we will
             // use this later to ensure there are no duplicates.
@@ -775,7 +775,6 @@ impl Block {
             // someone else -- i.e. we will think the slip is spent in the
             // block when generating the FEE TX to check against the in-block
             // fee tx.
-            //
             if !self.created_hashmap_of_slips_spent_this_block
                 && transaction.transaction_type != TransactionType::Fee
             {
@@ -788,9 +787,7 @@ impl Block {
                 self.created_hashmap_of_slips_spent_this_block = true;
             }
 
-            //
             // also check the transactions for golden ticket and fees
-            //
             match transaction.transaction_type {
                 TransactionType::Issuance => {
                     has_issuance_transaction = true;
@@ -814,6 +811,9 @@ impl Block {
                         self.total_rebroadcast_slips += 1;
                         self.total_rebroadcast_nolan += input.amount;
                     }
+                }
+                TransactionType::BlockStake => {
+                    self.has_staking_transaction = true;
                 }
                 _ => {}
             };
@@ -2302,7 +2302,7 @@ mod tests {
         // test blocks with transactions
         // Block 1
         // perform transaction to wallet public key
-        t.initialize(100, 100000).await;
+        t.initialize(100, 200_000_000_000_000).await;
         let block1 = t.get_latest_block().await;
         let public_key: SaitoPublicKey;
         {
@@ -2352,6 +2352,7 @@ mod tests {
                 0,                         // amount
                 0,                         // fee
                 true,                      // mine golden ticket
+                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -2434,11 +2435,11 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn avg_fee_per_byte_test() {
-        // pretty_env_logger::init();
+        pretty_env_logger::init();
         let mut t = TestManager::default();
 
         // Initialize the test manager
-        t.initialize(250, 10_000_000).await;
+        t.initialize(250, 200_000_000_000_000).await;
 
         let latest_block = t.get_latest_block().await;
 
@@ -2450,6 +2451,7 @@ mod tests {
                 1000,
                 1_000_000,
                 true,
+                false,
             )
             .await;
 
@@ -2482,6 +2484,7 @@ mod tests {
                 1000,
                 1_000_000,
                 false,
+                false,
             )
             .await;
 
@@ -2510,7 +2513,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
 
         // create test manager
         let mut t = TestManager::default();
@@ -2529,6 +2532,7 @@ mod tests {
                     10,
                     100,
                     10,
+                    true,
                     true,
                 )
                 .await;
@@ -2561,6 +2565,7 @@ mod tests {
                 10,
                 100,
                 10,
+                true,
                 true,
             )
             .await;

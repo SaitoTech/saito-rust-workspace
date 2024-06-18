@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 use crate::core::consensus::peer::Peer;
 use crate::core::defs::{PeerIndex, SaitoPublicKey};

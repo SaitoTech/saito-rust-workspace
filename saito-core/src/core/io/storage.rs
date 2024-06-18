@@ -332,6 +332,11 @@ mod test {
     async fn issuance_hashmap_equals_balance_hashmap_test() {
         let mut t = TestManager::default();
 
+        {
+            let mut blockchain = t.blockchain_lock.write().await;
+            blockchain.social_stake_amount = 10;
+        }
+
         let issuance_hashmap = t.convert_issuance_to_hashmap(t.issuance_path).await;
         let slips = t
             .storage

@@ -261,7 +261,7 @@ impl Transaction {
         to_public_key: SaitoPublicKey,
         with_amount: Currency,
     ) -> Transaction {
-        debug!("generate issuance transaction : amount = {:?}", with_amount);
+        trace!("generate issuance transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Issuance;
         let mut output = Slip::default();
@@ -439,6 +439,9 @@ impl Transaction {
 
     pub fn is_fee_transaction(&self) -> bool {
         self.transaction_type == TransactionType::Fee
+    }
+    pub fn is_staking_transaction(&self) -> bool {
+        self.transaction_type == TransactionType::BlockStake
     }
 
     pub fn is_atr_transaction(&self) -> bool {
@@ -832,8 +835,7 @@ impl Transaction {
                 return false;
             }
 
-            let latest_unlocked_block_id =
-                blockchain.get_latest_block_id() - blockchain.social_stake_period;
+            let latest_unlocked_block_id = blockchain.get_latest_unlocked_stake_block_id();
 
             let mut unique_keys: AHashSet<SaitoUTXOSetKey> = Default::default();
 

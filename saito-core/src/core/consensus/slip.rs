@@ -6,7 +6,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 
 use crate::core::defs::{
-    BlockId, Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet, UTXO_KEY_LENGTH,
+    Currency, PrintForLog, SaitoPublicKey, SaitoUTXOSetKey, UtxoSet, UTXO_KEY_LENGTH,
 };
 
 /// The size of a serialized slip in bytes.

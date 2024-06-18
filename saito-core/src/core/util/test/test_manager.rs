@@ -41,7 +41,7 @@ pub mod test {
     use tokio::sync::RwLock;
 
     use crate::core::consensus::block::{Block, BlockType};
-    use crate::core::consensus::blockchain::Blockchain;
+    use crate::core::consensus::blockchain::{AddBlockResult, Blockchain};
     use crate::core::consensus::golden_ticket::GoldenTicket;
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peer_collection::PeerCollection;
@@ -202,18 +202,19 @@ pub mod test {
         }
 
         /// add block to blockchain
-        pub async fn add_block(&mut self, block: Block) {
+        pub async fn add_block(&mut self, block: Block) -> AddBlockResult {
             debug!("adding block to test manager blockchain");
 
             let configs = self.config_lock.write().await;
             let mut blockchain = self.blockchain_lock.write().await;
             let mut mempool = self.mempool_lock.write().await;
 
-            let _ = blockchain
+            let result = blockchain
                 .add_block(block, &mut self.storage, &mut mempool, configs.deref())
                 .await;
 
             self.latest_block_hash = blockchain.last_block_hash;
+            result
         }
 
         // check that the blockchain connects properly
@@ -571,6 +572,7 @@ pub mod test {
             txs_amount: Currency,
             txs_fee: Currency,
             include_valid_golden_ticket: bool,
+            with_staking_tx: bool,
         ) -> Block {
             let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
             let private_key: SaitoPrivateKey;
@@ -629,6 +631,18 @@ pub mod test {
                 }
                 gttx.generate(&public_key, 0, 0);
                 transactions.insert(gttx.signature, gttx);
+            }
+            if with_staking_tx {
+                let blockchain = self.blockchain_lock.read().await;
+                let mut wallet = self.wallet_lock.write().await;
+                let result = wallet.create_staking_transaction(
+                    blockchain.social_stake_amount,
+                    blockchain.get_latest_unlocked_stake_block_id(),
+                );
+                assert!(result.is_ok());
+                let mut tx = result.unwrap();
+                tx.generate(&public_key, 0, 0);
+                transactions.insert(tx.signature, tx);
             }
 
             let configs = self.config_lock.read().await;
@@ -747,7 +761,9 @@ pub mod test {
 
             // create first block
             let timestamp = create_timestamp();
-            let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
+            let mut block = self
+                .create_block([0; 32], timestamp, 0, 0, 0, false, false)
+                .await;
 
             for slip in slips {
                 let mut tx: Transaction =
@@ -796,24 +812,19 @@ pub mod test {
             let _ = tokio::fs::remove_dir_all("data/wallets").await;
             tokio::fs::create_dir_all("data/wallets").await.unwrap();
 
-            //
             // create initial transactions
-            //
             let private_key: SaitoPrivateKey;
             {
                 let wallet = self.wallet_lock.read().await;
                 private_key = wallet.private_key;
             }
 
-            //
             // create first block
-            //
+            let mut block = self
+                .create_block([0; 32], timestamp, 0, 0, 0, false, false)
+                .await;
 
-            let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
-
-            //
             // generate UTXO-carrying VIP transactions
-            //
             for slip in slips {
                 let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
                 tx.generate(&slip.public_key, 0, 0);
@@ -862,7 +873,9 @@ pub mod test {
             }
 
             // create first block
-            let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
+            let mut block = self
+                .create_block([0; 32], timestamp, 0, 0, 0, false, false)
+                .await;
 
             // generate UTXO-carrying transactions
             for _i in 0..issuance_transactions {
@@ -956,6 +969,11 @@ pub mod test {
             amount: u64,
             timestamp_addition: u64,
         ) -> Result<(), Box<dyn Error>> {
+            info!(
+                "transferring value : {:?} to : {:?}",
+                amount,
+                to_public_key.to_hex()
+            );
             let latest_block_hash = self.get_latest_block_hash().await;
 
             let timestamp = create_timestamp();
@@ -968,16 +986,14 @@ pub mod test {
                     0,
                     0,
                     false,
+                    true,
                 )
                 .await;
 
             let private_key;
-            let from_public_key;
 
             {
-                let wallet;
-                wallet = self.wallet_lock.read().await;
-                from_public_key = wallet.public_key;
+                let wallet = self.wallet_lock.read().await;
                 private_key = wallet.private_key;
                 let mut tx = Transaction::create(
                     &mut wallet.clone(),
