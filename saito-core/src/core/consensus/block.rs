@@ -1648,7 +1648,7 @@ impl Block {
             .iter()
             .find(|tx| matches!(tx.transaction_type, TransactionType::BlockStake));
 
-        if staking_tx.is_none() && self.id > 1 {
+        if blockchain.social_stake_amount != 0 && staking_tx.is_none() && self.id > 1 {
             error!(
                 "block : {:?} does not have a staking transaction",
                 self.hash.to_hex()
@@ -2352,7 +2352,6 @@ mod tests {
                 0,                         // amount
                 0,                         // fee
                 true,                      // mine golden ticket
-                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -2435,7 +2434,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn avg_fee_per_byte_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         let mut t = TestManager::default();
 
         // Initialize the test manager
@@ -2451,7 +2450,6 @@ mod tests {
                 1000,
                 1_000_000,
                 true,
-                false,
             )
             .await;
 
@@ -2483,7 +2481,6 @@ mod tests {
                 100,
                 1000,
                 1_000_000,
-                false,
                 false,
             )
             .await;
@@ -2533,7 +2530,6 @@ mod tests {
                     100,
                     10,
                     true,
-                    true,
                 )
                 .await;
             block.generate();
@@ -2565,7 +2561,6 @@ mod tests {
                 10,
                 100,
                 10,
-                true,
                 true,
             )
             .await;

@@ -44,8 +44,8 @@ const FORK_ID_WEIGHTS: [u64; 16] = [
     0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
 ];
 
-const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
-const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 100;
+pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
+pub const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 100;
 
 #[derive(Debug)]
 pub enum AddBlockResult {
@@ -1805,8 +1805,11 @@ mod tests {
     use log::{debug, error, info};
     use tokio::sync::RwLock;
 
-    use crate::core::consensus::blockchain::{bit_pack, bit_unpack, AddBlockResult, Blockchain};
+    use crate::core::consensus::blockchain::{
+        bit_pack, bit_unpack, AddBlockResult, Blockchain, DEFAULT_SOCIAL_STAKE,
+    };
     use crate::core::consensus::slip::Slip;
+    use crate::core::consensus::transaction::TransactionType;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{PrintForLog, SaitoPublicKey};
     use crate::core::io::storage::Storage;
@@ -1929,7 +1932,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block2.generate(); // generate hashes
@@ -1960,7 +1962,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -1993,7 +1994,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block4.generate(); // generate hashes
@@ -2028,7 +2028,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block5.generate(); // generate hashes
@@ -2113,7 +2112,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block2.generate(); // generate hashes
@@ -2144,7 +2142,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -2177,7 +2174,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block4.generate(); // generate hashes
@@ -2212,7 +2208,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block5.generate(); // generate hashes
@@ -2249,7 +2244,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block6.generate(); // generate hashes
@@ -2297,7 +2291,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block7.generate(); // generate hashes
@@ -2336,7 +2329,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn balance_hashmap_persists_after_blockchain_reset_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         let mut t: TestManager = TestManager::default();
         let file_path = t.issuance_path;
         let slips = t
@@ -2437,7 +2430,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block2.generate(); // generate hashes
@@ -2468,7 +2460,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -2501,7 +2492,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block4.generate(); // generate hashes
@@ -2536,7 +2526,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block5.generate(); // generate hashes
@@ -2573,7 +2562,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block6.generate(); // generate hashes
@@ -2612,7 +2600,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block7.generate(); // generate hashes
@@ -2653,11 +2640,13 @@ mod tests {
         // pretty_env_logger::init();
 
         let mut t = TestManager::default();
+        t.enable_staking(DEFAULT_SOCIAL_STAKE).await;
         let block1;
         let block1_hash;
         let ts;
 
         t.initialize(100, 200_000_000_000_000).await;
+        t.enable_staking(DEFAULT_SOCIAL_STAKE).await;
 
         {
             let blockchain = t.blockchain_lock.read().await;
@@ -2671,7 +2660,7 @@ mod tests {
 
         // block 2
         let mut block2 = t
-            .create_block(
+            .create_block_with_staking(
                 block1_hash, // hash of parent block
                 ts + 120000, // timestamp
                 0,           // num transactions
@@ -2682,7 +2671,7 @@ mod tests {
             )
             .await;
 
-        block2.generate(); // generate hashes
+        block2.generate();
 
         let block2_hash = block2.hash;
         assert!(!block2.has_staking_transaction);
@@ -2706,7 +2695,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
 
@@ -2761,7 +2749,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
 
@@ -2788,7 +2775,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block3.generate(); // generate hashes
@@ -2805,7 +2791,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block4.generate(); // generate hashes
@@ -2822,7 +2807,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 false,       // mine golden ticket
-                true,
             )
             .await;
         block5.generate(); // generate hashes
@@ -2846,7 +2830,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block3_2.generate(); // generate hashes
@@ -2870,7 +2853,6 @@ mod tests {
                 0,             // amount
                 0,             // fee
                 true,          // mine golden ticket
-                true,
             )
             .await;
         block4_2.generate(); // generate hashes
@@ -2894,7 +2876,6 @@ mod tests {
                 0,             // amount
                 0,             // fee
                 false,         // mine golden ticket
-                true,
             )
             .await;
         block5_2.generate(); // generate hashes
@@ -2918,7 +2899,6 @@ mod tests {
                 0,             // amount
                 0,             // fee
                 true,          // mine golden ticket
-                true,
             )
             .await;
         block6_2.generate(); // generate hashes
@@ -2952,7 +2932,8 @@ mod tests {
         let ts;
 
         // block 1
-        t.initialize(100, 200_000_000_000_000).await;
+        t.initialize(100, 1_000_000_000).await;
+        t2.disable_staking().await;
 
         {
             let blockchain = t.blockchain_lock.write().await;
@@ -2972,7 +2953,6 @@ mod tests {
                 0,           // amount
                 0,           // fee
                 true,        // mine golden ticket
-                true,
             )
             .await;
         block2.generate(); // generate hashes
@@ -3060,7 +3040,6 @@ mod tests {
                     0,           // amount
                     0,           // fee
                     true,        // mine golden ticket
-                    true,
                 )
                 .await;
             block.generate(); // generate hashes
@@ -3172,7 +3151,6 @@ mod tests {
                     0,                 // amount
                     0,                 // fee
                     false,             // mine golden ticket
-                    true,
                 )
                 .await;
             block2.id = parent_block_id + 1;
@@ -3240,7 +3218,6 @@ mod tests {
                     0,                 // amount
                     0,                 // fee
                     false,             // mine golden ticket
-                    true,
                 )
                 .await;
             block2.id = parent_block_id + 1;

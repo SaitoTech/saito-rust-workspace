@@ -631,7 +631,7 @@ mod tests {
     #[serial_test::serial]
     async fn wallet_transfer_to_address_test() {
         let mut t = TestManager::default();
-        t.initialize(100, 200_000_000_000_000).await;
+        t.initialize(100, 100000).await;
 
         let mut last_param = 120000;
 
@@ -686,7 +686,11 @@ mod tests {
     async fn test_transfer_with_exact_funds() {
         // pretty_env_logger::init();
         let mut t = TestManager::default();
-        t.initialize(1, 200_000_000_000_000).await;
+        {
+            let mut blockchain = t.blockchain_lock.write().await;
+            blockchain.social_stake_amount = 0;
+        }
+        t.initialize(1, 500).await;
 
         let public_key_string = "s8oFPjBX97NC2vbm9E5Kd2oHWUShuSTUuZwSB1U4wsPR";
         let public_key = Storage::decode_str(public_key_string).unwrap();
@@ -764,6 +768,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn find_staking_slips_with_staking_slips() {
         let t = TestManager::default();
 
