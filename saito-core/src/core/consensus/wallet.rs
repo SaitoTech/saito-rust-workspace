@@ -457,13 +457,15 @@ impl Wallet {
             ..Default::default()
         };
 
-        let (inputs, output) =
+        let (inputs, outputs) =
             self.find_slips_for_staking(staking_amount, latest_unlocked_block_id)?;
 
         for input in inputs {
             transaction.add_from_slip(input);
         }
-        transaction.add_to_slip(output);
+        for output in outputs {
+            transaction.add_to_slip(output);
+        }
 
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.hash_for_signature = Some(hash_for_signature);
@@ -477,7 +479,7 @@ impl Wallet {
         &mut self,
         staking_amount: Currency,
         latest_unlocked_block_id: BlockId,
-    ) -> Result<(Vec<Slip>, Slip), std::io::Error> {
+    ) -> Result<(Vec<Slip>, Vec<Slip>), std::io::Error> {
         debug!("finding slips for staking : {:?}", staking_amount);
 
         let mut inputs: Vec<Slip> = vec![];
@@ -538,12 +540,23 @@ impl Wallet {
             self.staking_slips.remove(&key);
         }
 
+        let mut outputs = vec![];
+
         let mut output: Slip = Default::default();
-        output.amount = collected_amount;
+        output.amount = staking_amount;
         output.slip_type = SlipType::BlockStake;
         output.public_key = self.public_key;
+        outputs.push(output);
 
-        Ok((inputs, output))
+        if collected_amount > staking_amount {
+            let mut output: Slip = Default::default();
+            output.amount = collected_amount - staking_amount;
+            output.slip_type = SlipType::Normal;
+            output.public_key = self.public_key;
+            outputs.push(output);
+        }
+
+        Ok((inputs, outputs))
     }
 
     pub fn is_slip_unlocked(
@@ -738,10 +751,61 @@ mod tests {
 
         let result = wallet.find_slips_for_staking(1_000_000, 1);
         assert!(result.is_ok());
-        let (inputs, output) = result.unwrap();
+        let (inputs, outputs) = result.unwrap();
         assert_eq!(inputs.len(), 1);
-        assert_eq!(output.amount, 1_000_000);
-        assert_eq!(output.slip_type, SlipType::BlockStake);
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(outputs[0].amount, 1_000_000);
+        assert_eq!(outputs[0].slip_type, SlipType::BlockStake);
+
+        assert_eq!(wallet.staking_slips.len(), 0);
+        assert_eq!(wallet.unspent_slips.len(), 0);
+        assert_eq!(wallet.available_balance, 0);
+
+        let result = wallet.find_slips_for_staking(1_000, 2);
+        assert!(result.is_err());
+
+        assert_eq!(wallet.staking_slips.len(), 0);
+        assert_eq!(wallet.unspent_slips.len(), 0);
+
+        let mut slip = Slip {
+            public_key: wallet.public_key,
+            amount: 1_000,
+            ..Slip::default()
+        };
+        slip.generate_utxoset_key();
+        wallet.add_slip(1, 2, &slip, true, Some(&t.network));
+
+        let result = wallet.find_slips_for_staking(1_000_000, 2);
+        assert!(result.is_err());
+        assert_eq!(wallet.staking_slips.len(), 0);
+        assert_eq!(wallet.unspent_slips.len(), 1);
+    }
+    #[tokio::test]
+    async fn find_staking_slips_with_normal_slips_with_extra_funds() {
+        let t = TestManager::default();
+
+        let mut wallet = t.wallet_lock.write().await;
+
+        let mut slip = Slip {
+            public_key: wallet.public_key,
+            amount: 2_500_000,
+            slip_type: SlipType::Normal,
+            ..Slip::default()
+        };
+        slip.generate_utxoset_key();
+        wallet.add_slip(1, 1, &slip, true, Some(&t.network));
+        assert_eq!(wallet.available_balance, 2_500_000);
+
+        let result = wallet.find_slips_for_staking(1_000_000, 1);
+        assert!(result.is_ok());
+        let (inputs, outputs) = result.unwrap();
+        assert_eq!(inputs.len(), 1);
+        assert_eq!(outputs.len(), 2);
+        assert_eq!(outputs[0].amount, 1_000_000);
+        assert_eq!(outputs[0].slip_type, SlipType::BlockStake);
+
+        assert_eq!(outputs[1].amount, 1_500_000);
+        assert_eq!(outputs[1].slip_type, SlipType::Normal);
 
         assert_eq!(wallet.staking_slips.len(), 0);
         assert_eq!(wallet.unspent_slips.len(), 0);
@@ -786,10 +850,10 @@ mod tests {
 
         let result = wallet.find_slips_for_staking(1_000_000, 1);
         assert!(result.is_ok());
-        let (inputs, output) = result.unwrap();
+        let (inputs, outputs) = result.unwrap();
         assert_eq!(inputs.len(), 1);
-        assert_eq!(output.amount, 1_000_000);
-        assert_eq!(output.slip_type, SlipType::BlockStake);
+        assert_eq!(outputs[0].amount, 1_000_000);
+        assert_eq!(outputs[0].slip_type, SlipType::BlockStake);
 
         assert_eq!(wallet.staking_slips.len(), 0);
         assert_eq!(wallet.unspent_slips.len(), 0);
