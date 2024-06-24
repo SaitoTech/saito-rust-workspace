@@ -26,14 +26,6 @@ pub enum PeerDisconnectType {
     InternalDisconnect,
 }
 
-#[derive(Debug)]
-pub enum PeerDisconnectType {
-    /// If the peer was disconnected without our intervention
-    ExternalDisconnect,
-    /// If we disconnected the peer
-    InternalDisconnect,
-}
-
 // #[derive(Debug)]
 pub struct Network {
     // TODO : manage peers from network
