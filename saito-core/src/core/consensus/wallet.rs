@@ -480,7 +480,10 @@ impl Wallet {
         staking_amount: Currency,
         latest_unlocked_block_id: BlockId,
     ) -> Result<(Vec<Slip>, Vec<Slip>), std::io::Error> {
-        debug!("finding slips for staking : {:?}", staking_amount);
+        debug!(
+            "finding slips for staking : {:?} latest_unblocked_block_id: {:?} staking_slip_count: {:?}",
+            staking_amount, latest_unlocked_block_id, self.staking_slips.len()
+        );
 
         let mut inputs: Vec<Slip> = vec![];
         let mut collected_amount: Currency = 0;

@@ -784,8 +784,10 @@ impl Blockchain {
     }
 
     pub fn get_latest_unlocked_stake_block_id(&self) -> BlockId {
+        // if we have any time to unlock slips
         if self.get_latest_block_id() > self.social_stake_period {
-            self.get_latest_block_id() - self.social_stake_period
+            // we check for next block's id
+            self.get_latest_block_id() + 1 - self.social_stake_period
         } else {
             0
         }
