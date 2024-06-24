@@ -41,7 +41,7 @@ pub mod test {
     use tokio::sync::RwLock;
 
     use crate::core::consensus::block::{Block, BlockType};
-    use crate::core::consensus::blockchain::Blockchain;
+    use crate::core::consensus::blockchain::{AddBlockResult, Blockchain, DEFAULT_SOCIAL_STAKE};
     use crate::core::consensus::golden_ticket::GoldenTicket;
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peer_collection::PeerCollection;
@@ -94,13 +94,11 @@ pub mod test {
         fn default() -> Self {
             let keys = generate_keys();
             let wallet = Wallet::new(keys.1, keys.0);
-            let _public_key = wallet.public_key.clone();
-            let _private_key = wallet.private_key.clone();
             let peers = Arc::new(RwLock::new(PeerCollection::new()));
             let wallet_lock = Arc::new(RwLock::new(wallet));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
-            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(10);
+            let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
             let configs = Arc::new(RwLock::new(TestConfiguration {}));
 
             let issuance_path = TestManager::get_test_issuance_file().unwrap();
@@ -162,6 +160,19 @@ pub mod test {
             Ok(static_str)
         }
 
+        pub async fn disable_staking(&mut self) {
+            let mut blockchain = self.blockchain_lock.write().await;
+            blockchain.social_stake_amount = 0;
+        }
+
+        pub async fn enable_staking(&mut self, mut stake_value: Currency) {
+            let mut blockchain = self.blockchain_lock.write().await;
+            if stake_value == 0 {
+                stake_value = DEFAULT_SOCIAL_STAKE;
+            }
+            blockchain.social_stake_amount = stake_value;
+        }
+
         pub async fn convert_issuance_to_hashmap(
             &self,
             filepath: &'static str,
@@ -204,20 +215,19 @@ pub mod test {
         }
 
         /// add block to blockchain
-        pub async fn add_block(&mut self, block: Block) {
+        pub async fn add_block(&mut self, block: Block) -> AddBlockResult {
             debug!("adding block to test manager blockchain");
 
-            {
-                let configs = self.config_lock.write().await;
-                let mut blockchain = self.blockchain_lock.write().await;
-                let mut mempool = self.mempool_lock.write().await;
+            let configs = self.config_lock.write().await;
+            let mut blockchain = self.blockchain_lock.write().await;
+            let mut mempool = self.mempool_lock.write().await;
 
-                let _ = blockchain
-                    .add_block(block, &mut self.storage, &mut mempool, configs.deref())
-                    .await;
+            let result = blockchain
+                .add_block(block, &mut self.storage, &mut mempool, configs.deref())
+                .await;
 
-                self.latest_block_hash = blockchain.last_block_hash;
-            }
+            self.latest_block_hash = blockchain.last_block_hash;
+            result
         }
 
         // check that the blockchain connects properly
@@ -298,7 +308,7 @@ pub mod test {
                         assert_eq!(*value, *value2);
                     }
                     None => {
-                        let slip = Slip::parse_slip_from_utxokey(key);
+                        let slip = Slip::parse_slip_from_utxokey(key).unwrap();
                         info!(
                             "block : {:?} tx : {:?} amount : {:?} type : {:?}",
                             slip.block_id, slip.tx_ordinal, slip.amount, slip.slip_type
@@ -576,6 +586,33 @@ pub mod test {
             txs_fee: Currency,
             include_valid_golden_ticket: bool,
         ) -> Block {
+            let is_staking_enabled;
+            {
+                let blockchain = self.blockchain_lock.read().await;
+                is_staking_enabled = blockchain.social_stake_amount != 0;
+            }
+
+            self.create_block_with_staking(
+                parent_hash,
+                timestamp,
+                txs_count,
+                txs_amount,
+                txs_fee,
+                include_valid_golden_ticket,
+                is_staking_enabled,
+            )
+            .await
+        }
+        pub async fn create_block_with_staking(
+            &mut self,
+            parent_hash: SaitoHash,
+            timestamp: Timestamp,
+            txs_count: usize,
+            txs_amount: Currency,
+            txs_fee: Currency,
+            include_valid_golden_ticket: bool,
+            with_staking_tx: bool,
+        ) -> Block {
             let mut transactions: AHashMap<SaitoSignature, Transaction> = Default::default();
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
@@ -634,6 +671,18 @@ pub mod test {
                 gttx.generate(&public_key, 0, 0);
                 transactions.insert(gttx.signature, gttx);
             }
+            if with_staking_tx {
+                let blockchain = self.blockchain_lock.read().await;
+                let mut wallet = self.wallet_lock.write().await;
+                let result = wallet.create_staking_transaction(
+                    blockchain.social_stake_amount,
+                    blockchain.get_latest_unlocked_stake_block_id(),
+                );
+                assert!(result.is_ok());
+                let mut tx = result.unwrap();
+                tx.generate(&public_key, 0, 0);
+                transactions.insert(tx.signature, tx);
+            }
 
             let configs = self.config_lock.read().await;
             let mut blockchain = self.blockchain_lock.write().await;
@@ -656,7 +705,6 @@ pub mod test {
 
             block
         }
-
         pub async fn create_golden_ticket(
             wallet_lock: Arc<RwLock<Wallet>>,
             block_hash: SaitoHash,
@@ -733,9 +781,8 @@ pub mod test {
         // initialize chain from slips and add some amount my public key
         //
         pub async fn initialize_from_slips_and_value(&mut self, slips: Vec<Slip>, amount: u64) {
-            //
+            self.disable_staking().await;
             // reset data dirs
-            //
             let _ = tokio::fs::remove_dir_all("data/blocks").await;
             tokio::fs::create_dir_all("data/blocks").await.unwrap();
             let _ = tokio::fs::remove_dir_all("data/wallets").await;
@@ -788,36 +835,26 @@ pub mod test {
 
         // initialize chain from just slips properties
         pub async fn initialize_from_slips(&mut self, slips: Vec<Slip>) {
-            //
+            self.disable_staking().await;
             // initialize timestamp
-            //
             let timestamp = create_timestamp();
-            //
             // reset data dirs
-            //
             let _ = tokio::fs::remove_dir_all("data/blocks").await;
             tokio::fs::create_dir_all("data/blocks").await.unwrap();
             let _ = tokio::fs::remove_dir_all("data/wallets").await;
             tokio::fs::create_dir_all("data/wallets").await.unwrap();
 
-            //
             // create initial transactions
-            //
             let private_key: SaitoPrivateKey;
             {
                 let wallet = self.wallet_lock.read().await;
                 private_key = wallet.private_key;
             }
 
-            //
             // create first block
-            //
-
             let mut block = self.create_block([0; 32], timestamp, 0, 0, 0, false).await;
 
-            //
             // generate UTXO-carrying VIP transactions
-            //
             for slip in slips {
                 let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
                 tx.generate(&slip.public_key, 0, 0);
@@ -849,6 +886,7 @@ pub mod test {
             issuance_amount: Currency,
             timestamp: Timestamp,
         ) {
+            self.disable_staking().await;
             // reset data dirs
             let _ = tokio::fs::remove_dir_all("data/blocks").await;
             let _ = tokio::fs::create_dir_all("data/blocks").await;
@@ -960,6 +998,11 @@ pub mod test {
             amount: u64,
             timestamp_addition: u64,
         ) -> Result<(), Box<dyn Error>> {
+            info!(
+                "transferring value : {:?} to : {:?}",
+                amount,
+                to_public_key.to_hex()
+            );
             let latest_block_hash = self.get_latest_block_hash().await;
 
             let timestamp = create_timestamp();
@@ -976,12 +1019,9 @@ pub mod test {
                 .await;
 
             let private_key;
-            let from_public_key;
 
             {
-                let wallet;
-                wallet = self.wallet_lock.read().await;
-                from_public_key = wallet.public_key;
+                let wallet = self.wallet_lock.read().await;
                 private_key = wallet.private_key;
                 let mut tx = Transaction::create(
                     &mut wallet.clone(),

@@ -1,5 +1,7 @@
+use ahash::AHashSet;
 use std::io::{Error, ErrorKind};
 
+use crate::core::consensus::blockchain::Blockchain;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -11,8 +13,8 @@ use crate::core::consensus::hop::{Hop, HOP_SIZE};
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature, Timestamp,
-    UtxoSet,
+    Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
+    SaitoUTXOSetKey, Timestamp, UtxoSet, UTXO_KEY_LENGTH,
 };
 use crate::core::io::network::Network;
 use crate::core::util::crypto::{hash, sign, verify, verify_signature};
@@ -32,7 +34,7 @@ pub enum TransactionType {
     SPV = 5,
     /// Issues funds for an address at the start of the network
     Issuance = 6,
-    Other = 7,
+    BlockStake = 7,
 }
 
 #[serde_with::serde_as]
@@ -259,7 +261,7 @@ impl Transaction {
         to_public_key: SaitoPublicKey,
         with_amount: Currency,
     ) -> Transaction {
-        debug!("generate issuance transaction : amount = {:?}", with_amount);
+        trace!("generate issuance transaction : amount = {:?}", with_amount);
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Issuance;
         let mut output = Slip::default();
@@ -437,6 +439,9 @@ impl Transaction {
 
     pub fn is_fee_transaction(&self) -> bool {
         self.transaction_type == TransactionType::Fee
+    }
+    pub fn is_staking_transaction(&self) -> bool {
+        self.transaction_type == TransactionType::BlockStake
     }
 
     pub fn is_atr_transaction(&self) -> bool {
@@ -792,18 +797,12 @@ impl Transaction {
         self.signature = sign(&buffer, private_key);
     }
 
-    pub fn validate(&self, utxoset: &UtxoSet) -> bool {
-        // trace!(
-        //     "validating transaction : {:?}",
-        //     hex::encode(self.hash_for_signature.unwrap())
-        // );
-        //
+    pub fn validate(&self, utxoset: &UtxoSet, wallet: &Wallet, blockchain: &Blockchain) -> bool {
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
         // matches our self-generated safety check. We do not need to validate
         // their input slips as their input slips are records of what to do
         // when reversing/unwinding the chain and have been spent previously.
-        //
         if self.transaction_type == TransactionType::Fee {
             return true;
         }
@@ -817,7 +816,57 @@ impl Transaction {
             return true;
         }
 
-        //
+        if let TransactionType::BlockStake = self.transaction_type {
+            let mut total_stakes = 0;
+
+            for slip in self.to.iter() {
+                if !matches!(slip.slip_type, SlipType::BlockStake)
+                    && !matches!(slip.slip_type, SlipType::Normal)
+                {
+                    error!("staking transaction outputs are not staking");
+                    return false;
+                }
+
+                if matches!(slip.slip_type, SlipType::BlockStake) {
+                    total_stakes += slip.amount;
+                }
+            }
+
+            if total_stakes < blockchain.social_stake_amount {
+                error!(
+                    "Not enough funds staked. expected: {:?}, staked: {:?}",
+                    blockchain.social_stake_amount, total_stakes
+                );
+                return false;
+            }
+
+            let latest_unlocked_block_id = blockchain.get_latest_unlocked_stake_block_id();
+
+            let mut unique_keys: AHashSet<SaitoUTXOSetKey> = Default::default();
+
+            for slip in self.from.iter() {
+                if slip.utxoset_key == [0; UTXO_KEY_LENGTH] {
+                    return false;
+                }
+                if !wallet.is_slip_unlocked(&slip.utxoset_key, latest_unlocked_block_id) {
+                    return false;
+                }
+                let wallet_slip = wallet.slips.get(&slip.utxoset_key).unwrap();
+                if wallet_slip.amount != slip.amount {
+                    return false;
+                }
+
+                unique_keys.insert(slip.utxoset_key);
+            }
+
+            if unique_keys.len() != self.from.len() {
+                // same utxo is used twice in the transaction
+                return false;
+            }
+
+            return true;
+        }
+
         // User-Sent Transactions
         //
         // most transactions are identifiable by the public_key that
@@ -833,22 +882,17 @@ impl Transaction {
         // classes of transactions are further down in this function.
         // at the bottom is the validation criteria applied to ALL
         // transaction types.
-        //
         let transaction_type = self.transaction_type;
 
         if transaction_type != TransactionType::ATR && transaction_type != TransactionType::Issuance
         {
-            //
             // validate sender exists
-            //
             if self.from.is_empty() {
                 error!("ERROR 582039: less than 1 input in transaction");
                 return false;
             }
 
-            //
             // validate signature
-            //
             if let Some(hash_for_signature) = &self.hash_for_signature {
                 let sig: SaitoSignature = self.signature;
                 let public_key: SaitoPublicKey = self.from[0].public_key;
@@ -862,23 +906,19 @@ impl Transaction {
                     return false;
                 }
             } else {
-                //
                 // we reach here if we have not already calculated the hash
                 // that is checked by the signature. while we could auto-gen
                 // it here, we choose to throw an error to raise visibility of
                 // unexpected behavior.
-                //
                 error!("ERROR 757293: there is no hash for signature in a transaction");
                 return false;
             }
 
-            //
             // validate routing path sigs
             //
             // a transaction without routing paths is valid, and pays off the
             // sender in the payment lottery. but a transaction with an invalid
             // routing path is fraudulent.
-            //
             if !self.validate_routing_path() {
                 error!("ERROR 482033: routing paths do not validate, transaction invalid");
                 return false;

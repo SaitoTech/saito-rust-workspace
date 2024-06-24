@@ -10,16 +10,13 @@ use crate::core::consensus::peer::{Peer, PeerStatus};
 use crate::core::consensus::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{
-    BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp,
-    PEER_RECONNECT_WAIT_PERIOD,
-};
+use crate::core::defs::{BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp};
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
-use crate::core::util::configuration::{Configuration, PeerConfig};
+use crate::core::util::configuration::Configuration;
 
 #[derive(Debug)]
 pub enum PeerDisconnectType {

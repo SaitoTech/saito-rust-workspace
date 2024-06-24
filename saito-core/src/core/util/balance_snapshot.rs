@@ -4,7 +4,9 @@ use std::io::{BufRead, BufReader};
 use log::{debug, info};
 
 use crate::core::consensus::slip::{Slip, SlipType};
-use crate::core::defs::{BlockId, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp};
+use crate::core::defs::{
+    BlockId, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UTXO_KEY_LENGTH,
+};
 
 pub type BalanceFileRowType = (String, String, String, String);
 
@@ -139,7 +141,7 @@ impl BalanceSnapshot {
                 block_id,
                 tx_ordinal: tx_id,
                 slip_type: SlipType::Normal,
-                utxoset_key: [0; 58],
+                utxoset_key: [0; UTXO_KEY_LENGTH],
                 is_utxoset_key_set: false,
             };
             slip.generate_utxoset_key();
@@ -201,7 +203,7 @@ mod tests {
     use log::info;
 
     use crate::core::consensus::slip::{Slip, SlipType};
-    use crate::core::defs::PrintForLog;
+    use crate::core::defs::{PrintForLog, UTXO_KEY_LENGTH};
     use crate::core::util::balance_snapshot::BalanceSnapshot;
 
     #[test]
@@ -219,7 +221,7 @@ mod tests {
             block_id: 1,
             tx_ordinal: 1,
             slip_type: SlipType::Normal,
-            utxoset_key: [0; 58],
+            utxoset_key: [0; UTXO_KEY_LENGTH],
             is_utxoset_key_set: false,
         });
         snapshot.slips.push(Slip {
@@ -229,7 +231,7 @@ mod tests {
             block_id: 2,
             tx_ordinal: 2,
             slip_type: SlipType::Normal,
-            utxoset_key: [0; 58],
+            utxoset_key: [0; UTXO_KEY_LENGTH],
             is_utxoset_key_set: false,
         });
         snapshot.slips.push(Slip {
@@ -239,7 +241,7 @@ mod tests {
             block_id: 3,
             tx_ordinal: 3,
             slip_type: SlipType::Normal,
-            utxoset_key: [0; 58],
+            utxoset_key: [0; UTXO_KEY_LENGTH],
             is_utxoset_key_set: false,
         });
         let (file_name, rows) = snapshot.get_data();
@@ -306,7 +308,7 @@ mod tests {
             block_id: 1,
             tx_ordinal: 1,
             slip_type: SlipType::Normal,
-            utxoset_key: [0; 58],
+            utxoset_key: [0; UTXO_KEY_LENGTH],
             is_utxoset_key_set: false,
         });
         snapshot.slips.push(Slip {
@@ -316,7 +318,7 @@ mod tests {
             block_id: 2,
             tx_ordinal: 2,
             slip_type: SlipType::Normal,
-            utxoset_key: [0; 58],
+            utxoset_key: [0; UTXO_KEY_LENGTH],
             is_utxoset_key_set: false,
         });
         snapshot.slips.push(Slip {
@@ -326,7 +328,7 @@ mod tests {
             block_id: 3,
             tx_ordinal: 3,
             slip_type: SlipType::Normal,
-            utxoset_key: [0; 58],
+            utxoset_key: [0; UTXO_KEY_LENGTH],
             is_utxoset_key_set: false,
         });
 
