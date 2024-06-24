@@ -820,11 +820,16 @@ impl Transaction {
             let mut total_stakes = 0;
 
             for slip in self.to.iter() {
-                if !matches!(slip.slip_type, SlipType::BlockStake) {
+                if !matches!(slip.slip_type, SlipType::BlockStake)
+                    && !matches!(slip.slip_type, SlipType::Normal)
+                {
                     error!("staking transaction outputs are not staking");
                     return false;
                 }
-                total_stakes += slip.amount;
+
+                if matches!(slip.slip_type, SlipType::BlockStake) {
+                    total_stakes += slip.amount;
+                }
             }
 
             if total_stakes < blockchain.social_stake_amount {
@@ -851,7 +856,7 @@ impl Transaction {
                     return false;
                 }
 
-                unique_keys.insert(slip.utxoset_key.clone());
+                unique_keys.insert(slip.utxoset_key);
             }
 
             if unique_keys.len() != self.from.len() {
