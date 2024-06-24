@@ -114,9 +114,9 @@ export default class Transaction extends WasmWrapper<WasmTransaction> {
         return this.instance.total_fees;
     }
 
-    public async sign(private_key?: string) {
+    public async sign() {
         this.packData();
-        return this.instance.sign(private_key ?? "");
+        return this.instance.sign();
     }
 
     public isFrom(key: string): boolean {
