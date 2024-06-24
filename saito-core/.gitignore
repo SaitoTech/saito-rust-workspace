@@ -2,3 +2,4 @@
 Cargo.lock
 data/blocks/*
 data/
+/temp_test_directory/*

@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use num_traits::FromPrimitive;
 use saito_core::core::consensus::slip::{Slip, SlipType};
-use saito_core::core::defs::{Currency, PrintForLog, SaitoUTXOSetKey};
+use saito_core::core::defs::{Currency, PrintForLog, SaitoUTXOSetKey, UTXO_KEY_LENGTH};
 
 use crate::saitowasm::{string_to_hex, string_to_key};
 
@@ -91,7 +91,7 @@ impl WasmSlip {
                 block_id: 0,
                 tx_ordinal: 0,
                 slip_type: SlipType::Normal,
-                utxoset_key: [0; 58],
+                utxoset_key: [0; UTXO_KEY_LENGTH],
                 is_utxoset_key_set: false,
             },
         }

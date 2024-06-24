@@ -13,7 +13,6 @@ pub mod test {
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{BlockId, PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
     use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
-    use crate::core::util::configuration::PeerConfig;
 
     #[derive(Clone, Debug)]
     pub struct TestIOHandler {}

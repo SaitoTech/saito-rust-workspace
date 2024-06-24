@@ -2,7 +2,7 @@ use log::trace;
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::ringitem::RingItem;
-use crate::core::defs::{PrintForLog, SaitoHash, GENESIS_PERIOD};
+use crate::core::defs::{BlockId, PrintForLog, SaitoHash, GENESIS_PERIOD};
 
 pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
 
@@ -65,7 +65,7 @@ impl BlockRing {
         }
     }
 
-    pub fn get_latest_block_id(&self) -> u64 {
+    pub fn get_latest_block_id(&self) -> BlockId {
         match self.lc_pos {
             Some(lc_pos_block_ring) => match self.ring[lc_pos_block_ring].lc_pos {
                 Some(lc_pos_block_item) => {
