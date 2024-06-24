@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use log::{debug, error, info, trace, warn};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
@@ -17,6 +17,14 @@ use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
 use crate::core::util::configuration::Configuration;
+
+#[derive(Debug)]
+pub enum PeerDisconnectType {
+    /// If the peer was disconnected without our intervention
+    ExternalDisconnect,
+    /// If we disconnected the peer
+    InternalDisconnect,
+}
 
 #[derive(Debug)]
 pub enum PeerDisconnectType {
