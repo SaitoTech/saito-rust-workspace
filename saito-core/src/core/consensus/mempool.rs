@@ -113,7 +113,7 @@ impl Mempool {
             public_key = wallet.public_key;
             transaction.generate(&public_key, 0, 0);
 
-            tx_valid = transaction.validate(&blockchain.utxoset, &wallet, &blockchain);
+            tx_valid = transaction.validate(&blockchain.utxoset, &blockchain);
         }
 
         // validate
@@ -202,7 +202,6 @@ impl Mempool {
         let staking_tx;
         {
             let mut wallet = self.wallet_lock.write().await;
-            let latest_block_id = blockchain.get_latest_block_id();
 
             staking_tx = wallet
                 .create_staking_transaction(

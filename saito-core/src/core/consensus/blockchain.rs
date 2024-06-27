@@ -12,12 +12,12 @@ use tokio::sync::RwLock;
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockring::BlockRing;
 use crate::core::consensus::mempool::Mempool;
-use crate::core::consensus::slip::Slip;
+use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDATED};
 use crate::core::defs::{
-    BlockHash, BlockId, Currency, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, UtxoSet,
-    GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
+    BlockHash, BlockId, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
+    Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
     MIN_GOLDEN_TICKETS_NUMERATOR, NOLAN_PER_SAITO, PRUNE_AFTER_BLOCKS,
 };
 use crate::core::io::interface_io::InterfaceEvent;
@@ -569,7 +569,7 @@ impl Blockchain {
                     // TODO : what other types should be added back to the mempool
                     if tx.transaction_type == TransactionType::Normal {
                         // TODO : is there a way to not validate these again ?
-                        return tx.validate(&self.utxoset, &wallet, &self);
+                        return tx.validate(&self.utxoset, &self);
                     }
                     false
                 })
@@ -1114,14 +1114,11 @@ impl Blockchain {
         let block = self.blocks.get(block_hash).unwrap();
         let does_block_validate;
         {
-            let wallet = self.wallet_lock.read().await;
             // does_block_validate = current_wind_index == 0
             //     || block
             //         .validate(self, &self.utxoset, configs, storage, &wallet)
             //         .await;
-            does_block_validate = block
-                .validate(self, &self.utxoset, configs, storage, &wallet)
-                .await;
+            does_block_validate = block.validate(self, &self.utxoset, configs, storage).await;
         }
 
         let mut wallet_updated = WALLET_NOT_UPDATED;
@@ -1796,6 +1793,34 @@ impl Blockchain {
 
         snapshot
     }
+    pub fn is_slip_unlocked(&self, utxo_key: &SaitoUTXOSetKey) -> bool {
+        let latest_unlocked_block_id = self.get_latest_unlocked_stake_block_id();
+        let result = Slip::parse_slip_from_utxokey(utxo_key);
+        if result.is_err() {
+            warn!("cannot parse utxo key  : {:?}", utxo_key.to_hex());
+            return false;
+        }
+        let slip = result.unwrap();
+        let result = self.utxoset.get(utxo_key);
+        if result.is_none() {
+            warn!(
+                "slip not found. : {:?}-{:?}-{:?} type: {:?} amount : {:?}",
+                slip.block_id, slip.tx_ordinal, slip.slip_index, slip.slip_type, slip.amount
+            );
+            return false;
+        }
+        let spendable = result.unwrap();
+        if !spendable {
+            return false;
+        }
+        if let SlipType::BlockStake = slip.slip_type {
+            if slip.block_id > latest_unlocked_block_id {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 #[cfg(test)]
@@ -1811,7 +1836,6 @@ mod tests {
         bit_pack, bit_unpack, AddBlockResult, Blockchain, DEFAULT_SOCIAL_STAKE,
     };
     use crate::core::consensus::slip::Slip;
-    use crate::core::consensus::transaction::TransactionType;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{PrintForLog, SaitoPublicKey};
     use crate::core::io::storage::Storage;
@@ -2638,7 +2662,7 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
-    async fn block_add_test_1() {
+    async fn block_add_test_staking() {
         // pretty_env_logger::init();
 
         let mut t = TestManager::default();
