@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use log::{debug, error, info, trace, warn};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;

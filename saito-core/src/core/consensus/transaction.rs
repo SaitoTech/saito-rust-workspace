@@ -797,7 +797,7 @@ impl Transaction {
         self.signature = sign(&buffer, private_key);
     }
 
-    pub fn validate(&self, utxoset: &UtxoSet, wallet: &Wallet, blockchain: &Blockchain) -> bool {
+    pub fn validate(&self, utxoset: &UtxoSet, blockchain: &Blockchain) -> bool {
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
         // matches our self-generated safety check. We do not need to validate
@@ -840,19 +840,17 @@ impl Transaction {
                 return false;
             }
 
-            let latest_unlocked_block_id = blockchain.get_latest_unlocked_stake_block_id();
-
             let mut unique_keys: AHashSet<SaitoUTXOSetKey> = Default::default();
 
             for slip in self.from.iter() {
                 if slip.utxoset_key == [0; UTXO_KEY_LENGTH] {
                     return false;
                 }
-                if !wallet.is_slip_unlocked(&slip.utxoset_key, latest_unlocked_block_id) {
+                if !blockchain.is_slip_unlocked(&slip.utxoset_key) {
                     return false;
                 }
-                let wallet_slip = wallet.slips.get(&slip.utxoset_key).unwrap();
-                if wallet_slip.amount != slip.amount {
+                let utxo_slip = Slip::parse_slip_from_utxokey(&slip.utxoset_key).unwrap();
+                if utxo_slip.amount != slip.amount {
                     return false;
                 }
 

@@ -16,7 +16,6 @@ use crate::core::consensus::hop::HOP_SIZE;
 use crate::core::consensus::merkle::MerkleTree;
 use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
-use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey,
     SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
@@ -1622,7 +1621,6 @@ impl Block {
         utxoset: &UtxoSet,
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
-        wallet: &Wallet,
     ) -> bool {
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
         assert!(self.id > 0);
@@ -1944,7 +1942,7 @@ impl Block {
         // as to determine spendability.
 
         let transactions_valid = iterate!(self.transactions, 100)
-            .all(|tx: &Transaction| tx.validate(utxoset, wallet, blockchain));
+            .all(|tx: &Transaction| tx.validate(utxoset, blockchain));
 
         // let mut transactions_valid = true;
         // for tx in self.transactions.iter() {
