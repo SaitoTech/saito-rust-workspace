@@ -38,7 +38,7 @@ impl Peer {
         
         let mut rate_limiter = RateLimiter::new();
         rate_limiter.set_limit("key_list", 10, 60_000);  
-        rate_limiter.set_limit("handshake", 5, 60_000); 
+        rate_limiter.set_limit("handshake_challenge", 5, 60_000); 
 
         Peer {
             index: peer_index,
