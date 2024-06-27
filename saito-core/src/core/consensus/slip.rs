@@ -133,7 +133,7 @@ impl Slip {
         slip.amount = u64::from_be_bytes(key[50..58].try_into().unwrap());
         slip.slip_type = SlipType::from_u8(key[58]).ok_or(Error::from(ErrorKind::InvalidData))?;
 
-        slip.utxoset_key = key.clone();
+        slip.utxoset_key = *key;
         slip.is_utxoset_key_set = true;
 
         Ok(slip)

@@ -561,28 +561,6 @@ impl Wallet {
 
         Ok((inputs, outputs))
     }
-
-    pub fn is_slip_unlocked(
-        &self,
-        utxo_key: &SaitoUTXOSetKey,
-        latest_unlocked_block_id: BlockId,
-    ) -> bool {
-        let slip = self.slips.get(utxo_key);
-        if slip.is_none() {
-            return false;
-        }
-        let slip = slip.unwrap();
-        if !slip.lc {
-            return false;
-        }
-        if let SlipType::BlockStake = slip.slip_type {
-            if slip.block_id > latest_unlocked_block_id {
-                return false;
-            }
-        }
-
-        true
-    }
 }
 
 impl WalletSlip {

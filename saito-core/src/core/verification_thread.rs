@@ -46,7 +46,7 @@ impl VerificationThread {
         public_key = wallet.public_key;
         transaction.generate(&public_key, 0, 0);
 
-        if !transaction.validate(&blockchain.utxoset, &wallet, &blockchain) {
+        if !transaction.validate(&blockchain.utxoset, &blockchain) {
             debug!(
                 "transaction : {:?} not valid",
                 transaction.signature.to_hex()
@@ -77,7 +77,7 @@ impl VerificationThread {
                 .filter_map(|mut transaction| {
                     transaction.generate(&public_key, 0, 0);
 
-                    if !transaction.validate(&blockchain.utxoset, &wallet, &blockchain) {
+                    if !transaction.validate(&blockchain.utxoset, &blockchain) {
                         debug!(
                             "transaction : {:?} not valid",
                             transaction.signature.to_hex()

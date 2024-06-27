@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::core::consensus::transaction::{Transaction, TransactionType};
-use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, Timestamp};
+use saito_core::core::defs::{Currency, PrintForLog, Timestamp};
 
 use crate::saitowasm::{string_to_hex, string_to_key, SAITO};
 use crate::wasm_hop::WasmHop;
