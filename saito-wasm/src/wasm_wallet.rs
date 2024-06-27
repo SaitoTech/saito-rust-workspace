@@ -134,6 +134,12 @@ impl WasmWallet {
         );
     }
 
+
+    pub async fn add_to_pending(&mut self, tx: Transaction) {
+        let mut wallet = self.wallet.write().await;
+        wallet.add_to_pending(tx);
+    }
+
     pub async fn get_key_list(&self) -> Array {
         let wallet = self.wallet.read().await;
         let array = Array::new_with_length(wallet.key_list.len() as u32);

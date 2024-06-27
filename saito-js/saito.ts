@@ -486,4 +486,12 @@ export default class Saito {
             console.error(error);
         }
     }
+
+    public addPendingTx(tx: Transaction) {
+        try {
+            return Saito.getLibInstance().add_to_pending(tx);
+        } catch (e) {
+            console.error(e);
+        }
+    }
 }
