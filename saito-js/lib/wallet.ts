@@ -87,7 +87,8 @@ export default class Wallet extends WasmWrapper<WasmWallet> {
     }
 
     public async addToPending(tx: Transaction) {
-        return this.instance.add_to_pending(tx.instance);
+        let tx2 = tx.clone();
+        await this.instance.add_to_pending(tx2.wasmTransaction);
     }
 }
 

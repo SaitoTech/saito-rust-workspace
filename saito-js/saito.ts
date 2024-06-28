@@ -345,7 +345,8 @@ export default class Saito {
     }
 
     public async propagateTransaction(tx: Transaction) {
-        return Saito.getLibInstance().propagate_transaction(tx.wasmTransaction);
+        let tx2 = tx.clone();
+        return Saito.getLibInstance().propagate_transaction(tx2.wasmTransaction);
     }
 
     public async sendApiCall(

@@ -183,6 +183,8 @@ export default class Transaction extends WasmWrapper<WasmTransaction> {
     }
 
     public clone() {
-        return new Transaction.Type(undefined, this.toJson());
+        let tx = new Transaction(undefined, this.toJson());
+        tx.unpackData();
+        return tx;
     }
 }
