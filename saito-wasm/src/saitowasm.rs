@@ -810,13 +810,22 @@ pub async fn propagate_transaction(tx: &WasmTransaction) {
     trace!("propagate_transaction");
 
     let mut saito = SAITO.lock().await;
+    let mut tx = tx.clone().tx;
+    {
+        let wallet = saito
+            .as_ref()
+            .unwrap()
+            .routing_thread
+            .wallet_lock
+            .read()
+            .await;
+        tx.generate(&wallet.public_key, 0, 0);
+    }
     saito
         .as_mut()
         .unwrap()
         .consensus_thread
-        .process_event(ConsensusEvent::NewTransaction {
-            transaction: tx.tx.clone(),
-        })
+        .process_event(ConsensusEvent::NewTransaction { transaction: tx })
         .await;
 }
 

@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use js_sys::{Array, JsString};
-use log::{error, warn};
+use log::{error, info, warn};
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
@@ -134,9 +134,11 @@ impl WasmWallet {
         );
     }
 
-    pub async fn add_to_pending(&mut self, tx: WasmTransaction) {
+    pub async fn add_to_pending(&mut self, tx: &WasmTransaction) {
         let mut wallet = self.wallet.write().await;
-        wallet.add_to_pending(tx.tx.clone());
+        let mut tx = tx.clone().tx;
+        tx.generate(&wallet.public_key, 0, 0);
+        wallet.add_to_pending(tx);
     }
 
     pub async fn get_key_list(&self) -> Array {
