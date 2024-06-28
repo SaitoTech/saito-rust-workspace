@@ -715,6 +715,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn find_staking_slips_with_normal_slips() {
         let t = TestManager::default();
 
@@ -762,6 +763,7 @@ mod tests {
         assert_eq!(wallet.unspent_slips.len(), 1);
     }
     #[tokio::test]
+    #[serial_test::serial]
     async fn find_staking_slips_with_normal_slips_with_extra_funds() {
         let t = TestManager::default();
 
