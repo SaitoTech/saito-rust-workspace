@@ -489,7 +489,7 @@ export default class Saito {
 
     public addPendingTx(tx: Transaction) {
         try {
-            return Saito.getLibInstance().add_to_pending(tx);
+            return Saito.getLibInstance().add_to_pending(tx.wasmTransaction);
         } catch (e) {
             console.error(e);
         }
