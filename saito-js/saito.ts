@@ -487,9 +487,10 @@ export default class Saito {
         }
     }
 
-    public addPendingTx(tx: Transaction) {
+    public async addPendingTx(tx: Transaction) {
         try {
-            return Saito.getLibInstance().add_to_pending(tx.wasmTransaction);
+            let wallet = await this.getWallet();
+            return wallet.addToPending(tx);
         } catch (e) {
             console.error(e);
         }
