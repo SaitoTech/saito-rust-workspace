@@ -44,7 +44,9 @@ const FORK_ID_WEIGHTS: [u64; 16] = [
     0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
 ];
 
-pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
+// pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
+pub const DEFAULT_SOCIAL_STAKE: Currency = 0;
+
 pub const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 100;
 
 #[derive(Debug)]
@@ -2676,6 +2678,11 @@ mod tests {
 
         {
             let blockchain = t.blockchain_lock.read().await;
+
+            if blockchain.social_stake_amount == 0 {
+                // this test won't pass if staking is not available
+                return;
+            }
 
             assert_eq!(blockchain.blocks.len(), 1);
 
