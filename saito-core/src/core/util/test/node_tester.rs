@@ -1,21 +1,21 @@
 #[cfg(test)]
 pub mod test {
-    use std::io::Error;
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-    use crate::core::consensus::block::Block;
-    use crate::core::consensus::blockchain::Blockchain;
+    use crate::core::consensus::block::{Block, BlockType};
+    use crate::core::consensus::blockchain::{Blockchain, DEFAULT_SOCIAL_STAKE};
     use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
     use crate::core::consensus::context::Context;
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peer_collection::PeerCollection;
+    use crate::core::consensus::slip::SlipType;
     use crate::core::consensus::transaction::Transaction;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-    use crate::core::defs::{BlockId, Currency, SaitoPrivateKey, StatVariable, STAT_BIN_COUNT};
+    use crate::core::defs::{
+        BlockId, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, StatVariable, STAT_BIN_COUNT,
+    };
     use crate::core::defs::{SaitoPublicKey, Timestamp};
     use crate::core::io::network::Network;
+    use crate::core::io::network_event::NetworkEvent;
     use crate::core::io::storage::Storage;
     use crate::core::mining_thread::{MiningEvent, MiningThread};
     use crate::core::process::keep_time::KeepTime;
@@ -26,9 +26,15 @@ pub mod test {
     use crate::core::util::configuration::{
         BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
     };
+    use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
     use crate::core::verification_thread::{VerificationThread, VerifyRequest};
+    use log::{error, info};
     use serde::Deserialize;
+    use std::io::Error;
+    use std::ops::{Deref, DerefMut};
+    use std::sync::Arc;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::sync::mpsc::Receiver;
     use tokio::sync::RwLock;
 
@@ -122,11 +128,15 @@ pub mod test {
         receiver_for_stats: Receiver<String>,
         context: Context,
         timeout_in_ms: u64,
+        last_run_time: Timestamp,
     }
 
     impl Default for NodeTester {
         fn default() -> Self {
-            let wallet = Arc::new(RwLock::new(Wallet::new([0; 32], [0; 33])));
+            let (public_key, private_key) = generate_keys();
+            let wallet = Arc::new(RwLock::new(Wallet::new(private_key, public_key)));
+
+            info!("node tester public key : {:?}", public_key.to_base58());
 
             let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> =
                 Arc::new(RwLock::new(TestConfiguration::default()));
@@ -256,6 +266,7 @@ pub mod test {
                 context,
                 receiver_for_stats: receiver_in_stats,
                 timeout_in_ms: Duration::new(30, 0).as_millis() as u64,
+                last_run_time: 0,
             }
         }
     }
@@ -269,7 +280,7 @@ pub mod test {
 
             Ok(())
         }
-        async fn run_loop_once(&mut self) {
+        async fn run_event_loop_once(&mut self) {
             if let Ok(event) = self.receiver_for_router.try_recv() {
                 self.routing_thread.process_event(event).await.unwrap()
             }
@@ -285,13 +296,24 @@ pub mod test {
             if let Ok(event) = self.receiver_for_verification.try_recv() {
                 self.verification_thread.process_event(event).await.unwrap();
             }
+            self.run_timer_loop_once().await;
+        }
+        async fn run_timer_loop_once(&mut self) {
+            let duration =
+                Duration::from_millis(self.timer.get_timestamp_in_ms() - self.last_run_time);
+            self.routing_thread.process_timer_event(duration).await;
+            self.mining_thread.process_timer_event(duration).await;
+            self.stat_thread.process_timer_event(duration).await;
+            self.consensus_thread.process_timer_event(duration).await;
+            self.verification_thread.process_timer_event(duration).await;
+            self.last_run_time = self.timer.get_timestamp_in_ms();
         }
         async fn run_until(&mut self, timestamp: Timestamp) -> Result<(), Error> {
             loop {
                 if self.timer.get_timestamp_in_ms() >= timestamp {
                     break;
                 }
-                self.run_loop_once().await;
+                self.run_event_loop_once().await;
             }
             Ok(())
         }
@@ -304,10 +326,11 @@ pub mod test {
                         break;
                     }
                 }
-                self.run_loop_once().await;
+
+                self.run_event_loop_once().await;
 
                 if self.timer.get_timestamp_in_ms() > timeout {
-                    break;
+                    panic!("request timed out");
                 }
             }
 
@@ -322,10 +345,10 @@ pub mod test {
                         break;
                     }
                 }
-                self.run_loop_once().await;
+                self.run_event_loop_once().await;
 
                 if self.timer.get_timestamp_in_ms() > timeout {
-                    break;
+                    panic!("request timed out");
                 }
             }
 
@@ -340,10 +363,10 @@ pub mod test {
                         break;
                     }
                 }
-                self.run_loop_once().await;
+                self.run_event_loop_once().await;
 
                 if self.timer.get_timestamp_in_ms() > timeout {
-                    break;
+                    panic!("request timed out");
                 }
             }
 
@@ -363,7 +386,69 @@ pub mod test {
                 .unwrap()
         }
         pub async fn add_block(&mut self, block: Block) {
+            self.routing_thread
+                .process_network_event(NetworkEvent::BlockFetched {
+                    block_hash: block.hash,
+                    block_id: block.id,
+                    peer_index: block.routed_from_peer.unwrap_or(0),
+                    buffer: block.serialize_for_net(BlockType::Full),
+                })
+                .await;
+        }
+        pub async fn set_staking_enabled(&mut self, enable: bool) {
+            self.routing_thread
+                .blockchain_lock
+                .write()
+                .await
+                .social_stake_amount = if enable { DEFAULT_SOCIAL_STAKE } else { 0 };
+        }
+        pub async fn set_staking_requirement(&self, amount: Currency, period: u64) {
+            let mut blockchain = self.routing_thread.blockchain_lock.write().await;
+            blockchain.social_stake_amount = amount;
+            blockchain.social_stake_period = period;
+        }
+
+        pub async fn delete_blocks(&self) -> Result<(), Error> {
+            tokio::fs::create_dir_all("./data/blocks").await?;
+            tokio::fs::remove_dir_all("./data/blocks/").await?;
+            Ok(())
+        }
+        pub async fn create_block(
+            &self,
+            parent_hash: SaitoHash,
+            tx_count: u32,
+            fee_amount: Currency,
+            with_gt: bool,
+        ) -> Result<Block, Error> {
             todo!()
+        }
+        pub async fn create_transaction(
+            &self,
+            with_payment: Currency,
+            with_fee: Currency,
+            to_key: SaitoPublicKey,
+        ) -> Result<Transaction, Error> {
+            let mut wallet = self.routing_thread.wallet_lock.write().await;
+            let mut tx = Transaction::create(
+                wallet.deref_mut(),
+                to_key,
+                with_payment,
+                with_fee,
+                false,
+                None,
+            )?;
+            tx.generate(&wallet.public_key, 0, 0);
+            Ok(tx)
+        }
+        pub async fn set_issuance(&self, entries: Vec<(String, Currency)>) -> Result<(), Error> {
+            let mut content = String::new();
+
+            for (key, amount) in entries {
+                content += (amount.to_string() + "\t" + key.as_str() + "\t" + "Normal\n").as_str();
+            }
+
+            tokio::fs::create_dir_all("./data/issuance/").await?;
+            tokio::fs::write("./data/issuance/issuance", content.as_bytes()).await
         }
     }
 }

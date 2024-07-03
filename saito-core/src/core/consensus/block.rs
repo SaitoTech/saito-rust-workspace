@@ -2011,15 +2011,18 @@ mod tests {
     use log::info;
 
     use crate::core::consensus::block::{Block, BlockType};
+    use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::consensus::merkle::MerkleTree;
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
         Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
+        NOLAN_PER_SAITO,
     };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
+    use crate::core::util::test::node_tester::test::NodeTester;
     use crate::core::util::test::test_manager::test::TestManager;
 
     #[test]
@@ -2591,5 +2594,32 @@ mod tests {
         // assert_eq!(cv.expected_burnfee, 1104854);
         assert_eq!(cv.rebroadcasts.len(), 1);
         assert_eq!(cv.avg_nolan_rebroadcast_per_block, 10);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn atr_test_2() {
+        pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester.delete_blocks().await.unwrap();
+
+        let public_key = tester.get_public_key().await;
+        tester
+            .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 100)
+            .await;
+        let issuance = vec![(public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO)];
+        tester.set_issuance(issuance).await.unwrap();
+
+        tester.init().await.unwrap();
+
+        tester.wait_till_block_id(1).await.unwrap();
+
+        for i in 1..50 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i + 1).await.unwrap()
+        }
+
+        tester.wait_till_block_id(50).await.unwrap();
     }
 }

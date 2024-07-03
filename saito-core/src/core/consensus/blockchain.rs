@@ -1087,7 +1087,7 @@ impl Blockchain {
     ) -> WindingResult {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
-        info!(
+        debug!(
             "wind_chain: current_wind_index : {:?} new_chain_len: {:?} old_chain_len: {:?} failed : {:?}",
             current_wind_index,new_chain.len(),old_chain.len(), wind_failure
         );
