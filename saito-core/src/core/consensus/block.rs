@@ -2615,7 +2615,7 @@ mod tests {
         tester.wait_till_block_id(1).await.unwrap();
 
         for i in 1..50 {
-            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+            let tx = tester.create_transaction(0, 0, public_key).await.unwrap();
             tester.add_transaction(tx).await;
             tester.wait_till_block_id(i + 1).await.unwrap()
         }

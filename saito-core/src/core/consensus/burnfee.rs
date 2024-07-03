@@ -7,7 +7,9 @@ use crate::core::defs::{Currency, Timestamp};
 
 //
 // our target blocktime
-//
+#[cfg(test)]
+pub const HEARTBEAT: Timestamp = Duration::from_millis(5).as_millis() as Timestamp;
+#[cfg(not(test))]
 pub const HEARTBEAT: Timestamp = Duration::from_secs(5).as_millis() as Timestamp;
 
 //

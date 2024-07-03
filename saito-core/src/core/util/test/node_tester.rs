@@ -282,19 +282,19 @@ pub mod test {
         }
         async fn run_event_loop_once(&mut self) {
             if let Ok(event) = self.receiver_for_router.try_recv() {
-                self.routing_thread.process_event(event).await.unwrap()
+                self.routing_thread.process_event(event).await;
             }
             if let Ok(event) = self.receiver_for_miner.try_recv() {
-                self.mining_thread.process_event(event).await.unwrap();
+                self.mining_thread.process_event(event).await;
             }
             if let Ok(event) = self.receiver_for_stats.try_recv() {
-                self.stat_thread.process_event(event).await.unwrap();
+                self.stat_thread.process_event(event).await;
             }
             if let Ok(event) = self.receiver_for_consensus.try_recv() {
-                self.consensus_thread.process_event(event).await.unwrap();
+                self.consensus_thread.process_event(event).await;
             }
             if let Ok(event) = self.receiver_for_verification.try_recv() {
-                self.verification_thread.process_event(event).await.unwrap();
+                self.verification_thread.process_event(event).await;
             }
             self.run_timer_loop_once().await;
         }
@@ -438,6 +438,7 @@ pub mod test {
                 None,
             )?;
             tx.generate(&wallet.public_key, 0, 0);
+            tx.sign(&wallet.private_key);
             Ok(tx)
         }
         pub async fn set_issuance(&self, entries: Vec<(String, Currency)>) -> Result<(), Error> {
