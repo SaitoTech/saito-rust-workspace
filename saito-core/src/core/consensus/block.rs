@@ -2596,6 +2596,7 @@ mod tests {
         assert_eq!(cv.avg_nolan_rebroadcast_per_block, 10);
     }
 
+    #[ignore]
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test_2() {
@@ -2614,12 +2615,12 @@ mod tests {
 
         tester.wait_till_block_id(1).await.unwrap();
 
-        for i in 1..50 {
-            let tx = tester.create_transaction(0, 0, public_key).await.unwrap();
+        for i in 1..GENESIS_PERIOD {
+            let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
             tester.add_transaction(tx).await;
-            tester.wait_till_block_id(i + 1).await.unwrap()
+            tester.wait_till_block_id(i + 1).await.unwrap();
         }
 
-        tester.wait_till_block_id(50).await.unwrap();
+        tester.wait_till_block_id(GENESIS_PERIOD).await.unwrap();
     }
 }

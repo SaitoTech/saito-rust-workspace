@@ -206,7 +206,7 @@ impl Storage {
             error!("issuance file does not exist");
         }
 
-        return vec![];
+        vec![]
     }
 
     /// get issuance slips from the standard file

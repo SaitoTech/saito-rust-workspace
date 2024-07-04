@@ -147,13 +147,13 @@ impl Wallet {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        wallet_changed = WALLET_UPDATED;
+                        wallet_changed |= WALLET_UPDATED;
                         self.delete_slip(input, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        wallet_changed = WALLET_UPDATED;
+                        wallet_changed |= WALLET_UPDATED;
                         self.add_slip(block.id, index as u64, output, true, None);
                     }
                 }
@@ -162,18 +162,19 @@ impl Wallet {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
-                        wallet_changed = WALLET_UPDATED;
+                        wallet_changed |= WALLET_UPDATED;
                         self.add_slip(block.id, index as u64, input, true, None);
                     }
                 }
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
-                        wallet_changed = WALLET_UPDATED;
+                        wallet_changed |= WALLET_UPDATED;
                         self.delete_slip(output, None);
                     }
                 }
             }
         }
+        debug!("wallet changed ? {:?}", wallet_changed);
 
         wallet_changed
     }
@@ -207,6 +208,7 @@ impl Wallet {
         network: Option<&Network>,
     ) {
         if self.slips.contains_key(&slip.get_utxoset_key()) {
+            debug!("wallet already has slip : {:?}", slip);
             return;
         }
         let mut wallet_slip = WalletSlip::new();
@@ -226,7 +228,7 @@ impl Wallet {
             self.unspent_slips.insert(wallet_slip.utxokey);
         }
 
-        trace!(
+        debug!(
             "adding slip : {:?} with value : {:?} to wallet",
             wallet_slip.utxokey.to_hex(),
             wallet_slip.amount
@@ -284,7 +286,13 @@ impl Wallet {
 
         // grab inputs
         let mut keys_to_remove = Vec::new();
-        for key in &self.unspent_slips {
+        let mut unspent_slips = self.unspent_slips.iter().collect::<Vec<&SaitoUTXOSetKey>>();
+        unspent_slips.sort_by(|slip, slip2| {
+            let slip = Slip::parse_slip_from_utxokey(slip).unwrap();
+            let slip2 = Slip::parse_slip_from_utxokey(slip2).unwrap();
+            slip.amount.cmp(&slip2.amount)
+        });
+        for key in unspent_slips {
             if nolan_in >= nolan_requested {
                 break;
             }
@@ -506,13 +514,20 @@ impl Wallet {
             }
         }
 
+        let mut should_break_slips = false;
         if collected_amount < staking_amount {
             debug!("not enough funds in staking slips. searching in normal slips. current_balance : {:?}",self.available_balance);
             let required_from_unspent = staking_amount - collected_amount;
             let mut collected_from_unspent: Currency = 0;
             let mut keys_to_remove = vec![];
 
-            for key in self.unspent_slips.iter() {
+            let mut unspent_slips = self.unspent_slips.iter().collect::<Vec<&SaitoUTXOSetKey>>();
+            unspent_slips.sort_by(|slip, slip2| {
+                let slip = Slip::parse_slip_from_utxokey(slip).unwrap();
+                let slip2 = Slip::parse_slip_from_utxokey(slip2).unwrap();
+                slip2.amount.cmp(&slip.amount)
+            });
+            for key in unspent_slips {
                 let slip = self.slips.get(key).unwrap();
 
                 collected_from_unspent += slip.amount;
@@ -521,6 +536,8 @@ impl Wallet {
                 keys_to_remove.push(*key);
 
                 if collected_from_unspent >= required_from_unspent {
+                    // if we only have a single slip, and we access it for staking, we need to break it into multiple slips
+                    should_break_slips = self.unspent_slips.len() == 1;
                     break;
                 }
             }
@@ -552,11 +569,27 @@ impl Wallet {
         outputs.push(output);
 
         if collected_amount > staking_amount {
-            let mut output: Slip = Default::default();
-            output.amount = collected_amount - staking_amount;
-            output.slip_type = SlipType::Normal;
-            output.public_key = self.public_key;
-            outputs.push(output);
+            let amount = collected_amount - staking_amount;
+            let mut remainder = amount;
+            let mut slip_count = 1;
+            if should_break_slips {
+                slip_count = 2;
+            }
+            for _ in 0..slip_count {
+                let mut output: Slip = Default::default();
+                output.amount = amount / slip_count;
+                remainder -= output.amount;
+                output.slip_type = SlipType::Normal;
+                output.public_key = self.public_key;
+                outputs.push(output);
+            }
+            if remainder > 0 {
+                let mut output: Slip = Default::default();
+                output.amount = remainder;
+                output.slip_type = SlipType::Normal;
+                output.public_key = self.public_key;
+                outputs.push(output);
+            }
         }
 
         Ok((inputs, outputs))
@@ -783,12 +816,15 @@ mod tests {
         assert!(result.is_ok());
         let (inputs, outputs) = result.unwrap();
         assert_eq!(inputs.len(), 1);
-        assert_eq!(outputs.len(), 2);
+        assert_eq!(outputs.len(), 3);
         assert_eq!(outputs[0].amount, 1_000_000);
         assert_eq!(outputs[0].slip_type, SlipType::BlockStake);
 
-        assert_eq!(outputs[1].amount, 1_500_000);
+        assert_eq!(outputs[1].amount, 750_000);
         assert_eq!(outputs[1].slip_type, SlipType::Normal);
+
+        assert_eq!(outputs[2].amount, 750_000);
+        assert_eq!(outputs[2].slip_type, SlipType::Normal);
 
         assert_eq!(wallet.staking_slips.len(), 0);
         assert_eq!(wallet.unspent_slips.len(), 0);
