@@ -29,7 +29,7 @@ pub mod test {
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
     use crate::core::verification_thread::{VerificationThread, VerifyRequest};
-    use log::{error, info};
+    use log::info;
     use serde::Deserialize;
     use std::io::Error;
     use std::ops::{Deref, DerefMut};
@@ -162,7 +162,7 @@ pub mod test {
 
             let timer = Timer {
                 time_reader: Arc::new(TestTimeKeeper {}),
-                hasten_multiplier: 1,
+                hasten_multiplier: 1_000_000,
                 start_time: TestTimeKeeper {}.get_timestamp_in_ms(),
             };
 
@@ -224,7 +224,7 @@ pub mod test {
                     stat_sender: sender_to_stat.clone(),
                     config_lock: configuration.clone(),
                     enabled: true,
-                    mining_iterations: 1_000,
+                    mining_iterations: 100,
                 },
                 verification_thread: VerificationThread {
                     sender_to_consensus: sender_to_consensus.clone(),
@@ -309,8 +309,9 @@ pub mod test {
             self.last_run_time = self.timer.get_timestamp_in_ms();
         }
         async fn run_until(&mut self, timestamp: Timestamp) -> Result<(), Error> {
+            let time_keeper = TestTimeKeeper {};
             loop {
-                if self.timer.get_timestamp_in_ms() >= timestamp {
+                if time_keeper.get_timestamp_in_ms() >= timestamp {
                     break;
                 }
                 self.run_event_loop_once().await;
@@ -319,6 +320,7 @@ pub mod test {
         }
         pub async fn wait_till_block_id(&mut self, block_id: BlockId) -> Result<(), Error> {
             let timeout = self.timer.get_timestamp_in_ms() + self.timeout_in_ms;
+            let time_keeper = TestTimeKeeper {};
             loop {
                 {
                     let blockchain = self.routing_thread.blockchain_lock.read().await;
@@ -329,7 +331,7 @@ pub mod test {
 
                 self.run_event_loop_once().await;
 
-                if self.timer.get_timestamp_in_ms() > timeout {
+                if time_keeper.get_timestamp_in_ms() > timeout {
                     panic!("request timed out");
                 }
             }
@@ -338,6 +340,7 @@ pub mod test {
         }
         pub async fn wait_till_mempool_tx_count(&mut self, tx_count: u64) -> Result<(), Error> {
             let timeout = self.timer.get_timestamp_in_ms() + self.timeout_in_ms;
+            let time_keeper = TestTimeKeeper {};
             loop {
                 {
                     let mempool = self.routing_thread.mempool_lock.read().await;
@@ -347,7 +350,7 @@ pub mod test {
                 }
                 self.run_event_loop_once().await;
 
-                if self.timer.get_timestamp_in_ms() > timeout {
+                if time_keeper.get_timestamp_in_ms() > timeout {
                     panic!("request timed out");
                 }
             }
@@ -356,6 +359,7 @@ pub mod test {
         }
         pub async fn wait_till_wallet_balance(&mut self, balance: Currency) -> Result<(), Error> {
             let timeout = self.timer.get_timestamp_in_ms() + self.timeout_in_ms;
+            let time_keeper = TestTimeKeeper {};
             loop {
                 {
                     let wallet = self.routing_thread.wallet_lock.read().await;
@@ -365,7 +369,7 @@ pub mod test {
                 }
                 self.run_event_loop_once().await;
 
-                if self.timer.get_timestamp_in_ms() > timeout {
+                if time_keeper.get_timestamp_in_ms() > timeout {
                     panic!("request timed out");
                 }
             }
