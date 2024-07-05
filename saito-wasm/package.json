@@ -1,6 +1,6 @@
 {
   "name": "saito-wasm",
-  "version": "0.1.7",
+  "version": "0.2.11",
   "description": "js wrappings around saito-core using wasm",
   "scripts": {
     "test": "./node_modules/.bin/jest",
@@ -43,5 +43,5 @@
     "node-fetch": "^3.3.0",
     "cross-env": "^7.0.3"
   },
-  "type": "module"
+  "type": "commonjs"
 }

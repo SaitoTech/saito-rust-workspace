@@ -109,13 +109,9 @@ class MsgHandler {
     }
 }
 
-try {
-    // if (typeof exports === "undefined") {
-    //     module.exports = MsgHandler;
-    // } else {
-    //     exports = MsgHandler;
-    // }
-    module.exports = exports = {MsgHandler};
-} catch (e) {
-    console.error(e);
-}
+// if (typeof exports === "undefined") {
+//     module.exports = {MsgHandler};
+// } else {
+//     exports = {MsgHandler};
+// }
+module.exports = exports = {MsgHandler};
