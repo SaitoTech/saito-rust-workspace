@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use js_sys::{Array, JsString};
-use log::{error, info, warn};
+use log::{error, warn};
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
