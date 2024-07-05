@@ -96,14 +96,17 @@ impl ConsensusThread {
 
         let slips = self.storage.get_token_supply_slips_from_disk().await;
         let private_key;
+        let public_key;
         {
             let wallet = self.wallet_lock.read().await;
             private_key = wallet.private_key;
+            public_key = wallet.public_key;
         }
         let mut txs: Vec<Transaction> = vec![];
         for slip in slips {
             debug!("{:?} slip public key", slip.public_key.to_base58());
             let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
+            tx.generate(&public_key, 0, 0);
             tx.sign(&private_key);
             txs.push(tx);
         }
@@ -111,15 +114,12 @@ impl ConsensusThread {
         let blockchain = blockchain_lock.read().await;
         let mut mempool = mempool_lock.write().await;
 
-        // debug!("{:?} transaction from slips", txs);
         for tx in txs {
             mempool
                 .add_transaction_if_validates(tx.clone(), &blockchain)
                 .await;
             info!("added issuance init tx for : {:?}", tx.signature.to_hex());
         }
-
-        // debug!("{:?} mempool transacts", mempool.transactions);
     }
 }
 

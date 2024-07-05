@@ -65,7 +65,7 @@ pub enum AddBlockResult {
 pub enum WindingResult {
     Wind(usize, bool, WalletUpdateStatus),
     Unwind(usize, bool, Vec<SaitoHash>, WalletUpdateStatus),
-    FinishWithSuccess,
+    FinishWithSuccess(WalletUpdateStatus),
     FinishWithFailure,
 }
 
@@ -363,11 +363,12 @@ impl Blockchain {
                 .await;
 
             debug!(
-                "Full block count after= {:?}",
+                "Full block count after= {:?} wallet_updated= {:?}",
                 self.blocks
                     .iter()
                     .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
-                    .count()
+                    .count(),
+                wallet_updated
             );
 
             if does_new_chain_validate {
@@ -913,6 +914,7 @@ impl Blockchain {
             configs.is_browser(),
             configs.is_spv_mode(),
         ) {
+            debug!("gt count is not valid");
             return (false, WALLET_NOT_UPDATED);
         }
 
@@ -953,7 +955,9 @@ impl Blockchain {
                             )
                             .await;
                     }
-                    WindingResult::FinishWithSuccess => return (true, wallet_update_status),
+                    WindingResult::FinishWithSuccess(wallet_updated) => {
+                        return (true, wallet_update_status | wallet_updated)
+                    }
                     WindingResult::FinishWithFailure => return (false, wallet_update_status),
                 }
             }
@@ -992,8 +996,8 @@ impl Blockchain {
                             )
                             .await;
                     }
-                    WindingResult::FinishWithSuccess => {
-                        return (true, wallet_update_status);
+                    WindingResult::FinishWithSuccess(wallet_updated) => {
+                        return (true, wallet_update_status | wallet_updated);
                     }
                     WindingResult::FinishWithFailure => {
                         return (false, wallet_update_status);
@@ -1087,7 +1091,7 @@ impl Blockchain {
     ) -> WindingResult {
         // trace!(" ... blockchain.wind_chain strt: {:?}", create_timestamp());
 
-        info!(
+        debug!(
             "wind_chain: current_wind_index : {:?} new_chain_len: {:?} old_chain_len: {:?} failed : {:?}",
             current_wind_index,new_chain.len(),old_chain.len(), wind_failure
         );
@@ -1163,7 +1167,7 @@ impl Blockchain {
                 if wind_failure {
                     return WindingResult::FinishWithFailure;
                 }
-                return WindingResult::FinishWithSuccess;
+                return WindingResult::FinishWithSuccess(wallet_updated);
             }
 
             WindingResult::Wind(current_wind_index - 1, false, wallet_updated)
@@ -1369,7 +1373,7 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
     ) -> WalletUpdateStatus {
         debug!(
-            "on_chain_reorganization : block_id = {:?} block_hash = {:?}",
+            "blockchain.on_chain_reorganization : block_id = {:?} block_hash = {:?}",
             block_id,
             block_hash.to_hex()
         );
@@ -1382,7 +1386,7 @@ impl Blockchain {
                 self.last_block_id, block_id
             );
             self.downgrade_blockchain_data(configs.is_spv_mode()).await;
-            return wallet_updated;
+            return true;
         }
 
         if longest_chain {
@@ -1403,7 +1407,7 @@ impl Blockchain {
             }
 
             // update genesis period, purge old data
-            wallet_updated = self.update_genesis_period(storage).await;
+            wallet_updated |= self.update_genesis_period(storage).await;
 
             // generate fork_id
             let fork_id = self.generate_fork_id(block_id);
@@ -1516,9 +1520,7 @@ impl Blockchain {
 
     async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
         trace!("downgrading blockchain data");
-        //
         // downgrade blocks still on the chain
-        //
         if PRUNE_AFTER_BLOCKS > self.get_latest_block_id() {
             return;
         }
@@ -1656,6 +1658,8 @@ impl Blockchain {
                 network
                     .io_interface
                     .send_interface_event(InterfaceEvent::WalletUpdate());
+            } else {
+                debug!("not updating wallet for block : {:?}", block_hash.to_hex());
             }
 
             if !is_spv_mode {

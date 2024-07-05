@@ -994,127 +994,7 @@ impl Block {
         }
 
         // calculate automatic transaction rebroadcasts / ATR / atr
-        if self.id > GENESIS_PERIOD + 1 {
-            debug!("calculating ATR");
-
-            // which block needs to be rebroadcast?
-            let pruned_block_hash = blockchain
-                .blockring
-                .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
-
-            // load that block
-            if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
-                let result = storage
-                    .load_block_from_disk(storage.generate_block_filepath(pruned_block).as_str())
-                    .await;
-                if result.is_err() {
-                    error!(
-                        "couldn't load block for ATR from disk. block hash : {:?}",
-                        pruned_block.hash.to_hex()
-                    );
-                    error!("{:?}", result.err().unwrap());
-                } else {
-                    let mut atr_block = result.unwrap();
-                    atr_block.generate();
-                    assert_ne!(
-                        atr_block.block_type,
-                        BlockType::Pruned,
-                        "block should be fetched fully before this"
-                    );
-                    // utxos receive their share of the staking_treasury adjusted for
-                    // the value of the UTXO that are looping around the blockchain.
-                    let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
-                    let expected_utxo_payout = if expected_utxo_staked > 0 {
-                        self.treasury / expected_utxo_staked
-                    } else {
-                        0
-                    };
-                    debug!("expected_utxo_staked : {:?}", expected_utxo_staked);
-                    debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
-
-                    // +1 gives us a figure we can multiply any UTXO by in order to
-                    // determine the payout for any utxo
-                    let expected_atr_multiplier = 1 + expected_utxo_payout;
-
-                    // loop through the block to identify unspend transactions that are
-                    // eligible for rebroadcasting.
-                    trace!("identifying all unspent txs");
-                    for transaction in &atr_block.transactions {
-                        trace!("checking tx : {:?}", transaction.signature.to_hex());
-                        let mut outputs = vec![];
-
-                        // we want to avoid calculating the size of the transaction or anything more
-                        // complicated until we know that we have a transaction that requires
-                        // rebroadcasting.
-                        for output in transaction.to.iter() {
-                            // valid means unspent and non-zero amount
-                            if output.validate(&blockchain.utxoset) {
-                                outputs.push(output);
-                            }
-                        }
-
-                        // if we should rebroadcast this transaction, we figure out the payout using
-                        // the multiplier we calculated above, and then deduct the ATR fee that is
-                        // deducted from the transaction on rebroadcast.
-                        if !outputs.is_empty() {
-                            let tx_size = transaction.get_serialized_size() as u64;
-                            let atr_fee = tx_size * cv.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
-
-                            // in the future we can use more complicated logic which attempts to divide
-                            // the ATR fee across the UTXO, but for ease of implementation we simply
-                            // subtract the fee from every single UTXO that is unspent.
-                            //
-                            // users who wish to minimize ATR fees should avoid creating transactions
-                            // with multiple unspent UTXO .
-                            for output in outputs {
-                                let atr_payout_for_slip = output.amount * expected_atr_multiplier;
-                                let atr_fee_for_slip = atr_fee;
-
-                                if output.amount + atr_payout_for_slip > atr_fee {
-                                    cv.total_rebroadcast_nolan += output.amount;
-                                    cv.total_rebroadcast_slips += 1;
-
-                                    let mut slip = output.clone();
-                                    slip.slip_type = SlipType::ATR;
-                                    slip.amount =
-                                        output.amount + atr_payout_for_slip - atr_fee_for_slip;
-
-                                    cv.total_rebroadcast_staking_payouts_nolan +=
-                                        atr_payout_for_slip;
-                                    cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
-
-                                    // create our ATR rebroadcast transaction
-                                    let rebroadcast_tx =
-                                        Transaction::create_rebroadcast_transaction(
-                                            transaction,
-                                            slip,
-                                        );
-
-                                    // update cryptographic hash of all ATRs
-                                    let mut vbytes: Vec<u8> = vec![];
-                                    vbytes.extend(&cv.rebroadcast_hash);
-                                    vbytes.extend(&rebroadcast_tx.serialize_for_signature());
-                                    cv.rebroadcast_hash = hash(&vbytes);
-                                    cv.rebroadcasts.push(rebroadcast_tx);
-                                } else {
-                                    // this UTXO will be worth less than zero if the atr_payout is
-                                    // added and then the atr_fee is deducted. so we do not rebroadcast
-                                    // it but collect the dust as a fee paid to the blockchain by the
-                                    // utxo with gratitude for its release.
-                                    cv.total_rebroadcast_fees_nolan += output.amount;
-                                }
-                            }
-                        } // output
-                    }
-                    // tx
-                    debug!(
-                        "transactions : {:?}, rebroadcasts : {:?}",
-                        atr_block.transactions.len(),
-                        cv.rebroadcasts.len()
-                    );
-                }
-            } // block
-        } // if at least 1 genesis period deep
+        self.generate_atr_values(blockchain, storage, &mut cv).await;
 
         // we can now adjust the value of avg_nolan_rebroadcast_per_block since
         // we know the total amount of fees that have been rebroadcast in this
@@ -1330,6 +1210,136 @@ impl Block {
         cv.nolan_falling_off_chain = 0;
 
         cv
+    }
+
+    async fn generate_atr_values(
+        &self,
+        blockchain: &Blockchain,
+        storage: &Storage,
+        cv: &mut ConsensusValues,
+    ) {
+        // if at least 1 genesis period deep
+        if self.id > GENESIS_PERIOD + 1 {
+            debug!("calculating ATR");
+
+            // which block needs to be rebroadcast?
+            let pruned_block_hash = blockchain
+                .blockring
+                .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
+
+            // load that block
+            if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
+                let result = storage
+                    .load_block_from_disk(storage.generate_block_filepath(pruned_block).as_str())
+                    .await;
+                if result.is_err() {
+                    error!(
+                        "couldn't load block for ATR from disk. block hash : {:?}",
+                        pruned_block.hash.to_hex()
+                    );
+                    error!("{:?}", result.err().unwrap());
+                } else {
+                    let mut atr_block = result.unwrap();
+                    atr_block.generate();
+                    assert_ne!(
+                        atr_block.block_type,
+                        BlockType::Pruned,
+                        "block should be fetched fully before this"
+                    );
+                    // utxos receive their share of the staking_treasury adjusted for
+                    // the value of the UTXO that are looping around the blockchain.
+                    let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
+                    let expected_utxo_payout = if expected_utxo_staked > 0 {
+                        self.treasury / expected_utxo_staked
+                    } else {
+                        0
+                    };
+                    debug!("expected_utxo_staked : {:?}", expected_utxo_staked);
+                    debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
+
+                    // +1 gives us a figure we can multiply any UTXO by in order to
+                    // determine the payout for any utxo
+                    let expected_atr_multiplier = 1 + expected_utxo_payout;
+
+                    // loop through the block to identify unspend transactions that are
+                    // eligible for rebroadcasting.
+                    trace!("identifying all unspent txs");
+                    for transaction in &atr_block.transactions {
+                        trace!("checking tx : {:?}", transaction.signature.to_hex());
+                        let mut outputs = vec![];
+
+                        // we want to avoid calculating the size of the transaction or anything more
+                        // complicated until we know that we have a transaction that requires
+                        // rebroadcasting.
+                        for output in transaction.to.iter() {
+                            // valid means unspent and non-zero amount
+                            if output.validate(&blockchain.utxoset) {
+                                outputs.push(output);
+                            }
+                        }
+
+                        // if we should rebroadcast this transaction, we figure out the payout using
+                        // the multiplier we calculated above, and then deduct the ATR fee that is
+                        // deducted from the transaction on rebroadcast.
+                        if !outputs.is_empty() {
+                            let tx_size = transaction.get_serialized_size() as u64;
+                            let atr_fee = tx_size * cv.avg_fee_per_byte * 2; // x2 base-fee multiplier because ATR
+
+                            // in the future we can use more complicated logic which attempts to divide
+                            // the ATR fee across the UTXO, but for ease of implementation we simply
+                            // subtract the fee from every single UTXO that is unspent.
+                            //
+                            // users who wish to minimize ATR fees should avoid creating transactions
+                            // with multiple unspent UTXO .
+                            for output in outputs {
+                                let atr_payout_for_slip = output.amount * expected_atr_multiplier;
+                                let atr_fee_for_slip = atr_fee;
+
+                                if output.amount + atr_payout_for_slip > atr_fee {
+                                    cv.total_rebroadcast_nolan += output.amount;
+                                    cv.total_rebroadcast_slips += 1;
+
+                                    let mut slip = output.clone();
+                                    slip.slip_type = SlipType::ATR;
+                                    slip.amount =
+                                        output.amount + atr_payout_for_slip - atr_fee_for_slip;
+
+                                    cv.total_rebroadcast_staking_payouts_nolan +=
+                                        atr_payout_for_slip;
+                                    cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
+
+                                    // create our ATR rebroadcast transaction
+                                    let rebroadcast_tx =
+                                        Transaction::create_rebroadcast_transaction(
+                                            transaction,
+                                            slip,
+                                        );
+
+                                    // update cryptographic hash of all ATRs
+                                    let mut vbytes: Vec<u8> = vec![];
+                                    vbytes.extend(&cv.rebroadcast_hash);
+                                    vbytes.extend(&rebroadcast_tx.serialize_for_signature());
+                                    cv.rebroadcast_hash = hash(&vbytes);
+                                    cv.rebroadcasts.push(rebroadcast_tx);
+                                } else {
+                                    // this UTXO will be worth less than zero if the atr_payout is
+                                    // added and then the atr_fee is deducted. so we do not rebroadcast
+                                    // it but collect the dust as a fee paid to the blockchain by the
+                                    // utxo with gratitude for its release.
+                                    cv.total_rebroadcast_fees_nolan += output.amount;
+                                }
+                            }
+                        } // output
+                    }
+                    // tx
+                    debug!(
+                        "transactions : {:?}, rebroadcasts : {:?}",
+                        atr_block.transactions.len(),
+                        cv.rebroadcasts.len()
+                    );
+                }
+            } // block
+        } // if at least 1 genesis period deep
     }
 
     pub fn generate_pre_hash(&mut self) {
@@ -2001,15 +2011,18 @@ mod tests {
     use log::info;
 
     use crate::core::consensus::block::{Block, BlockType};
+    use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::consensus::merkle::MerkleTree;
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
         Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
+        NOLAN_PER_SAITO,
     };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
+    use crate::core::util::test::node_tester::test::NodeTester;
     use crate::core::util::test::test_manager::test::TestManager;
 
     #[test]
@@ -2581,5 +2594,33 @@ mod tests {
         // assert_eq!(cv.expected_burnfee, 1104854);
         assert_eq!(cv.rebroadcasts.len(), 1);
         assert_eq!(cv.avg_nolan_rebroadcast_per_block, 10);
+    }
+
+    #[ignore]
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn atr_test_2() {
+        pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester.delete_blocks().await.unwrap();
+
+        let public_key = tester.get_public_key().await;
+        tester
+            .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 100)
+            .await;
+        let issuance = vec![(public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO)];
+        tester.set_issuance(issuance).await.unwrap();
+
+        tester.init().await.unwrap();
+
+        tester.wait_till_block_id(1).await.unwrap();
+
+        for i in 1..GENESIS_PERIOD {
+            let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i + 1).await.unwrap();
+        }
+
+        tester.wait_till_block_id(GENESIS_PERIOD).await.unwrap();
     }
 }

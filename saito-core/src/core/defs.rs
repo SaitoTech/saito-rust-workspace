@@ -27,7 +27,7 @@ pub const NOLAN_PER_SAITO: Currency = 100_000_000;
 pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";
 
 #[cfg(test)]
-pub const GENESIS_PERIOD: u64 = 10;
+pub const GENESIS_PERIOD: u64 = 100;
 
 #[cfg(not(test))]
 pub const GENESIS_PERIOD: u64 = 100_000;
