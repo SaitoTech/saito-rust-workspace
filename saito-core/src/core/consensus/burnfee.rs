@@ -7,7 +7,6 @@ use crate::core::defs::{Currency, Timestamp};
 
 //
 // our target blocktime
-//
 pub const HEARTBEAT: Timestamp = Duration::from_secs(5).as_millis() as Timestamp;
 
 //
