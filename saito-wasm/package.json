@@ -43,5 +43,5 @@
     "node-fetch": "^3.3.0",
     "cross-env": "^7.0.3"
   },
-  "type": "commonjs"
+  "type": "module"
 }
