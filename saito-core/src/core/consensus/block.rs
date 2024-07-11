@@ -1219,7 +1219,7 @@ impl Block {
         cv: &mut ConsensusValues,
     ) {
         // if at least 1 genesis period deep
-        if self.id > GENESIS_PERIOD + 1 {
+        if self.id > GENESIS_PERIOD {
             debug!("calculating ATR");
 
             // which block needs to be rebroadcast?
@@ -1313,6 +1313,7 @@ impl Block {
                                         Transaction::create_rebroadcast_transaction(
                                             transaction,
                                             slip,
+                                            output.clone(),
                                         );
 
                                     // update cryptographic hash of all ATRs
@@ -2596,7 +2597,6 @@ mod tests {
         assert_eq!(cv.avg_nolan_rebroadcast_per_block, 10);
     }
 
-    #[ignore]
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test_2() {
@@ -2608,7 +2608,14 @@ mod tests {
         tester
             .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 100)
             .await;
-        let issuance = vec![(public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO)];
+        let issuance = vec![
+            (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50_000 * NOLAN_PER_SAITO,
+            ),
+        ];
         tester.set_issuance(issuance).await.unwrap();
 
         tester.init().await.unwrap();
@@ -2621,6 +2628,51 @@ mod tests {
             tester.wait_till_block_id(i + 1).await.unwrap();
         }
 
+        let wallet = tester.consensus_thread.wallet_lock.read().await;
+        let have_atr_slips = wallet
+            .slips
+            .iter()
+            .any(|(_, slip)| slip.slip_type == SlipType::ATR);
+        assert!(!have_atr_slips);
+        drop(wallet);
+
         tester.wait_till_block_id(GENESIS_PERIOD).await.unwrap();
+
+        let wallet = tester.consensus_thread.wallet_lock.read().await;
+        let atr_slip_count = wallet
+            .slips
+            .iter()
+            .filter(|(_, slip)| slip.slip_type == SlipType::ATR)
+            .count();
+        assert_eq!(atr_slip_count, 0);
+        drop(wallet);
+
+        let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
+        tester.add_transaction(tx).await;
+
+        tester.wait_till_block_id(GENESIS_PERIOD + 1).await.unwrap();
+
+        let wallet = tester.consensus_thread.wallet_lock.read().await;
+        let atr_slip_count = wallet
+            .slips
+            .iter()
+            .filter(|(_, slip)| slip.slip_type == SlipType::ATR)
+            .count();
+        assert_eq!(atr_slip_count, 1);
+        drop(wallet);
+
+        let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
+        tester.add_transaction(tx).await;
+
+        tester.wait_till_block_id(GENESIS_PERIOD + 2).await.unwrap();
+
+        let wallet = tester.consensus_thread.wallet_lock.read().await;
+        let atr_slip_count = wallet
+            .slips
+            .iter()
+            .filter(|(_, slip)| slip.slip_type == SlipType::ATR)
+            .count();
+        assert_eq!(atr_slip_count, 2);
+        drop(wallet);
     }
 }

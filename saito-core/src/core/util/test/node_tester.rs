@@ -115,12 +115,12 @@ pub mod test {
     }
 
     pub struct NodeTester {
-        consensus_thread: ConsensusThread,
-        routing_thread: RoutingThread,
-        mining_thread: MiningThread,
-        verification_thread: VerificationThread,
-        stat_thread: StatThread,
-        timer: Timer,
+        pub consensus_thread: ConsensusThread,
+        pub routing_thread: RoutingThread,
+        pub mining_thread: MiningThread,
+        pub verification_thread: VerificationThread,
+        pub stat_thread: StatThread,
+        pub timer: Timer,
         receiver_for_router: Receiver<RoutingEvent>,
         receiver_for_consensus: Receiver<ConsensusEvent>,
         receiver_for_miner: Receiver<MiningEvent>,

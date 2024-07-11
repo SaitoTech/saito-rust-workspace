@@ -183,7 +183,7 @@ impl Storage {
             if let Ok(lines) = self.io_interface.read_value(issuance_file).await {
                 let mut contents = String::from_utf8(lines).unwrap();
                 contents = contents.trim_end_matches('\r').to_string();
-                let lines: Vec<&str> = contents.split("\n").collect();
+                let lines: Vec<&str> = contents.split('\n').collect();
 
                 for line in lines {
                     let line = line.trim_end_matches('\r');

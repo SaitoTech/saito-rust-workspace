@@ -290,9 +290,8 @@ impl Transaction {
     /// ```
     pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
-        slip: Slip,
-        // with_fee: Currency,
-        // with_staking_subsidy: Currency,
+        to_slip: Slip,
+        from_slip: Slip,
     ) -> Transaction {
         let mut transaction = Transaction::default();
 
@@ -313,11 +312,11 @@ impl Transaction {
             transaction.data = transaction_to_rebroadcast.serialize_for_net().to_vec();
         }
 
-        //
+        transaction.add_from_slip(from_slip);
+
         // add the output slip
-        //
-        assert_eq!(slip.slip_type, SlipType::ATR);
-        transaction.add_to_slip(slip);
+        assert_eq!(to_slip.slip_type, SlipType::ATR);
+        transaction.add_to_slip(to_slip);
 
         // signature is the ORIGINAL signature. this transaction
         // will fail its signature check and then get analysed as
