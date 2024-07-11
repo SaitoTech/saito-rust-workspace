@@ -229,9 +229,10 @@ impl Wallet {
         }
 
         debug!(
-            "adding slip : {:?} with value : {:?} to wallet",
-            wallet_slip.utxokey.to_hex(),
-            wallet_slip.amount
+            "adding slip of type : {:?} with value : {:?} to wallet : {:?}",
+            wallet_slip.slip_type,
+            wallet_slip.amount,
+            wallet_slip.utxokey.to_hex()
         );
         self.slips.insert(wallet_slip.utxokey, wallet_slip);
         if let Some(network) = network {
