@@ -224,7 +224,7 @@ pub mod test {
                     stat_sender: sender_to_stat.clone(),
                     config_lock: configuration.clone(),
                     enabled: true,
-                    mining_iterations: 100,
+                    mining_iterations: 1,
                 },
                 verification_thread: VerificationThread {
                     sender_to_consensus: sender_to_consensus.clone(),
