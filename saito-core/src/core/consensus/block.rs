@@ -719,6 +719,10 @@ impl Block {
     pub fn generate(&mut self) -> bool {
         let creator_public_key = &self.creator;
 
+        self.total_rebroadcast_nolan = 0;
+        self.total_rebroadcast_slips = 0;
+        self.rebroadcast_hash = [0; 32];
+
         // allow transactions to generate themselves
         let _transactions_pre_calculated = &self
             .transactions
@@ -806,9 +810,11 @@ impl Block {
                     vbytes.extend(&transaction.serialize_for_signature());
                     self.rebroadcast_hash = hash(&vbytes);
 
-                    for input in transaction.from.iter() {
-                        self.total_rebroadcast_slips += 1;
-                        self.total_rebroadcast_nolan += input.amount;
+                    for slip in transaction.to.iter() {
+                        if matches!(slip.slip_type, SlipType::ATR) {
+                            self.total_rebroadcast_slips += 1;
+                            self.total_rebroadcast_nolan += slip.amount;
+                        }
                     }
                 }
                 TransactionType::BlockStake => {
@@ -1219,7 +1225,7 @@ impl Block {
         cv: &mut ConsensusValues,
     ) {
         // if at least 1 genesis period deep
-        if self.id > GENESIS_PERIOD + 1 {
+        if self.id > GENESIS_PERIOD {
             debug!("calculating ATR");
 
             // which block needs to be rebroadcast?
@@ -1302,7 +1308,8 @@ impl Block {
                                     let mut slip = output.clone();
                                     slip.slip_type = SlipType::ATR;
                                     slip.amount =
-                                        output.amount + atr_payout_for_slip - atr_fee_for_slip;
+                                        // output.amount +
+                                            atr_payout_for_slip - atr_fee_for_slip;
 
                                     cv.total_rebroadcast_staking_payouts_nolan +=
                                         atr_payout_for_slip;
@@ -1313,6 +1320,7 @@ impl Block {
                                         Transaction::create_rebroadcast_transaction(
                                             transaction,
                                             slip,
+                                            output.clone(),
                                         );
 
                                     // update cryptographic hash of all ATRs
@@ -1873,11 +1881,17 @@ impl Block {
         // which we counted in the generate_metadata() function, with the
         // expected number given the consensus values we calculated earlier.
         if cv.total_rebroadcast_slips != self.total_rebroadcast_slips {
-            error!("ERROR 624442: rebroadcast slips total incorrect");
+            error!(
+                "ERROR 624442: rebroadcast slips total incorrect. expected : {:?} actual : {:?}",
+                cv.total_rebroadcast_slips, self.total_rebroadcast_slips
+            );
             return false;
         }
         if cv.total_rebroadcast_nolan != self.total_rebroadcast_nolan {
-            error!("ERROR 294018: rebroadcast nolan amount incorrect");
+            error!(
+                "ERROR 294018: rebroadcast nolan amount incorrect. expected : {:?} actual : {:?}",
+                cv.total_rebroadcast_nolan, self.total_rebroadcast_nolan
+            );
             return false;
         }
         if cv.rebroadcast_hash != self.rebroadcast_hash {
@@ -2596,7 +2610,6 @@ mod tests {
         assert_eq!(cv.avg_nolan_rebroadcast_per_block, 10);
     }
 
-    #[ignore]
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test_2() {
@@ -2606,9 +2619,16 @@ mod tests {
 
         let public_key = tester.get_public_key().await;
         tester
-            .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 100)
+            .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
             .await;
-        let issuance = vec![(public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO)];
+        let issuance = vec![
+            (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50_000 * NOLAN_PER_SAITO,
+            ),
+        ];
         tester.set_issuance(issuance).await.unwrap();
 
         tester.init().await.unwrap();
@@ -2621,6 +2641,80 @@ mod tests {
             tester.wait_till_block_id(i + 1).await.unwrap();
         }
 
+        let wallet = tester.consensus_thread.wallet_lock.read().await;
+        let have_atr_slips = wallet
+            .slips
+            .iter()
+            .any(|(_, slip)| slip.slip_type == SlipType::ATR);
+        assert!(!have_atr_slips);
+        drop(wallet);
+
         tester.wait_till_block_id(GENESIS_PERIOD).await.unwrap();
+        {
+            let wallet = tester.consensus_thread.wallet_lock.read().await;
+            let atr_slip_count = wallet
+                .slips
+                .iter()
+                .filter(|(_, slip)| matches!(slip.slip_type, SlipType::ATR))
+                .count();
+            assert_eq!(atr_slip_count, 0);
+        }
+
+        {
+            let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
+            tester.add_transaction(tx).await;
+
+            tester.wait_till_block_id(GENESIS_PERIOD + 1).await.unwrap();
+
+            let wallet = tester.consensus_thread.wallet_lock.read().await;
+            let atr_slip_count = wallet
+                .slips
+                .iter()
+                .filter(|(_, slip)| matches!(slip.slip_type, SlipType::ATR))
+                .count();
+            // wallet only has slips owned by that public key
+            assert_eq!(atr_slip_count, 0);
+        }
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block = blockchain.get_latest_block().unwrap();
+            assert_eq!(blockchain.get_latest_block_id(), GENESIS_PERIOD + 1);
+            assert_eq!(block.id, GENESIS_PERIOD + 1);
+            let mut have_atr_tx = false;
+            for tx in block.transactions.iter() {
+                if tx.transaction_type == TransactionType::ATR {
+                    have_atr_tx = true;
+                }
+            }
+            assert!(have_atr_tx);
+        }
+
+        {
+            let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
+            tester.add_transaction(tx).await;
+
+            tester.wait_till_block_id(GENESIS_PERIOD + 2).await.unwrap();
+
+            let wallet = tester.consensus_thread.wallet_lock.read().await;
+            let atr_slip_count = wallet
+                .slips
+                .iter()
+                .filter(|(_, slip)| matches!(slip.slip_type, SlipType::ATR))
+                .count();
+            assert_eq!(atr_slip_count, 1);
+        }
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block = blockchain.get_latest_block().unwrap();
+            assert_eq!(blockchain.get_latest_block_id(), GENESIS_PERIOD + 2);
+            assert_eq!(block.id, GENESIS_PERIOD + 2);
+            let mut have_atr_tx = false;
+            for tx in block.transactions.iter() {
+                if tx.transaction_type == TransactionType::ATR {
+                    have_atr_tx = true;
+                }
+            }
+            assert!(have_atr_tx);
+        }
     }
 }
