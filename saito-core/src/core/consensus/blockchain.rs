@@ -16,7 +16,7 @@ use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDATED};
 use crate::core::defs::{
-    BlockHash, BlockId, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
+    BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
     Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
     MIN_GOLDEN_TICKETS_NUMERATOR, NOLAN_PER_SAITO, PRUNE_AFTER_BLOCKS,
 };
@@ -590,8 +590,8 @@ impl Blockchain {
         }
     }
 
-    pub fn generate_fork_id(&self, block_id: u64) -> SaitoHash {
-        let mut fork_id = [0; 32];
+    pub fn generate_fork_id(&self, block_id: u64) -> ForkId {
+        let mut fork_id: ForkId = [0; 32];
         let mut current_block_id = block_id;
 
         // roll back to last even 10 blocks
@@ -1843,9 +1843,10 @@ mod tests {
     };
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{PrintForLog, SaitoPublicKey};
+    use crate::core::defs::{ForkId, PrintForLog, SaitoPublicKey, NOLAN_PER_SAITO};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, hash};
+    use crate::core::util::test::node_tester::test::NodeTester;
     use crate::core::util::test::test_manager::test::TestManager;
 
     // fn init_testlog() {
@@ -3271,5 +3272,69 @@ mod tests {
             let calculate_hash = hash(&buf);
             assert_eq!(block2.hash, calculate_hash);
         }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn ghost_chain_content_test() {
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        let fork_id_1: ForkId = tester.get_fork_id(1).await;
+        tester.wait_till_block_id_with_txs(10, 10, 0).await.unwrap();
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_fork_id_difference() {
+        pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        let fork_id_1 = tester.get_fork_id(1).await;
+
+        tester.wait_till_block_id_with_txs(10, 10, 0).await.unwrap();
+
+        let fork_id_10 = tester.get_fork_id(10).await;
+        assert_ne!(fork_id_1.to_hex(), fork_id_10.to_hex());
+
+        tester
+            .wait_till_block_id_with_txs(100, 10, 10)
+            .await
+            .unwrap();
+
+        let fork_id_100 = tester.get_fork_id(100).await;
+        assert_ne!(fork_id_10.to_hex(), fork_id_100.to_hex());
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_block_generation_without_fees() {
+        pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        tester.wait_till_block_id_with_txs(100, 0, 0).await.unwrap()
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_block_generation_with_fees() {
+        pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        tester.wait_till_block_id_with_txs(5, 0, 10).await.unwrap()
     }
 }

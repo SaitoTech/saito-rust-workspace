@@ -544,9 +544,9 @@ impl Wallet {
             }
 
             if collected_from_unspent < required_from_unspent {
-                info!("couldn't collect enough funds upto requested staking amount. requested: {:?}, collected: {:?} required_from_unspent: {:?}",
+                warn!("couldn't collect enough funds upto requested staking amount. requested: {:?}, collected: {:?} required_from_unspent: {:?}",
                     staking_amount,collected_amount,required_from_unspent);
-                info!("wallet balance : {:?}", self.available_balance);
+                warn!("wallet balance : {:?}", self.available_balance);
                 return Err(Error::from(ErrorKind::NotFound));
             }
 
@@ -576,7 +576,7 @@ impl Wallet {
             if should_break_slips {
                 slip_count = 2;
             }
-            for _ in 0..slip_count {
+            {
                 let mut output: Slip = Default::default();
                 output.amount = amount / slip_count;
                 remainder -= output.amount;

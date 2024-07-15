@@ -1968,18 +1968,6 @@ impl Block {
         let transactions_valid = iterate!(self.transactions, 100)
             .all(|tx: &Transaction| tx.validate(utxoset, blockchain));
 
-        // let mut transactions_valid = true;
-        // for tx in self.transactions.iter() {
-        //     if !tx.validate(utxoset) {
-        //         transactions_valid = false;
-        //         error!(
-        //             "tx : {:?} of type : {:?} is not valid",
-        //             hex::encode(tx.signature),
-        //             tx.transaction_type
-        //         );
-        //         break;
-        //     }
-        // }
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");
         }
@@ -2613,7 +2601,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test_2() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         let mut tester = NodeTester::default();
         tester.delete_blocks().await.unwrap();
 

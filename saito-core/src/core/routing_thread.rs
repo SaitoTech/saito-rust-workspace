@@ -4,7 +4,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
@@ -237,6 +237,24 @@ impl RoutingThread {
                 .unwrap();
         }
 
+        let ghost = Self::generate_ghost_chain(block_id, fork_id, blockchain, peer_public_key);
+
+        debug!("sending ghost chain to peer : {:?}", peer_index);
+        // debug!("ghost : {:?}", ghost);
+        let buffer = Message::GhostChain(ghost).serialize();
+        self.network
+            .io_interface
+            .send_message(peer_index, buffer.as_slice())
+            .await
+            .unwrap();
+    }
+
+    pub(crate) fn generate_ghost_chain(
+        block_id: u64,
+        fork_id: SaitoHash,
+        blockchain: RwLockReadGuard<Blockchain>,
+        peer_public_key: SaitoPublicKey,
+    ) -> GhostChainSync {
         let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
 
         debug!("last_shared_ancestor 1 : {:?}", last_shared_ancestor);
@@ -288,15 +306,7 @@ impl RoutingThread {
                 }
             }
         }
-
-        debug!("sending ghost chain to peer : {:?}", peer_index);
-        // debug!("ghost : {:?}", ghost);
-        let buffer = Message::GhostChain(ghost).serialize();
-        self.network
-            .io_interface
-            .send_message(peer_index, buffer.as_slice())
-            .await
-            .unwrap();
+        ghost
     }
 
     async fn handle_new_peer(&mut self, peer_index: u64) {

@@ -241,6 +241,7 @@ async fn run_mining_event_processor(
         timer: time_keeper_origin.clone(),
         miner_active: false,
         target: [0; 32],
+        target_id: 0,
         difficulty: 0,
         public_key: [0; 33],
         mined_golden_tickets: 0,
@@ -248,6 +249,7 @@ async fn run_mining_event_processor(
         config_lock: context.config_lock.clone(),
         enabled: true,
         mining_iterations: 10_000,
+        mining_start: 0,
     };
 
     let (interface_sender_to_miner, interface_receiver_for_miner) =
