@@ -209,7 +209,7 @@ impl Slip {
                 None => {
                     // debug!() since method is used to check when cleaning up mempool
                     debug!(
-                        "not in utxoset so invalid. value is returned false: {:?} slip type : {:?} block : {:?} tx : {:?} index : {:?} and amount : {:?}",
+                        "not in utxoset so invalid. value is returned false: {:?}, slip type : {:?}, block : {:?}, tx : {:?}, index : {:?}, and amount : {:?}",
                         self.utxoset_key.to_hex(),
                         self.slip_type,
                         self.block_id,

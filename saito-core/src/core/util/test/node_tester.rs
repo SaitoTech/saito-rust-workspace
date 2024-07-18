@@ -30,7 +30,7 @@ pub mod test {
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
     use crate::core::verification_thread::{VerificationThread, VerifyRequest};
-    use log::{debug, info};
+    use log::info;
     use serde::Deserialize;
     use std::io::Error;
     use std::ops::DerefMut;
