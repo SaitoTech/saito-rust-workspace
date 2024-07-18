@@ -1,15 +1,15 @@
-use std::io::{Error, ErrorKind};
-
 use figment::providers::{Format, Json};
 use figment::Figment;
 use log::{debug, error};
-use serde::Deserialize;
-
 use saito_core::core::util::configuration::{
     BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
 };
+use serde::{Deserialize, Serialize};
+use std::io::{Error, ErrorKind};
+use std::path::Path;
+use tokio::io::AsyncWriteExt;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct NodeConfigurations {
     server: Server,
     peers: Vec<PeerConfig>,
@@ -18,25 +18,31 @@ pub struct NodeConfigurations {
     spv_mode: Option<bool>,
 }
 
-impl NodeConfigurations {}
+impl NodeConfigurations {
+    pub fn write_to_file(&self, config_file_path: String) -> Result<(), Error> {
+        let file = std::fs::File::create(config_file_path)?;
+        serde_json::to_writer_pretty(&file, &self)?;
+        Ok(())
+    }
+}
 impl Default for NodeConfigurations {
     fn default() -> Self {
         NodeConfigurations {
             server: Server {
-                host: "".to_string(),
-                port: 0,
-                protocol: "".to_string(),
+                host: "127.0.0.1".to_string(),
+                port: 12101,
+                protocol: "http".to_string(),
                 endpoint: Endpoint {
-                    host: "".to_string(),
-                    port: 0,
-                    protocol: "".to_string(),
+                    host: "127.0.0.1".to_string(),
+                    port: 12101,
+                    protocol: "http".to_string(),
                 },
-                verification_threads: 0,
-                channel_size: 0,
-                stat_timer_in_ms: 0,
-                thread_sleep_time_in_ms: 0,
-                block_fetch_batch_size: 0,
-                reconnection_wait_time: 0,
+                verification_threads: 4,
+                channel_size: 1000,
+                stat_timer_in_ms: 5000,
+                thread_sleep_time_in_ms: 10,
+                block_fetch_batch_size: 10,
+                reconnection_wait_time: 10,
             },
             peers: vec![],
             lite: false,
@@ -92,13 +98,17 @@ impl ConfigHandler {
             config_file_path,
             std::env::current_dir()
         );
+        if !Path::new(config_file_path.as_str()).exists() {
+            let configs = NodeConfigurations::default();
+            configs.write_to_file(config_file_path.to_string())?;
+        }
         // TODO : add prompt with user friendly format
         let configs = Figment::new()
             .merge(Json::file(config_file_path))
             .extract::<NodeConfigurations>();
 
         if configs.is_err() {
-            error!("{:?}", configs.err().unwrap());
+            error!("failed loading configs. {:?}", configs.err().unwrap());
             return Err(std::io::Error::from(ErrorKind::InvalidInput));
         }
 
@@ -116,7 +126,7 @@ mod test {
 
     #[test]
     fn load_config_from_existing_file() {
-        let path = String::from("saito-rust/src/test/data/config_handler_tests.json");
+        let path = String::from("src/test/data/config_handler_tests.json");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_ok());
         let configs = result.unwrap();
@@ -142,7 +152,7 @@ mod test {
 
     #[test]
     fn load_config_from_bad_file_format() {
-        let path = String::from("saito-rust/src/test/data/config_handler_tests_bad_format.xml");
+        let path = String::from("src/test/data/config_handler_tests_bad_format.xml");
         let result = ConfigHandler::load_configs(path);
         assert!(result.is_err());
         assert_eq!(result.err().unwrap().kind(), ErrorKind::InvalidInput);
@@ -150,9 +160,8 @@ mod test {
 
     #[test]
     fn load_config_from_non_existing_file() {
-        let path = String::from("badfilename.json");
+        let path = String::from("config/new_file_to_write.json");
         let result = ConfigHandler::load_configs(path);
-        assert!(result.is_err());
-        assert_eq!(result.err().unwrap().kind(), ErrorKind::InvalidInput);
+        assert!(result.is_ok());
     }
 }

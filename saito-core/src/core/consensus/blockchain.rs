@@ -18,7 +18,7 @@ use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDA
 use crate::core::defs::{
     BlockHash, BlockId, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
     Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
-    MIN_GOLDEN_TICKETS_NUMERATOR, NOLAN_PER_SAITO, PRUNE_AFTER_BLOCKS,
+    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
