@@ -18,7 +18,7 @@ use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDA
 use crate::core::defs::{
     BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
     Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
-    MIN_GOLDEN_TICKETS_NUMERATOR, NOLAN_PER_SAITO, PRUNE_AFTER_BLOCKS,
+    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -1841,7 +1841,7 @@ mod tests {
     use crate::core::consensus::blockchain::{
         bit_pack, bit_unpack, AddBlockResult, Blockchain, DEFAULT_SOCIAL_STAKE,
     };
-    use crate::core::consensus::slip::Slip;
+    use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{ForkId, PrintForLog, SaitoPublicKey, NOLAN_PER_SAITO};
     use crate::core::io::storage::Storage;
@@ -3336,5 +3336,30 @@ mod tests {
             .unwrap();
 
         tester.wait_till_block_id_with_txs(5, 0, 10).await.unwrap()
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_block_generation_without_fees_with_values() {
+        pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        tester
+            .wait_till_block_id_with_txs(200, 10, 0)
+            .await
+            .unwrap();
+        {
+            let wallet = tester.routing_thread.wallet_lock.read().await;
+            let atr_slip_count = wallet
+                .slips
+                .iter()
+                .filter(|(_, slip)| matches!(slip.slip_type, SlipType::ATR))
+                .count();
+            assert!(atr_slip_count > 0);
+        }
     }
 }

@@ -13,7 +13,7 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{PrintForLog, SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT};
+use crate::core::defs::{BlockId, PrintForLog, SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT};
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::io::storage::Storage;
@@ -28,10 +28,20 @@ pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_millis() a
 
 #[derive(Debug)]
 pub enum ConsensusEvent {
-    NewGoldenTicket { golden_ticket: GoldenTicket },
-    BlockFetched { peer_index: u64, block: Block },
-    NewTransaction { transaction: Transaction },
-    NewTransactions { transactions: Vec<Transaction> },
+    NewGoldenTicket {
+        golden_ticket: GoldenTicket,
+        block_id: BlockId,
+    },
+    BlockFetched {
+        peer_index: u64,
+        block: Block,
+    },
+    NewTransaction {
+        transaction: Transaction,
+    },
+    NewTransactions {
+        transactions: Vec<Transaction>,
+    },
 }
 
 pub struct ConsensusStats {
@@ -273,10 +283,14 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
         // println!("process_event : {:?}", event.type_id());
         return match event {
-            ConsensusEvent::NewGoldenTicket { golden_ticket } => {
+            ConsensusEvent::NewGoldenTicket {
+                golden_ticket,
+                block_id,
+            } => {
                 debug!(
-                    "received new golden ticket : {:?}",
-                    golden_ticket.target.to_hex()
+                    "received new golden ticket : {:?} for target block : {:?}",
+                    golden_ticket.target.to_hex(),
+                    block_id
                 );
 
                 let mut mempool = self.mempool_lock.write().await;

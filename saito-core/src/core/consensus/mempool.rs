@@ -92,10 +92,9 @@ impl Mempool {
             );
             return;
         }
+        debug!("golden ticket added to mempool");
         self.golden_tickets
             .insert(gt.target, (golden_ticket, false));
-
-        debug!("golden ticket added to mempool");
     }
     pub async fn add_transaction_if_validates(
         &mut self,
@@ -192,11 +191,12 @@ impl Mempool {
             .can_bundle_block(blockchain, current_timestamp, &gt_tx, configs, &public_key)
             .await?;
         info!(
-            "bundling block with {:?} txs with work : {:?} with a gap of {:?} seconds. timestamp : {:?}",
+            "bundling block with {:?} txs with work : {:?} with a gap of {:?} seconds. timestamp : {:?} with gt : {:?}",
             self.transactions.len(),
             mempool_work,
             block_timestamp_gap,
-            current_timestamp
+            current_timestamp,
+            gt_tx.is_some()
         );
 
         let staking_tx;
@@ -302,7 +302,7 @@ impl Mempool {
             configs.is_browser(),
             configs.is_spv_mode(),
         ) {
-            trace!("waiting till more golden tickets come in");
+            debug!("waiting till more golden tickets come in");
             return None;
         }
 

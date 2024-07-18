@@ -76,7 +76,10 @@ impl MiningThread {
             self.miner_active = false;
             self.mined_golden_tickets += 1;
             self.sender_to_mempool
-                .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
+                .send(ConsensusEvent::NewGoldenTicket {
+                    golden_ticket: gt,
+                    block_id: self.target_id,
+                })
                 .await
                 .expect("sending to mempool failed");
             return true;

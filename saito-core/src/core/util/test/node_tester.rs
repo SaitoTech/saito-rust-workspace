@@ -6,13 +6,13 @@ pub mod test {
     use crate::core::consensus::context::Context;
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peer_collection::PeerCollection;
-    use crate::core::consensus::slip::SlipType;
+
     use crate::core::consensus::transaction::Transaction;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
     use crate::core::defs::{
         BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPrivateKey, StatVariable,
-        NOLAN_PER_SAITO, STAT_BIN_COUNT,
+        STAT_BIN_COUNT,
     };
     use crate::core::defs::{SaitoPublicKey, Timestamp};
     use crate::core::io::network::Network;
@@ -30,10 +30,10 @@ pub mod test {
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
     use crate::core::verification_thread::{VerificationThread, VerifyRequest};
-    use log::info;
+    use log::{debug, info};
     use serde::Deserialize;
     use std::io::Error;
-    use std::ops::{Deref, DerefMut};
+    use std::ops::DerefMut;
     use std::sync::Arc;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::sync::mpsc::Receiver;
@@ -358,7 +358,9 @@ pub mod test {
                     }
                 }
 
-                self.run_event_loop_once().await;
+                for _ in 0..100 {
+                    self.run_event_loop_once().await;
+                }
 
                 if time_keeper.get_timestamp_in_ms() > timeout {
                     panic!("request timed out");
@@ -367,6 +369,7 @@ pub mod test {
 
             Ok(())
         }
+
         pub async fn wait_till_block_id_with_txs(
             &mut self,
             wait_till_block_id: BlockId,
