@@ -98,7 +98,11 @@ impl ConfigHandler {
             config_file_path,
             std::env::current_dir()
         );
-        if !Path::new(config_file_path.as_str()).exists() {
+        let path = Path::new(config_file_path.as_str());
+        if !path.exists() {
+            if path.parent().is_some() {
+                std::fs::create_dir_all(path.parent().unwrap())?;
+            }
             let configs = NodeConfigurations::default();
             configs.write_to_file(config_file_path.to_string())?;
         }
