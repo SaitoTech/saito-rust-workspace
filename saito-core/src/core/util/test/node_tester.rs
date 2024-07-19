@@ -6,7 +6,7 @@ pub mod test {
     use crate::core::consensus::context::Context;
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peer_collection::PeerCollection;
-    
+
     use crate::core::consensus::transaction::Transaction;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -32,7 +32,7 @@ pub mod test {
     use log::info;
     use serde::Deserialize;
     use std::io::Error;
-    use std::ops::{DerefMut};
+    use std::ops::DerefMut;
     use std::sync::Arc;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::sync::mpsc::Receiver;
