@@ -1,6 +1,6 @@
 use figment::providers::{Format, Json};
 use figment::Figment;
-use log::{debug, error};
+use log::{debug, error, info};
 use saito_core::core::util::configuration::{
     BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
 };
@@ -100,6 +100,7 @@ impl ConfigHandler {
         );
         let path = Path::new(config_file_path.as_str());
         if !path.exists() {
+            info!("writing default config file to : {:?}", config_file_path);
             if path.parent().is_some() {
                 std::fs::create_dir_all(path.parent().unwrap())?;
             }
