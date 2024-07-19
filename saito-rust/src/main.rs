@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{crate_version, App, Arg};
-use log::info;
 use log::{debug, error};
+use log::{info, LevelFilter};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::select;
@@ -509,7 +509,9 @@ fn setup_log() {
     // switch to this for instrumentation
     // console_subscriber::init();
 
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+        .from_env_lossy();
     let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());
