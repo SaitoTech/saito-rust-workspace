@@ -342,7 +342,7 @@ async fn run_routing_event_processor(
     fetch_batch_size: usize,
     time_keeper_origin: &Timer,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let mut routing_event_processor = RoutingThread {
+    let routing_event_processor = RoutingThread {
         blockchain_lock: context.blockchain_lock.clone(),
         mempool_lock: context.mempool_lock.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
@@ -509,7 +509,9 @@ fn setup_log() {
     // switch to this for instrumentation
     // console_subscriber::init();
 
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let filter = tracing_subscriber::EnvFilter::builder()
+        .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+        .from_env_lossy();
     let filter = filter.add_directive(Directive::from_str("tokio_tungstenite=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("tungstenite=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("mio::poll=info").unwrap());

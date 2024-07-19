@@ -2025,7 +2025,7 @@ mod tests {
     use log::info;
 
     use crate::core::consensus::block::{Block, BlockType};
-    use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
+
     use crate::core::consensus::merkle::MerkleTree;
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
