@@ -501,9 +501,24 @@ impl Block {
 	//
         block.merkle_root = block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
 
+
+	//
+	// the "pre-hash" is a hash value created from all of the consensus-data and is 
+	// signed by the block creator to generate the signature. the signature is then 
+	// part of the block data that is used to generate the final block hash.
+	//
+	// now that we have updated all of our consensus variables, we generate the pre-
+	// hash and then sign the block with our private key.
+	//
         block.generate_pre_hash();
         block.sign(private_key);
-        // finally, we regenerate pre-hash given signature, etc.
+
+
+	//
+	// TODO -- is this appropriate to run
+	//
+        // finally we run generate()
+	//
         block.generate();
 
         block
@@ -758,7 +773,9 @@ impl Block {
         self.total_rebroadcast_slips = 0;
         self.rebroadcast_hash = [0; 32];
 
+	//
         // allow transactions to generate themselves
+	//
         let _transactions_pre_calculated = &self
             .transactions
             .iter_mut()
