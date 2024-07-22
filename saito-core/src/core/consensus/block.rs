@@ -175,7 +175,7 @@ pub struct Block {
     pub merkle_root: [u8; 32],
     #[serde_as(as = "[_; 64]")]
     pub signature: [u8; 64],
-    pub limbo: Currency,
+    pub graveyard: Currency,
     pub burnfee: Currency,
     pub difficulty: u64,
     pub treasury: Currency,
@@ -258,7 +258,7 @@ impl Block {
             creator: [0; 33],
             merkle_root: [0; 32],
             signature: [0; 64],
-            limbo: 0,
+            graveyard: 0,
             burnfee: 0,
             difficulty: 0,
             treasury: 0,
@@ -331,7 +331,7 @@ impl Block {
             previous_block_burnfee = previous_block.burnfee;
             previous_block_timestamp = previous_block.timestamp;
             previous_block_difficulty = previous_block.difficulty;
-            previous_block_treasury = previous_block.limbo;
+            previous_block_treasury = previous_block.graveyard;
             previous_block_staking_treasury = previous_block.treasury;
             previous_block_total_fees = previous_block.total_fees;
         }
@@ -445,7 +445,7 @@ impl Block {
         // TODO - we should consider deleting the treasury, if we do not use
         // it as a catch for any tokens removed for blocks where payouts
         // exceed variance permitted and payouts are deducted downwards.
-        block.limbo = 0;
+        block.graveyard = 0;
 
         // adjust staking treasury
         if cv.staking_payout != 0 {
@@ -609,7 +609,7 @@ impl Block {
         block.creator = creator;
         block.merkle_root = merkle_root;
         block.signature = signature;
-        block.limbo = treasury;
+        block.graveyard = treasury;
         block.burnfee = burnfee;
         block.difficulty = difficulty;
         block.treasury = staking_treasury;
@@ -1396,7 +1396,7 @@ impl Block {
             self.previous_block_hash.as_slice(),
             self.creator.as_slice(),
             self.merkle_root.as_slice(),
-            self.limbo.to_be_bytes().as_slice(),
+            self.graveyard.to_be_bytes().as_slice(),
             self.treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
@@ -1418,8 +1418,8 @@ impl Block {
     /// [creator - 33 bytes - Secp25k1 pubkey compact format]
     /// [merkle_root - 32 bytes - SHA 256 hash
     /// [signature - 64 bytes - Secp25k1 sig]
+    /// [graveyard - 8 bytes - u64]
     /// [treasury - 8 bytes - u64]
-    /// [staking_treasury - 8 bytes - u64]
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
     /// [avg_income - 8 bytes - u64]
@@ -1449,7 +1449,7 @@ impl Block {
             self.creator.as_slice(),
             self.merkle_root.as_slice(),
             self.signature.as_slice(),
-            self.limbo.to_be_bytes().as_slice(),
+            self.graveyard.to_be_bytes().as_slice(),
             self.treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
@@ -1619,7 +1619,7 @@ impl Block {
         block.creator = self.creator;
         block.burnfee = self.burnfee;
         block.difficulty = self.difficulty;
-        block.limbo = self.limbo;
+        block.graveyard = self.graveyard;
         block.treasury = self.treasury;
         block.signature = self.signature;
         block.avg_income = self.avg_income;
@@ -1770,16 +1770,14 @@ impl Block {
                 return false;
             }
 
-            // treasury - TODO remove if we are not going to use this. leaving it in
-            // for now as it is a good place to put any NOLAN that get removed because
-            // of deflationary pressures or attacks that push consensus into not issuing
-            // a full payout.
-            if self.limbo != 0 {
+            // graveyard - this is where we store any NOLAN that is removed from circulation
+	    // because distributing it could push attacks into profitability for attackers
+            if self.graveyard != 0 {
                 error!(
-                    "ERROR 123243: treasury is positive. expected : {:?} + {:?} = {:?} actual : {:?} found",
-                    previous_block.limbo , 0 ,
-                    (previous_block.limbo + 0) ,
-                    self.limbo,
+                    "ERROR 123243: graveyard is positive. expected : {:?} + {:?} = {:?} actual : {:?} found",
+                    previous_block.graveyard , 0 ,
+                    (previous_block.graveyard + 0) ,
+                    self.graveyard,
                 );
                 return false;
             }
@@ -2036,7 +2034,7 @@ mod tests {
         assert_eq!(block.creator, [0; 33]);
         assert_eq!(block.merkle_root, [0; 32]);
         assert_eq!(block.signature, [0; 64]);
-        assert_eq!(block.limbo, 0);
+        assert_eq!(block.graveyard, 0);
         assert_eq!(block.burnfee, 0);
         assert_eq!(block.difficulty, 0);
         assert_eq!(block.transactions, vec![]);
@@ -2094,7 +2092,7 @@ mod tests {
         .unwrap();
         block.burnfee = 50000000;
         block.difficulty = 0;
-        block.limbo = 0;
+        block.graveyard = 0;
         block.treasury = 0;
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
@@ -2147,7 +2145,7 @@ mod tests {
         block.creator = [2; 33];
         block.merkle_root = [0; 32];
         block.signature = [4; 64];
-        block.limbo = 1_000_000;
+        block.graveyard = 1_000_000;
         block.burnfee = 2;
         block.difficulty = 3;
         block.transactions = vec![mock_tx, mock_tx2];
@@ -2171,7 +2169,7 @@ mod tests {
         assert_eq!(deserialized_block.creator, [2; 33]);
         assert_ne!(deserialized_block.merkle_root, [0; 32]);
         assert_eq!(deserialized_block.signature, [4; 64]);
-        assert_eq!(deserialized_block.limbo, 1_000_000);
+        assert_eq!(deserialized_block.graveyard, 1_000_000);
         assert_eq!(deserialized_block.burnfee, 2);
         assert_eq!(deserialized_block.difficulty, 3);
 
@@ -2186,7 +2184,7 @@ mod tests {
         assert_eq!(deserialized_block_header.creator, [2; 33]);
         assert_ne!(deserialized_block_header.merkle_root, [0; 32]);
         assert_eq!(deserialized_block_header.signature, [4; 64]);
-        assert_eq!(deserialized_block_header.limbo, 1_000_000);
+        assert_eq!(deserialized_block_header.graveyard, 1_000_000);
         assert_eq!(deserialized_block_header.burnfee, 2);
         assert_eq!(deserialized_block_header.difficulty, 3);
 
@@ -2199,7 +2197,7 @@ mod tests {
             lite_block.previous_block_hash.to_hex()
         );
         assert_eq!(block.creator, lite_block.creator);
-        assert_eq!(block.limbo, lite_block.limbo);
+        assert_eq!(block.graveyard, lite_block.graveyard);
         assert_eq!(block.treasury, lite_block.treasury);
         assert_eq!(block.burnfee, lite_block.burnfee);
         assert_eq!(block.difficulty, lite_block.difficulty);
