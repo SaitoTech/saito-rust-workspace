@@ -81,7 +81,7 @@ pub struct ConsensusValues {
     pub treasury_contribution: Currency ,
     // amount to add to staker treasury in block
     pub graveyard_contribution: Currency ,
-    // amount to add to staker treasury in block
+    // amount to add to staker treasury in block DEPRECATED
     pub staking_payout: Currency,
     #[serde(skip)]
     // average income
@@ -117,7 +117,7 @@ impl ConsensusValues {
 	    graveyard_contribution: 0,
 	    treasury_contribution: 0,
             nolan_falling_off_chain: 0,
-            staking_payout: 0,
+            staking_payout: 0,				// DEPRECATED
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -143,8 +143,10 @@ impl ConsensusValues {
             total_rebroadcast_fees_nolan: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
             rebroadcast_hash: [0; 32],
+	    graveyard_contribution: 0,
+	    treasury_contribution: 0,
             nolan_falling_off_chain: 0,
-            staking_payout: 0,
+            staking_payout: 0,				// DEPRECATED
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -486,27 +488,20 @@ impl Block {
 	//
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
-	//
-        // treasury = tokens collected for ATR and miner payouts
-	//
-        if cv.staking_payout != 0 {
-            debug!(
-                "adding staking payout : {:?} to treasury : {:?}",
-                cv.staking_payout, block.treasury
-            );
-            block.treasury += cv.staking_payout;
-        }
-        if cv.total_rebroadcast_staking_payouts_nolan != 0
-            && block.treasury >= cv.total_rebroadcast_staking_payouts_nolan
-        {
-            block.treasury -= cv.total_rebroadcast_staking_payouts_nolan;
-        }
+        //
+        // treasury 
+        //          
+        block.treasury = previous_block_treasury + cv.treasury_contribution - cv.total_rebroadcast_staking_payouts_nolan;
 
+	//
+	// graveyard
+	//
+        block.graveyard = previous_block_graveyard + cv.graveyard_contribution;
+                
 	//
         // generate merkle root
 	//
         block.merkle_root = block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
-
 
 	//
 	// the "pre-hash" is a hash value created from all of the consensus-data and is 
@@ -1033,8 +1028,12 @@ impl Block {
         // this sets avg_nolan_rebroadcast_per_block, but does not update it to reflect the current
         // new status. this permits us to use the value to calculate the ATR payouts in the next
         // step.
+	//
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-            // burn fee is "block production difficulty" (fee lockup cost)
+
+	    //
+	    // burn fee
+	    //
             cv.expected_burnfee = BurnFee::calculate_burnfee_for_block(
                 previous_block.burnfee,
                 self.timestamp,
@@ -1042,7 +1041,7 @@ impl Block {
             );
 
 	    //
-            // difficulty is "mining difficulty" (payout unlock cost)
+            // difficulty
             //
             // we increase difficulty if two blocks in a row have golden tickets and decrease
             // it if two blocks in a row do not have golden ticket. this targets a difficulty
@@ -1057,7 +1056,7 @@ impl Block {
             }
 
 	    //
-            // average income
+            // average income = smoothed fees per block
             //
             // we set these figures according to the values in the previous block,
             // and then adjust them according to the values from this block.
@@ -1071,12 +1070,16 @@ impl Block {
                 / GENESIS_PERIOD as i128;
             cv.avg_income = (cv.avg_income as i128 - adjustment) as Currency;
         } else {
+
+	    //
             // if there is no previous block, the burn fee is not adjusted. validation
             // rules will cause the block to fail unless it is the first block. average
             // income is set to whatever the block avg_income is set to.
+	    //
             cv.avg_income = self.avg_income;
             cv.expected_burnfee = self.burnfee;
             cv.expected_difficulty = self.difficulty;
+
         }
 
 	//
@@ -1091,6 +1094,7 @@ impl Block {
         // note that we cannot move this above the ATR section as we use the
         // value of this variable (from the last block) to figure out what the
         // ATR payout should be in this block.
+	//
         let adjustment = (cv.avg_nolan_rebroadcast_per_block as i128
             - cv.total_rebroadcast_nolan as i128)
             / GENESIS_PERIOD as i128;
@@ -1114,7 +1118,7 @@ impl Block {
         //
         // if this block contains a golden ticket:
         //
-        //    - 50% of previous block to treasury (miner)
+        //    - 50% of previous block to treasury
         //    - 50% of previous block to routing node
         //
         //    if previous block contains a golden ticket:
@@ -1123,7 +1127,7 @@ impl Block {
         //
         //    if previous block does not contain a golden ticket:
         //
-        //	  - 50% of previous previous block to treasury (staker)
+        //	  - 50% of previous previous block to treasury
         //    	  - 50% of previous previous block to routing node
         //
         // if this block does not contain a golden ticket:
@@ -1134,8 +1138,8 @@ impl Block {
         //
         //    if previous block does not contain a golden ticket
         //
-        //        - 50% of previous previous block to graveyard
-        //        - 50% of previous previous block to graveyard
+        //        - 50% of previous_previous block to graveyard
+        //        - 50% of previous_previous block to graveyard
         //
         // note that all payouts are capped at 150% of the long-term average block fees
         // collected by the network. this is done in order to prevent attackers from
@@ -1891,10 +1895,7 @@ impl Block {
 
 
 	//
-	// should these be checked from values in generate_consensus_values?
-        //
-        // consensus values -> difficulty
-        // consensus values -> burn fee
+        // consensus values => difficulty
         //
         if cv.expected_difficulty != self.difficulty {
             error!(
@@ -1904,8 +1905,6 @@ impl Block {
             return false;
         }
 
-
-
 	//
         // many kinds of validation like the burn fee and the golden ticket solution
         // require the existence of the previous block in order to validate. we put all
@@ -1913,7 +1912,12 @@ impl Block {
         //
         // if no previous block exists, we are valid only in a limited number of
         // circumstances, such as this being the first block we are adding to our chain.
+	//
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+
+	    //
+	    // ghost blocks
+	    //
             if let BlockType::Ghost = previous_block.block_type {
                 return true;
             }
@@ -1922,12 +1926,8 @@ impl Block {
             // treasury
 	    //
             let mut expected_treasury = previous_block.treasury;
-            expected_treasury += cv.staking_payout;
-            if expected_treasury >= cv.total_rebroadcast_staking_payouts_nolan {
-                expected_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
-            } else {
-                expected_treasury = 0;
-            }
+            expected_treasury += cv.treasury_contribution;
+            expected_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
 
             if self.treasury != expected_treasury {
                 error!(
@@ -1940,12 +1940,12 @@ impl Block {
 	    //
             // graveyard - sponge for any NOLAN removed from circulation
             //
-	    if self.graveyard != 0 {
+            let mut expected_graveyard = previous_block.graveyard;
+            expected_graveyard += cv.graveyard_contribution;
+	    if self.graveyard != expected_graveyard {
                 error!(
-                    "ERROR 123243: graveyard is positive. expected : {:?} + {:?} = {:?} actual : {:?} found",
-                    previous_block.graveyard , 0 ,
-                    (previous_block.graveyard + 0) ,
-                    self.graveyard,
+                    "ERROR 123243: graveyard does not validate: {} expected versus {} found",
+                    expected_graveyard, self.graveyard,
                 );
                 return false;
             }
