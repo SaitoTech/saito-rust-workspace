@@ -321,6 +321,7 @@ impl Block {
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
     ) -> Block {
+
         debug!(
             "Block::create : previous block hash : {:?}",
             previous_block_hash.to_hex()
@@ -344,75 +345,69 @@ impl Block {
             previous_block_total_fees = previous_block.total_fees;
         }
 
+
+	//
+	// create block
+	//
         let mut block = Block::new();
 
-        let current_burnfee: Currency = BurnFee::calculate_burnfee_for_block(
+        block.id = previous_block_id + 1;
+        block.previous_block_hash = previous_block_hash;
+        block.timestamp = current_timestamp;
+        block.difficulty = previous_block_difficulty;
+        block.creator = *public_key;
+        block.previous_block_unpaid = previous_block_total_fees;
+	block.graveyard = previous_block_graveyard;
+
+	//
+	// burnfee
+	//
+        block.burnfee = BurnFee::calculate_burnfee_for_block(
             previous_block_burnfee,
             current_timestamp,
             previous_block_timestamp,
         );
 
-        block.id = previous_block_id + 1;
-        block.previous_block_hash = previous_block_hash;
-        block.burnfee = current_burnfee;
-        block.timestamp = current_timestamp;
-        block.difficulty = previous_block_difficulty;
-        block.creator = *public_key;
-        block.previous_block_unpaid = previous_block_total_fees;
-
+	//////////////////////
+	// ADD TRANSACTIONS //
+	//////////////////////
+	//
+	// - add golden ticket
+	// - add normal transactions
+	// - generate consensus values (for ATR txs)
+	// - add ATR transactions
+	// - add FEE transaction
+	// - calculate slips spent this block
+	//
+	// add golden ticket
+	//
         if golden_ticket.is_some() {
             debug!("golden ticket found. adding to block.");
             block.transactions.push(golden_ticket.unwrap());
             block.previous_block_unpaid = 0;
         }
+
+	//
+	// normal transactions
+	//
         debug!("adding {:?} transactions to the block", transactions.len());
         block.transactions.reserve(transactions.len());
         let iter = transactions.drain().map(|(_, tx)| tx);
-
         block.transactions.extend(iter);
-
-        // block.transactions = transactions.drain().collect();
         transactions.clear();
-
-        // update slips_spent_this_block so that we have a record of
-        // how many times input slips are spent in this block. we will
-        // use this later to ensure there are no duplicates. this include
-        // during the fee transaction, so that we cannot pay a staker
-        // that is also paid this block otherwise.
-        // this will not include the fee transaction or the ATR txs
-        // because they have not been added to teh block yet, but they
-        // permit us to avoid paying out StakerWithdrawal slips when we
-        // generate the fee payment.
-        //
-        // note -- the FEE TX will not have inputs, but we do not need
-        // to add an exception for it because it has not been added to the
-        // block yet.
-        if !block.created_hashmap_of_slips_spent_this_block {
-            debug!("creating hashmap of slips spent this block...");
-            for transaction in &block.transactions {
-                for input in transaction.from.iter() {
-                    block
-                        .slips_spent_this_block
-                        .entry(input.get_utxoset_key())
-                        .and_modify(|e| *e += 1)
-                        .or_insert(1);
-                }
-                block.created_hashmap_of_slips_spent_this_block = true;
-            }
-        }
-
-        // contextual values
+	
+	//
+        // consensus values
+	//
+	// we must generate our consensus values object here in order to be 
+	// able to add the ATR transactions and calculate our fee values given 
+	// their presence etc.
+	//
         let mut cv: ConsensusValues = block.generate_consensus_values(blockchain, storage).await;
-
         block.cv = cv.clone();
 
 	//
         // ATR transactions
-	//
-	// These transactions are looping around the blockchain if they contain enough
-	// NOLAN to pay the necessary rebroadcast fee. They are added after all of the 
-	// normal / non-ATR transactions are added, and before the fee-transaction, 
-	// which is the last tx in the block.
 	//
         let rlen = cv.rebroadcasts.len();
         // TODO - more efficient solution that iterating through the entire transaction set here?
@@ -427,9 +422,6 @@ impl Block {
 	//
         // fee transaction
         //
-        // the fee transaction is the last transaction in the block and includes any 
-	// payouts triggered by the golden transaction included in the block.
-        //
         if cv.fee_transaction.is_some() {
             debug!("adding fee transaction");
             let mut fee_tx = cv.fee_transaction.unwrap();
@@ -439,36 +431,54 @@ impl Block {
             block.add_transaction(fee_tx);
         }
 
+        //
+	// slips_spent_this_block
 	//
-        // update slips_spent_this_block so that we have a record of
-        // how many times input slips are spent in this block. we will
-        // use this later to ensure there are no duplicates.
-	//
-	// TODO - once again, we are iterating and should find more efficient
-	// solution.
-	//
-        for transaction in &block.transactions {
-            if transaction.transaction_type != TransactionType::Fee {
-                for input in transaction.from.iter() {
-                    block
-                        .slips_spent_this_block
-                        .entry(input.get_utxoset_key())
-                        .and_modify(|e| *e += 1)
-                        .or_insert(1);
+	// we keep a record of how many times input slips are spent this
+	// block to ensure there are no duplicates. we avoid adding the 
+	// FEE transaction as it has no inputs.
+        //
+        if !block.created_hashmap_of_slips_spent_this_block {
+            debug!("creating hashmap of slips spent this block...");
+            for transaction in &block.transactions {
+                if transaction.transaction_type != TransactionType::Fee {
+                    for input in transaction.from.iter() {
+                        block
+                            .slips_spent_this_block
+                            .entry(input.get_utxoset_key())
+                            .and_modify(|e| *e += 1)
+                            .or_insert(1);
+                    }
                 }
+                block.created_hashmap_of_slips_spent_this_block = true;
             }
         }
         block.created_hashmap_of_slips_spent_this_block = true;
 
+
+	//////////////////////
+	// CONSENSUS VALUES //
+	//////////////////////
 	//
-        // set difficulty
+	//
+        // difficulty
 	//
         block.difficulty = cv.expected_difficulty;
 
 	//
-	// graveyard = tokens that are removed from cirulation
+	// avg fee
 	//
-        block.graveyard = cv.expected_graveyard;
+        block.avg_income = cv.avg_income;
+
+	//
+	// fee per byte
+	//
+        block.avg_fee_per_byte = cv.avg_fee_per_byte;
+
+	//
+	// nolan rebroadcast per block
+	//
+        block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
 	//
         // treasury = tokens collected for ATR and miner payouts
@@ -491,18 +501,14 @@ impl Block {
 	//
         block.merkle_root = block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
 
-        block.avg_income = cv.avg_income;
-        block.avg_fee_per_byte = cv.avg_fee_per_byte;
-        block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
-
-
         block.generate_pre_hash();
         block.sign(private_key);
-        // regenerates pre-hash, etc.
+        // finally, we regenerate pre-hash given signature, etc.
         block.generate();
 
         block
     }
+
 
     //
     // runs when block deleted
@@ -899,7 +905,9 @@ impl Block {
     // block or validated. this includes:
     //
     //   * payouts (golden tickets)
-    //   * amount collected into staking treasury
+    //		- routing winner
+    //		
+    //   * amount collected into treasury
     //   * total fees in block
     //   * difficulty (mining / payout cost)
     //   * total fees in block
@@ -915,11 +923,13 @@ impl Block {
         blockchain: &Blockchain,
         storage: &Storage,
     ) -> ConsensusValues {
+
         debug!(
             "generate consensus values for {:?} from : {:?} txs",
             self.hash.to_hex(),
             self.transactions.len()
         );
+
         let mut cv = ConsensusValues::new();
         let mut num_non_fee_transactions = 0;
 
