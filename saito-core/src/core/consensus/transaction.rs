@@ -864,6 +864,7 @@ impl Transaction {
             return true;
         }
 
+	//
         // User-Sent Transactions
         //
         // most transactions are identifiable by the public_key that

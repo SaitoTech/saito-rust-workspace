@@ -52,7 +52,7 @@ pub struct ConsensusValues {
     pub gt_num: u8,
     // index of GT in transactions if exists
     pub gt_index: Option<usize>,
-    // total fees in block
+    // total fees in block -- includes normal transactions and ATR
     pub total_fees: Currency,
     // expected burnfee
     pub expected_burnfee: Currency,
@@ -77,6 +77,10 @@ pub struct ConsensusValues {
     pub rebroadcast_hash: [u8; 32],
     // dust falling off chain, needs adding to treasury
     pub nolan_falling_off_chain: Currency,
+    // amount to add to staker treasury in block
+    pub treasury_contribution: Currency ,
+    // amount to add to staker treasury in block
+    pub graveyard_contribution: Currency ,
     // amount to add to staker treasury in block
     pub staking_payout: Currency,
     #[serde(skip)]
@@ -110,6 +114,8 @@ impl ConsensusValues {
             total_rebroadcast_fees_nolan: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
             rebroadcast_hash: [0; 32],
+	    graveyard_contribution: 0,
+	    treasury_contribution: 0,
             nolan_falling_off_chain: 0,
             staking_payout: 0,
             avg_income: 0,
@@ -729,6 +735,7 @@ impl Block {
         let winning_tx_placeholder: Transaction;
         let mut winning_tx: &Transaction;
 
+	//
         // winning TX contains the winning nolan
         //
         // either a fee-paying transaction or an ATR transaction
@@ -740,7 +747,9 @@ impl Block {
             winning_tx = &transaction;
         }
 
+	//
         // if winner is atr, we take inside TX
+	//
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.data.to_vec();
             winning_tx_placeholder =
@@ -761,6 +770,9 @@ impl Block {
     // but must be calculated from information such as the set of transactions
     // and the presence / absence of golden tickets, etc.
     //
+    // - transaction_hashmap - used to identify which addresses have txs in block
+    // - merkle_root - root of tx tree
+
     // we first calculate as much information as we can in parallel before
     // sweeping through the transactions to find out what percentage of the
     // cumulative block fees they contain.
@@ -1067,8 +1079,10 @@ impl Block {
             cv.expected_difficulty = self.difficulty;
         }
 
+	//
         // calculate automatic transaction rebroadcasts / ATR / atr
         self.generate_atr_values(blockchain, storage, &mut cv).await;
+	//
 
         // we can now adjust the value of avg_nolan_rebroadcast_per_block since
         // we know the total amount of fees that have been rebroadcast in this
@@ -1100,7 +1114,7 @@ impl Block {
         //
         // if this block contains a golden ticket:
         //
-        //    - 50% of previous block to miner
+        //    - 50% of previous block to treasury (miner)
         //    - 50% of previous block to routing node
         //
         //    if previous block contains a golden ticket:
@@ -1109,7 +1123,7 @@ impl Block {
         //
         //    if previous block does not contain a golden ticket:
         //
-        //	  - 50% of previous previous block to staking treasury
+        //	  - 50% of previous previous block to treasury (staker)
         //    	  - 50% of previous previous block to routing node
         //
         // if this block does not contain a golden ticket:
@@ -1120,13 +1134,14 @@ impl Block {
         //
         //    if previous block does not contain a golden ticket
         //
-        //        - 50% of previous previous block to staking treasury
-        //        - 50% of previous previous block to staking treasury
+        //        - 50% of previous previous block to graveyard
+        //        - 50% of previous previous block to graveyard
         //
         // note that all payouts are capped at 150% of the long-term average block fees
         // collected by the network. this is done in order to prevent attackers from
         // gaming the payout lottery in an edge-case attack on the proportionality of
-        // payouts to work.
+        // payouts to work, by generating blocks that have very deep-hop routing work
+	//
         trace!("calculating payments...");
 
         // calculating the payouts means filling in this information based on the block
@@ -1139,54 +1154,113 @@ impl Block {
         let mut router2_payout: Currency = 0;
         let mut router2_publickey: SaitoPublicKey = [0; 33];
         let mut staking_payout: Currency = 0;
+        let mut treasury_contribution: Currency = 0;
+        let mut graveyard_contribution: Currency = 0;
 
-        // if there is a golden ticket
+
+	//
+        // if this block contains a golden ticket
+	//
         if let Some(gt_index) = cv.gt_index {
+
             trace!("there is a golden ticket: {:?}", cv.gt_index);
 
-            // we fetch the random number for determining the payouts from the golden ticket
-            // in our current block (this block). we will then continually hash it to generate
-            // a series of other numbers that can be used to calculate subsequent payouts.
+	    //
+            // golden ticket needed to process payout
+	    //
             let golden_ticket: GoldenTicket =
                 GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
             let mut next_random_number = hash(golden_ticket.random.as_ref());
 
+	    //
             // load the previous block
+	    //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+
                 //
-                // the amount of the payout depends on the fees in the block
-                // we will adjust these before creating the final transaction
-                // in order to limit against attacks on the lottery mechanism.
+		// half to treasury (miner + atr)
                 //
-                miner_payout = previous_block.total_fees / 2;
+		// we sanity check that the fees in the block are not greater than 1.5x the total 
+		// average fees processed by the blockchain. this is a sanity-check against 
+		// attackers who might try to create extremely deep-hop routing chains in order
+		// to increase their chance of payout.
+		//
+		let expected_treasury_contribution = previous_block.total_fees / 2;
+	        let maximum_treasury_contribution = (previous_block.avg_income as f64 * 1.5) as u64;
+	        if expected_treasury_contribution > maximum_treasury_contribution {
+		    treasury_contribution = maximum_treasury_contribution;
+		    graveyard_contribution += expected_treasury_contribution - maximum_treasury_contribution;
+		} else {
+		    treasury_contribution = expected_treasury_contribution;
+		}
+	
+		//
+		// we target a single solution every 2 blocks, so the miner
+		// payout should be TREASURY / 2 / GENESIS_PERIOD * 2 ==> 
+		//
+                miner_payout = previous_block.treasury / GENESIS_PERIOD;
                 miner_publickey = golden_ticket.public_key;
-                router1_payout = previous_block.total_fees - miner_payout;
+
+		//
+		// half to router
+		//
+                router1_payout = previous_block.total_fees - treasury_contribution;
                 router1_publickey = previous_block.find_winning_router(next_random_number);
+
 
                 trace!("there is a miner publickey: {:?}", miner_publickey.to_hex());
 
-                // iterate our hash 2 times to accomodate for the iteration that was
-                // done in order to find the previous winning router.
+		//
+                // finding a router consumes 2 hashes
+		//
                 next_random_number = hash(next_random_number.as_ref());
                 next_random_number = hash(next_random_number.as_ref());
 
-                // if the previous block did NOT contain a golden ticket, we recurse
-                // backwards a single block and issue the payouts for that block
-                // as well.
+		//
+                // if the previous block ALSO HAD a golden ticket there is no need for further
+		// action as that previous block has already contributed its tokens to the 
+		// treasury and routing node.
+		//
                 if previous_block.has_golden_ticket {
                     // do nothing
+		//
+		// if the previous block DID NOT HAVE a golden ticket then it did not issue
+		// a payout and we need to recurse back and process it similarly to how we 
+		// processed the last payout.
+		//
                 } else {
-                    // we want to pay out the previous_previous_block to a routing node and the staking table
+
                     if let Some(previous_previous_block) =
                         blockchain.blocks.get(&previous_block.previous_block_hash)
                     {
+
+                        //
+                	// half to treasury (miner + atr)
+                	//
+                	// we sanity check that the fees in the block are not greater than 1.5x the total 
+                	// average fees processed by the blockchain. this is a sanity-check against 
+                	// attackers who might try to create extremely deep-hop routing chains in order
+                	// to increase their chance of payout.
+                	//
+                	let expected_treasury_contribution2 = previous_previous_block.total_fees / 2;
+	        	let maximum_treasury_contribution2 = (previous_block.avg_income as f64 * 1.5) as u64;
+                	if expected_treasury_contribution2 > maximum_treasury_contribution2 {
+                	    treasury_contribution += maximum_treasury_contribution2;
+                	    graveyard_contribution += expected_treasury_contribution2 - maximum_treasury_contribution2;
+                	} else {
+                	    treasury_contribution += expected_treasury_contribution2;
+                	}
+
+			//
                         // calculate staker and router payments
-                        router2_payout = previous_previous_block.total_fees / 2;
+			//
+                        router2_payout = previous_previous_block.total_fees - (previous_previous_block.total_fees/ 2);
                         router2_publickey =
                             previous_previous_block.find_winning_router(next_random_number);
-                        staking_payout = previous_previous_block.total_fees - router2_payout;
 
+			//
                         // finding a router consumes 2 hashes
+			//
                         next_random_number = hash(next_random_number.as_slice());
                         next_random_number = hash(next_random_number.as_slice());
                     }
@@ -1200,20 +1274,6 @@ impl Block {
                 );
             }
 
-            // TODO
-	    //
-            // if our total payouts are greater than 1.5x the average fee throughput
-            // of the blockchain, then we may be experiencing an edge-case attack in
-            // which the attacker is flooding the block with low-hop routing work in 
-	    // order to increase their chance of winning the lottery payout. this 
-	    // attack requires them to include SO MUCH low-hop transaction work that 
-	    // it necessarily causes the overall fee throughput to spike massively.
-            //
-	    // we prevent that here
-	    //
-            //if miner_payout > (previous_block.avg_income as f64 * 1.5) { miner_payout = previous_block.avg_income as f64 * 1.5; }
-            //if router1_payout > (previous_block.avg_income as f64 * 1.5) { router1_payout = previous_block.avg_income as f64 * 1.5; }
-            //if router2_payout > (previous_block.avg_income as f64 * 1.5) { router2_payout = previous_block.avg_income as f64 * 1.5; }
 
             //
             // now create fee transactions
@@ -1257,33 +1317,37 @@ impl Block {
             }
 
             cv.fee_transaction = Some(transaction);
-        } else {
-            // if no golden ticket, check if previous block was paid out (has golden ticket)
-            if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-                if previous_block.has_golden_ticket {
 
+        } else {
+
+	    //
+	    // if there is no golden ticket AND the previous block was not paid out then
+	    // we should collect the funds that are lost and add them to our graveyard.
+	    //
+            if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+
+                if previous_block.has_golden_ticket {
                     // do nothing, already paid out
                 } else {
                     // our previous_previous_block is about to disappear, which means
-                    // we should collect the funds that would be lost and add them to
-                    // the staking treasury.
+                    // we should make note that these funds are slipping into our graveyard
                     if let Some(previous_previous_block) =
                         blockchain.blocks.get(&previous_block.previous_block_hash)
                     {
-                        staking_payout = previous_previous_block.total_fees;
+                        graveyard_contribution;
                     }
                 }
             }
         }
 
-        cv.staking_payout = staking_payout;
+        cv.treasury_contribution = treasury_contribution;
+        cv.graveyard_contribution = graveyard_contribution;
 
         //
         // TODO - once we start reducing any mining/staking payouts because the fees-in-block
-        // are larger than the average, we can put the removed tokens here in order to keep
-        // track of them.
+        // are larger than the average, we can put the removed tokens into the graveyard contribution
         //
-        cv.nolan_falling_off_chain = 0;
+        cv.nolan_falling_off_chain = cv.graveyard_contribution;
 
         cv
     }
@@ -1305,6 +1369,7 @@ impl Block {
 
             // load that block
             if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
+
                 let result = storage
                     .load_block_from_disk(storage.generate_block_filepath(pruned_block).as_str())
                     .await;
@@ -1322,14 +1387,17 @@ impl Block {
                         BlockType::Pruned,
                         "block should be fetched fully before this"
                     );
-                    // utxos receive their share of the treasury adjusted for
-                    // the value of the UTXO that are looping around the blockchain.
+
+		    //
+		    // ATR payout is half the treasury, divided by the UTXO staked
+		    //
                     let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
                     let expected_utxo_payout = if expected_utxo_staked > 0 {
-                        self.treasury / expected_utxo_staked
+                        (self.treasury / 2) / expected_utxo_staked
                     } else {
                         0
                     };
+
                     debug!("expected_utxo_staked : {:?}", expected_utxo_staked);
                     debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
 
