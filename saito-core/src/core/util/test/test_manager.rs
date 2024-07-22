@@ -418,11 +418,11 @@ pub mod test {
                 block_contains_fee_tx = false;
 
                 previous_block_treasury = current_block_treasury;
-                current_block_treasury = block.graveyard;
+                current_block_treasury = block.treasury;
 
                 for t in 0..block.transactions.len() {
                     //
-                    // the difference in the staking_treasury.
+                    // the difference in the treasury
                     //
                     if block.transactions[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = true;
@@ -446,7 +446,6 @@ pub mod test {
                 if i == 1 {
                     token_supply = block_outputs + block.graveyard + block.treasury;
                     spendable_supply = block_outputs;
-
                     current_block_treasury = block.treasury;
                     current_block_graveyard = block.graveyard;
                     current_block_previous_block_unpaid = 0;
