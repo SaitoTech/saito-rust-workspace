@@ -322,8 +322,8 @@ impl Block {
         let mut previous_block_burnfee = 0;
         let mut previous_block_timestamp = 0;
         let mut previous_block_difficulty = 0;
+        let mut previous_block_graveyard = 0;
         let mut previous_block_treasury = 0;
-        let mut previous_block_staking_treasury = 0;
         let mut previous_block_total_fees = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
@@ -331,8 +331,8 @@ impl Block {
             previous_block_burnfee = previous_block.burnfee;
             previous_block_timestamp = previous_block.timestamp;
             previous_block_difficulty = previous_block.difficulty;
-            previous_block_treasury = previous_block.graveyard;
-            previous_block_staking_treasury = previous_block.treasury;
+            previous_block_graveyard = previous_block.graveyard;
+            previous_block_treasury = previous_block.treasury;
             previous_block_total_fees = previous_block.total_fees;
         }
 
@@ -442,12 +442,15 @@ impl Block {
         // set difficulty
         block.difficulty = cv.expected_difficulty;
 
-        // TODO - we should consider deleting the treasury, if we do not use
-        // it as a catch for any tokens removed for blocks where payouts
-        // exceed variance permitted and payouts are deducted downwards.
+	//
+	// graveyard = tokens that are removed from cirulation
+	// treasury = tokens that have been collected for distribution to miners / ATR
+	//
         block.graveyard = 0;
 
+	//
         // adjust staking treasury
+	//
         if cv.staking_payout != 0 {
             debug!(
                 "adding staking payout : {:?} to treasury : {:?}",
@@ -494,8 +497,8 @@ impl Block {
     /// [creator - 33 bytes - Secp25k1 pubkey compact format]
     /// [merkle_root - 32 bytes - SHA 256 hash
     /// [signature - 64 bytes - Secp25k1 sig]
+    /// [graveyard - 8 bytes - u64]
     /// [treasury - 8 bytes - u64]
-    /// [staking_treasury - 8 bytes - u64]
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
@@ -535,8 +538,8 @@ impl Block {
             .try_into()
             .or(Err(Error::from(ErrorKind::InvalidData)))?;
 
-        let treasury: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
-        let staking_treasury: Currency =
+        let graveyard: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
+        let treasury: Currency =
             Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
         let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
         let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
@@ -609,10 +612,10 @@ impl Block {
         block.creator = creator;
         block.merkle_root = merkle_root;
         block.signature = signature;
-        block.graveyard = treasury;
+        block.graveyard = graveyard;
+        block.treasury = treasury;
         block.burnfee = burnfee;
         block.difficulty = difficulty;
-        block.treasury = staking_treasury;
         block.avg_income = avg_income;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
@@ -717,6 +720,7 @@ impl Block {
     // cumulative block fees they contain.
     //
     pub fn generate(&mut self) -> bool {
+
         let creator_public_key = &self.creator;
 
         self.total_rebroadcast_nolan = 0;
@@ -1106,7 +1110,6 @@ impl Block {
                 // backwards a single block and issue the payouts for that block
                 // as well.
                 if previous_block.has_golden_ticket {
-
                     // do nothing
                 } else {
                     // we want to pay out the previous_previous_block to a routing node and the staking table
@@ -1133,14 +1136,17 @@ impl Block {
                 );
             }
 
-            //
+            // TODO
+	    //
             // if our total payouts are greater than 1.5x the average fee throughput
             // of the blockchain, then we may be experiencing an edge-case attack in
-            // which the attacker
+            // which the attacker is flooding the block with low-hop routing work in 
+	    // order to increase their chance of winning the lottery payout. this 
+	    // attack requires them to include SO MUCH low-hop transaction work that 
+	    // it necessarily causes the overall fee throughput to spike massively.
             //
-            // TODO - get the difference and add it to the staking payouts so that the
-            // tokens are not lost but paid out to users.
-            //
+	    // we prevent that here
+	    //
             //if miner_payout > (previous_block.avg_income as f64 * 1.5) { miner_payout = previous_block.avg_income as f64 * 1.5; }
             //if router1_payout > (previous_block.avg_income as f64 * 1.5) { router1_payout = previous_block.avg_income as f64 * 1.5; }
             //if router2_payout > (previous_block.avg_income as f64 * 1.5) { router2_payout = previous_block.avg_income as f64 * 1.5; }
