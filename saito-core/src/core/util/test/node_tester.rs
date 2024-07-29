@@ -348,8 +348,8 @@ pub mod test {
             Ok(())
         }
         pub async fn wait_till_block_id(&mut self, block_id: BlockId) -> Result<(), Error> {
-            let timeout = self.timer.get_timestamp_in_ms() + self.timeout_in_ms;
             let time_keeper = TestTimeKeeper {};
+            let timeout = time_keeper.get_timestamp_in_ms() + self.timeout_in_ms;
             loop {
                 {
                     let blockchain = self.routing_thread.blockchain_lock.read().await;
@@ -376,6 +376,9 @@ pub mod test {
             let public_key = self.get_public_key().await;
             let mut current_block_id = self.get_latest_block_id().await;
 
+            let time_keeper = TestTimeKeeper {};
+            let timeout_time = time_keeper.get_timestamp_in_ms() + self.timeout_in_ms;
+
             loop {
                 let tx = self
                     .create_transaction(tx_value, tx_fee, public_key)
@@ -386,6 +389,10 @@ pub mod test {
 
                 if current_block_id >= wait_till_block_id {
                     break;
+                }
+                let current_time = time_keeper.get_timestamp_in_ms();
+                if current_time > timeout_time {
+                    panic!("request timed out");
                 }
             }
             self.wait_till_block_id(wait_till_block_id).await
