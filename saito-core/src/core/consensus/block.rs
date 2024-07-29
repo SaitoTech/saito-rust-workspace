@@ -1157,7 +1157,7 @@ impl Block {
         let mut router1_publickey: SaitoPublicKey = [0; 33];
         let mut router2_payout: Currency = 0;
         let mut router2_publickey: SaitoPublicKey = [0; 33];
-        let mut staking_payout: Currency = 0;
+        let staking_payout: Currency = 0;
         let mut treasury_contribution: Currency = 0;
         let mut graveyard_contribution: Currency = 0;
 
@@ -2182,7 +2182,7 @@ mod tests {
     use log::info;
 
     use crate::core::consensus::block::{Block, BlockType};
-    use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
+    
     use crate::core::consensus::merkle::MerkleTree;
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};

@@ -344,7 +344,7 @@ async fn run_routing_event_processor(
     fetch_batch_size: usize,
     time_keeper_origin: &Timer,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let mut routing_event_processor = RoutingThread {
+    let routing_event_processor = RoutingThread {
         blockchain_lock: context.blockchain_lock.clone(),
         mempool_lock: context.mempool_lock.clone(),
         sender_to_consensus: sender_to_mempool.clone(),
