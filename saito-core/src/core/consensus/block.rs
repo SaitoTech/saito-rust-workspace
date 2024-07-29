@@ -78,9 +78,9 @@ pub struct ConsensusValues {
     // dust falling off chain, needs adding to treasury
     pub nolan_falling_off_chain: Currency,
     // amount to add to staker treasury in block
-    pub treasury_contribution: Currency ,
+    pub treasury_contribution: Currency,
     // amount to add to staker treasury in block
-    pub graveyard_contribution: Currency ,
+    pub graveyard_contribution: Currency,
     // amount to add to staker treasury in block DEPRECATED
     pub staking_payout: Currency,
     #[serde(skip)]
@@ -114,10 +114,10 @@ impl ConsensusValues {
             total_rebroadcast_fees_nolan: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
             rebroadcast_hash: [0; 32],
-	    graveyard_contribution: 0,
-	    treasury_contribution: 0,
+            graveyard_contribution: 0,
+            treasury_contribution: 0,
             nolan_falling_off_chain: 0,
-            staking_payout: 0,				// DEPRECATED
+            staking_payout: 0, // DEPRECATED
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -143,10 +143,10 @@ impl ConsensusValues {
             total_rebroadcast_fees_nolan: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
             rebroadcast_hash: [0; 32],
-	    graveyard_contribution: 0,
-	    treasury_contribution: 0,
+            graveyard_contribution: 0,
+            treasury_contribution: 0,
             nolan_falling_off_chain: 0,
-            staking_payout: 0,				// DEPRECATED
+            staking_payout: 0, // DEPRECATED
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -329,7 +329,6 @@ impl Block {
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
     ) -> Block {
-
         debug!(
             "Block::create : previous block hash : {:?}",
             previous_block_hash.to_hex()
@@ -353,10 +352,9 @@ impl Block {
             previous_block_total_fees = previous_block.total_fees;
         }
 
-
-	//
-	// create block
-	//
+        //
+        // create block
+        //
         let mut block = Block::new();
 
         block.id = previous_block_id + 1;
@@ -365,58 +363,58 @@ impl Block {
         block.difficulty = previous_block_difficulty;
         block.creator = *public_key;
         block.previous_block_unpaid = previous_block_total_fees;
-	block.graveyard = previous_block_graveyard;
+        block.graveyard = previous_block_graveyard;
 
-	//
-	// burnfee
-	//
+        //
+        // burnfee
+        //
         block.burnfee = BurnFee::calculate_burnfee_for_block(
             previous_block_burnfee,
             current_timestamp,
             previous_block_timestamp,
         );
 
-	//////////////////////
-	// ADD TRANSACTIONS //
-	//////////////////////
-	//
-	// - add golden ticket
-	// - add normal transactions
-	// - generate consensus values (for ATR txs)
-	// - add ATR transactions
-	// - add FEE transaction
-	// - calculate slips spent this block
-	//
-	// add golden ticket
-	//
+        //////////////////////
+        // ADD TRANSACTIONS //
+        //////////////////////
+        //
+        // - add golden ticket
+        // - add normal transactions
+        // - generate consensus values (for ATR txs)
+        // - add ATR transactions
+        // - add FEE transaction
+        // - calculate slips spent this block
+        //
+        // add golden ticket
+        //
         if golden_ticket.is_some() {
             debug!("golden ticket found. adding to block.");
             block.transactions.push(golden_ticket.unwrap());
             block.previous_block_unpaid = 0;
         }
 
-	//
-	// normal transactions
-	//
+        //
+        // normal transactions
+        //
         debug!("adding {:?} transactions to the block", transactions.len());
         block.transactions.reserve(transactions.len());
         let iter = transactions.drain().map(|(_, tx)| tx);
         block.transactions.extend(iter);
         transactions.clear();
-	
-	//
+
+        //
         // consensus values
-	//
-	// we must generate our consensus values object here in order to be 
-	// able to add the ATR transactions and calculate our fee values given 
-	// their presence etc.
-	//
+        //
+        // we must generate our consensus values object here in order to be
+        // able to add the ATR transactions and calculate our fee values given
+        // their presence etc.
+        //
         let mut cv: ConsensusValues = block.generate_consensus_values(blockchain, storage).await;
         block.cv = cv.clone();
 
-	//
+        //
         // ATR transactions
-	//
+        //
         let rlen = cv.rebroadcasts.len();
         // TODO - more efficient solution that iterating through the entire transaction set here?
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
@@ -427,7 +425,7 @@ impl Block {
             block.transactions.append(&mut cv.rebroadcasts);
         }
 
-	//
+        //
         // fee transaction
         //
         if cv.fee_transaction.is_some() {
@@ -440,11 +438,11 @@ impl Block {
         }
 
         //
-	// slips_spent_this_block
-	//
-	// we keep a record of how many times input slips are spent this
-	// block to ensure there are no duplicates. we avoid adding the 
-	// FEE transaction as it has no inputs.
+        // slips_spent_this_block
+        //
+        // we keep a record of how many times input slips are spent this
+        // block to ensure there are no duplicates. we avoid adding the
+        // FEE transaction as it has no inputs.
         //
         if !block.created_hashmap_of_slips_spent_this_block {
             debug!("creating hashmap of slips spent this block...");
@@ -463,68 +461,66 @@ impl Block {
         }
         block.created_hashmap_of_slips_spent_this_block = true;
 
-
-	//////////////////////
-	// CONSENSUS VALUES //
-	//////////////////////
-	//
-	//
+        //////////////////////
+        // CONSENSUS VALUES //
+        //////////////////////
+        //
+        //
         // difficulty
-	//
+        //
         block.difficulty = cv.expected_difficulty;
 
-	//
-	// avg fee
-	//
+        //
+        // avg fee
+        //
         block.avg_income = cv.avg_income;
 
-	//
-	// fee per byte
-	//
+        //
+        // fee per byte
+        //
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
 
-	//
-	// nolan rebroadcast per block
-	//
+        //
+        // nolan rebroadcast per block
+        //
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
         //
-        // treasury 
-        //          
-        block.treasury = previous_block_treasury + cv.treasury_contribution - cv.total_rebroadcast_staking_payouts_nolan;
+        // treasury
+        //
+        block.treasury = previous_block_treasury + cv.treasury_contribution
+            - cv.total_rebroadcast_staking_payouts_nolan;
 
-	//
-	// graveyard
-	//
+        //
+        // graveyard
+        //
         block.graveyard = previous_block_graveyard + cv.graveyard_contribution;
-                
-	//
+
+        //
         // generate merkle root
-	//
+        //
         block.merkle_root = block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
 
-	//
-	// the "pre-hash" is a hash value created from all of the consensus-data and is 
-	// signed by the block creator to generate the signature. the signature is then 
-	// part of the block data that is used to generate the final block hash.
-	//
-	// now that we have updated all of our consensus variables, we generate the pre-
-	// hash and then sign the block with our private key.
-	//
+        //
+        // the "pre-hash" is a hash value created from all of the consensus-data and is
+        // signed by the block creator to generate the signature. the signature is then
+        // part of the block data that is used to generate the final block hash.
+        //
+        // now that we have updated all of our consensus variables, we generate the pre-
+        // hash and then sign the block with our private key.
+        //
         block.generate_pre_hash();
         block.sign(private_key);
 
-
-	//
-	// TODO -- is this appropriate to run
-	//
+        //
+        // TODO -- is this appropriate to run
+        //
         // finally we run generate()
-	//
+        //
         block.generate();
 
         block
     }
-
 
     //
     // runs when block deleted
@@ -586,8 +582,7 @@ impl Block {
             .or(Err(Error::from(ErrorKind::InvalidData)))?;
 
         let graveyard: Currency = Currency::from_be_bytes(bytes[181..189].try_into().unwrap());
-        let treasury: Currency =
-            Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
+        let treasury: Currency = Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
         let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
         let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
         let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
@@ -730,7 +725,7 @@ impl Block {
         let winning_tx_placeholder: Transaction;
         let mut winning_tx: &Transaction;
 
-	//
+        //
         // winning TX contains the winning nolan
         //
         // either a fee-paying transaction or an ATR transaction
@@ -742,9 +737,9 @@ impl Block {
             winning_tx = &transaction;
         }
 
-	//
+        //
         // if winner is atr, we take inside TX
-	//
+        //
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.data.to_vec();
             winning_tx_placeholder =
@@ -773,16 +768,15 @@ impl Block {
     // cumulative block fees they contain.
     //
     pub fn generate(&mut self) -> bool {
-
         let creator_public_key = &self.creator;
 
         self.total_rebroadcast_nolan = 0;
         self.total_rebroadcast_slips = 0;
         self.rebroadcast_hash = [0; 32];
 
-	//
+        //
         // allow transactions to generate themselves
-	//
+        //
         let _transactions_pre_calculated = &self
             .transactions
             .iter_mut()
@@ -930,7 +924,7 @@ impl Block {
     //
     //   * payouts (golden tickets)
     //		- routing winner
-    //		
+    //
     //   * amount collected into treasury
     //   * total fees in block
     //   * difficulty (mining / payout cost)
@@ -947,7 +941,6 @@ impl Block {
         blockchain: &Blockchain,
         storage: &Storage,
     ) -> ConsensusValues {
-
         debug!(
             "generate consensus values for {:?} from : {:?} txs",
             self.hash.to_hex(),
@@ -963,8 +956,8 @@ impl Block {
         // we want to minimize the number of times we need to loop through the
         // block, so we use a single loop to add up the total fees in the block
         // and figure out which transactions (if any) are golden ticket transactions
-        // issuance transactions (block #1 only), staking transactions, and 
-	// fee/payout transactions.
+        // issuance transactions (block #1 only), staking transactions, and
+        // fee/payout transactions.
         //
         let mut total_tx_size: usize = 0;
         let mut total_fees_in_normal_txs = 0;
@@ -1011,36 +1004,35 @@ impl Block {
             }
         }
 
-	//
+        //
         // now that we know the total fees in the block, we can calculate the avg
         // fee per byte in the block as a whole. we need to know this in order to
         // determine how much to charge to ATR rebroadcasting transactions.
-	//
+        //
         if total_tx_size > 0 {
             cv.avg_fee_per_byte = total_fees_in_normal_txs / total_tx_size as Currency;
         } else {
             cv.avg_fee_per_byte = 0;
         }
 
-	//
+        //
         // adjust mining difficulty and income and variance averages
         //
         // this sets avg_nolan_rebroadcast_per_block, but does not update it to reflect the current
         // new status. this permits us to use the value to calculate the ATR payouts in the next
         // step.
-	//
+        //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-
-	    //
-	    // burn fee
-	    //
+            //
+            // burn fee
+            //
             cv.expected_burnfee = BurnFee::calculate_burnfee_for_block(
                 previous_block.burnfee,
                 self.timestamp,
                 previous_block.timestamp,
             );
 
-	    //
+            //
             // difficulty
             //
             // we increase difficulty if two blocks in a row have golden tickets and decrease
@@ -1055,7 +1047,7 @@ impl Block {
                 cv.expected_difficulty -= 1;
             }
 
-	    //
+            //
             // average income = smoothed fees per block
             //
             // we set these figures according to the values in the previous block,
@@ -1070,22 +1062,20 @@ impl Block {
                 / GENESIS_PERIOD as i128;
             cv.avg_income = (cv.avg_income as i128 - adjustment) as Currency;
         } else {
-
-	    //
+            //
             // if there is no previous block, the burn fee is not adjusted. validation
             // rules will cause the block to fail unless it is the first block. average
             // income is set to whatever the block avg_income is set to.
-	    //
+            //
             cv.avg_income = self.avg_income;
             cv.expected_burnfee = self.burnfee;
             cv.expected_difficulty = self.difficulty;
-
         }
 
-	//
+        //
         // calculate automatic transaction rebroadcasts / ATR / atr
         self.generate_atr_values(blockchain, storage, &mut cv).await;
-	//
+        //
 
         // we can now adjust the value of avg_nolan_rebroadcast_per_block since
         // we know the total amount of fees that have been rebroadcast in this
@@ -1094,7 +1084,7 @@ impl Block {
         // note that we cannot move this above the ATR section as we use the
         // value of this variable (from the last block) to figure out what the
         // ATR payout should be in this block.
-	//
+        //
         let adjustment = (cv.avg_nolan_rebroadcast_per_block as i128
             - cv.total_rebroadcast_nolan as i128)
             / GENESIS_PERIOD as i128;
@@ -1145,7 +1135,7 @@ impl Block {
         // collected by the network. this is done in order to prevent attackers from
         // gaming the payout lottery in an edge-case attack on the proportionality of
         // payouts to work, by generating blocks that have very deep-hop routing work
-	//
+        //
         trace!("calculating payments...");
 
         // calculating the payouts means filling in this information based on the block
@@ -1161,110 +1151,109 @@ impl Block {
         let mut treasury_contribution: Currency = 0;
         let mut graveyard_contribution: Currency = 0;
 
-
-	//
+        //
         // if this block contains a golden ticket
-	//
+        //
         if let Some(gt_index) = cv.gt_index {
-
             trace!("there is a golden ticket: {:?}", cv.gt_index);
 
-	    //
+            //
             // golden ticket needed to process payout
-	    //
+            //
             let golden_ticket: GoldenTicket =
                 GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
             let mut next_random_number = hash(golden_ticket.random.as_ref());
 
-	    //
+            //
             // load the previous block
-	    //
+            //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+                //
+                // half to treasury (miner + atr)
+                //
+                // we sanity check that the fees in the block are not greater than 1.5x the total
+                // average fees processed by the blockchain. this is a sanity-check against
+                // attackers who might try to create extremely deep-hop routing chains in order
+                // to increase their chance of payout.
+                //
+                let expected_treasury_contribution = previous_block.total_fees / 2;
+                let maximum_treasury_contribution = (previous_block.avg_income as f64 * 1.5) as u64;
+                if expected_treasury_contribution > maximum_treasury_contribution {
+                    treasury_contribution = maximum_treasury_contribution;
+                    graveyard_contribution +=
+                        expected_treasury_contribution - maximum_treasury_contribution;
+                } else {
+                    treasury_contribution = expected_treasury_contribution;
+                }
 
                 //
-		// half to treasury (miner + atr)
+                // we target a single solution every 2 blocks, so the miner
+                // payout should be TREASURY / 2 / GENESIS_PERIOD * 2 ==>
                 //
-		// we sanity check that the fees in the block are not greater than 1.5x the total 
-		// average fees processed by the blockchain. this is a sanity-check against 
-		// attackers who might try to create extremely deep-hop routing chains in order
-		// to increase their chance of payout.
-		//
-		let expected_treasury_contribution = previous_block.total_fees / 2;
-	        let maximum_treasury_contribution = (previous_block.avg_income as f64 * 1.5) as u64;
-	        if expected_treasury_contribution > maximum_treasury_contribution {
-		    treasury_contribution = maximum_treasury_contribution;
-		    graveyard_contribution += expected_treasury_contribution - maximum_treasury_contribution;
-		} else {
-		    treasury_contribution = expected_treasury_contribution;
-		}
-	
-		//
-		// we target a single solution every 2 blocks, so the miner
-		// payout should be TREASURY / 2 / GENESIS_PERIOD * 2 ==> 
-		//
                 miner_payout = previous_block.treasury / GENESIS_PERIOD;
                 miner_publickey = golden_ticket.public_key;
 
-		//
-		// half to router
-		//
+                //
+                // half to router
+                //
                 router1_payout = previous_block.total_fees - treasury_contribution;
                 router1_publickey = previous_block.find_winning_router(next_random_number);
 
-
                 trace!("there is a miner publickey: {:?}", miner_publickey.to_hex());
 
-		//
+                //
                 // finding a router consumes 2 hashes
-		//
+                //
                 next_random_number = hash(next_random_number.as_ref());
                 next_random_number = hash(next_random_number.as_ref());
 
-		//
+                //
                 // if the previous block ALSO HAD a golden ticket there is no need for further
-		// action as that previous block has already contributed its tokens to the 
-		// treasury and routing node.
-		//
+                // action as that previous block has already contributed its tokens to the
+                // treasury and routing node.
+                //
                 if previous_block.has_golden_ticket {
                     // do nothing
-		//
-		// if the previous block DID NOT HAVE a golden ticket then it did not issue
-		// a payout and we need to recurse back and process it similarly to how we 
-		// processed the last payout.
-		//
+                    //
+                    // if the previous block DID NOT HAVE a golden ticket then it did not issue
+                    // a payout and we need to recurse back and process it similarly to how we
+                    // processed the last payout.
+                    //
                 } else {
-
                     if let Some(previous_previous_block) =
                         blockchain.blocks.get(&previous_block.previous_block_hash)
                     {
+                        //
+                        // half to treasury (miner + atr)
+                        //
+                        // we sanity check that the fees in the block are not greater than 1.5x the total
+                        // average fees processed by the blockchain. this is a sanity-check against
+                        // attackers who might try to create extremely deep-hop routing chains in order
+                        // to increase their chance of payout.
+                        //
+                        let expected_treasury_contribution2 =
+                            previous_previous_block.total_fees / 2;
+                        let maximum_treasury_contribution2 =
+                            (previous_block.avg_income as f64 * 1.5) as u64;
+                        if expected_treasury_contribution2 > maximum_treasury_contribution2 {
+                            treasury_contribution += maximum_treasury_contribution2;
+                            graveyard_contribution +=
+                                expected_treasury_contribution2 - maximum_treasury_contribution2;
+                        } else {
+                            treasury_contribution += expected_treasury_contribution2;
+                        }
 
                         //
-                	// half to treasury (miner + atr)
-                	//
-                	// we sanity check that the fees in the block are not greater than 1.5x the total 
-                	// average fees processed by the blockchain. this is a sanity-check against 
-                	// attackers who might try to create extremely deep-hop routing chains in order
-                	// to increase their chance of payout.
-                	//
-                	let expected_treasury_contribution2 = previous_previous_block.total_fees / 2;
-	        	let maximum_treasury_contribution2 = (previous_block.avg_income as f64 * 1.5) as u64;
-                	if expected_treasury_contribution2 > maximum_treasury_contribution2 {
-                	    treasury_contribution += maximum_treasury_contribution2;
-                	    graveyard_contribution += expected_treasury_contribution2 - maximum_treasury_contribution2;
-                	} else {
-                	    treasury_contribution += expected_treasury_contribution2;
-                	}
-
-			//
                         // calculate staker and router payments
-			//
-                        router2_payout = previous_previous_block.total_fees - (previous_previous_block.total_fees/ 2);
+                        //
+                        router2_payout = previous_previous_block.total_fees
+                            - (previous_previous_block.total_fees / 2);
                         router2_publickey =
                             previous_previous_block.find_winning_router(next_random_number);
 
-			//
+                        //
                         // finding a router consumes 2 hashes
-			//
+                        //
                         next_random_number = hash(next_random_number.as_slice());
                         next_random_number = hash(next_random_number.as_slice());
                     }
@@ -1277,7 +1266,6 @@ impl Block {
                     self.id
                 );
             }
-
 
             //
             // now create fee transactions
@@ -1321,15 +1309,12 @@ impl Block {
             }
 
             cv.fee_transaction = Some(transaction);
-
         } else {
-
-	    //
-	    // if there is no golden ticket AND the previous block was not paid out then
-	    // we should collect the funds that are lost and add them to our graveyard.
-	    //
+            //
+            // if there is no golden ticket AND the previous block was not paid out then
+            // we should collect the funds that are lost and add them to our graveyard.
+            //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-
                 if previous_block.has_golden_ticket {
                     // do nothing, already paid out
                 } else {
@@ -1373,7 +1358,6 @@ impl Block {
 
             // load that block
             if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
-
                 let result = storage
                     .load_block_from_disk(storage.generate_block_filepath(pruned_block).as_str())
                     .await;
@@ -1392,9 +1376,9 @@ impl Block {
                         "block should be fetched fully before this"
                     );
 
-		    //
-		    // ATR payout is half the treasury, divided by the UTXO staked
-		    //
+                    //
+                    // ATR payout is half the treasury, divided by the UTXO staked
+                    //
                     let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
                     let expected_utxo_payout = if expected_utxo_staked > 0 {
                         (self.treasury / 2) / expected_utxo_staked
@@ -1782,60 +1766,59 @@ impl Block {
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
     ) -> bool {
-
-	//
+        //
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
-	//
+        //
         assert!(self.id > 0);
         if configs.is_spv_mode() {
             self.generate_consensus_values(blockchain, storage).await;
             return true;
         }
 
-	//
-	// "ghost blocks" are blocks that simply contain the block hash, they are used
-	// by lite-clients to sync the chain without validating all of the transactions
-	// in situations where users want to make that trade-off. for that reasons, if 
-	// we have a Ghost Block we automatically validate it.
-	//
+        //
+        // "ghost blocks" are blocks that simply contain the block hash, they are used
+        // by lite-clients to sync the chain without validating all of the transactions
+        // in situations where users want to make that trade-off. for that reasons, if
+        // we have a Ghost Block we automatically validate it.
+        //
         if let BlockType::Ghost = self.block_type {
             return true;
         }
 
-	//
+        //
         // all valid blocks with ID > 1 must have at least one transaction
-	//
+        //
         if self.transactions.is_empty() && self.id != 1 && !blockchain.blocks.is_empty() {
             error!("ERROR 424342: block does not validate as it has no transactions",);
             return false;
         }
 
-	//
+        //
         // all valid blocks must be signed by their creator
-	//
+        //
         if !verify_signature(&self.pre_hash, &self.signature, &self.creator) {
             error!("ERROR 582039: block is not signed by creator or signature does not validate",);
             return false;
         }
 
-	//
+        //
         // generate "Consensus Values"
         //
         // consensus data refers to the info in the proposed block that depends
         // on its relationship to other blocks in the chain -- things like the burn
         // fee, the ATR transactions, the golden ticket solution and the payouts.
         //
-        // we use the function generate_consensus_values to determine what these 
-	// values should be, so we re-run the function here. it will generate the 
-	// same values that would have been generated on the creation of the block,
-	// permitting us to check against those values to see if the block was 
-	// created according to consensus values.
-	//
+        // we use the function generate_consensus_values to determine what these
+        // values should be, so we re-run the function here. it will generate the
+        // same values that would have been generated on the creation of the block,
+        // permitting us to check against those values to see if the block was
+        // created according to consensus values.
+        //
         let cv = self.generate_consensus_values(blockchain, storage).await;
 
-	//
+        //
         // consensus values -> average number of fees in the block
-	//
+        //
         if cv.avg_income != self.avg_income {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
@@ -1866,17 +1849,17 @@ impl Block {
             return false;
         }
 
-	//
-	// consensus values -> avg fee per byte
-	//
+        //
+        // consensus values -> avg fee per byte
+        //
         if cv.avg_fee_per_byte != self.avg_fee_per_byte {
             error!("block is mis-reporting its average fee per byte");
             return false;
         }
 
-	//
+        //
         // consensus values -> issuance transactions (only block #1 can print money)
-	//
+        //
         if cv.it_num > 0 && self.id > 1 {
             error!("ERROR: blockchain contains issuance after block 1 in chain",);
             return false;
@@ -1893,8 +1876,7 @@ impl Block {
             return false;
         }
 
-
-	//
+        //
         // consensus values => difficulty
         //
         if cv.expected_difficulty != self.difficulty {
@@ -1905,26 +1887,25 @@ impl Block {
             return false;
         }
 
-	//
+        //
         // many kinds of validation like the burn fee and the golden ticket solution
         // require the existence of the previous block in order to validate. we put all
         // of these validation steps below so they will have access to the previous block
         //
         // if no previous block exists, we are valid only in a limited number of
         // circumstances, such as this being the first block we are adding to our chain.
-	//
+        //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-
-	    //
-	    // ghost blocks
-	    //
+            //
+            // ghost blocks
+            //
             if let BlockType::Ghost = previous_block.block_type {
                 return true;
             }
 
-	    //
+            //
             // treasury
-	    //
+            //
             let mut expected_treasury = previous_block.treasury;
             expected_treasury += cv.treasury_contribution;
             expected_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
@@ -1937,12 +1918,12 @@ impl Block {
                 return false;
             }
 
-	    //
+            //
             // graveyard - sponge for any NOLAN removed from circulation
             //
             let mut expected_graveyard = previous_block.graveyard;
             expected_graveyard += cv.graveyard_contribution;
-	    if self.graveyard != expected_graveyard {
+            if self.graveyard != expected_graveyard {
                 error!(
                     "ERROR 123243: graveyard does not validate: {} expected versus {} found",
                     expected_graveyard, self.graveyard,
@@ -1950,7 +1931,7 @@ impl Block {
                 return false;
             }
 
-	    //
+            //
             // validate routing work required
             //
             // this checks the total amount of fees that need to be burned in this
@@ -1968,7 +1949,7 @@ impl Block {
 
             // trace!(" ... done routing work required: {:?}", create_timestamp());
 
-	    //
+            //
             // validate golden ticket
             //
             // the golden ticket is a special kind of transaction that stores the
@@ -2065,10 +2046,9 @@ impl Block {
             return false;
         }
 
-
-	//
+        //
         // validate merkle root
-	//
+        //
         if self.merkle_root == [0; 32]
             && self.merkle_root
                 != self.generate_merkle_root(configs.is_browser(), configs.is_spv_mode())
@@ -2112,8 +2092,6 @@ impl Block {
                 }
             }
         }
-
-
 
         // validate transactions
         //
@@ -2182,7 +2160,7 @@ mod tests {
     use log::info;
 
     use crate::core::consensus::block::{Block, BlockType};
-    
+
     use crate::core::consensus::merkle::MerkleTree;
     use crate::core::consensus::slip::{Slip, SlipType};
     use crate::core::consensus::transaction::{Transaction, TransactionType};
