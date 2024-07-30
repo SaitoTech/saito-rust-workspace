@@ -71,8 +71,10 @@ pub struct ConsensusValues {
     pub total_rebroadcast_nolan: Currency,
     // amount of NOLAN paid by ATR txs
     pub total_rebroadcast_fees_nolan: Currency,
-    // amount of NOLAN paid to ATR txs
+    // amount of NOLAN paid to ATR txs from treasury
     pub total_rebroadcast_staking_payouts_nolan: Currency,
+    // amount of NOLAN paid to miner from treasury
+    pub miner_payout: Currency,
     // all ATR txs hashed together
     pub rebroadcast_hash: [u8; 32],
     // dust falling off chain, needs adding to treasury
@@ -111,6 +113,7 @@ impl ConsensusValues {
             rebroadcasts: vec![],
             total_rebroadcast_slips: 0,
             total_rebroadcast_nolan: 0,
+            miner_payout: 0,
             total_rebroadcast_fees_nolan: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
             rebroadcast_hash: [0; 32],
@@ -141,6 +144,7 @@ impl ConsensusValues {
             total_rebroadcast_slips: 0,
             total_rebroadcast_nolan: 0,
             total_rebroadcast_fees_nolan: 0,
+            miner_payout: 0,
             total_rebroadcast_staking_payouts_nolan: 0,
             rebroadcast_hash: [0; 32],
             graveyard_contribution: 0,
@@ -489,7 +493,8 @@ impl Block {
         // treasury
         //
         block.treasury = previous_block_treasury + cv.treasury_contribution
-            - cv.total_rebroadcast_staking_payouts_nolan;
+            - cv.total_rebroadcast_staking_payouts_nolan
+	    - cv.miner_payout;
 
         //
         // graveyard
@@ -1192,6 +1197,11 @@ impl Block {
                 //
                 miner_payout = previous_block.treasury / GENESIS_PERIOD;
                 miner_publickey = golden_ticket.public_key;
+
+		//
+		// update CV -- needed to track treasury
+		//
+		cv.miner_payout = miner_payout;
 
                 //
                 // half to router
@@ -1909,6 +1919,7 @@ impl Block {
             let mut expected_treasury = previous_block.treasury;
             expected_treasury += cv.treasury_contribution;
             expected_treasury -= cv.total_rebroadcast_staking_payouts_nolan;
+            expected_treasury -= cv.miner_payout;
 
             if self.treasury != expected_treasury {
                 error!(
