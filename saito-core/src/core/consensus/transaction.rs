@@ -216,18 +216,13 @@ impl Transaction {
             slip.public_key = wallet.public_key;
             transaction.add_from_slip(slip);
         } else {
-            let (mut input_slips, mut output_slips) =
-                wallet.generate_slips(total_requested, network);
-            let input_len = input_slips.len();
-            let output_len = output_slips.len();
+            let (input_slips, output_slips) = wallet.generate_slips(total_requested, network);
 
-            for _i in 0..input_len {
-                transaction.add_from_slip(input_slips[0].clone());
-                input_slips.remove(0);
+            for input in input_slips {
+                transaction.add_from_slip(input);
             }
-            for _i in 0..output_len {
-                transaction.add_to_slip(output_slips[0].clone());
-                output_slips.remove(0);
+            for output in output_slips {
+                transaction.add_to_slip(output);
             }
         }
         for _i in 0..keys.len() {

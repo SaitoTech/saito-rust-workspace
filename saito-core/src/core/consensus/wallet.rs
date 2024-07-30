@@ -306,12 +306,13 @@ impl Wallet {
             input.block_id = slip.block_id;
             input.tx_ordinal = slip.tx_ordinal;
             input.slip_index = slip.slip_index;
+            input.slip_type = slip.slip_type;
             inputs.push(input);
 
             slip.spent = true;
             self.available_balance -= slip.amount;
 
-            trace!(
+            debug!(
                 "marking slip : {:?} with value : {:?} as spent",
                 slip.utxokey.to_hex(),
                 slip.amount
