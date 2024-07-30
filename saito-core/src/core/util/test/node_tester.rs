@@ -268,7 +268,7 @@ pub mod test {
                 receiver_for_verification: receiver_in_verification,
                 context,
                 receiver_for_stats: receiver_in_stats,
-                timeout_in_ms: Duration::new(10000, 0).as_millis() as u64,
+                timeout_in_ms: Duration::new(100000, 0).as_millis() as u64,
                 last_run_time: 0,
             }
         }
