@@ -3285,6 +3285,17 @@ mod tests {
 
         let fork_id_1: ForkId = tester.get_fork_id(1).await;
         tester.wait_till_block_id_with_txs(10, 10, 0).await.unwrap();
+        let fork_id_1_after: ForkId = tester.get_fork_id(1).await;
+        assert_eq!(fork_id_1, fork_id_1_after);
+
+        // only testing if the fork id is not changing when the blockchain is updated
+        let fork_id = tester.get_fork_id(10).await;
+        tester
+            .wait_till_block_id_with_txs(100, 10, 0)
+            .await
+            .unwrap();
+        let fork_id_after = tester.get_fork_id(10).await;
+        assert_eq!(fork_id, fork_id_after);
     }
 
     #[tokio::test]
