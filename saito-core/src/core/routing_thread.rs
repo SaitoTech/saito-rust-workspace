@@ -733,7 +733,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ghost_chain_gen() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
         tester
