@@ -128,7 +128,7 @@ pub mod test {
         receiver_for_verification: Receiver<VerifyRequest>,
         receiver_for_stats: Receiver<String>,
         context: Context,
-        timeout_in_ms: u64,
+        pub timeout_in_ms: u64,
         last_run_time: Timestamp,
     }
 

@@ -1831,11 +1831,11 @@ impl Blockchain {
 
 #[cfg(test)]
 mod tests {
+    use log::{debug, error, info};
     use std::fs;
     use std::ops::Deref;
     use std::sync::Arc;
-
-    use log::{debug, error, info};
+    use std::time::Duration;
     use tokio::sync::RwLock;
 
     use crate::core::consensus::blockchain::{
@@ -3349,5 +3349,87 @@ mod tests {
             .unwrap();
 
         tester.wait_till_block_id_with_txs(5, 0, 10).await.unwrap()
+    }
+
+    #[ignore]
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn load_abandoned_block() {
+        pretty_env_logger::init();
+        let block_hash;
+        {
+            let mut tester = NodeTester::default();
+            tester.delete_blocks().await.unwrap();
+            tester
+                .init_with_staking(0, 100, 100000 * NOLAN_PER_SAITO)
+                .await
+                .unwrap();
+
+            tester.wait_till_block_id_with_txs(10, 0, 10).await.unwrap();
+            block_hash = tester
+                .routing_thread
+                .blockchain_lock
+                .read()
+                .await
+                .get_latest_block_hash();
+        }
+        // check if there are 100 blocks in disk
+        {
+            let mut result = tokio::fs::read_dir("./data/blocks").await.unwrap();
+            let mut count = 0;
+            loop {
+                let entry = result.next_entry().await;
+                match entry {
+                    Ok(entry) => {
+                        if entry.is_none() {
+                            break;
+                        }
+                        let entry = entry.unwrap();
+                        let file_name = entry.file_name().to_str().unwrap().to_string();
+                        if !file_name.contains(block_hash.to_hex().as_str()) {
+                            // remove all the blocks except the last
+                            info!("removing file : {:?}", file_name);
+                            tokio::fs::remove_file(
+                                ("./data/blocks/".to_string() + file_name.as_str()).as_str(),
+                            )
+                            .await
+                            .unwrap();
+                        }
+                        count += 1;
+                    }
+                    Err(_) => {
+                        break;
+                    }
+                }
+            }
+            assert_eq!(count, 10);
+        }
+
+        {
+            let mut tester = NodeTester::default();
+            tester.timeout_in_ms = Duration::new(100, 0).as_millis() as u64;
+            tester.init().await.unwrap();
+
+            tester.wait_till_block_id_with_txs(10, 0, 10).await.unwrap();
+        }
+        {
+            let mut result = tokio::fs::read_dir("./data/blocks").await.unwrap();
+            let mut count = 0;
+            loop {
+                let entry = result.next_entry().await;
+                match entry {
+                    Ok(entry) => {
+                        if entry.is_none() {
+                            break;
+                        }
+                        count += 1;
+                    }
+                    Err(_) => {
+                        break;
+                    }
+                }
+            }
+            assert_eq!(count, 11);
+        }
     }
 }
