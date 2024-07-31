@@ -489,21 +489,24 @@ impl Block {
         //
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
-// HACK
-debug!("This is an info log");
-debug!("block treasury: {:?}", block.treasury);
-debug!("previous block treasury: {:?}", previous_block_treasury);
-debug!("cv.treasury_contribution: {:?}", cv.treasury_contribution);
-debug!("cv.trspn: {:?}", cv.total_rebroadcast_staking_payouts_nolan);
-debug!("cv.mp: {:?}", cv.miner_payout);
-debug!("avg nolan re per blk: {:?}", block.avg_nolan_rebroadcast_per_block);
+        // HACK
+        debug!("This is an info log");
+        debug!("block treasury: {:?}", block.treasury);
+        debug!("previous block treasury: {:?}", previous_block_treasury);
+        debug!("cv.treasury_contribution: {:?}", cv.treasury_contribution);
+        debug!("cv.trspn: {:?}", cv.total_rebroadcast_staking_payouts_nolan);
+        debug!("cv.mp: {:?}", cv.miner_payout);
+        debug!(
+            "avg nolan re per blk: {:?}",
+            block.avg_nolan_rebroadcast_per_block
+        );
 
         //
         // treasury
         //
         block.treasury = previous_block_treasury + cv.treasury_contribution
             - cv.total_rebroadcast_staking_payouts_nolan
-	    - cv.miner_payout;
+            - cv.miner_payout;
 
         //
         // graveyard
@@ -1073,7 +1076,6 @@ debug!("avg nolan re per blk: {:?}", block.avg_nolan_rebroadcast_per_block);
             let adjustment = (previous_block.avg_income as i128 - cv.total_fees as i128)
                 / GENESIS_PERIOD as i128;
             cv.avg_income = (cv.avg_income as i128 - adjustment) as Currency;
-
         } else {
             //
             // if there is no previous block, the burn fee is not adjusted. validation
@@ -1206,10 +1208,10 @@ debug!("avg nolan re per blk: {:?}", block.avg_nolan_rebroadcast_per_block);
                 miner_payout = previous_block.treasury / GENESIS_PERIOD;
                 miner_publickey = golden_ticket.public_key;
 
-		//
-		// update CV -- needed to track treasury
-		//
-		cv.miner_payout = miner_payout;
+                //
+                // update CV -- needed to track treasury
+                //
+                cv.miner_payout = miner_payout;
 
                 //
                 // half to router
@@ -1365,22 +1367,20 @@ debug!("avg nolan re per blk: {:?}", block.avg_nolan_rebroadcast_per_block);
         storage: &Storage,
         cv: &mut ConsensusValues,
     ) {
-
-	//
+        //
         // we need to be at least 1 genesis period deep
-	//
+        //
         if self.id > GENESIS_PERIOD {
-
-	    //
+            //
             // fetch block with slips to rebroadcast
-	    //
+            //
             let pruned_block_hash = blockchain
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
 
-	    //
-	    // load it
-	    //
+            //
+            // load it
+            //
             if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
                 let result = storage
                     .load_block_from_disk(storage.generate_block_filepath(pruned_block).as_str())
@@ -1392,7 +1392,6 @@ debug!("avg nolan re per blk: {:?}", block.avg_nolan_rebroadcast_per_block);
                     );
                     error!("{:?}", result.err().unwrap());
                 } else {
-
                     let mut atr_block = result.unwrap();
                     atr_block.generate();
                     assert_ne!(
@@ -1406,20 +1405,22 @@ debug!("avg nolan re per blk: {:?}", block.avg_nolan_rebroadcast_per_block);
                     //
                     let expected_utxo_staked = GENESIS_PERIOD * cv.avg_nolan_rebroadcast_per_block;
 
-//
-// HACK
-//
-debug!("avg nolan re per blk: {:?}", cv.avg_nolan_rebroadcast_per_block);
-debug!("expected_utx_staked: {:?}", expected_utxo_staked);
-debug!("self.treasury: {:?}", self.treasury);
-debug!("cv.avg_fee_per_byte: {:?}", cv.avg_fee_per_byte);
-                //
-                // we target a single solution every 2 blocks, so the miner
-                // payout should be TREASURY / 2 / GENESIS_PERIOD * 2 ==>
-                //
-//                miner_payout = previous_block.treasury / GENESIS_PERIOD;
-//                miner_publickey = golden_ticket.public_key;
-
+                    //
+                    // HACK
+                    //
+                    debug!(
+                        "avg nolan re per blk: {:?}",
+                        cv.avg_nolan_rebroadcast_per_block
+                    );
+                    debug!("expected_utx_staked: {:?}", expected_utxo_staked);
+                    debug!("self.treasury: {:?}", self.treasury);
+                    debug!("cv.avg_fee_per_byte: {:?}", cv.avg_fee_per_byte);
+                    //
+                    // we target a single solution every 2 blocks, so the miner
+                    // payout should be TREASURY / 2 / GENESIS_PERIOD * 2 ==>
+                    //
+                    //                miner_payout = previous_block.treasury / GENESIS_PERIOD;
+                    //                miner_publickey = golden_ticket.public_key;
 
                     let expected_utxo_payout = if expected_utxo_staked > 0 {
                         (self.treasury / 2) / expected_utxo_staked
@@ -1465,14 +1466,14 @@ debug!("cv.avg_fee_per_byte: {:?}", cv.avg_fee_per_byte);
                             // users who wish to minimize ATR fees should avoid creating transactions
                             // with multiple unspent UTXO .
                             for output in outputs {
-debug!("output amount: {:?}", output.amount);
-debug!("expected_atr_multiplier: {:?}", expected_atr_multiplier);
+                                debug!("output amount: {:?}", output.amount);
+                                debug!("expected_atr_multiplier: {:?}", expected_atr_multiplier);
                                 let atr_payout_for_slip = output.amount * expected_atr_multiplier;
-                                let mut surplus_payout_to_subtract_from_treasury = atr_payout_for_slip - output.amount;
+                                let mut surplus_payout_to_subtract_from_treasury =
+                                    atr_payout_for_slip - output.amount;
                                 let atr_fee_for_slip = atr_fee;
 
                                 if atr_payout_for_slip > atr_fee {
-
                                     cv.total_rebroadcast_nolan += output.amount;
                                     cv.total_rebroadcast_slips += 1;
 
@@ -1480,9 +1481,10 @@ debug!("expected_atr_multiplier: {:?}", expected_atr_multiplier);
                                     slip.slip_type = SlipType::ATR;
                                     slip.amount = atr_payout_for_slip - atr_fee_for_slip;
 
-debug!("total rebroadcast --- atr payout for slip -- atr_fee_for_slip {:?} - {:?}", atr_payout_for_slip, atr_fee_for_slip);
+                                    debug!("total rebroadcast --- atr payout for slip -- atr_fee_for_slip {:?} - {:?}", atr_payout_for_slip, atr_fee_for_slip);
 
-                                    cv.total_rebroadcast_staking_payouts_nolan += surplus_payout_to_subtract_from_treasury;
+                                    cv.total_rebroadcast_staking_payouts_nolan +=
+                                        surplus_payout_to_subtract_from_treasury;
                                     cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
 
                                     // create our ATR rebroadcast transaction
