@@ -1469,7 +1469,7 @@ impl Block {
                                 debug!("output amount: {:?}", output.amount);
                                 debug!("expected_atr_multiplier: {:?}", expected_atr_multiplier);
                                 let atr_payout_for_slip = output.amount * expected_atr_multiplier;
-                                let mut surplus_payout_to_subtract_from_treasury =
+                                let surplus_payout_to_subtract_from_treasury =
                                     atr_payout_for_slip - output.amount;
                                 let atr_fee_for_slip = atr_fee;
 
