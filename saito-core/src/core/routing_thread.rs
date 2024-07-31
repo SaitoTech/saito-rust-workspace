@@ -732,6 +732,7 @@ mod tests {
     use crate::core::util::test::node_tester::test::NodeTester;
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_ghost_chain_gen() {
         // pretty_env_logger::init();
         let peer_public_key = generate_keys().0;
