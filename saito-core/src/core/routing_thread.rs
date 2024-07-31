@@ -723,3 +723,69 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         self.stat_sender.send(stat).await.unwrap();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::core::defs::NOLAN_PER_SAITO;
+    use crate::core::routing_thread::RoutingThread;
+    use crate::core::util::crypto::generate_keys;
+    use crate::core::util::test::node_tester::test::NodeTester;
+
+    #[tokio::test]
+    async fn test_ghost_chain_gen() {
+        pretty_env_logger::init();
+        let peer_public_key = generate_keys().0;
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        tester.wait_till_block_id_with_txs(100, 0, 0).await.unwrap();
+
+        {
+            let fork_id = tester.get_fork_id(50).await;
+            let blockchain = tester.routing_thread.blockchain_lock.read().await;
+
+            let ghost_chain =
+                RoutingThread::generate_ghost_chain(50, fork_id, blockchain, peer_public_key);
+
+            assert_eq!(ghost_chain.block_ids.len(), 10);
+            assert_eq!(ghost_chain.block_ts.len(), 10);
+            assert_eq!(ghost_chain.gts.len(), 10);
+            assert_eq!(ghost_chain.prehashes.len(), 10);
+            assert_eq!(ghost_chain.previous_block_hashes.len(), 10);
+            assert!(ghost_chain.txs.iter().all(|x| !(*x)));
+        }
+
+        {
+            let tx = tester
+                .create_transaction(100, 10, peer_public_key)
+                .await
+                .unwrap();
+            tester.add_transaction(tx).await;
+        }
+
+        tester.wait_till_block_id(101).await.unwrap();
+
+        tester
+            .wait_till_block_id_with_txs(105, 10, 0)
+            .await
+            .unwrap();
+
+        {
+            let block_id = 101;
+            let fork_id = tester.get_fork_id(block_id).await;
+            let blockchain = tester.routing_thread.blockchain_lock.read().await;
+            let ghost_chain =
+                RoutingThread::generate_ghost_chain(block_id, fork_id, blockchain, peer_public_key);
+
+            assert_eq!(ghost_chain.block_ids.len(), 5);
+            assert_eq!(ghost_chain.block_ts.len(), 5);
+            assert_eq!(ghost_chain.gts.len(), 5);
+            assert_eq!(ghost_chain.prehashes.len(), 5);
+            assert_eq!(ghost_chain.previous_block_hashes.len(), 5);
+            assert_eq!(ghost_chain.txs.iter().filter(|x| **x).count(), 1);
+        }
+    }
+}

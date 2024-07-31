@@ -3296,6 +3296,8 @@ mod tests {
             .unwrap();
         let fork_id_after = tester.get_fork_id(10).await;
         assert_eq!(fork_id, fork_id_after);
+
+        {}
     }
 
     #[tokio::test]
