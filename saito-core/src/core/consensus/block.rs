@@ -1181,7 +1181,7 @@ impl Block {
         // if this block contains a golden ticket
         //
         if let Some(gt_index) = cv.gt_index {
-            trace!("there is a golden ticket: {:?}", cv.gt_index);
+            debug!("there is a golden ticket: {:?}", cv.gt_index);
 
             //
             // golden ticket needed to process payout
@@ -1194,6 +1194,10 @@ impl Block {
             // load the previous block
             //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+
+            debug!("previous block exists!");
+
+
                 //
                 // half to treasury (miner + atr)
                 //
@@ -1327,6 +1331,7 @@ impl Block {
                 output.tx_ordinal = num_non_fee_transactions + 1;
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
+                slip_index += 1;
             }
             if router1_publickey != [0; 33] {
                 let mut output = Slip::default();
@@ -1356,6 +1361,9 @@ debug!("total_fees_in_normal_txs: {:?}", total_fees_in_normal_txs);
 debug!("miner payout: {:?}", miner_payout);
 debug!("router1 payout: {:?}", router1_payout);
 debug!("router2 payout: {:?}", router2_payout);
+debug!("miner pkey: {:?}", miner_publickey);
+debug!("router1 pkey: {:?}", router1_publickey);
+debug!("router2 pkey: {:?}", router2_publickey);
 
             cv.fee_transaction = Some(transaction);
         } else {
@@ -2219,12 +2227,20 @@ debug!("our hash1 is: {:?}: ", hash1);
 debug!("our hash2 is: {:?}: ", hash2);
 
                 if hash1 != hash2 {
+
+
                     error!(
                         "ERROR 892032: block {} fee transaction doesn't match cv-expected fee transaction",
                         self.id
                     );
-                    info!("expected = {:?}", fee_transaction_expected);
-                    info!("actual   = {:?}", fee_transaction_in_block);
+                    error!("expected = {:?}", &fee_transaction_expected.serialize_for_signature());
+                    error!("actual   = {:?}", &fee_transaction_in_block.serialize_for_signature());
+        		if let Some(gt_index) = cv.gt_index {
+            let golden_ticket: GoldenTicket =
+                GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
+                    error!("gt.publickey = {:?}", golden_ticket.public_key);
+			}
+
                     return false;
                 }
             }
