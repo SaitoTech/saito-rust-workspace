@@ -84,8 +84,6 @@ pub struct ConsensusValues {
     pub treasury_contribution: Currency,
     // amount to add to staker treasury in block
     pub graveyard_contribution: Currency,
-    // amount to add to staker treasury in block DEPRECATED
-    pub staking_payout: Currency,
     #[serde(skip)]
     // average income
     pub avg_income: Currency,
@@ -121,7 +119,6 @@ impl ConsensusValues {
             graveyard_contribution: 0,
             treasury_contribution: 0,
             nolan_falling_off_chain: 0,
-            staking_payout: 0, // DEPRECATED
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -151,7 +148,6 @@ impl ConsensusValues {
             graveyard_contribution: 0,
             treasury_contribution: 0,
             nolan_falling_off_chain: 0,
-            staking_payout: 0, // DEPRECATED
             avg_income: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -1173,7 +1169,6 @@ impl Block {
         let mut router1_publickey: SaitoPublicKey = [0; 33];
         let mut router2_payout: Currency = 0;
         let mut router2_publickey: SaitoPublicKey = [0; 33];
-        let staking_payout: Currency = 0;
         let mut treasury_contribution: Currency = 0;
         let mut graveyard_contribution: Currency = 0;
 
