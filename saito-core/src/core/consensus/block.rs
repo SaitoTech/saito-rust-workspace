@@ -1483,6 +1483,13 @@ debug!("router2 pkey: {:?}", router2_publickey);
                         0
                     };
 
+		    //
+                    // +1 gives us a figure we can multiply any UTXO by in order to
+                    // determine the total amount that should be issued in the ATR 
+		    // transaction.
+		    //
+                    let expected_atr_multiplier = 1 + expected_utxo_payout;
+
 //
 // HACK
 //
@@ -1492,13 +1499,7 @@ debug!("self.treasury: {:?}", self.treasury);
 debug!("cv.avg_fee_per_byte: {:?}", cv.avg_fee_per_byte);
 debug!("total_utxo_staked : {:?}", total_utxo_staked);
 debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
-
-		    //
-                    // +1 gives us a figure we can multiply any UTXO by in order to
-                    // determine the total amount that should be issued in the ATR 
-		    // transaction.
-		    //
-                    let expected_atr_multiplier = 1 + expected_utxo_payout;
+debug!("expected_atr_multiplier : {:?}", expected_atr_multiplier);
 
 		    //
                     // now loop through block to find eligible transactions
@@ -1548,6 +1549,7 @@ debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
 				// not pass this criteria have their fee collected but are not issued a payout.
 				//
                                 if atr_payout_for_slip > atr_fee {
+
                                     cv.total_rebroadcast_nolan += output.amount;
                                     cv.total_rebroadcast_slips += 1;
 
@@ -1597,6 +1599,52 @@ debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
                             }
                         } // output
                     }
+
+
+		    //
+		    // if ATR payouts are too large a portion of treasury, we adjust payout downwards
+		    //
+		    // if the blockchain does not have many unspent NOLAN but a very large amount of 
+		    // NOLAN are found in this block, then the amount we expect to pay can be a much 
+		    // larger portion of the treasury than we expect. in this case we want to reduce
+		    // the amount of the treasury that we issue to no more than 5% of the amount in
+		    // the treasury. this allows the AVG to increase withouth enabling cheap attacks
+		    // that might drain the treasury. it should only be a concern (hypothetically) in
+		    // the early stages of the blockchain.
+		    //
+		    if cv.total_rebroadcast_staking_payouts_nolan > (self.treasury as f64 * 0.05) as u64 {
+
+			let mut max_total_payout = (self.treasury as f64 * 0.05) as u64;
+			let mut unadjusted_total_nolan = cv.total_rebroadcast_nolan;
+			let adjusted_atr_payout_multiplier = (max_total_payout / unadjusted_total_nolan);
+			let adjusted_output_multiplier = 1 + adjusted_atr_payout_multiplier;
+			let mut adjusted_total_rebroadcast_staking_payouts_nolan: Currency = 0;
+                        let mut adjusted_total_rebroadcast_fees_nolan: Currency = 0;
+
+			//
+			// we re-determine our multiplier for the ATR payout based on our
+			// max_total_payout divided by the unadjusted_total_nolan that we
+			// are rebroadcasting. 
+			//
+                        for rebroadcast_tx in &mut cv.rebroadcasts {
+
+			    //
+			    // update the amount that is in the output transaction according
+			    // to the amount in the input transaction. since this isn't a common
+			    // edge-case and cannot be systematically abused we're going to forgo
+			    // the rebroadcast fee in this case, and assume it is covered by the 
+			    // reduced payout.
+			    //
+			    rebroadcast_tx.to[0].amount = rebroadcast_tx.from[0].amount * adjusted_output_multiplier;
+			    adjusted_total_rebroadcast_staking_payouts_nolan += rebroadcast_tx.to[0].amount;
+			    adjusted_total_rebroadcast_staking_payouts_nolan -= rebroadcast_tx.from[0].amount;
+
+			}
+		    }
+
+debug!("self.treasury: {:?}", self.treasury);
+
+
 
 		    //
                     // tx

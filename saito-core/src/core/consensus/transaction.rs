@@ -134,6 +134,7 @@ impl Transaction {
         self.to.push(output_slip);
     }
 
+    
     /// this function exists largely for testing. It attempts to attach the requested fee
     /// to the transaction if possible. If not possible it reverts back to a transaction
     /// with 1 zero-fee input and 1 zero-fee output.
