@@ -86,7 +86,7 @@ pub struct ConsensusValues {
     pub graveyard_contribution: Currency,
     #[serde(skip)]
     // average income
-    pub avg_income: Currency,
+    pub avg_total_fees: Currency,
     // average fee per byte
     pub avg_fee_per_byte: Currency,
     // average nolan rebroadcast per block
@@ -119,7 +119,7 @@ impl ConsensusValues {
             graveyard_contribution: 0,
             treasury_contribution: 0,
             nolan_falling_off_chain: 0,
-            avg_income: 0,
+            avg_total_fees: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
         }
@@ -148,7 +148,7 @@ impl ConsensusValues {
             graveyard_contribution: 0,
             treasury_contribution: 0,
             nolan_falling_off_chain: 0,
-            avg_income: 0,
+            avg_total_fees: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
         }
@@ -196,7 +196,7 @@ pub struct Block {
     pub burnfee: Currency,
     pub difficulty: u64,
     pub treasury: Currency,
-    pub avg_income: Currency,
+    pub avg_total_fees: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
     pub previous_block_unpaid: Currency,
@@ -279,7 +279,7 @@ impl Block {
             burnfee: 0,
             difficulty: 0,
             treasury: 0,
-            avg_income: 0,
+            avg_total_fees: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
             previous_block_unpaid: 0,
@@ -474,7 +474,7 @@ impl Block {
         //
         // avg fee
         //
-        block.avg_income = cv.avg_income;
+        block.avg_total_fees = cv.avg_total_fees;
 
         //
         // fee per byte
@@ -599,7 +599,7 @@ impl Block {
         let treasury: Currency = Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
         let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
         let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
-        let avg_income: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
+        let avg_total_fees: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
         let avg_fee_per_byte: Currency =
             Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
         let avg_nolan_rebroadcast_per_block: Currency =
@@ -672,7 +672,7 @@ impl Block {
         block.treasury = treasury;
         block.burnfee = burnfee;
         block.difficulty = difficulty;
-        block.avg_income = avg_income;
+        block.avg_total_fees = avg_total_fees;
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
         block.previous_block_unpaid = previous_block_unpaid;
@@ -1073,22 +1073,22 @@ impl Block {
             //
             // average income = smoothed fees per block
             //
-            cv.avg_income = previous_block.avg_income;
+            cv.avg_total_fees = previous_block.avg_total_fees;
             cv.avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
 
             //
             // average income adjusts gradually over the genesis period
             //
-            let adjustment = (previous_block.avg_income as i128 - cv.total_fees as i128)
+            let adjustment = (previous_block.avg_total_fees as i128 - cv.total_fees as i128)
                 / GENESIS_PERIOD as i128;
-            cv.avg_income = (cv.avg_income as i128 - adjustment) as Currency;
+            cv.avg_total_fees = (cv.avg_total_fees as i128 - adjustment) as Currency;
         } else {
             //
             // if there is no previous block, the burn fee is not adjusted. validation
             // rules will cause the block to fail unless it is the first block. average
-            // income is set to whatever the block avg_income is set to.
+            // income is set to whatever the block avg_total_fees is set to.
             //
-            cv.avg_income = self.avg_income;
+            cv.avg_total_fees = self.avg_total_fees;
             cv.expected_burnfee = self.burnfee;
             cv.expected_difficulty = self.difficulty;
         }
@@ -1202,7 +1202,7 @@ impl Block {
                 // to increase their chance of payout.
                 //
                 let expected_treasury_contribution = previous_block.total_fees / 2;
-                let maximum_treasury_contribution = (previous_block.avg_income as f64 * 1.5) as u64;
+                let maximum_treasury_contribution = (previous_block.avg_total_fees as f64 * 1.5) as u64;
                 if expected_treasury_contribution > maximum_treasury_contribution {
                     treasury_contribution = maximum_treasury_contribution;
                     graveyard_contribution +=
@@ -1277,7 +1277,7 @@ impl Block {
                         let expected_treasury_contribution2 =
                             previous_previous_block.total_fees / 2;
                         let maximum_treasury_contribution2 =
-                            (previous_block.avg_income as f64 * 1.5) as u64;
+                            (previous_block.avg_total_fees as f64 * 1.5) as u64;
                         if expected_treasury_contribution2 > maximum_treasury_contribution2 {
                             treasury_contribution += maximum_treasury_contribution2;
                             graveyard_contribution +=
@@ -1661,7 +1661,7 @@ debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
             self.treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
-            self.avg_income.to_be_bytes().as_slice(),
+            self.avg_total_fees.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
@@ -1683,7 +1683,7 @@ debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
     /// [treasury - 8 bytes - u64]
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
-    /// [avg_income - 8 bytes - u64]
+    /// [avg_total_fees - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
         let mut tx_len_buffer: Vec<u8> = vec![];
@@ -1714,7 +1714,7 @@ debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
             self.treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
-            self.avg_income.to_be_bytes().as_slice(),
+            self.avg_total_fees.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
@@ -1883,7 +1883,7 @@ debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
         block.graveyard = self.graveyard;
         block.treasury = self.treasury;
         block.signature = self.signature;
-        block.avg_income = self.avg_income;
+        block.avg_total_fees = self.avg_total_fees;
         block.avg_fee_per_byte = self.avg_fee_per_byte;
         block.previous_block_unpaid = self.previous_block_unpaid;
         block.avg_nolan_rebroadcast_per_block = self.avg_nolan_rebroadcast_per_block;
@@ -1954,10 +1954,10 @@ debug!("expected_utxo_payout : {:?}", expected_utxo_payout);
         //
         // consensus values -> average number of fees in the block
         //
-        if cv.avg_income != self.avg_income {
+        if cv.avg_total_fees != self.avg_total_fees {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
-                self.avg_income, cv.avg_income
+                self.avg_total_fees, cv.avg_total_fees
             );
             return false;
         }
@@ -2498,7 +2498,7 @@ mod tests {
         assert_eq!(block.treasury, lite_block.treasury);
         assert_eq!(block.burnfee, lite_block.burnfee);
         assert_eq!(block.difficulty, lite_block.difficulty);
-        assert_eq!(block.avg_income, lite_block.avg_income);
+        assert_eq!(block.avg_total_fees, lite_block.avg_total_fees);
         assert_eq!(block.avg_fee_per_byte, lite_block.avg_fee_per_byte);
         assert_eq!(
             block.avg_nolan_rebroadcast_per_block,
@@ -2855,7 +2855,7 @@ mod tests {
         println!("cv : {:?} \n", cv);
 
         // TODO : check the values in the below asserts
-        // assert_eq!(cv.avg_income, 3290);
+        // assert_eq!(cv.avg_total_fees, 3290);
         // assert_eq!(cv.total_fees, 5100);
         // assert_eq!(cv.expected_burnfee, 1562500);
         assert_eq!(cv.rebroadcasts.len(), 0);
@@ -2886,7 +2886,7 @@ mod tests {
         println!("cv2 : {:?}", cv);
 
         // TODO : check the values in the below asserts
-        // assert_eq!(cv.avg_income, 3471);
+        // assert_eq!(cv.avg_total_fees, 3471);
         // assert_eq!(cv.total_fees, 5100);
         // assert_eq!(cv.expected_burnfee, 1104854);
         assert_eq!(cv.rebroadcasts.len(), 1);
