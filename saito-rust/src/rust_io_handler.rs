@@ -151,6 +151,8 @@ impl InterfaceIO for RustIOHandler {
             return Err(result.err().unwrap());
         }
 
+        // TODO : write the file to a temp file and move to avoid file corruptions
+
         Ok(())
     }
 
@@ -169,6 +171,7 @@ impl InterfaceIO for RustIOHandler {
 
         let file = self.open_files.get_mut(key).unwrap();
 
+        // TODO : write the file to a temp file and move to avoid file corruptions
         let result = file.write_all(value).await;
         if result.is_err() {
             return Err(result.err().unwrap());
