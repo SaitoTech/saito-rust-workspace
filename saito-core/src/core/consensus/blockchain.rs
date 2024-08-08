@@ -2672,7 +2672,7 @@ mod tests {
     async fn block_add_test_staking() {
         // pretty_env_logger::init();
 
-debug!("testing block_add_test_staking");
+        debug!("testing block_add_test_staking");
 
         let mut t = TestManager::default();
         t.enable_staking(DEFAULT_SOCIAL_STAKE).await;
