@@ -32,6 +32,7 @@ pub struct MiningThread {
     pub timer: Timer,
     pub miner_active: bool,
     pub target: SaitoHash,
+    pub target_id: BlockId,
     pub difficulty: u64,
     pub public_key: SaitoPublicKey,
     pub mined_golden_tickets: u64,
@@ -40,6 +41,7 @@ pub struct MiningThread {
     // todo : make this private and init using configs
     pub enabled: bool,
     pub mining_iterations: u32,
+    pub mining_start: Timestamp,
 }
 
 impl MiningThread {
@@ -62,12 +64,14 @@ impl MiningThread {
         let gt = GoldenTicket::create(self.target, random_bytes, self.public_key);
         if gt.validate(self.difficulty) {
             info!(
-                "golden ticket found. sending to mempool. previous block : {:?} random : {:?} key : {:?} solution : {:?} for difficulty : {:?}",
+                "golden ticket found. sending to mempool. previous block : {:?}:{:?}\n random : {:?} key : {:?} solution : {:?}\n for difficulty : {:?}\n spent_time : {:?}",
+                self.target_id,
                 gt.target.to_hex(),
                 gt.random.to_hex(),
                 gt.public_key.to_base58(),
                 hash(&gt.serialize_for_net()).to_hex(),
-                self.difficulty
+                self.difficulty,
+                (self.timer.get_timestamp_in_ms()-self.mining_start)
             );
             self.miner_active = false;
             self.mined_golden_tickets += 1;
@@ -121,7 +125,9 @@ impl ProcessEvent<MiningEvent> for MiningThread {
                 );
                 self.difficulty = difficulty;
                 self.target = hash;
+                self.target_id = block_id;
                 self.miner_active = true;
+                self.mining_start = self.timer.get_timestamp_in_ms();
                 Some(())
             }
         };

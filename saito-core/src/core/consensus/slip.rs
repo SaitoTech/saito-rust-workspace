@@ -64,6 +64,10 @@ impl Slip {
             error!("ERROR 572034: asked to remove a slip without its utxoset_key properly set!");
             false;
         }
+        debug!(
+            "deleting slip from utxo : {:?}-{:?}-{:?} with value : {:?}",
+            self.block_id, self.tx_ordinal, self.slip_index, self.amount
+        );
         utxoset.remove_entry(&self.get_utxoset_key());
         true
     }
@@ -142,8 +146,24 @@ impl Slip {
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, spendable: bool) {
         if self.amount > 0 {
             if spendable {
+                debug!(
+                    "adding slip to utxo : {:?}-{:?}-{:?} with value : {:?} key: {:?}",
+                    self.block_id,
+                    self.tx_ordinal,
+                    self.slip_index,
+                    self.amount,
+                    self.utxoset_key.to_hex()
+                );
                 utxoset.insert(self.utxoset_key, spendable);
             } else {
+                debug!(
+                    "removing slip from utxo : {:?}-{:?}-{:?} with value : {:?} key: {:?}",
+                    self.block_id,
+                    self.tx_ordinal,
+                    self.slip_index,
+                    self.amount,
+                    self.utxoset_key.to_hex()
+                );
                 utxoset.remove(&self.utxoset_key);
             }
         }

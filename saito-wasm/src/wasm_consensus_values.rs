@@ -132,7 +132,12 @@ impl WasmConsensusValues {
 
     #[wasm_bindgen(getter = avg_income)]
     pub fn avg_income(&self) -> u64 {
-        self.cv.avg_income
+        self.cv.avg_total_fees
+    }
+
+    #[wasm_bindgen(getter = avg_total_fees)]
+    pub fn avg_total_fees(&self) -> u64 {
+        self.cv.avg_total_fees
     }
 }
 
