@@ -4,7 +4,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
@@ -237,6 +237,24 @@ impl RoutingThread {
                 .unwrap();
         }
 
+        let ghost = Self::generate_ghost_chain(block_id, fork_id, blockchain, peer_public_key);
+
+        debug!("sending ghost chain to peer : {:?}", peer_index);
+        // debug!("ghost : {:?}", ghost);
+        let buffer = Message::GhostChain(ghost).serialize();
+        self.network
+            .io_interface
+            .send_message(peer_index, buffer.as_slice())
+            .await
+            .unwrap();
+    }
+
+    pub(crate) fn generate_ghost_chain(
+        block_id: u64,
+        fork_id: SaitoHash,
+        blockchain: RwLockReadGuard<Blockchain>,
+        peer_public_key: SaitoPublicKey,
+    ) -> GhostChainSync {
         let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
 
         debug!("last_shared_ancestor 1 : {:?}", last_shared_ancestor);
@@ -288,15 +306,7 @@ impl RoutingThread {
                 }
             }
         }
-
-        debug!("sending ghost chain to peer : {:?}", peer_index);
-        // debug!("ghost : {:?}", ghost);
-        let buffer = Message::GhostChain(ghost).serialize();
-        self.network
-            .io_interface
-            .send_message(peer_index, buffer.as_slice())
-            .await
-            .unwrap();
+        ghost
     }
 
     async fn handle_new_peer(&mut self, peer_index: u64) {
@@ -711,5 +721,72 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             peers_in_handshake,
         );
         self.stat_sender.send(stat).await.unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::defs::NOLAN_PER_SAITO;
+    use crate::core::routing_thread::RoutingThread;
+    use crate::core::util::crypto::generate_keys;
+    use crate::core::util::test::node_tester::test::NodeTester;
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_ghost_chain_gen() {
+        // pretty_env_logger::init();
+        let peer_public_key = generate_keys().0;
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        tester.wait_till_block_id_with_txs(100, 0, 0).await.unwrap();
+
+        {
+            let fork_id = tester.get_fork_id(50).await;
+            let blockchain = tester.routing_thread.blockchain_lock.read().await;
+
+            let ghost_chain =
+                RoutingThread::generate_ghost_chain(50, fork_id, blockchain, peer_public_key);
+
+            assert_eq!(ghost_chain.block_ids.len(), 10);
+            assert_eq!(ghost_chain.block_ts.len(), 10);
+            assert_eq!(ghost_chain.gts.len(), 10);
+            assert_eq!(ghost_chain.prehashes.len(), 10);
+            assert_eq!(ghost_chain.previous_block_hashes.len(), 10);
+            assert!(ghost_chain.txs.iter().all(|x| !(*x)));
+        }
+
+        {
+            let tx = tester
+                .create_transaction(100, 10, peer_public_key)
+                .await
+                .unwrap();
+            tester.add_transaction(tx).await;
+        }
+
+        tester.wait_till_block_id(101).await.unwrap();
+
+        tester
+            .wait_till_block_id_with_txs(105, 10, 0)
+            .await
+            .unwrap();
+
+        {
+            let block_id = 101;
+            let fork_id = tester.get_fork_id(block_id).await;
+            let blockchain = tester.routing_thread.blockchain_lock.read().await;
+            let ghost_chain =
+                RoutingThread::generate_ghost_chain(block_id, fork_id, blockchain, peer_public_key);
+
+            assert_eq!(ghost_chain.block_ids.len(), 5);
+            assert_eq!(ghost_chain.block_ts.len(), 5);
+            assert_eq!(ghost_chain.gts.len(), 5);
+            assert_eq!(ghost_chain.prehashes.len(), 5);
+            assert_eq!(ghost_chain.previous_block_hashes.len(), 5);
+            assert_eq!(ghost_chain.txs.iter().filter(|x| **x).count(), 1);
+        }
     }
 }

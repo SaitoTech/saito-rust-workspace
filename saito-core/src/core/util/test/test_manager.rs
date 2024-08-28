@@ -366,7 +366,7 @@ pub mod test {
             // of four places
             //
             // - block.treasury
-            // - block.limbo
+            // - block.graveyard
             // - collected current block (N)
             // - collected previous block (N-1)
             //
@@ -383,19 +383,19 @@ pub mod test {
 
             let mut previous_block_treasury: Currency = 0;
             let mut current_block_treasury: Currency = 0;
-            let mut previous_block_limbo: Currency = 0;
-            let mut current_block_limbo: Currency = 0;
+            let mut previous_block_graveyard: Currency = 0;
+            let mut current_block_graveyard: Currency = 0;
             let mut previous_block_previous_block_unpaid: Currency = 0;
             let mut current_block_previous_block_unpaid: Currency = 0;
             let mut current_block_missing_tokens: i128 = 0;
             let mut previous_block_missing_tokens: i128 = 0;
 
             let mut current_block_net_change_in_treasury: i128 = 0;
-            let mut current_block_net_change_in_limbo: i128 = 0;
+            let mut current_block_net_change_in_graveyard: i128 = 0;
             let mut current_block_net_change_in_utxo: i128 = 0;
 
             let mut previous_block_net_change_in_treasury: i128 = 0;
-            let mut previous_block_net_change_in_limbo: i128 = 0;
+            let mut previous_block_net_change_in_graveyard: i128 = 0;
             let mut previous_block_net_change_in_utxo: i128 = 0;
 
             let mut amount_of_tokens_unaccounted_for: i128 = 0;
@@ -418,11 +418,11 @@ pub mod test {
                 block_contains_fee_tx = false;
 
                 previous_block_treasury = current_block_treasury;
-                current_block_treasury = block.limbo;
+                current_block_treasury = block.treasury;
 
                 for t in 0..block.transactions.len() {
                     //
-                    // the difference in the staking_treasury.
+                    // the difference in the treasury
                     //
                     if block.transactions[t].transaction_type == TransactionType::Fee {
                         block_contains_fee_tx = true;
@@ -444,11 +444,10 @@ pub mod test {
                 // block #1 sets circulation
                 //
                 if i == 1 {
-                    token_supply = block_outputs + block.limbo + block.treasury;
+                    token_supply = block_outputs + block.graveyard + block.treasury;
                     spendable_supply = block_outputs;
-
                     current_block_treasury = block.treasury;
-                    current_block_limbo = block.limbo;
+                    current_block_graveyard = block.graveyard;
                     current_block_previous_block_unpaid = 0;
                 } else {
                     println!(
@@ -460,7 +459,7 @@ pub mod test {
                     // update current variables
                     //
                     current_block_treasury = block.treasury;
-                    current_block_limbo = block.limbo;
+                    current_block_graveyard = block.graveyard;
                     current_block_previous_block_unpaid = block.previous_block_unpaid;
 
                     //
@@ -468,8 +467,8 @@ pub mod test {
                     //
                     current_block_net_change_in_treasury =
                         current_block_treasury as i128 - previous_block_treasury as i128;
-                    current_block_net_change_in_limbo =
-                        current_block_limbo as i128 - previous_block_limbo as i128;
+                    current_block_net_change_in_graveyard =
+                        current_block_graveyard as i128 - previous_block_graveyard as i128;
                     current_block_net_change_in_utxo = block_outputs as i128 - block_inputs as i128;
 
                     //
@@ -489,7 +488,7 @@ pub mod test {
                     current_block_missing_tokens = token_supply as i128
                         - new_spendable_supply as i128
                         - current_block_treasury as i128
-                        - current_block_limbo as i128
+                        - current_block_graveyard as i128
                         - current_block_previous_block_unpaid as i128;
 
                     amount_of_tokens_unaccounted_for =
@@ -509,8 +508,8 @@ pub mod test {
                         current_block_net_change_in_treasury
                     );
                     println!(
-                        "current_block_net_change_in_limbo : {:?}",
-                        current_block_net_change_in_limbo
+                        "current_block_net_change_in_graveyard : {:?}",
+                        current_block_net_change_in_graveyard
                     );
                     println!(
                         "current_block_net_change_in_utxo : {:?}",
@@ -525,8 +524,8 @@ pub mod test {
                         previous_block_net_change_in_treasury
                     );
                     println!(
-                        "previous_block_net_change_in_limbo : {:?}",
-                        previous_block_net_change_in_limbo
+                        "previous_block_net_change_in_graveyard : {:?}",
+                        previous_block_net_change_in_graveyard
                     );
                     println!(
                         "previous_block_net_change_in_utxo : {:?}",
@@ -565,12 +564,12 @@ pub mod test {
                     spendable_supply = new_spendable_supply as u64;
 
                     previous_block_treasury = current_block_treasury;
-                    previous_block_limbo = current_block_limbo;
+                    previous_block_graveyard = current_block_graveyard;
                     previous_block_previous_block_unpaid = current_block_previous_block_unpaid;
                     previous_block_missing_tokens = current_block_missing_tokens;
 
                     previous_block_net_change_in_treasury = current_block_net_change_in_treasury;
-                    previous_block_net_change_in_limbo = current_block_net_change_in_limbo;
+                    previous_block_net_change_in_graveyard = current_block_net_change_in_graveyard;
                     previous_block_net_change_in_utxo = current_block_net_change_in_utxo;
                 }
             }

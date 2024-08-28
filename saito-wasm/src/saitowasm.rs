@@ -160,6 +160,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             timer: timer.clone(),
             miner_active: false,
             target: [0; 32],
+            target_id: 0,
             difficulty: 0,
             public_key: [0; 33],
             mined_golden_tickets: 0,
@@ -167,6 +168,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             config_lock: configuration.clone(),
             enabled: true,
             mining_iterations: 1_000,
+            mining_start: 0,
         },
         verification_thread: VerificationThread {
             sender_to_consensus: sender_to_consensus.clone(),
