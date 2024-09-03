@@ -16,9 +16,9 @@ use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDATED};
 use crate::core::defs::{
-    BlockHash, BlockId, Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
+    BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
     Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
-    MIN_GOLDEN_TICKETS_NUMERATOR, NOLAN_PER_SAITO, PRUNE_AFTER_BLOCKS,
+    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -590,8 +590,8 @@ impl Blockchain {
         }
     }
 
-    pub fn generate_fork_id(&self, block_id: u64) -> SaitoHash {
-        let mut fork_id = [0; 32];
+    pub fn generate_fork_id(&self, block_id: u64) -> ForkId {
+        let mut fork_id: ForkId = [0; 32];
         let mut current_block_id = block_id;
 
         // roll back to last even 10 blocks
@@ -1831,11 +1831,11 @@ impl Blockchain {
 
 #[cfg(test)]
 mod tests {
+    use log::{debug, error, info};
     use std::fs;
     use std::ops::Deref;
     use std::sync::Arc;
-
-    use log::{debug, error, info};
+    use std::time::Duration;
     use tokio::sync::RwLock;
 
     use crate::core::consensus::blockchain::{
@@ -1843,9 +1843,10 @@ mod tests {
     };
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{PrintForLog, SaitoPublicKey};
+    use crate::core::defs::{ForkId, PrintForLog, SaitoPublicKey, NOLAN_PER_SAITO};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, hash};
+    use crate::core::util::test::node_tester::test::NodeTester;
     use crate::core::util::test::test_manager::test::TestManager;
 
     // fn init_testlog() {
@@ -2671,6 +2672,8 @@ mod tests {
     async fn block_add_test_staking() {
         // pretty_env_logger::init();
 
+        debug!("testing block_add_test_staking");
+
         let mut t = TestManager::default();
         t.enable_staking(DEFAULT_SOCIAL_STAKE).await;
         let block1;
@@ -3270,6 +3273,165 @@ mod tests {
             .concat();
             let calculate_hash = hash(&buf);
             assert_eq!(block2.hash, calculate_hash);
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn ghost_chain_content_test() {
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        let fork_id_1: ForkId = tester.get_fork_id(1).await;
+        tester.wait_till_block_id_with_txs(10, 10, 0).await.unwrap();
+        let fork_id_1_after: ForkId = tester.get_fork_id(1).await;
+        assert_eq!(fork_id_1, fork_id_1_after);
+
+        // only testing if the fork id is not changing when the blockchain is updated
+        let fork_id = tester.get_fork_id(10).await;
+        tester
+            .wait_till_block_id_with_txs(100, 10, 0)
+            .await
+            .unwrap();
+        let fork_id_after = tester.get_fork_id(10).await;
+        assert_eq!(fork_id, fork_id_after);
+
+        {}
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_fork_id_difference() {
+        // pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        let fork_id_1 = tester.get_fork_id(1).await;
+
+        tester.wait_till_block_id_with_txs(10, 10, 0).await.unwrap();
+
+        let fork_id_10 = tester.get_fork_id(10).await;
+        assert_ne!(fork_id_1.to_hex(), fork_id_10.to_hex());
+
+        tester
+            .wait_till_block_id_with_txs(100, 10, 10)
+            .await
+            .unwrap();
+
+        let fork_id_100 = tester.get_fork_id(100).await;
+        assert_ne!(fork_id_10.to_hex(), fork_id_100.to_hex());
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_block_generation_without_fees() {
+        // pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        tester.wait_till_block_id_with_txs(100, 0, 0).await.unwrap()
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_block_generation_with_fees() {
+        // pretty_env_logger::init();
+        let mut tester = NodeTester::default();
+        tester
+            .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
+            .await
+            .unwrap();
+
+        tester.wait_till_block_id_with_txs(5, 0, 10).await.unwrap()
+    }
+
+    #[ignore]
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn load_abandoned_block() {
+        pretty_env_logger::init();
+        let block_hash;
+        {
+            let mut tester = NodeTester::default();
+            tester.delete_blocks().await.unwrap();
+            tester
+                .init_with_staking(0, 100, 100000 * NOLAN_PER_SAITO)
+                .await
+                .unwrap();
+
+            tester.wait_till_block_id_with_txs(10, 0, 10).await.unwrap();
+            block_hash = tester
+                .routing_thread
+                .blockchain_lock
+                .read()
+                .await
+                .get_latest_block_hash();
+        }
+        // check if there are 100 blocks in disk
+        {
+            let mut result = tokio::fs::read_dir("./data/blocks").await.unwrap();
+            let mut count = 0;
+            loop {
+                let entry = result.next_entry().await;
+                match entry {
+                    Ok(entry) => {
+                        if entry.is_none() {
+                            break;
+                        }
+                        let entry = entry.unwrap();
+                        let file_name = entry.file_name().to_str().unwrap().to_string();
+                        if !file_name.contains(block_hash.to_hex().as_str()) {
+                            // remove all the blocks except the last
+                            info!("removing file : {:?}", file_name);
+                            tokio::fs::remove_file(
+                                ("./data/blocks/".to_string() + file_name.as_str()).as_str(),
+                            )
+                            .await
+                            .unwrap();
+                        }
+                        count += 1;
+                    }
+                    Err(_) => {
+                        break;
+                    }
+                }
+            }
+            assert_eq!(count, 10);
+        }
+
+        {
+            let mut tester = NodeTester::default();
+            tester.timeout_in_ms = Duration::new(100, 0).as_millis() as u64;
+            tester.init().await.unwrap();
+
+            tester.wait_till_block_id_with_txs(10, 0, 10).await.unwrap();
+        }
+        {
+            let mut result = tokio::fs::read_dir("./data/blocks").await.unwrap();
+            let mut count = 0;
+            loop {
+                let entry = result.next_entry().await;
+                match entry {
+                    Ok(entry) => {
+                        if entry.is_none() {
+                            break;
+                        }
+                        count += 1;
+                    }
+                    Err(_) => {
+                        break;
+                    }
+                }
+            }
+            assert_eq!(count, 11);
         }
     }
 }

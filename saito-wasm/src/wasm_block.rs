@@ -173,11 +173,6 @@ impl WasmBlock {
         self.block.cv.avg_nolan_rebroadcast_per_block
     }
 
-    #[wasm_bindgen(getter = staking_payout)]
-    pub fn staking_payout(&self) -> u64 {
-        self.block.cv.staking_payout
-    }
-
     #[wasm_bindgen(getter = rebroadcast_hash)]
     pub fn rebroadcast_hash(&self) -> JsString {
         // Convert the byte array to a JsValue
@@ -190,9 +185,15 @@ impl WasmBlock {
         self.block.cv.nolan_falling_off_chain
     }
 
+    // TODO -- deprecated
     #[wasm_bindgen(getter = avg_income)]
     pub fn avg_income(&self) -> u64 {
-        self.block.cv.avg_income
+        self.block.cv.avg_total_fees
+    }
+
+    #[wasm_bindgen(getter = avg_total_fees)]
+    pub fn avg_total_fees(&self) -> u64 {
+        self.block.cv.avg_total_fees
     }
 
     #[wasm_bindgen(getter = id)]

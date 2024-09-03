@@ -6,12 +6,13 @@ pub mod test {
     use crate::core::consensus::context::Context;
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peer_collection::PeerCollection;
-    use crate::core::consensus::slip::SlipType;
+
     use crate::core::consensus::transaction::Transaction;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
     use crate::core::defs::{
-        BlockId, Currency, PrintForLog, SaitoHash, SaitoPrivateKey, StatVariable, STAT_BIN_COUNT,
+        BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPrivateKey, StatVariable,
+        STAT_BIN_COUNT,
     };
     use crate::core::defs::{SaitoPublicKey, Timestamp};
     use crate::core::io::network::Network;
@@ -32,7 +33,7 @@ pub mod test {
     use log::info;
     use serde::Deserialize;
     use std::io::Error;
-    use std::ops::{Deref, DerefMut};
+    use std::ops::DerefMut;
     use std::sync::Arc;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::sync::mpsc::Receiver;
@@ -115,19 +116,19 @@ pub mod test {
     }
 
     pub struct NodeTester {
-        consensus_thread: ConsensusThread,
-        routing_thread: RoutingThread,
-        mining_thread: MiningThread,
-        verification_thread: VerificationThread,
-        stat_thread: StatThread,
-        timer: Timer,
+        pub consensus_thread: ConsensusThread,
+        pub routing_thread: RoutingThread,
+        pub mining_thread: MiningThread,
+        pub verification_thread: VerificationThread,
+        pub stat_thread: StatThread,
+        pub timer: Timer,
         receiver_for_router: Receiver<RoutingEvent>,
         receiver_for_consensus: Receiver<ConsensusEvent>,
         receiver_for_miner: Receiver<MiningEvent>,
         receiver_for_verification: Receiver<VerifyRequest>,
         receiver_for_stats: Receiver<String>,
         context: Context,
-        timeout_in_ms: u64,
+        pub timeout_in_ms: u64,
         last_run_time: Timestamp,
     }
 
@@ -218,13 +219,15 @@ pub mod test {
                     timer: timer.clone(),
                     miner_active: false,
                     target: [0; 32],
+                    target_id: 0,
                     difficulty: 0,
                     public_key: [0; 33],
                     mined_golden_tickets: 0,
                     stat_sender: sender_to_stat.clone(),
                     config_lock: configuration.clone(),
                     enabled: true,
-                    mining_iterations: 100,
+                    mining_iterations: 1,
+                    mining_start: 0,
                 },
                 verification_thread: VerificationThread {
                     sender_to_consensus: sender_to_consensus.clone(),
@@ -265,7 +268,7 @@ pub mod test {
                 receiver_for_verification: receiver_in_verification,
                 context,
                 receiver_for_stats: receiver_in_stats,
-                timeout_in_ms: Duration::new(30, 0).as_millis() as u64,
+                timeout_in_ms: Duration::new(10, 0).as_millis() as u64,
                 last_run_time: 0,
             }
         }
@@ -279,6 +282,28 @@ pub mod test {
             self.stat_thread.on_init().await;
 
             Ok(())
+        }
+
+        pub async fn init_with_staking(
+            &mut self,
+            staking_requirement: Currency,
+            staking_period: u64,
+            additional_funds: Currency,
+        ) -> Result<(), Error> {
+            self.delete_blocks().await?;
+
+            let public_key = self.get_public_key().await;
+            self.set_staking_requirement(staking_requirement, staking_period)
+                .await;
+            let issuance = vec![
+                (public_key.to_base58(), staking_requirement * staking_period),
+                (public_key.to_base58(), additional_funds),
+            ];
+            self.set_issuance(issuance).await?;
+
+            self.init().await?;
+
+            self.wait_till_block_id(1).await
         }
         async fn run_event_loop_once(&mut self) {
             if let Ok(event) = self.receiver_for_router.try_recv() {
@@ -299,8 +324,12 @@ pub mod test {
             self.run_timer_loop_once().await;
         }
         async fn run_timer_loop_once(&mut self) {
-            let duration =
-                Duration::from_millis(self.timer.get_timestamp_in_ms() - self.last_run_time);
+            let current_time = self.timer.get_timestamp_in_ms();
+            if current_time < self.last_run_time {
+                return;
+            }
+            let diff = current_time - self.last_run_time;
+            let duration = Duration::from_millis(diff);
             self.routing_thread.process_timer_event(duration).await;
             self.mining_thread.process_timer_event(duration).await;
             self.stat_thread.process_timer_event(duration).await;
@@ -319,8 +348,8 @@ pub mod test {
             Ok(())
         }
         pub async fn wait_till_block_id(&mut self, block_id: BlockId) -> Result<(), Error> {
-            let timeout = self.timer.get_timestamp_in_ms() + self.timeout_in_ms;
             let time_keeper = TestTimeKeeper {};
+            let timeout = time_keeper.get_timestamp_in_ms() + self.timeout_in_ms;
             loop {
                 {
                     let blockchain = self.routing_thread.blockchain_lock.read().await;
@@ -337,6 +366,43 @@ pub mod test {
             }
 
             Ok(())
+        }
+        pub async fn wait_till_block_id_with_txs(
+            &mut self,
+            wait_till_block_id: BlockId,
+            tx_value: Currency,
+            tx_fee: Currency,
+        ) -> Result<(), Error> {
+            let public_key = self.get_public_key().await;
+            let mut current_block_id = self.get_latest_block_id().await;
+
+            let time_keeper = TestTimeKeeper {};
+            let timeout_time = time_keeper.get_timestamp_in_ms() + self.timeout_in_ms;
+
+            loop {
+                let tx = self
+                    .create_transaction(tx_value, tx_fee, public_key)
+                    .await?;
+                self.add_transaction(tx).await;
+                self.wait_till_block_id(current_block_id + 1).await?;
+                current_block_id = self.get_latest_block_id().await;
+
+                if current_block_id >= wait_till_block_id {
+                    break;
+                }
+                let current_time = time_keeper.get_timestamp_in_ms();
+                if current_time > timeout_time {
+                    panic!("request timed out");
+                }
+            }
+            self.wait_till_block_id(wait_till_block_id).await
+        }
+        pub async fn get_latest_block_id(&self) -> BlockId {
+            self.routing_thread
+                .blockchain_lock
+                .read()
+                .await
+                .get_latest_block_id()
         }
         pub async fn wait_till_mempool_tx_count(&mut self, tx_count: u64) -> Result<(), Error> {
             let timeout = self.timer.get_timestamp_in_ms() + self.timeout_in_ms;
@@ -382,7 +448,13 @@ pub mod test {
         pub async fn get_private_key(&self) -> SaitoPrivateKey {
             self.routing_thread.wallet_lock.read().await.private_key
         }
-
+        pub async fn get_fork_id(&self, block_id: BlockId) -> ForkId {
+            self.routing_thread
+                .blockchain_lock
+                .read()
+                .await
+                .generate_fork_id(block_id)
+        }
         pub async fn add_transaction(&mut self, transaction: Transaction) {
             self.consensus_thread
                 .process_event(ConsensusEvent::NewTransaction { transaction })

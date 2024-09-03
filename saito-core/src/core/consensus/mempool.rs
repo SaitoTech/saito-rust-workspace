@@ -226,8 +226,14 @@ impl Mempool {
         .await;
         block.generate();
         debug!(
-            "block generated with work : {:?} and burnfee : {:?}",
-            block.total_work, block.burnfee
+            "block generated with work : {:?} and burnfee : {:?} gts : {:?}",
+            block.total_work,
+            block.burnfee,
+            block
+                .transactions
+                .iter()
+                .filter(|tx| matches!(tx.transaction_type, TransactionType::GoldenTicket))
+                .count()
         );
         // assert_eq!(block.total_work, mempool_work);
         self.new_tx_added = false;

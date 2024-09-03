@@ -229,9 +229,10 @@ impl Wallet {
         }
 
         debug!(
-            "adding slip : {:?} with value : {:?} to wallet",
-            wallet_slip.utxokey.to_hex(),
-            wallet_slip.amount
+            "adding slip of type : {:?} with value : {:?} to wallet : {:?}",
+            wallet_slip.slip_type,
+            wallet_slip.amount,
+            wallet_slip.utxokey.to_hex()
         );
         self.slips.insert(wallet_slip.utxokey, wallet_slip);
         if let Some(network) = network {
@@ -305,12 +306,13 @@ impl Wallet {
             input.block_id = slip.block_id;
             input.tx_ordinal = slip.tx_ordinal;
             input.slip_index = slip.slip_index;
+            input.slip_type = slip.slip_type;
             inputs.push(input);
 
             slip.spent = true;
             self.available_balance -= slip.amount;
 
-            trace!(
+            debug!(
                 "marking slip : {:?} with value : {:?} as spent",
                 slip.utxokey.to_hex(),
                 slip.amount
@@ -543,9 +545,9 @@ impl Wallet {
             }
 
             if collected_from_unspent < required_from_unspent {
-                info!("couldn't collect enough funds upto requested staking amount. requested: {:?}, collected: {:?} required_from_unspent: {:?}",
+                warn!("couldn't collect enough funds upto requested staking amount. requested: {:?}, collected: {:?} required_from_unspent: {:?}",
                     staking_amount,collected_amount,required_from_unspent);
-                info!("wallet balance : {:?}", self.available_balance);
+                warn!("wallet balance : {:?}", self.available_balance);
                 return Err(Error::from(ErrorKind::NotFound));
             }
 
@@ -575,7 +577,7 @@ impl Wallet {
             if should_break_slips {
                 slip_count = 2;
             }
-            for _ in 0..slip_count {
+            {
                 let mut output: Slip = Default::default();
                 output.amount = amount / slip_count;
                 remainder -= output.amount;

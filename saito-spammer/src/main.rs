@@ -136,6 +136,7 @@ async fn run_mining_event_processor(
         timer: timer.clone(),
         miner_active: false,
         target: [0; 32],
+        target_id: 0,
         difficulty: 0,
         public_key: [0; 33],
         mined_golden_tickets: 0,
@@ -143,6 +144,7 @@ async fn run_mining_event_processor(
         config_lock,
         enabled: false,
         mining_iterations: 100,
+        mining_start: 0,
     };
     debug!("running miner thread");
     let miner_handle = run_thread(
@@ -297,7 +299,7 @@ async fn run_routing_event_processor(
     fetch_batch_size: usize,
     timer: &Timer,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
-    let mut routing_event_processor = RoutingThread {
+    let routing_event_processor = RoutingThread {
         blockchain_lock: context.blockchain_lock.clone(),
         mempool_lock: context.mempool_lock.clone(),
         sender_to_consensus: sender_to_mempool.clone(),

@@ -12,14 +12,14 @@ pub struct PeerConfig {
     pub synctype: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Endpoint {
     pub host: String,
     pub port: u16,
     pub protocol: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Server {
     #[serde(default)]
     pub host: String,
