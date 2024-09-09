@@ -419,15 +419,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             if configs.get_peer_configs().is_empty() && list.is_empty() {
                 self.generate_genesis_block = true;
             }
+            let start_time = self.timer.get_timestamp_in_ms();
 
             info!(
                 "loading {:?} blocks from disk. Timestamp : {:?}",
                 list.len(),
-                StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
+                StatVariable::format_timestamp(start_time)
             );
             while !list.is_empty() {
                 let file_names: Vec<String> =
-                    list.drain(..std::cmp::min(1000, list.len())).collect();
+                    list.drain(..std::cmp::min(100, list.len())).collect();
                 self.storage
                     .load_blocks_from_disk(file_names.as_slice(), self.mempool_lock.clone())
                     .await;
@@ -443,16 +444,19 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     )
                     .await;
 
-                info!(
-                    "{:?} blocks remaining to be loaded. Timestamp : {:?}",
-                    list.len(),
-                    StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
-                );
+                if list.len() % 1000 == 0 {
+                    info!(
+                        "{:?} blocks remaining to be loaded. Timestamp : {:?}",
+                        list.len(),
+                        StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
+                    );
+                }
             }
             info!(
-                "{:?} total blocks in blockchain. Timestamp : {:?}",
+                "{:?} total blocks in blockchain. Timestamp : {:?}, elapsed_time : {:?}",
                 blockchain.blocks.len(),
-                StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
+                StatVariable::format_timestamp(self.timer.get_timestamp_in_ms()),
+                self.timer.get_timestamp_in_ms() - start_time
             );
         }
 

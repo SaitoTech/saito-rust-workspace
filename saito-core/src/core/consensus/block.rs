@@ -2278,7 +2278,7 @@ impl Block {
                     if let Some(gt_index) = cv.gt_index {
                         let golden_ticket: GoldenTicket =
                             GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
-                        error!("gt.publickey = {:?}", golden_ticket.public_key);
+                        error!("gt.publickey = {:?}", golden_ticket.public_key.to_hex());
                     }
 
                     return false;
