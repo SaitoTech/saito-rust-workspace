@@ -138,7 +138,10 @@ impl Network {
             if peer.get_public_key().is_some() {
                 // calling here before removing the peer from collections
                 self.io_interface
-                    .send_interface_event(InterfaceEvent::PeerConnectionDropped(peer_index));
+                    .send_interface_event(InterfaceEvent::PeerConnectionDropped(
+                        peer_index,
+                        peer.get_public_key().unwrap(),
+                    ));
             }
             if peer.static_peer_config.is_none() {
                 // we remove the peer only if it's connected "from" outside

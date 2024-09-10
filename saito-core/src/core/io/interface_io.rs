@@ -5,12 +5,12 @@ use async_trait::async_trait;
 
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{BlockId, PeerIndex, SaitoHash};
+use crate::core::defs::{BlockId, PeerIndex, SaitoHash, SaitoPublicKey};
 use crate::core::process::version::Version;
 
 pub enum InterfaceEvent {
     PeerHandshakeComplete(PeerIndex),
-    PeerConnectionDropped(PeerIndex),
+    PeerConnectionDropped(PeerIndex, SaitoPublicKey),
     PeerConnected(PeerIndex),
     BlockAddSuccess(SaitoHash, u64),
     WalletUpdate(),

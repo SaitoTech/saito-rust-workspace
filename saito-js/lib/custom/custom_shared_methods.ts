@@ -93,7 +93,7 @@ export default class CustomSharedMethods implements SharedMethods {
         throw new Error("Method not implemented.");
     }
 
-    sendInterfaceEvent(event: String, peerIndex: bigint): void {
+    sendInterfaceEvent(event: String, peerIndex: bigint, public_key: string): void {
         throw new Error("Method not implemented.");
     }
 
