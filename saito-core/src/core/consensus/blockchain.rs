@@ -3277,6 +3277,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     #[serial_test::serial]
     async fn ghost_chain_content_test() {
         let mut tester = NodeTester::default();

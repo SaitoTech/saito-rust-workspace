@@ -217,13 +217,21 @@ impl InterfaceIO for WasmIoHandler {
     fn send_interface_event(&self, event: InterfaceEvent) {
         match event {
             InterfaceEvent::PeerHandshakeComplete(index) => {
-                MsgHandler::send_interface_event("handshake_complete".to_string(), index);
+                MsgHandler::send_interface_event(
+                    "handshake_complete".to_string(),
+                    index,
+                    "".to_string(),
+                );
             }
-            InterfaceEvent::PeerConnectionDropped(index) => {
-                MsgHandler::send_interface_event("peer_disconnect".to_string(), index);
+            InterfaceEvent::PeerConnectionDropped(index, public_key) => {
+                MsgHandler::send_interface_event(
+                    "peer_disconnect".to_string(),
+                    index,
+                    public_key.to_base58(),
+                );
             }
             InterfaceEvent::PeerConnected(index) => {
-                MsgHandler::send_interface_event("peer_connect".to_string(), index);
+                MsgHandler::send_interface_event("peer_connect".to_string(), index, "".to_string());
             }
             InterfaceEvent::BlockAddSuccess(hash, block_id) => {
                 MsgHandler::send_block_success(hash.to_hex(), block_id);
@@ -363,7 +371,7 @@ extern "C" {
     pub fn process_api_error(buffer: Uint8Array, msg_index: u32, peer_index: u64);
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
-    pub fn send_interface_event(event: String, peer_index: u64);
+    pub fn send_interface_event(event: String, peer_index: u64, public_key: String);
 
     #[wasm_bindgen(static_method_of = MsgHandler)]
     pub fn send_block_success(hash: String, block_id: u64);

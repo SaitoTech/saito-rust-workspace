@@ -151,7 +151,7 @@ export default class WebSharedMethods extends CustomSharedMethods {
         throw new Error("Method not implemented.");
     }
 
-    sendInterfaceEvent(event: String, peerIndex: bigint) {
+    sendInterfaceEvent(event: String, peerIndex: bigint, public_key: string) {
         throw new Error("Method not implemented.");
     }
 }

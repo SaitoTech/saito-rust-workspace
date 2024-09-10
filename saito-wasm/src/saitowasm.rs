@@ -1,8 +1,3 @@
-// extern crate wee_alloc;
-//
-// #[global_allocator]
-// static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 use std::io::{Error, ErrorKind};
 
 use std::sync::Arc;
@@ -1051,17 +1046,17 @@ where
 
     let str = str.unwrap();
     if str.is_empty() {
-        debug!("cannot convert empty string to key");
+        // debug!("cannot convert empty string to key");
         return Err(Error::from(ErrorKind::InvalidInput));
     }
 
     let key = T::from_base58(str.as_str());
     if key.is_err() {
-        error!(
-            "failed parsing key : {:?}. str : {:?}",
-            key.err().unwrap(),
-            str
-        );
+        // error!(
+        //     "failed parsing key : {:?}. str : {:?}",
+        //     key.err().unwrap(),
+        //     str
+        // );
         return Err(Error::from(ErrorKind::InvalidInput));
     }
     let key = key.unwrap();
@@ -1074,7 +1069,7 @@ where
 {
     let str = key.as_string();
     if str.is_none() {
-        error!("cannot convert wasm string to rust string");
+        // error!("cannot convert wasm string to rust string");
         return Err(Error::from(ErrorKind::InvalidInput));
     }
 
