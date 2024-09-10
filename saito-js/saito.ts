@@ -474,7 +474,7 @@ export default class Saito {
         try {
             return Saito.getLibInstance().is_valid_public_key(key);
         } catch (e) {
-            console.error(e);
+            // console.debug(e);
         }
         return false;
     }
