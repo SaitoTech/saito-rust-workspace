@@ -3,8 +3,6 @@ name: Run E2E Tests
 on:
   push:
     branches: [ feature/315/e2e ]
-  pull_request:
-    branches: [ ]
 
 jobs:
   run-tests:
