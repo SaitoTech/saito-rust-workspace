@@ -1,8 +1,3 @@
-// extern crate wee_alloc;
-//
-// #[global_allocator]
-// static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 use std::io::{Error, ErrorKind};
 
 use std::sync::Arc;
