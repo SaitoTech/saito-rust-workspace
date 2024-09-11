@@ -35,6 +35,7 @@ pub enum TransactionType {
     /// Issues funds for an address at the start of the network
     Issuance = 6,
     BlockStake = 7,
+    Bound = 8,
 }
 
 #[serde_with::serde_as]
