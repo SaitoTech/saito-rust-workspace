@@ -157,7 +157,7 @@ impl Network {
             peers.remove_peer(peer_index);
         }
     }
-    pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
+    pub async fn handle_new_peer(&mut self, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario;
         let mut peers = self.peer_lock.write().await;
         if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
