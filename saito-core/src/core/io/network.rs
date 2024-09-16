@@ -18,6 +18,8 @@ use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
 
+
+
 #[derive(Debug)]
 pub enum PeerDisconnectType {
     /// If the peer was disconnected without our intervention
@@ -25,7 +27,7 @@ pub enum PeerDisconnectType {
     /// If we disconnected the peer
     InternalDisconnect,
 }
-use crate::core::util::configuration::{Configuration, PeerConfig};
+use crate::core::util::configuration::Configuration;
 use crate::core::util::rate_limiter::RateLimiterRequestType;
 
 // #[derive(Debug)]
@@ -560,7 +562,7 @@ impl Network {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::util::test::test_manager;
+    use crate::core::util::{configuration::PeerConfig, test::test_manager};
     use rand::Rng;
 
     #[tokio::test]
@@ -576,7 +578,6 @@ mod tests {
             peer2 = Peer::new(peer2_index);
 
             peer2.key_list_rate_limiter.set_limit(limit);
-
             let peer_data = PeerConfig {
                 host: String::from(""),
                 port: 8080,

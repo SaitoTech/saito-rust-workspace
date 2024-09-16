@@ -1607,13 +1607,13 @@ impl Block {
                     if cv.total_rebroadcast_staking_payouts_nolan
                         > (self.treasury as f64 * 0.05) as u64
                     {
-                        let mut max_total_payout = (self.treasury as f64 * 0.05) as u64;
-                        let mut unadjusted_total_nolan = cv.total_rebroadcast_nolan;
+                        let max_total_payout = (self.treasury as f64 * 0.05) as u64;
+                        let unadjusted_total_nolan = cv.total_rebroadcast_nolan;
                         let adjusted_atr_payout_multiplier =
-                            (max_total_payout / unadjusted_total_nolan);
+                            max_total_payout / unadjusted_total_nolan;
                         let adjusted_output_multiplier = 1 + adjusted_atr_payout_multiplier;
                         let mut adjusted_total_rebroadcast_staking_payouts_nolan: Currency = 0;
-                        let mut adjusted_total_rebroadcast_fees_nolan: Currency = 0;
+                        let adjusted_total_rebroadcast_fees_nolan: Currency = 0;
 
                         //
                         // we re-determine our multiplier for the ATR payout based on our
