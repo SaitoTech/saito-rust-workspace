@@ -505,7 +505,7 @@ impl Transaction {
             .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
-                if slip.slip_type != SlipType::ATR {
+                if slip.slip_type != SlipType::ATR || slip.slip_type != SlipType::Bound {
                     slip.block_id = block_id;
                     slip.tx_ordinal = tx_index;
                     slip.slip_index = index as u8;
@@ -951,6 +951,16 @@ impl Transaction {
 
         if transaction_type == TransactionType::Bound {
             // TODO : check if bound slips have matching normal slips
+
+            // first input slip should be non-zero
+            if let Some(slip) = self.from.first() {
+                if slip.amount == 0 {
+                    // first slip should have a value to make sure the NFT creator cannot mint multiple transactions with the same hash
+                    return false;
+                }
+            } else {
+                return false;
+            }
 
             // validate input bound slips
 
