@@ -21,7 +21,6 @@ use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
 use crate::core::util::configuration::{Configuration, PeerConfig};
-use crate::core::util::rate_limiter::RateLimiter;
 
 // #[derive(Debug)]
 pub struct Network {
@@ -168,8 +167,6 @@ impl Network {
     }
     pub async fn handle_new_peer(&mut self, peer_data: Option<PeerConfig>, peer_index: u64) {
         // TODO : if an incoming peer is same as static peer, handle the scenario;
-        debug!("handing new peer : {:?}", &peer_data.unwrap().clone().protocol);
-        let protocol = peer_data.unwrap().clone().protocol;
         let mut peers = self.peer_lock.write().await;
 
         let mut peer = Peer::new(peer_index);
@@ -217,7 +214,7 @@ impl Network {
         let peer = peer.unwrap();
         let current_time = self.timer.get_timestamp_in_ms();
 
-        if !peer.can_make_request("hand", current_time) {
+        if !peer.can_make_request("handshake_challenge", current_time) {
             debug!("peer {:?} exceeded rate limit for key list", peer_index);
             return;
         }else {
@@ -538,20 +535,7 @@ impl Network {
         }
     }
 
-    // pub async fn check_rate_limit(&mut self, peer_index: u64) -> bool {
-    //     let current_time = self.timer.get_timestamp_in_ms();
-    //     {
-    //         let mut rate_limiter = self.rate_limiter.write().await;
-    //         if !rate_limiter.can_process_more(peer_index, current_time) {
-    //             error!("peer {:?} exceeded rate limit for key list", peer_index);
-    //             return false;
-    //         } else {
-    //             return true;
-    //         }
-    //     }
 
-    //     // self.rate_limiter.can_process_more(peer_index, current_time)
-    // }
 
     pub async fn update_peer_timer(&mut self, peer_index: PeerIndex) {
         let mut peers = self.peer_lock.write().await;
@@ -574,7 +558,7 @@ mod tests {
     #[tokio::test]
     async fn test_keylist_rate_limiter() {
         let mut t1 = test_manager::test::TestManager::default();
-        let TOKENS: usize = 10;
+        let limit: usize = 10;
         let peer2_index: u64 = 0;
         let mut peer2;
     
@@ -584,7 +568,7 @@ mod tests {
           peer2  = Peer::new(peer2_index);
       
     
-            // peer2.rate_limiter.set_limit("key_list", 10, 60_000); 
+            peer2.rate_limiter.set_limit("key_list", limit, 60_000); 
     
             let peer_data = PeerConfig {
                 host: String::from(""),
@@ -617,8 +601,7 @@ mod tests {
     
             dbg!(&result);
     
-            if i < TOKENS {
-
+            if i < limit {
                 assert!(result.is_ok(), "Expected Ok, got {:?}", result);
             } else {
                 assert!(result.is_err(), "Expected Err, got {:?}", result);
@@ -627,24 +610,5 @@ mod tests {
         dbg!(peer2);
     }
     
-    // #[tokio::test]
 
-    // async fn test_rate_limter_token_refill() {
-    //     let TOKENS: u64 = 10;
-    //     let peer_index: u64 = 1;
-    //     let initial_time: u64 = 100000;
-    //     let refill_time: u64 = initial_time + 60000; // 1 minute later
-
-    //     let mut rate_limiter = RateLimiter::default(TOKENS);
-
-    //     // Consume all tokens
-    //     for _ in 0..TOKENS {
-    //         assert!(rate_limiter.can_process_more(peer_index, initial_time));
-    //     }
-
-    //     assert!(!rate_limiter.can_process_more(peer_index, initial_time));
-
-    //     // Simulate the passage of time and refill tokens
-    //     assert!(rate_limiter.can_process_more(peer_index, refill_time));
-    // }
 }
