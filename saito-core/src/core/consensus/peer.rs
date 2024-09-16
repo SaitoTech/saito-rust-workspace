@@ -49,9 +49,9 @@ pub struct Peer {
 impl Peer {
     pub fn new(peer_index: u64) -> Peer {
         let mut key_list_rate_limiter = RateLimiter::default();
-        key_list_rate_limiter.set_limit(RATE_LIMITS[0]);
+        key_list_rate_limiter.set_limit(10);
         let mut handshake_rate_limiter = RateLimiter::default();
-        handshake_rate_limiter.set_limit(RATE_LIMITS[1]);
+        handshake_rate_limiter.set_limit(5);
 
         Peer {
             index: peer_index,
