@@ -28,11 +28,3 @@ export default class WasmWrapper<T> {
   //   this.instance.free();
   // }
 }
-
-// export default class WasmWrapper<T> {
-//   public instance: T;
-
-//   constructor(instance: T) {
-//     this.instance = instance;
-//   }
-// }

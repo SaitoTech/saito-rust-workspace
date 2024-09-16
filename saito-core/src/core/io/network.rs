@@ -26,6 +26,7 @@ pub enum PeerDisconnectType {
     InternalDisconnect,
 }
 use crate::core::util::configuration::{Configuration, PeerConfig};
+use crate::core::util::rate_limiter::RateLimiterRequestType;
 
 // #[derive(Debug)]
 pub struct Network {
@@ -201,7 +202,7 @@ impl Network {
         let peer = peer.unwrap();
         let current_time = self.timer.get_timestamp_in_ms();
 
-        if !peer.can_make_request("handshake_challenge", current_time) {
+        if !peer.can_make_request(RateLimiterRequestType::HandshakeChallenge, current_time) {
             debug!("peer {:?} exceeded rate limit for key list", peer_index);
             return;
         } else {
@@ -287,7 +288,7 @@ impl Network {
 
         if let Some(peer) = peer {
             // Check rate limit
-            if !peer.can_make_request("key_list", current_time) {
+            if !peer.can_make_request(RateLimiterRequestType::KeyList, current_time) {
                 debug!("peer {:?} exceeded rate limit for key list", peer_index);
                 return Err(Error::from(ErrorKind::Other));
             } else {
@@ -574,7 +575,7 @@ mod tests {
 
             peer2 = Peer::new(peer2_index);
 
-            peer2.rate_limiter.set_limit("key_list", limit, 60_000);
+            peer2.key_list_rate_limiter.set_limit(limit);
 
             let peer_data = PeerConfig {
                 host: String::from(""),

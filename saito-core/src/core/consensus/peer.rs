@@ -7,7 +7,9 @@ use tokio::sync::RwLock;
 
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD};
+use crate::core::defs::{
+    PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, RATE_LIMITS, WS_KEEP_ALIVE_PERIOD,
+};
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
@@ -15,7 +17,7 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use crate::core::util::rate_limiter::RateLimiter;
+use crate::core::util::rate_limiter::{RateLimiter, RateLimiterRequestType};
 
 #[derive(Clone, Debug)]
 pub enum PeerStatus {
@@ -32,7 +34,6 @@ pub struct Peer {
     pub index: u64,
     pub peer_status: PeerStatus,
     pub block_fetch_url: String,
-    // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
     pub static_peer_config: Option<util::configuration::PeerConfig>,
     pub challenge_for_peer: Option<SaitoHash>,
     pub key_list: Vec<SaitoPublicKey>,
@@ -40,14 +41,16 @@ pub struct Peer {
     pub last_msg_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
-    pub rate_limiter: RateLimiter,
+    pub key_list_rate_limiter: RateLimiter,
+    pub handshake_rate_limiter: RateLimiter,
 }
 
 impl Peer {
     pub fn new(peer_index: u64) -> Peer {
-        let mut rate_limiter = RateLimiter::new();
-        rate_limiter.set_limit("key_list", 10, 60_000);
-        rate_limiter.set_limit("handshake_challenge", 5, 60_000);
+        let mut key_list_rate_limiter = RateLimiter::default();
+        key_list_rate_limiter.set_limit(RATE_LIMITS[0]);
+        let mut handshake_rate_limiter = RateLimiter::default();
+        handshake_rate_limiter.set_limit(RATE_LIMITS[1]);
 
         Peer {
             index: peer_index,
@@ -60,7 +63,18 @@ impl Peer {
             last_msg_at: 0,
             wallet_version: Default::default(),
             core_version: Default::default(),
-            rate_limiter: rate_limiter,
+            key_list_rate_limiter,
+            handshake_rate_limiter,
+        }
+    }
+
+    pub fn can_make_request(&mut self, request: RateLimiterRequestType, current_time: u64) -> bool {
+        if let RateLimiterRequestType::KeyList = request {
+            self.key_list_rate_limiter.can_make_request(current_time)
+        } else if let RateLimiterRequestType::HandshakeChallenge = request {
+            self.handshake_rate_limiter.can_make_request(current_time)
+        } else {
+            false
         }
     }
 
@@ -105,9 +119,6 @@ impl Peer {
         Ok(())
     }
 
-    pub fn can_make_request(&mut self, action: &str, current_time: u64) -> bool {
-        self.rate_limiter.can_make_request(action, current_time)
-    }
     pub async fn handle_handshake_challenge(
         &mut self,
         challenge: HandshakeChallenge,
