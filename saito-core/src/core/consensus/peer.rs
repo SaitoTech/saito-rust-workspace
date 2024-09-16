@@ -40,15 +40,14 @@ pub struct Peer {
     pub last_msg_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
-    pub rate_limiter: RateLimiter
+    pub rate_limiter: RateLimiter,
 }
 
 impl Peer {
     pub fn new(peer_index: u64) -> Peer {
-        
         let mut rate_limiter = RateLimiter::new();
-        rate_limiter.set_limit("key_list", 10, 60_000);  
-        rate_limiter.set_limit("handshake_challenge", 5, 60_000); 
+        rate_limiter.set_limit("key_list", 10, 60_000);
+        rate_limiter.set_limit("handshake_challenge", 5, 60_000);
 
         Peer {
             index: peer_index,
@@ -61,9 +60,8 @@ impl Peer {
             last_msg_at: 0,
             wallet_version: Default::default(),
             core_version: Default::default(),
-            rate_limiter: rate_limiter
+            rate_limiter: rate_limiter,
         }
-        
     }
 
     pub fn get_url(&self) -> String {
