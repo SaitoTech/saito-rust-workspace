@@ -589,7 +589,7 @@ mod tests {
 
             peer2.static_peer_config = Some(peer_data);
             peers.index_to_peers.insert(peer2_index, peer2.clone());
-            println!("Current peer count = {:?}", peers.index_to_peers.len());
+            println!("peer count = {:?}", peers.index_to_peers.len());
         }
 
         for i in 0..40 {
