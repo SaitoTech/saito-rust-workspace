@@ -589,7 +589,7 @@ mod tests {
                 port: 8080,
                 protocol: String::from(""),
                 synctype: String::from(""),
-                is_main: true,
+                // is_main: true,
             };
     
             peer2.static_peer_config = Some(peer_data);
