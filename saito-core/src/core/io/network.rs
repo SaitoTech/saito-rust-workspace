@@ -204,10 +204,9 @@ impl Network {
         if !peer.can_make_request("handshake_challenge", current_time) {
             debug!("peer {:?} exceeded rate limit for key list", peer_index);
             return;
-        }else {
+        } else {
             debug!("can make request")
         }
-
 
         peer.handle_handshake_challenge(
             challenge,
@@ -280,21 +279,21 @@ impl Network {
             key_list.len(),
             peer_index
         );
-    
+
         let current_time = self.timer.get_timestamp_in_ms();
         // Lock peers to write
         let mut peers = self.peer_lock.write().await;
         let peer = peers.index_to_peers.get_mut(&peer_index);
-    
+
         if let Some(peer) = peer {
             // Check rate limit
             if !peer.can_make_request("key_list", current_time) {
                 debug!("peer {:?} exceeded rate limit for key list", peer_index);
                 return Err(Error::from(ErrorKind::Other));
-            }else {
+            } else {
                 debug!("can make request")
             }
-    
+
             debug!(
                 "handling received keylist of length : {:?} from peer : {:?}",
                 key_list.len(),
@@ -310,10 +309,8 @@ impl Network {
             Err(Error::from(ErrorKind::NotFound))
         }
     }
-    
-  
-    pub async fn send_key_list(&self, key_list: &[SaitoPublicKey]) {
 
+    pub async fn send_key_list(&self, key_list: &[SaitoPublicKey]) {
         debug!(
             "sending key list to all the peers {:?}",
             key_list
@@ -321,7 +318,6 @@ impl Network {
                 .map(|key| key.to_base58())
                 .collect::<Vec<String>>()
         );
-
 
         self.io_interface
             .send_message_to_all(
@@ -549,8 +545,6 @@ impl Network {
         }
     }
 
-
-
     pub async fn update_peer_timer(&mut self, peer_index: PeerIndex) {
         let mut peers = self.peer_lock.write().await;
         let peer = peers.index_to_peers.get_mut(&peer_index);
@@ -565,9 +559,8 @@ impl Network {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::{ util::test::test_manager};
+    use crate::core::util::test::test_manager;
     use rand::Rng;
-
 
     #[tokio::test]
     async fn test_keylist_rate_limiter() {
@@ -575,15 +568,14 @@ mod tests {
         let limit: usize = 10;
         let peer2_index: u64 = 0;
         let mut peer2;
-    
+
         {
             let mut peers = t1.network.peer_lock.write().await;
 
-          peer2  = Peer::new(peer2_index);
-      
-    
-            peer2.rate_limiter.set_limit("key_list", limit, 60_000); 
-    
+            peer2 = Peer::new(peer2_index);
+
+            peer2.rate_limiter.set_limit("key_list", limit, 60_000);
+
             let peer_data = PeerConfig {
                 host: String::from(""),
                 port: 8080,
@@ -591,14 +583,13 @@ mod tests {
                 synctype: String::from(""),
                 // is_main: true,
             };
-    
+
             peer2.static_peer_config = Some(peer_data);
             peers.index_to_peers.insert(peer2_index, peer2.clone());
             println!("Current peer count = {:?}", peers.index_to_peers.len());
         }
-    
+
         for i in 0..40 {
-        
             let key_list: Vec<SaitoPublicKey> = (0..11)
                 .map(|_| {
                     let mut key = [0u8; 33];
@@ -606,15 +597,14 @@ mod tests {
                     key
                 })
                 .collect();
-    
-       
+
             let result = t1
                 .network
                 .handle_received_key_list(peer2_index, key_list)
                 .await;
-    
+
             dbg!(&result);
-    
+
             if i < limit {
                 assert!(result.is_ok(), "Expected Ok, got {:?}", result);
             } else {
@@ -623,6 +613,4 @@ mod tests {
         }
         dbg!(peer2);
     }
-    
-
 }

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
     limits: HashMap<String, usize>,
