@@ -18,8 +18,6 @@ use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
 
-
-
 #[derive(Debug)]
 pub enum PeerDisconnectType {
     /// If the peer was disconnected without our intervention
