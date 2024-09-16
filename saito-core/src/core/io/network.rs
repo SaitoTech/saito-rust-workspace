@@ -203,7 +203,10 @@ impl Network {
         let current_time = self.timer.get_timestamp_in_ms();
 
         if !peer.can_make_request(RateLimiterRequestType::HandshakeChallenge, current_time) {
-            debug!("peer {:?} exceeded rate limit for handshake challenge", peer_index);
+            debug!(
+                "peer {:?} exceeded rate limit for handshake challenge",
+                peer_index
+            );
             return;
         } else {
             debug!("can make request")
