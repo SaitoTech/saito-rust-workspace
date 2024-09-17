@@ -7,9 +7,7 @@ use tokio::sync::RwLock;
 
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{
-    PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD,
-};
+use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD};
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
