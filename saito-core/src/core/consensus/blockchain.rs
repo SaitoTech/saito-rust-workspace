@@ -3306,7 +3306,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_fork_id_difference() {
-        // pretty_env_logger::init();
+        // pretty_env_logger::init()
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)

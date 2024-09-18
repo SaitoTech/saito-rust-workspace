@@ -291,6 +291,7 @@ async fn run_consensus_event_processor(
         sender_to_miner: sender_to_miner.clone(),
         // sender_global: global_sender.clone(),
         timer: time_keeper_origin.clone(),
+
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_network_controller.clone(),
@@ -352,6 +353,7 @@ async fn run_routing_event_processor(
         timer: time_keeper_origin.clone(),
         config_lock: configs_lock.clone(),
         wallet_lock: context.wallet_lock.clone(),
+
         network: Network::new(
             Box::new(RustIOHandler::new(
                 sender_to_io_controller.clone(),
