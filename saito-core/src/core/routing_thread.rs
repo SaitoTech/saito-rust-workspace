@@ -336,7 +336,7 @@ impl RoutingThread {
         request: BlockchainRequest,
         peer_index: u64,
     ) {
-        info!(
+        debug!(
             "processing incoming blockchain request : {:?}-{:?}-{:?} from peer : {:?}",
             request.latest_block_id,
             request.latest_block_hash.to_hex(),

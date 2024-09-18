@@ -253,7 +253,7 @@ impl Peer {
         self.core_version = response.core_version;
         self.peer_status = PeerStatus::Connected(response.public_key);
 
-        info!(
+        debug!(
             "my version : {:?} peer version : {:?}",
             wallet.wallet_version, response.wallet_version
         );

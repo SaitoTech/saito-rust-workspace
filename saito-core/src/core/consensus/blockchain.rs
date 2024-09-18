@@ -1205,10 +1205,10 @@ impl Blockchain {
                 // to unwind. Because of this, we start WINDING the old chain back
                 // which requires us to start at the END of the new chain vector.
                 if !old_chain.is_empty() {
-                    info!("old chain len: {}", old_chain.len());
+                    debug!("old chain len: {}", old_chain.len());
                     WindingResult::Wind(old_chain.len() - 1, true, wallet_updated)
                 } else {
-                    info!("old chain is empty. finishing with failure");
+                    debug!("old chain is empty. finishing with failure");
                     WindingResult::FinishWithFailure
                 }
             } else {
