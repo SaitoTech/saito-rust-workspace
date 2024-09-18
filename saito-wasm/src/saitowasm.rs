@@ -5,12 +5,7 @@ use std::time::Duration;
 
 use js_sys::{Array, BigInt, JsString, Uint8Array};
 use lazy_static::lazy_static;
-use log::{debug, error, info, trace, warn};
-use secp256k1::SECP256K1;
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::{Mutex, RwLock};
-use wasm_bindgen::prelude::*;
-
+use log::{debug, error, info, trace, warn, Level, Log, Metadata, Record};
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
@@ -37,6 +32,11 @@ use saito_core::core::stat_thread::StatThread;
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
+use secp256k1::SECP256K1;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::{Mutex, RwLock};
+use wasm_bindgen::prelude::*;
+use web_sys::console;
 
 use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
 use crate::wasm_block::WasmBlock;
@@ -219,6 +219,93 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
     }
 }
 
+struct WasmLogger {}
+
+impl Log for WasmLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= log::max_level()
+    }
+
+    fn log(&self, record: &Record) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        log(record)
+    }
+
+    fn flush(&self) {}
+}
+pub(crate) struct Style<'s> {
+    pub trace: &'s str,
+    pub debug: &'s str,
+    pub info: &'s str,
+    pub warn: &'s str,
+    pub error: &'s str,
+    pub file_line: &'s str,
+    pub text: &'s str,
+}
+
+impl Style<'static> {
+    /// Returns default style values.
+    pub const fn default() -> Self {
+        macro_rules! bg_color {
+            ($color:expr) => {
+                concat!("color: white; padding: 0 3px; background: ", $color, ";")
+            };
+        }
+
+        Style {
+            trace: bg_color!("gray"),
+            debug: bg_color!("blue"),
+            info: bg_color!("green"),
+            warn: bg_color!("orange"),
+            error: bg_color!("darkred"),
+            file_line: "font-weight: bold; color: inherit",
+            text: "background: inherit; color: inherit",
+        }
+    }
+}
+const STYLE: Style<'static> = Style::default();
+
+pub fn log(record: &Record) {
+    let console_log = match record.level() {
+        Level::Error => console::error_4,
+        Level::Warn => console::warn_4,
+        Level::Info => console::info_4,
+        Level::Debug => console::log_4,
+        Level::Trace => console::debug_4,
+    };
+
+    let message = {
+        let message = format!(
+            "%c%c%c{text}",
+            // level = record.level(),
+            // file = record.file().unwrap_or_else(|| record.target()),
+            // line = record
+            //     .line()
+            //     .map_or_else(|| "[Unknown]".to_string(), |line| line.to_string()),
+            text = record.args(),
+        );
+        JsValue::from(&message)
+    };
+
+    let level_style = {
+        let style_str = match record.level() {
+            Level::Trace => STYLE.trace,
+            Level::Debug => STYLE.debug,
+            Level::Info => STYLE.info,
+            Level::Warn => STYLE.warn,
+            Level::Error => STYLE.error,
+        };
+
+        JsValue::from(style_str)
+    };
+
+    let file_line_style = JsValue::from_str(STYLE.file_line);
+    let text_style = JsValue::from_str(STYLE.text);
+    console_log(&message, &level_style, &file_line_style, &text_style);
+}
+
 #[wasm_bindgen]
 pub async fn initialize(
     json: JsString,
@@ -235,7 +322,10 @@ pub async fn initialize(
         _ => log::Level::Info,
     };
 
-    console_log::init_with_level(log_level).unwrap();
+    log::set_logger(&WasmLogger {}).unwrap();
+    log::set_max_level(log_level.to_level_filter());
+
+    // console_log::init_with_level(log_level).unwrap();
 
     trace!("trace test");
     debug!("debug test");
