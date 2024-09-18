@@ -311,7 +311,7 @@ impl Network {
         peer_index: u64,
         blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
-        info!("requesting blockchain from peer : {:?}", peer_index);
+        debug!("requesting blockchain from peer : {:?}", peer_index);
 
         let configs = self.config_lock.read().await;
         let blockchain = blockchain_lock.read().await;

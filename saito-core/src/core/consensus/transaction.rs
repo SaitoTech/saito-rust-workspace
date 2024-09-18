@@ -1002,7 +1002,7 @@ impl Transaction {
                     self.path.len()
                 );
                 for hop in self.path.iter() {
-                    info!("hop : {:?} --> {:?}", hop.from.to_hex(), hop.to.to_hex());
+                    debug!("hop : {:?} --> {:?}", hop.from.to_hex(), hop.to.to_hex());
                 }
                 return false;
             }
