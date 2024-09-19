@@ -12,7 +12,8 @@ export enum TransactionType {
     Vip = 4,
     SPV = 5,
     Issuance = 6,
-    Other = 7,
+    BlockStake = 7,
+    Bound = 8,
 }
 
 export default class Transaction extends WasmWrapper<WasmTransaction> {
