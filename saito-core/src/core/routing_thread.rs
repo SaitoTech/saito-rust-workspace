@@ -24,6 +24,7 @@ use crate::core::msg::ghost_chain_sync::GhostChainSync;
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
 use crate::core::process::process_event::ProcessEvent;
+use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
@@ -389,7 +390,9 @@ impl RoutingThread {
 
         if let Some(peer) = peers.index_to_peers.get(&peer_index) {
             // TODO : check if this check can be removed from here, since network.rs also have the same check
-            if wallet.wallet_version > peer.wallet_version {
+            if wallet.wallet_version > peer.wallet_version
+                && peer.wallet_version != Version::new(0, 0, 0)
+            {
                 warn!(
                     "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
                     block_hash.to_hex(), peer.index, wallet.wallet_version, peer.wallet_version

@@ -17,6 +17,7 @@ use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
+use crate::core::process::version::Version;
 
 #[derive(Debug)]
 pub enum PeerDisconnectType {
@@ -440,7 +441,9 @@ impl Network {
             let wallet = self.wallet_lock.read().await;
 
             if let Some(peer) = peers.index_to_peers.get(&peer_index) {
-                if wallet.wallet_version > peer.wallet_version {
+                if wallet.wallet_version > peer.wallet_version
+                    && peer.wallet_version != Version::new(0, 0, 0)
+                {
                     warn!(
                     "Not Fetching Block: {:?} from peer :{:?} since peer version is old. expected: {:?} actual {:?} ",
                     block_hash.to_hex(), peer.index, wallet.wallet_version, peer.wallet_version
