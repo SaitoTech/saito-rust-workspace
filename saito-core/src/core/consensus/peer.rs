@@ -15,6 +15,7 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
+use crate::core::util::rate_limiter::{RateLimiter, RateLimiterRequestType};
 
 #[derive(Clone, Debug)]
 pub enum PeerStatus {
@@ -39,10 +40,17 @@ pub struct Peer {
     pub last_msg_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
+    pub key_list_rate_limiter: RateLimiter,
+    pub handshake_rate_limiter: RateLimiter,
 }
 
 impl Peer {
     pub fn new(peer_index: u64) -> Peer {
+        let mut key_list_rate_limiter = RateLimiter::default();
+        key_list_rate_limiter.set_limit(10);
+        let mut handshake_rate_limiter = RateLimiter::default();
+        handshake_rate_limiter.set_limit(5);
+
         Peer {
             index: peer_index,
             peer_status: PeerStatus::Disconnected(0, 1_000),
@@ -54,6 +62,18 @@ impl Peer {
             last_msg_at: 0,
             wallet_version: Default::default(),
             core_version: Default::default(),
+            key_list_rate_limiter,
+            handshake_rate_limiter,
+        }
+    }
+
+    pub fn can_make_request(&mut self, request: RateLimiterRequestType, current_time: u64) -> bool {
+        if let RateLimiterRequestType::KeyList = request {
+            self.key_list_rate_limiter.can_make_request(current_time)
+        } else if let RateLimiterRequestType::HandshakeChallenge = request {
+            self.handshake_rate_limiter.can_make_request(current_time)
+        } else {
+            false
         }
     }
 
@@ -97,6 +117,7 @@ impl Peer {
 
         Ok(())
     }
+
     pub async fn handle_handshake_challenge(
         &mut self,
         challenge: HandshakeChallenge,
@@ -232,7 +253,7 @@ impl Peer {
         self.core_version = response.core_version;
         self.peer_status = PeerStatus::Connected(response.public_key);
 
-        info!(
+        debug!(
             "my version : {:?} peer version : {:?}",
             wallet.wallet_version, response.wallet_version
         );

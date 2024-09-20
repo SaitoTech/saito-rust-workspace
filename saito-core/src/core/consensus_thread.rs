@@ -428,7 +428,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             );
             while !list.is_empty() {
                 let file_names: Vec<String> =
-                    list.drain(..std::cmp::min(100, list.len())).collect();
+                    list.drain(..std::cmp::min(1000, list.len())).collect();
                 self.storage
                     .load_blocks_from_disk(file_names.as_slice(), self.mempool_lock.clone())
                     .await;
@@ -444,13 +444,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     )
                     .await;
 
-                if list.len() % 1000 == 0 {
-                    info!(
-                        "{:?} blocks remaining to be loaded. Timestamp : {:?}",
-                        list.len(),
-                        StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
-                    );
-                }
+                info!(
+                    "{:?} blocks remaining to be loaded. Timestamp : {:?}",
+                    list.len(),
+                    StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
+                );
             }
             info!(
                 "{:?} total blocks in blockchain. Timestamp : {:?}, elapsed_time : {:?}",

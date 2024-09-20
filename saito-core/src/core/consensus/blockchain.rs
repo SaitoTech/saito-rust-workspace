@@ -1205,10 +1205,10 @@ impl Blockchain {
                 // to unwind. Because of this, we start WINDING the old chain back
                 // which requires us to start at the END of the new chain vector.
                 if !old_chain.is_empty() {
-                    info!("old chain len: {}", old_chain.len());
+                    debug!("old chain len: {}", old_chain.len());
                     WindingResult::Wind(old_chain.len() - 1, true, wallet_updated)
                 } else {
-                    info!("old chain is empty. finishing with failure");
+                    debug!("old chain is empty. finishing with failure");
                     WindingResult::FinishWithFailure
                 }
             } else {
@@ -3306,7 +3306,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_fork_id_difference() {
-        // pretty_env_logger::init();
+        // pretty_env_logger::init()
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
