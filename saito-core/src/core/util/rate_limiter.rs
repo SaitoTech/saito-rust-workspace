@@ -37,8 +37,8 @@ impl RateLimiter {
 impl Default for RateLimiter {
     fn default() -> Self {
         RateLimiter {
-            limit: 10,      // Default limit of 10 requests
-            window: 60_000, // Default window of 60 seconds
+            limit: 10,     // Default limit of 10 requests
+            window: 1_000, // Default window of 1 seconds
             request_count: 0,
             last_request_time: 0,
         }
@@ -54,7 +54,7 @@ mod tests {
         let rate_limiter = RateLimiter::default();
 
         assert_eq!(rate_limiter.limit, 10);
-        assert_eq!(rate_limiter.window, 60_000);
+        assert_eq!(rate_limiter.window, 1_000);
         assert_eq!(rate_limiter.request_count, 0);
         assert_eq!(rate_limiter.last_request_time, 0);
     }

@@ -126,7 +126,6 @@ impl RoutingThread {
                     .await;
             }
             Message::HandshakeResponse(response) => {
-                // debug!("received handshake response");
                 self.network
                     .handle_handshake_response(
                         peer_index,
@@ -139,10 +138,6 @@ impl RoutingThread {
             }
 
             Message::Transaction(transaction) => {
-                // trace!(
-                //     "received transaction : {:?}",
-                //     transaction.signature.to_hex()
-                // );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;
@@ -196,7 +191,6 @@ impl RoutingThread {
             }
             _ => unreachable!(),
         }
-        // trace!("incoming message processed");
     }
     /// Processes a received ghost chain request from a peer to sync itself with the blockchain
     ///

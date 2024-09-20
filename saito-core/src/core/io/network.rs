@@ -587,7 +587,7 @@ mod tests {
 
             peer2 = Peer::new(peer2_index);
 
-            peer2.key_list_rate_limiter.set_limit(limit);
+            peer2.key_list_limiter.set_limit(limit);
             let peer_data = PeerConfig {
                 host: String::from(""),
                 port: 8080,

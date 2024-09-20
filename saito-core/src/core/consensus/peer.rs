@@ -40,8 +40,9 @@ pub struct Peer {
     pub last_msg_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
-    pub key_list_rate_limiter: RateLimiter,
-    pub handshake_rate_limiter: RateLimiter,
+    pub key_list_limiter: RateLimiter,
+    pub handshake_limiter: RateLimiter,
+    pub message_limiter: RateLimiter,
 }
 
 impl Peer {
@@ -51,6 +52,9 @@ impl Peer {
 
         let mut handshake_rate_limiter: RateLimiter = Default::default();
         handshake_rate_limiter.set_limit(10);
+
+        let mut message_limiter: RateLimiter = Default::default();
+        message_limiter.set_limit(1000);
 
         Peer {
             index: peer_index,
@@ -63,16 +67,21 @@ impl Peer {
             last_msg_at: 0,
             wallet_version: Default::default(),
             core_version: Default::default(),
-            key_list_rate_limiter,
-            handshake_rate_limiter,
+            key_list_limiter: key_list_rate_limiter,
+            handshake_limiter: handshake_rate_limiter,
+            message_limiter,
         }
     }
 
     pub fn has_key_list_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
-        self.key_list_rate_limiter.has_limit_exceeded(current_time)
+        self.key_list_limiter.has_limit_exceeded(current_time)
     }
     pub fn has_handshake_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
-        self.handshake_rate_limiter.has_limit_exceeded(current_time)
+        self.handshake_limiter.has_limit_exceeded(current_time)
+    }
+
+    pub fn has_message_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
+        self.message_limiter.has_limit_exceeded(current_time)
     }
 
     pub fn get_url(&self) -> String {
