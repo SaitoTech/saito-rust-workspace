@@ -7,7 +7,9 @@ use tokio::sync::RwLock;
 
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD};
+use crate::core::defs::{
+    PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD,
+};
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
@@ -46,7 +48,7 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub fn new(peer_index: u64) -> Peer {
+    pub fn new(peer_index: PeerIndex) -> Peer {
         let mut key_list_rate_limiter: RateLimiter = Default::default();
         key_list_rate_limiter.set_limit(30);
 

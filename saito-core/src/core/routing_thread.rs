@@ -531,6 +531,14 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         match event {
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
+                {
+                    let mut peers = self.network.peer_lock.write().await;
+                    let peer = peers.find_peer_by_index_mut(peer_index)?;
+                    let time = self.timer.get_timestamp_in_ms();
+                    if peer.has_message_limit_exceeded(time) {
+                        return None;
+                    }
+                }
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
