@@ -1,13 +1,9 @@
 use crate::core::defs::Timestamp;
 
-pub enum RateLimiterRequestType {
-    KeyList,
-    HandshakeChallenge,
-}
-
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
-    limit: usize,                 // Max allowed requests in the window
+    /// Max allowed requests in the window
+    limit: usize,
     window: Timestamp,            // Window duration in milliseconds
     request_count: usize,         // Number of requests made in the current window
     last_request_time: Timestamp, // Timestamp of the last request in milliseconds
@@ -23,6 +19,7 @@ impl RateLimiter {
     }
 
     pub fn has_limit_exceeded(&mut self, current_time: u64) -> bool {
+        // TODO : current implementation allows twice the limit from spikes. a sliding window implementation would be better I think.
         if current_time.saturating_sub(self.last_request_time) > self.window {
             self.request_count = 0;
             self.last_request_time = current_time;

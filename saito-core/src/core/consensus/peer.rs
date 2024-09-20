@@ -15,7 +15,7 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use crate::core::util::rate_limiter::{RateLimiter, RateLimiterRequestType};
+use crate::core::util::rate_limiter::RateLimiter;
 
 #[derive(Clone, Debug)]
 pub enum PeerStatus {
@@ -46,10 +46,11 @@ pub struct Peer {
 
 impl Peer {
     pub fn new(peer_index: u64) -> Peer {
-        let mut key_list_rate_limiter = RateLimiter::default();
-        key_list_rate_limiter.set_limit(10);
-        let mut handshake_rate_limiter = RateLimiter::default();
-        handshake_rate_limiter.set_limit(5);
+        let mut key_list_rate_limiter: RateLimiter = Default::default();
+        key_list_rate_limiter.set_limit(30);
+
+        let mut handshake_rate_limiter: RateLimiter = Default::default();
+        handshake_rate_limiter.set_limit(10);
 
         Peer {
             index: peer_index,
@@ -67,18 +68,11 @@ impl Peer {
         }
     }
 
-    pub fn has_limit_exceeded(
-        &mut self,
-        request: RateLimiterRequestType,
-        current_time: u64,
-    ) -> bool {
-        if let RateLimiterRequestType::KeyList = request {
-            self.key_list_rate_limiter.has_limit_exceeded(current_time)
-        } else if let RateLimiterRequestType::HandshakeChallenge = request {
-            self.handshake_rate_limiter.has_limit_exceeded(current_time)
-        } else {
-            false
-        }
+    pub fn has_key_list_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
+        self.key_list_rate_limiter.has_limit_exceeded(current_time)
+    }
+    pub fn has_handshake_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
+        self.handshake_rate_limiter.has_limit_exceeded(current_time)
     }
 
     pub fn get_url(&self) -> String {
