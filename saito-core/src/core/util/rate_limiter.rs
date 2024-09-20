@@ -22,7 +22,7 @@ impl RateLimiter {
         self.window = window;
     }
 
-    pub fn can_make_request(&mut self, current_time: u64) -> bool {
+    pub fn has_limit_exceeded(&mut self, current_time: u64) -> bool {
         if current_time.saturating_sub(self.last_request_time) > self.window {
             self.request_count = 0;
             self.last_request_time = current_time;
@@ -30,9 +30,9 @@ impl RateLimiter {
 
         if self.request_count < self.limit {
             self.request_count += 1;
-            true
-        } else {
             false
+        } else {
+            true
         }
     }
 }
@@ -82,7 +82,7 @@ mod tests {
     fn can_make_request_within_limit_test() {
         let mut rate_limiter = RateLimiter::default();
         let current_time = 10_000;
-        assert!(rate_limiter.can_make_request(current_time));
+        assert!(!rate_limiter.has_limit_exceeded(current_time));
         assert_eq!(rate_limiter.request_count, 1);
     }
 
@@ -91,9 +91,9 @@ mod tests {
         let mut rate_limiter = RateLimiter::default();
         let current_time = 10_000;
         for _ in 0..rate_limiter.limit {
-            assert!(rate_limiter.can_make_request(current_time));
+            assert!(!rate_limiter.has_limit_exceeded(current_time));
         }
-        assert!(!rate_limiter.can_make_request(current_time));
+        assert!(rate_limiter.has_limit_exceeded(current_time));
         assert_eq!(rate_limiter.request_count, rate_limiter.limit);
     }
 
@@ -103,10 +103,10 @@ mod tests {
         let current_time = 10_000;
 
         for _ in 0..rate_limiter.limit {
-            assert!(rate_limiter.can_make_request(current_time));
+            assert!(!rate_limiter.has_limit_exceeded(current_time));
         }
         let new_time = current_time + rate_limiter.window + 1;
-        assert!(rate_limiter.can_make_request(new_time));
+        assert!(!rate_limiter.has_limit_exceeded(new_time));
         assert_eq!(rate_limiter.request_count, 1);
         assert_eq!(rate_limiter.last_request_time, new_time);
     }
@@ -117,11 +117,11 @@ mod tests {
         let initial_time = 10_000;
 
         for _ in 0..rate_limiter.limit {
-            assert!(rate_limiter.can_make_request(initial_time));
+            assert!(!rate_limiter.has_limit_exceeded(initial_time));
         }
 
         let later_time = initial_time + rate_limiter.window + 500;
-        assert!(rate_limiter.can_make_request(later_time));
+        assert!(!rate_limiter.has_limit_exceeded(later_time));
         dbg!("{}", &rate_limiter);
         assert_eq!(rate_limiter.request_count, 1);
         assert_eq!(rate_limiter.last_request_time, later_time);

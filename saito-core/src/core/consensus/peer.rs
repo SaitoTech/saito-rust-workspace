@@ -67,11 +67,15 @@ impl Peer {
         }
     }
 
-    pub fn can_make_request(&mut self, request: RateLimiterRequestType, current_time: u64) -> bool {
+    pub fn has_limit_exceeded(
+        &mut self,
+        request: RateLimiterRequestType,
+        current_time: u64,
+    ) -> bool {
         if let RateLimiterRequestType::KeyList = request {
-            self.key_list_rate_limiter.can_make_request(current_time)
+            self.key_list_rate_limiter.has_limit_exceeded(current_time)
         } else if let RateLimiterRequestType::HandshakeChallenge = request {
-            self.handshake_rate_limiter.can_make_request(current_time)
+            self.handshake_rate_limiter.has_limit_exceeded(current_time)
         } else {
             false
         }
