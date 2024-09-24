@@ -134,7 +134,6 @@ impl Network {
                 .unwrap();
         }
 
-        let mut remove_peer = false;
         let mut peers = self.peer_lock.write().await;
         if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
             if peer.get_public_key().is_some() {
@@ -145,17 +144,10 @@ impl Network {
                         peer.get_public_key().unwrap(),
                     ));
             }
-            if peer.static_peer_config.is_none() {
-                // we remove the peer only if it's connected "from" outside
-                remove_peer = true;
-            }
-            peer.mark_as_disconnected();
+
+            peer.mark_as_disconnected(self.timer.get_timestamp_in_ms());
         } else {
             error!("unknown peer : {:?} disconnected", peer_index);
-        }
-        if remove_peer {
-            debug!("removing peer : {:?} from peer collection", peer_index);
-            peers.remove_peer(peer_index);
         }
     }
     pub async fn handle_new_peer(&mut self, peer_index: u64) {
@@ -254,6 +246,7 @@ impl Network {
                 self.io_interface.as_ref(),
                 wallet_lock.clone(),
                 configs_lock.clone(),
+                current_time,
             )
             .await;
         if result.is_err() || peer.get_public_key().is_none() {

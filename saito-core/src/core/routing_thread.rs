@@ -88,6 +88,7 @@ pub struct RoutingThread {
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub network: Network,
     pub reconnection_timer: Timestamp,
+    pub peer_removal_timer: Timestamp,
     pub stats: RoutingStats,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
     pub last_verification_thread_index: usize,
@@ -623,6 +624,14 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             self.reconnection_timer = 0;
             self.fetch_next_blocks().await;
             work_done = true;
+        }
+
+        const PEER_REMOVAL_PERIOD: Timestamp = Duration::from_secs(60).as_millis() as Timestamp;
+        self.peer_removal_timer += duration_value;
+        if self.peer_removal_timer >= PEER_REMOVAL_PERIOD {
+            let mut peers = self.network.peer_lock.write().await;
+            peers.remove_disconnected_peers(current_time);
+            self.peer_removal_timer = 0;
         }
 
         if work_done {

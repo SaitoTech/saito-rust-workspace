@@ -40,6 +40,7 @@ pub struct Peer {
     pub key_list: Vec<SaitoPublicKey>,
     pub services: Vec<PeerService>,
     pub last_msg_at: Timestamp,
+    pub disconnected_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
     pub key_list_limiter: RateLimiter,
@@ -67,6 +68,7 @@ impl Peer {
             key_list: vec![],
             services: vec![],
             last_msg_at: 0,
+            disconnected_at: Timestamp::MAX,
             wallet_version: Default::default(),
             core_version: Default::default(),
             key_list_limiter: key_list_rate_limiter,
@@ -120,8 +122,7 @@ impl Peer {
         let message = Message::HandshakeChallenge(challenge);
         io_handler
             .send_message(self.index, message.serialize().as_slice())
-            .await
-            .unwrap();
+            .await?;
         debug!("handshake challenge sent for peer: {:?}", self.index);
 
         Ok(())
@@ -175,8 +176,7 @@ impl Peer {
                 self.index,
                 Message::HandshakeResponse(response).serialize().as_slice(),
             )
-            .await
-            .unwrap();
+            .await?;
         debug!("first handshake response sent for peer: {:?}", self.index);
 
         Ok(())
@@ -187,6 +187,7 @@ impl Peer {
         io_handler: &(dyn InterfaceIO + Send + Sync),
         wallet_lock: Arc<RwLock<Wallet>>,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        current_time: Timestamp,
     ) -> Result<(), Error> {
         debug!(
             "handling handshake response :{:?} for peer : {:?} with address : {:?}",
@@ -199,7 +200,7 @@ impl Peer {
                 "core version is not set in handshake response. expected : {:?}",
                 wallet_lock.read().await.core_version
             );
-            self.mark_as_disconnected();
+            self.mark_as_disconnected(current_time);
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -208,7 +209,7 @@ impl Peer {
                 "we don't have a challenge to verify for peer : {:?}",
                 self.index
             );
-            self.mark_as_disconnected();
+            self.mark_as_disconnected(current_time);
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -222,7 +223,7 @@ impl Peer {
                 sent_challenge.to_hex(),
                 response.public_key.to_base58()
             );
-            self.mark_as_disconnected();
+            self.mark_as_disconnected(current_time);
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -251,7 +252,7 @@ impl Peer {
                 self.index,
                 response.wallet_version,
             ));
-            self.mark_as_disconnected();
+            self.mark_as_disconnected(current_time);
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -293,8 +294,7 @@ impl Peer {
                     self.index,
                     Message::HandshakeResponse(response).serialize().as_slice(),
                 )
-                .await
-                .unwrap();
+                .await?;
             debug!("second handshake response sent for peer: {:?}", self.index);
         } else {
             info!(
@@ -375,9 +375,10 @@ impl Peer {
         None
     }
 
-    pub fn mark_as_disconnected(&mut self) {
+    pub fn mark_as_disconnected(&mut self, disconnected_at: Timestamp) {
         self.challenge_for_peer = None;
         self.services = vec![];
+        self.disconnected_at = disconnected_at;
 
         if let PeerStatus::Disconnected(_, _) = self.peer_status {
         } else {
