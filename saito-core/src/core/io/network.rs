@@ -220,55 +220,67 @@ impl Network {
         blockchain_lock: Arc<RwLock<Blockchain>>,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     ) {
-        // debug!("handling handshake response");
         let mut peers = self.peer_lock.write().await;
-
-        let peer = peers.index_to_peers.get_mut(&peer_index);
-        if peer.is_none() {
-            error!(
-                "peer not found for index : {:?}. cannot handle handshake response",
-                peer_index
-            );
-            return;
-        }
-        let peer: &mut Peer = peer.unwrap();
-        let current_time = self.timer.get_timestamp_in_ms();
-        if peer.has_handshake_limit_exceeded(current_time) {
+        let public_key;
+        {
+            let peer = peers.index_to_peers.get_mut(&peer_index);
+            if peer.is_none() {
+                error!(
+                    "peer not found for index : {:?}. cannot handle handshake response",
+                    peer_index
+                );
+                return;
+            }
+            let peer: &mut Peer = peer.unwrap();
+            let current_time = self.timer.get_timestamp_in_ms();
+            if peer.has_handshake_limit_exceeded(current_time) {
+                debug!(
+                    "peer {:?} exceeded rate limit for handshake challenge",
+                    peer_index
+                );
+                return;
+            }
+            let result = peer
+                .handle_handshake_response(
+                    response,
+                    self.io_interface.as_ref(),
+                    wallet_lock.clone(),
+                    configs_lock.clone(),
+                    current_time,
+                )
+                .await;
+            if result.is_err() || peer.get_public_key().is_none() {
+                info!(
+                    "disconnecting peer : {:?} as handshake response was not handled",
+                    peer_index
+                );
+                self.io_interface
+                    .disconnect_from_peer(peer_index)
+                    .await
+                    .unwrap();
+                return;
+            }
+            public_key = peer.get_public_key().unwrap();
             debug!(
-                "peer {:?} exceeded rate limit for handshake challenge",
-                peer_index
+                "peer : {:?} handshake successful for peer : {:?}",
+                peer.index,
+                public_key.to_base58()
             );
-            return;
         }
-        let result = peer
-            .handle_handshake_response(
-                response,
-                self.io_interface.as_ref(),
-                wallet_lock.clone(),
-                configs_lock.clone(),
-                current_time,
-            )
-            .await;
-        if result.is_err() || peer.get_public_key().is_none() {
-            info!(
-                "disconnecting peer : {:?} as handshake response was not handled",
-                peer_index
-            );
-            self.io_interface
-                .disconnect_from_peer(peer_index)
-                .await
-                .unwrap();
-            return;
+        if let Some(old_peer) = peers.remove_reconnected_peer(&public_key) {
+            // if we already have the public key, and it's disconnected, we will consider this as a reconnection.
+            // so we will remove the old peer and add those data into new peer
+            // else we will reject the new connection
+            let peer = peers
+                .find_peer_by_index_mut(peer_index)
+                .expect("peer should exist here since it was accessed previously");
+            peer.join_as_reconnection(old_peer)
+        } else {
+            peers.address_to_peers.insert(public_key, peer_index);
         }
-        let public_key = peer.get_public_key().unwrap();
-        debug!(
-            "peer : {:?} handshake successful for peer : {:?}",
-            peer.index,
-            public_key.to_base58()
-        );
+
         self.io_interface
             .send_interface_event(InterfaceEvent::PeerConnected(peer_index));
-        peers.address_to_peers.insert(public_key, peer_index);
         // start block syncing here
         self.request_blockchain_from_peer(peer_index, blockchain_lock.clone())
             .await;

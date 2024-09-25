@@ -26,12 +26,12 @@ pub enum PeerStatus {
         Timestamp, /*reconnection period*/
     ),
     Connecting,
-    Connected(SaitoPublicKey),
+    Connected,
 }
 
 #[derive(Debug, Clone)]
 pub struct Peer {
-    pub index: u64,
+    pub index: PeerIndex,
     pub peer_status: PeerStatus,
     pub block_fetch_url: String,
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
@@ -46,6 +46,7 @@ pub struct Peer {
     pub key_list_limiter: RateLimiter,
     pub handshake_limiter: RateLimiter,
     pub message_limiter: RateLimiter,
+    pub public_key: Option<SaitoPublicKey>,
 }
 
 impl Peer {
@@ -74,6 +75,7 @@ impl Peer {
             key_list_limiter: key_list_rate_limiter,
             handshake_limiter: handshake_rate_limiter,
             message_limiter,
+            public_key: None,
         }
     }
 
@@ -257,11 +259,20 @@ impl Peer {
             return Err(Error::from(ErrorKind::InvalidInput));
         }
 
+        if self.public_key.is_some() {
+            assert_eq!(
+                response.public_key,
+                self.public_key.unwrap(),
+                "This peer instance is to handle a peer with a different public key"
+            );
+        }
+
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
         self.wallet_version = response.wallet_version;
         self.core_version = response.core_version;
-        self.peer_status = PeerStatus::Connected(response.public_key);
+        self.peer_status = PeerStatus::Connected;
+        self.public_key = Some(response.public_key);
 
         debug!(
             "my version : {:?} peer version : {:?}",
@@ -369,10 +380,7 @@ impl Peer {
         self.static_peer_config.is_some()
     }
     pub fn get_public_key(&self) -> Option<SaitoPublicKey> {
-        if let PeerStatus::Connected(key) = self.peer_status {
-            return Some(key);
-        }
-        None
+        self.public_key
     }
 
     pub fn mark_as_disconnected(&mut self, disconnected_at: Timestamp) {
@@ -384,6 +392,31 @@ impl Peer {
         } else {
             self.peer_status = PeerStatus::Disconnected(0, 1_000);
         }
+    }
+
+    /// Copies data from an old peer instance to a new reconnected peer
+    ///
+    /// # Arguments
+    ///
+    /// * `peer`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    pub(crate) fn join_as_reconnection(&mut self, peer: Peer) {
+        assert!(
+            !matches!(peer.peer_status, PeerStatus::Connected),
+            "Old peer should not be already connected"
+        );
+        self.message_limiter = peer.message_limiter;
+        self.handshake_limiter = peer.handshake_limiter;
+        self.key_list_limiter = peer.key_list_limiter;
+
+        self.static_peer_config = peer.static_peer_config;
     }
 }
 

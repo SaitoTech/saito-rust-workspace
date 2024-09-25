@@ -1,4 +1,4 @@
-use crate::core::consensus::peer::Peer;
+use crate::core::consensus::peer::{Peer, PeerStatus};
 use crate::core::defs::{PeerIndex, SaitoPublicKey, Timestamp};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -29,12 +29,34 @@ impl PeerCollection {
 
         self.find_peer_by_index(*result)
     }
+    pub fn find_peer_by_address_mut(&mut self, address: &SaitoPublicKey) -> Option<&mut Peer> {
+        let result = self.address_to_peers.get(address)?;
+
+        self.find_peer_by_index_mut(*result)
+    }
 
     pub fn find_peer_by_index(&self, peer_index: u64) -> Option<&Peer> {
         self.index_to_peers.get(&peer_index)
     }
     pub fn find_peer_by_index_mut(&mut self, peer_index: u64) -> Option<&mut Peer> {
         self.index_to_peers.get_mut(&peer_index)
+    }
+
+    pub fn remove_reconnected_peer(&mut self, public_key: &SaitoPublicKey) -> Option<Peer> {
+        let peer_index;
+        {
+            let peer = self.find_peer_by_address(&public_key)?;
+            if let PeerStatus::Connected = peer.peer_status {
+                // since peer is already connected
+                return None;
+            }
+            peer_index = peer.index;
+        }
+
+        let peer = self.index_to_peers.remove(&peer_index)?;
+        self.address_to_peers.remove(&peer.public_key?);
+
+        Some(peer)
     }
 
     pub fn remove_disconnected_peers(&mut self, current_time: Timestamp) {
