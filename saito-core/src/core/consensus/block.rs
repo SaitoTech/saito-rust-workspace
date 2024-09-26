@@ -1351,9 +1351,9 @@ impl Block {
             debug!("miner payout: {:?}", miner_payout);
             debug!("router1 payout: {:?}", router1_payout);
             debug!("router2 payout: {:?}", router2_payout);
-            debug!("miner pkey: {:?}", miner_publickey);
-            debug!("router1 pkey: {:?}", router1_publickey);
-            debug!("router2 pkey: {:?}", router2_publickey);
+            debug!("miner pkey: {:?}", miner_publickey.to_base58());
+            debug!("router1 pkey: {:?}", router1_publickey.to_base58());
+            debug!("router2 pkey: {:?}", router2_publickey.to_base58());
 
             cv.fee_transaction = Some(transaction);
         } else {
@@ -2259,8 +2259,8 @@ impl Block {
                 let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
                 let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
 
-                debug!("our hash1 is: {:?}: ", hash1);
-                debug!("our hash2 is: {:?}: ", hash2);
+                debug!("our hash1 is: {:?}: ", hash1.to_hex());
+                debug!("our hash2 is: {:?}: ", hash2.to_hex());
 
                 if hash1 != hash2 {
                     error!(
