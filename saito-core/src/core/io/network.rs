@@ -583,7 +583,7 @@ mod tests {
     #[tokio::test]
     async fn test_keylist_rate_limiter() {
         let mut t1 = test_manager::test::TestManager::default();
-        let limit: usize = 10;
+        let limit: u64 = 10;
         let peer2_index: u64 = 0;
         let mut peer2;
 

@@ -1,10 +1,5 @@
-use std::cmp::Ordering;
-use std::io::{Error, ErrorKind};
-use std::sync::Arc;
-
-use log::{debug, info, warn};
-use tokio::sync::RwLock;
-
+use crate::core::consensus::limit::block_depth_limit_checker::BlockDepthLimitChecker;
+use crate::core::consensus::limit::rate_limiter::RateLimiter;
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
@@ -17,7 +12,12 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use crate::core::util::rate_limiter::RateLimiter;
+use log::{debug, info, warn};
+use std::cmp::Ordering;
+use std::io::{Error, ErrorKind};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::RwLock;
 
 #[derive(Clone, Debug)]
 pub enum PeerStatus {
@@ -43,23 +43,19 @@ pub struct Peer {
     pub disconnected_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
+    // NOTE: we are currently mapping 1 peer = 1 socket = 1 public key. But in the future we need to support multiple peers per public key
+    // so some of these limiters might have to be handled from a different place than the peer. (Eg : Account struct?)
     pub key_list_limiter: RateLimiter,
     pub handshake_limiter: RateLimiter,
     pub message_limiter: RateLimiter,
+    pub invalid_block_limiter: RateLimiter,
+    pub same_depth_blocks_limiter: BlockDepthLimitChecker,
     pub public_key: Option<SaitoPublicKey>,
+    pub is_blacklisted: bool,
 }
 
 impl Peer {
     pub fn new(peer_index: PeerIndex) -> Peer {
-        let mut key_list_rate_limiter: RateLimiter = Default::default();
-        key_list_rate_limiter.set_limit(30);
-
-        let mut handshake_rate_limiter: RateLimiter = Default::default();
-        handshake_rate_limiter.set_limit(10);
-
-        let mut message_limiter: RateLimiter = Default::default();
-        message_limiter.set_limit(1000);
-
         Peer {
             index: peer_index,
             peer_status: PeerStatus::Disconnected(0, 1_000),
@@ -72,10 +68,16 @@ impl Peer {
             disconnected_at: Timestamp::MAX,
             wallet_version: Default::default(),
             core_version: Default::default(),
-            key_list_limiter: key_list_rate_limiter,
-            handshake_limiter: handshake_rate_limiter,
-            message_limiter,
+            key_list_limiter: RateLimiter::builder(10, Duration::from_secs(60)),
+            handshake_limiter: RateLimiter::builder(10, Duration::from_secs(60)),
+            message_limiter: RateLimiter::builder(100, Duration::from_secs(1)),
+            invalid_block_limiter: RateLimiter::builder(1, Duration::from_secs(3600)),
+            same_depth_blocks_limiter: BlockDepthLimitChecker::builder(
+                10,
+                Duration::from_secs(600),
+            ),
             public_key: None,
+            is_blacklisted: false,
         }
     }
 
@@ -91,7 +93,7 @@ impl Peer {
     }
 
     pub fn get_url(&self) -> String {
-        return if let Some(config) = self.static_peer_config.as_ref() {
+        if let Some(config) = self.static_peer_config.as_ref() {
             let mut protocol: String = String::from("ws");
             if config.protocol == "https" {
                 protocol = String::from("wss");
@@ -104,7 +106,7 @@ impl Peer {
                 + "/wsopen"
         } else {
             "".to_string()
-        };
+        }
     }
     pub async fn initiate_handshake(
         &mut self,

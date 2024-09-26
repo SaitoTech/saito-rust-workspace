@@ -537,6 +537,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     let peer = peers.find_peer_by_index_mut(peer_index)?;
                     let time = self.timer.get_timestamp_in_ms();
                     if peer.has_message_limit_exceeded(time) {
+                        info!("limit exceeded for messages from peer : {:?}", peer_index);
                         return None;
                     }
                 }
