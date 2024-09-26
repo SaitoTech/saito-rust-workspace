@@ -196,7 +196,7 @@ impl Network {
 
         // TODO : this rate check is done after a lock is acquired which is not ideal
         if peer.has_handshake_limit_exceeded(current_time) {
-            debug!(
+            warn!(
                 "peer {:?} exceeded rate limit for handshake challenge",
                 peer_index
             );
@@ -234,7 +234,7 @@ impl Network {
             let peer: &mut Peer = peer.unwrap();
             let current_time = self.timer.get_timestamp_in_ms();
             if peer.has_handshake_limit_exceeded(current_time) {
-                debug!(
+                warn!(
                     "peer {:?} exceeded rate limit for handshake challenge",
                     peer_index
                 );
