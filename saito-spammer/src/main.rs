@@ -318,6 +318,7 @@ async fn run_routing_event_processor(
             timer.clone(),
         ),
         reconnection_timer: 0,
+        peer_removal_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
         senders_to_verification: senders,
         last_verification_thread_index: 0,
@@ -486,7 +487,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let context = Context::new(configs_clone.clone(), wallet);
 
-    let peers_lock = Arc::new(RwLock::new(PeerCollection::new()));
+    let peers_lock = Arc::new(RwLock::new(PeerCollection::default()));
 
     let (sender_to_consensus, receiver_for_consensus) =
         tokio::sync::mpsc::channel::<ConsensusEvent>(channel_size);

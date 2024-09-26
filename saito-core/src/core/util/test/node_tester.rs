@@ -144,7 +144,7 @@ pub mod test {
 
             let channel_size = 1_000_000;
 
-            let peers = Arc::new(RwLock::new(PeerCollection::new()));
+            let peers = Arc::new(RwLock::new(PeerCollection::default()));
             let context = Context {
                 blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
                 mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
@@ -184,6 +184,7 @@ pub mod test {
                         timer.clone(),
                     ),
                     reconnection_timer: 0,
+                    peer_removal_timer: 0,
                     stats: RoutingStats::new(sender_to_stat.clone()),
                     senders_to_verification: vec![sender_to_verification.clone()],
                     last_verification_thread_index: 0,

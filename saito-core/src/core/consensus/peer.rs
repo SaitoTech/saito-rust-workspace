@@ -1,13 +1,10 @@
-use std::cmp::Ordering;
-use std::io::{Error, ErrorKind};
-use std::sync::Arc;
-
-use log::{debug, info, warn};
-use tokio::sync::RwLock;
-
+use crate::core::consensus::limit::block_depth_limit_checker::BlockDepthLimitChecker;
+use crate::core::consensus::limit::rate_limiter::RateLimiter;
 use crate::core::consensus::peer_service::PeerService;
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD};
+use crate::core::defs::{
+    PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD,
+};
 use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
@@ -15,7 +12,12 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use crate::core::util::rate_limiter::{RateLimiter, RateLimiterRequestType};
+use log::{debug, info, warn};
+use std::cmp::Ordering;
+use std::io::{Error, ErrorKind};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::RwLock;
 
 #[derive(Clone, Debug)]
 pub enum PeerStatus {
@@ -24,12 +26,12 @@ pub enum PeerStatus {
         Timestamp, /*reconnection period*/
     ),
     Connecting,
-    Connected(SaitoPublicKey),
+    Connected,
 }
 
 #[derive(Debug, Clone)]
 pub struct Peer {
-    pub index: u64,
+    pub index: PeerIndex,
     pub peer_status: PeerStatus,
     pub block_fetch_url: String,
     // if this is None(), it means an incoming connection. else a connection which we started from the data from config file
@@ -38,19 +40,22 @@ pub struct Peer {
     pub key_list: Vec<SaitoPublicKey>,
     pub services: Vec<PeerService>,
     pub last_msg_at: Timestamp,
+    pub disconnected_at: Timestamp,
     pub wallet_version: Version,
     pub core_version: Version,
-    pub key_list_rate_limiter: RateLimiter,
-    pub handshake_rate_limiter: RateLimiter,
+    // NOTE: we are currently mapping 1 peer = 1 socket = 1 public key. But in the future we need to support multiple peers per public key
+    // so some of these limiters might have to be handled from a different place than the peer. (Eg : Account struct?)
+    pub key_list_limiter: RateLimiter,
+    pub handshake_limiter: RateLimiter,
+    pub message_limiter: RateLimiter,
+    pub invalid_block_limiter: RateLimiter,
+    pub same_depth_blocks_limiter: BlockDepthLimitChecker,
+    pub public_key: Option<SaitoPublicKey>,
+    pub is_blacklisted: bool,
 }
 
 impl Peer {
-    pub fn new(peer_index: u64) -> Peer {
-        let mut key_list_rate_limiter = RateLimiter::default();
-        key_list_rate_limiter.set_limit(10);
-        let mut handshake_rate_limiter = RateLimiter::default();
-        handshake_rate_limiter.set_limit(5);
-
+    pub fn new(peer_index: PeerIndex) -> Peer {
         Peer {
             index: peer_index,
             peer_status: PeerStatus::Disconnected(0, 1_000),
@@ -60,25 +65,35 @@ impl Peer {
             key_list: vec![],
             services: vec![],
             last_msg_at: 0,
+            disconnected_at: Timestamp::MAX,
             wallet_version: Default::default(),
             core_version: Default::default(),
-            key_list_rate_limiter,
-            handshake_rate_limiter,
+            key_list_limiter: RateLimiter::builder(10, Duration::from_secs(60)),
+            handshake_limiter: RateLimiter::builder(10, Duration::from_secs(60)),
+            message_limiter: RateLimiter::builder(1000, Duration::from_secs(1)),
+            invalid_block_limiter: RateLimiter::builder(1, Duration::from_secs(3600)),
+            same_depth_blocks_limiter: BlockDepthLimitChecker::builder(
+                10,
+                Duration::from_secs(600),
+            ),
+            public_key: None,
+            is_blacklisted: false,
         }
     }
 
-    pub fn can_make_request(&mut self, request: RateLimiterRequestType, current_time: u64) -> bool {
-        if let RateLimiterRequestType::KeyList = request {
-            self.key_list_rate_limiter.can_make_request(current_time)
-        } else if let RateLimiterRequestType::HandshakeChallenge = request {
-            self.handshake_rate_limiter.can_make_request(current_time)
-        } else {
-            false
-        }
+    pub fn has_key_list_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
+        self.key_list_limiter.has_limit_exceeded(current_time)
+    }
+    pub fn has_handshake_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
+        self.handshake_limiter.has_limit_exceeded(current_time)
+    }
+
+    pub fn has_message_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
+        self.message_limiter.has_limit_exceeded(current_time)
     }
 
     pub fn get_url(&self) -> String {
-        return if let Some(config) = self.static_peer_config.as_ref() {
+        if let Some(config) = self.static_peer_config.as_ref() {
             let mut protocol: String = String::from("ws");
             if config.protocol == "https" {
                 protocol = String::from("wss");
@@ -91,7 +106,7 @@ impl Peer {
                 + "/wsopen"
         } else {
             "".to_string()
-        };
+        }
     }
     pub async fn initiate_handshake(
         &mut self,
@@ -111,8 +126,7 @@ impl Peer {
         let message = Message::HandshakeChallenge(challenge);
         io_handler
             .send_message(self.index, message.serialize().as_slice())
-            .await
-            .unwrap();
+            .await?;
         debug!("handshake challenge sent for peer: {:?}", self.index);
 
         Ok(())
@@ -166,8 +180,7 @@ impl Peer {
                 self.index,
                 Message::HandshakeResponse(response).serialize().as_slice(),
             )
-            .await
-            .unwrap();
+            .await?;
         debug!("first handshake response sent for peer: {:?}", self.index);
 
         Ok(())
@@ -178,6 +191,7 @@ impl Peer {
         io_handler: &(dyn InterfaceIO + Send + Sync),
         wallet_lock: Arc<RwLock<Wallet>>,
         configs_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
+        current_time: Timestamp,
     ) -> Result<(), Error> {
         debug!(
             "handling handshake response :{:?} for peer : {:?} with address : {:?}",
@@ -190,7 +204,7 @@ impl Peer {
                 "core version is not set in handshake response. expected : {:?}",
                 wallet_lock.read().await.core_version
             );
-            self.mark_as_disconnected();
+            self.mark_as_disconnected(current_time);
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -199,7 +213,7 @@ impl Peer {
                 "we don't have a challenge to verify for peer : {:?}",
                 self.index
             );
-            self.mark_as_disconnected();
+            self.mark_as_disconnected(current_time);
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -213,7 +227,7 @@ impl Peer {
                 sent_challenge.to_hex(),
                 response.public_key.to_base58()
             );
-            self.mark_as_disconnected();
+            self.mark_as_disconnected(current_time);
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -242,16 +256,25 @@ impl Peer {
                 self.index,
                 response.wallet_version,
             ));
-            self.mark_as_disconnected();
+            self.mark_as_disconnected(current_time);
             io_handler.disconnect_from_peer(self.index).await?;
             return Err(Error::from(ErrorKind::InvalidInput));
+        }
+
+        if self.public_key.is_some() {
+            assert_eq!(
+                response.public_key,
+                self.public_key.unwrap(),
+                "This peer instance is to handle a peer with a different public key"
+            );
         }
 
         self.block_fetch_url = response.block_fetch_url;
         self.services = response.services;
         self.wallet_version = response.wallet_version;
         self.core_version = response.core_version;
-        self.peer_status = PeerStatus::Connected(response.public_key);
+        self.peer_status = PeerStatus::Connected;
+        self.public_key = Some(response.public_key);
 
         debug!(
             "my version : {:?} peer version : {:?}",
@@ -284,8 +307,7 @@ impl Peer {
                     self.index,
                     Message::HandshakeResponse(response).serialize().as_slice(),
                 )
-                .await
-                .unwrap();
+                .await?;
             debug!("second handshake response sent for peer: {:?}", self.index);
         } else {
             info!(
@@ -360,20 +382,43 @@ impl Peer {
         self.static_peer_config.is_some()
     }
     pub fn get_public_key(&self) -> Option<SaitoPublicKey> {
-        if let PeerStatus::Connected(key) = self.peer_status {
-            return Some(key);
-        }
-        None
+        self.public_key
     }
 
-    pub fn mark_as_disconnected(&mut self) {
+    pub fn mark_as_disconnected(&mut self, disconnected_at: Timestamp) {
         self.challenge_for_peer = None;
         self.services = vec![];
+        self.disconnected_at = disconnected_at;
 
         if let PeerStatus::Disconnected(_, _) = self.peer_status {
         } else {
             self.peer_status = PeerStatus::Disconnected(0, 1_000);
         }
+    }
+
+    /// Copies data from an old peer instance to a new reconnected peer
+    ///
+    /// # Arguments
+    ///
+    /// * `peer`:
+    ///
+    /// returns: ()
+    ///
+    /// # Examples
+    ///
+    /// ```
+    ///
+    /// ```
+    pub(crate) fn join_as_reconnection(&mut self, peer: Peer) {
+        assert!(
+            !matches!(peer.peer_status, PeerStatus::Connected),
+            "Old peer should not be already connected"
+        );
+        self.message_limiter = peer.message_limiter;
+        self.handshake_limiter = peer.handshake_limiter;
+        self.key_list_limiter = peer.key_list_limiter;
+
+        self.static_peer_config = peer.static_peer_config;
     }
 }
 

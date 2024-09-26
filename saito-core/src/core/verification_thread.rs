@@ -115,6 +115,12 @@ impl VerificationThread {
                 "failed verifying block buffer with length : {:?}",
                 buffer_len
             );
+            let mut peers = self.peer_lock.write().await;
+            if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
+                // NOTE : this means if we cannot deserialize a block from the buffer we mark it as blacklisted.
+                peer.is_blacklisted = true;
+            }
+
             return;
         }
 
@@ -131,6 +137,11 @@ impl VerificationThread {
                 block_id,
                 block_hash.to_hex()
             );
+            let mut peers = self.peer_lock.write().await;
+            if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
+                // NOTE : this means if we cannot deserialize a block from the buffer we mark it as blacklisted.
+                peer.is_blacklisted = true;
+            }
             return;
         }
 

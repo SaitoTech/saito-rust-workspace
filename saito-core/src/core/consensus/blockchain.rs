@@ -1570,6 +1570,7 @@ impl Blockchain {
 
             debug!("blocks to add : {:?}", blocks.len());
             while let Some(block) = blocks.pop_front() {
+                let peer_index = block.routed_from_peer;
                 let result = self.add_block(block, storage, &mut mempool, configs).await;
                 match result {
                     AddBlockResult::BlockAddedSuccessfully(
@@ -1603,7 +1604,14 @@ impl Blockchain {
                         )
                         .await;
                     }
-                    AddBlockResult::FailedNotValid => {}
+                    AddBlockResult::FailedNotValid => {
+                        if let Some(peer_index) = peer_index {
+                            let mut peers = network.unwrap().peer_lock.write().await;
+                            if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
+                                peer.is_blacklisted = true;
+                            }
+                        }
+                    }
                 }
             }
             if sender_to_miner.is_some() {

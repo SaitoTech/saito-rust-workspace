@@ -1,16 +1,13 @@
+use crate::core::consensus::peer::{Peer, PeerStatus};
+use crate::core::defs::{PeerIndex, SaitoPublicKey, Timestamp};
 use std::collections::HashMap;
+use std::time::Duration;
 
-use crate::core::consensus::peer::Peer;
-use crate::core::defs::{PeerIndex, SaitoPublicKey};
+const PEER_REMOVAL_WINDOW: Timestamp = Duration::from_secs(3600 * 24).as_millis() as Timestamp;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PeerCounter {
     counter: PeerIndex,
-}
-impl Default for PeerCounter {
-    fn default() -> Self {
-        PeerCounter { counter: 0 }
-    }
 }
 
 impl PeerCounter {
@@ -19,7 +16,7 @@ impl PeerCounter {
         self.counter
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PeerCollection {
     pub index_to_peers: HashMap<PeerIndex, Peer>,
     pub address_to_peers: HashMap<SaitoPublicKey, PeerIndex>,
@@ -27,21 +24,15 @@ pub struct PeerCollection {
 }
 
 impl PeerCollection {
-    pub fn new() -> PeerCollection {
-        PeerCollection {
-            index_to_peers: Default::default(),
-            address_to_peers: Default::default(),
-            peer_counter: Default::default(),
-        }
-    }
-
     pub fn find_peer_by_address(&self, address: &SaitoPublicKey) -> Option<&Peer> {
-        let result = self.address_to_peers.get(address);
-        if result.is_none() {
-            return None;
-        }
+        let result = self.address_to_peers.get(address)?;
 
-        return self.find_peer_by_index(*result.unwrap());
+        self.find_peer_by_index(*result)
+    }
+    pub fn find_peer_by_address_mut(&mut self, address: &SaitoPublicKey) -> Option<&mut Peer> {
+        let result = self.address_to_peers.get(address)?;
+
+        self.find_peer_by_index_mut(*result)
     }
 
     pub fn find_peer_by_index(&self, peer_index: u64) -> Option<&Peer> {
@@ -51,13 +42,44 @@ impl PeerCollection {
         self.index_to_peers.get_mut(&peer_index)
     }
 
-    pub fn remove_peer(&mut self, peer_index: PeerIndex) -> Option<Peer> {
-        let peer = self.index_to_peers.remove(&peer_index);
-        if let Some(peer) = peer.as_ref() {
-            if let Some(key) = peer.get_public_key() {
-                self.address_to_peers.remove(&key);
+    pub fn remove_reconnected_peer(&mut self, public_key: &SaitoPublicKey) -> Option<Peer> {
+        let peer_index;
+        {
+            let peer = self.find_peer_by_address(&public_key)?;
+            if let PeerStatus::Connected = peer.peer_status {
+                // since peer is already connected
+                return None;
+            }
+            peer_index = peer.index;
+        }
+
+        let peer = self.index_to_peers.remove(&peer_index)?;
+        self.address_to_peers.remove(&peer.public_key?);
+
+        Some(peer)
+    }
+
+    pub fn remove_disconnected_peers(&mut self, current_time: Timestamp) {
+        let peer_indices: Vec<PeerIndex> = self
+            .index_to_peers
+            .iter()
+            .filter_map(|(peer_index, peer)| {
+                if peer.static_peer_config.is_some() {
+                    // static peers always remain in memory
+                    return None;
+                }
+                if peer.disconnected_at + PEER_REMOVAL_WINDOW > current_time {
+                    return None;
+                }
+                Some(*peer_index)
+            })
+            .collect();
+
+        for peer_index in peer_indices {
+            let peer = self.index_to_peers.remove(&peer_index).unwrap();
+            if let Some(public_key) = peer.get_public_key() {
+                self.address_to_peers.remove(&public_key);
             }
         }
-        peer
     }
 }
