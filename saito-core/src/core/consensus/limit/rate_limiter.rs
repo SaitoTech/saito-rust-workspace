@@ -1,5 +1,4 @@
 use crate::core::defs::Timestamp;
-use log::warn;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
