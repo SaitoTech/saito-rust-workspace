@@ -583,6 +583,24 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 buffer,
             } => {
                 debug!("block received : {:?}", block_hash.to_hex());
+                {
+                    let mut peers = self.network.peer_lock.write().await;
+                    let peer = peers.find_peer_by_index_mut(peer_index)?;
+                    let time = self.timer.get_timestamp_in_ms();
+                    peer.invalid_block_limiter.increase();
+                    if peer.has_invalid_block_limit_exceeded(time) {
+                        info!(
+                            "limit exceeded for invalid blocks from peer : {:?}. disconnecting peer...",
+                            peer_index
+                        );
+                        self.network
+                            .io_interface
+                            .disconnect_from_peer(peer_index)
+                            .await
+                            .unwrap();
+                        return None;
+                    }
+                }
 
                 self.send_to_verification_thread(VerifyRequest::Block(
                     buffer, peer_index, block_hash, block_id,

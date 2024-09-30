@@ -90,6 +90,10 @@ impl Peer {
         self.message_limiter.has_limit_exceeded(current_time)
     }
 
+    pub fn has_invalid_block_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
+        self.invalid_block_limiter.has_limit_exceeded(current_time)
+    }
+
     pub fn get_url(&self) -> String {
         if let Some(config) = self.static_peer_config.as_ref() {
             let mut protocol: String = String::from("ws");
