@@ -51,7 +51,6 @@ pub struct Peer {
     pub invalid_block_limiter: RateLimiter,
     pub same_depth_blocks_limiter: BlockDepthLimitChecker,
     pub public_key: Option<SaitoPublicKey>,
-    pub is_blacklisted: bool,
 }
 
 impl Peer {
@@ -77,7 +76,6 @@ impl Peer {
                 Duration::from_secs(600),
             ),
             public_key: None,
-            is_blacklisted: false,
         }
     }
 

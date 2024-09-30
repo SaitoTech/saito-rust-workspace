@@ -195,6 +195,7 @@ impl Network {
         let current_time = self.timer.get_timestamp_in_ms();
 
         // TODO : this rate check is done after a lock is acquired which is not ideal
+        peer.handshake_limiter.increase();
         if peer.has_handshake_limit_exceeded(current_time) {
             warn!(
                 "peer {:?} exceeded rate limit for handshake challenge",
@@ -233,6 +234,7 @@ impl Network {
             }
             let peer: &mut Peer = peer.unwrap();
             let current_time = self.timer.get_timestamp_in_ms();
+            peer.handshake_limiter.increase();
             if peer.has_handshake_limit_exceeded(current_time) {
                 warn!(
                     "peer {:?} exceeded rate limit for handshake challenge",
@@ -303,6 +305,7 @@ impl Network {
 
         if let Some(peer) = peer {
             // Check rate limit
+            peer.key_list_limiter.increase();
             if peer.has_key_list_limit_exceeded(current_time) {
                 debug!("peer {:?} exceeded rate limit for key list", peer_index);
                 return Err(Error::from(ErrorKind::Other));
