@@ -90,19 +90,19 @@ impl Storage {
             Ok(()) => debug!("Block directory created"),
             Err(err) => {
                 error!("Error creating block directory {:?}", err);
-                return Err(Error::from(err));
+                return Err(err);
             }
         }
 
-        let list = self.io_interface.load_block_file_list().await;
-        if list.is_err() {
-            error!(
-                "failed loading block list from disk : {:?}",
-                list.err().unwrap()
-            );
-            return Err(Error::from(ErrorKind::InvalidData));
-        }
-        let mut list = list.unwrap();
+        let mut list = self
+            .io_interface
+            .load_block_file_list()
+            .await
+            .map_err(|err| {
+                error!("failed loading block list from disk : {:?}", err);
+                Error::from(ErrorKind::InvalidData)
+            })?;
+
         list.sort();
         Ok(list)
     }
@@ -115,7 +115,7 @@ impl Storage {
         debug!("loading  {:?} blocks from disk", file_names.len());
 
         let mut mempool = mempool_lock.write().await;
-        for (_index, file_name) in file_names.iter().enumerate() {
+        for file_name in file_names.iter() {
             let file_name = file_name.clone();
             let result = self
                 .io_interface
