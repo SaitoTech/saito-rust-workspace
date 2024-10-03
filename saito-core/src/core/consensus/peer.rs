@@ -51,7 +51,6 @@ pub struct Peer {
     pub invalid_block_limiter: RateLimiter,
     pub same_depth_blocks_limiter: BlockDepthLimitChecker,
     pub public_key: Option<SaitoPublicKey>,
-    pub is_blacklisted: bool,
 }
 
 impl Peer {
@@ -77,7 +76,6 @@ impl Peer {
                 Duration::from_secs(600),
             ),
             public_key: None,
-            is_blacklisted: false,
         }
     }
 
@@ -90,6 +88,10 @@ impl Peer {
 
     pub fn has_message_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
         self.message_limiter.has_limit_exceeded(current_time)
+    }
+
+    pub fn has_invalid_block_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
+        self.invalid_block_limiter.has_limit_exceeded(current_time)
     }
 
     pub fn get_url(&self) -> String {

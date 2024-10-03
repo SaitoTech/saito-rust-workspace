@@ -90,19 +90,19 @@ impl Storage {
             Ok(()) => debug!("Block directory created"),
             Err(err) => {
                 error!("Error creating block directory {:?}", err);
-                return Err(Error::from(err));
+                return Err(err);
             }
         }
 
-        let list = self.io_interface.load_block_file_list().await;
-        if list.is_err() {
-            error!(
-                "failed loading block list from disk : {:?}",
-                list.err().unwrap()
-            );
-            return Err(Error::from(ErrorKind::InvalidData));
-        }
-        let mut list = list.unwrap();
+        let mut list = self
+            .io_interface
+            .load_block_file_list()
+            .await
+            .map_err(|err| {
+                error!("failed loading block list from disk : {:?}", err);
+                Error::from(ErrorKind::InvalidData)
+            })?;
+
         list.sort();
         Ok(list)
     }
@@ -115,7 +115,7 @@ impl Storage {
         debug!("loading  {:?} blocks from disk", file_names.len());
 
         let mut mempool = mempool_lock.write().await;
-        for (_index, file_name) in file_names.iter().enumerate() {
+        for file_name in file_names.iter() {
             let file_name = file_name.clone();
             let result = self
                 .io_interface
@@ -308,11 +308,11 @@ impl Storage {
 
 #[cfg(test)]
 mod test {
-    use log::{info, trace};
+    use log::trace;
 
     use crate::core::consensus::block::Block;
     use crate::core::defs::{PrintForLog, SaitoHash};
-    use crate::core::util::crypto::{hash, verify};
+    use crate::core::util::crypto::hash;
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
 
     // part is relative to it's cargo.toml
@@ -376,61 +376,6 @@ mod test {
         actual_retrieved_block.generate();
 
         assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
-    }
-
-    // TODO : delete this test
-    #[ignore]
-    #[tokio::test]
-    async fn block_load_test_slr() {
-        // pretty_env_logger::init();
-
-        let t = TestManager::default();
-
-        info!(
-            "current dir = {:?}",
-            std::env::current_dir().unwrap().to_str().unwrap()
-        );
-        let filename = std::env::current_dir().unwrap().to_str().unwrap().to_string() +
-            "/data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai";
-        let retrieved_block = t.storage.load_block_from_disk(filename.as_str()).await;
-        let mut block = retrieved_block.unwrap();
-        block.generate();
-
-        info!(
-            "prehash = {:?},  prev : {:?}",
-            block.pre_hash.to_hex(),
-            block.previous_block_hash.to_hex(),
-        );
-
-        assert_eq!(
-            block.hash.to_hex(),
-            "f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda"
-        );
-        assert_ne!(block.timestamp, 0);
-
-        let hex = hash(&block.pre_hash.to_vec());
-        info!(
-            "prehash = {:?}, hex = {:?}, signature : {:?}, creator = {:?}",
-            block.pre_hash.to_hex(),
-            hex.to_hex(),
-            block.signature.to_hex(),
-            block.creator.to_base58()
-        );
-        // assert_eq!("000000000000000a0000017d26dd628abcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bdcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bccccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000000000000000000000000000000002faf08000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        //     hex::encode(block.serialize_for_signature()));
-        let result = verify(
-            &block.serialize_for_signature(),
-            &block.signature,
-            &block.creator,
-        );
-        assert!(result);
-
-        let filename = t.storage.generate_block_filepath(&block);
-        assert_eq!(
-            filename,
-            "./data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai"
-        );
-        // assert_eq!(retrieved_block.timestamp, 1637034582666);
     }
 
     #[test]

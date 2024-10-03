@@ -1,5 +1,4 @@
 use crate::core::defs::Timestamp;
-use log::warn;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -16,27 +15,20 @@ impl RateLimiter {
         self.limit = limit;
     }
 
-    pub fn set_window(&mut self, window: u64) {
+    pub fn set_window(&mut self, window: Timestamp) {
         self.window = window;
     }
 
-    pub fn has_limit_exceeded(&mut self, current_time: u64) -> bool {
-        // warn!(
-        //     "current_count : {:?} limit : {:?}",
-        //     self.request_count, self.limit
-        // );
+    pub fn has_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
         // TODO : current implementation allows twice the limit from spikes. a sliding window implementation would be better I think.
         if current_time.saturating_sub(self.last_request_time) > self.window {
             self.request_count = 0;
             self.last_request_time = current_time;
         }
-
-        if self.request_count < self.limit {
-            self.request_count += 1;
-            false
-        } else {
-            true
-        }
+        self.request_count >= self.limit
+    }
+    pub fn increase(&mut self) {
+        self.request_count += 1;
     }
 
     pub fn builder(count: u64, duration: Duration) -> Self {
@@ -83,8 +75,10 @@ mod tests {
     fn can_make_request_within_limit_test() {
         let mut rate_limiter = RateLimiter::builder(10, Duration::from_secs(1));
         let current_time = 10_000;
-        assert!(!rate_limiter.has_limit_exceeded(current_time));
+        rate_limiter.increase();
         assert_eq!(rate_limiter.request_count, 1);
+        assert!(!rate_limiter.has_limit_exceeded(current_time));
+        assert_eq!(rate_limiter.request_count, 0);
     }
 
     #[test]
@@ -92,8 +86,10 @@ mod tests {
         let mut rate_limiter = RateLimiter::builder(10, Duration::from_secs(1));
         let current_time = 10_000;
         for _ in 0..rate_limiter.limit {
+            rate_limiter.increase();
             assert!(!rate_limiter.has_limit_exceeded(current_time));
         }
+        rate_limiter.increase();
         assert!(rate_limiter.has_limit_exceeded(current_time));
         assert_eq!(rate_limiter.request_count, rate_limiter.limit);
     }
@@ -104,11 +100,13 @@ mod tests {
         let current_time = 10_000;
 
         for _ in 0..rate_limiter.limit {
+            rate_limiter.increase();
             assert!(!rate_limiter.has_limit_exceeded(current_time));
         }
         let new_time = current_time + rate_limiter.window + 1;
+        rate_limiter.increase();
         assert!(!rate_limiter.has_limit_exceeded(new_time));
-        assert_eq!(rate_limiter.request_count, 1);
+        assert_eq!(rate_limiter.request_count, 0);
         assert_eq!(rate_limiter.last_request_time, new_time);
     }
 
@@ -118,13 +116,15 @@ mod tests {
         let initial_time = 10_000;
 
         for _ in 0..rate_limiter.limit {
+            rate_limiter.increase();
             assert!(!rate_limiter.has_limit_exceeded(initial_time));
         }
 
         let later_time = initial_time + rate_limiter.window + 500;
+        rate_limiter.increase();
         assert!(!rate_limiter.has_limit_exceeded(later_time));
         dbg!("{}", &rate_limiter);
-        assert_eq!(rate_limiter.request_count, 1);
+        assert_eq!(rate_limiter.request_count, 0);
         assert_eq!(rate_limiter.last_request_time, later_time);
     }
 }

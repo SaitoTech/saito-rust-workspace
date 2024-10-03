@@ -2,7 +2,7 @@ use ahash::AHashSet;
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::blockchain::Blockchain;
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
