@@ -308,11 +308,11 @@ impl Storage {
 
 #[cfg(test)]
 mod test {
-    use log::{info, trace};
+    use log::trace;
 
     use crate::core::consensus::block::Block;
     use crate::core::defs::{PrintForLog, SaitoHash};
-    use crate::core::util::crypto::{hash, verify};
+    use crate::core::util::crypto::hash;
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
 
     // part is relative to it's cargo.toml
