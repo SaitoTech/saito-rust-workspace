@@ -378,61 +378,6 @@ mod test {
         assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
     }
 
-    // TODO : delete this test
-    #[ignore]
-    #[tokio::test]
-    async fn block_load_test_slr() {
-        // pretty_env_logger::init();
-
-        let t = TestManager::default();
-
-        info!(
-            "current dir = {:?}",
-            std::env::current_dir().unwrap().to_str().unwrap()
-        );
-        let filename = std::env::current_dir().unwrap().to_str().unwrap().to_string() +
-            "/data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai";
-        let retrieved_block = t.storage.load_block_from_disk(filename.as_str()).await;
-        let mut block = retrieved_block.unwrap();
-        block.generate();
-
-        info!(
-            "prehash = {:?},  prev : {:?}",
-            block.pre_hash.to_hex(),
-            block.previous_block_hash.to_hex(),
-        );
-
-        assert_eq!(
-            block.hash.to_hex(),
-            "f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda"
-        );
-        assert_ne!(block.timestamp, 0);
-
-        let hex = hash(&block.pre_hash.to_vec());
-        info!(
-            "prehash = {:?}, hex = {:?}, signature : {:?}, creator = {:?}",
-            block.pre_hash.to_hex(),
-            hex.to_hex(),
-            block.signature.to_hex(),
-            block.creator.to_base58()
-        );
-        // assert_eq!("000000000000000a0000017d26dd628abcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bdcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bccccf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000000000000000000000000000000002faf08000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        //     hex::encode(block.serialize_for_signature()));
-        let result = verify(
-            &block.serialize_for_signature(),
-            &block.signature,
-            &block.creator,
-        );
-        assert!(result);
-
-        let filename = t.storage.generate_block_filepath(&block);
-        assert_eq!(
-            filename,
-            "./data/blocks/1658821412997-f1bcf447a958018d38433adb6249c4cb4529af8f9613fdd8affd123d2a602dda.sai"
-        );
-        // assert_eq!(retrieved_block.timestamp, 1637034582666);
-    }
-
     #[test]
     fn hashing_test() {
         // pretty_env_logger::init();

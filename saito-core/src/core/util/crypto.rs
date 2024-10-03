@@ -89,7 +89,7 @@ pub fn hash(data: &[u8]) -> SaitoHash {
     let mut hasher = Hasher::new();
     // Hashing in parallel can be faster if large enough
     // TODO: Blake3 has benchmarked 128 kb as the cutoff,
-    // the benchmark should be redone for Saito's needs
+    //  the benchmark should be redone for Saito's needs
 
     #[cfg(feature = "with-rayon")]
     {

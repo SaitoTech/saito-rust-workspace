@@ -944,8 +944,8 @@ impl Block {
     //   * difficulty (mining / payout cost)
     //   * total fees in block
     //   * TODO - review generate() and see if we can clean-up the way we
-    //     do things so all values are calculated here and merely SET or
-    //     confirmed in the validate/generate function.
+    //      do things so all values are calculated here and merely SET or
+    //      confirmed in the validate/generate function.
     //
     // it returns an object from which the values are either assigned to the block
     // or checked to confirm validity.
@@ -1381,7 +1381,7 @@ impl Block {
 
         //
         // TODO - once we start reducing any mining/staking payouts because the fees-in-block
-        // are larger than the average, we can put the removed tokens into the graveyard contribution
+        //  are larger than the average, we can put the removed tokens into the graveyard contribution
         //
         cv.nolan_falling_off_chain = cv.graveyard_contribution;
 
@@ -1816,7 +1816,7 @@ impl Block {
 
         //
         // TODO - if the block does not exist on disk, we have to
-        // attempt a remote fetch.
+        //  attempt a remote fetch.
         //
 
         //
@@ -2321,7 +2321,6 @@ impl Block {
         }
         for tx in self.transactions.iter() {
             for slip in tx.from.iter() {
-                // TODO : use a hashset instead ??
                 self.transaction_map.insert(slip.public_key, true);
             }
             for slip in tx.to.iter() {

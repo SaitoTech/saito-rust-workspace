@@ -6,7 +6,6 @@ use saito_core::core::io::network_event::NetworkEvent;
 
 #[derive(Debug)]
 pub struct IoEvent {
-    // TODO : remove controller id if not used
     pub event_processor_id: u8,
     pub event_id: u64,
     pub event: NetworkEvent,
