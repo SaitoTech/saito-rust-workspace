@@ -94,7 +94,7 @@ pub mod test {
         fn default() -> Self {
             let keys = generate_keys();
             let wallet = Wallet::new(keys.1, keys.0);
-            let peers = Arc::new(RwLock::new(PeerCollection::new()));
+            let peers = Arc::new(RwLock::new(PeerCollection::default()));
             let wallet_lock = Arc::new(RwLock::new(wallet));
             let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));

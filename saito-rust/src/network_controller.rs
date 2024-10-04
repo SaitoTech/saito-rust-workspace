@@ -78,7 +78,7 @@ impl NetworkController {
             }
         }
 
-        return !send_failed;
+        !send_failed
     }
 
     pub async fn send_outgoing_message(

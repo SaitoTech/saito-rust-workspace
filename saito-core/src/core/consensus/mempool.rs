@@ -284,8 +284,6 @@ impl Mempool {
         configs: &(dyn Configuration + Send + Sync),
         public_key: &SaitoPublicKey,
     ) -> Option<Currency> {
-        // TODO : add checks [downloading_active,etc...] from SLR code here
-
         if blockchain.blocks.is_empty() {
             warn!("Not generating #1 block. Waiting for blocks from peers");
             return None;

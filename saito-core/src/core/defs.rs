@@ -57,7 +57,6 @@ pub const WS_KEEP_ALIVE_PERIOD: Timestamp = Duration::from_secs(10).as_millis() 
 /// mempool
 /// peers
 /// wallet
-/// TODO : add a macro to check the lock ordering as a feature flag
 ///
 
 pub const LOCK_ORDER_NETWORK_CONTROLLER: u8 = 1;

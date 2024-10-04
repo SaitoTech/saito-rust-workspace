@@ -78,13 +78,6 @@ impl Message {
         let message_type: u8 = u8::from_be_bytes(buffer[0..1].try_into().unwrap());
         let buffer = buffer[1..].to_vec();
 
-        // trace!(
-        //     "deserializing buffer size = {:?} of type = {:?}",
-        //     buffer.len(),
-        //     message_type
-        // );
-
-        // TODO : remove hardcoded values into an enum
         match message_type {
             1 => {
                 let result = HandshakeChallenge::deserialize(&buffer)?;

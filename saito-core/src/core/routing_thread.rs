@@ -88,6 +88,7 @@ pub struct RoutingThread {
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub network: Network,
     pub reconnection_timer: Timestamp,
+    pub peer_removal_timer: Timestamp,
     pub stats: RoutingStats,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
     pub last_verification_thread_index: usize,
@@ -126,7 +127,6 @@ impl RoutingThread {
                     .await;
             }
             Message::HandshakeResponse(response) => {
-                // debug!("received handshake response");
                 self.network
                     .handle_handshake_response(
                         peer_index,
@@ -139,10 +139,6 @@ impl RoutingThread {
             }
 
             Message::Transaction(transaction) => {
-                // trace!(
-                //     "received transaction : {:?}",
-                //     transaction.signature.to_hex()
-                // );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;
@@ -196,7 +192,6 @@ impl RoutingThread {
             }
             _ => unreachable!(),
         }
-        // trace!("incoming message processed");
     }
     /// Processes a received ghost chain request from a peer to sync itself with the blockchain
     ///
@@ -537,6 +532,16 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         match event {
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
+                {
+                    let mut peers = self.network.peer_lock.write().await;
+                    let peer = peers.find_peer_by_index_mut(peer_index)?;
+                    let time = self.timer.get_timestamp_in_ms();
+                    peer.message_limiter.increase();
+                    if peer.has_message_limit_exceeded(time) {
+                        info!("limit exceeded for messages from peer : {:?}", peer_index);
+                        return None;
+                    }
+                }
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
@@ -578,6 +583,24 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 buffer,
             } => {
                 debug!("block received : {:?}", block_hash.to_hex());
+                {
+                    let mut peers = self.network.peer_lock.write().await;
+                    let peer = peers.find_peer_by_index_mut(peer_index)?;
+                    let time = self.timer.get_timestamp_in_ms();
+                    peer.invalid_block_limiter.increase();
+                    if peer.has_invalid_block_limit_exceeded(time) {
+                        info!(
+                            "limit exceeded for invalid blocks from peer : {:?}. disconnecting peer...",
+                            peer_index
+                        );
+                        self.network
+                            .io_interface
+                            .disconnect_from_peer(peer_index)
+                            .await
+                            .unwrap();
+                        return None;
+                    }
+                }
 
                 self.send_to_verification_thread(VerifyRequest::Block(
                     buffer, peer_index, block_hash, block_id,
@@ -621,6 +644,14 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             self.reconnection_timer = 0;
             self.fetch_next_blocks().await;
             work_done = true;
+        }
+
+        const PEER_REMOVAL_PERIOD: Timestamp = Duration::from_secs(60).as_millis() as Timestamp;
+        self.peer_removal_timer += duration_value;
+        if self.peer_removal_timer >= PEER_REMOVAL_PERIOD {
+            let mut peers = self.network.peer_lock.write().await;
+            peers.remove_disconnected_peers(current_time);
+            self.peer_removal_timer = 0;
         }
 
         if work_done {

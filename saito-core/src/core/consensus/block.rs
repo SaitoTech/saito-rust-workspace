@@ -944,8 +944,8 @@ impl Block {
     //   * difficulty (mining / payout cost)
     //   * total fees in block
     //   * TODO - review generate() and see if we can clean-up the way we
-    //     do things so all values are calculated here and merely SET or
-    //     confirmed in the validate/generate function.
+    //      do things so all values are calculated here and merely SET or
+    //      confirmed in the validate/generate function.
     //
     // it returns an object from which the values are either assigned to the block
     // or checked to confirm validity.
@@ -1351,9 +1351,9 @@ impl Block {
             debug!("miner payout: {:?}", miner_payout);
             debug!("router1 payout: {:?}", router1_payout);
             debug!("router2 payout: {:?}", router2_payout);
-            debug!("miner pkey: {:?}", miner_publickey);
-            debug!("router1 pkey: {:?}", router1_publickey);
-            debug!("router2 pkey: {:?}", router2_publickey);
+            debug!("miner pkey: {:?}", miner_publickey.to_base58());
+            debug!("router1 pkey: {:?}", router1_publickey.to_base58());
+            debug!("router2 pkey: {:?}", router2_publickey.to_base58());
 
             cv.fee_transaction = Some(transaction);
         } else {
@@ -1381,7 +1381,7 @@ impl Block {
 
         //
         // TODO - once we start reducing any mining/staking payouts because the fees-in-block
-        // are larger than the average, we can put the removed tokens into the graveyard contribution
+        //  are larger than the average, we can put the removed tokens into the graveyard contribution
         //
         cv.nolan_falling_off_chain = cv.graveyard_contribution;
 
@@ -1816,7 +1816,7 @@ impl Block {
 
         //
         // TODO - if the block does not exist on disk, we have to
-        // attempt a remote fetch.
+        //  attempt a remote fetch.
         //
 
         //
@@ -2259,8 +2259,8 @@ impl Block {
                 let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
                 let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
 
-                debug!("our hash1 is: {:?}: ", hash1);
-                debug!("our hash2 is: {:?}: ", hash2);
+                debug!("our hash1 is: {:?}: ", hash1.to_hex());
+                debug!("our hash2 is: {:?}: ", hash2.to_hex());
 
                 if hash1 != hash2 {
                     error!(
@@ -2321,7 +2321,6 @@ impl Block {
         }
         for tx in self.transactions.iter() {
             for slip in tx.from.iter() {
-                // TODO : use a hashset instead ??
                 self.transaction_map.insert(slip.public_key, true);
             }
             for slip in tx.to.iter() {

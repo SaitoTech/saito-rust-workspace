@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::Error;
@@ -181,7 +182,9 @@ impl Blockchain {
                 let previous_block_fetched = iterate!(mempool.blocks_queue, 100)
                     .any(|b| block.previous_block_hash == b.hash);
 
-                return if !previous_block_fetched && block.id > 1 {
+                return if !previous_block_fetched
+                    && block.id > max(1, self.get_latest_block_id().saturating_sub(GENESIS_PERIOD))
+                {
                     debug!(
                         "need to fetch previous block : {:?}-{:?}",
                         block.id - 1,
@@ -279,8 +282,6 @@ impl Blockchain {
                 // behavior. we have the comparison here to separate expected from
                 // unexpected / edge-case issues around block receipt.
             } else {
-                // TODO - implement logic to handle once nodes can connect
-                //
                 // if this not our first block, handle edge-case around receiving
                 // block 503 before block 453 when block 453 is our expected proper
                 // next block and we are getting blocks out-of-order because of
@@ -524,18 +525,11 @@ impl Blockchain {
                 self.get_latest_block_id() - GENESIS_PERIOD,
             );
 
-            // TODO
-            //
-            // handle this more efficiently - we should be able to prepare the block
-            // in advance so that this doesn't take up time in block production. we
-            // need to generate_metadata_hashes so that the slips know the utxo_key
-            // to use to check the utxoset.
             if pruned_block_hash != [0; 32] {
                 let block = self.get_mut_block(&pruned_block_hash).unwrap();
 
-                // TODO : REVIEW : shouldn't this block be pruned ? why block type is Full ?
                 block
-                    .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_spv_mode())
+                    .upgrade_block_to_block_type(BlockType::Pruned, storage, configs.is_spv_mode())
                     .await;
             }
         }
@@ -572,7 +566,7 @@ impl Blockchain {
                     // TODO : what other types should be added back to the mempool
                     if tx.transaction_type == TransactionType::Normal {
                         // TODO : is there a way to not validate these again ?
-                        return tx.validate(&self.utxoset, &self);
+                        return tx.validate(&self.utxoset, self);
                     }
                     false
                 })
@@ -1135,9 +1129,9 @@ impl Blockchain {
                 .on_chain_reorganization(block.id, block.hash, true);
 
             // TODO - wallet update should be optional, as core routing nodes
-            // will not want to do the work of scrolling through the block and
-            // updating their wallets by default. wallet processing can be
-            // more efficiently handled by lite-nodes.
+            //  will not want to do the work of scrolling through the block and
+            //  updating their wallets by default. wallet processing can be
+            //  more efficiently handled by lite-nodes.
             {
                 let mut wallet = self.wallet_lock.write().await;
 
@@ -1570,6 +1564,7 @@ impl Blockchain {
 
             debug!("blocks to add : {:?}", blocks.len());
             while let Some(block) = blocks.pop_front() {
+                let peer_index = block.routed_from_peer;
                 let result = self.add_block(block, storage, &mut mempool, configs).await;
                 match result {
                     AddBlockResult::BlockAddedSuccessfully(
@@ -1603,7 +1598,14 @@ impl Blockchain {
                         )
                         .await;
                     }
-                    AddBlockResult::FailedNotValid => {}
+                    AddBlockResult::FailedNotValid => {
+                        if let Some(peer_index) = peer_index {
+                            let mut peers = network.unwrap().peer_lock.write().await;
+                            if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
+                                peer.invalid_block_limiter.increase();
+                            }
+                        }
+                    }
                 }
             }
             if sender_to_miner.is_some() {
@@ -3127,7 +3129,6 @@ mod tests {
         let bmap = t.balance_map().await;
 
         //store it
-        //TODO path errors
         let filepath = "./utxoset_test";
 
         match t

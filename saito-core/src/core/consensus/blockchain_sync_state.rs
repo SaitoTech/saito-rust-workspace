@@ -157,7 +157,7 @@ impl BlockchainSyncState {
             let mut fetching_count = 0;
 
             // TODO : we don't need to iterate through this list multiple times. refactor !!!
-            // TODO : (can collect more than required and drop larger block ids if there are too many)
+            //  (can collect more than required and drop larger block ids if there are too many)
             for block_data in deq.iter_mut() {
                 match block_data.status {
                     BlockStatus::Queued => {}
@@ -418,16 +418,6 @@ impl BlockchainSyncState {
         // stats.push(stat);
         stats
     }
-    // pub fn set_latest_blockchain_id(&mut self, id: BlockId) {
-    //     // TODO : batch size should be larger than the fork length diff which can change the current fork.
-    //     // otherwise we won't fetch the blocks for new longest fork until current fork adds new blocks
-    //     self.block_fetch_ceiling = id + self.batch_size as BlockId;
-    //     trace!(
-    //         "setting latest blockchain id : {:?} and ceiling : {:?}",
-    //         id,
-    //         self.block_fetch_ceiling
-    //     );
-    // }
 
     /// Mark the blocks which we couldn't fetch from the peer. After a sevaral retries we will stop fetching the block until we fetch it from another peer.
     ///
