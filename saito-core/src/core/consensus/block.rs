@@ -54,6 +54,10 @@ pub struct ConsensusValues {
     pub gt_index: Option<usize>,
     // total fees in block -- includes normal transactions and ATR
     pub total_fees: Currency,
+    // total fees in block -- only includes new/normal transactions
+    pub total_fees_new: Currency,
+    // total fees in block -- only includes ATR transactions
+    pub total_fees_atr: Currency,
     // expected burnfee
     pub expected_burnfee: Currency,
     // expected difficulty
@@ -107,6 +111,8 @@ impl ConsensusValues {
             gt_num: 0,
             gt_index: None,
             total_fees: 5000,
+            total_fees_new: 0,
+            total_fees_atr: 0,
             expected_burnfee: 1,
             expected_difficulty: 1,
             rebroadcasts: vec![],
@@ -136,6 +142,8 @@ impl ConsensusValues {
             gt_num: 0,
             gt_index: None,
             total_fees: 0,
+            total_fees_new: 0,
+            total_fees_atr: 0,
             expected_burnfee: 1,
             expected_difficulty: 1,
             rebroadcasts: vec![],
@@ -226,6 +234,10 @@ pub struct Block {
     pub hash: SaitoHash,
     /// total fees in block from all transactions including ATR txs
     total_fees: Currency,
+    /// total fees in block from only new txs
+    total_fees_new: Currency,
+    /// total fees in block only ATR txs
+    total_fees_atr: Currency,
     /// total routing work in block for block creator
     pub total_work: Currency,
     /// is block on longest chain
@@ -287,6 +299,8 @@ impl Block {
             pre_hash: [0; 32],
             hash: [0; 32],
             total_fees: 0,
+            total_fees_new: 0,
+            total_fees_atr: 0,
             total_work: 0,
             in_longest_chain: false,
             has_golden_ticket: false,
@@ -342,6 +356,8 @@ impl Block {
         let mut previous_block_graveyard = 0;
         let mut previous_block_treasury = 0;
         let mut previous_block_total_fees = 0;
+        let mut previous_block_total_fees_new = 0;
+        let mut previous_block_total_fees_atr = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
             previous_block_id = previous_block.id;
@@ -351,6 +367,8 @@ impl Block {
             previous_block_graveyard = previous_block.graveyard;
             previous_block_treasury = previous_block.treasury;
             previous_block_total_fees = previous_block.total_fees;
+            previous_block_total_fees_new = previous_block.total_fees_new;
+            previous_block_total_fees_atr = previous_block.total_fees_atr;
         }
 
         //
@@ -417,7 +435,9 @@ impl Block {
         // ATR transactions
         //
         let rlen = cv.rebroadcasts.len();
+	//
         // TODO - more efficient solution that iterating through the entire transaction set here?
+	//
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
             .iter_mut()
             .enumerate()
@@ -941,6 +961,8 @@ impl Block {
     //
     //   * amount collected into treasury
     //   * total fees in block
+    //	  	- total_fees_new
+    //	  	- total_fees_atr
     //   * difficulty (mining / payout cost)
     //   * total fees in block
     //   * TODO - review generate() and see if we can clean-up the way we
@@ -955,6 +977,7 @@ impl Block {
         blockchain: &Blockchain,
         storage: &Storage,
     ) -> ConsensusValues {
+
         debug!(
             "generate consensus values for {:?} from : {:?} txs",
             self.hash.to_hex(),
@@ -981,8 +1004,9 @@ impl Block {
         // calculate total fees and total tx sizes
         //
         for (index, transaction) in self.transactions.iter().enumerate() {
+
             if !transaction.is_fee_transaction() {
-                cv.total_fees += transaction.total_fees;
+                cv.total_fees_new += transaction.total_fees;
             } else {
                 //
                 // the fee transaction is the last transaction in the block, so we
@@ -1029,6 +1053,7 @@ impl Block {
         } else {
             cv.avg_fee_per_byte = 0;
         }
+
 
         //
         // adjust mining difficulty and income and variance averages
@@ -1090,11 +1115,14 @@ impl Block {
             cv.expected_difficulty = self.difficulty;
         }
 
+
         //
         // calculate automatic transaction rebroadcasts / ATR / atr
         //
         self.generate_atr_values(blockchain, storage, atr_payout, &mut cv)
             .await;
+        cv.total_fees = cv.total_rebroadcast_fees_nolan + cv.total_fees_new;
+
 
         // we can now adjust the value of avg_nolan_rebroadcast_per_block since
         // we know the total amount of fees that have been rebroadcast in this
@@ -1117,6 +1145,7 @@ impl Block {
          cv.avg_nolan_rebroadcast_per_block, cv.total_rebroadcast_fees_nolan, cv.total_rebroadcast_staking_payouts_nolan, cv.rebroadcasts.len()
         );
 
+        //
         // calculate payouts
         //
         // every block pays out the PREVIOUS BLOCK(S). how payouts are handled depends
@@ -1127,7 +1156,7 @@ impl Block {
         //
         // if this block contains a golden ticket:
         //
-        //    - 50% of previous block to treasury
+        //    - 50% of previous block to miner (adjusted)
         //    - 50% of previous block to routing node
         //
         //    if previous block contains a golden ticket:
@@ -1190,34 +1219,31 @@ impl Block {
                 debug!("previous block exists!");
 
                 //
-                // half to treasury (miner + atr)
+                // half to miner
                 //
                 // we sanity check that the fees in the block are not greater than 1.5x the total
-                // average fees processed by the blockchain. this is a sanity-check against
-                // attackers who might try to create extremely deep-hop routing chains in order
-                // to increase their chance of payout.
-                //
-                let expected_treasury_contribution = previous_block.total_fees / 2;
-                let maximum_treasury_contribution =
-                    (previous_block.avg_total_fees as f64 * 1.5) as u64;
-                if expected_treasury_contribution > maximum_treasury_contribution {
-                    treasury_contribution = maximum_treasury_contribution;
-                    graveyard_contribution +=
-                        expected_treasury_contribution - maximum_treasury_contribution;
+                // average fees processed by the blockchain. if this is the case then we are going
+		// to cap the amount that will be paid out to stakers and miners alike...
+		//
+		// this protects against attackers who attack to game the lottery by creating extremely
+		// deep-hop routing paths with lots and lots of tokens in order to increase their odds
+		// of winning the payout lottery by enough to tip themselves statistically into profit.
+		//
+		// we protect against this by observing the flood in fees and capping anything over 
+		// 1.5x the average fee throughput of the blockchain. The attacker can still attempt 
+		// to do this, but it will be prohibitively expensive for them to raise the long-run
+		// fee average so sharply without burning far too much of their own money.
+		//
+                let expected_miner_payout = previous_block.total_fees / 2;
+                let maximum_miner_payout = (previous_block.avg_total_fees as f64 * 1.5) as u64;
+                if expected_miner_payout > maximum_miner_payout {
+                    graveyard_contribution += expected_miner_payout - maximum_miner_payout;
+                    miner_payout = maximum_miner_payout;
                 } else {
-                    treasury_contribution = expected_treasury_contribution;
+                    miner_payout = expected_miner_payout;
                 }
-
-                //
-                // the treasury funds both the mining and atr payout. in equilibrium, half
-                // of the treasury should be allocated to both, but we do not expect mining
-                // to find a solution every block, so:
-                //
-                // miner payout should be ((TREASURY / 2) / GENESIS_PERIOD) * 2 ==>
-                //
-                miner_payout = previous_block.treasury / GENESIS_PERIOD;
                 miner_publickey = golden_ticket.public_key;
-
+		
                 //
                 // the ATR payout is half of the treasury. we are going to divide this
                 // up among all of the UTXO that we think are being rebroadcast around
@@ -1529,12 +1555,12 @@ impl Block {
                             // subtract the fee from every single UTXO that is unspent.
                             //
                             // users who wish to minimize ATR fees should avoid creating transactions
-                            // with multiple unspent UTXO .
+                            // with multiple unspent UTXO.
                             //
                             for output in outputs {
+
                                 let atr_payout_for_slip = output.amount * expected_atr_multiplier;
-                                let surplus_payout_to_subtract_from_treasury =
-                                    atr_payout_for_slip - output.amount;
+                                let surplus_payout_to_subtract_from_treasury = atr_payout_for_slip - output.amount;
                                 let atr_fee_for_slip = atr_fee;
 
                                 //
@@ -1543,6 +1569,7 @@ impl Block {
                                 // not pass this criteria have their fee collected but are not issued a payout.
                                 //
                                 if atr_payout_for_slip > atr_fee {
+
                                     cv.total_rebroadcast_nolan += output.amount;
                                     cv.total_rebroadcast_slips += 1;
 
@@ -1558,8 +1585,7 @@ impl Block {
                                     //
                                     // track payouts and fees
                                     //
-                                    cv.total_rebroadcast_staking_payouts_nolan +=
-                                        surplus_payout_to_subtract_from_treasury;
+                                    cv.total_rebroadcast_staking_payouts_nolan += surplus_payout_to_subtract_from_treasury;
                                     cv.total_rebroadcast_fees_nolan += atr_fee_for_slip;
 
                                     //
