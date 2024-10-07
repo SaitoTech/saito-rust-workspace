@@ -87,6 +87,15 @@ impl Peer {
     pub fn has_invalid_block_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
         self.invalid_block_limiter.has_limit_exceeded(current_time)
     }
+    pub fn get_limited_till(&mut self, current_time: Timestamp) -> Option<Timestamp> {
+        let mut result = None;
+
+        if self.has_key_list_limit_exceeded(current_time) {
+            if self.key_list_limiter.has_limit_exceeded(current_time) {}
+        }
+
+        result
+    }
 
     pub fn get_url(&self) -> String {
         if let Some(config) = self.static_peer_config.as_ref() {
