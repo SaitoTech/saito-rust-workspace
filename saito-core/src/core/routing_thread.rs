@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use std::time::Duration;
-
+use ahash::HashMap;
 use async_trait::async_trait;
 use log::{debug, info, trace, warn};
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{RwLock, RwLockReadGuard};
 
@@ -10,7 +10,7 @@ use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::peers::peer_service::PeerService;
-use crate::core::consensus::peers::peer_state_writer::PEER_STATE_WRITE_PERIOD;
+use crate::core::consensus::peers::peer_state_writer::{PeerStateEntry, PEER_STATE_WRITE_PERIOD};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
@@ -659,9 +659,29 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         self.peer_file_write_timer += duration_value;
         if self.peer_file_write_timer >= PEER_STATE_WRITE_PERIOD {
             let mut peers = self.network.peer_lock.write().await;
+            let mut data: HashMap<SaitoPublicKey, PeerStateEntry> = Default::default();
+
+            let current_time = self.timer.get_timestamp_in_ms();
+
+            for (peer_index, peer) in peers.index_to_peers.iter_mut() {
+                if peer.public_key.is_none() {
+                    continue;
+                }
+                data.insert(
+                    peer.public_key.unwrap(),
+                    PeerStateEntry {
+                        msg_limit_exceeded: peer.has_message_limit_exceeded(current_time),
+                        invalid_blocks_received: peer
+                            .has_invalid_block_limit_exceeded(current_time),
+                        same_depth_blocks_received: false,
+                        too_far_blocks_received: false,
+                        limited_till: None,
+                    },
+                );
+            }
             peers
                 .peer_state_writer
-                .write_state(&mut self.network.io_interface)
+                .write_state(data, &mut self.network.io_interface)
                 .await
                 .unwrap();
             self.peer_file_write_timer = 0;
