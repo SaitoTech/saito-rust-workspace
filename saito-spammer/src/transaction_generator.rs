@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use saito_core::core::consensus::blockchain::Blockchain;
-use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::peers::peer_collection::PeerCollection;
 use saito_core::core::consensus::slip::{Slip, SLIP_SIZE};
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;

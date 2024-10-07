@@ -10,7 +10,7 @@ use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::mempool::Mempool;
-use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::peers::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -121,6 +121,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             ),
             reconnection_timer: 0,
             peer_removal_timer: 0,
+            peer_file_write_timer: 0,
             stats: RoutingStats::new(sender_to_stat.clone()),
             senders_to_verification: vec![sender_to_verification.clone()],
             last_verification_thread_index: 0,

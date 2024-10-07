@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
-use crate::core::consensus::peer_collection::PeerCollection;
+use crate::core::consensus::peers::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::Transaction;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;

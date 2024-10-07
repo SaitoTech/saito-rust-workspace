@@ -11,7 +11,7 @@ use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
-use saito_core::core::consensus::peer_service::PeerService;
+use saito_core::core::consensus::peers::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::{BlockId, PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};

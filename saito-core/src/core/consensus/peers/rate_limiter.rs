@@ -20,7 +20,7 @@ impl RateLimiter {
     }
 
     pub fn has_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
-        // TODO : current implementation allows twice the limit from spikes. a sliding window implementation would be better I think.
+        // TODO : current implementation allows twice the peers from spikes. a sliding window implementation would be better I think.
         if current_time.saturating_sub(self.last_request_time) > self.window {
             self.request_count = 0;
             self.last_request_time = current_time;
