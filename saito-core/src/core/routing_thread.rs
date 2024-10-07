@@ -9,7 +9,8 @@ use tokio::sync::{RwLock, RwLockReadGuard};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
-use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::peers::peer_service::PeerService;
+use crate::core::consensus::peers::peer_state_writer::PEER_STATE_WRITE_PERIOD;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
@@ -89,6 +90,7 @@ pub struct RoutingThread {
     pub network: Network,
     pub reconnection_timer: Timestamp,
     pub peer_removal_timer: Timestamp,
+    pub peer_file_write_timer: Timestamp,
     pub stats: RoutingStats,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
     pub last_verification_thread_index: usize,
@@ -538,7 +540,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     let time = self.timer.get_timestamp_in_ms();
                     peer.message_limiter.increase();
                     if peer.has_message_limit_exceeded(time) {
-                        info!("limit exceeded for messages from peer : {:?}", peer_index);
+                        info!("peers exceeded for messages from peer : {:?}", peer_index);
                         return None;
                     }
                 }
@@ -590,7 +592,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     peer.invalid_block_limiter.increase();
                     if peer.has_invalid_block_limit_exceeded(time) {
                         info!(
-                            "limit exceeded for invalid blocks from peer : {:?}. disconnecting peer...",
+                            "peers exceeded for invalid blocks from peer : {:?}. disconnecting peer...",
                             peer_index
                         );
                         self.network
@@ -652,6 +654,17 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             let mut peers = self.network.peer_lock.write().await;
             peers.remove_disconnected_peers(current_time);
             self.peer_removal_timer = 0;
+        }
+
+        self.peer_file_write_timer += duration_value;
+        if self.peer_file_write_timer >= PEER_STATE_WRITE_PERIOD {
+            let mut peers = self.network.peer_lock.write().await;
+            peers
+                .peer_state_writer
+                .write_state(&mut self.network.io_interface)
+                .await
+                .unwrap();
+            self.peer_file_write_timer = 0;
         }
 
         if work_done {
