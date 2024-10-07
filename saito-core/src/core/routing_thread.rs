@@ -589,7 +589,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     let mut peers = self.network.peer_lock.write().await;
                     let peer = peers.find_peer_by_index_mut(peer_index)?;
                     let time = self.timer.get_timestamp_in_ms();
-                    peer.invalid_block_limiter.increase();
                     if peer.has_invalid_block_limit_exceeded(time) {
                         info!(
                             "peers exceeded for invalid blocks from peer : {:?}. disconnecting peer...",
@@ -654,6 +653,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             let mut peers = self.network.peer_lock.write().await;
             peers.remove_disconnected_peers(current_time);
             self.peer_removal_timer = 0;
+            work_done = true;
         }
 
         self.peer_file_write_timer += duration_value;
@@ -665,6 +665,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
             for (peer_index, peer) in peers.index_to_peers.iter_mut() {
                 if peer.public_key.is_none() {
+                    info!("public key not set yet for peer : {:?}", peer_index);
                     continue;
                 }
                 data.insert(
@@ -685,6 +686,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 .await
                 .unwrap();
             self.peer_file_write_timer = 0;
+            work_done = true;
         }
 
         if work_done {
