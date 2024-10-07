@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind};
 use log::{error, warn};
 
 use crate::core::consensus::block::{Block, BlockType};
-use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::peers::peer_service::PeerService;
 use crate::core::consensus::transaction::Transaction;
 use crate::core::defs::{BlockHash, BlockId, ForkId, SaitoPublicKey};
 use crate::core::msg::api_message::ApiMessage;

@@ -2,7 +2,7 @@ use std::io::{Error, ErrorKind};
 
 use log::{trace, warn};
 
-use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::peers::peer_service::PeerService;
 use crate::core::defs::{SaitoHash, SaitoPublicKey, SaitoSignature};
 use crate::core::process::version::Version;
 use crate::core::util::serialize::Serialize;
