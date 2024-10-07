@@ -139,7 +139,7 @@ impl VerificationThread {
             );
             let mut peers = self.peer_lock.write().await;
             if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
-                // NOTE : this means if we cannot deserialize a block from the buffer we mark it as blacklisted.
+                // NOTE : this means if we receive an invalid block, peer is blacklisted.
                 peer.invalid_block_limiter.increase();
             }
             return;

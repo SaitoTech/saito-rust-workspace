@@ -144,11 +144,11 @@ export default class WebSharedMethods extends CustomSharedMethods {
     }
 
     appendValue(key: string, value: Uint8Array): void {
-        throw new Error("Method not implemented.");
+        // TODO : check if this needs implementing. might be not needed for web
     }
 
     flushData(key: string): void {
-        throw new Error("Method not implemented.");
+        // TODO : check if this needs implementing. might be not needed for web
     }
 
     sendInterfaceEvent(event: String, peerIndex: bigint, public_key: string) {
