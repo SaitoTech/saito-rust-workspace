@@ -18,6 +18,8 @@ pub(crate) struct PeerStateEntry {
     pub invalid_blocks_received: bool,
     pub same_depth_blocks_received: bool,
     pub too_far_blocks_received: bool,
+    pub handshake_limit_exceeded: bool,
+    pub keylist_limit_exceeded: bool,
     pub limited_till: Option<Timestamp>,
 }
 
@@ -30,6 +32,8 @@ impl Default for PeerStateEntry {
             invalid_blocks_received: false,
             same_depth_blocks_received: false,
             too_far_blocks_received: false,
+            handshake_limit_exceeded: false,
+            keylist_limit_exceeded: false,
             limited_till: None,
         }
     }
@@ -58,7 +62,7 @@ impl PeerStateWriter {
         io_handler: &mut Box<dyn InterfaceIO + Send + Sync>,
     ) -> Result<(), Error> {
         let line =
-            "peer_index,public_key,limited_till,msg_limit,invalid_blocks_limit,same_depth_limit,too_far_block_limit\r\n"
+            "peer_index,public_key,limited_till,msg_limit,invalid_blocks_limit,same_depth_limit,too_far_block_limit,handshake_limit,keylist_limit\r\n"
                 .to_string();
         io_handler
             .write_value(PEER_STATE_FILENAME, line.as_bytes())
@@ -66,7 +70,7 @@ impl PeerStateWriter {
 
         for data in data.iter() {
             let line = format!(
-                "{:?},{:?},{:?},{:?},{:?},{:?},{:?}\r\n",
+                "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}\r\n",
                 data.peer_index,
                 data.public_key.to_base58(),
                 data.limited_till.unwrap_or(0),
@@ -74,6 +78,8 @@ impl PeerStateWriter {
                 data.invalid_blocks_received,
                 data.same_depth_blocks_received,
                 data.too_far_blocks_received,
+                data.handshake_limit_exceeded,
+                data.keylist_limit_exceeded,
             );
             io_handler
                 .append_value(PEER_STATE_FILENAME, line.as_bytes())
