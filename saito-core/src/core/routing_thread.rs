@@ -527,6 +527,39 @@ impl RoutingThread {
             warn!("peer {:?} not found to update services", peer_index);
         }
     }
+
+    async fn write_peer_state_data(&mut self, duration_value: Timestamp, work_done: &mut bool) {
+        self.peer_file_write_timer += duration_value;
+        if self.peer_file_write_timer >= PEER_STATE_WRITE_PERIOD {
+            let mut peers = self.network.peer_lock.write().await;
+            let mut data: Vec<PeerStateEntry> = Default::default();
+
+            let current_time = self.timer.get_timestamp_in_ms();
+
+            for (peer_index, peer) in peers.index_to_peers.iter_mut() {
+                if peer.public_key.is_none() {
+                    info!("public key not set yet for peer : {:?}", peer_index);
+                    continue;
+                }
+                data.push(PeerStateEntry {
+                    peer_index: peer.index,
+                    public_key: peer.public_key.unwrap_or([0; 33]),
+                    msg_limit_exceeded: peer.has_message_limit_exceeded(current_time),
+                    invalid_blocks_received: peer.has_invalid_block_limit_exceeded(current_time),
+                    same_depth_blocks_received: false,
+                    too_far_blocks_received: false,
+                    limited_till: None,
+                });
+            }
+            peers
+                .peer_state_writer
+                .write_state(data, &mut self.network.io_interface)
+                .await
+                .unwrap();
+            self.peer_file_write_timer = 0;
+            *work_done = true;
+        }
+    }
 }
 
 #[async_trait]
@@ -656,38 +689,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             work_done = true;
         }
 
-        self.peer_file_write_timer += duration_value;
-        if self.peer_file_write_timer >= PEER_STATE_WRITE_PERIOD {
-            let mut peers = self.network.peer_lock.write().await;
-            let mut data: HashMap<SaitoPublicKey, PeerStateEntry> = Default::default();
-
-            let current_time = self.timer.get_timestamp_in_ms();
-
-            for (peer_index, peer) in peers.index_to_peers.iter_mut() {
-                if peer.public_key.is_none() {
-                    info!("public key not set yet for peer : {:?}", peer_index);
-                    continue;
-                }
-                data.insert(
-                    peer.public_key.unwrap(),
-                    PeerStateEntry {
-                        msg_limit_exceeded: peer.has_message_limit_exceeded(current_time),
-                        invalid_blocks_received: peer
-                            .has_invalid_block_limit_exceeded(current_time),
-                        same_depth_blocks_received: false,
-                        too_far_blocks_received: false,
-                        limited_till: None,
-                    },
-                );
-            }
-            peers
-                .peer_state_writer
-                .write_state(data, &mut self.network.io_interface)
-                .await
-                .unwrap();
-            self.peer_file_write_timer = 0;
-            work_done = true;
-        }
+        self.write_peer_state_data(duration_value, &mut work_done)
+            .await;
 
         if work_done {
             return Some(());
