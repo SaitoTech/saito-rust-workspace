@@ -548,6 +548,8 @@ impl RoutingThread {
                     invalid_blocks_received: peer.has_invalid_block_limit_exceeded(current_time),
                     same_depth_blocks_received: false,
                     too_far_blocks_received: false,
+                    handshake_limit_exceeded: peer.has_handshake_limit_exceeded(current_time),
+                    keylist_limit_exceeded: peer.has_key_list_limit_exceeded(current_time),
                     limited_till: None,
                 });
             }
