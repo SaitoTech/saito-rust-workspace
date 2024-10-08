@@ -34,11 +34,12 @@ pub const BLOCK_HEADER_SIZE: usize = 245;
 //
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct ConsensusValues {
+
     // expected transaction containing outbound payments
     pub fee_transaction: Option<Transaction>,
     // number of staking transactions if exist
     pub st_num: u8,
-    // index of staking transactions if exists
+    // index of staking transaction if exists
     pub st_index: Option<usize>,
     // number of issuance transactions if exists
     pub it_num: u8,
@@ -78,12 +79,13 @@ pub struct ConsensusValues {
     pub total_rebroadcast_fees_nolan: Currency,
     // amount of NOLAN paid to ATR txs from treasury
     pub total_rebroadcast_staking_payouts_nolan: Currency,
-    // amount of NOLAN paid to miner from treasury
+
+    // miner
+
     pub miner_payout: Currency,
+
     // all ATR txs hashed together
     pub rebroadcast_hash: [u8; 32],
-    // dust falling off chain, needs adding to treasury
-    pub nolan_falling_off_chain: Currency,
     // amount to add to staker treasury in block
     pub treasury_contribution: Currency,
     // amount to add to staker treasury in block
@@ -124,7 +126,6 @@ impl ConsensusValues {
             rebroadcast_hash: [0; 32],
             graveyard_contribution: 0,
             treasury_contribution: 0,
-            nolan_falling_off_chain: 0,
             avg_total_fees: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -155,7 +156,6 @@ impl ConsensusValues {
             rebroadcast_hash: [0; 32],
             graveyard_contribution: 0,
             treasury_contribution: 0,
-            nolan_falling_off_chain: 0,
             avg_total_fees: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
@@ -1404,12 +1404,6 @@ impl Block {
 
         cv.treasury_contribution = treasury_contribution;
         cv.graveyard_contribution = graveyard_contribution;
-
-        //
-        // TODO - once we start reducing any mining/staking payouts because the fees-in-block
-        //  are larger than the average, we can put the removed tokens into the graveyard contribution
-        //
-        cv.nolan_falling_off_chain = cv.graveyard_contribution;
 
         cv
     }

@@ -28,7 +28,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
                 type: JSON.stringify(this.block_type),
                 previous_block_hash: this.previousBlockHash,
                 transactions: this.transactions.map(tx => tx.toJson()),
-                nolan_falling_off_chain: this.instance.nolan_falling_off_chain,
                 timestamp: this.instance.timestamp,
                 creator: this.instance.creator,
                 file_name: this.instance.file_name,

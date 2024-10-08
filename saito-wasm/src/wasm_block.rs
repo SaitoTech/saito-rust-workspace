@@ -180,11 +180,6 @@ impl WasmBlock {
         self.block.cv.rebroadcast_hash.to_hex().into()
     }
 
-    #[wasm_bindgen(getter = nolan_falling_off_chain)]
-    pub fn nolan_falling_off_chain(&self) -> u64 {
-        self.block.cv.nolan_falling_off_chain
-    }
-
     // TODO -- deprecated
     #[wasm_bindgen(getter = avg_income)]
     pub fn avg_income(&self) -> u64 {
