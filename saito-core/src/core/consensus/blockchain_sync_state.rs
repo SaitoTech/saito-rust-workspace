@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::core::consensus::blockchain::Blockchain;
-use crate::core::consensus::peer_collection::PeerCollection;
+use crate::core::consensus::peers::peer_collection::PeerCollection;
 use ahash::HashMap;
 use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
@@ -173,7 +173,7 @@ impl BlockchainSyncState {
             let mut allowed_quota = self.batch_size - fetching_count;
 
             for block_data in deq.iter_mut() {
-                // we limit concurrent fetches to this amount
+                // we peers concurrent fetches to this amount
                 if allowed_quota == 0 {
                     // we have reached allowed concurrent fetches quota.
                     break;

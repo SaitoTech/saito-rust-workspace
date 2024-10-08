@@ -5,7 +5,7 @@ pub mod test {
     use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
     use crate::core::consensus::context::Context;
     use crate::core::consensus::mempool::Mempool;
-    use crate::core::consensus::peer_collection::PeerCollection;
+    use crate::core::consensus::peers::peer_collection::PeerCollection;
 
     use crate::core::consensus::transaction::Transaction;
     use crate::core::consensus::wallet::Wallet;
@@ -185,6 +185,7 @@ pub mod test {
                     ),
                     reconnection_timer: 0,
                     peer_removal_timer: 0,
+                    peer_file_write_timer: 0,
                     stats: RoutingStats::new(sender_to_stat.clone()),
                     senders_to_verification: vec![sender_to_verification.clone()],
                     last_verification_thread_index: 0,

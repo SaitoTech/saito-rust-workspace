@@ -1,6 +1,6 @@
-use crate::core::consensus::limit::block_depth_limit_checker::BlockDepthLimitChecker;
-use crate::core::consensus::limit::rate_limiter::RateLimiter;
-use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::peers::block_depth_limit_checker::BlockDepthLimitChecker;
+use crate::core::consensus::peers::peer_service::PeerService;
+use crate::core::consensus::peers::rate_limiter::RateLimiter;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
     PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD,
@@ -92,6 +92,15 @@ impl Peer {
 
     pub fn has_invalid_block_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
         self.invalid_block_limiter.has_limit_exceeded(current_time)
+    }
+    pub fn get_limited_till(&mut self, current_time: Timestamp) -> Option<Timestamp> {
+        let mut result = None;
+
+        if self.has_key_list_limit_exceeded(current_time) {
+            if self.key_list_limiter.has_limit_exceeded(current_time) {}
+        }
+
+        result
     }
 
     pub fn get_url(&self) -> String {
@@ -426,7 +435,7 @@ impl Peer {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::consensus::peer::{Peer, PeerStatus};
+    use crate::core::consensus::peers::peer::{Peer, PeerStatus};
     use crate::core::process::version::Version;
     use std::cmp::Ordering;
 

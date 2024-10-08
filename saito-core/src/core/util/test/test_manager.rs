@@ -44,7 +44,7 @@ pub mod test {
     use crate::core::consensus::blockchain::{AddBlockResult, Blockchain, DEFAULT_SOCIAL_STAKE};
     use crate::core::consensus::golden_ticket::GoldenTicket;
     use crate::core::consensus::mempool::Mempool;
-    use crate::core::consensus::peer_collection::PeerCollection;
+    use crate::core::consensus::peers::peer_collection::PeerCollection;
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;

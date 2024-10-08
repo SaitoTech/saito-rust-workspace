@@ -24,7 +24,7 @@ use warp::Filter;
 
 use saito_core::core::consensus::block::{Block, BlockType};
 use saito_core::core::consensus::blockchain::Blockchain;
-use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::peers::peer_collection::PeerCollection;
 use saito_core::core::defs::{
     BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, BLOCK_FILE_EXTENSION,
     STAT_BIN_COUNT,

@@ -8,7 +8,7 @@ use rand::{thread_rng, Rng};
 use secp256k1::ecdsa;
 pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
 
-type Aes128Cbc = Cbc<Aes128, Pkcs7>;
+// type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
 pub const PARALLEL_HASH_BYTE_THRESHOLD: usize = 128_000;
 
