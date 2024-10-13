@@ -1,7 +1,5 @@
 use crate::core::defs::{PeerIndex, PrintForLog, SaitoPublicKey, Timestamp};
 use crate::core::io::interface_io::InterfaceIO;
-use crate::core::routing_thread::PeerState;
-use ahash::HashMap;
 use std::io::Error;
 use std::time::Duration;
 

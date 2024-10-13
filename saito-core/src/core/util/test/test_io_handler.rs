@@ -5,7 +5,7 @@ pub mod test {
     use std::path::Path;
 
     use async_trait::async_trait;
-    use log::{debug, error, info};
+    use log::{debug, info};
     use tokio::fs::File;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
