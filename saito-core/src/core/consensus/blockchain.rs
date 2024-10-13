@@ -58,7 +58,11 @@ pub enum AddBlockResult {
         WalletUpdateStatus,
     ),
     BlockAlreadyExists,
-    FailedButRetry(Block, bool /*fetch previous block*/),
+    FailedButRetry(
+        Block,
+        bool, /*fetch previous block*/
+        bool, /*fetch whole blockchain*/
+    ),
     FailedNotValid,
 }
 
@@ -185,19 +189,28 @@ impl Blockchain {
                 return if !previous_block_fetched
                     && block.id > max(1, self.get_latest_block_id().saturating_sub(GENESIS_PERIOD))
                 {
-                    debug!(
-                        "need to fetch previous block : {:?}-{:?}",
-                        block.id - 1,
-                        block.previous_block_hash.to_hex()
-                    );
+                    const BLOCK_DIFF_BEFORE_FETCHING_CHAIN: BlockId = 100;
+                    if block.id.abs_diff(self.get_latest_block_id())
+                        < BLOCK_DIFF_BEFORE_FETCHING_CHAIN
+                    {
+                        debug!(
+                            "need to fetch previous block : {:?}-{:?}",
+                            block.id - 1,
+                            block.previous_block_hash.to_hex()
+                        );
 
-                    AddBlockResult::FailedButRetry(block, true)
+                        AddBlockResult::FailedButRetry(block, true, false)
+                    } else {
+                        info!("block : {:?}-{:?} is too distant with the current latest block : id={:?}. so need to fetch the whole blockchain from the peer to make sure this is not an attack",
+                            block.id,block.hash.to_hex(),self.get_latest_block_id());
+                        AddBlockResult::FailedButRetry(block, false, true)
+                    }
                 } else {
                     debug!(
                         "previous block : {:?} is in the mempool. not fetching",
                         block.previous_block_hash.to_hex()
                     );
-                    AddBlockResult::FailedButRetry(block, false)
+                    AddBlockResult::FailedButRetry(block, false, false)
                 };
             }
         }
@@ -1589,12 +1602,13 @@ impl Blockchain {
                         .await;
                     }
                     AddBlockResult::BlockAlreadyExists => {}
-                    AddBlockResult::FailedButRetry(block, fetch_prev_block) => {
+                    AddBlockResult::FailedButRetry(block, fetch_prev_block, fetch_blockchain) => {
                         Self::handle_failed_block_to_be_retried(
                             sender_to_router.clone(),
                             &mut mempool,
                             block,
                             fetch_prev_block,
+                            fetch_blockchain,
                         )
                         .await;
                     }
@@ -1682,23 +1696,32 @@ impl Blockchain {
         mempool: &mut Mempool,
         block: Block,
         fetch_prev_block: bool,
+        fetch_blockchain: bool,
     ) {
         debug!("adding block : {:?} back to mempool so it can be processed again after the previous block : {:?} is added",
                                     block.hash.to_hex(),
                                     block.previous_block_hash.to_hex());
 
-        if fetch_prev_block && sender_to_router.is_some() {
-            sender_to_router
-                .as_ref()
-                .unwrap()
-                .send(RoutingEvent::BlockFetchRequest(
-                    block.routed_from_peer.unwrap_or(0),
-                    block.previous_block_hash,
-                    block.id - 1,
-                ))
-                .await
-                .expect("sending block fetch request failed");
+        if let Some(sender) = sender_to_router.as_ref() {
+            if fetch_blockchain {
+                sender
+                    .send(RoutingEvent::BlockchainRequest(
+                        block.routed_from_peer.unwrap(),
+                    ))
+                    .await
+                    .expect("sending blockchain request failed");
+            } else if fetch_prev_block {
+                sender
+                    .send(RoutingEvent::BlockFetchRequest(
+                        block.routed_from_peer.unwrap_or(0),
+                        block.previous_block_hash,
+                        block.id - 1,
+                    ))
+                    .await
+                    .expect("sending block fetch request failed");
+            }
         }
+
         mempool.add_block(block);
     }
 

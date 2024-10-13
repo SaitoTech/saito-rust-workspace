@@ -35,6 +35,7 @@ use crate::core::verification_thread::VerifyRequest;
 pub enum RoutingEvent {
     BlockchainUpdated(BlockHash),
     BlockFetchRequest(PeerIndex, BlockHash, BlockId),
+    BlockchainRequest(PeerIndex),
 }
 
 #[derive(Debug)]
@@ -719,6 +720,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                         peer_index,
                         self.network.peer_lock.clone(),
                     )
+                    .await;
+            }
+            RoutingEvent::BlockchainRequest(peer_index) => {
+                self.network
+                    .request_blockchain_from_peer(peer_index, self.blockchain_lock.clone())
                     .await;
             }
         }
