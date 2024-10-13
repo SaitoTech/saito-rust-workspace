@@ -349,7 +349,7 @@ impl Network {
             .unwrap();
     }
 
-    async fn request_blockchain_from_peer(
+    pub(crate) async fn request_blockchain_from_peer(
         &self,
         peer_index: u64,
         blockchain_lock: Arc<RwLock<Blockchain>>,

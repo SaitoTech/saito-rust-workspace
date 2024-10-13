@@ -1,4 +1,3 @@
-use crate::core::consensus::peers::block_depth_limit_checker::BlockDepthLimitChecker;
 use crate::core::consensus::peers::peer_service::PeerService;
 use crate::core::consensus::peers::rate_limiter::RateLimiter;
 use crate::core::consensus::wallet::Wallet;
@@ -49,7 +48,6 @@ pub struct Peer {
     pub handshake_limiter: RateLimiter,
     pub message_limiter: RateLimiter,
     pub invalid_block_limiter: RateLimiter,
-    pub same_depth_blocks_limiter: BlockDepthLimitChecker,
     pub public_key: Option<SaitoPublicKey>,
 }
 
@@ -71,10 +69,6 @@ impl Peer {
             handshake_limiter: RateLimiter::builder(10, Duration::from_secs(60)),
             message_limiter: RateLimiter::builder(1000, Duration::from_secs(1)),
             invalid_block_limiter: RateLimiter::builder(1, Duration::from_secs(3600)),
-            same_depth_blocks_limiter: BlockDepthLimitChecker::builder(
-                10,
-                Duration::from_secs(600),
-            ),
             public_key: None,
         }
     }
@@ -92,15 +86,6 @@ impl Peer {
 
     pub fn has_invalid_block_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
         self.invalid_block_limiter.has_limit_exceeded(current_time)
-    }
-    pub fn get_limited_till(&mut self, current_time: Timestamp) -> Option<Timestamp> {
-        let mut result = None;
-
-        if self.has_key_list_limit_exceeded(current_time) {
-            if self.key_list_limiter.has_limit_exceeded(current_time) {}
-        }
-
-        result
     }
 
     pub fn get_url(&self) -> String {
