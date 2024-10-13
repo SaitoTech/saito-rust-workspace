@@ -189,7 +189,7 @@ impl Blockchain {
                 return if !previous_block_fetched
                     && block.id > max(1, self.get_latest_block_id().saturating_sub(GENESIS_PERIOD))
                 {
-                    const BLOCK_DIFF_BEFORE_FETCHING_CHAIN: BlockId = 100;
+                    const BLOCK_DIFF_BEFORE_FETCHING_CHAIN: BlockId = 1000;
                     if block.id.abs_diff(self.get_latest_block_id())
                         < BLOCK_DIFF_BEFORE_FETCHING_CHAIN
                     {
