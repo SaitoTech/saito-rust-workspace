@@ -272,7 +272,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
     async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
         // println!("process_event : {:?}", event.type_id());
-        return match event {
+        match event {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
                     "received new golden ticket : {:?}",
@@ -371,7 +371,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 }
                 Some(())
             }
-        };
+        }
     }
 
     async fn on_init(&mut self) {
