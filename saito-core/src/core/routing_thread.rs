@@ -312,6 +312,11 @@ impl RoutingThread {
         self.network.handle_new_peer(peer_index).await;
     }
 
+    async fn add_static_peer(&mut self, url: String) {
+        trace!("handling new peer : {:?}", url);
+        self.network.add_static_peer(url).await;
+    }
+
     async fn handle_peer_disconnect(
         &mut self,
         peer_index: u64,
@@ -602,6 +607,12 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             NetworkEvent::PeerConnectionResult { result } => {
                 if result.is_ok() {
                     self.handle_new_peer(result.unwrap()).await;
+                    return Some(());
+                }
+            }
+            NetworkEvent::AddStaticPeer { result } => {
+                if result.is_ok() {
+                    self.add_static_peer(result.unwrap()).await;
                     return Some(());
                 }
             }

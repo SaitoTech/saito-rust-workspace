@@ -18,6 +18,8 @@ use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
 use crate::core::process::version::Version;
+use url::Url;
+
 
 #[derive(Debug)]
 pub enum PeerDisconnectType {
@@ -26,7 +28,7 @@ pub enum PeerDisconnectType {
     /// If we disconnected the peer
     InternalDisconnect,
 }
-use crate::core::util::configuration::Configuration;
+use crate::core::util::configuration::{Configuration, PeerConfig};
 
 // #[derive(Debug)]
 pub struct Network {
@@ -526,7 +528,62 @@ impl Network {
 
         info!("added {:?} static peers", peers.index_to_peers.len());
     }
+    
+    pub async fn add_static_peer(&mut self, url_str: String) {
+        match Url::parse(&url_str) {
+         
+            Ok(url) => {
+                let host = match url.host_str() {
+                    Some(h) => h.to_string(),
+                    None => {
+                        error!("No host in URL: {}", url_str);
+                        return;
+                    }
+                };
 
+                let port = match url.port() {
+                    Some(p) => p,
+                    None => {
+                        error!("No port in URL: {}", url_str);
+                        return;
+                    }
+                };
+
+                let protocol = url.scheme().to_string();
+                let peer_config = PeerConfig {
+                    host: host.clone(),
+                    port,
+                    protocol: protocol.clone(),
+                    synctype: String::from("full"),
+                };
+
+                debug!("Peer config: {:?}", peer_config);
+
+                let mut peers = self.peer_lock.write().await;
+                let peer_index = peers.peer_counter.get_next_index();
+                let mut peer = Peer::new(peer_index);
+                
+                peer.static_peer_config = Some(peer_config);
+                peer.block_fetch_url = format!("{}://{}", protocol, url.authority());
+
+                peers.index_to_peers.insert(peer_index, peer);
+
+                debug!("Added static peer with index: {} and URL: {}", peer_index, url_str);
+
+                // Uncomment the following line if you want to attempt connection immediately
+                // if let Err(e) = self.io_interface.connect_to_peer(&url_str, peer_index).await {
+                //     error!("Failed to connect to peer {}: {}", url_str, e);
+                // }
+            },
+            Err(e) => {
+                error!("Invalid URL {}: {}", url_str, e);
+            }
+
+        }
+
+        debug!{"this is the url string {:?}", url_str};
+  
+   }
     pub async fn connect_to_static_peers(&mut self, current_time: Timestamp) {
         trace!("connecting to static peers...");
         let mut peers = self.peer_lock.write().await;

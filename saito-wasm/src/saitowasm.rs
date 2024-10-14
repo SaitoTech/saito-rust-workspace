@@ -502,6 +502,21 @@ pub async fn process_new_peer(peer_index: PeerIndex) {
 }
 
 #[wasm_bindgen]
+pub async fn add_static_peer(url: String) {
+    debug!("add_static_peer : {:?}", url);
+    let mut saito = SAITO.lock().await;
+
+    saito
+        .as_mut()
+        .unwrap()
+        .routing_thread
+        .process_network_event(NetworkEvent::AddStaticPeer {
+            result: Ok(url),
+        })
+        .await;
+}
+
+#[wasm_bindgen]
 pub async fn get_next_peer_index() -> BigInt {
     let mut saito = SAITO.lock().await;
     let mut peers = saito

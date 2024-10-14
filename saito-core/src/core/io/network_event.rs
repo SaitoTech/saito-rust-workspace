@@ -25,6 +25,9 @@ pub enum NetworkEvent {
     PeerConnectionResult {
         result: Result<u64, std::io::Error>,
     },
+    AddStaticPeer {
+        result: Result<String, std::io::Error>,
+    },
     PeerDisconnected {
         peer_index: u64,
         disconnect_type: PeerDisconnectType,
