@@ -531,20 +531,14 @@ impl Network {
    
     pub async fn handle_new_stun_peer(&mut self, peer_index: PeerIndex, public_key: SaitoPublicKey) -> Result<(), Error> {
         debug!("Adding STUN peer with index: {} and public key: {}", peer_index, public_key.to_base58());
-    
         let mut peers = self.peer_lock.write().await;
-
         if peers.index_to_peers.contains_key(&peer_index) {
             return Err(Error::new(ErrorKind::AlreadyExists, "Peer with this index already exists"));
         }
-
-        let peer = Peer::new_stun(peer_index, public_key);
-
+        let peer = Peer::new_stun(peer_index, public_key, self.io_interface.as_ref());
         peers.index_to_peers.insert(peer_index, peer);
         peers.address_to_peers.insert(public_key, peer_index);
-
         debug!("STUN peer added successfully");
-
         self.io_interface
             .send_interface_event(InterfaceEvent::StunPeerConnected(peer_index));
 

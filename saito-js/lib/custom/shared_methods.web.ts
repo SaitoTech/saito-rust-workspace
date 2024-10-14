@@ -134,13 +134,7 @@ export default class WebSharedMethods extends CustomSharedMethods {
 
         let socket = Saito.getInstance().getSocket(peerIndex);
         if (socket) {
-            console.log(`Sending message to ${peerIndex} via websocket`);
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(buffer);
-
-            } else {
-                console.error(`WebSocket for peer ${peerIndex} is not open. Current state: ${socket.readyState}`);
-            }
+            socket.send(buffer);
         } else {
             console.error(`No WebSocket found for peer ${peerIndex}`);
         }

@@ -91,11 +91,12 @@ impl Peer {
         }
     }
 
-    pub fn new_stun(peer_index: PeerIndex, public_key: SaitoPublicKey) -> Peer {
+    pub fn new_stun(peer_index: PeerIndex, public_key: SaitoPublicKey,  io_handler: &(dyn InterfaceIO + Send + Sync),) -> Peer {
         let mut peer = Peer::new(peer_index);
         peer.peer_type = PeerType::STUN;
         peer.public_key = Some(public_key);
         peer.peer_status = PeerStatus::Connected;
+        peer.services = io_handler.get_my_services();
         peer
     }
 

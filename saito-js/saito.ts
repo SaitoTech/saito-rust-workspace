@@ -226,17 +226,9 @@ export default class Saito {
         peerConnection.ondatachannel = (event) => {
             const dataChannel = event.channel;
             dataChannel.onmessage = (messageEvent) => {
-
                 // Handle incoming messages
                 if (messageEvent.data instanceof ArrayBuffer) {
                     const buffer = new Uint8Array(messageEvent.data);
-                    // console.log('Processing binary message buffer for STUN peer', peerIndex, buffer);
-                    this.processMsgBufferFromPeer(buffer, peerIndex);
-                } else if (typeof messageEvent.data === 'string') {
-                    // console.log('Received string data from STUN peer', peerIndex, messageEvent.data);
-                    // Handle string data if needed, or convert to Uint8Array
-                    const encoder = new TextEncoder();
-                    const buffer = encoder.encode(messageEvent.data);
                     this.processMsgBufferFromPeer(buffer, peerIndex);
                 } else {
                     console.warn('Received unexpected data type from STUN peer', peerIndex, messageEvent);

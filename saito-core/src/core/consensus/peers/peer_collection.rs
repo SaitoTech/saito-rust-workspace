@@ -45,7 +45,7 @@ impl PeerCollection {
     }
 
     pub fn remove_reconnected_peer(&mut self, public_key: &SaitoPublicKey) -> Option<Peer> {
-        let peer_index;
+        let peer_index: u64;
         {
             let peer = self.find_peer_by_address(&public_key)?;
             if let PeerStatus::Connected = peer.peer_status {
@@ -68,6 +68,10 @@ impl PeerCollection {
             .filter_map(|(peer_index, peer)| {
                 if peer.static_peer_config.is_some() {
                     // static peers always remain in memory
+                    return None;
+                }
+                if peer.is_stun_peer() {
+                    // stun peers remain unless explicity removed
                     return None;
                 }
                 if peer.disconnected_at + PEER_REMOVAL_WINDOW > current_time {
