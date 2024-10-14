@@ -3,7 +3,7 @@ import Transaction from "./lib/transaction";
 import Block from "./lib/block";
 import Factory from "./lib/factory";
 import Peer from "./lib/peer";
-import Wallet, {DefaultEmptyPrivateKey} from "./lib/wallet";
+import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
@@ -19,6 +19,7 @@ export default class Saito {
     private static instance: Saito;
     private static libInstance: any;
     sockets: Map<bigint, any> = new Map<bigint, any>();
+    stunPeers: Map<bigint, any> = new Map<bigint, any>();
     factory = new Factory();
     promises = new Map<number, any>();
     private callbackIndex: number = 1;
@@ -209,6 +210,83 @@ export default class Saito {
         console.log("adding socket : " + peer_index + ". total sockets : " + this.sockets.size);
     }
 
+    public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection): Promise<bigint> {
+        const peerIndex = await Saito.getLibInstance().get_next_peer_index();
+        this.stunPeers.set(peerIndex, peerConnection);
+
+        const dataChannelOptions: RTCDataChannelInit = {
+            ordered: true,
+            protocol: 'saito',
+        };
+        const dc = peerConnection.createDataChannel('core-channel', dataChannelOptions);
+
+
+        //@ts-ignore
+        peerConnection.dc = dc;
+        peerConnection.ondatachannel = (event) => {
+            const dataChannel = event.channel;
+            dataChannel.onmessage = (messageEvent) => {
+
+                // Handle incoming messages
+                if (messageEvent.data instanceof ArrayBuffer) {
+                    const buffer = new Uint8Array(messageEvent.data);
+                    // console.log('Processing binary message buffer for STUN peer', peerIndex, buffer);
+                    this.processMsgBufferFromPeer(buffer, peerIndex);
+                } else if (typeof messageEvent.data === 'string') {
+                    // console.log('Received string data from STUN peer', peerIndex, messageEvent.data);
+                    // Handle string data if needed, or convert to Uint8Array
+                    const encoder = new TextEncoder();
+                    const buffer = encoder.encode(messageEvent.data);
+                    this.processMsgBufferFromPeer(buffer, peerIndex);
+                } else {
+                    console.warn('Received unexpected data type from STUN peer', peerIndex, messageEvent);
+                }
+            };
+
+            dataChannel.onopen = () => {
+                console.log('Data channel is open for STUN peer', peerIndex);
+            };
+
+            dataChannel.onerror = (error: any) => {
+                console.error('Data channel error for STUN peer', peerIndex, error);
+
+                // Log detailed error information
+                if (error.error) {
+                    console.error('Error name:', error.error.name);
+                    console.error('Error message:', error.error.message);
+                    console.error('Error stack:', error.error.stack);
+                }
+
+                // Check the data channel state
+                console.log('Data channel state after error:', dataChannel.readyState);
+
+                // Attempt to recover or reconnect
+                if (dataChannel.readyState === 'closed') {
+                    console.log('Attempting to reopen data channel for STUN peer', peerIndex);
+                    // this.reopenDataChannel(peerIndex, peerConnection);
+                }
+            }
+
+
+        };
+
+
+        // Call the Rust side to add the STUN peer
+        await Saito.getLibInstance().process_stun_peer(peerIndex, publicKey);
+        console.log(`Added STUN peer with index: ${peerIndex} and public key: ${publicKey}`);
+        return peerIndex;
+
+
+    }
+
+    public isStunPeer(index: bigint): boolean {
+        return this.stunPeers.has(index);
+    }
+
+
+
+
+
     public getSocket(index: bigint): any | null {
         return this.sockets.get(index);
     }
@@ -252,6 +330,13 @@ export default class Saito {
     public async processNewPeer(index: bigint, peer_config: any): Promise<void> {
         return Saito.getLibInstance().process_new_peer(index, peer_config);
     }
+
+    public async add_static_peer(url: string): Promise<void> {
+        return Saito.getLibInstance().add_static_peer(url);
+    }
+
+
+
 
     public async processPeerDisconnection(peer_index: bigint): Promise<void> {
         return Saito.getLibInstance().process_peer_disconnection(peer_index);
@@ -402,7 +487,7 @@ export default class Saito {
             .catch((error) => {
                 console.error(error);
                 if (callback) {
-                    return callback({err: error.toString()});
+                    return callback({ err: error.toString() });
                 }
             });
     }
@@ -413,7 +498,7 @@ export default class Saito {
         callback?: any,
         peerIndex?: bigint
     ): Promise<any> {
-        // console.log("saito.sendRequest : peer = " + peerIndex);
+        console.log("sending request : peer = " + peerIndex);
         let wallet = await this.getWallet();
         let publicKey = await wallet.getPublicKey();
         let tx = await this.createTransaction(publicKey, BigInt(0), BigInt(0));

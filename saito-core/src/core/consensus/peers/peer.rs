@@ -19,6 +19,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 
+
+#[derive(Clone, Debug)]
+pub enum PeerType {
+    WebSocket,
+    STUN,
+}
+
+
 #[derive(Clone, Debug)]
 pub enum PeerStatus {
     Disconnected(
@@ -51,6 +59,8 @@ pub struct Peer {
     pub invalid_block_limiter: RateLimiter,
     pub same_depth_blocks_limiter: BlockDepthLimitChecker,
     pub public_key: Option<SaitoPublicKey>,
+    pub peer_type: PeerType,
+
 }
 
 impl Peer {
@@ -76,8 +86,23 @@ impl Peer {
                 Duration::from_secs(600),
             ),
             public_key: None,
+            peer_type: PeerType::WebSocket,
+
         }
     }
+
+    pub fn new_stun(peer_index: PeerIndex, public_key: SaitoPublicKey) -> Peer {
+        let mut peer = Peer::new(peer_index);
+        peer.peer_type = PeerType::STUN;
+        peer.public_key = Some(public_key);
+        peer.peer_status = PeerStatus::Connected;
+        peer
+    }
+
+    pub fn is_stun_peer(&self) -> bool {
+        matches!(self.peer_type, PeerType::STUN)
+    }
+
 
     pub fn has_key_list_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
         self.key_list_limiter.has_limit_exceeded(current_time)

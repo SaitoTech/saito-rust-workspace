@@ -502,18 +502,34 @@ pub async fn process_new_peer(peer_index: PeerIndex) {
 }
 
 #[wasm_bindgen]
-pub async fn add_static_peer(url: String) {
-    debug!("add_static_peer : {:?}", url);
+pub async fn process_stun_peer(peer_index: PeerIndex, public_key: JsString) -> Result<(), JsValue> {
+    debug!("processing stun peer with index: {:?} and public key: {:?} ", peer_index, public_key);
+
     let mut saito = SAITO.lock().await;
+
+    // let key: Result<[u8; 33], Error> = string_to_key(public_key);
+    // if key.is_err() {
+    //     error!(
+    //         "failed parsing public key from string. {:?}",
+    //         key.err().unwrap()
+    //     );
+    //     return Err(JsValue::from(
+    //         "Failed parsing private key string to key",
+    //     ));
+    // }
+
+    let key: [u8; 33] = string_to_key(public_key.into())
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse public key: {}", e)))?;
 
     saito
         .as_mut()
         .unwrap()
         .routing_thread
-        .process_network_event(NetworkEvent::AddStaticPeer {
-            result: Ok(url),
+        .process_network_event(NetworkEvent::AddStunPeer {
+            result: Ok((peer_index, key)),
         })
         .await;
+    Ok(())
 }
 
 #[wasm_bindgen]
@@ -770,7 +786,7 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
         return false;
     }
     let sig = sig.unwrap();
-    let key = string_to_key(public_key);
+    let key: Result<[u8; 33], Error> = string_to_key(public_key);
     if key.is_err() {
         error!(
             "failed parsing public key from string. {:?}",
@@ -943,6 +959,7 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
     };
     let message = Message::ApplicationMessage(api_message);
     let buffer = message.serialize();
+    debug!("sending api call");
     if peer_index == 0 {
         saito
             .as_ref()

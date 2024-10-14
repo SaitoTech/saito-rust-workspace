@@ -528,62 +528,29 @@ impl Network {
 
         info!("added {:?} static peers", peers.index_to_peers.len());
     }
+   
+    pub async fn handle_new_stun_peer(&mut self, peer_index: PeerIndex, public_key: SaitoPublicKey) -> Result<(), Error> {
+        debug!("Adding STUN peer with index: {} and public key: {}", peer_index, public_key.to_base58());
     
-    pub async fn add_static_peer(&mut self, url_str: String) {
-        match Url::parse(&url_str) {
-         
-            Ok(url) => {
-                let host = match url.host_str() {
-                    Some(h) => h.to_string(),
-                    None => {
-                        error!("No host in URL: {}", url_str);
-                        return;
-                    }
-                };
+        let mut peers = self.peer_lock.write().await;
 
-                let port = match url.port() {
-                    Some(p) => p,
-                    None => {
-                        error!("No port in URL: {}", url_str);
-                        return;
-                    }
-                };
-
-                let protocol = url.scheme().to_string();
-                let peer_config = PeerConfig {
-                    host: host.clone(),
-                    port,
-                    protocol: protocol.clone(),
-                    synctype: String::from("full"),
-                };
-
-                debug!("Peer config: {:?}", peer_config);
-
-                let mut peers = self.peer_lock.write().await;
-                let peer_index = peers.peer_counter.get_next_index();
-                let mut peer = Peer::new(peer_index);
-                
-                peer.static_peer_config = Some(peer_config);
-                peer.block_fetch_url = format!("{}://{}", protocol, url.authority());
-
-                peers.index_to_peers.insert(peer_index, peer);
-
-                debug!("Added static peer with index: {} and URL: {}", peer_index, url_str);
-
-                // Uncomment the following line if you want to attempt connection immediately
-                // if let Err(e) = self.io_interface.connect_to_peer(&url_str, peer_index).await {
-                //     error!("Failed to connect to peer {}: {}", url_str, e);
-                // }
-            },
-            Err(e) => {
-                error!("Invalid URL {}: {}", url_str, e);
-            }
-
+        if peers.index_to_peers.contains_key(&peer_index) {
+            return Err(Error::new(ErrorKind::AlreadyExists, "Peer with this index already exists"));
         }
 
-        debug!{"this is the url string {:?}", url_str};
-  
-   }
+        let peer = Peer::new_stun(peer_index, public_key);
+
+        peers.index_to_peers.insert(peer_index, peer);
+        peers.address_to_peers.insert(public_key, peer_index);
+
+        debug!("STUN peer added successfully");
+
+        self.io_interface
+            .send_interface_event(InterfaceEvent::StunPeerConnected(peer_index));
+
+        Ok(())
+    }
+
     pub async fn connect_to_static_peers(&mut self, current_time: Timestamp) {
         trace!("connecting to static peers...");
         let mut peers = self.peer_lock.write().await;

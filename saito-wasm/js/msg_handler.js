@@ -114,5 +114,5 @@ class MsgHandler {
 // } else {
 //     exports = {MsgHandler};
 // }
-module.exports = exports = {MsgHandler};
-// export {MsgHandler};
+// module.exports = exports = {MsgHandler};
+export {MsgHandler};

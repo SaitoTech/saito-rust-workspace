@@ -110,15 +110,46 @@ export default class WebSharedMethods extends CustomSharedMethods {
     }
 
     sendMessage(peerIndex: bigint, buffer: Uint8Array): void {
+        const stunPeer = Saito.getInstance().stunPeers.get(peerIndex);
+        console.log(stunPeer, "stun peer", Saito.getInstance().isStunPeer(peerIndex))
+        if (Saito.getInstance().isStunPeer(peerIndex)) {
+            if (stunPeer && stunPeer.dc) {
+                if (stunPeer.dc.readyState === 'open') {
+                    console.log(`Sending message to STUN peer ${peerIndex} via data channel`);
+                    try {
+                        stunPeer.dc.send(buffer);
+                    } catch (error) {
+                        console.error(`Error sending message to STUN peer ${peerIndex} via data channel:`, error);
+                    }
+                } else {
+                    console.warn(`Data channel for STUN peer ${peerIndex} is not open. Current state: ${stunPeer.dc.readyState}`);
+                    console.log(`Falling back to WebSocket for STUN peer ${peerIndex}`);
+                }
+            } else {
+                console.warn(`STUN peer ${peerIndex} or its data channel is not initialized. Falling back to WebSocket`);
+            }
+            console.log(stunPeer.dc.readyState, 'stun peer ready state');
+            return;
+        }
+
         let socket = Saito.getInstance().getSocket(peerIndex);
         if (socket) {
-            socket.send(buffer);
+            console.log(`Sending message to ${peerIndex} via websocket`);
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(buffer);
+
+            } else {
+                console.error(`WebSocket for peer ${peerIndex} is not open. Current state: ${socket.readyState}`);
+            }
+        } else {
+            console.error(`No WebSocket found for peer ${peerIndex}`);
         }
     }
 
     sendMessageToAll(buffer: Uint8Array, exceptions: Array<bigint>): void {
         // console.debug("sending message to  all with size : " + buffer.byteLength);
         // console.info(' --- Sending to All ---')
+        console.log('sending message to all ', Saito.getInstance().stunPeers);
         Saito.getInstance().sockets.forEach((socket, key) => {
             if (exceptions.includes(key)) {
                 return;

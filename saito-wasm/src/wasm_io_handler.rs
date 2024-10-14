@@ -233,6 +233,9 @@ impl InterfaceIO for WasmIoHandler {
             InterfaceEvent::PeerConnected(index) => {
                 MsgHandler::send_interface_event("peer_connect".to_string(), index, "".to_string());
             }
+            InterfaceEvent::StunPeerConnected(index) => {
+                MsgHandler::send_interface_event("stun_peer_connect".to_string(), index, "".to_string());
+            }
             InterfaceEvent::BlockAddSuccess(hash, block_id) => {
                 MsgHandler::send_block_success(hash.to_hex(), block_id);
             }

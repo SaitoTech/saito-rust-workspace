@@ -1,4 +1,4 @@
-use crate::core::defs::{BlockId, PeerIndex, SaitoHash};
+use crate::core::defs::{BlockId, PeerIndex, SaitoHash, SaitoPublicKey};
 use crate::core::io::network::PeerDisconnectType;
 
 #[derive(Debug)]
@@ -25,8 +25,8 @@ pub enum NetworkEvent {
     PeerConnectionResult {
         result: Result<u64, std::io::Error>,
     },
-    AddStaticPeer {
-        result: Result<String, std::io::Error>,
+    AddStunPeer {
+        result: Result<(u64, SaitoPublicKey), std::io::Error>,
     },
     PeerDisconnected {
         peer_index: u64,

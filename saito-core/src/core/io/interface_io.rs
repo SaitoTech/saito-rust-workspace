@@ -12,6 +12,7 @@ pub enum InterfaceEvent {
     PeerHandshakeComplete(PeerIndex),
     PeerConnectionDropped(PeerIndex, SaitoPublicKey),
     PeerConnected(PeerIndex),
+    StunPeerConnected(PeerIndex),
     BlockAddSuccess(SaitoHash, u64),
     WalletUpdate(),
     NewVersionDetected(PeerIndex, Version),
