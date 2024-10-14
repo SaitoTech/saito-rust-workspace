@@ -263,7 +263,6 @@ export default class Saito {
         };
 
 
-        // Call the Rust side to add the STUN peer
         await Saito.getLibInstance().process_stun_peer(peerIndex, publicKey);
         console.log(`Added STUN peer with index: ${peerIndex} and public key: ${publicKey}`);
         return peerIndex;
