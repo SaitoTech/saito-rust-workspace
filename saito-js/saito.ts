@@ -8,6 +8,7 @@ import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
+ 
 export enum LogLevel {
     Error = 0,
     Warn,
@@ -342,11 +343,6 @@ export default class Saito {
     public async processNewPeer(index: bigint, peer_config: any): Promise<void> {
         return Saito.getLibInstance().process_new_peer(index, peer_config);
     }
-
-    public async add_static_peer(url: string): Promise<void> {
-        return Saito.getLibInstance().add_static_peer(url);
-    }
-
 
 
 

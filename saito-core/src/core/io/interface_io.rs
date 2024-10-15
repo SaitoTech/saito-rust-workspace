@@ -12,10 +12,11 @@ pub enum InterfaceEvent {
     PeerHandshakeComplete(PeerIndex),
     PeerConnectionDropped(PeerIndex, SaitoPublicKey),
     PeerConnected(PeerIndex),
-    StunPeerConnected(PeerIndex),
     BlockAddSuccess(SaitoHash, u64),
     WalletUpdate(),
     NewVersionDetected(PeerIndex, Version),
+    StunPeerConnected(PeerIndex),
+    StunPeerDisconnected(PeerIndex, SaitoPublicKey)
 }
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way

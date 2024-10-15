@@ -319,7 +319,7 @@ impl RoutingThread {
     }
 
     async fn remove_stun_peer(&mut self, peer_index: u64 ) {
-        trace!("handling new stun peer : {:?}", peer_index);
+        trace!("removing stun peer : {:?}", peer_index);
         self.network.remove_stun_peer(peer_index ).await;
     }
 

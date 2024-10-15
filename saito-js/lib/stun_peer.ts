@@ -35,22 +35,18 @@ export class StunManager {
                 dc.removeEventListener('error', onError);
             };
 
-            const onOpen = () => {
+            const onOpen = async () => {
                 cleanup();
                 // Check if this public key already exists
                 let existingPeerIndex = this.findPeerIndexByPublicKey(publicKey);
                 if (existingPeerIndex !== null) {
                     console.log(`Replacing existing STUN peer with index: ${existingPeerIndex} for public key: ${publicKey}`);
-
                     // remove stun peer from local map
                     this.removeStunPeer(existingPeerIndex);
                     // remove stun peer from the network
-                    Saito.getLibInstance().remove_stun_peer(existingPeerIndex);
-
-
+                    console.log(Saito.getLibInstance(), "lib instance")
+                    Saito.getLibInstance().remove_stun_peer(existingPeerIndex)
                 }
-
-
 
                 this.stunPeers.set(peerIndex, { peerConnection, publicKey });
                 console.log(`Data channel opened and STUN peer added with index: ${peerIndex} and public key: ${publicKey}`);
@@ -103,7 +99,6 @@ export class StunManager {
 
         dataChannel.onerror = (error: Event) => {
             console.error('Data channel error for STUN peer', peerIndex, error);
-            // Log detailed error information if available
             if (error instanceof RTCErrorEvent) {
                 console.error('Error name:', error.error.name);
                 console.error('Error message:', error.error.message);

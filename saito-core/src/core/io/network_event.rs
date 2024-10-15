@@ -29,7 +29,7 @@ pub enum NetworkEvent {
         result: Result<(u64, SaitoPublicKey), std::io::Error>,
     },
     RemoveStunPeer {
-        result: Result<(u64), std::io::Error>,
+        result: Result<u64, std::io::Error>,
     },
     PeerDisconnected {
         peer_index: u64,
