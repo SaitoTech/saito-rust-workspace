@@ -25,7 +25,7 @@ use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 245;
+pub const BLOCK_HEADER_SIZE: usize = 285;
 
 //
 // ConsensusValues is an object that is generated that contains all of the 
@@ -69,6 +69,13 @@ pub struct ConsensusValues {
     // total fees -- only atr transactions
     pub total_fees_atr: Currency,
 
+    // smoothed avg fees -- new and atr transactions
+    pub avg_total_fees: Currency ,
+    // smoothed avg fees -- only new transactions
+    pub avg_total_fees_new: Currency ,
+    // smoothed avg fees -- only atr transactions
+    pub avg_total_fees_atr: Currency ,
+
     // total size in bytes
     pub total_bytes_new: u64,
 
@@ -93,13 +100,6 @@ pub struct ConsensusValues {
     pub avg_payout_graveyard: Currency ,
     // smoothed avg atr payout
     pub avg_payout_atr: Currency ,
-
-    // smoothed avg fees paid by new txs
-    pub avg_fees_new: Currency ,
-    // smoothed avg fees paid by atr txs
-    pub avg_fees_atr: Currency ,
-    // smoothed avg fees both new+atr
-    pub avg_fees_total: Currency ,
 
     // smoothed avg fee per byte (last epoch)
     pub avg_fee_per_byte: Currency ,
@@ -145,6 +145,10 @@ impl ConsensusValues {
             total_fees_new: 0,
             total_fees_atr: 0,
 
+	    avg_total_fees: 0,
+	    avg_total_fees_new: 0,
+	    avg_total_fees_atr: 0,
+
 	    total_bytes_new: 0,
 
 	    total_payout_routing: 0,
@@ -159,9 +163,6 @@ impl ConsensusValues {
 	    avg_payout_graveyard: 0,
 	    avg_payout_atr: 0,
 
-	    avg_fees_new: 0,
-	    avg_fees_atr: 0,
-	    avg_fees_total: 0,
 	    avg_fee_per_byte: 0,
 
 	    fee_per_byte: 0,
@@ -195,6 +196,10 @@ impl ConsensusValues {
             total_fees_new: 0,
             total_fees_atr: 0,
 
+	    avg_total_fees: 0,
+	    avg_total_fees_new: 0,
+	    avg_total_fees_atr: 0,
+
 	    total_bytes_new: 0,
 
 	    total_payout_routing: 0,
@@ -209,9 +214,6 @@ impl ConsensusValues {
 	    avg_payout_graveyard: 0,
 	    avg_payout_atr: 0,
 
-	    avg_fees_new: 0,
-	    avg_fees_atr: 0,
-	    avg_fees_total: 0,
 	    avg_fee_per_byte: 0,
 
 	    fee_per_byte: 0,
@@ -271,8 +273,13 @@ pub struct Block {
     pub difficulty: u64,
     pub treasury: Currency,
     pub avg_total_fees: Currency,
+    pub avg_total_fees_new: Currency,
+    pub avg_total_fees_atr: Currency,
+    pub avg_payout_routing: Currency,
+    pub avg_payout_mining: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
+
     pub previous_block_unpaid: Currency,
 
     /// Transactions
@@ -349,6 +356,7 @@ impl Block {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Block {
         Block {
+
             id: 0,
             timestamp: 0,
             previous_block_hash: [0; 32],
@@ -363,6 +371,11 @@ impl Block {
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
             previous_block_unpaid: 0,
+            avg_total_fees_new: 0,
+            avg_total_fees_atr: 0,
+            avg_payout_routing: 0,
+    	    avg_payout_mining: 0,
+
             transactions: vec![],
             pre_hash: [0; 32],
             hash: [0; 32],
@@ -426,6 +439,11 @@ impl Block {
         let mut previous_block_total_fees = 0;
         let mut previous_block_total_fees_new = 0;
         let mut previous_block_total_fees_atr = 0;
+        let mut previous_block_avg_total_fees = 0;
+        let mut previous_block_avg_total_fees_new = 0;
+        let mut previous_block_avg_total_fees_atr = 0;
+        let mut previous_block_avg_payout_routing = 0;
+        let mut previous_block_avg_payout_mining = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
             previous_block_id = previous_block.id;
@@ -437,7 +455,13 @@ impl Block {
             previous_block_total_fees = previous_block.total_fees;
             previous_block_total_fees_new = previous_block.total_fees_new;
             previous_block_total_fees_atr = previous_block.total_fees_atr;
+            previous_block_avg_total_fees = previous_block.avg_total_fees;
+            previous_block_avg_total_fees_new = previous_block.avg_total_fees_new;
+            previous_block_avg_total_fees_atr = previous_block.avg_total_fees_atr;
+            previous_block_avg_payout_routing = previous_block.avg_payout_routing;
+            previous_block_avg_payout_mining = previous_block.avg_payout_mining;
         }
+
 
         //
         // create block
@@ -560,9 +584,29 @@ impl Block {
         block.difficulty = cv.difficulty;
 
         //
-        // avg fee
+        // avg total fees
         //
-        block.avg_total_fees = cv.avg_fees_total;
+        block.avg_total_fees = cv.avg_total_fees;
+
+        //
+        // avg total fees new
+        //
+        block.avg_total_fees_new = cv.avg_total_fees_new;
+
+        //
+        // avg total fees atr
+        //
+        block.avg_total_fees_atr = cv.avg_total_fees_atr;
+
+        //
+        // avg payout routing
+        //
+        block.avg_payout_routing = cv.avg_payout_routing;
+
+        //
+        // avg payout mining
+        //
+        block.avg_payout_mining = cv.avg_payout_mining;
 
         //
         // fee per byte
@@ -602,9 +646,7 @@ impl Block {
         block.sign(private_key);
 
         //
-        // TODO -- is this appropriate to run
-        //
-        // finally we run generate()
+        // finally run generate()
         //
         block.generate();
 
@@ -633,6 +675,17 @@ impl Block {
     /// [treasury - 8 bytes - u64]
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
+    /// [avg_total_fees - 8 bytes - u64]
+    /// [avg_fee_per_byte - 8 bytes - u64]
+    /// [avg_nolan_rebroadcast_per_block - 8 bytes - u64]
+    /// [previous_block_unpaid - 8 bytes - u64]
+
+    /// [avg_total_fees - 8 bytes - u64]
+    /// [avg_total_fees_new - 8 bytes - u64]
+    /// [avg_total_fees_atr - 8 bytes - u64]
+    /// [avg_payout_routing - 8 bytes - u64]
+    /// [avg_payout_mining - 8 bytes - u64]
+
     /// [transaction][transaction][transaction]...
     pub fn deserialize_from_net(bytes: &[u8]) -> Result<Block, Error> {
         if bytes.len() < BLOCK_HEADER_SIZE {
@@ -681,6 +734,16 @@ impl Block {
             Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
         let previous_block_unpaid: Currency =
             Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
+        let avg_total_fees: Currency =
+            Currency::from_be_bytes(bytes[245..253].try_into().unwrap());
+        let avg_total_fees_new: Currency =
+            Currency::from_be_bytes(bytes[253..261].try_into().unwrap());
+        let avg_total_fees_atr: Currency =
+            Currency::from_be_bytes(bytes[261..269].try_into().unwrap());
+        let avg_payout_routing: Currency =
+            Currency::from_be_bytes(bytes[269..277].try_into().unwrap());
+        let avg_payout_mining: Currency =
+            Currency::from_be_bytes(bytes[277..285].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -751,6 +814,11 @@ impl Block {
         block.avg_fee_per_byte = avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = avg_nolan_rebroadcast_per_block;
         block.previous_block_unpaid = previous_block_unpaid;
+        block.avg_total_fees = avg_total_fees;
+        block.avg_total_fees_new = avg_total_fees_new;
+        block.avg_total_fees_atr = avg_total_fees_atr;
+        block.avg_payout_routing = avg_payout_routing;
+        block.avg_payout_mining = avg_payout_mining;
         block.transactions = transactions.to_vec();
 
         // trace!("block.deserialize tx length = {:?}", transactions_len);
@@ -857,6 +925,7 @@ impl Block {
     // cumulative block fees they contain.
     //
     pub fn generate(&mut self) -> bool {
+
         let creator_public_key = &self.creator;
 
         self.total_rebroadcast_nolan = 0;
@@ -972,7 +1041,9 @@ impl Block {
         self.golden_ticket_index = golden_ticket_index;
         self.issuance_transaction_index = issuance_transaction_index;
 
+	//
         // update block with total fees
+	//
         self.total_fees = cumulative_fees;
         self.total_work = total_work;
 
@@ -1017,21 +1088,23 @@ impl Block {
         storage: &Storage,
     ) -> ConsensusValues {
 
-
-        let mut cv = ConsensusValues::new();
-
-
         //
         // we will reference these variables
 	//
+        let mut cv = ConsensusValues::new();
 	let mut previous_block_treasury: Currency = 0;
         let mut previous_block_avg_nolan_rebroadcast_per_block: Currency = 0;
 	let mut previous_block_avg_fee_per_byte: Currency = 0;
+	let mut previous_block_avg_total_fees: Currency = 0;
+	let mut previous_block_avg_total_fees_new: Currency = 0;
+	let mut previous_block_avg_total_fees_atr: Currency = 0;
+        let mut previous_block_avg_payout_routing: Currency = 0;
+        let mut previous_block_avg_payout_mining: Currency = 0;
+
 	let mut total_number_of_non_fee_transactions = 0;
 
-
         //
-        // total fees and tx sizes and indexes
+        // tx fees and sizes and indices
         //
         for (index, transaction) in self.transactions.iter().enumerate() {
 
@@ -1091,6 +1164,11 @@ impl Block {
 	    previous_block_treasury = previous_block.treasury;
             previous_block_avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
             previous_block_avg_fee_per_byte = previous_block.avg_fee_per_byte;
+            previous_block_avg_total_fees = previous_block.avg_total_fees;
+            previous_block_avg_total_fees_new = previous_block.avg_total_fees_new;
+            previous_block_avg_total_fees_atr = previous_block.avg_total_fees_atr;
+            previous_block_avg_payout_routing = previous_block.avg_payout_routing;
+            previous_block_avg_payout_mining = previous_block.avg_payout_mining;
 
             //
             // burn fee
@@ -1309,30 +1387,33 @@ impl Block {
 
 
 	//
-	// update total fees
+	// total fees
 	//
         cv.total_fees = cv.total_fees_new + cv.total_fees_atr;
 
 	//
-	// update averages
+	// fee-per-byte
 	//
-        if cv.total_bytes_new > 0 {
-            cv.fee_per_byte = cv.total_fees_new / cv.total_bytes_new as Currency;
-        } else {
-            cv.fee_per_byte = 0;
-        }
+        if cv.total_bytes_new > 0 { cv.fee_per_byte = cv.total_fees_new / cv.total_bytes_new as Currency; }
 
-
-	// avg_fees_new
-	// avg_fees_atr
-	// avg_fees_total
 	//
-        //let adjustment = (previous_block.avg_total_fees as i128 - cv.total_fees as i128)
-        //        / GENESIS_PERIOD as i128;
-        //cv.avg_fees_total = (cv.avg_fees_total as i128 - adjustment) as Currency;
+	// avg_total_fees
 	//
+        let adjustment = (previous_block_avg_total_fees as i128 - cv.total_fees as i128) / GENESIS_PERIOD as i128;
+        cv.avg_total_fees = (previous_block_avg_total_fees as i128 - adjustment) as Currency;
 
+	//
+	// avg_total_fees_new
+	//
+        let adjustment = (previous_block_avg_total_fees_new as i128 - cv.total_fees_new as i128) / GENESIS_PERIOD as i128;
+        cv.avg_total_fees_new = (previous_block_avg_total_fees_new as i128 - adjustment) as Currency;
 
+	//
+	// avg_total_fees_atr
+	//
+        let adjustment = (previous_block_avg_total_fees_atr as i128 - cv.total_fees_atr as i128) / GENESIS_PERIOD as i128;
+        cv.avg_total_fees_atr = (previous_block_avg_total_fees_atr as i128 - adjustment) as Currency;
+	
 	//
 	// average nolan rebroadcast per block
 	//
@@ -1345,8 +1426,6 @@ impl Block {
             / GENESIS_PERIOD as i128;
         cv.avg_nolan_rebroadcast_per_block = (previous_block_avg_nolan_rebroadcast_per_block as i128 - adjustment) as Currency;
       
-
-
         //
         // calculate payouts
         //
@@ -1509,19 +1588,17 @@ impl Block {
                 slip_index += 1;
             }
 
-            // HACK
-            debug!("miner payout: {:?}", miner_payout);
-            debug!("router1 payout: {:?}", router1_payout);
-            debug!("router2 payout: {:?}", router2_payout);
-            debug!("miner pkey: {:?}", miner_publickey.to_base58());
-            debug!("router1 pkey: {:?}", router1_publickey.to_base58());
-            debug!("router2 pkey: {:?}", router2_publickey.to_base58());
+            //debug!("miner payout: {:?}", miner_payout);
+            //debug!("router1 payout: {:?}", router1_payout);
+            //debug!("router2 payout: {:?}", router2_payout);
+            //debug!("miner pkey: {:?}", miner_publickey.to_base58());
+            //debug!("router1 pkey: {:?}", router1_publickey.to_base58());
+            //debug!("router2 pkey: {:?}", router2_publickey.to_base58());
 
 	    cv.total_payout_mining = miner_payout;
 	    cv.total_payout_routing = router1_payout + router2_payout;
 
             cv.fee_transaction = Some(transaction);
-
 
         } else {
             //
@@ -1599,12 +1676,16 @@ impl Block {
             self.treasury.to_be_bytes().as_slice(),
             self.burnfee.to_be_bytes().as_slice(),
             self.difficulty.to_be_bytes().as_slice(),
-            self.avg_total_fees.to_be_bytes().as_slice(),
             self.avg_fee_per_byte.to_be_bytes().as_slice(),
             self.avg_nolan_rebroadcast_per_block
                 .to_be_bytes()
                 .as_slice(),
             self.previous_block_unpaid.to_be_bytes().as_slice(),
+            self.avg_total_fees.to_be_bytes().as_slice(),
+            self.avg_total_fees_new.to_be_bytes().as_slice(),
+            self.avg_total_fees_atr.to_be_bytes().as_slice(),
+            self.avg_payout_routing.to_be_bytes().as_slice(),
+            self.avg_payout_mining.to_be_bytes().as_slice(),
         ]
         .concat()
     }
@@ -1622,6 +1703,14 @@ impl Block {
     /// [burnfee - 8 bytes - u64]
     /// [difficulty - 8 bytes - u64]
     /// [avg_total_fees - 8 bytes - u64]
+    /// [avg_fee_per_byte - 8 bytes - u64]
+    /// [avg_nolan_rebroadcast_per_block - 8 bytes - u64]
+    /// [previous_block_unpaid - 8 bytes - u64]
+    /// [avg_total_fees - 8 bytes - u64]		// note the duplicate here, is because added in group
+    /// [avg_total_fees_new - 8 bytes - u64]
+    /// [avg_total_fees_atr - 8 bytes - u64]
+    /// [avg_payout_routing - 8 bytes - u64]
+    /// [avg_payout_mining - 8 bytes - u64]
     /// [transaction][transaction][transaction]...
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
         let mut tx_len_buffer: Vec<u8> = vec![];
@@ -1658,6 +1747,11 @@ impl Block {
                 .to_be_bytes()
                 .as_slice(),
             self.previous_block_unpaid.to_be_bytes().as_slice(),
+            self.avg_total_fees.to_be_bytes().as_slice(),
+            self.avg_total_fees_new.to_be_bytes().as_slice(),
+            self.avg_total_fees_atr.to_be_bytes().as_slice(),
+            self.avg_payout_routing.to_be_bytes().as_slice(),
+            self.avg_payout_mining.to_be_bytes().as_slice(),
             tx_buf.as_slice(),
         ]
         .concat();
@@ -1738,6 +1832,7 @@ impl Block {
 
             // in-memory swap copying txs in block from mempool
             mem::swap(&mut new_block.transactions, &mut self.transactions);
+
             // transactions need hashes
             self.generate();
             self.block_type = BlockType::Full;
@@ -1823,8 +1918,12 @@ impl Block {
         block.signature = self.signature;
         block.avg_total_fees = self.avg_total_fees;
         block.avg_fee_per_byte = self.avg_fee_per_byte;
-        block.previous_block_unpaid = self.previous_block_unpaid;
         block.avg_nolan_rebroadcast_per_block = self.avg_nolan_rebroadcast_per_block;
+        block.previous_block_unpaid = self.previous_block_unpaid;
+        block.avg_total_fees_new = self.avg_total_fees_new;
+        block.avg_total_fees_atr = self.avg_total_fees_atr;
+        block.avg_payout_routing = self.avg_payout_routing;
+        block.avg_payout_mining = self.avg_payout_mining;
         block.hash = self.hash;
 
         block.merkle_root = self.generate_merkle_root(true, true);
@@ -1882,10 +1981,10 @@ impl Block {
         //
         // consensus values -> average number of fees in the block
         //
-        if cv.avg_fees_total != self.avg_total_fees {
+        if cv.avg_total_fees != self.avg_total_fees {
             error!(
                 "block is misreporting its average income. current : {:?} expected : {:?}",
-                self.avg_total_fees, cv.avg_fees_total
+                self.avg_total_fees, cv.avg_total_fees
             );
             return false;
         }
@@ -2028,10 +2127,13 @@ impl Block {
             if let Some(gt_index) = cv.gt_index {
                 let golden_ticket: GoldenTicket =
                     GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
+
+		//
                 // we already have a golden ticket, but create a new one pulling the
                 // target hash from our previous block to ensure that this ticket is
                 // actually valid in the context of our blockchain, and not just
                 // internally consistent in the blockchain of the sender.
+		//
                 let gt = GoldenTicket::create(
                     previous_block.hash,
                     golden_ticket.random,
@@ -2783,10 +2885,6 @@ mod tests {
 
         println!("cv : {:?} \n", cv);
 
-        // TODO : check the values in the below asserts
-        // assert_eq!(cv.avg_fees_total, 3290);
-        // assert_eq!(cv.total_fees, 5100);
-        // assert_eq!(cv.burnfee, 1562500);
         assert_eq!(cv.rebroadcasts.len(), 0);
         assert_eq!(cv.avg_nolan_rebroadcast_per_block, 0);
 
@@ -2815,7 +2913,7 @@ mod tests {
         println!("cv2 : {:?}", cv);
 
         // TODO : check the values in the below asserts
-        // assert_eq!(cv.avg_fees_total, 3471);
+        // assert_eq!(cv.avg_total_fees, 3471);
         // assert_eq!(cv.total_fees, 5100);
         // assert_eq!(cv.burnfee, 1104854);
         assert_eq!(cv.rebroadcasts.len(), 1);
