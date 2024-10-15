@@ -16,7 +16,7 @@ pub enum InterfaceEvent {
     WalletUpdate(),
     NewVersionDetected(PeerIndex, Version),
     StunPeerConnected(PeerIndex),
-    StunPeerDisconnected(PeerIndex, SaitoPublicKey)
+    StunPeerDisconnected(PeerIndex, SaitoPublicKey),
 }
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way

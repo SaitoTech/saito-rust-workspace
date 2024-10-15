@@ -311,16 +311,17 @@ impl RoutingThread {
         self.network.handle_new_peer(peer_index).await;
     }
 
-    async fn handle_new_stun_peer(&mut self, peer_index: u64, public_key: SaitoPublicKey ) {
+    async fn handle_new_stun_peer(&mut self, peer_index: u64, public_key: SaitoPublicKey) {
         trace!("handling new stun peer : {:?}", peer_index);
-        self.network.handle_new_stun_peer(peer_index, public_key ).await;
+        self.network
+            .handle_new_stun_peer(peer_index, public_key)
+            .await;
     }
 
-    async fn remove_stun_peer(&mut self, peer_index: u64 ) {
+    async fn remove_stun_peer(&mut self, peer_index: u64) {
         trace!("removing stun peer : {:?}", peer_index);
-        self.network.remove_stun_peer(peer_index ).await;
+        self.network.remove_stun_peer(peer_index).await;
     }
-
 
     async fn handle_peer_disconnect(
         &mut self,
@@ -577,14 +578,12 @@ impl RoutingThread {
 #[async_trait]
 impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
-      
         match event {
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
                 {
                     let mut peers = self.network.peer_lock.write().await;
                     let peer = peers.find_peer_by_index_mut(peer_index)?;
 
-                
                     let time: u64 = self.timer.get_timestamp_in_ms();
                     peer.message_limiter.increase();
                     if peer.has_message_limit_exceeded(time) {
@@ -628,7 +627,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             }
             NetworkEvent::RemoveStunPeer { result } => {
                 if result.is_ok() {
-                    let peer_index= result.unwrap();
+                    let peer_index = result.unwrap();
                     self.remove_stun_peer(peer_index).await;
                     return Some(());
                 }
