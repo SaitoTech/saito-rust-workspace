@@ -8,7 +8,7 @@ import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
- 
+
 export enum LogLevel {
     Error = 0,
     Warn,
@@ -18,11 +18,11 @@ export enum LogLevel {
 }
 
 export default class Saito {
-    
+
     private static instance: Saito;
     private static libInstance: any;
     sockets: Map<bigint, any> = new Map<bigint, any>();
-
+    private stunPeers: Map<bigint, { peerConnection: RTCPeerConnection, publicKey: string }> = new Map();
     stunManager: StunPeer;
     factory = new Factory();
     promises = new Map<number, any>();
@@ -188,8 +188,8 @@ export default class Saito {
 
     constructor(factory: Factory) {
         this.factory = factory;
-        this.stunManager  = new StunPeer(this);
-        
+        this.stunManager = new StunPeer(this);
+
     }
 
     public static getInstance(): Saito {
@@ -217,86 +217,10 @@ export default class Saito {
         console.log("adding socket : " + peer_index + ". total sockets : " + this.sockets.size);
     }
 
-    // public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection): Promise<bigint> {
-    //     const peerIndex = await Saito.getLibInstance().get_next_peer_index();
-    //     this.stunPeers.set(peerIndex, peerConnection);
-
-    //     const dataChannelOptions: RTCDataChannelInit = {
-    //         ordered: true,
-    //         protocol: 'saito',
-    //     };
-    //     const dc = peerConnection.createDataChannel('core-channel', dataChannelOptions);
-
-
-    //     //@ts-ignore
-    //     peerConnection.dc = dc;
-    //     peerConnection.ondatachannel = (event) => {
-    //         const dataChannel = event.channel;
-    //         dataChannel.onmessage = (messageEvent) => {
-    //             // Handle incoming messages
-    //             if (messageEvent.data instanceof ArrayBuffer) {
-    //                 const buffer = new Uint8Array(messageEvent.data);
-    //                 this.processMsgBufferFromPeer(buffer, peerIndex);
-    //             } else {
-    //                 console.warn('Received unexpected data type from STUN peer', peerIndex, messageEvent);
-    //             }
-    //         };
-
-    //         dataChannel.onopen = () => {
-    //             console.log('Data channel is open for STUN peer', peerIndex);
-    //         };
-
-    //         dataChannel.onerror = (error: any) => {
-    //             console.error('Data channel error for STUN peer', peerIndex, error);
-
-    //             if (error.error) {
-    //                 console.error('Error name:', error.error.name);
-    //                 console.error('Error message:', error.error.message);
-    //             }
-
-    //             // Check the data channel state
-    //             console.log('Data channel state after error:', dataChannel.readyState);
-    //             // Attempt to recover or reconnect
-    //             if (dataChannel.readyState === 'closed') {
-    //                 console.log('Attempting to reopen data channel for STUN peer', peerIndex);
-    //                 // this.reopenDataChannel(peerIndex, peerConnection);
-    //             }
-    //             dataChannel.onclose = () => {
-    //                 console.log('Data channel closed for STUN peer', peerIndex);
-    //                 this.removeStunPeer(peerIndex);
-    //             };
-    //         }
-
-
-    //     };
-
-
-    //     await Saito.getLibInstance().process_stun_peer(peerIndex, publicKey);
-    //     console.log(`Added STUN peer with index: ${peerIndex} and public key: ${publicKey}`);
-    //     return peerIndex;
-
-
-    // }
-
-    // private removeStunPeer(peerIndex: bigint) {
-    //     if (this.stunPeers.has(peerIndex)) {
-    //         this.stunPeers.delete(peerIndex);
-    //         console.log(`Removed STUN peer with index: ${peerIndex}`);
-    //     } else {
-    //         console.warn(`Attempt to remove non-existent STUN peer with index: ${peerIndex}`);
-    //     }
-    // }
-
-
-
 
     public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection) {
         await this.stunManager.addStunPeer(publicKey, peerConnection);
     }
-
-  
-
-
 
 
 
