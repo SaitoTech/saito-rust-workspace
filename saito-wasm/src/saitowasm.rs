@@ -150,6 +150,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             txs_for_mempool: vec![],
             stat_sender: sender_to_stat.clone(),
             config_lock: configuration.clone(),
+            produce_blocks_by_timer: true,
         },
         mining_thread: MiningThread {
             wallet_lock: context.wallet_lock.clone(),
