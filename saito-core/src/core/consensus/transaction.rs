@@ -442,6 +442,10 @@ impl Transaction {
         self.transaction_type == TransactionType::ATR
     }
 
+    pub fn is_normal_transaction(&self) -> bool {
+        self.transaction_type == TransactionType::Normal
+    }
+
     pub fn is_golden_ticket(&self) -> bool {
         self.transaction_type == TransactionType::GoldenTicket
     }
