@@ -115,9 +115,6 @@ export default class WebSharedMethods extends CustomSharedMethods {
             if (stunPeer) {
                 //@ts-ignore
                 const { peerConnection, publicKey } = stunPeer; 
-
-                console.log("peerConnection ", peerConnection );
-
                 //@ts-ignore
                 const dc = peerConnection.dc;
                 if (dc) {
