@@ -116,8 +116,10 @@ export default class WebSharedMethods extends CustomSharedMethods {
                 //@ts-ignore
                 const { peerConnection, publicKey } = stunPeer; 
 
+                console.log("peerConnection ", peerConnection );
+
                 //@ts-ignore
-                let {dc} = peerConnection;
+                const dc = peerConnection.dc;
                 if (dc) {
                     if (dc.readyState === 'open') {
                         console.log(`Sending message to STUN peer ${peerIndex} via data channel`);

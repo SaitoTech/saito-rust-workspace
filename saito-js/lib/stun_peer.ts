@@ -90,8 +90,9 @@ export class StunManager {
     private setupDataChannelListeners(dataChannel: RTCDataChannel, peerIndex: bigint) {
         dataChannel.onmessage = (messageEvent) => {
             if (messageEvent.data instanceof ArrayBuffer) {
+                console.log('received message from peer', peerIndex)
                 const buffer = new Uint8Array(messageEvent.data);
-                this.saitoInstance.processMsgBufferFromPeer(buffer, peerIndex);
+                Saito.getInstance().processMsgBufferFromPeer(buffer, peerIndex);
             } else {
                 console.warn('Received unexpected data type from STUN peer', peerIndex, messageEvent);
             }

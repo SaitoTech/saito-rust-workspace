@@ -290,8 +290,8 @@ export default class Saito {
 
 
 
-    public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection): Promise<bigint> {
-        return this.stunManager.addStunPeer(publicKey, peerConnection);
+    public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection) {
+        await this.stunManager.addStunPeer(publicKey, peerConnection);
     }
 
   

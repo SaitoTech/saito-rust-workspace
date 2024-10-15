@@ -61,6 +61,7 @@ class Blog extends ModTemplate {
     async onPeerHandshakeComplete(app) {
     }
 
+ 
     async testLoadBlogTransactions() {
         // for testing
         let peer = this.peers[0]
