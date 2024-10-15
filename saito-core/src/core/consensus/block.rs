@@ -468,38 +468,24 @@ impl Block {
         //
         let mut block = Block::new();
 
+	//
+	// fill in default values
+	//
         block.id = previous_block_id + 1;
         block.previous_block_hash = previous_block_hash;
         block.timestamp = current_timestamp;
         block.difficulty = previous_block_difficulty;
+        block.burnfee = previous_block_burnfee;
         block.creator = *public_key;
         block.previous_block_unpaid = previous_block_total_fees;
+        block.treasury = previous_block_treasury;
         block.graveyard = previous_block_graveyard;
 
-        //
-        // burnfee
-        //
-        block.burnfee = BurnFee::calculate_burnfee_for_block(
-            previous_block_burnfee,
-            current_timestamp,
-            previous_block_timestamp,
-        );
 
-        //////////////////////
-        // ADD TRANSACTIONS //
-        //////////////////////
         //
-        // - add golden ticket
-        // - add normal transactions
-        // - generate consensus values (for ATR txs)
-        // - add ATR transactions
-        // - add FEE transaction
-        // - calculate slips spent this block
-        //
-        // add golden ticket
+        // golden ticket
         //
         if golden_ticket.is_some() {
-            debug!("golden ticket found. adding to block.");
             block.transactions.push(golden_ticket.unwrap());
             block.previous_block_unpaid = 0;
         }
@@ -507,7 +493,6 @@ impl Block {
         //
         // normal transactions
         //
-        debug!("adding {:?} transactions to the block", transactions.len());
         block.transactions.reserve(transactions.len());
         let iter = transactions.drain().map(|(_, tx)| tx);
         block.transactions.extend(iter);
@@ -516,68 +501,14 @@ impl Block {
         //
         // consensus values
         //
-        // we must generate our consensus values object here in order to be
-        // able to add the ATR transactions and calculate our fee values given
-        // their presence etc.
-        //
         let mut cv: ConsensusValues = block.generate_consensus_values(blockchain, storage).await;
         block.cv = cv.clone();
 
-        //
-        // ATR transactions
-        //
-        let rlen = cv.rebroadcasts.len();
 	//
-        // TODO - more efficient solution that iterating through the entire transaction set here?
+	// burn fee
 	//
-        let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
-            .iter_mut()
-            .enumerate()
-            .all(|(index, tx)| tx.generate(public_key, index as u64, block.id));
-        if rlen > 0 {
-            block.transactions.append(&mut cv.rebroadcasts);
-        }
+	block.burnfee = cv.burnfee;
 
-        //
-        // fee transaction
-        //
-        if cv.fee_transaction.is_some() {
-            debug!("adding fee transaction");
-            let mut fee_tx = cv.fee_transaction.unwrap();
-            let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
-            fee_tx.hash_for_signature = Some(hash_for_signature);
-            fee_tx.sign(private_key);
-            block.add_transaction(fee_tx);
-        }
-
-        //
-        // slips_spent_this_block
-        //
-        // we keep a record of how many times input slips are spent this
-        // block to ensure there are no duplicates. we avoid adding the
-        // FEE transaction as it has no inputs.
-        //
-        if !block.created_hashmap_of_slips_spent_this_block {
-            debug!("creating hashmap of slips spent this block...");
-            for transaction in &block.transactions {
-                if transaction.transaction_type != TransactionType::Fee {
-                    for input in transaction.from.iter() {
-                        block
-                            .slips_spent_this_block
-                            .entry(input.get_utxoset_key())
-                            .and_modify(|e| *e += 1)
-                            .or_insert(1);
-                    }
-                }
-                block.created_hashmap_of_slips_spent_this_block = true;
-            }
-        }
-        block.created_hashmap_of_slips_spent_this_block = true;
-
-        //////////////////////
-        // CONSENSUS VALUES //
-        //////////////////////
-        //
         //
         // difficulty
         //
@@ -621,13 +552,67 @@ impl Block {
         //
         // treasury
         //
-        block.treasury = previous_block_treasury + cv.total_payout_treasury
-            - cv.total_payout_atr;
+        block.treasury = previous_block_treasury + cv.total_payout_treasury - cv.total_payout_atr;
 
         //
         // graveyard
         //
         block.graveyard = previous_block_graveyard + cv.total_payout_graveyard;
+
+        //
+        // ATR transactions
+        //
+        let rlen = cv.rebroadcasts.len();
+
+	//
+        // TODO - can we remove this section and skip right ahead to appending the atr txs? we run
+	// generate() down below at the end of this function, so why are we generating the hash and 
+	// the merkle-root here?
+	//
+	// and why do we run it below AFTER we sign the block? if we can eliminate the need for this
+	// loop through the transaction set and the redundant creation of the tx hashes and the 
+	// block merkle-root that would be an improvement to the efficiency of block creation.
+	//
+        let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
+            .iter_mut()
+            .enumerate()
+            .all(|(index, tx)| tx.generate(public_key, index as u64, block.id));
+	
+	//
+	// add ATR transactions
+	//
+        if rlen > 0 { block.transactions.append(&mut cv.rebroadcasts); }
+
+        //
+        // fee transaction
+        //
+        if cv.fee_transaction.is_some() {
+            let mut fee_tx = cv.fee_transaction.unwrap();
+            let hash_for_signature: SaitoHash = hash(&fee_tx.serialize_for_signature());
+            fee_tx.hash_for_signature = Some(hash_for_signature);
+            fee_tx.sign(private_key);
+            block.add_transaction(fee_tx);
+        }
+
+        //
+        // create hashmap of slips_spent_this_block (used to avoid doublespends)
+        //
+        if !block.created_hashmap_of_slips_spent_this_block {
+            debug!("creating hashmap of slips spent this block...");
+            for transaction in &block.transactions {
+                if transaction.transaction_type != TransactionType::Fee {
+                    for input in transaction.from.iter() {
+                        block
+                            .slips_spent_this_block
+                            .entry(input.get_utxoset_key())
+                            .and_modify(|e| *e += 1)
+                            .or_insert(1);
+                    }
+                }
+                block.created_hashmap_of_slips_spent_this_block = true;
+            }
+        }
+        block.created_hashmap_of_slips_spent_this_block = true;
 
         //
         // generate merkle root
@@ -639,10 +624,11 @@ impl Block {
         // signed by the block creator to generate the signature. the signature is then
         // part of the block data that is used to generate the final block hash.
         //
-        // now that we have updated all of our consensus variables, we generate the pre-
-        // hash and then sign the block with our private key.
-        //
         block.generate_pre_hash();
+
+	//
+	//
+	//
         block.sign(private_key);
 
         //
@@ -1132,7 +1118,7 @@ impl Block {
                 total_number_of_non_fee_transactions += 1;
             }
 	
-            if transaction.is_golden_ticket() || transaction.is_normal_transaction() {
+            if (transaction.is_golden_ticket() || transaction.is_normal_transaction()) && !transaction.is_atr_transaction() {
 		cv.total_bytes_new += transaction.get_serialized_size() as u64;
                 cv.total_fees_new += transaction.total_fees;
             }

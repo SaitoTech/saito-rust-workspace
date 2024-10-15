@@ -463,7 +463,9 @@ impl Transaction {
     // tx.hash -> needed to generate merkle root
     // tx.fees -> needed to calculate payouts
     // tx.work -> needed to confirm adequate routing work
+    //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
+
         // ensure hash exists for signing
         self.generate_hash_for_signature();
 
