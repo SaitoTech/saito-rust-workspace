@@ -189,7 +189,6 @@ async fn run_consensus_event_processor(
         generate_genesis_block,
         sender_to_router: sender_to_routing.clone(),
         sender_to_miner: sender_to_miner.clone(),
-        // sender_global: global_sender.clone(),
         timer: timer.clone(),
         network: Network::new(
             Box::new(RustIOHandler::new(
@@ -210,6 +209,7 @@ async fn run_consensus_event_processor(
         txs_for_mempool: vec![],
         stat_sender: sender_to_stat.clone(),
         config_lock: context.config_lock.clone(),
+        produce_blocks_by_timer: true,
     };
 
     debug!("running mempool thread");

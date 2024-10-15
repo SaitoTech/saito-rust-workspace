@@ -84,6 +84,7 @@ pub struct ConsensusThread {
     pub txs_for_mempool: Vec<Transaction>,
     pub stat_sender: Sender<String>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
+    pub produce_blocks_by_timer: bool,
 }
 
 impl ConsensusThread {
@@ -121,6 +122,141 @@ impl ConsensusThread {
             info!("added issuance init tx for : {:?}", tx.signature.to_hex());
         }
     }
+
+    pub async fn produce_block(&mut self, timestamp: Timestamp) {
+        let configs = self.network.config_lock.read().await;
+
+        let mut blockchain = self.blockchain_lock.write().await;
+        let mut mempool = self.mempool_lock.write().await;
+
+        if !self.txs_for_mempool.is_empty() {
+            for tx in self.txs_for_mempool.iter() {
+                if let TransactionType::GoldenTicket = tx.transaction_type {
+                    unreachable!("golden tickets shouldn't be here");
+                } else {
+                    mempool.add_transaction(tx.clone()).await;
+                }
+            }
+        }
+
+        self.block_producing_timer = 0;
+
+        let mut gt_result = None;
+        let mut gt_propagated = false;
+        {
+            let result: Option<&(Transaction, bool)> = mempool
+                .golden_tickets
+                .get(&blockchain.get_latest_block_hash());
+            if let Some((tx, propagated)) = result {
+                gt_result = Some(tx.clone());
+                gt_propagated = *propagated;
+            }
+        }
+
+        let mut block = None;
+        if !configs.is_browser() && !configs.is_spv_mode() && !blockchain.blocks.is_empty() {
+            block = mempool
+                .bundle_block(
+                    blockchain.deref_mut(),
+                    timestamp,
+                    gt_result.clone(),
+                    configs.deref(),
+                    &self.storage,
+                )
+                .await;
+        }
+        if let Some(block) = block {
+            debug!(
+                "adding bundled block : {:?} with id : {:?} to mempool",
+                block.hash.to_hex(),
+                block.id
+            );
+            trace!(
+                "mempool size after bundling : {:?}",
+                mempool.transactions.len()
+            );
+
+            mempool.add_block(block);
+            self.txs_for_mempool.clear();
+            // dropping the lock here since blockchain needs the write lock to add blocks
+            drop(mempool);
+            self.stats.blocks_created.increment();
+            let _updated = blockchain
+                .add_blocks_from_mempool(
+                    self.mempool_lock.clone(),
+                    Some(&self.network),
+                    &mut self.storage,
+                    Some(self.sender_to_miner.clone()),
+                    Some(self.sender_to_router.clone()),
+                    configs.deref(),
+                )
+                .await;
+
+            debug!("blocks added to blockchain");
+        } else {
+            // route messages to peers
+            for tx in self.txs_for_mempool.drain(..) {
+                self.network.propagate_transaction(&tx).await;
+            }
+            // route golden tickets to peers
+            if gt_result.is_some() && !gt_propagated {
+                self.network
+                    .propagate_transaction(gt_result.as_ref().unwrap())
+                    .await;
+                debug!(
+                    "propagating gt : {:?} to peers",
+                    hash(&gt_result.unwrap().serialize_for_net()).to_hex()
+                );
+                let (_, propagated) = mempool
+                    .golden_tickets
+                    .get_mut(&blockchain.get_latest_block_hash())
+                    .unwrap();
+                *propagated = true;
+            }
+        }
+    }
+
+    async fn produce_genesis_block(&mut self, timestamp: Timestamp) {
+        Self::generate_issuance_tx(
+            self,
+            self.mempool_lock.clone(),
+            self.blockchain_lock.clone(),
+        )
+        .await;
+
+        let configs = self.config_lock.read().await;
+        let mut blockchain = self.blockchain_lock.write().await;
+        if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
+            let mut mempool = self.mempool_lock.write().await;
+
+            let block = mempool
+                .bundle_genesis_block(&mut blockchain, timestamp, configs.deref(), &self.storage)
+                .await;
+
+            let _res = blockchain
+                .add_block(block, &mut self.storage, &mut mempool, configs.deref())
+                .await;
+        }
+
+        self.generate_genesis_block = false;
+    }
+
+    pub async fn add_gt_to_mempool(&mut self, golden_ticket: GoldenTicket) {
+        let mut mempool = self.mempool_lock.write().await;
+        let public_key;
+        let private_key;
+        {
+            let wallet = self.wallet_lock.read().await;
+
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
+        }
+        let transaction =
+            Wallet::create_golden_ticket_transaction(golden_ticket, &public_key, &private_key)
+                .await;
+        self.stats.received_gts.increment();
+        mempool.add_golden_ticket(transaction).await;
+    }
 }
 
 #[async_trait]
@@ -135,133 +271,16 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         let duration_value = duration.as_millis() as u64;
 
         if self.generate_genesis_block {
-            Self::generate_issuance_tx(
-                self,
-                self.mempool_lock.clone(),
-                self.blockchain_lock.clone(),
-            )
-            .await;
-
-            {
-                let configs = self.config_lock.read().await;
-                let mut blockchain = self.blockchain_lock.write().await;
-                if blockchain.blocks.is_empty() && blockchain.genesis_block_id == 0 {
-                    let mut mempool = self.mempool_lock.write().await;
-
-                    let block = mempool
-                        .bundle_genesis_block(
-                            &mut blockchain,
-                            timestamp,
-                            configs.deref(),
-                            &self.storage,
-                        )
-                        .await;
-
-                    let _res = blockchain
-                        .add_block(block, &mut self.storage, &mut mempool, configs.deref())
-                        .await;
-                }
-
-                self.generate_genesis_block = false;
-                return Some(());
-            }
+            self.produce_genesis_block(timestamp).await;
+            return Some(());
         }
 
         // generate blocks
         self.block_producing_timer += duration_value;
-        if self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
-            let configs = self.network.config_lock.read().await;
+        if self.produce_blocks_by_timer && self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
+            self.produce_block(timestamp).await;
 
-            let mut blockchain = self.blockchain_lock.write().await;
-            let mut mempool = self.mempool_lock.write().await;
-
-            if !self.txs_for_mempool.is_empty() {
-                for tx in self.txs_for_mempool.iter() {
-                    if let TransactionType::GoldenTicket = tx.transaction_type {
-                        unreachable!("golden tickets shouldn't be here");
-                    } else {
-                        mempool.add_transaction(tx.clone()).await;
-                    }
-                }
-            }
-
-            self.block_producing_timer = 0;
-
-            let mut gt_result = None;
-            let mut gt_propagated = false;
-            {
-                let result: Option<&(Transaction, bool)> = mempool
-                    .golden_tickets
-                    .get(&blockchain.get_latest_block_hash());
-                if let Some((tx, propagated)) = result {
-                    gt_result = Some(tx.clone());
-                    gt_propagated = *propagated;
-                }
-            }
-
-            let mut block = None;
-            if !configs.is_browser() && !configs.is_spv_mode() && !blockchain.blocks.is_empty() {
-                block = mempool
-                    .bundle_block(
-                        blockchain.deref_mut(),
-                        timestamp,
-                        gt_result.clone(),
-                        configs.deref(),
-                        &self.storage,
-                    )
-                    .await;
-            }
-            if let Some(block) = block {
-                debug!(
-                    "adding bundled block : {:?} with id : {:?} to mempool",
-                    block.hash.to_hex(),
-                    block.id
-                );
-                trace!(
-                    "mempool size after bundling : {:?}",
-                    mempool.transactions.len()
-                );
-
-                mempool.add_block(block);
-                self.txs_for_mempool.clear();
-                // dropping the lock here since blockchain needs the write lock to add blocks
-                drop(mempool);
-                self.stats.blocks_created.increment();
-                let _updated = blockchain
-                    .add_blocks_from_mempool(
-                        self.mempool_lock.clone(),
-                        Some(&self.network),
-                        &mut self.storage,
-                        Some(self.sender_to_miner.clone()),
-                        Some(self.sender_to_router.clone()),
-                        configs.deref(),
-                    )
-                    .await;
-
-                debug!("blocks added to blockchain");
-
-                work_done = true;
-            } else {
-                // route messages to peers
-                for tx in self.txs_for_mempool.drain(..) {
-                    self.network.propagate_transaction(&tx).await;
-                }
-                // route golden tickets to peers
-                if gt_result.is_some() && !gt_propagated {
-                    self.network
-                        .propagate_transaction(gt_result.as_ref().unwrap())
-                        .await;
-                    debug!(
-                        "propagating gt : {:?} to peers",
-                        hash(&gt_result.unwrap().serialize_for_net()).to_hex()
-                    );
-                    let (_, propagated) = mempool
-                        .golden_tickets
-                        .get_mut(&blockchain.get_latest_block_hash())
-                        .unwrap();
-                    *propagated = true;
-                }
-            }
+            work_done = true;
         }
 
         if work_done {
@@ -271,7 +290,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
-        // println!("process_event : {:?}", event.type_id());
         match event {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
@@ -279,23 +297,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     golden_ticket.target.to_hex()
                 );
 
-                let mut mempool = self.mempool_lock.write().await;
-                let public_key;
-                let private_key;
-                {
-                    let wallet = self.wallet_lock.read().await;
-
-                    public_key = wallet.public_key;
-                    private_key = wallet.private_key;
-                }
-                let transaction = Wallet::create_golden_ticket_transaction(
-                    golden_ticket,
-                    &public_key,
-                    &private_key,
-                )
-                .await;
-                self.stats.received_gts.increment();
-                mempool.add_golden_ticket(transaction).await;
+                self.add_gt_to_mempool(golden_ticket).await;
                 Some(())
             }
             ConsensusEvent::BlockFetched { block, .. } => {
@@ -337,11 +339,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             ConsensusEvent::NewTransaction { transaction } => {
                 self.stats.received_tx.increment();
 
-                // trace!(
-                //     "tx received with sig: {:?} hash : {:?}",
-                //     transaction.signature.to_hex(),
-                //     hash(&transaction.serialize_for_net()).to_hex()
-                // );
                 if let TransactionType::GoldenTicket = transaction.transaction_type {
                     let mut mempool = self.mempool_lock.write().await;
 

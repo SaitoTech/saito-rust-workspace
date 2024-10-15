@@ -150,6 +150,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             txs_for_mempool: vec![],
             stat_sender: sender_to_stat.clone(),
             config_lock: configuration.clone(),
+            produce_blocks_by_timer: true,
         },
         mining_thread: MiningThread {
             wallet_lock: context.wallet_lock.clone(),
@@ -1108,6 +1109,67 @@ pub async fn write_issuance_file(threshold: Currency) {
         .expect("issuance file should be written");
 
     info!("total written lines : {:?}", total_written_lines);
+}
+
+#[wasm_bindgen]
+pub async fn disable_bundling_blocks_by_timer() {
+    let mut saito = SAITO.lock().await;
+    saito
+        .as_mut()
+        .unwrap()
+        .consensus_thread
+        .produce_blocks_by_timer = false;
+}
+#[wasm_bindgen]
+pub async fn produce_block_with_gt() {
+    let mut saito = SAITO.lock().await;
+
+    {
+        let miner = &mut saito.as_mut().unwrap().mining_thread;
+        info!("mining for a gt...");
+        loop {
+            if let Some(gt) = miner.mine().await {
+                info!("gt found");
+                saito
+                    .as_mut()
+                    .unwrap()
+                    .consensus_thread
+                    .add_gt_to_mempool(gt)
+                    .await;
+                break;
+            }
+        }
+    }
+
+    let timestamp = saito
+        .as_ref()
+        .unwrap()
+        .consensus_thread
+        .timer
+        .get_timestamp_in_ms();
+    saito
+        .as_mut()
+        .unwrap()
+        .consensus_thread
+        .produce_block(timestamp)
+        .await;
+}
+
+#[wasm_bindgen]
+pub async fn produce_block_without_gt() {
+    let mut saito = SAITO.lock().await;
+    let timestamp = saito
+        .as_ref()
+        .unwrap()
+        .consensus_thread
+        .timer
+        .get_timestamp_in_ms();
+    saito
+        .as_mut()
+        .unwrap()
+        .consensus_thread
+        .produce_block(timestamp)
+        .await;
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {

@@ -45,14 +45,14 @@ pub struct MiningThread {
 }
 
 impl MiningThread {
-    async fn mine(&mut self) -> bool {
+    pub async fn mine(&mut self) -> Option<GoldenTicket> {
         assert!(self.miner_active);
 
         if self.public_key == [0; 33] {
             let wallet = self.wallet_lock.read().await;
             if wallet.public_key == [0; 33] {
                 // wallet not initialized yet
-                return false;
+                return None;
             }
             self.public_key = wallet.public_key;
             info!("node public key = {:?}", self.public_key.to_base58());
@@ -73,15 +73,10 @@ impl MiningThread {
                 self.difficulty,
                 (self.timer.get_timestamp_in_ms()-self.mining_start)
             );
-            self.miner_active = false;
-            self.mined_golden_tickets += 1;
-            self.sender_to_mempool
-                .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
-                .await
-                .expect("sending to mempool failed");
-            return true;
+
+            return Some(gt);
         }
-        false
+        None
     }
 }
 
@@ -97,7 +92,13 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         }
         if self.enabled && self.miner_active {
             for _ in 0..self.mining_iterations {
-                if self.mine().await {
+                if let Some(gt) = self.mine().await {
+                    self.miner_active = false;
+                    self.mined_golden_tickets += 1;
+                    self.sender_to_mempool
+                        .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
+                        .await
+                        .expect("sending to mempool failed");
                     return Some(());
                 }
             }
