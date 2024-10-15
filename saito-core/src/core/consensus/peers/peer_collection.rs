@@ -45,7 +45,7 @@ impl PeerCollection {
     }
 
     pub fn remove_reconnected_peer(&mut self, public_key: &SaitoPublicKey) -> Option<Peer> {
-        let peer_index: u64;
+        let peer_index;
         {
             let peer = self.find_peer_by_address(&public_key)?;
             if let PeerStatus::Connected = peer.peer_status {

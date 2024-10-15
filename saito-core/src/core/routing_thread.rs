@@ -1,8 +1,5 @@
-use ahash::HashMap;
 use async_trait::async_trait;
 use log::{debug, info, trace, warn};
-use secp256k1::PublicKey;
-use std::any::Any;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
@@ -596,7 +593,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 }
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
-                debug!("processing network event peer {:?}", message.type_id());
                 if message.is_err() {
                     warn!(
                         "failed deserializing msg from peer : {:?} with buffer size : {:?}. disconnecting peer",

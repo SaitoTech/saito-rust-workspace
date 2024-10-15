@@ -788,7 +788,7 @@ pub fn verify_signature(buffer: Uint8Array, signature: JsString, public_key: JsS
         return false;
     }
     let sig = sig.unwrap();
-    let key: Result<[u8; 33], Error> = string_to_key(public_key);
+    let key = string_to_key(public_key);
     if key.is_err() {
         error!(
             "failed parsing public key from string. {:?}",
@@ -961,7 +961,6 @@ pub async fn send_api_call(buffer: Uint8Array, msg_index: u32, peer_index: PeerI
     };
     let message = Message::ApplicationMessage(api_message);
     let buffer = message.serialize();
-    debug!("sending api call");
     if peer_index == 0 {
         saito
             .as_ref()

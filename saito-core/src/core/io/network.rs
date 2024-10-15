@@ -18,7 +18,6 @@ use crate::core::msg::handshake::{HandshakeChallenge, HandshakeResponse};
 use crate::core::msg::message::Message;
 use crate::core::process::keep_time::Timer;
 use crate::core::process::version::Version;
-use url::Url;
 
 #[derive(Debug)]
 pub enum PeerDisconnectType {
@@ -27,7 +26,7 @@ pub enum PeerDisconnectType {
     /// If we disconnected the peer
     InternalDisconnect,
 }
-use crate::core::util::configuration::{Configuration, PeerConfig};
+use crate::core::util::configuration::{Configuration};
 
 // #[derive(Debug)]
 pub struct Network {

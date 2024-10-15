@@ -2050,7 +2050,6 @@ dependencies = [
  "serial_test",
  "tokio",
  "tracing-subscriber",
- "url",
 ]
 
 [[package]]
@@ -2083,7 +2082,6 @@ dependencies = [
  "tokio-tungstenite 0.21.0",
  "tracing-subscriber",
  "tungstenite 0.21.0",
- "url",
  "warp",
 ]
 

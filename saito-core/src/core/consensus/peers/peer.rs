@@ -22,7 +22,7 @@ use tokio::sync::RwLock;
 
 #[derive(Clone, Debug)]
 pub enum PeerType {
-    WebSocket,
+    DEFAULT,
     STUN,
 }
 
@@ -86,7 +86,7 @@ impl Peer {
                 Duration::from_secs(600),
             ),
             public_key: None,
-            peer_type: PeerType::WebSocket,
+            peer_type: PeerType::DEFAULT,
 
         }
     }
