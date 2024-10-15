@@ -1,4 +1,5 @@
-use crate::core::consensus::peer::{Peer, PeerStatus};
+use crate::core::consensus::peers::peer::{Peer, PeerStatus};
+use crate::core::consensus::peers::peer_state_writer::PeerStateWriter;
 use crate::core::defs::{PeerIndex, SaitoPublicKey, Timestamp};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -21,6 +22,7 @@ pub struct PeerCollection {
     pub index_to_peers: HashMap<PeerIndex, Peer>,
     pub address_to_peers: HashMap<SaitoPublicKey, PeerIndex>,
     pub peer_counter: PeerCounter,
+    pub peer_state_writer: PeerStateWriter,
 }
 
 impl PeerCollection {

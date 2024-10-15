@@ -1,15 +1,15 @@
-use std::sync::Arc;
-use std::time::Duration;
-
 use async_trait::async_trait;
 use log::{debug, info, trace, warn};
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{RwLock, RwLockReadGuard};
 
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
-use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::peers::peer_service::PeerService;
+use crate::core::consensus::peers::peer_state_writer::{PeerStateEntry, PEER_STATE_WRITE_PERIOD};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
@@ -34,6 +34,7 @@ use crate::core::verification_thread::VerifyRequest;
 pub enum RoutingEvent {
     BlockchainUpdated(BlockHash),
     BlockFetchRequest(PeerIndex, BlockHash, BlockId),
+    BlockchainRequest(PeerIndex),
 }
 
 #[derive(Debug)]
@@ -89,6 +90,7 @@ pub struct RoutingThread {
     pub network: Network,
     pub reconnection_timer: Timestamp,
     pub peer_removal_timer: Timestamp,
+    pub peer_file_write_timer: Timestamp,
     pub stats: RoutingStats,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
     pub last_verification_thread_index: usize,
@@ -525,6 +527,41 @@ impl RoutingThread {
             warn!("peer {:?} not found to update services", peer_index);
         }
     }
+
+    async fn write_peer_state_data(&mut self, duration_value: Timestamp, work_done: &mut bool) {
+        self.peer_file_write_timer += duration_value;
+        if self.peer_file_write_timer >= PEER_STATE_WRITE_PERIOD {
+            let mut peers = self.network.peer_lock.write().await;
+            let mut data: Vec<PeerStateEntry> = Default::default();
+
+            let current_time = self.timer.get_timestamp_in_ms();
+
+            for (peer_index, peer) in peers.index_to_peers.iter_mut() {
+                if peer.public_key.is_none() {
+                    info!("public key not set yet for peer : {:?}", peer_index);
+                    continue;
+                }
+                data.push(PeerStateEntry {
+                    peer_index: peer.index,
+                    public_key: peer.public_key.unwrap_or([0; 33]),
+                    msg_limit_exceeded: peer.has_message_limit_exceeded(current_time),
+                    invalid_blocks_received: peer.has_invalid_block_limit_exceeded(current_time),
+                    same_depth_blocks_received: false,
+                    too_far_blocks_received: false,
+                    handshake_limit_exceeded: peer.has_handshake_limit_exceeded(current_time),
+                    keylist_limit_exceeded: peer.has_key_list_limit_exceeded(current_time),
+                    limited_till: None,
+                });
+            }
+            peers
+                .peer_state_writer
+                .write_state(data, &mut self.network.io_interface)
+                .await
+                .unwrap();
+            self.peer_file_write_timer = 0;
+            *work_done = true;
+        }
+    }
 }
 
 #[async_trait]
@@ -538,7 +575,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     let time = self.timer.get_timestamp_in_ms();
                     peer.message_limiter.increase();
                     if peer.has_message_limit_exceeded(time) {
-                        info!("limit exceeded for messages from peer : {:?}", peer_index);
+                        info!("peers exceeded for messages from peer : {:?}", peer_index);
                         return None;
                     }
                 }
@@ -587,10 +624,9 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     let mut peers = self.network.peer_lock.write().await;
                     let peer = peers.find_peer_by_index_mut(peer_index)?;
                     let time = self.timer.get_timestamp_in_ms();
-                    peer.invalid_block_limiter.increase();
                     if peer.has_invalid_block_limit_exceeded(time) {
                         info!(
-                            "limit exceeded for invalid blocks from peer : {:?}. disconnecting peer...",
+                            "peers exceeded for invalid blocks from peer : {:?}. disconnecting peer...",
                             peer_index
                         );
                         self.network
@@ -652,7 +688,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             let mut peers = self.network.peer_lock.write().await;
             peers.remove_disconnected_peers(current_time);
             self.peer_removal_timer = 0;
+            work_done = true;
         }
+
+        self.write_peer_state_data(duration_value, &mut work_done)
+            .await;
 
         if work_done {
             return Some(());
@@ -679,6 +719,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                         peer_index,
                         self.network.peer_lock.clone(),
                     )
+                    .await;
+            }
+            RoutingEvent::BlockchainRequest(peer_index) => {
+                self.network
+                    .request_blockchain_from_peer(peer_index, self.blockchain_lock.clone())
                     .await;
             }
         }

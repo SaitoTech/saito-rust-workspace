@@ -7,8 +7,8 @@ use tokio::sync::RwLock;
 use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::mempool::Mempool;
-use crate::core::consensus::peer::{Peer, PeerStatus};
-use crate::core::consensus::peer_collection::PeerCollection;
+use crate::core::consensus::peers::peer::{Peer, PeerStatus};
+use crate::core::consensus::peers::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp};
@@ -198,7 +198,7 @@ impl Network {
         peer.handshake_limiter.increase();
         if peer.has_handshake_limit_exceeded(current_time) {
             warn!(
-                "peer {:?} exceeded rate limit for handshake challenge",
+                "peer {:?} exceeded rate peers for handshake challenge",
                 peer_index
             );
             return;
@@ -237,7 +237,7 @@ impl Network {
             peer.handshake_limiter.increase();
             if peer.has_handshake_limit_exceeded(current_time) {
                 warn!(
-                    "peer {:?} exceeded rate limit for handshake challenge",
+                    "peer {:?} exceeded rate peers for handshake challenge",
                     peer_index
                 );
                 return;
@@ -304,10 +304,10 @@ impl Network {
         let peer = peers.index_to_peers.get_mut(&peer_index);
 
         if let Some(peer) = peer {
-            // Check rate limit
+            // Check rate peers
             peer.key_list_limiter.increase();
             if peer.has_key_list_limit_exceeded(current_time) {
-                debug!("peer {:?} exceeded rate limit for key list", peer_index);
+                debug!("peer {:?} exceeded rate peers for key list", peer_index);
                 return Err(Error::from(ErrorKind::Other));
             } else {
                 debug!("can make request")
@@ -349,7 +349,7 @@ impl Network {
             .unwrap();
     }
 
-    async fn request_blockchain_from_peer(
+    pub(crate) async fn request_blockchain_from_peer(
         &self,
         peer_index: u64,
         blockchain_lock: Arc<RwLock<Blockchain>>,

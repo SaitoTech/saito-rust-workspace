@@ -5,11 +5,11 @@ pub mod test {
     use std::path::Path;
 
     use async_trait::async_trait;
-    use log::{debug, error, info};
+    use log::{debug, info};
     use tokio::fs::File;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    use crate::core::consensus::peer_service::PeerService;
+    use crate::core::consensus::peers::peer_service::PeerService;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{BlockId, PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
     use crate::core::io::interface_io::{InterfaceEvent, InterfaceIO};
@@ -86,24 +86,15 @@ pub mod test {
         }
 
         async fn append_value(&mut self, _key: &str, _value: &[u8]) -> Result<(), Error> {
-            todo!()
+            Ok(())
         }
 
         async fn flush_data(&mut self, _key: &str) -> Result<(), Error> {
-            todo!()
+            Ok(())
         }
 
         async fn read_value(&self, key: &str) -> Result<Vec<u8>, Error> {
-            let result = File::open(key).await;
-            if result.is_err() {
-                error!(
-                    "error : path {:?} \r\n : {:?}",
-                    key.to_string(),
-                    result.err().unwrap()
-                );
-                unreachable!();
-            }
-            let mut file = result.unwrap();
+            let mut file = File::open(key).await?;
             let mut encoded = Vec::<u8>::new();
 
             let result = file.read_to_end(&mut encoded).await;
@@ -113,13 +104,8 @@ pub mod test {
             Ok(encoded)
         }
         async fn load_block_file_list(&self) -> Result<Vec<String>, Error> {
-            info!("current dir = {:?}", std::env::current_dir().unwrap());
-            let result = fs::read_dir(self.get_block_dir());
-            if result.is_err() {
-                return Err(result.err().unwrap());
-            }
-            let mut paths: Vec<_> = result
-                .unwrap()
+            info!("current dir = {:?}", std::env::current_dir()?);
+            let mut paths: Vec<_> = fs::read_dir(self.get_block_dir())?
                 .map(|r| r.unwrap())
                 .filter(|r| {
                     r.file_name()

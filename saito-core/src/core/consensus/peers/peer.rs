@@ -1,6 +1,5 @@
-use crate::core::consensus::limit::block_depth_limit_checker::BlockDepthLimitChecker;
-use crate::core::consensus::limit::rate_limiter::RateLimiter;
-use crate::core::consensus::peer_service::PeerService;
+use crate::core::consensus::peers::peer_service::PeerService;
+use crate::core::consensus::peers::rate_limiter::RateLimiter;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
     PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, Timestamp, WS_KEEP_ALIVE_PERIOD,
@@ -49,7 +48,6 @@ pub struct Peer {
     pub handshake_limiter: RateLimiter,
     pub message_limiter: RateLimiter,
     pub invalid_block_limiter: RateLimiter,
-    pub same_depth_blocks_limiter: BlockDepthLimitChecker,
     pub public_key: Option<SaitoPublicKey>,
 }
 
@@ -71,10 +69,6 @@ impl Peer {
             handshake_limiter: RateLimiter::builder(10, Duration::from_secs(60)),
             message_limiter: RateLimiter::builder(1000, Duration::from_secs(1)),
             invalid_block_limiter: RateLimiter::builder(1, Duration::from_secs(3600)),
-            same_depth_blocks_limiter: BlockDepthLimitChecker::builder(
-                10,
-                Duration::from_secs(600),
-            ),
             public_key: None,
         }
     }
@@ -426,7 +420,7 @@ impl Peer {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::consensus::peer::{Peer, PeerStatus};
+    use crate::core::consensus::peers::peer::{Peer, PeerStatus};
     use crate::core::process::version::Version;
     use std::cmp::Ordering;
 

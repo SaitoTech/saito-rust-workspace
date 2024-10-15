@@ -18,7 +18,7 @@ use tracing_subscriber::Layer;
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
-use saito_core::core::consensus::peer_collection::PeerCollection;
+use saito_core::core::consensus::peers::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
@@ -319,6 +319,7 @@ async fn run_routing_event_processor(
         ),
         reconnection_timer: 0,
         peer_removal_timer: 0,
+        peer_file_write_timer: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
         senders_to_verification: senders,
         last_verification_thread_index: 0,
