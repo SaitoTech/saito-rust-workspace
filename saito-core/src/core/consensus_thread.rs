@@ -123,7 +123,7 @@ impl ConsensusThread {
         }
     }
 
-    async fn produce_block(&mut self, timestamp: Timestamp) {
+    pub async fn produce_block(&mut self, timestamp: Timestamp) {
         let configs = self.network.config_lock.read().await;
 
         let mut blockchain = self.blockchain_lock.write().await;
@@ -240,6 +240,23 @@ impl ConsensusThread {
 
         self.generate_genesis_block = false;
     }
+
+    pub async fn add_gt_to_mempool(&mut self, golden_ticket: GoldenTicket) {
+        let mut mempool = self.mempool_lock.write().await;
+        let public_key;
+        let private_key;
+        {
+            let wallet = self.wallet_lock.read().await;
+
+            public_key = wallet.public_key;
+            private_key = wallet.private_key;
+        }
+        let transaction =
+            Wallet::create_golden_ticket_transaction(golden_ticket, &public_key, &private_key)
+                .await;
+        self.stats.received_gts.increment();
+        mempool.add_golden_ticket(transaction).await;
+    }
 }
 
 #[async_trait]
@@ -273,7 +290,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     }
 
     async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
-        // println!("process_event : {:?}", event.type_id());
         match event {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
                 debug!(
@@ -281,23 +297,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     golden_ticket.target.to_hex()
                 );
 
-                let mut mempool = self.mempool_lock.write().await;
-                let public_key;
-                let private_key;
-                {
-                    let wallet = self.wallet_lock.read().await;
-
-                    public_key = wallet.public_key;
-                    private_key = wallet.private_key;
-                }
-                let transaction = Wallet::create_golden_ticket_transaction(
-                    golden_ticket,
-                    &public_key,
-                    &private_key,
-                )
-                .await;
-                self.stats.received_gts.increment();
-                mempool.add_golden_ticket(transaction).await;
+                self.add_gt_to_mempool(golden_ticket).await;
                 Some(())
             }
             ConsensusEvent::BlockFetched { block, .. } => {

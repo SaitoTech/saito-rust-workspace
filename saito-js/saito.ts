@@ -496,4 +496,28 @@ export default class Saito {
             console.error(e);
         }
     }
+
+    public async disableProducingBlocksByTimer() {
+        try {
+            return Saito.getLibInstance().disable_producing_blocks_by_timer();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    public async produceBlockWithGt() {
+        try {
+            return Saito.getLibInstance().produce_block_with_gt();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    public async produceBlockWithoutGt() {
+        try {
+            return Saito.getLibInstance().produce_block_without_gt();
+        } catch (error) {
+            console.error(error);
+        }
+    }
 }

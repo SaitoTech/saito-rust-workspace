@@ -45,7 +45,7 @@ pub struct MiningThread {
 }
 
 impl MiningThread {
-    async fn mine(&mut self) -> Option<GoldenTicket> {
+    pub async fn mine(&mut self) -> Option<GoldenTicket> {
         assert!(self.miner_active);
 
         if self.public_key == [0; 33] {
