@@ -3,6 +3,7 @@ import Transaction from "./lib/transaction";
 import Block from "./lib/block";
 import Factory from "./lib/factory";
 import Peer from "./lib/peer";
+import StunPeer from "./lib/stun_peer";
 import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
@@ -16,10 +17,12 @@ export enum LogLevel {
 }
 
 export default class Saito {
+    
     private static instance: Saito;
     private static libInstance: any;
     sockets: Map<bigint, any> = new Map<bigint, any>();
-    stunPeers: Map<bigint, any> = new Map<bigint, any>();
+
+    stunManager: StunPeer;
     factory = new Factory();
     promises = new Map<number, any>();
     private callbackIndex: number = 1;
@@ -37,6 +40,7 @@ export default class Saito {
     ) {
         console.log("initializing saito lib");
         Saito.instance = new Saito(factory);
+
 
         // @ts-ignore
         globalThis.shared_methods = {
@@ -183,6 +187,8 @@ export default class Saito {
 
     constructor(factory: Factory) {
         this.factory = factory;
+        this.stunManager  = new StunPeer(this);
+        
     }
 
     public static getInstance(): Saito {
@@ -281,91 +287,13 @@ export default class Saito {
     // }
 
 
+
+
     public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection): Promise<bigint> {
-        const peerIndex = await Saito.getLibInstance().get_next_peer_index();
-
-        const dataChannelOptions: RTCDataChannelInit = {
-            ordered: true,
-            protocol: 'saito',
-        };
-        const dc = peerConnection.createDataChannel('core-channel', dataChannelOptions);
-
-        //@ts-ignore
-        peerConnection.dc = dc;
-
-        return new Promise((resolve, reject) => {
-            let timeout: any;
-            const cleanup = () => {
-                if (timeout) clearTimeout(timeout);
-                dc.removeEventListener('open', onOpen);
-                dc.removeEventListener('error', onError);
-            };
-
-            const onOpen = () => {
-                cleanup();
-                this.stunPeers.set(peerIndex, peerConnection);
-                console.log(`Data channel opened and STUN peer added with index: ${peerIndex} and public key: ${publicKey}`);
-                this.setupDataChannelListeners(dc, peerIndex);
-                Saito.getLibInstance().process_stun_peer(peerIndex, publicKey)
-                    .then(() => resolve(peerIndex))
-                    .catch(reject);
-            };
-
-            const onError = (error: Event) => {
-                cleanup();
-                console.error('Error opening data channel for STUN peer', error);
-                reject(new Error('Failed to open data channel'));
-            };
-
-            dc.addEventListener('open', onOpen);
-            dc.addEventListener('error', onError);
-
-            // Set a timeout in case the connection doesn't establish
-            timeout = setTimeout(() => {
-                cleanup();
-                reject(new Error('Timeout while waiting for data channel to open'));
-            }, 30000); // 30 seconds timeout
-        });
+        return this.stunManager.addStunPeer(publicKey, peerConnection);
     }
 
-    private setupDataChannelListeners(dataChannel: RTCDataChannel, peerIndex: bigint) {
-        dataChannel.onmessage = (messageEvent) => {
-            if (messageEvent.data instanceof ArrayBuffer) {
-                const buffer = new Uint8Array(messageEvent.data);
-                this.processMsgBufferFromPeer(buffer, peerIndex);
-            } else {
-                console.warn('Received unexpected data type from STUN peer', peerIndex, messageEvent);
-            }
-        };
-
-        dataChannel.onerror = (error: Event) => {
-            console.error('Data channel error for STUN peer', peerIndex, error);
-            // Log detailed error information if available
-            if (error instanceof RTCErrorEvent) {
-                console.error('Error name:', error.error.name);
-                console.error('Error message:', error.error.message);
-            }
-            console.log('Data channel state after error:', dataChannel.readyState);
-        };
-
-        dataChannel.onclose = () => {
-            console.log('Data channel closed for STUN peer', peerIndex);
-            this.removeStunPeer(peerIndex);
-        };
-    }
-
-    private removeStunPeer(peerIndex: bigint) {
-        if (this.stunPeers.has(peerIndex)) {
-            this.stunPeers.delete(peerIndex);
-            console.log(`Removed STUN peer with index: ${peerIndex}`);
-        } else {
-            console.warn(`Attempt to remove non-existent STUN peer with index: ${peerIndex}`);
-        }
-    }
-
-    public isStunPeer(index: bigint): boolean {
-        return this.stunPeers.has(index);
-    }
+  
 
 
 

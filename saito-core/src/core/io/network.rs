@@ -20,7 +20,6 @@ use crate::core::process::keep_time::Timer;
 use crate::core::process::version::Version;
 use url::Url;
 
-
 #[derive(Debug)]
 pub enum PeerDisconnectType {
     /// If the peer was disconnected without our intervention
@@ -528,12 +527,23 @@ impl Network {
 
         info!("added {:?} static peers", peers.index_to_peers.len());
     }
-   
-    pub async fn handle_new_stun_peer(&mut self, peer_index: PeerIndex, public_key: SaitoPublicKey) -> Result<(), Error> {
-        debug!("Adding STUN peer with index: {} and public key: {}", peer_index, public_key.to_base58());
+
+    pub async fn handle_new_stun_peer(
+        &mut self,
+        peer_index: PeerIndex,
+        public_key: SaitoPublicKey,
+    ) -> Result<(), Error> {
+        debug!(
+            "Adding STUN peer with index: {} and public key: {}",
+            peer_index,
+            public_key.to_base58()
+        );
         let mut peers = self.peer_lock.write().await;
         if peers.index_to_peers.contains_key(&peer_index) {
-            return Err(Error::new(ErrorKind::AlreadyExists, "Peer with this index already exists"));
+            return Err(Error::new(
+                ErrorKind::AlreadyExists,
+                "Peer with this index already exists",
+            ));
         }
         let peer = Peer::new_stun(peer_index, public_key, self.io_interface.as_ref());
         peers.index_to_peers.insert(peer_index, peer);
@@ -543,6 +553,17 @@ impl Network {
             .send_interface_event(InterfaceEvent::StunPeerConnected(peer_index));
 
         Ok(())
+    }
+
+    pub async fn remove_stun_peer(&mut self, peer_index: PeerIndex) {
+        debug!("Removing STUN peer with index: {}", peer_index);
+        let mut peers = self.peer_lock.write().await;
+        if let Some(peer) = peers.index_to_peers.remove(&peer_index) {
+            if let Some(public_key) = peer.get_public_key() {
+                peers.address_to_peers.remove(&public_key);
+            }
+            debug!("STUN peer removed from network successfully")
+        } 
     }
 
     pub async fn connect_to_static_peers(&mut self, current_time: Timestamp) {

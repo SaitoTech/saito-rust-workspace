@@ -318,6 +318,11 @@ impl RoutingThread {
         self.network.handle_new_stun_peer(peer_index, public_key ).await;
     }
 
+    async fn remove_stun_peer(&mut self, peer_index: u64 ) {
+        trace!("handling new stun peer : {:?}", peer_index);
+        self.network.remove_stun_peer(peer_index ).await;
+    }
+
 
     async fn handle_peer_disconnect(
         &mut self,
@@ -621,6 +626,13 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 if result.is_ok() {
                     let (peer_index, public_key) = result.unwrap();
                     self.handle_new_stun_peer(peer_index, public_key).await;
+                    return Some(());
+                }
+            }
+            NetworkEvent::RemoveStunPeer { result } => {
+                if result.is_ok() {
+                    let peer_index= result.unwrap();
+                    self.remove_stun_peer(peer_index).await;
                     return Some(());
                 }
             }

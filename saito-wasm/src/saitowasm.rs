@@ -504,20 +504,7 @@ pub async fn process_new_peer(peer_index: PeerIndex) {
 #[wasm_bindgen]
 pub async fn process_stun_peer(peer_index: PeerIndex, public_key: JsString) -> Result<(), JsValue> {
     debug!("processing stun peer with index: {:?} and public key: {:?} ", peer_index, public_key);
-
     let mut saito = SAITO.lock().await;
-
-    // let key: Result<[u8; 33], Error> = string_to_key(public_key);
-    // if key.is_err() {
-    //     error!(
-    //         "failed parsing public key from string. {:?}",
-    //         key.err().unwrap()
-    //     );
-    //     return Err(JsValue::from(
-    //         "Failed parsing private key string to key",
-    //     ));
-    // }
-
     let key: [u8; 33] = string_to_key(public_key.into())
         .map_err(|e| JsValue::from_str(&format!("Failed to parse public key: {}", e)))?;
 
@@ -530,6 +517,21 @@ pub async fn process_stun_peer(peer_index: PeerIndex, public_key: JsString) -> R
         })
         .await;
     Ok(())
+}
+
+#[wasm_bindgen]
+pub async fn remove_stun_peer(peer_index: PeerIndex) {
+    debug!("removing stun peer with index: {:?} from netowrk ", peer_index);
+    let mut saito = SAITO.lock().await;
+    saito
+    .as_mut()
+    .unwrap()
+    .routing_thread
+    .process_network_event(NetworkEvent::RemoveStunPeer {
+        result: Ok(peer_index),
+    })
+    .await;
+
 }
 
 #[wasm_bindgen]

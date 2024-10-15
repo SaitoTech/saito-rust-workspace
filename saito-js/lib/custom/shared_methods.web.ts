@@ -110,21 +110,30 @@ export default class WebSharedMethods extends CustomSharedMethods {
     }
 
     sendMessage(peerIndex: bigint, buffer: Uint8Array): void {
-        if (Saito.getInstance().isStunPeer(peerIndex)) {
-            const stunPeer = Saito.getInstance().stunPeers.get(peerIndex);
-            if (stunPeer && stunPeer.dc) {
-                if (stunPeer.dc.readyState === 'open') {
-                    console.log(`Sending message to STUN peer ${peerIndex} via data channel`);
-                    try {
-                        stunPeer.dc.send(buffer);
-                    } catch (error) {
-                        console.error(`Error sending message to STUN peer ${peerIndex} via data channel:`, error);
+        if (Saito.getInstance().stunManager.isStunPeer(peerIndex)) {
+            const stunPeer = Saito.getInstance().stunManager.getStunPeer(peerIndex);
+            if (stunPeer) {
+                //@ts-ignore
+                const { peerConnection, publicKey } = stunPeer; 
+
+                //@ts-ignore
+                let {dc} = peerConnection;
+                if (dc) {
+                    if (dc.readyState === 'open') {
+                        console.log(`Sending message to STUN peer ${peerIndex} via data channel`);
+                        try {
+                            dc.send(buffer);
+                        } catch (error) {
+                            console.error(`Error sending message to STUN peer ${peerIndex} via data channel:`, error);
+                        }
+                    } else {
+                        console.warn(`Data channel for STUN peer ${peerIndex} is not open. Current state: ${dc.readyState}`);
                     }
                 } else {
-                    console.warn(`Data channel for STUN peer ${peerIndex} is not open. Current state: ${stunPeer.dc.readyState}`);
+                    console.warn(`Data channel for STUN peer ${peerIndex} is not initialized`);
                 }
             } else {
-                console.warn(`STUN peer ${peerIndex} or its data channel is not initializedå`);
+                console.warn(`STUN peer ${peerIndex} not found`);
             }
             return;
         }
