@@ -1,3 +1,4 @@
+use ahash::HashMap;
 use async_trait::async_trait;
 use log::{debug, info, trace, warn};
 use std::sync::Arc;
