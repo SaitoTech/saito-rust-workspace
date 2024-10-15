@@ -126,7 +126,6 @@ export default class WebSharedMethods extends CustomSharedMethods {
             } else {
                 console.warn(`STUN peer ${peerIndex} or its data channel is not initializedå`);
             }
-            console.log(stunPeer.dc.readyState, 'stun peer ready state');
             return;
         }
 
@@ -142,7 +141,6 @@ export default class WebSharedMethods extends CustomSharedMethods {
     sendMessageToAll(buffer: Uint8Array, exceptions: Array<bigint>): void {
         // console.debug("sending message to  all with size : " + buffer.byteLength);
         // console.info(' --- Sending to All ---')
-        console.log('sending message to all ', Saito.getInstance().stunPeers);
         Saito.getInstance().sockets.forEach((socket, key) => {
             if (exceptions.includes(key)) {
                 return;

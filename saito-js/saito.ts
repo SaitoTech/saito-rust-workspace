@@ -210,9 +210,79 @@ export default class Saito {
         console.log("adding socket : " + peer_index + ". total sockets : " + this.sockets.size);
     }
 
+    // public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection): Promise<bigint> {
+    //     const peerIndex = await Saito.getLibInstance().get_next_peer_index();
+    //     this.stunPeers.set(peerIndex, peerConnection);
+
+    //     const dataChannelOptions: RTCDataChannelInit = {
+    //         ordered: true,
+    //         protocol: 'saito',
+    //     };
+    //     const dc = peerConnection.createDataChannel('core-channel', dataChannelOptions);
+
+
+    //     //@ts-ignore
+    //     peerConnection.dc = dc;
+    //     peerConnection.ondatachannel = (event) => {
+    //         const dataChannel = event.channel;
+    //         dataChannel.onmessage = (messageEvent) => {
+    //             // Handle incoming messages
+    //             if (messageEvent.data instanceof ArrayBuffer) {
+    //                 const buffer = new Uint8Array(messageEvent.data);
+    //                 this.processMsgBufferFromPeer(buffer, peerIndex);
+    //             } else {
+    //                 console.warn('Received unexpected data type from STUN peer', peerIndex, messageEvent);
+    //             }
+    //         };
+
+    //         dataChannel.onopen = () => {
+    //             console.log('Data channel is open for STUN peer', peerIndex);
+    //         };
+
+    //         dataChannel.onerror = (error: any) => {
+    //             console.error('Data channel error for STUN peer', peerIndex, error);
+
+    //             if (error.error) {
+    //                 console.error('Error name:', error.error.name);
+    //                 console.error('Error message:', error.error.message);
+    //             }
+
+    //             // Check the data channel state
+    //             console.log('Data channel state after error:', dataChannel.readyState);
+    //             // Attempt to recover or reconnect
+    //             if (dataChannel.readyState === 'closed') {
+    //                 console.log('Attempting to reopen data channel for STUN peer', peerIndex);
+    //                 // this.reopenDataChannel(peerIndex, peerConnection);
+    //             }
+    //             dataChannel.onclose = () => {
+    //                 console.log('Data channel closed for STUN peer', peerIndex);
+    //                 this.removeStunPeer(peerIndex);
+    //             };
+    //         }
+
+
+    //     };
+
+
+    //     await Saito.getLibInstance().process_stun_peer(peerIndex, publicKey);
+    //     console.log(`Added STUN peer with index: ${peerIndex} and public key: ${publicKey}`);
+    //     return peerIndex;
+
+
+    // }
+
+    // private removeStunPeer(peerIndex: bigint) {
+    //     if (this.stunPeers.has(peerIndex)) {
+    //         this.stunPeers.delete(peerIndex);
+    //         console.log(`Removed STUN peer with index: ${peerIndex}`);
+    //     } else {
+    //         console.warn(`Attempt to remove non-existent STUN peer with index: ${peerIndex}`);
+    //     }
+    // }
+
+
     public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection): Promise<bigint> {
         const peerIndex = await Saito.getLibInstance().get_next_peer_index();
-        this.stunPeers.set(peerIndex, peerConnection);
 
         const dataChannelOptions: RTCDataChannelInit = {
             ordered: true,
@@ -220,54 +290,77 @@ export default class Saito {
         };
         const dc = peerConnection.createDataChannel('core-channel', dataChannelOptions);
 
-
         //@ts-ignore
         peerConnection.dc = dc;
-        peerConnection.ondatachannel = (event) => {
-            const dataChannel = event.channel;
-            dataChannel.onmessage = (messageEvent) => {
-                // Handle incoming messages
-                if (messageEvent.data instanceof ArrayBuffer) {
-                    const buffer = new Uint8Array(messageEvent.data);
-                    this.processMsgBufferFromPeer(buffer, peerIndex);
-                } else {
-                    console.warn('Received unexpected data type from STUN peer', peerIndex, messageEvent);
-                }
+
+        return new Promise((resolve, reject) => {
+            let timeout: any;
+            const cleanup = () => {
+                if (timeout) clearTimeout(timeout);
+                dc.removeEventListener('open', onOpen);
+                dc.removeEventListener('error', onError);
             };
 
-            dataChannel.onopen = () => {
-                console.log('Data channel is open for STUN peer', peerIndex);
+            const onOpen = () => {
+                cleanup();
+                this.stunPeers.set(peerIndex, peerConnection);
+                console.log(`Data channel opened and STUN peer added with index: ${peerIndex} and public key: ${publicKey}`);
+                this.setupDataChannelListeners(dc, peerIndex);
+                Saito.getLibInstance().process_stun_peer(peerIndex, publicKey)
+                    .then(() => resolve(peerIndex))
+                    .catch(reject);
             };
 
-            dataChannel.onerror = (error: any) => {
-                console.error('Data channel error for STUN peer', peerIndex, error);
+            const onError = (error: Event) => {
+                cleanup();
+                console.error('Error opening data channel for STUN peer', error);
+                reject(new Error('Failed to open data channel'));
+            };
 
-                // Log detailed error information
-                if (error.error) {
-                    console.error('Error name:', error.error.name);
-                    console.error('Error message:', error.error.message);
-                    console.error('Error stack:', error.error.stack);
-                }
+            dc.addEventListener('open', onOpen);
+            dc.addEventListener('error', onError);
 
-                // Check the data channel state
-                console.log('Data channel state after error:', dataChannel.readyState);
+            // Set a timeout in case the connection doesn't establish
+            timeout = setTimeout(() => {
+                cleanup();
+                reject(new Error('Timeout while waiting for data channel to open'));
+            }, 30000); // 30 seconds timeout
+        });
+    }
 
-                // Attempt to recover or reconnect
-                if (dataChannel.readyState === 'closed') {
-                    console.log('Attempting to reopen data channel for STUN peer', peerIndex);
-                    // this.reopenDataChannel(peerIndex, peerConnection);
-                }
+    private setupDataChannelListeners(dataChannel: RTCDataChannel, peerIndex: bigint) {
+        dataChannel.onmessage = (messageEvent) => {
+            if (messageEvent.data instanceof ArrayBuffer) {
+                const buffer = new Uint8Array(messageEvent.data);
+                this.processMsgBufferFromPeer(buffer, peerIndex);
+            } else {
+                console.warn('Received unexpected data type from STUN peer', peerIndex, messageEvent);
             }
-
-
         };
 
+        dataChannel.onerror = (error: Event) => {
+            console.error('Data channel error for STUN peer', peerIndex, error);
+            // Log detailed error information if available
+            if (error instanceof RTCErrorEvent) {
+                console.error('Error name:', error.error.name);
+                console.error('Error message:', error.error.message);
+            }
+            console.log('Data channel state after error:', dataChannel.readyState);
+        };
 
-        await Saito.getLibInstance().process_stun_peer(peerIndex, publicKey);
-        console.log(`Added STUN peer with index: ${peerIndex} and public key: ${publicKey}`);
-        return peerIndex;
+        dataChannel.onclose = () => {
+            console.log('Data channel closed for STUN peer', peerIndex);
+            this.removeStunPeer(peerIndex);
+        };
+    }
 
-
+    private removeStunPeer(peerIndex: bigint) {
+        if (this.stunPeers.has(peerIndex)) {
+            this.stunPeers.delete(peerIndex);
+            console.log(`Removed STUN peer with index: ${peerIndex}`);
+        } else {
+            console.warn(`Attempt to remove non-existent STUN peer with index: ${peerIndex}`);
+        }
     }
 
     public isStunPeer(index: bigint): boolean {
