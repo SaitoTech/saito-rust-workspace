@@ -253,6 +253,7 @@ pub enum BlockType {
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Block {
+
     /// Consensus Level Variables
     ///
     /// these are the variables that are serialized into the block header
@@ -437,9 +438,9 @@ impl Block {
         );
 
         let mut previous_block_id = 0;
-        let mut previous_block_burnfee = 0;
+        //let mut previous_block_burnfee = 0;
         let mut previous_block_timestamp = 0;
-        let mut previous_block_difficulty = 0;
+        //let mut previous_block_difficulty = 0;
         let mut previous_block_graveyard = 0;
         let mut previous_block_treasury = 0;
         let mut previous_block_total_fees = 0;
@@ -456,9 +457,9 @@ impl Block {
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
             previous_block_id = previous_block.id;
-            previous_block_burnfee = previous_block.burnfee;
+            //previous_block_burnfee = previous_block.burnfee;
             previous_block_timestamp = previous_block.timestamp;
-            previous_block_difficulty = previous_block.difficulty;
+            //previous_block_difficulty = previous_block.difficulty;
             previous_block_graveyard = previous_block.graveyard;
             previous_block_treasury = previous_block.treasury;
             previous_block_total_fees = previous_block.total_fees;
@@ -485,8 +486,8 @@ impl Block {
         block.id = previous_block_id + 1;
         block.previous_block_hash = previous_block_hash;
         block.timestamp = current_timestamp;
-        block.difficulty = previous_block_difficulty;
-        block.burnfee = previous_block_burnfee;
+        //block.difficulty = previous_block_difficulty;
+        //block.burnfee = previous_block_burnfee;
         block.creator = *public_key;
         block.previous_block_unpaid = previous_block_total_fees;
         block.treasury = previous_block_treasury;
@@ -528,6 +529,21 @@ impl Block {
         //
         // avg total fees
         //
+        block.total_fees = cv.total_fees;
+
+        //
+        // avg total fees new
+        //
+        block.total_fees_new = cv.total_fees_new;
+
+        //
+        // avg total fees atr
+        //
+        block.total_fees_atr = cv.total_fees_atr;
+
+        //
+        // avg total fees
+        //
         block.avg_total_fees = cv.avg_total_fees;
 
         //
@@ -549,6 +565,21 @@ impl Block {
         // avg payout mining
         //
         block.avg_payout_mining = cv.avg_payout_mining;
+
+        //
+        // avg payout treasury
+        //
+        block.avg_payout_treasury = cv.avg_payout_treasury;
+
+        //
+        // avg payout graveyard
+        //
+        block.avg_payout_graveyard = cv.avg_payout_graveyard;
+
+        //
+        // avg payout atr
+        //
+        block.avg_payout_atr = cv.avg_payout_atr;
 
         //
         // fee per byte
