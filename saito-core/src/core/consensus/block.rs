@@ -273,9 +273,17 @@ pub struct Block {
     pub burnfee: Currency,
     pub difficulty: u64,
     pub treasury: Currency,
+    pub total_fees: Currency,
+    pub total_fees_new: Currency,
+    pub total_fees_atr: Currency,
     pub avg_total_fees: Currency,
     pub avg_total_fees_new: Currency,
     pub avg_total_fees_atr: Currency,
+    pub total_payout_routing: Currency,
+    pub total_payout_mining: Currency,
+    pub total_payout_treasury: Currency,
+    pub total_payout_graveyard: Currency,
+    pub total_payout_atr: Currency,
     pub avg_payout_routing: Currency,
     pub avg_payout_mining: Currency,
     pub avg_payout_treasury: Currency,
@@ -309,13 +317,6 @@ pub struct Block {
     pub pre_hash: SaitoHash,
     /// hash of block, combines pre_hash and previous_block_hash
     pub hash: SaitoHash,
-
-    /// total fees in block from all transactions including ATR txs
-    total_fees: Currency,
-    /// total fees in block from only new txs
-    total_fees_new: Currency,
-    /// total fees in block only ATR txs
-    total_fees_atr: Currency,
 
     /// total routing work in block for block creator
     pub total_work: Currency,
@@ -371,12 +372,20 @@ impl Block {
             burnfee: 0,
             difficulty: 0,
             treasury: 0,
-            avg_total_fees: 0,
             avg_fee_per_byte: 0,
             avg_nolan_rebroadcast_per_block: 0,
             previous_block_unpaid: 0,
+            total_fees: 0,
+            total_fees_new: 0,
+            total_fees_atr: 0,
+            avg_total_fees: 0,
             avg_total_fees_new: 0,
             avg_total_fees_atr: 0,
+            total_payout_routing: 0,
+    	    total_payout_mining: 0,
+            total_payout_treasury: 0,
+    	    total_payout_graveyard: 0,
+    	    total_payout_atr: 0,
             avg_payout_routing: 0,
     	    avg_payout_mining: 0,
             avg_payout_treasury: 0,
@@ -386,9 +395,6 @@ impl Block {
             transactions: vec![],
             pre_hash: [0; 32],
             hash: [0; 32],
-            total_fees: 0,
-            total_fees_new: 0,
-            total_fees_atr: 0,
             total_work: 0,
             in_longest_chain: false,
             has_golden_ticket: false,
@@ -557,6 +563,31 @@ impl Block {
         block.avg_total_fees_atr = cv.avg_total_fees_atr;
 
         //
+        // payout routing
+        //
+        block.total_payout_routing = cv.total_payout_routing;
+
+        //
+        // avg payout mining
+        //
+        block.total_payout_mining = cv.total_payout_mining;
+
+        //
+        // avg payout treasury
+        //
+        block.total_payout_treasury = cv.total_payout_treasury;
+
+        //
+        // avg payout graveyard
+        //
+        block.total_payout_graveyard = cv.total_payout_graveyard;
+
+        //
+        // avg payout atr
+        //
+        block.total_payout_atr = cv.total_payout_atr;
+
+        //
         // avg payout routing
         //
         block.avg_payout_routing = cv.avg_payout_routing;
@@ -713,6 +744,17 @@ impl Block {
     /// [avg_total_fees_atr - 8 bytes - u64]
     /// [avg_payout_routing - 8 bytes - u64]
     /// [avg_payout_mining - 8 bytes - u64]
+    /// [avg_payout_treasury - 8 bytes - u64]
+    /// [avg_payout_graveyard - 8 bytes - u64]
+    /// [avg_payout_atr - 8 bytes - u64]
+    /// [total_payout_routing - 8 bytes - u64]
+    /// [total_payout_mining - 8 bytes - u64]
+    /// [total_payout_treasury - 8 bytes - u64]
+    /// [total_payout_graveyard - 8 bytes - u64]
+    /// [total_payout_atr - 8 bytes - u64]
+    /// [total_fees - 8 bytes - u64]
+    /// [total_fees_new - 8 bytes - u64]
+    /// [total_fees_atr - 8 bytes - u64]
 
     /// [transaction][transaction][transaction]...
     pub fn deserialize_from_net(bytes: &[u8]) -> Result<Block, Error> {
@@ -755,7 +797,7 @@ impl Block {
         let treasury: Currency = Currency::from_be_bytes(bytes[189..197].try_into().unwrap());
         let burnfee: Currency = Currency::from_be_bytes(bytes[197..205].try_into().unwrap());
         let difficulty: u64 = u64::from_be_bytes(bytes[205..213].try_into().unwrap());
-        let avg_total_fees: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap());
+        let avg_total_fees: Currency = Currency::from_be_bytes(bytes[213..221].try_into().unwrap()); // dupe below
         let avg_fee_per_byte: Currency =
             Currency::from_be_bytes(bytes[221..229].try_into().unwrap());
         let avg_nolan_rebroadcast_per_block: Currency =
@@ -772,6 +814,29 @@ impl Block {
             Currency::from_be_bytes(bytes[269..277].try_into().unwrap());
         let avg_payout_mining: Currency =
             Currency::from_be_bytes(bytes[277..285].try_into().unwrap());
+        let avg_payout_treasury: Currency =
+            Currency::from_be_bytes(bytes[285..285].try_into().unwrap());
+        let avg_payout_graveyard: Currency =
+            Currency::from_be_bytes(bytes[293..301].try_into().unwrap());
+        let avg_payout_atr: Currency =
+            Currency::from_be_bytes(bytes[301..309].try_into().unwrap());
+        let total_payout_routing: Currency =
+            Currency::from_be_bytes(bytes[309..317].try_into().unwrap());
+        let total_payout_mining: Currency =
+            Currency::from_be_bytes(bytes[317..325].try_into().unwrap());
+        let total_payout_treasury: Currency =
+            Currency::from_be_bytes(bytes[325..333].try_into().unwrap());
+        let total_payout_graveyard: Currency =
+            Currency::from_be_bytes(bytes[333..341].try_into().unwrap());
+        let total_payout_atr: Currency =
+            Currency::from_be_bytes(bytes[341..349].try_into().unwrap());
+        let total_fees: Currency =
+            Currency::from_be_bytes(bytes[349..357].try_into().unwrap());
+        let total_fees_new: Currency =
+            Currency::from_be_bytes(bytes[357..365].try_into().unwrap());
+        let total_fees_atr: Currency =
+            Currency::from_be_bytes(bytes[365..373].try_into().unwrap());
+
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -847,6 +912,18 @@ impl Block {
         block.avg_total_fees_atr = avg_total_fees_atr;
         block.avg_payout_routing = avg_payout_routing;
         block.avg_payout_mining = avg_payout_mining;
+        block.avg_payout_treasury = avg_payout_treasury;
+        block.avg_payout_graveyard = avg_payout_graveyard;
+        block.avg_payout_atr = avg_payout_atr; 
+        block.total_payout_routing = total_payout_routing;
+        block.total_payout_mining = total_payout_mining;
+        block.total_payout_treasury = total_payout_treasury;
+        block.total_payout_graveyard = total_payout_graveyard;
+        block.total_payout_atr = total_payout_atr; 
+        block.total_fees = total_fees;
+        block.total_fees_new = total_fees_new;
+        block.total_fees_atr = total_fees_atr;
+
         block.transactions = transactions.to_vec();
 
         // trace!("block.deserialize tx length = {:?}", transactions_len);
@@ -1781,6 +1858,13 @@ impl Block {
     /// [avg_total_fees_atr - 8 bytes - u64]
     /// [avg_payout_routing - 8 bytes - u64]
     /// [avg_payout_mining - 8 bytes - u64]
+    /// [avg_payout_treasury - 8 bytes - u64]
+    /// [avg_payout_graveyard - 8 bytes - u64]
+    /// [avg_payout_atr - 8 bytes - u64]
+    /// [total_fees - 8 bytes - u64]
+    /// [total_fees_new - 8 bytes - u64]
+    /// [total_fees_atr - 8 bytes - u64]
+
     /// [transaction][transaction][transaction]...
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
         let mut tx_len_buffer: Vec<u8> = vec![];
@@ -1822,6 +1906,17 @@ impl Block {
             self.avg_total_fees_atr.to_be_bytes().as_slice(),
             self.avg_payout_routing.to_be_bytes().as_slice(),
             self.avg_payout_mining.to_be_bytes().as_slice(),
+            self.avg_payout_treasury.to_be_bytes().as_slice(),
+            self.avg_payout_graveyard.to_be_bytes().as_slice(),
+            self.avg_payout_atr.to_be_bytes().as_slice(),
+            self.total_payout_routing.to_be_bytes().as_slice(),
+            self.total_payout_mining.to_be_bytes().as_slice(),
+            self.total_payout_treasury.to_be_bytes().as_slice(),
+            self.total_payout_graveyard.to_be_bytes().as_slice(),
+            self.total_payout_atr.to_be_bytes().as_slice(),
+            self.total_fees.to_be_bytes().as_slice(),
+            self.total_fees_new.to_be_bytes().as_slice(),
+            self.total_fees_atr.to_be_bytes().as_slice(),
             tx_buf.as_slice(),
         ]
         .concat();
@@ -1986,14 +2081,25 @@ impl Block {
         block.graveyard = self.graveyard;
         block.treasury = self.treasury;
         block.signature = self.signature;
-        block.avg_total_fees = self.avg_total_fees;
         block.avg_fee_per_byte = self.avg_fee_per_byte;
         block.avg_nolan_rebroadcast_per_block = self.avg_nolan_rebroadcast_per_block;
         block.previous_block_unpaid = self.previous_block_unpaid;
+        block.avg_total_fees = self.avg_total_fees;
         block.avg_total_fees_new = self.avg_total_fees_new;
         block.avg_total_fees_atr = self.avg_total_fees_atr;
         block.avg_payout_routing = self.avg_payout_routing;
         block.avg_payout_mining = self.avg_payout_mining;
+        block.avg_payout_treasury = self.avg_payout_treasury;
+        block.avg_payout_graveyard = self.avg_payout_graveyard;
+        block.avg_payout_atr = self.avg_payout_atr;
+        block.total_payout_routing = self.total_payout_routing;
+        block.total_payout_mining = self.total_payout_mining;
+        block.total_payout_treasury = self.total_payout_treasury;
+        block.total_payout_graveyard = self.total_payout_graveyard;
+        block.total_payout_atr = self.total_payout_atr;
+        block.total_fees = self.total_fees;
+        block.total_fees_new = self.total_fees_new;
+        block.total_fees_atr = self.total_fees_atr;
         block.hash = self.hash;
 
         block.merkle_root = self.generate_merkle_root(true, true);
@@ -2008,6 +2114,7 @@ impl Block {
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
     ) -> bool {
+
         //
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
         //
@@ -2049,12 +2156,67 @@ impl Block {
         let cv = self.generate_consensus_values(blockchain, storage).await;
 
         //
-        // consensus values -> average number of fees in the block
+        // avg_total_fees
         //
         if cv.avg_total_fees != self.avg_total_fees {
             error!(
-                "block is misreporting its average income. current : {:?} expected : {:?}",
+                "avg_total_fees error: {:?} expected : {:?}",
                 self.avg_total_fees, cv.avg_total_fees
+            );
+            return false;
+        }
+
+        //
+        // avg_total_fees_new
+        //
+        if cv.avg_total_fees_new != self.avg_total_fees_new {
+            error!(
+                "avg_total_fees_new error: {:?} expected : {:?}",
+                self.avg_total_fees_new, cv.avg_total_fees_new
+            );
+            return false;
+        }
+
+        //
+        // avg_total_fees_atr
+        //
+        if cv.avg_total_fees_atr != self.avg_total_fees_atr {
+            error!(
+                "avg_total_fees_atr error: {:?} expected : {:?}",
+                self.avg_total_fees_atr, cv.avg_total_fees_atr
+            );
+            return false;
+        }
+
+        //
+        // total_fees
+        //
+        if cv.total_fees != self.total_fees {
+            error!(
+                "total_fees error: {:?} expected : {:?}",
+                self.total_fees, cv.total_fees
+            );
+            return false;
+        }
+
+        //
+        // total_fees_new
+        //
+        if cv.total_fees_new != self.total_fees_new {
+            error!(
+                "total_fees_new error: {:?} expected : {:?}",
+                self.total_fees_new, cv.total_fees_new
+            );
+            return false;
+        }
+
+        //
+        // total_fees_atr
+        //
+        if cv.total_fees_atr != self.total_fees_atr {
+            error!(
+                "total_fees_atr error: {:?} expected : {:?}",
+                self.total_fees_atr, cv.total_fees_atr
             );
             return false;
         }
