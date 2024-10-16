@@ -277,6 +277,9 @@ pub struct Block {
     pub avg_total_fees_atr: Currency,
     pub avg_payout_routing: Currency,
     pub avg_payout_mining: Currency,
+    pub avg_payout_treasury: Currency,
+    pub avg_payout_graveyard: Currency,
+    pub avg_payout_atr: Currency,
     pub avg_fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
 
@@ -375,6 +378,9 @@ impl Block {
             avg_total_fees_atr: 0,
             avg_payout_routing: 0,
     	    avg_payout_mining: 0,
+            avg_payout_treasury: 0,
+    	    avg_payout_graveyard: 0,
+    	    avg_payout_atr: 0,
 
             transactions: vec![],
             pre_hash: [0; 32],
@@ -444,6 +450,9 @@ impl Block {
         let mut previous_block_avg_total_fees_atr = 0;
         let mut previous_block_avg_payout_routing = 0;
         let mut previous_block_avg_payout_mining = 0;
+        let mut previous_block_avg_payout_treasury = 0;
+        let mut previous_block_avg_payout_graveyard = 0;
+        let mut previous_block_avg_payout_atr = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
             previous_block_id = previous_block.id;
@@ -460,8 +469,10 @@ impl Block {
             previous_block_avg_total_fees_atr = previous_block.avg_total_fees_atr;
             previous_block_avg_payout_routing = previous_block.avg_payout_routing;
             previous_block_avg_payout_mining = previous_block.avg_payout_mining;
+            previous_block_avg_payout_treasury = previous_block.avg_payout_treasury;
+            previous_block_avg_payout_graveyard = previous_block.avg_payout_graveyard;
+            previous_block_avg_payout_atr = previous_block.avg_payout_atr;
         }
-
 
         //
         // create block
@@ -1086,6 +1097,9 @@ impl Block {
 	let mut previous_block_avg_total_fees_atr: Currency = 0;
         let mut previous_block_avg_payout_routing: Currency = 0;
         let mut previous_block_avg_payout_mining: Currency = 0;
+        let mut previous_block_avg_payout_treasury: Currency = 0;
+        let mut previous_block_avg_payout_graveyard: Currency = 0;
+        let mut previous_block_avg_payout_atr: Currency = 0;
 
 	let mut total_number_of_non_fee_transactions = 0;
 
@@ -1378,9 +1392,15 @@ impl Block {
         cv.total_fees = cv.total_fees_new + cv.total_fees_atr;
 
 	//
-	// fee-per-byte
+	// fee_per_byte
 	//
         if cv.total_bytes_new > 0 { cv.fee_per_byte = cv.total_fees_new / cv.total_bytes_new as Currency; }
+
+	//
+	// avg_fee_per_byte
+	//
+        let adjustment = (previous_block_avg_fee_per_byte as i128 - cv.fee_per_byte as i128) / GENESIS_PERIOD as i128;
+        cv.avg_fee_per_byte = (previous_block_avg_fee_per_byte as i128 - adjustment) as Currency;
 
 	//
 	// avg_total_fees
@@ -1606,9 +1626,42 @@ impl Block {
             }
         }
 
+	//
+	// treasury and graveyard
+	//
         cv.total_payout_treasury = treasury_contribution;
         cv.total_payout_graveyard = graveyard_contribution;
 
+	//
+	// average routing payout
+	//
+        let adjustment = (previous_block_avg_payout_routing as i128 - cv.total_payout_routing as i128) / GENESIS_PERIOD as i128;
+        cv.avg_payout_routing = (previous_block_avg_payout_routing as i128 - adjustment) as Currency;
+	
+	//
+	// average mining payout
+	//
+        let adjustment = (previous_block_avg_payout_mining as i128 - cv.total_payout_mining as i128) / GENESIS_PERIOD as i128;
+        cv.avg_payout_mining = (previous_block_avg_payout_mining as i128 - adjustment) as Currency;
+	
+	//
+	// average treasury payout
+	//
+        let adjustment = (previous_block_avg_payout_treasury as i128 - cv.total_payout_treasury as i128) / GENESIS_PERIOD as i128;
+        cv.avg_payout_treasury = (previous_block_avg_payout_treasury as i128 - adjustment) as Currency;
+	
+	//
+	// average graveyard payout
+	//
+        let adjustment = (previous_block_avg_payout_graveyard as i128 - cv.total_payout_graveyard as i128) / GENESIS_PERIOD as i128;
+        cv.avg_payout_graveyard = (previous_block_avg_payout_graveyard as i128 - adjustment) as Currency;
+	
+	//
+	// average atr payout
+	//
+        let adjustment = (previous_block_avg_payout_atr as i128 - cv.total_payout_atr as i128) / GENESIS_PERIOD as i128;
+        cv.avg_payout_atr = (previous_block_avg_payout_atr as i128 - adjustment) as Currency;
+	
         cv
     }
 
