@@ -26,10 +26,11 @@ pub enum NetworkEvent {
         result: Result<u64, std::io::Error>,
     },
     AddStunPeer {
-        result: Result<(u64, SaitoPublicKey), std::io::Error>,
+        peer_index: u64,
+        public_key: SaitoPublicKey,
     },
     RemoveStunPeer {
-        result: Result<u64, std::io::Error>,
+        peer_index: u64,
     },
     PeerDisconnected {
         peer_index: u64,

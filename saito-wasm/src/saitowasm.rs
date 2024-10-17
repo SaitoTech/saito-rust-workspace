@@ -508,7 +508,7 @@ pub async fn process_stun_peer(peer_index: PeerIndex, public_key: JsString) -> R
         peer_index, public_key
     );
     let mut saito = SAITO.lock().await;
-    let key: [u8; 33] = string_to_key(public_key.into())
+    let key: SaitoPublicKey = string_to_key(public_key.into())
         .map_err(|e| JsValue::from_str(&format!("Failed to parse public key: {}", e)))?;
 
     saito
@@ -516,7 +516,8 @@ pub async fn process_stun_peer(peer_index: PeerIndex, public_key: JsString) -> R
         .unwrap()
         .routing_thread
         .process_network_event(NetworkEvent::AddStunPeer {
-            result: Ok((peer_index, key)),
+            peer_index,
+            public_key: key,
         })
         .await;
     Ok(())
@@ -533,9 +534,7 @@ pub async fn remove_stun_peer(peer_index: PeerIndex) {
         .as_mut()
         .unwrap()
         .routing_thread
-        .process_network_event(NetworkEvent::RemoveStunPeer {
-            result: Ok(peer_index),
-        })
+        .process_network_event(NetworkEvent::RemoveStunPeer { peer_index })
         .await;
 }
 

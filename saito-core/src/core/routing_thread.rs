@@ -618,19 +618,16 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 }
             }
 
-            NetworkEvent::AddStunPeer { result } => {
-                if result.is_ok() {
-                    let (peer_index, public_key) = result.unwrap();
-                    self.handle_new_stun_peer(peer_index, public_key).await;
-                    return Some(());
-                }
+            NetworkEvent::AddStunPeer {
+                peer_index,
+                public_key,
+            } => {
+                self.handle_new_stun_peer(peer_index, public_key).await;
+                return Some(());
             }
-            NetworkEvent::RemoveStunPeer { result } => {
-                if result.is_ok() {
-                    let peer_index = result.unwrap();
-                    self.remove_stun_peer(peer_index).await;
-                    return Some(());
-                }
+            NetworkEvent::RemoveStunPeer { peer_index } => {
+                self.remove_stun_peer(peer_index).await;
+                return Some(());
             }
             NetworkEvent::PeerDisconnected {
                 peer_index,

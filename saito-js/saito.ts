@@ -217,6 +217,7 @@ export default class Saito {
         console.log("adding socket : " + peer_index + ". total sockets : " + this.sockets.size);
     }
 
+    
 
     public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection) {
         await this.stunManager.addStunPeer(publicKey, peerConnection);

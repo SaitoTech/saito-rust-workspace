@@ -1,4 +1,3 @@
-import { type Page, type Locator } from "@playwright/test";
 import SaitoNode from "./saito_node";
 
 export default class RustNode extends SaitoNode {

@@ -21,8 +21,8 @@ use tokio::sync::RwLock;
 
 #[derive(Clone, Debug)]
 pub enum PeerType {
-    DEFAULT,
-    STUN,
+    Default,
+    Stun,
 }
 
 #[derive(Clone, Debug)]
@@ -83,7 +83,7 @@ impl Peer {
                 Duration::from_secs(600),
             ),
             public_key: None,
-            peer_type: PeerType::DEFAULT,
+            peer_type: PeerType::Default,
         }
     }
 
@@ -93,7 +93,7 @@ impl Peer {
         io_handler: &(dyn InterfaceIO + Send + Sync),
     ) -> Peer {
         let mut peer = Peer::new(peer_index);
-        peer.peer_type = PeerType::STUN;
+        peer.peer_type = PeerType::Stun;
         peer.public_key = Some(public_key);
         peer.peer_status = PeerStatus::Connected;
         peer.services = io_handler.get_my_services();
@@ -101,7 +101,7 @@ impl Peer {
     }
 
     pub fn is_stun_peer(&self) -> bool {
-        matches!(self.peer_type, PeerType::STUN)
+        matches!(self.peer_type, PeerType::Stun)
     }
 
     pub fn has_key_list_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
