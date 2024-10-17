@@ -19,6 +19,12 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 
 #[derive(Clone, Debug)]
+pub enum PeerType {
+    Default,
+    Stun,
+}
+
+#[derive(Clone, Debug)]
 pub enum PeerStatus {
     Disconnected(
         Timestamp, /*next connection time*/
@@ -49,6 +55,7 @@ pub struct Peer {
     pub message_limiter: RateLimiter,
     pub invalid_block_limiter: RateLimiter,
     pub public_key: Option<SaitoPublicKey>,
+    pub peer_type: PeerType,
 }
 
 impl Peer {
@@ -70,7 +77,25 @@ impl Peer {
             message_limiter: RateLimiter::builder(1000, Duration::from_secs(1)),
             invalid_block_limiter: RateLimiter::builder(1, Duration::from_secs(3600)),
             public_key: None,
+            peer_type: PeerType::Default,
         }
+    }
+
+    pub fn new_stun(
+        peer_index: PeerIndex,
+        public_key: SaitoPublicKey,
+        io_handler: &(dyn InterfaceIO + Send + Sync),
+    ) -> Peer {
+        let mut peer = Peer::new(peer_index);
+        peer.peer_type = PeerType::Stun;
+        peer.public_key = Some(public_key);
+        peer.peer_status = PeerStatus::Connected;
+        peer.services = io_handler.get_my_services();
+        peer
+    }
+
+    pub fn is_stun_peer(&self) -> bool {
+        matches!(self.peer_type, PeerType::Stun)
     }
 
     pub fn has_key_list_limit_exceeded(&mut self, current_time: Timestamp) -> bool {

@@ -3,9 +3,11 @@ import Transaction from "./lib/transaction";
 import Block from "./lib/block";
 import Factory from "./lib/factory";
 import Peer from "./lib/peer";
-import Wallet, {DefaultEmptyPrivateKey} from "./lib/wallet";
+import StunPeer from "./lib/stun_peer";
+import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
+
 
 export enum LogLevel {
     Error = 0,
@@ -16,9 +18,12 @@ export enum LogLevel {
 }
 
 export default class Saito {
+
     private static instance: Saito;
     private static libInstance: any;
     sockets: Map<bigint, any> = new Map<bigint, any>();
+    private stunPeers: Map<bigint, { peerConnection: RTCPeerConnection, publicKey: string }> = new Map();
+    stunManager: StunPeer;
     factory = new Factory();
     promises = new Map<number, any>();
     private callbackIndex: number = 1;
@@ -36,6 +41,7 @@ export default class Saito {
     ) {
         console.log("initializing saito lib");
         Saito.instance = new Saito(factory);
+
 
         // @ts-ignore
         globalThis.shared_methods = {
@@ -182,6 +188,8 @@ export default class Saito {
 
     constructor(factory: Factory) {
         this.factory = factory;
+        this.stunManager = new StunPeer(this);
+
     }
 
     public static getInstance(): Saito {
@@ -208,6 +216,14 @@ export default class Saito {
         this.sockets.set(peer_index, socket);
         console.log("adding socket : " + peer_index + ". total sockets : " + this.sockets.size);
     }
+
+    
+
+    public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection) {
+        await this.stunManager.addStunPeer(publicKey, peerConnection);
+    }
+
+
 
     public getSocket(index: bigint): any | null {
         return this.sockets.get(index);
@@ -252,6 +268,8 @@ export default class Saito {
     public async processNewPeer(index: bigint, peer_config: any): Promise<void> {
         return Saito.getLibInstance().process_new_peer(index, peer_config);
     }
+
+
 
     public async processPeerDisconnection(peer_index: bigint): Promise<void> {
         return Saito.getLibInstance().process_peer_disconnection(peer_index);
@@ -402,7 +420,7 @@ export default class Saito {
             .catch((error) => {
                 console.error(error);
                 if (callback) {
-                    return callback({err: error.toString()});
+                    return callback({ err: error.toString() });
                 }
             });
     }
@@ -413,7 +431,7 @@ export default class Saito {
         callback?: any,
         peerIndex?: bigint
     ): Promise<any> {
-        // console.log("saito.sendRequest : peer = " + peerIndex);
+        console.log("sending request : peer = " + peerIndex);
         let wallet = await this.getWallet();
         let publicKey = await wallet.getPublicKey();
         let tx = await this.createTransaction(publicKey, BigInt(0), BigInt(0));
