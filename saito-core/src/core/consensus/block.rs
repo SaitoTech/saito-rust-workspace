@@ -25,7 +25,7 @@ use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 285;
+pub const BLOCK_HEADER_SIZE: usize = 381;
 
 //
 // ConsensusValues is an object that is generated that contains all of the 
@@ -164,7 +164,6 @@ impl ConsensusValues {
 	    avg_payout_atr: 0,
 
 	    avg_fee_per_byte: 0,
-
 	    fee_per_byte: 0,
 
             burnfee: 1,
@@ -215,7 +214,6 @@ impl ConsensusValues {
 	    avg_payout_atr: 0,
 
 	    avg_fee_per_byte: 0,
-
 	    fee_per_byte: 0,
 
             burnfee: 1,
@@ -270,9 +268,8 @@ pub struct Block {
     #[serde_as(as = "[_; 64]")]
     pub signature: [u8; 64],
     pub graveyard: Currency,
-    pub burnfee: Currency,
-    pub difficulty: u64,
     pub treasury: Currency,
+
     pub total_fees: Currency,
     pub total_fees_new: Currency,
     pub total_fees_atr: Currency,
@@ -290,8 +287,10 @@ pub struct Block {
     pub avg_payout_graveyard: Currency,
     pub avg_payout_atr: Currency,
     pub avg_fee_per_byte: Currency,
+    pub fee_per_byte: Currency,
     pub avg_nolan_rebroadcast_per_block: Currency,
-
+    pub burnfee: Currency,
+    pub difficulty: u64,
     pub previous_block_unpaid: Currency,
 
     /// Transactions
@@ -369,11 +368,7 @@ impl Block {
             merkle_root: [0; 32],
             signature: [0; 64],
             graveyard: 0,
-            burnfee: 0,
-            difficulty: 0,
             treasury: 0,
-            avg_fee_per_byte: 0,
-            avg_nolan_rebroadcast_per_block: 0,
             previous_block_unpaid: 0,
             total_fees: 0,
             total_fees_new: 0,
@@ -391,6 +386,11 @@ impl Block {
             avg_payout_treasury: 0,
     	    avg_payout_graveyard: 0,
     	    avg_payout_atr: 0,
+            avg_fee_per_byte: 0,
+            fee_per_byte: 0,
+            burnfee: 0,
+            difficulty: 0,
+            avg_nolan_rebroadcast_per_block: 0,
 
             transactions: vec![],
             pre_hash: [0; 32],
@@ -444,14 +444,10 @@ impl Block {
         );
 
         let mut previous_block_id = 0;
-        //let mut previous_block_burnfee = 0;
         let mut previous_block_timestamp = 0;
-        //let mut previous_block_difficulty = 0;
         let mut previous_block_graveyard = 0;
         let mut previous_block_treasury = 0;
         let mut previous_block_total_fees = 0;
-        let mut previous_block_total_fees_new = 0;
-        let mut previous_block_total_fees_atr = 0;
         let mut previous_block_avg_total_fees = 0;
         let mut previous_block_avg_total_fees_new = 0;
         let mut previous_block_avg_total_fees_atr = 0;
@@ -460,17 +456,14 @@ impl Block {
         let mut previous_block_avg_payout_treasury = 0;
         let mut previous_block_avg_payout_graveyard = 0;
         let mut previous_block_avg_payout_atr = 0;
+        let mut previous_block_avg_fee_per_byte = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
             previous_block_id = previous_block.id;
-            //previous_block_burnfee = previous_block.burnfee;
+            previous_block_total_fees = previous_block.total_fees;
             previous_block_timestamp = previous_block.timestamp;
-            //previous_block_difficulty = previous_block.difficulty;
             previous_block_graveyard = previous_block.graveyard;
             previous_block_treasury = previous_block.treasury;
-            previous_block_total_fees = previous_block.total_fees;
-            previous_block_total_fees_new = previous_block.total_fees_new;
-            previous_block_total_fees_atr = previous_block.total_fees_atr;
             previous_block_avg_total_fees = previous_block.avg_total_fees;
             previous_block_avg_total_fees_new = previous_block.avg_total_fees_new;
             previous_block_avg_total_fees_atr = previous_block.avg_total_fees_atr;
@@ -479,6 +472,7 @@ impl Block {
             previous_block_avg_payout_treasury = previous_block.avg_payout_treasury;
             previous_block_avg_payout_graveyard = previous_block.avg_payout_graveyard;
             previous_block_avg_payout_atr = previous_block.avg_payout_atr;
+            previous_block_avg_fee_per_byte = previous_block.avg_fee_per_byte;
         }
 
         //
@@ -492,20 +486,22 @@ impl Block {
         block.id = previous_block_id + 1;
         block.previous_block_hash = previous_block_hash;
         block.timestamp = current_timestamp;
-        //block.difficulty = previous_block_difficulty;
-        //block.burnfee = previous_block_burnfee;
         block.creator = *public_key;
-        block.previous_block_unpaid = previous_block_total_fees;
-        block.treasury = previous_block_treasury;
-        block.graveyard = previous_block_graveyard;
 
+	//
+	// previous block unpaid
+	//
+	if golden_ticket.is_some() {
+            block.previous_block_unpaid = 0;
+	} else {
+            block.previous_block_unpaid = previous_block_total_fees;
+	}
 
         //
         // golden ticket
         //
         if golden_ticket.is_some() {
             block.transactions.push(golden_ticket.unwrap());
-            block.previous_block_unpaid = 0;
         }
 
         //
@@ -522,28 +518,18 @@ impl Block {
         let mut cv: ConsensusValues = block.generate_consensus_values(blockchain, storage).await;
         block.cv = cv.clone();
 
-	//
-	// burn fee
-	//
-	block.burnfee = cv.burnfee;
-
         //
-        // difficulty
-        //
-        block.difficulty = cv.difficulty;
-
-        //
-        // avg total fees
+        // total fees
         //
         block.total_fees = cv.total_fees;
 
         //
-        // avg total fees new
+        // total fees new
         //
         block.total_fees_new = cv.total_fees_new;
 
         //
-        // avg total fees atr
+        // total fees atr
         //
         block.total_fees_atr = cv.total_fees_atr;
 
@@ -618,9 +604,24 @@ impl Block {
         block.avg_fee_per_byte = cv.avg_fee_per_byte;
 
         //
+        // fee per byte
+        //
+        block.fee_per_byte = cv.fee_per_byte;
+
+        //
         // nolan rebroadcast per block
         //
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
+
+	//
+	// burn fee
+	//
+	block.burnfee = cv.burnfee;
+
+        //
+        // difficulty
+        //
+        block.difficulty = cv.difficulty;
 
         //
         // treasury
@@ -755,6 +756,7 @@ impl Block {
     /// [total_fees - 8 bytes - u64]
     /// [total_fees_new - 8 bytes - u64]
     /// [total_fees_atr - 8 bytes - u64]
+    /// [fee_per_byte - 8 bytes - u64]
 
     /// [transaction][transaction][transaction]...
     pub fn deserialize_from_net(bytes: &[u8]) -> Result<Block, Error> {
@@ -836,6 +838,8 @@ impl Block {
             Currency::from_be_bytes(bytes[357..365].try_into().unwrap());
         let total_fees_atr: Currency =
             Currency::from_be_bytes(bytes[365..373].try_into().unwrap());
+        let fee_per_byte: Currency =
+            Currency::from_be_bytes(bytes[373..381].try_into().unwrap());
 
 
         let mut transactions = vec![];
@@ -923,6 +927,7 @@ impl Block {
         block.total_fees = total_fees;
         block.total_fees_new = total_fees_new;
         block.total_fees_atr = total_fees_atr;
+        block.fee_per_byte = fee_per_byte;
 
         block.transactions = transactions.to_vec();
 
@@ -1208,7 +1213,6 @@ impl Block {
         let mut previous_block_avg_payout_treasury: Currency = 0;
         let mut previous_block_avg_payout_graveyard: Currency = 0;
         let mut previous_block_avg_payout_atr: Currency = 0;
-
 	let mut total_number_of_non_fee_transactions = 0;
 
         //
@@ -1702,16 +1706,8 @@ impl Block {
                 slip_index += 1;
             }
 
-            //debug!("miner payout: {:?}", miner_payout);
-            //debug!("router1 payout: {:?}", router1_payout);
-            //debug!("router2 payout: {:?}", router2_payout);
-            //debug!("miner pkey: {:?}", miner_publickey.to_base58());
-            //debug!("router1 pkey: {:?}", router1_publickey.to_base58());
-            //debug!("router2 pkey: {:?}", router2_publickey.to_base58());
-
 	    cv.total_payout_mining = miner_payout;
 	    cv.total_payout_routing = router1_payout + router2_payout;
-
             cv.fee_transaction = Some(transaction);
 
         } else {
@@ -1864,6 +1860,7 @@ impl Block {
     /// [total_fees - 8 bytes - u64]
     /// [total_fees_new - 8 bytes - u64]
     /// [total_fees_atr - 8 bytes - u64]
+    /// [fee_per_byte - 8 bytes - u64]
 
     /// [transaction][transaction][transaction]...
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
@@ -1917,6 +1914,7 @@ impl Block {
             self.total_fees.to_be_bytes().as_slice(),
             self.total_fees_new.to_be_bytes().as_slice(),
             self.total_fees_atr.to_be_bytes().as_slice(),
+            self.fee_per_byte.to_be_bytes().as_slice(),
             tx_buf.as_slice(),
         ]
         .concat();
@@ -2100,6 +2098,7 @@ impl Block {
         block.total_fees = self.total_fees;
         block.total_fees_new = self.total_fees_new;
         block.total_fees_atr = self.total_fees_atr;
+        block.fee_per_byte = self.fee_per_byte;
         block.hash = self.hash;
 
         block.merkle_root = self.generate_merkle_root(true, true);
@@ -2156,39 +2155,6 @@ impl Block {
         let cv = self.generate_consensus_values(blockchain, storage).await;
 
         //
-        // avg_total_fees
-        //
-        if cv.avg_total_fees != self.avg_total_fees {
-            error!(
-                "avg_total_fees error: {:?} expected : {:?}",
-                self.avg_total_fees, cv.avg_total_fees
-            );
-            return false;
-        }
-
-        //
-        // avg_total_fees_new
-        //
-        if cv.avg_total_fees_new != self.avg_total_fees_new {
-            error!(
-                "avg_total_fees_new error: {:?} expected : {:?}",
-                self.avg_total_fees_new, cv.avg_total_fees_new
-            );
-            return false;
-        }
-
-        //
-        // avg_total_fees_atr
-        //
-        if cv.avg_total_fees_atr != self.avg_total_fees_atr {
-            error!(
-                "avg_total_fees_atr error: {:?} expected : {:?}",
-                self.avg_total_fees_atr, cv.avg_total_fees_atr
-            );
-            return false;
-        }
-
-        //
         // total_fees
         //
         if cv.total_fees != self.total_fees {
@@ -2222,18 +2188,183 @@ impl Block {
         }
 
         //
-        // consensus values -> difficulty (mining/payout unlock difficulty)
+        // avg_total_fees
         //
-        if cv.difficulty != self.difficulty {
+        if cv.avg_total_fees != self.avg_total_fees {
             error!(
-                "ERROR 202392: difficulty is invalid. expected: {:?} vs actual : {:?}",
-                cv.difficulty, self.difficulty
+                "avg_total_fees error: {:?} expected : {:?}",
+                self.avg_total_fees, cv.avg_total_fees
             );
             return false;
         }
 
         //
-        // consensus values -> burnfee (cost of producing block)
+        // avg_total_fees_new
+        //
+        if cv.avg_total_fees_new != self.avg_total_fees_new {
+            error!(
+                "avg_total_fees_new error: {:?} expected : {:?}",
+                self.avg_total_fees_new, cv.avg_total_fees_new
+            );
+            return false;
+        }
+
+        //
+        // avg_total_fees_atr
+        //
+        if cv.avg_total_fees_atr != self.avg_total_fees_atr {
+            error!(
+                "avg_total_fees_atr error: {:?} expected : {:?}",
+                self.avg_total_fees_atr, cv.avg_total_fees_atr
+            );
+            return false;
+        }
+
+        //
+        // total_payout_routing
+        //
+        if cv.total_payout_routing != self.total_payout_routing {
+            error!(
+                "total_payout_routing error: {:?} expected : {:?}",
+                self.total_payout_routing, cv.total_payout_routing
+            );
+            return false;
+        }
+
+        //
+        // total_payout_mining
+        //
+        if cv.total_payout_mining != self.total_payout_mining {
+            error!(
+                "total_payout_mining error: {:?} expected : {:?}",
+                self.total_payout_mining, cv.total_payout_mining
+            );
+            return false;
+        }
+
+        //
+        // total_payout_treasury
+        //
+        if cv.total_payout_treasury != self.total_payout_treasury {
+            error!(
+                "total_payout_treasury error: {:?} expected : {:?}",
+                self.total_payout_treasury, cv.total_payout_treasury
+            );
+            return false;
+        }
+
+        //
+        // total_payout_graveyard
+        //
+        if cv.total_payout_graveyard != self.total_payout_graveyard {
+            error!(
+                "total_payout_graveyard error: {:?} expected : {:?}",
+                self.total_payout_graveyard, cv.total_payout_graveyard
+            );
+            return false;
+        }
+
+        //
+        // total_payout_atr
+        //
+        if cv.total_payout_atr != self.total_payout_atr {
+            error!(
+                "total_payout_atr error: {:?} expected : {:?}",
+                self.total_payout_atr, cv.total_payout_atr
+            );
+            return false;
+        }
+
+        //
+        // avg_payout_routing
+        //
+        if cv.avg_payout_routing != self.avg_payout_routing {
+            error!(
+                "avg_payout_routing error: {:?} expected : {:?}",
+                self.avg_payout_routing, cv.avg_payout_routing
+            );
+            return false;
+        }
+
+        //
+        // avg_payout_mining
+        //
+        if cv.avg_payout_mining != self.avg_payout_mining {
+            error!(
+                "avg_payout_mining error: {:?} expected : {:?}",
+                self.avg_payout_mining, cv.avg_payout_mining
+            );
+            return false;
+        }
+
+        //
+        // total_payout_treasury
+        //
+        if cv.avg_payout_treasury != self.avg_payout_treasury {
+            error!(
+                "avg_payout_treasury error: {:?} expected : {:?}",
+                self.avg_payout_treasury, cv.avg_payout_treasury
+            );
+            return false;
+        }
+
+        //
+        // avg_payout_graveyard
+        //
+        if cv.avg_payout_graveyard != self.avg_payout_graveyard {
+            error!(
+                "avg_payout_graveyard error: {:?} expected : {:?}",
+                self.avg_payout_graveyard, cv.avg_payout_graveyard
+            );
+            return false;
+        }
+
+        //
+        // total_payout_atr
+        //
+        if cv.avg_payout_atr != self.avg_payout_atr {
+            error!(
+                "avg_payout_atr error: {:?} expected : {:?}",
+                self.avg_payout_atr, cv.avg_payout_atr
+            );
+            return false;
+        }
+
+        //
+        // avg_fee_per_byte
+        //
+        if cv.avg_fee_per_byte != self.avg_fee_per_byte {
+            error!(
+                "ERROR 202392: avg_fee_per_byte is invalid. expected: {:?} vs actual : {:?}",
+                cv.avg_fee_per_byte, self.avg_fee_per_byte
+            );
+            return false;
+        }
+
+        //
+        // fee_per_byte
+        //
+        if cv.fee_per_byte != self.fee_per_byte {
+            error!(
+                "ERROR 202392: fee_per_byte is invalid. expected: {:?} vs actual : {:?}",
+                cv.fee_per_byte, self.fee_per_byte
+            );
+            return false;
+        }
+
+        //
+        // consensus values -> difficulty (mining/payout unlock difficulty)
+        //
+        if cv.avg_nolan_rebroadcast_per_block != self.avg_nolan_rebroadcast_per_block {
+            error!(
+                "ERROR 202392: avg_nolan_rebroadcast_per_block is invalid. expected: {:?} vs actual : {:?}",
+                cv.avg_nolan_rebroadcast_per_block, self.avg_nolan_rebroadcast_per_block
+            );
+            return false;
+        }
+
+        //
+        // burnfee
         //
         if cv.burnfee != self.burnfee {
             error!(
@@ -2244,15 +2375,18 @@ impl Block {
         }
 
         //
-        // consensus values -> avg fee per byte
+        // difficulty
         //
-        if cv.avg_fee_per_byte != self.avg_fee_per_byte {
-            error!("block is mis-reporting its average fee per byte");
+        if cv.difficulty != self.difficulty {
+            error!(
+                "ERROR 202392: difficulty is invalid. expected: {:?} vs actual : {:?}",
+                cv.difficulty, self.difficulty
+            );
             return false;
         }
 
         //
-        // consensus values -> issuance transactions (only block #1 can print money)
+        // issuance transactions (only possible in block #1)
         //
         if cv.it_num > 0 && self.id > 1 {
             error!("ERROR: blockchain contains issuance after block 1 in chain",);
@@ -2260,7 +2394,7 @@ impl Block {
         }
 
         //
-        // consensus values -> staking transaction (social slashing)
+        // social staking transactions (if required)
         //
         if blockchain.social_stake_amount != 0 && cv.st_num != 1 && self.id > 1 {
             error!(
@@ -2270,26 +2404,12 @@ impl Block {
             return false;
         }
 
-        //
-        // consensus values => difficulty
-        //
-        if cv.difficulty != self.difficulty {
-            error!(
-                "block : {:?} does not have difficulty set appropriately",
-                self.hash.to_hex()
-            );
-            return false;
-        }
 
         //
-        // many kinds of validation like the burn fee and the golden ticket solution
-        // require the existence of the previous block in order to validate. we put all
-        // of these validation steps below so they will have access to the previous block
-        //
-        // if no previous block exists, we are valid only in a limited number of
-        // circumstances, such as this being the first block we are adding to our chain.
-        //
+        // validation of the following requires a previous-block to exist
+	//
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
+
             //
             // ghost blocks
             //
@@ -2303,7 +2423,6 @@ impl Block {
             let mut expected_treasury = previous_block.treasury;
             expected_treasury += cv.total_payout_treasury;
             expected_treasury -= cv.total_payout_atr;
-
             if self.treasury != expected_treasury {
                 error!(
                     "ERROR 820391: treasury does not validate: {} expected versus {} found",
@@ -2313,7 +2432,7 @@ impl Block {
             }
 
             //
-            // graveyard - sponge for any NOLAN removed from circulation
+            // graveyard
             //
             let mut expected_graveyard = previous_block.graveyard;
             expected_graveyard += cv.total_payout_graveyard;
@@ -2328,8 +2447,6 @@ impl Block {
             //
             // validate routing work required
             //
-            // this checks the total amount of fees that need to be burned in this
-            // block to be considered valid according to consensus criteria.
             let amount_of_routing_work_needed: Currency =
                 BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
                     previous_block.burnfee,
@@ -2340,8 +2457,6 @@ impl Block {
                 error!("Error 510293: block lacking adequate routing work from creator. actual : {:?} expected : {:?}",self.total_work, amount_of_routing_work_needed);
                 return false;
             }
-
-            // trace!(" ... done routing work required: {:?}", create_timestamp());
 
             //
             // validate golden ticket
@@ -2356,6 +2471,7 @@ impl Block {
             // the validation process we have already examined the fee transaction
             // which was generated using this solution. If the solution is invalid
             // we find that out now, and it invalidates the block.
+            //
             if let Some(gt_index) = cv.gt_index {
                 let golden_ticket: GoldenTicket =
                     GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
@@ -2372,13 +2488,20 @@ impl Block {
                     golden_ticket.public_key,
                 );
 
+		//
                 // if there is a golden ticket, our previous_block_unpaid should be
                 // zero, as we will have issued payment in this block.
+		//
                 if self.previous_block_unpaid != 0 {
                     error!("ERROR 720351: golden ticket but previous block incorrect");
                     return false;
                 }
 
+		//
+		// we confirm that the golden ticket is targetting the block hash
+		// of the previous block. the solution is invalid if it is not 
+		// current with the state of the chain..
+		//
                 if !gt.validate(previous_block.difficulty) {
                     error!(
                         "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}",
@@ -2398,11 +2521,14 @@ impl Block {
                     );
                     return false;
                 }
+
             } else {
+		//
                 // if there is no golden ticket, our previous block's total_fees will
                 // be stored in this block as previous_block_unpaid. this simplifies
                 // smoothing payouts, and assists with monitoring that the total token
                 // supply has not changed.
+		//
                 if self.previous_block_unpaid != previous_block.total_fees {
                     error!("ERROR 572983: previous_block_unpaid value incorrect");
                     return false;
@@ -2411,6 +2537,7 @@ impl Block {
             // trace!(" ... golden ticket: (validated)  {:?}", create_timestamp());
         }
 
+	//
         // validate atr
         //
         // Automatic Transaction Rebroadcasts are removed programmatically from
@@ -2443,7 +2570,7 @@ impl Block {
         }
 
         //
-        // validate merkle root
+        // merkle root
         //
         if self.merkle_root == [0; 32]
             && self.merkle_root
@@ -2453,33 +2580,31 @@ impl Block {
             return false;
         }
 
-        // trace!(" ... block.validate: (cv-data)   {:?}", create_timestamp());
-
-        // validate fee transactions
+        //
+        // fee transaction
         //
         // because the fee transaction that is created by generate_consensus_values is
         // produced without knowledge of the block in which it will be put, we need to
         // update that transaction with this information prior to hashing it in order
         // for the hash-comparison to work.
+        //
         if cv.ft_num > 0 {
             if let (Some(ft_index), Some(fee_transaction_expected)) =
                 (cv.ft_index, cv.fee_transaction)
             {
-                // no golden ticket? invalid
                 if cv.gt_index.is_none() {
                     error!(
-                        "ERROR 48203: block appears to have fee transaction without golden ticket"
+                        "ERROR 48203: block has fee transaction but no golden ticket"
                     );
                     return false;
                 }
 
+		//
                 // the fee transaction is hashed to compare it with the one in the block
+		//
                 let fee_transaction_in_block = self.transactions.get(ft_index).unwrap();
                 let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
                 let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
-
-                debug!("our hash1 is: {:?}: ", hash1.to_hex());
-                debug!("our hash2 is: {:?}: ", hash2.to_hex());
 
                 if hash1 != hash2 {
                     error!(
@@ -2505,6 +2630,7 @@ impl Block {
             }
         }
 
+        //
         // validate transactions
         //
         // validating transactions requires checking that the signatures are valid,
