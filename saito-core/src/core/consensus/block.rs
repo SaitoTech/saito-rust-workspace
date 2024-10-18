@@ -123,6 +123,12 @@ pub struct ConsensusValues {
     // average of SAITO rebroadcast (inputs) each block
     pub avg_nolan_rebroadcast_per_block: Currency,
 
+    pub total_rebroadcast_fees_nolan: Currency,
+
+    pub total_rebroadcast_staking_payouts_nolan: Currency,
+
+    pub expected_difficulty: u64,
+
 }
 
 impl ConsensusValues {
@@ -175,6 +181,12 @@ impl ConsensusValues {
             rebroadcast_hash: [0; 32],
     	    avg_nolan_rebroadcast_per_block: 0,
 
+        total_rebroadcast_fees_nolan: 0,
+
+        total_rebroadcast_staking_payouts_nolan: 0,
+
+        expected_difficulty: 0,
+
         }
     }
     pub fn default() -> ConsensusValues {
@@ -224,6 +236,11 @@ impl ConsensusValues {
             total_rebroadcast_nolan: 0,
             rebroadcast_hash: [0; 32],
     	    avg_nolan_rebroadcast_per_block: 0,
+        total_rebroadcast_fees_nolan: 0,
+
+        total_rebroadcast_staking_payouts_nolan: 0,
+
+        expected_difficulty: 0,
 
         }
     }
