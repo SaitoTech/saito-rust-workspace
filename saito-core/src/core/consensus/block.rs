@@ -28,7 +28,7 @@ use crate::iterate;
 pub const BLOCK_HEADER_SIZE: usize = 381;
 
 //
-// ConsensusValues is an object that is generated that contains all of the 
+// ConsensusValues is an object that is generated that contains all of the
 // variables that a block SHOULD contain given its position in the chain
 // and its set of transactions.
 //
@@ -41,7 +41,6 @@ pub const BLOCK_HEADER_SIZE: usize = 381;
 //
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct ConsensusValues {
-
     // expected transaction containing outbound payments
     pub fee_transaction: Option<Transaction>,
 
@@ -70,11 +69,11 @@ pub struct ConsensusValues {
     pub total_fees_atr: Currency,
 
     // smoothed avg fees -- new and atr transactions
-    pub avg_total_fees: Currency ,
+    pub avg_total_fees: Currency,
     // smoothed avg fees -- only new transactions
-    pub avg_total_fees_new: Currency ,
+    pub avg_total_fees_new: Currency,
     // smoothed avg fees -- only atr transactions
-    pub avg_total_fees_atr: Currency ,
+    pub avg_total_fees_atr: Currency,
 
     // total size in bytes
     pub total_bytes_new: u64,
@@ -91,18 +90,18 @@ pub struct ConsensusValues {
     pub total_payout_atr: Currency,
 
     // smoothed avg routing payout
-    pub avg_payout_routing: Currency ,
+    pub avg_payout_routing: Currency,
     // smoothed avg mining payout
-    pub avg_payout_mining: Currency ,
+    pub avg_payout_mining: Currency,
     // smoothed avg treasury payout
-    pub avg_payout_treasury: Currency ,
+    pub avg_payout_treasury: Currency,
     // smoothed avg graveyard payout
-    pub avg_payout_graveyard: Currency ,
+    pub avg_payout_graveyard: Currency,
     // smoothed avg atr payout
-    pub avg_payout_atr: Currency ,
+    pub avg_payout_atr: Currency,
 
     // smoothed avg fee per byte (last epoch)
-    pub avg_fee_per_byte: Currency ,
+    pub avg_fee_per_byte: Currency,
 
     // avg byte fees paid by all txs (single block)
     pub fee_per_byte: Currency,
@@ -128,14 +127,12 @@ pub struct ConsensusValues {
     pub total_rebroadcast_staking_payouts_nolan: Currency,
 
     pub expected_difficulty: u64,
-
 }
 
 impl ConsensusValues {
     #[allow(clippy::too_many_arguments)]
     pub fn new() -> ConsensusValues {
         ConsensusValues {
-
             fee_transaction: None,
 
             st_num: 0,
@@ -151,26 +148,26 @@ impl ConsensusValues {
             total_fees_new: 0,
             total_fees_atr: 0,
 
-	    avg_total_fees: 0,
-	    avg_total_fees_new: 0,
-	    avg_total_fees_atr: 0,
+            avg_total_fees: 0,
+            avg_total_fees_new: 0,
+            avg_total_fees_atr: 0,
 
-	    total_bytes_new: 0,
+            total_bytes_new: 0,
 
-	    total_payout_routing: 0,
-	    total_payout_mining: 0,
-	    total_payout_treasury: 0,
-	    total_payout_graveyard: 0,
-	    total_payout_atr: 0,
+            total_payout_routing: 0,
+            total_payout_mining: 0,
+            total_payout_treasury: 0,
+            total_payout_graveyard: 0,
+            total_payout_atr: 0,
 
-	    avg_payout_routing: 0,
-	    avg_payout_mining: 0,
-	    avg_payout_treasury: 0,
-	    avg_payout_graveyard: 0,
-	    avg_payout_atr: 0,
+            avg_payout_routing: 0,
+            avg_payout_mining: 0,
+            avg_payout_treasury: 0,
+            avg_payout_graveyard: 0,
+            avg_payout_atr: 0,
 
-	    avg_fee_per_byte: 0,
-	    fee_per_byte: 0,
+            avg_fee_per_byte: 0,
+            fee_per_byte: 0,
 
             burnfee: 1,
             difficulty: 1,
@@ -179,19 +176,17 @@ impl ConsensusValues {
             total_rebroadcast_slips: 0,
             total_rebroadcast_nolan: 0,
             rebroadcast_hash: [0; 32],
-    	    avg_nolan_rebroadcast_per_block: 0,
+            avg_nolan_rebroadcast_per_block: 0,
 
-        total_rebroadcast_fees_nolan: 0,
+            total_rebroadcast_fees_nolan: 0,
 
-        total_rebroadcast_staking_payouts_nolan: 0,
+            total_rebroadcast_staking_payouts_nolan: 0,
 
-        expected_difficulty: 0,
-
+            expected_difficulty: 0,
         }
     }
     pub fn default() -> ConsensusValues {
         ConsensusValues {
-
             fee_transaction: None,
 
             st_num: 0,
@@ -207,26 +202,26 @@ impl ConsensusValues {
             total_fees_new: 0,
             total_fees_atr: 0,
 
-	    avg_total_fees: 0,
-	    avg_total_fees_new: 0,
-	    avg_total_fees_atr: 0,
+            avg_total_fees: 0,
+            avg_total_fees_new: 0,
+            avg_total_fees_atr: 0,
 
-	    total_bytes_new: 0,
+            total_bytes_new: 0,
 
-	    total_payout_routing: 0,
-	    total_payout_mining: 0,
-	    total_payout_treasury: 0,
-	    total_payout_graveyard: 0,
-	    total_payout_atr: 0,
+            total_payout_routing: 0,
+            total_payout_mining: 0,
+            total_payout_treasury: 0,
+            total_payout_graveyard: 0,
+            total_payout_atr: 0,
 
-	    avg_payout_routing: 0,
-	    avg_payout_mining: 0,
-	    avg_payout_treasury: 0,
-	    avg_payout_graveyard: 0,
-	    avg_payout_atr: 0,
+            avg_payout_routing: 0,
+            avg_payout_mining: 0,
+            avg_payout_treasury: 0,
+            avg_payout_graveyard: 0,
+            avg_payout_atr: 0,
 
-	    avg_fee_per_byte: 0,
-	    fee_per_byte: 0,
+            avg_fee_per_byte: 0,
+            fee_per_byte: 0,
 
             burnfee: 1,
             difficulty: 1,
@@ -235,13 +230,12 @@ impl ConsensusValues {
             total_rebroadcast_slips: 0,
             total_rebroadcast_nolan: 0,
             rebroadcast_hash: [0; 32],
-    	    avg_nolan_rebroadcast_per_block: 0,
-        total_rebroadcast_fees_nolan: 0,
+            avg_nolan_rebroadcast_per_block: 0,
+            total_rebroadcast_fees_nolan: 0,
 
-        total_rebroadcast_staking_payouts_nolan: 0,
+            total_rebroadcast_staking_payouts_nolan: 0,
 
-        expected_difficulty: 0,
-
+            expected_difficulty: 0,
         }
     }
 }
@@ -268,7 +262,6 @@ pub enum BlockType {
 #[serde_with::serde_as]
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Block {
-
     /// Consensus Level Variables
     ///
     /// these are the variables that are serialized into the block header
@@ -377,7 +370,6 @@ impl Block {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Block {
         Block {
-
             id: 0,
             timestamp: 0,
             previous_block_hash: [0; 32],
@@ -394,15 +386,15 @@ impl Block {
             avg_total_fees_new: 0,
             avg_total_fees_atr: 0,
             total_payout_routing: 0,
-    	    total_payout_mining: 0,
+            total_payout_mining: 0,
             total_payout_treasury: 0,
-    	    total_payout_graveyard: 0,
-    	    total_payout_atr: 0,
+            total_payout_graveyard: 0,
+            total_payout_atr: 0,
             avg_payout_routing: 0,
-    	    avg_payout_mining: 0,
+            avg_payout_mining: 0,
             avg_payout_treasury: 0,
-    	    avg_payout_graveyard: 0,
-    	    avg_payout_atr: 0,
+            avg_payout_graveyard: 0,
+            avg_payout_atr: 0,
             avg_fee_per_byte: 0,
             fee_per_byte: 0,
             burnfee: 0,
@@ -497,22 +489,22 @@ impl Block {
         //
         let mut block = Block::new();
 
-	//
-	// fill in default values
-	//
+        //
+        // fill in default values
+        //
         block.id = previous_block_id + 1;
         block.previous_block_hash = previous_block_hash;
         block.timestamp = current_timestamp;
         block.creator = *public_key;
 
-	//
-	// previous block unpaid
-	//
-	if golden_ticket.is_some() {
+        //
+        // previous block unpaid
+        //
+        if golden_ticket.is_some() {
             block.previous_block_unpaid = 0;
-	} else {
+        } else {
             block.previous_block_unpaid = previous_block_total_fees;
-	}
+        }
 
         //
         // golden ticket
@@ -630,10 +622,10 @@ impl Block {
         //
         block.avg_nolan_rebroadcast_per_block = cv.avg_nolan_rebroadcast_per_block;
 
-	//
-	// burn fee
-	//
-	block.burnfee = cv.burnfee;
+        //
+        // burn fee
+        //
+        block.burnfee = cv.burnfee;
 
         //
         // difficulty
@@ -655,24 +647,26 @@ impl Block {
         //
         let rlen = cv.rebroadcasts.len();
 
-	//
+        //
         // TODO - can we remove this section and skip right ahead to appending the atr txs? we run
-	// generate() down below at the end of this function, so why are we generating the hash and 
-	// the merkle-root here?
-	//
-	// and why do we run it below AFTER we sign the block? if we can eliminate the need for this
-	// loop through the transaction set and the redundant creation of the tx hashes and the 
-	// block merkle-root that would be an improvement to the efficiency of block creation.
-	//
+        // generate() down below at the end of this function, so why are we generating the hash and
+        // the merkle-root here?
+        //
+        // and why do we run it below AFTER we sign the block? if we can eliminate the need for this
+        // loop through the transaction set and the redundant creation of the tx hashes and the
+        // block merkle-root that would be an improvement to the efficiency of block creation.
+        //
         let _tx_hashes_generated = cv.rebroadcasts[0..rlen]
             .iter_mut()
             .enumerate()
             .all(|(index, tx)| tx.generate(public_key, index as u64, block.id));
-	
-	//
-	// add ATR transactions
-	//
-        if rlen > 0 { block.transactions.append(&mut cv.rebroadcasts); }
+
+        //
+        // add ATR transactions
+        //
+        if rlen > 0 {
+            block.transactions.append(&mut cv.rebroadcasts);
+        }
 
         //
         // fee transaction
@@ -717,9 +711,9 @@ impl Block {
         //
         block.generate_pre_hash();
 
-	//
-	//
-	//
+        //
+        //
+        //
         block.sign(private_key);
 
         //
@@ -823,8 +817,7 @@ impl Block {
             Currency::from_be_bytes(bytes[229..237].try_into().unwrap());
         let previous_block_unpaid: Currency =
             Currency::from_be_bytes(bytes[237..245].try_into().unwrap());
-        let avg_total_fees: Currency =
-            Currency::from_be_bytes(bytes[245..253].try_into().unwrap());
+        let avg_total_fees: Currency = Currency::from_be_bytes(bytes[245..253].try_into().unwrap());
         let avg_total_fees_new: Currency =
             Currency::from_be_bytes(bytes[253..261].try_into().unwrap());
         let avg_total_fees_atr: Currency =
@@ -837,8 +830,7 @@ impl Block {
             Currency::from_be_bytes(bytes[285..285].try_into().unwrap());
         let avg_payout_graveyard: Currency =
             Currency::from_be_bytes(bytes[293..301].try_into().unwrap());
-        let avg_payout_atr: Currency =
-            Currency::from_be_bytes(bytes[301..309].try_into().unwrap());
+        let avg_payout_atr: Currency = Currency::from_be_bytes(bytes[301..309].try_into().unwrap());
         let total_payout_routing: Currency =
             Currency::from_be_bytes(bytes[309..317].try_into().unwrap());
         let total_payout_mining: Currency =
@@ -849,15 +841,10 @@ impl Block {
             Currency::from_be_bytes(bytes[333..341].try_into().unwrap());
         let total_payout_atr: Currency =
             Currency::from_be_bytes(bytes[341..349].try_into().unwrap());
-        let total_fees: Currency =
-            Currency::from_be_bytes(bytes[349..357].try_into().unwrap());
-        let total_fees_new: Currency =
-            Currency::from_be_bytes(bytes[357..365].try_into().unwrap());
-        let total_fees_atr: Currency =
-            Currency::from_be_bytes(bytes[365..373].try_into().unwrap());
-        let fee_per_byte: Currency =
-            Currency::from_be_bytes(bytes[373..381].try_into().unwrap());
-
+        let total_fees: Currency = Currency::from_be_bytes(bytes[349..357].try_into().unwrap());
+        let total_fees_new: Currency = Currency::from_be_bytes(bytes[357..365].try_into().unwrap());
+        let total_fees_atr: Currency = Currency::from_be_bytes(bytes[365..373].try_into().unwrap());
+        let fee_per_byte: Currency = Currency::from_be_bytes(bytes[373..381].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -935,12 +922,12 @@ impl Block {
         block.avg_payout_mining = avg_payout_mining;
         block.avg_payout_treasury = avg_payout_treasury;
         block.avg_payout_graveyard = avg_payout_graveyard;
-        block.avg_payout_atr = avg_payout_atr; 
+        block.avg_payout_atr = avg_payout_atr;
         block.total_payout_routing = total_payout_routing;
         block.total_payout_mining = total_payout_mining;
         block.total_payout_treasury = total_payout_treasury;
         block.total_payout_graveyard = total_payout_graveyard;
-        block.total_payout_atr = total_payout_atr; 
+        block.total_payout_atr = total_payout_atr;
         block.total_fees = total_fees;
         block.total_fees_new = total_fees_new;
         block.total_fees_atr = total_fees_atr;
@@ -1052,7 +1039,6 @@ impl Block {
     // cumulative block fees they contain.
     //
     pub fn generate(&mut self) -> bool {
-
         let creator_public_key = &self.creator;
 
         self.total_rebroadcast_nolan = 0;
@@ -1168,9 +1154,9 @@ impl Block {
         self.golden_ticket_index = golden_ticket_index;
         self.issuance_transaction_index = issuance_transaction_index;
 
-	//
+        //
         // update block with total fees
-	//
+        //
         self.total_fees = cumulative_fees;
         self.total_work = total_work;
 
@@ -1214,38 +1200,36 @@ impl Block {
         blockchain: &Blockchain,
         storage: &Storage,
     ) -> ConsensusValues {
-
         //
         // we will reference these variables
-	//
+        //
         let mut cv = ConsensusValues::new();
-	let mut previous_block_treasury: Currency = 0;
+        let mut previous_block_treasury: Currency = 0;
         let mut previous_block_avg_nolan_rebroadcast_per_block: Currency = 0;
-	let mut previous_block_avg_fee_per_byte: Currency = 0;
-	let mut previous_block_avg_total_fees: Currency = 0;
-	let mut previous_block_avg_total_fees_new: Currency = 0;
-	let mut previous_block_avg_total_fees_atr: Currency = 0;
+        let mut previous_block_avg_fee_per_byte: Currency = 0;
+        let mut previous_block_avg_total_fees: Currency = 0;
+        let mut previous_block_avg_total_fees_new: Currency = 0;
+        let mut previous_block_avg_total_fees_atr: Currency = 0;
         let mut previous_block_avg_payout_routing: Currency = 0;
         let mut previous_block_avg_payout_mining: Currency = 0;
         let mut previous_block_avg_payout_treasury: Currency = 0;
         let mut previous_block_avg_payout_graveyard: Currency = 0;
         let mut previous_block_avg_payout_atr: Currency = 0;
-	let mut total_number_of_non_fee_transactions = 0;
+        let mut total_number_of_non_fee_transactions = 0;
 
         //
         // tx fees and sizes and indices
         //
         for (index, transaction) in self.transactions.iter().enumerate() {
-
-	    //
-	    // Normal
-	    // Fee
-	    // GoldenTicket
-	    // ATR
-	    // SPV
-	    // Issuance
-	    // BlockStake
-	    //
+            //
+            // Normal
+            // Fee
+            // GoldenTicket
+            // ATR
+            // SPV
+            // Issuance
+            // BlockStake
+            //
 
             if transaction.is_fee_transaction() {
                 cv.ft_num += 1;
@@ -1254,15 +1238,17 @@ impl Block {
                 //
                 // the fee transaction is the last transaction in the block, so we
                 // count the number of non-fee transactions in order to know the
-                // tx_ordinal of the fee transaction, which is needed in order to 
-		// make the slips in that transaction spendable when we insert them
-		// into the hashmap.
+                // tx_ordinal of the fee transaction, which is needed in order to
+                // make the slips in that transaction spendable when we insert them
+                // into the hashmap.
                 //
                 total_number_of_non_fee_transactions += 1;
             }
-	
-            if (transaction.is_golden_ticket() || transaction.is_normal_transaction()) && !transaction.is_atr_transaction() {
-		cv.total_bytes_new += transaction.get_serialized_size() as u64;
+
+            if (transaction.is_golden_ticket() || transaction.is_normal_transaction())
+                && !transaction.is_atr_transaction()
+            {
+                cv.total_bytes_new += transaction.get_serialized_size() as u64;
                 cv.total_fees_new += transaction.total_fees;
             }
 
@@ -1282,16 +1268,16 @@ impl Block {
             }
         }
 
-	//
-	// burn fee and difficulty
-	//
+        //
+        // burn fee and difficulty
+        //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-
-	    //
-	    // reference variables
-	    //
-	    previous_block_treasury = previous_block.treasury;
-            previous_block_avg_nolan_rebroadcast_per_block = previous_block.avg_nolan_rebroadcast_per_block;
+            //
+            // reference variables
+            //
+            previous_block_treasury = previous_block.treasury;
+            previous_block_avg_nolan_rebroadcast_per_block =
+                previous_block.avg_nolan_rebroadcast_per_block;
             previous_block_avg_fee_per_byte = previous_block.avg_fee_per_byte;
             previous_block_avg_total_fees = previous_block.avg_total_fees;
             previous_block_avg_total_fees_new = previous_block.avg_total_fees_new;
@@ -1319,14 +1305,10 @@ impl Block {
             } else if cv.gt_num == 0 && cv.difficulty > 0 {
                 cv.difficulty -= 1;
             }
-
-	} else {
-
-	    cv.burnfee = self.burnfee;
-	    cv.difficulty = self.difficulty;
-
-	}
-
+        } else {
+            cv.burnfee = self.burnfee;
+            cv.difficulty = self.difficulty;
+        }
 
         //
         // automatic transaction rebroadcasts / atr
@@ -1356,8 +1338,9 @@ impl Block {
 
                     //
                     // estimate amount looping around chain
-		    //
-                    let total_utxo_staked = GENESIS_PERIOD * previous_block_avg_nolan_rebroadcast_per_block;
+                    //
+                    let total_utxo_staked =
+                        GENESIS_PERIOD * previous_block_avg_nolan_rebroadcast_per_block;
 
                     //
                     // divide the treasury
@@ -1377,13 +1360,12 @@ impl Block {
                     // loop through block to find eligible transactions
                     //
                     for transaction in &atr_block.transactions {
-
                         let mut outputs = vec![];
                         let mut total_nolan_eligible_for_atr_payout: Currency = 0;
 
-			//
-			// find eligible outputs
-			//
+                        //
+                        // find eligible outputs
+                        //
                         for output in transaction.to.iter() {
                             if output.validate(&blockchain.utxoset) {
                                 outputs.push(output);
@@ -1395,7 +1377,6 @@ impl Block {
                         // now process each output
                         //
                         if !outputs.is_empty() {
-
                             let tx_size = transaction.get_serialized_size() as u64;
                             let atr_fee = tx_size * previous_block_avg_fee_per_byte;
 
@@ -1403,9 +1384,9 @@ impl Block {
                             // every output pays the rebroadcast fee
                             //
                             for output in outputs {
-
                                 let atr_payout_for_slip = output.amount * expected_atr_multiplier;
-                                let surplus_payout_to_subtract_from_treasury = atr_payout_for_slip - output.amount;
+                                let surplus_payout_to_subtract_from_treasury =
+                                    atr_payout_for_slip - output.amount;
                                 let atr_fee_for_slip = atr_fee;
 
                                 //
@@ -1414,7 +1395,6 @@ impl Block {
                                 // not pass this criteria have their fee collected but are not issued a payout.
                                 //
                                 if atr_payout_for_slip > atr_fee {
-
                                     cv.total_rebroadcast_nolan += output.amount;
                                     cv.total_rebroadcast_slips += 1;
 
@@ -1449,7 +1429,6 @@ impl Block {
                                     vbytes.extend(&rebroadcast_tx.serialize_for_signature());
                                     cv.rebroadcast_hash = hash(&vbytes);
                                     cv.rebroadcasts.push(rebroadcast_tx);
-
                                 } else {
                                     //
                                     // this UTXO will be worth less than zero if the atr_payout is
@@ -1467,20 +1446,17 @@ impl Block {
                     //
                     // if ATR payouts are too large, adjust payout downwards
                     //
-		    // because we are approximating the amount of the treasury to pay based on our 
-		    // expectation of how many UTXO are looping through the chain, we can hit a problem
-		    // if this block has a very large amount of SAITO -- enough to blow out the payout
-		    // to a much larger portion of the treasury than desireable.
-		    //
-		    // we handle this by limiting the amount of the treasury that we will issue each 
-		    // block to no more than 5% of the amount in the treasury. this prevents attackers
-		    // from flushing the treasury out to their own wallet by massively increasing the 
-		    // amount of SAITO being rebroadcast in a single block.
+                    // because we are approximating the amount of the treasury to pay based on our
+                    // expectation of how many UTXO are looping through the chain, we can hit a problem
+                    // if this block has a very large amount of SAITO -- enough to blow out the payout
+                    // to a much larger portion of the treasury than desireable.
                     //
-                    if cv.total_payout_atr
-                        > (self.treasury as f64 * 0.05) as u64
-                    {
-
+                    // we handle this by limiting the amount of the treasury that we will issue each
+                    // block to no more than 5% of the amount in the treasury. this prevents attackers
+                    // from flushing the treasury out to their own wallet by massively increasing the
+                    // amount of SAITO being rebroadcast in a single block.
+                    //
+                    if cv.total_payout_atr > (self.treasury as f64 * 0.05) as u64 {
                         let max_total_payout = (self.treasury as f64 * 0.05) as u64;
                         let unadjusted_total_nolan = cv.total_rebroadcast_nolan;
                         let adjusted_atr_payout_multiplier =
@@ -1494,7 +1470,7 @@ impl Block {
                         // max_total_payout divided by the unadjusted_total_nolan that we
                         // are rebroadcasting.
                         //
-			cv.total_payout_atr = 0;
+                        cv.total_payout_atr = 0;
                         for rebroadcast_tx in &mut cv.rebroadcasts {
                             //
                             // update the amount that is in the output transaction according
@@ -1505,53 +1481,60 @@ impl Block {
                             //
                             rebroadcast_tx.to[0].amount =
                                 rebroadcast_tx.from[0].amount * adjusted_output_multiplier;
-			    cv.total_fees_atr = 0;
-			    cv.total_payout_atr += rebroadcast_tx.to[0].amount;
-			    cv.total_payout_atr -= rebroadcast_tx.from[0].amount;
+                            cv.total_fees_atr = 0;
+                            cv.total_payout_atr += rebroadcast_tx.to[0].amount;
+                            cv.total_payout_atr -= rebroadcast_tx.from[0].amount;
                         }
                     }
                 }
             } // block
         } // if at least 1 genesis period deep
 
-
-	//
-	// total fees
-	//
+        //
+        // total fees
+        //
         cv.total_fees = cv.total_fees_new + cv.total_fees_atr;
 
-	//
-	// fee_per_byte
-	//
-        if cv.total_bytes_new > 0 { cv.fee_per_byte = cv.total_fees_new / cv.total_bytes_new as Currency; }
+        //
+        // fee_per_byte
+        //
+        if cv.total_bytes_new > 0 {
+            cv.fee_per_byte = cv.total_fees_new / cv.total_bytes_new as Currency;
+        }
 
-	//
-	// avg_fee_per_byte
-	//
-        let adjustment = (previous_block_avg_fee_per_byte as i128 - cv.fee_per_byte as i128) / GENESIS_PERIOD as i128;
+        //
+        // avg_fee_per_byte
+        //
+        let adjustment = (previous_block_avg_fee_per_byte as i128 - cv.fee_per_byte as i128)
+            / GENESIS_PERIOD as i128;
         cv.avg_fee_per_byte = (previous_block_avg_fee_per_byte as i128 - adjustment) as Currency;
 
-	//
-	// avg_total_fees
-	//
-        let adjustment = (previous_block_avg_total_fees as i128 - cv.total_fees as i128) / GENESIS_PERIOD as i128;
+        //
+        // avg_total_fees
+        //
+        let adjustment = (previous_block_avg_total_fees as i128 - cv.total_fees as i128)
+            / GENESIS_PERIOD as i128;
         cv.avg_total_fees = (previous_block_avg_total_fees as i128 - adjustment) as Currency;
 
-	//
-	// avg_total_fees_new
-	//
-        let adjustment = (previous_block_avg_total_fees_new as i128 - cv.total_fees_new as i128) / GENESIS_PERIOD as i128;
-        cv.avg_total_fees_new = (previous_block_avg_total_fees_new as i128 - adjustment) as Currency;
+        //
+        // avg_total_fees_new
+        //
+        let adjustment = (previous_block_avg_total_fees_new as i128 - cv.total_fees_new as i128)
+            / GENESIS_PERIOD as i128;
+        cv.avg_total_fees_new =
+            (previous_block_avg_total_fees_new as i128 - adjustment) as Currency;
 
-	//
-	// avg_total_fees_atr
-	//
-        let adjustment = (previous_block_avg_total_fees_atr as i128 - cv.total_fees_atr as i128) / GENESIS_PERIOD as i128;
-        cv.avg_total_fees_atr = (previous_block_avg_total_fees_atr as i128 - adjustment) as Currency;
-	
-	//
-	// average nolan rebroadcast per block
-	//
+        //
+        // avg_total_fees_atr
+        //
+        let adjustment = (previous_block_avg_total_fees_atr as i128 - cv.total_fees_atr as i128)
+            / GENESIS_PERIOD as i128;
+        cv.avg_total_fees_atr =
+            (previous_block_avg_total_fees_atr as i128 - adjustment) as Currency;
+
+        //
+        // average nolan rebroadcast per block
+        //
         // note that we cannot move this above the ATR section as we use the
         // value of this variable (from the last block) to figure out what the
         // ATR payout should be in this block.
@@ -1559,8 +1542,9 @@ impl Block {
         let adjustment = (previous_block_avg_nolan_rebroadcast_per_block as i128
             - cv.total_rebroadcast_nolan as i128)
             / GENESIS_PERIOD as i128;
-        cv.avg_nolan_rebroadcast_per_block = (previous_block_avg_nolan_rebroadcast_per_block as i128 - adjustment) as Currency;
-      
+        cv.avg_nolan_rebroadcast_per_block =
+            (previous_block_avg_nolan_rebroadcast_per_block as i128 - adjustment) as Currency;
+
         //
         // calculate payouts
         //
@@ -1577,7 +1561,6 @@ impl Block {
         // if this block contains a golden ticket
         //
         if let Some(gt_index) = cv.gt_index {
-
             //
             // golden ticket needed to process payout
             //
@@ -1589,7 +1572,6 @@ impl Block {
             // load the previous block
             //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-
                 debug!("previous block exists!");
 
                 //
@@ -1604,7 +1586,7 @@ impl Block {
                     miner_payout = expected_miner_payout;
                 }
                 miner_publickey = golden_ticket.public_key;
-		
+
                 //
                 // half to router
                 //
@@ -1623,13 +1605,13 @@ impl Block {
                 // treasury and routing node.
                 //
                 if previous_block.has_golden_ticket {
-		    //
+                    //
                     // do nothing
                     //
                 } else {
                     //
                     // recurse and payout previous block
-		    //
+                    //
                     if let Some(previous_previous_block) =
                         blockchain.blocks.get(&previous_block.previous_block_hash)
                     {
@@ -1661,10 +1643,9 @@ impl Block {
                         router2_publickey =
                             previous_previous_block.find_winning_router(next_random_number);
 
-
-			//
-			// treasury collects the rest
-			//
+                        //
+                        // treasury collects the rest
+                        //
 
                         //
                         // finding a router consumes 2 hashes
@@ -1723,10 +1704,9 @@ impl Block {
                 slip_index += 1;
             }
 
-	    cv.total_payout_mining = miner_payout;
-	    cv.total_payout_routing = router1_payout + router2_payout;
+            cv.total_payout_mining = miner_payout;
+            cv.total_payout_routing = router1_payout + router2_payout;
             cv.fee_transaction = Some(transaction);
-
         } else {
             //
             // if there is no golden ticket AND the previous block was not paid out then
@@ -1747,42 +1727,54 @@ impl Block {
             }
         }
 
-	//
-	// treasury and graveyard
-	//
+        //
+        // treasury and graveyard
+        //
         cv.total_payout_treasury = treasury_contribution;
         cv.total_payout_graveyard = graveyard_contribution;
 
-	//
-	// average routing payout
-	//
-        let adjustment = (previous_block_avg_payout_routing as i128 - cv.total_payout_routing as i128) / GENESIS_PERIOD as i128;
-        cv.avg_payout_routing = (previous_block_avg_payout_routing as i128 - adjustment) as Currency;
-	
-	//
-	// average mining payout
-	//
-        let adjustment = (previous_block_avg_payout_mining as i128 - cv.total_payout_mining as i128) / GENESIS_PERIOD as i128;
+        //
+        // average routing payout
+        //
+        let adjustment = (previous_block_avg_payout_routing as i128
+            - cv.total_payout_routing as i128)
+            / GENESIS_PERIOD as i128;
+        cv.avg_payout_routing =
+            (previous_block_avg_payout_routing as i128 - adjustment) as Currency;
+
+        //
+        // average mining payout
+        //
+        let adjustment = (previous_block_avg_payout_mining as i128
+            - cv.total_payout_mining as i128)
+            / GENESIS_PERIOD as i128;
         cv.avg_payout_mining = (previous_block_avg_payout_mining as i128 - adjustment) as Currency;
-	
-	//
-	// average treasury payout
-	//
-        let adjustment = (previous_block_avg_payout_treasury as i128 - cv.total_payout_treasury as i128) / GENESIS_PERIOD as i128;
-        cv.avg_payout_treasury = (previous_block_avg_payout_treasury as i128 - adjustment) as Currency;
-	
-	//
-	// average graveyard payout
-	//
-        let adjustment = (previous_block_avg_payout_graveyard as i128 - cv.total_payout_graveyard as i128) / GENESIS_PERIOD as i128;
-        cv.avg_payout_graveyard = (previous_block_avg_payout_graveyard as i128 - adjustment) as Currency;
-	
-	//
-	// average atr payout
-	//
-        let adjustment = (previous_block_avg_payout_atr as i128 - cv.total_payout_atr as i128) / GENESIS_PERIOD as i128;
+
+        //
+        // average treasury payout
+        //
+        let adjustment = (previous_block_avg_payout_treasury as i128
+            - cv.total_payout_treasury as i128)
+            / GENESIS_PERIOD as i128;
+        cv.avg_payout_treasury =
+            (previous_block_avg_payout_treasury as i128 - adjustment) as Currency;
+
+        //
+        // average graveyard payout
+        //
+        let adjustment = (previous_block_avg_payout_graveyard as i128
+            - cv.total_payout_graveyard as i128)
+            / GENESIS_PERIOD as i128;
+        cv.avg_payout_graveyard =
+            (previous_block_avg_payout_graveyard as i128 - adjustment) as Currency;
+
+        //
+        // average atr payout
+        //
+        let adjustment = (previous_block_avg_payout_atr as i128 - cv.total_payout_atr as i128)
+            / GENESIS_PERIOD as i128;
         cv.avg_payout_atr = (previous_block_avg_payout_atr as i128 - adjustment) as Currency;
-	
+
         cv
     }
 
@@ -2130,7 +2122,6 @@ impl Block {
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
     ) -> bool {
-
         //
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
         //
@@ -2421,12 +2412,10 @@ impl Block {
             return false;
         }
 
-
         //
         // validation of the following requires a previous-block to exist
-	//
+        //
         if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-
             //
             // ghost blocks
             //
@@ -2493,32 +2482,32 @@ impl Block {
                 let golden_ticket: GoldenTicket =
                     GoldenTicket::deserialize_from_net(&self.transactions[gt_index].data);
 
-		//
+                //
                 // we already have a golden ticket, but create a new one pulling the
                 // target hash from our previous block to ensure that this ticket is
                 // actually valid in the context of our blockchain, and not just
                 // internally consistent in the blockchain of the sender.
-		//
+                //
                 let gt = GoldenTicket::create(
                     previous_block.hash,
                     golden_ticket.random,
                     golden_ticket.public_key,
                 );
 
-		//
+                //
                 // if there is a golden ticket, our previous_block_unpaid should be
                 // zero, as we will have issued payment in this block.
-		//
+                //
                 if self.previous_block_unpaid != 0 {
                     error!("ERROR 720351: golden ticket but previous block incorrect");
                     return false;
                 }
 
-		//
-		// we confirm that the golden ticket is targetting the block hash
-		// of the previous block. the solution is invalid if it is not 
-		// current with the state of the chain..
-		//
+                //
+                // we confirm that the golden ticket is targetting the block hash
+                // of the previous block. the solution is invalid if it is not
+                // current with the state of the chain..
+                //
                 if !gt.validate(previous_block.difficulty) {
                     error!(
                         "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}",
@@ -2538,14 +2527,13 @@ impl Block {
                     );
                     return false;
                 }
-
             } else {
-		//
+                //
                 // if there is no golden ticket, our previous block's total_fees will
                 // be stored in this block as previous_block_unpaid. this simplifies
                 // smoothing payouts, and assists with monitoring that the total token
                 // supply has not changed.
-		//
+                //
                 if self.previous_block_unpaid != previous_block.total_fees {
                     error!("ERROR 572983: previous_block_unpaid value incorrect");
                     return false;
@@ -2554,7 +2542,7 @@ impl Block {
             // trace!(" ... golden ticket: (validated)  {:?}", create_timestamp());
         }
 
-	//
+        //
         // validate atr
         //
         // Automatic Transaction Rebroadcasts are removed programmatically from
@@ -2610,15 +2598,13 @@ impl Block {
                 (cv.ft_index, cv.fee_transaction)
             {
                 if cv.gt_index.is_none() {
-                    error!(
-                        "ERROR 48203: block has fee transaction but no golden ticket"
-                    );
+                    error!("ERROR 48203: block has fee transaction but no golden ticket");
                     return false;
                 }
 
-		//
+                //
                 // the fee transaction is hashed to compare it with the one in the block
-		//
+                //
                 let fee_transaction_in_block = self.transactions.get(ft_index).unwrap();
                 let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
                 let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
