@@ -88,7 +88,7 @@ impl Peer {
         self.invalid_block_limiter.has_limit_exceeded(current_time)
     }
     pub fn get_limited_till(&mut self, current_time: Timestamp) -> Option<Timestamp> {
-        let mut result = None;
+        let result = None;
 
         if self.has_key_list_limit_exceeded(current_time) {
             if self.key_list_limiter.has_limit_exceeded(current_time) {}
