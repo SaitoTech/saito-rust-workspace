@@ -70,6 +70,10 @@ impl PeerCollection {
                     // static peers always remain in memory
                     return None;
                 }
+                if peer.is_stun_peer() {
+                    // stun peers remain unless explicity removed
+                    return None;
+                }
                 if peer.disconnected_at + PEER_REMOVAL_WINDOW > current_time {
                     return None;
                 }

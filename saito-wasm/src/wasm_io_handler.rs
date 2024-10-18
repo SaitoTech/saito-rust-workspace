@@ -249,6 +249,21 @@ impl InterfaceIO for WasmIoHandler {
                     index,
                 );
             }
+
+            InterfaceEvent::StunPeerConnected(index) => {
+                MsgHandler::send_interface_event(
+                    "stun peer connect".to_string(),
+                    index,
+                    "".to_string(),
+                );
+            }
+            InterfaceEvent::StunPeerDisconnected(index, public_key) => {
+                MsgHandler::send_interface_event(
+                    "stun peer disconnect".to_string(),
+                    index,
+                    public_key.to_base58(),
+                );
+            }
         }
     }
 
