@@ -1212,9 +1212,9 @@ impl Block {
         let mut previous_block_avg_total_fees_atr: Currency = 0;
         let mut previous_block_avg_payout_routing: Currency = 0;
         let mut previous_block_avg_payout_mining: Currency = 0;
-        let mut previous_block_avg_payout_treasury: Currency = 0;
-        let mut previous_block_avg_payout_graveyard: Currency = 0;
-        let mut previous_block_avg_payout_atr: Currency = 0;
+        let previous_block_avg_payout_treasury: Currency = 0;
+        let previous_block_avg_payout_graveyard: Currency = 0;
+        let previous_block_avg_payout_atr: Currency = 0;
         let mut total_number_of_non_fee_transactions = 0;
 
         //
@@ -1462,7 +1462,7 @@ impl Block {
                         let adjusted_atr_payout_multiplier =
                             max_total_payout / unadjusted_total_nolan;
                         let adjusted_output_multiplier = 1 + adjusted_atr_payout_multiplier;
-                        let mut adjusted_total_rebroadcast_staking_payouts_nolan: Currency = 0;
+                        let adjusted_total_rebroadcast_staking_payouts_nolan: Currency = 0;
                         let adjusted_total_rebroadcast_fees_nolan: Currency = 0;
 
                         //
