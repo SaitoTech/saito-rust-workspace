@@ -827,7 +827,7 @@ impl Block {
         let avg_payout_mining: Currency =
             Currency::from_be_bytes(bytes[277..285].try_into().unwrap());
         let avg_payout_treasury: Currency =
-            Currency::from_be_bytes(bytes[285..285].try_into().unwrap());
+            Currency::from_be_bytes(bytes[285..293].try_into().unwrap());
         let avg_payout_graveyard: Currency =
             Currency::from_be_bytes(bytes[293..301].try_into().unwrap());
         let avg_payout_atr: Currency = Currency::from_be_bytes(bytes[301..309].try_into().unwrap());
@@ -2786,7 +2786,7 @@ mod tests {
         block.signature = <[u8; 64]>::from_hex("c9a6c2d0bf884be6933878577171a3c8094c2bf6e0bc1b4ec3535a4a55224d186d4d891e254736cae6c0d2002c8dfc0ddfc7fcdbe4bc583f96fa5b273b9d63f4").unwrap();
 
         let serialized_body = block.serialize_for_signature();
-        assert_eq!(serialized_body.len(), 177);
+        assert_eq!(serialized_body.len(), 209);
 
         block.creator = <SaitoPublicKey>::from_hex(
             "dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8bcc",
