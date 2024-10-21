@@ -518,9 +518,7 @@ impl Network {
             .drain(..)
             .for_each(|config| {
                 let mut peer = Peer::new(peers.peer_counter.get_next_index());
-
                 peer.static_peer_config = Some(config);
-
                 peers.index_to_peers.insert(peer.index, peer);
             });
 
@@ -573,7 +571,6 @@ impl Network {
         }
 
         let peer = Peer::new_archive_peer(peer_index, public_key, host, port);
-
         // Add the peer to our collections
         peers.index_to_peers.insert(peer_index, peer);
         peers.address_to_peers.insert(public_key, peer_index);
@@ -635,10 +632,7 @@ impl Network {
         }
 
     }
-    pub async fn add_new_archive_peer(&mut self, peer_index: PeerIndex, host:String, port: u16 ) {
- 
-    }
-
+   
     pub async fn send_pings(&mut self) {
         let current_time = self.timer.get_timestamp_in_ms();
         let mut peers = self.peer_lock.write().await;

@@ -3,6 +3,8 @@ use crate::core::consensus::peers::peer_state_writer::PeerStateWriter;
 use crate::core::defs::{PeerIndex, SaitoPublicKey, Timestamp};
 use std::collections::HashMap;
 use std::time::Duration;
+use log::{debug, warn, error};
+
 
 const PEER_REMOVAL_WINDOW: Timestamp = Duration::from_secs(3600 * 24).as_millis() as Timestamp;
 
@@ -74,9 +76,35 @@ impl PeerCollection {
                     // stun peers remain unless explicity removed
                     return None;
                 }
-                if peer.disconnected_at + PEER_REMOVAL_WINDOW > current_time {
-                    return None;
-                }
+                // if peer.is_archive_peer {
+                //     // archive peers should remain in memory
+                //     return None;
+                // }
+
+                // debug!(" disconnected at {} {} {}", peer.disconnected_at, PEER_REMOVAL_WINDOW, current_time);
+                match peer.disconnected_at {
+                    Timestamp::MAX => None, // Peer hasn't been disconnected yet
+                    0 => {
+                        warn!("Peer {} has disconnected_at set to 0", peer_index);
+                        None
+                    }
+                    
+                    disconnected_at => {
+                        debug!(
+                            "Peer {}: disconnected_at: {}, current_time: {}, PEER_REMOVAL_WINDOW: {}",
+                            peer_index, disconnected_at, current_time, PEER_REMOVAL_WINDOW
+                        );
+                        if let Some(removal_time) = disconnected_at.checked_add(PEER_REMOVAL_WINDOW) {
+                            if removal_time <= current_time {
+                                Some(*peer_index)
+                            } else {
+                                None
+                            }
+                        } else {
+                            error!("Overflow occurred when calculating removal time for peer {}", peer_index);
+                            None
+                        }}};
+                    
                 Some(*peer_index)
             })
             .collect();

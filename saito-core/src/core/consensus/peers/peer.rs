@@ -56,6 +56,8 @@ pub struct Peer {
     pub invalid_block_limiter: RateLimiter,
     pub public_key: Option<SaitoPublicKey>,
     pub peer_type: PeerType,
+    // pub is_static_peer: bool,
+    pub is_archive_peer: bool
 }
 
 impl Peer {
@@ -78,6 +80,8 @@ impl Peer {
             invalid_block_limiter: RateLimiter::builder(1, Duration::from_secs(3600)),
             public_key: None,
             peer_type: PeerType::Default,
+            // is_static_peer: false,
+            is_archive_peer: false
         }
     }
 
@@ -98,6 +102,8 @@ impl Peer {
         let mut peer = Peer::new(peer_index);
         peer.public_key = Some(public_key);
         peer.peer_status = PeerStatus::Connecting;
+        peer.is_archive_peer = true;
+        // peer.services = io_handler.get_my_services();
         peer
     }
 
@@ -315,7 +321,9 @@ impl Peer {
             ));
         }
 
-        if self.static_peer_config.is_none() {
+
+        debug!("is archive peer: {} ", self.is_archive_peer);
+        if self.static_peer_config.is_none() && !self.is_archive_peer {
             // this is only called in initiator's side.
             // [1. A:challenge -> 2. B:response -> 3. A : response|B verified -> 4. B: A verified]
             // we only need to send a response for response is in above stage 3 (meaning the challenger).
