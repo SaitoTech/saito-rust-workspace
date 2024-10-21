@@ -141,15 +141,9 @@ impl InterfaceIO for RustIOHandler {
                 .await
                 .expect("creating directory structure failed");
         }
-        let result = File::create(filename).await;
-        if result.is_err() {
-            return Err(result.err().unwrap());
-        }
-        let mut file = result.unwrap();
-        let result = file.write_all(value).await;
-        if result.is_err() {
-            return Err(result.err().unwrap());
-        }
+        let mut file = File::create(filename).await?;
+
+        let result = file.write_all(value).await?;
 
         // TODO : write the file to a temp file and move to avoid file corruptions
 

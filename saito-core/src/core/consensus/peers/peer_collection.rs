@@ -22,7 +22,7 @@ pub struct PeerCollection {
     pub index_to_peers: HashMap<PeerIndex, Peer>,
     pub address_to_peers: HashMap<SaitoPublicKey, PeerIndex>,
     pub peer_counter: PeerCounter,
-    pub peer_state_writer: PeerStateWriter,
+    pub(crate) peer_state_writer: PeerStateWriter,
 }
 
 impl PeerCollection {
