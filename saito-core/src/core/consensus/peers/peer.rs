@@ -393,6 +393,10 @@ impl Peer {
     pub fn mark_as_disconnected(&mut self, disconnected_at: Timestamp) {
         self.challenge_for_peer = None;
         self.services = vec![];
+        info!(
+            "marking peer : {:?} as disconnected. at : {:?}",
+            self.index, disconnected_at
+        );
         self.disconnected_at = disconnected_at;
 
         if let PeerStatus::Disconnected(_, _) = self.peer_status {
@@ -419,9 +423,12 @@ impl Peer {
             !matches!(peer.peer_status, PeerStatus::Connected),
             "Old peer should not be already connected"
         );
+        info!("joining peer : {:?} as a reconnection", peer.index);
+
         self.message_limiter = peer.message_limiter;
         self.handshake_limiter = peer.handshake_limiter;
         self.key_list_limiter = peer.key_list_limiter;
+        self.disconnected_at = Timestamp::MAX;
 
         self.static_peer_config = peer.static_peer_config;
     }

@@ -190,7 +190,8 @@ impl RoutingThread {
             Message::KeyListUpdate(key_list) => {
                 self.network
                     .handle_received_key_list(peer_index, key_list)
-                    .await;
+                    .await
+                    .unwrap();
             }
             _ => unreachable!(),
         }
@@ -682,9 +683,10 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             work_done = true;
         }
 
-        const PEER_REMOVAL_PERIOD: Timestamp = Duration::from_secs(60).as_millis() as Timestamp;
+        const PEER_REMOVAL_TIMER_PERIOD: Timestamp =
+            Duration::from_secs(60).as_millis() as Timestamp;
         self.peer_removal_timer += duration_value;
-        if self.peer_removal_timer >= PEER_REMOVAL_PERIOD {
+        if self.peer_removal_timer >= PEER_REMOVAL_TIMER_PERIOD {
             let mut peers = self.network.peer_lock.write().await;
             peers.remove_disconnected_peers(current_time);
             self.peer_removal_timer = 0;

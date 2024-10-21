@@ -292,7 +292,7 @@ impl Network {
         peer_index: PeerIndex,
         key_list: Vec<SaitoPublicKey>,
     ) -> Result<(), Error> {
-        debug!(
+        trace!(
             "handler received key list of length : {:?} from peer : {:?}",
             key_list.len(),
             peer_index
@@ -313,11 +313,9 @@ impl Network {
                     peer.public_key.unwrap().to_base58()
                 );
                 return Err(Error::from(ErrorKind::Other));
-            } else {
-                debug!("can make request")
             }
 
-            debug!(
+            trace!(
                 "handling received keylist of length : {:?} from peer : {:?}",
                 key_list.len(),
                 peer_index
@@ -540,7 +538,6 @@ impl Network {
                 if current_time < *connect_time {
                     continue;
                 }
-                debug!("static peer : {:?} is disconnected", peer_index);
                 if let Some(config) = peer.static_peer_config.as_ref() {
                     debug!(
                         "trying to connect to static peer : {:?} with {:?}",
@@ -552,8 +549,6 @@ impl Network {
                         .unwrap();
                     *period *= 2;
                     *connect_time = current_time + *period;
-                } else {
-                    error!("static peer : {:?} doesn't have configs set", peer_index);
                 }
             }
         }
