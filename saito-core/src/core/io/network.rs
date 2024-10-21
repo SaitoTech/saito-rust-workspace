@@ -307,7 +307,11 @@ impl Network {
             // Check rate peers
             peer.key_list_limiter.increase();
             if peer.has_key_list_limit_exceeded(current_time) {
-                debug!("peer {:?} exceeded rate peers for key list", peer_index);
+                debug!(
+                    "peer {} - {} exceeded the rate for key list",
+                    peer_index,
+                    peer.public_key.unwrap().to_base58()
+                );
                 return Err(Error::from(ErrorKind::Other));
             } else {
                 debug!("can make request")
