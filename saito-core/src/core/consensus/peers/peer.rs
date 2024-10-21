@@ -423,7 +423,10 @@ impl Peer {
             !matches!(peer.peer_status, PeerStatus::Connected),
             "Old peer should not be already connected"
         );
-        info!("joining peer : {:?} as a reconnection", peer.index);
+        info!(
+            "joining peer : {:?} to peer : {:?} as a reconnection",
+            peer.index, self.index
+        );
 
         self.message_limiter = peer.message_limiter;
         self.handshake_limiter = peer.handshake_limiter;
