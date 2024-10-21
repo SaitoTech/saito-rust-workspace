@@ -315,7 +315,13 @@ impl RoutingThread {
         trace!("handling new stun peer : {:?}", peer_index);
         self.network
             .handle_new_stun_peer(peer_index, public_key)
+          
             .await;
+    }
+    async fn handle_new_archive_peer(&mut self, peer_index: u64, public_key: SaitoPublicKey, host:String, port: u16) {
+        trace!("handling new stun peer : {:?}", peer_index);
+        self.network
+            .handle_new_archive_peer(peer_index, public_key, host, port).await;
     }
 
     async fn remove_stun_peer(&mut self, peer_index: u64) {
@@ -616,6 +622,10 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     self.handle_new_peer(result.unwrap()).await;
                     return Some(());
                 }
+            }
+
+            NetworkEvent::AddArchivePeer {peer_index, public_key, host, port  } => {
+              self.handle_new_archive_peer(peer_index, public_key, host, port).await;
             }
 
             NetworkEvent::AddStunPeer {

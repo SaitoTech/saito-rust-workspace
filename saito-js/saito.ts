@@ -269,8 +269,6 @@ export default class Saito {
         return Saito.getLibInstance().process_new_peer(index, peer_config);
     }
 
-
-
     public async processPeerDisconnection(peer_index: bigint): Promise<void> {
         return Saito.getLibInstance().process_peer_disconnection(peer_index);
     }

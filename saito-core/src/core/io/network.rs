@@ -552,6 +552,37 @@ impl Network {
         self.io_interface
             .send_interface_event(InterfaceEvent::StunPeerConnected(peer_index));
     }
+  
+    pub async fn handle_new_archive_peer(&mut self, peer_index: PeerIndex, public_key: SaitoPublicKey, host: String, port: u16) {
+        debug!(
+            "Adding archive peer with index: {}, public key: {}, host: {}, port: {}",
+            peer_index,
+            public_key.to_base58(),
+            host,
+            port
+        );
+
+        let mut peers = self.peer_lock.write().await;
+
+        if peers.index_to_peers.contains_key(&peer_index) {
+            error!(
+                "Failed to add archive peer: Peer with index {} already exists",
+                peer_index
+            );
+            return;
+        }
+
+        let peer = Peer::new_archive_peer(peer_index, public_key, host, port);
+
+        // Add the peer to our collections
+        peers.index_to_peers.insert(peer_index, peer);
+        peers.address_to_peers.insert(public_key, peer_index);
+
+        debug!("Archive peer added successfully");
+        // self.io_interface
+        //     .send_interface_event(InterfaceEvent::ArchivePeerConnected(peer_index, public_key));
+    }
+
 
     pub async fn remove_stun_peer(&mut self, peer_index: PeerIndex) {
         debug!("Removing STUN peer with index: {}", peer_index);
@@ -602,6 +633,10 @@ impl Network {
                 }
             }
         }
+
+    }
+    pub async fn add_new_archive_peer(&mut self, peer_index: PeerIndex, host:String, port: u16 ) {
+ 
     }
 
     pub async fn send_pings(&mut self) {

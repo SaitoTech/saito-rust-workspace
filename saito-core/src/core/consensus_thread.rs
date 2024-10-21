@@ -296,7 +296,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     "received new golden ticket : {:?}",
                     golden_ticket.target.to_hex()
                 );
-
                 self.add_gt_to_mempool(golden_ticket).await;
                 Some(())
             }

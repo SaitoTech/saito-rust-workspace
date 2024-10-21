@@ -33,6 +33,7 @@ use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use secp256k1::SECP256K1;
+use serde_json::to_string;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
@@ -498,8 +499,35 @@ pub async fn process_new_peer(peer_index: PeerIndex) {
         .routing_thread
         .process_network_event(NetworkEvent::PeerConnectionResult {
             result: Ok(peer_index),
-        })
-        .await;
+        }).await;
+}
+
+
+#[wasm_bindgen]
+pub async fn add_new_archive_peer(peer_index: PeerIndex, public_key: JsString, host: JsString, port: u16) -> Result<(), JsValue> {
+    debug!("adding new archive peer : {:?}", peer_index);
+    
+    let mut saito = SAITO.lock().await;
+    
+    // Convert JsString to String
+    let host_string: String = host.into();
+    
+    // Convert JsString to SaitoPublicKey
+    let key: SaitoPublicKey = string_to_key(public_key.into())
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse public key: {}", e)))?;
+    
+    saito
+        .as_mut()
+        .ok_or_else(|| JsValue::from_str("Saito instance is not initialized"))?
+        .routing_thread
+        .process_network_event(NetworkEvent::AddArchivePeer { 
+            peer_index, 
+            public_key: key, 
+            host: host_string,  
+            port 
+        }).await;
+    
+    Ok(())
 }
 
 #[wasm_bindgen]

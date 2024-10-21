@@ -94,6 +94,13 @@ impl Peer {
         peer
     }
 
+    pub fn new_archive_peer(peer_index: PeerIndex, public_key: SaitoPublicKey, host: String, port: u16) -> Peer {
+        let mut peer = Peer::new(peer_index);
+        peer.public_key = Some(public_key);
+        peer.peer_status = PeerStatus::Connecting;
+        peer
+    }
+
     pub fn is_stun_peer(&self) -> bool {
         matches!(self.peer_type, PeerType::Stun)
     }

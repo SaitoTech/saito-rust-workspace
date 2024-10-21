@@ -32,6 +32,12 @@ pub enum NetworkEvent {
     RemoveStunPeer {
         peer_index: u64,
     },
+    AddArchivePeer {
+        peer_index: u64,
+        public_key: SaitoPublicKey,
+        host: String,
+        port: u16
+    },
     PeerDisconnected {
         peer_index: u64,
         disconnect_type: PeerDisconnectType,
