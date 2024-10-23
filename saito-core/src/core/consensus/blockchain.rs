@@ -3298,10 +3298,10 @@ mod tests {
             let calculate_hash = hash(&buf);
             assert_eq!(block2.hash, calculate_hash);
         }
+        // TODO : check ghost chain data here
     }
 
     #[tokio::test]
-    #[ignore]
     #[serial_test::serial]
     async fn ghost_chain_content_test() {
         let mut tester = NodeTester::default();

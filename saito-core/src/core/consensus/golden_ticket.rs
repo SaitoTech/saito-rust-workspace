@@ -54,7 +54,7 @@ impl GoldenTicket {
     pub fn validate(&self, difficulty: u64) -> bool {
         let solution_hash = hash(&self.serialize_for_net());
 
-        return GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty);
+        GoldenTicket::validate_hashing_difficulty(&solution_hash, difficulty)
     }
 
     pub fn validate_hashing_difficulty(solution_hash: &SaitoHash, difficulty: u64) -> bool {
