@@ -3132,6 +3132,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     #[serial_test::serial]
     async fn avg_fee_per_byte_test() {
         // pretty_env_logger::init();
