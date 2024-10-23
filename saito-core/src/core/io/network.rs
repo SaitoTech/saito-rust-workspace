@@ -292,7 +292,7 @@ impl Network {
         peer_index: PeerIndex,
         key_list: Vec<SaitoPublicKey>,
     ) -> Result<(), Error> {
-        debug!(
+        trace!(
             "handler received key list of length : {:?} from peer : {:?}",
             key_list.len(),
             peer_index
@@ -307,13 +307,15 @@ impl Network {
             // Check rate peers
             peer.key_list_limiter.increase();
             if peer.has_key_list_limit_exceeded(current_time) {
-                debug!("peer {:?} exceeded rate peers for key list", peer_index);
+                debug!(
+                    "peer {} - {} exceeded the rate for key list",
+                    peer_index,
+                    peer.public_key.unwrap().to_base58()
+                );
                 return Err(Error::from(ErrorKind::Other));
-            } else {
-                debug!("can make request")
             }
 
-            debug!(
+            trace!(
                 "handling received keylist of length : {:?} from peer : {:?}",
                 key_list.len(),
                 peer_index
@@ -527,6 +529,55 @@ impl Network {
         info!("added {:?} static peers", peers.index_to_peers.len());
     }
 
+    pub async fn handle_new_stun_peer(
+        &mut self,
+        peer_index: PeerIndex,
+        public_key: SaitoPublicKey,
+    ) {
+        debug!(
+            "Adding STUN peer with index: {} and public key: {}",
+            peer_index,
+            public_key.to_base58()
+        );
+        let mut peers = self.peer_lock.write().await;
+        if peers.index_to_peers.contains_key(&peer_index) {
+            error!(
+                "Failed to add STUN peer: Peer with index {} already exists",
+                peer_index
+            );
+            return;
+        }
+        let peer = Peer::new_stun(peer_index, public_key, self.io_interface.as_ref());
+        peers.index_to_peers.insert(peer_index, peer);
+        peers.address_to_peers.insert(public_key, peer_index);
+        debug!("STUN peer added successfully");
+        self.io_interface
+            .send_interface_event(InterfaceEvent::StunPeerConnected(peer_index));
+    }
+
+    pub async fn remove_stun_peer(&mut self, peer_index: PeerIndex) {
+        debug!("Removing STUN peer with index: {}", peer_index);
+        let mut peers = self.peer_lock.write().await;
+        let peer_public_key: SaitoPublicKey;
+        if let Some(peer) = peers.index_to_peers.remove(&peer_index) {
+            if let Some(public_key) = peer.get_public_key() {
+                peer_public_key = public_key;
+                peers.address_to_peers.remove(&public_key);
+                debug!("STUN peer removed from network successfully");
+                self.io_interface
+                    .send_interface_event(InterfaceEvent::StunPeerDisconnected(
+                        peer_index,
+                        peer_public_key,
+                    ));
+            }
+        } else {
+            error!(
+                "Failed to remove STUN peer: Peer with index {} not found",
+                peer_index
+            );
+        }
+    }
+
     pub async fn connect_to_static_peers(&mut self, current_time: Timestamp) {
         trace!("connecting to static peers...");
         let mut peers = self.peer_lock.write().await;
@@ -536,9 +587,8 @@ impl Network {
                 if current_time < *connect_time {
                     continue;
                 }
-                debug!("static peer : {:?} is disconnected", peer_index);
                 if let Some(config) = peer.static_peer_config.as_ref() {
-                    debug!(
+                    info!(
                         "trying to connect to static peer : {:?} with {:?}",
                         peer_index, config
                     );
@@ -548,8 +598,6 @@ impl Network {
                         .unwrap();
                     *period *= 2;
                     *connect_time = current_time + *period;
-                } else {
-                    error!("static peer : {:?} doesn't have configs set", peer_index);
                 }
             }
         }

@@ -7,8 +7,11 @@ use crate::core::defs::{Currency, Timestamp};
 
 //
 // our target blocktime
+#[cfg(not(test))]
 pub const HEARTBEAT: Timestamp = Duration::from_secs(5).as_millis() as Timestamp;
 
+#[cfg(test)]
+pub const HEARTBEAT: Timestamp = Duration::from_millis(100).as_millis() as Timestamp;
 //
 // Burn Fee
 //
@@ -148,6 +151,6 @@ mod tests {
             current_block_timestamp,
             previous_block_timestamp,
         );
-        assert_eq!(burnfee, 1066003582);
+        assert_eq!(burnfee, 150755672);
     }
 }

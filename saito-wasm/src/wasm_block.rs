@@ -89,9 +89,9 @@ impl WasmBlock {
     //     array
     // }
 
-    #[wasm_bindgen(getter = expected_burnfee)]
-    pub fn expected_burnfee(&self) -> u64 {
-        self.block.cv.expected_burnfee
+    #[wasm_bindgen(getter = burnfee)]
+    pub fn burnfee(&self) -> u64 {
+        self.block.cv.burnfee
     }
 
     #[wasm_bindgen(getter = ft_num)]
@@ -127,9 +127,9 @@ impl WasmBlock {
         self.block.cv.total_fees
     }
 
-    #[wasm_bindgen(getter = expected_difficulty)]
-    pub fn expected_difficulty(&self) -> u64 {
-        self.block.cv.expected_difficulty
+    #[wasm_bindgen(getter = difficulty)]
+    pub fn difficulty(&self) -> u64 {
+        self.block.cv.difficulty
     }
 
     #[wasm_bindgen(getter = rebroadcasts)]
@@ -178,11 +178,6 @@ impl WasmBlock {
         // Convert the byte array to a JsValue
         // JsValue::from_serde(&self.block.cv.rebroadcast_hash).unwrap()
         self.block.cv.rebroadcast_hash.to_hex().into()
-    }
-
-    #[wasm_bindgen(getter = nolan_falling_off_chain)]
-    pub fn nolan_falling_off_chain(&self) -> u64 {
-        self.block.cv.nolan_falling_off_chain
     }
 
     // TODO -- deprecated

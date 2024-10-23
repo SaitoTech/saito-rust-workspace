@@ -115,7 +115,6 @@ impl RoutingThread {
     /// ```
     async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
         self.network.update_peer_timer(peer_index).await;
-
         match message {
             Message::HandshakeChallenge(challenge) => {
                 debug!("received handshake challenge");
@@ -190,7 +189,8 @@ impl RoutingThread {
             Message::KeyListUpdate(key_list) => {
                 self.network
                     .handle_received_key_list(peer_index, key_list)
-                    .await;
+                    .await
+                    .unwrap();
             }
             _ => unreachable!(),
         }
@@ -310,6 +310,18 @@ impl RoutingThread {
     async fn handle_new_peer(&mut self, peer_index: u64) {
         trace!("handling new peer : {:?}", peer_index);
         self.network.handle_new_peer(peer_index).await;
+    }
+
+    async fn handle_new_stun_peer(&mut self, peer_index: u64, public_key: SaitoPublicKey) {
+        trace!("handling new stun peer : {:?}", peer_index);
+        self.network
+            .handle_new_stun_peer(peer_index, public_key)
+            .await;
+    }
+
+    async fn remove_stun_peer(&mut self, peer_index: u64) {
+        trace!("removing stun peer : {:?}", peer_index);
+        self.network.remove_stun_peer(peer_index).await;
     }
 
     async fn handle_peer_disconnect(
@@ -572,7 +584,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                 {
                     let mut peers = self.network.peer_lock.write().await;
                     let peer = peers.find_peer_by_index_mut(peer_index)?;
-                    let time = self.timer.get_timestamp_in_ms();
+
+                    let time: u64 = self.timer.get_timestamp_in_ms();
                     peer.message_limiter.increase();
                     if peer.has_message_limit_exceeded(time) {
                         info!("peers exceeded for messages from peer : {:?}", peer_index);
@@ -604,6 +617,18 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     self.handle_new_peer(result.unwrap()).await;
                     return Some(());
                 }
+            }
+
+            NetworkEvent::AddStunPeer {
+                peer_index,
+                public_key,
+            } => {
+                self.handle_new_stun_peer(peer_index, public_key).await;
+                return Some(());
+            }
+            NetworkEvent::RemoveStunPeer { peer_index } => {
+                self.remove_stun_peer(peer_index).await;
+                return Some(());
             }
             NetworkEvent::PeerDisconnected {
                 peer_index,
@@ -682,9 +707,10 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             work_done = true;
         }
 
-        const PEER_REMOVAL_PERIOD: Timestamp = Duration::from_secs(60).as_millis() as Timestamp;
+        const PEER_REMOVAL_TIMER_PERIOD: Timestamp =
+            Duration::from_secs(60).as_millis() as Timestamp;
         self.peer_removal_timer += duration_value;
-        if self.peer_removal_timer >= PEER_REMOVAL_PERIOD {
+        if self.peer_removal_timer >= PEER_REMOVAL_TIMER_PERIOD {
             let mut peers = self.network.peer_lock.write().await;
             peers.remove_disconnected_peers(current_time);
             self.peer_removal_timer = 0;
