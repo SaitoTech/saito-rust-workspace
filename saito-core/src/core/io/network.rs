@@ -588,7 +588,7 @@ impl Network {
                     continue;
                 }
                 if let Some(config) = peer.static_peer_config.as_ref() {
-                    debug!(
+                    info!(
                         "trying to connect to static peer : {:?} with {:?}",
                         peer_index, config
                     );

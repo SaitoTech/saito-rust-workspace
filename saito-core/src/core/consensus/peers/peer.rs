@@ -75,7 +75,7 @@ impl Peer {
             key_list_limiter: RateLimiter::builder(100, Duration::from_secs(60)),
             handshake_limiter: RateLimiter::builder(100, Duration::from_secs(60)),
             message_limiter: RateLimiter::builder(1000, Duration::from_secs(1)),
-            invalid_block_limiter: RateLimiter::builder(1, Duration::from_secs(3600)),
+            invalid_block_limiter: RateLimiter::builder(10, Duration::from_secs(3600)),
             public_key: None,
             peer_type: PeerType::Default,
         }
