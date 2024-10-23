@@ -118,11 +118,6 @@ impl WasmConsensusValues {
         self.cv.rebroadcast_hash.to_hex().into()
     }
 
-    #[wasm_bindgen(getter = nolan_falling_off_chain)]
-    pub fn nolan_falling_off_chain(&self) -> u64 {
-        self.cv.nolan_falling_off_chain
-    }
-
     // #[wasm_bindgen(getter = block_payout)]
     // pub fn block_payout(&self) -> JsValue {
     //     // assuming you can convert Vec<BlockPayout> to a JsValue

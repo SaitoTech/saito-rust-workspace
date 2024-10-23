@@ -72,10 +72,10 @@ impl Peer {
             disconnected_at: Timestamp::MAX,
             wallet_version: Default::default(),
             core_version: Default::default(),
-            key_list_limiter: RateLimiter::builder(10, Duration::from_secs(60)),
-            handshake_limiter: RateLimiter::builder(10, Duration::from_secs(60)),
+            key_list_limiter: RateLimiter::builder(100, Duration::from_secs(60)),
+            handshake_limiter: RateLimiter::builder(100, Duration::from_secs(60)),
             message_limiter: RateLimiter::builder(1000, Duration::from_secs(1)),
-            invalid_block_limiter: RateLimiter::builder(1, Duration::from_secs(3600)),
+            invalid_block_limiter: RateLimiter::builder(10, Duration::from_secs(3600)),
             public_key: None,
             peer_type: PeerType::Default,
         }
@@ -111,6 +111,15 @@ impl Peer {
 
     pub fn has_invalid_block_limit_exceeded(&mut self, current_time: Timestamp) -> bool {
         self.invalid_block_limiter.has_limit_exceeded(current_time)
+    }
+    pub fn get_limited_till(&mut self, current_time: Timestamp) -> Option<Timestamp> {
+        let result = None;
+
+        if self.has_key_list_limit_exceeded(current_time) {
+            if self.key_list_limiter.has_limit_exceeded(current_time) {}
+        }
+
+        result
     }
 
     pub fn get_url(&self) -> String {
@@ -409,6 +418,10 @@ impl Peer {
     pub fn mark_as_disconnected(&mut self, disconnected_at: Timestamp) {
         self.challenge_for_peer = None;
         self.services = vec![];
+        info!(
+            "marking peer : {:?} as disconnected. at : {:?}",
+            self.index, disconnected_at
+        );
         self.disconnected_at = disconnected_at;
 
         if let PeerStatus::Disconnected(_, _) = self.peer_status {
@@ -435,9 +448,15 @@ impl Peer {
             !matches!(peer.peer_status, PeerStatus::Connected),
             "Old peer should not be already connected"
         );
+        info!(
+            "joining peer : {:?} to peer : {:?} as a reconnection",
+            peer.index, self.index
+        );
+
         self.message_limiter = peer.message_limiter;
         self.handshake_limiter = peer.handshake_limiter;
         self.key_list_limiter = peer.key_list_limiter;
+        self.disconnected_at = Timestamp::MAX;
 
         self.static_peer_config = peer.static_peer_config;
     }

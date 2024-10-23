@@ -46,7 +46,6 @@ pub struct NetworkController {
     sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
     currently_queried_urls: Arc<Mutex<HashSet<String>>>,
     pub sender_to_saito_controller: Sender<IoEvent>,
-    peers_lock: Arc<RwLock<PeerCollection>>,
 }
 
 impl NetworkController {
@@ -500,7 +499,6 @@ pub async fn run_network_controller(
         sockets: Arc::new(Mutex::new(HashMap::new())),
         sender_to_saito_controller: sender_to_core,
         currently_queried_urls: Arc::new(Default::default()),
-        peers_lock: peers_lock.clone(),
     }));
 
     let server_handle = run_websocket_server(

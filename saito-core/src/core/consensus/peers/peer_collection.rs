@@ -1,10 +1,11 @@
 use crate::core::consensus::peers::peer::{Peer, PeerStatus};
 use crate::core::consensus::peers::peer_state_writer::PeerStateWriter;
 use crate::core::defs::{PeerIndex, SaitoPublicKey, Timestamp};
+use log::info;
 use std::collections::HashMap;
 use std::time::Duration;
 
-const PEER_REMOVAL_WINDOW: Timestamp = Duration::from_secs(3600 * 24).as_millis() as Timestamp;
+const PEER_REMOVAL_WINDOW: Timestamp = Duration::from_secs(10).as_millis() as Timestamp;
 
 #[derive(Clone, Debug, Default)]
 pub struct PeerCounter {
@@ -22,7 +23,7 @@ pub struct PeerCollection {
     pub index_to_peers: HashMap<PeerIndex, Peer>,
     pub address_to_peers: HashMap<SaitoPublicKey, PeerIndex>,
     pub peer_counter: PeerCounter,
-    pub peer_state_writer: PeerStateWriter,
+    pub(crate) peer_state_writer: PeerStateWriter,
 }
 
 impl PeerCollection {
@@ -74,9 +75,15 @@ impl PeerCollection {
                     // stun peers remain unless explicity removed
                     return None;
                 }
-                if peer.disconnected_at + PEER_REMOVAL_WINDOW > current_time {
+                if peer.disconnected_at == Timestamp::MAX
+                    || peer.disconnected_at + PEER_REMOVAL_WINDOW > current_time
+                {
                     return None;
                 }
+                info!(
+                    "removing peer : {:?} as peer hasn't connected for a long time",
+                    peer_index
+                );
                 Some(*peer_index)
             })
             .collect();

@@ -70,7 +70,7 @@ jobs:
         working-directory: 'slr'
 
       - name: run issuance file generation
-        run: ts-node gen-issuance.ts
+        run: ts-node scripts/gen-issuance.ts
         working-directory: 'slr'
 
       - name: check for generated issuance file
