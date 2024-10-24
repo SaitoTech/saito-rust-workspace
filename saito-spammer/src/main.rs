@@ -320,7 +320,6 @@ async fn run_routing_event_processor(
         reconnection_timer: 0,
         peer_removal_timer: 0,
         peer_file_write_timer: 0,
-        block_fetch_event_timer: 0,
         last_emitted_block_fetch_count: 0,
         stats: RoutingStats::new(sender_to_stat.clone()),
         senders_to_verification: senders,
