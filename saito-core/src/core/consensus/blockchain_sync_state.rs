@@ -127,7 +127,7 @@ impl BlockchainSyncState {
         self.blocks_to_fetch.retain(|_, vec| !vec.is_empty());
     }
 
-    /// Generates the list of blocks which needs to be fetched next. A list is generated per each block since we can fetch from multiple peers concurrently.
+    /// Generates the list of blocks which needs to be fetched next. A list is generated per each peer since we can fetch from multiple peers concurrently.
     pub fn get_blocks_to_fetch_per_peer(
         &mut self,
     ) -> HashMap<PeerIndex, Vec<(SaitoHash, BlockId)>> {

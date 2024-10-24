@@ -17,6 +17,7 @@ pub enum InterfaceEvent {
     NewVersionDetected(PeerIndex, Version),
     StunPeerConnected(PeerIndex),
     StunPeerDisconnected(PeerIndex, SaitoPublicKey),
+    BlockFetchStatus(BlockId),
 }
 
 /// An interface is provided to access the IO functionalities in a platform (Rust/WASM) agnostic way

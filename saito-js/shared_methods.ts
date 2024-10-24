@@ -37,6 +37,8 @@ export default interface SharedMethods {
 
     sendInterfaceEvent(event: String, peerIndex: bigint, public_key: string): void;
 
+    sendBlockFetchStatus(count: bigint): void;
+
     sendNewVersionAlert(major: number, minor: number, patch: number, peerIndex: bigint): void;
 
     sendBlockSuccess(hash: String, blockId: bigint): void;
