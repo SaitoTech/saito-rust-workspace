@@ -126,7 +126,12 @@ impl BlockchainSyncState {
         self.received_block_picture.retain(|_, map| !map.is_empty());
         self.blocks_to_fetch.retain(|_, vec| !vec.is_empty());
     }
-
+    pub fn get_fetching_block_count(&self) -> BlockId {
+        self.blocks_to_fetch
+            .values()
+            .map(|v| v.len() as BlockId)
+            .sum::<BlockId>()
+    }
     /// Generates the list of blocks which needs to be fetched next. A list is generated per each peer since we can fetch from multiple peers concurrently.
     pub fn get_blocks_to_fetch_per_peer(
         &mut self,

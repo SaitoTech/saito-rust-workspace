@@ -92,7 +92,6 @@ pub struct RoutingThread {
     pub reconnection_timer: Timestamp,
     pub peer_removal_timer: Timestamp,
     pub peer_file_write_timer: Timestamp,
-    pub block_fetch_event_timer: Timestamp,
     pub last_emitted_block_fetch_count: BlockId,
     pub stats: RoutingStats,
     pub senders_to_verification: Vec<Sender<VerifyRequest>>,
@@ -439,6 +438,11 @@ impl RoutingThread {
 
         let map = self.blockchain_sync_state.get_blocks_to_fetch_per_peer();
 
+        let fetching_count = self.blockchain_sync_state.get_fetching_block_count();
+        self.network
+            .io_interface
+            .send_interface_event(InterfaceEvent::BlockFetchStatus(fetching_count as BlockId));
+
         let mut fetched_blocks: Vec<(PeerIndex, SaitoHash)> = Default::default();
         for (peer_index, vec) in map {
             for (hash, block_id) in vec.iter() {
@@ -707,29 +711,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             self.network.send_pings().await;
             self.reconnection_timer = 0;
             self.fetch_next_blocks().await;
-            work_done = true;
-        }
-
-        const BLOCK_FETCH_EVENT_STAT_TIMER: Timestamp = 1_000;
-        self.block_fetch_event_timer += duration_value;
-        if self.block_fetch_event_timer >= BLOCK_FETCH_EVENT_STAT_TIMER {
-            // TODO : this is costly, might need to optimize this
-            let fetching_count = self
-                .blockchain_sync_state
-                .get_blocks_to_fetch_per_peer()
-                .values()
-                .map(|v| v.len())
-                .sum::<usize>() as BlockId;
-            if self.last_emitted_block_fetch_count != fetching_count {
-                self.network
-                    .io_interface
-                    .send_interface_event(InterfaceEvent::BlockFetchStatus(
-                        fetching_count as BlockId,
-                    ));
-                self.last_emitted_block_fetch_count = fetching_count;
-            }
-
-            self.block_fetch_event_timer = 0;
             work_done = true;
         }
 
