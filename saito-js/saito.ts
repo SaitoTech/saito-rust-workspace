@@ -4,7 +4,7 @@ import Block from "./lib/block";
 import Factory from "./lib/factory";
 import Peer from "./lib/peer";
 import StunPeer from "./lib/stun_peer";
-import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
+import Wallet, {DefaultEmptyPrivateKey} from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
@@ -118,6 +118,9 @@ export default class Saito {
             send_interface_event: (event: string, peerIndex: bigint, public_key: string) => {
                 return sharedMethods.sendInterfaceEvent(event, peerIndex, public_key);
             },
+            send_block_fetch_status_event: (count: bigint) => {
+                return sharedMethods.sendBlockFetchStatus(count);
+            },
             send_block_success: (hash: string, blockId: bigint) => {
                 return sharedMethods.sendBlockSuccess(hash, blockId);
             },
@@ -217,12 +220,10 @@ export default class Saito {
         console.log("adding socket : " + peer_index + ". total sockets : " + this.sockets.size);
     }
 
-    
 
     public async addStunPeer(publicKey: string, peerConnection: RTCPeerConnection) {
         await this.stunManager.addStunPeer(publicKey, peerConnection);
     }
-
 
 
     public getSocket(index: bigint): any | null {
@@ -268,7 +269,6 @@ export default class Saito {
     public async processNewPeer(index: bigint, peer_config: any): Promise<void> {
         return Saito.getLibInstance().process_new_peer(index, peer_config);
     }
-
 
 
     public async processPeerDisconnection(peer_index: bigint): Promise<void> {
@@ -420,7 +420,7 @@ export default class Saito {
             .catch((error) => {
                 console.error(error);
                 if (callback) {
-                    return callback({ err: error.toString() });
+                    return callback({err: error.toString()});
                 }
             });
     }

@@ -71,6 +71,10 @@ class MsgHandler {
         return global.shared_methods.send_interface_event(event, peerIndex, public_key);
     }
 
+    static send_block_fetch_status_event(count) {
+        return global.shared_methods.send_block_fetch_status_event(count);
+    }
+
     static save_wallet() {
         return global.shared_methods.save_wallet();
     }
