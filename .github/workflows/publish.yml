@@ -228,7 +228,7 @@ jobs:
         working-directory: 'slr'
 
       - name: run issuance file generation
-        run: ts-node scripts/gen-issuance.ts
+        run: npm run generate-issuance
         working-directory: 'slr'
 
       - name: check for generated issuance file
