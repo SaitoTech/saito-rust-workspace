@@ -5,7 +5,7 @@ use log::info;
 use std::collections::HashMap;
 use std::time::Duration;
 
-const PEER_REMOVAL_WINDOW: Timestamp = Duration::from_secs(10).as_millis() as Timestamp;
+const PEER_REMOVAL_WINDOW: Timestamp = Duration::from_secs(600).as_millis() as Timestamp;
 
 #[derive(Clone, Debug, Default)]
 pub struct PeerCounter {
@@ -81,8 +81,9 @@ impl PeerCollection {
                     return None;
                 }
                 info!(
-                    "removing peer : {:?} as peer hasn't connected for a long time",
-                    peer_index
+                    "removing peer : {:?} as peer hasn't connected for more than {:?} seconds",
+                    peer_index,
+                    Duration::from_millis(current_time - peer.disconnected_at).as_secs()
                 );
                 Some(*peer_index)
             })
