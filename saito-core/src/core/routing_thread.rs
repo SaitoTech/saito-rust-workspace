@@ -715,7 +715,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
         }
 
         const PEER_REMOVAL_TIMER_PERIOD: Timestamp =
-            Duration::from_secs(60).as_millis() as Timestamp;
+            Duration::from_secs(5).as_millis() as Timestamp;
         self.peer_removal_timer += duration_value;
         if self.peer_removal_timer >= PEER_REMOVAL_TIMER_PERIOD {
             let mut peers = self.network.peer_lock.write().await;
