@@ -146,9 +146,13 @@ impl Wallet {
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
                 for input in tx.from.iter() {
-                    if input.amount > 0 && input.public_key == self.public_key {
-                        wallet_changed |= WALLET_UPDATED;
-                        self.delete_slip(input, None);
+                    if input.public_key == self.public_key {
+                        if input.amount > 0 {
+                            wallet_changed |= WALLET_UPDATED;
+                            self.delete_slip(input, None);
+                        }
+
+                        self.delete_pending_transaction(tx);
                     }
                 }
                 for output in tx.to.iter() {
@@ -404,6 +408,14 @@ impl Wallet {
         assert!(tx.hash_for_signature.is_some());
         self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
     }
+
+    pub fn delete_pending_transaction(&mut self, tx: &Transaction) {
+        let hash = tx.hash_for_signature.unwrap().clone();
+        if self.pending_txs.remove(&hash).is_none() {
+            debug!("Transaction not found in pending_txs");
+        }
+    }
+
     pub fn update_from_balance_snapshot(
         &mut self,
         snapshot: BalanceSnapshot,
