@@ -739,6 +739,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn wallet_serialize_and_deserialize_test() {
         let keys = generate_keys();
         let wallet1 = Wallet::new(keys.1, keys.0);
