@@ -126,4 +126,93 @@ export default class Block extends WasmWrapper<WasmBlock> {
     public deserialize(buffer: Uint8Array) {
         this.instance.deserialize(buffer);
     }
+
+    public get getTotalFees(): bigint {
+        return this.instance.total_fees;
+    }
+
+    public get getTotalFeesNew(): bigint {
+        return this.instance.total_fees_new;
+    }
+
+    public get getTotalFeesAtr(): bigint {
+        return this.instance.total_fees_atr;
+    }
+
+    public get getAvgTotalFees(): bigint {
+        return this.instance.avg_total_fees;
+    }
+
+    public get getAvgTotalFeesNew(): bigint {
+        return this.instance.avg_total_fees_new;
+    }
+
+    public get getAvgTotalFeesAtr(): bigint {
+        return this.instance.avg_total_fees_atr;
+    }
+
+    public get getTotalPayoutRouting(): bigint {
+        return this.instance.total_payout_routing;
+    }
+
+    public get getTotalPayoutMining(): bigint {
+        return this.instance.total_payout_mining;
+    }
+
+    public get getTotalPayoutTreasury(): bigint {
+        return this.instance.total_payout_treasury;
+    }
+
+    public get getTotalPayoutGraveyard(): bigint {
+        return this.instance.total_payout_graveyard;
+    }
+
+    public get getTotalPayoutAtr(): bigint {
+        return this.instance.total_payout_atr;
+    }
+
+    public get getAvgPayoutAtr(): bigint {
+        return this.instance.avg_payout_routing;
+    }
+
+    public get getAvgPayoutMining(): bigint {
+        return this.instance.avg_payout_mining;
+    }
+
+    public get getAvgPayoutTreasury(): bigint {
+        return this.instance.avg_payout_treasury;
+    }
+
+    public get getAvgPayoutGraveyard(): bigint {
+        return this.instance.avg_payout_graveyard;
+    }
+
+    public get getAvgPayoutAtr(): bigint {
+        return this.instance.avg_payout_atr;
+    }
+
+    public get getAvgfreePerByte(): bigint {
+        return this.instance.avg_fee_per_byte;
+    }
+
+    public get getFeePerByte(): bigint {
+        return this.instance.fee_per_byte;
+    }
+
+    public get getAvgNolanBroadcastPerBlock(): bigint {
+        return this.instance.avg_nolan_rebroadcast_per_block;
+    }
+
+    public get getBurnFee(): bigint {
+        return this.instance.burnfee;
+    }
+
+    public get getDifficulty(): bigint {
+        return this.instance.difficulty;
+    }
+
+    public get getPreviousBlockUnpaid(): bigint {
+        return this.instance.previous_block_unpaid;
+    }
+
 }
