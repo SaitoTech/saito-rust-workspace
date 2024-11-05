@@ -152,7 +152,10 @@ impl Wallet {
                             self.delete_slip(input, None);
                         }
 
-                        self.delete_pending_transaction(tx);
+                        if self.delete_pending_transaction(tx) {
+                            info!("Wallet updated on delete_pending_transaction");
+                            wallet_changed |= WALLET_UPDATED;
+                        }
                     }
                 }
                 for output in tx.to.iter() {
@@ -409,10 +412,13 @@ impl Wallet {
         self.pending_txs.insert(tx.hash_for_signature.unwrap(), tx);
     }
 
-    pub fn delete_pending_transaction(&mut self, tx: &Transaction) {
+    pub fn delete_pending_transaction(&mut self, tx: &Transaction) -> bool {
         let hash = tx.hash_for_signature.unwrap().clone();
-        if self.pending_txs.remove(&hash).is_none() {
+        if self.pending_txs.remove(&hash).is_some() {
+            true
+        } else {
             debug!("Transaction not found in pending_txs");
+            false
         }
     }
 
