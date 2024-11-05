@@ -153,7 +153,6 @@ impl Wallet {
                         }
 
                         if self.delete_pending_transaction(tx) {
-                            info!("Wallet updated on delete_pending_transaction");
                             wallet_changed |= WALLET_UPDATED;
                         }
                     }
