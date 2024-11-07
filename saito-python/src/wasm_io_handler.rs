@@ -9,7 +9,6 @@ use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::{BlockId, PeerIndex, SaitoHash};
 use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 
-
 pub struct WasmIoHandler {}
 
 #[async_trait]
