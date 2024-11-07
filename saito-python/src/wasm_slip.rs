@@ -1,5 +1,5 @@
 use log::warn;
-use pyo3::{pyclass, PyResult};
+use pyo3::pyclass;
 
 use num_traits::FromPrimitive;
 use saito_core::core::consensus::slip::{Slip, SlipType};

@@ -4,48 +4,40 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use lazy_static::lazy_static;
-use log::{debug, error, info, trace, warn, Level, Log, Metadata, Record};
+use log::{debug, error, info, trace, warn};
 use pyo3::pyfunction;
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::mempool::Mempool;
 use saito_core::core::consensus::peers::peer_collection::PeerCollection;
-use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
+    Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
     Timestamp, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::{Network, PeerDisconnectType};
 use saito_core::core::io::network_event::NetworkEvent;
 use saito_core::core::io::storage::Storage;
 use saito_core::core::mining_thread::{MiningEvent, MiningThread};
-use saito_core::core::msg::api_message::ApiMessage;
-use saito_core::core::msg::message::Message;
 use saito_core::core::process::keep_time::Timer;
 use saito_core::core::process::process_event::ProcessEvent;
-use saito_core::core::process::version::Version;
 use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
 use saito_core::core::stat_thread::StatThread;
 use saito_core::core::util::configuration::Configuration;
-use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
+use saito_core::core::util::crypto::generate_keypair_from_private_key;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use secp256k1::SECP256K1;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 
 use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
-use crate::wasm_block::WasmBlock;
-use crate::wasm_blockchain::WasmBlockchain;
 use crate::wasm_configuration::WasmConfiguration;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_peer::WasmPeer;
-use crate::wasm_slip::WasmSlip;
 use crate::wasm_time_keeper::WasmTimeKeeper;
 use crate::wasm_transaction::WasmTransaction;
-use crate::wasm_wallet::WasmWallet;
 
 pub struct SaitoWasm {
     pub(crate) routing_thread: RoutingThread,

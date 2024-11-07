@@ -1,15 +1,14 @@
 use std::fmt::{Debug, Formatter};
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use async_trait::async_trait;
-use log::{error, trace};
+use log::trace;
 
 use saito_core::core::consensus::peers::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::defs::{BlockId, PeerIndex, PrintForLog, SaitoHash};
+use saito_core::core::defs::{BlockId, PeerIndex, SaitoHash};
 use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
 
-use crate::wasm_peer_service::{WasmPeerService, WasmPeerServiceList};
 
 pub struct WasmIoHandler {}
 
