@@ -1,7 +1,6 @@
 use log::warn;
 use pyo3::pyclass;
 
-use crate::wasm_peer_service::WasmPeerService;
 use saito_core::core::consensus::peers::peer::Peer;
 use saito_core::core::consensus::peers::peer_service::PeerService;
 use saito_core::core::defs::{PeerIndex, PrintForLog, SaitoPublicKey};

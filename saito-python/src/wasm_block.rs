@@ -1,13 +1,11 @@
-use log::error;
 use num_traits::FromPrimitive;
 use pyo3::pyclass;
 
 use saito_core::core::consensus::block::{Block, BlockType};
 use saito_core::core::consensus::transaction::Transaction;
-use saito_core::core::defs::{Currency, PrintForLog, SaitoPublicKey, Timestamp};
+use saito_core::core::defs::{Currency, PrintForLog, Timestamp};
 
 use crate::saitowasm::{string_to_hex, string_to_key};
-use crate::wasm_consensus_values::WasmConsensusValues;
 use crate::wasm_transaction::WasmTransaction;
 
 #[pyclass]

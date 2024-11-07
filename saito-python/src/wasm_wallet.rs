@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use log::{error, warn};
 use pyo3::pyclass;
-use secp256k1::hashes::hex;
 use tokio::sync::RwLock;
 
 use saito_core::core::consensus::slip::Slip;
@@ -12,7 +11,7 @@ use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublic
 use saito_core::core::io::network::Network;
 use saito_core::core::io::storage::Storage;
 
-use crate::saitowasm::{string_to_hex, SAITO};
+use crate::saitowasm::string_to_hex;
 use crate::wasm_io_handler::WasmIoHandler;
 use crate::wasm_transaction::WasmTransaction;
 
