@@ -376,7 +376,6 @@ impl WasmBlock {
         self.block.has_issuance_transaction
     }
 
-
     #[wasm_bindgen(getter = issuance_transaction_index)]
     pub fn issuance_transaction_index(&self) -> u64 {
         self.block.issuance_transaction_index
