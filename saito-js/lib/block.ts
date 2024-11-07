@@ -207,4 +207,92 @@ export default class Block extends WasmWrapper<WasmBlock> {
         return this.instance.total_rebroadcast_staking_payouts_nolan;
     }
 
+    public get totalFeesNew(): bigint {
+        return this.instance.total_fees_new;
+    }
+
+    public get totalFeesAtr(): bigint {
+        return this.instance.total_fees_atr;
+    }
+
+    public get avgTotalFeesNew(): bigint {
+        return this.instance.avg_total_fees_new;
+    }
+
+    public get avgTotalFeesAtr(): bigint {
+        return this.instance.avg_total_fees_atr;
+    }
+
+    public get totalPayoutRouting(): bigint {
+        return this.instance.total_payout_routing;
+    }
+
+    public get totalPayoutMining(): bigint {
+        return this.instance.total_payout_mining;
+    }
+
+    public get totalPayoutTreasury(): bigint {
+        return this.instance.total_payout_treasury;
+    }
+
+    public get totalPayoutGraveyard(): bigint {
+        return this.instance.total_payout_graveyard;
+    }
+
+    public get avgPayoutRouting(): bigint {
+        return this.instance.avg_payout_routing;
+    }
+
+    public get avgPayoutTreasury(): bigint {
+        return this.instance.avg_payout_treasury;
+    }
+
+    public get avgPayoutGraveyard(): bigint {
+        return this.instance.avg_payout_graveyard;
+    }
+
+    public get avgPayoutAtr(): bigint {
+        return this.instance.avg_payout_atr;
+    }
+
+    public get feePerByte(): bigint {
+        return this.instance.fee_per_byte;
+    }
+
+    public get previousBlockUnpaid(): bigint {
+        return this.instance.previous_block_unpaid;
+    }
+
+    public get totalWork(): bigint {
+        return this.instance.total_work;
+    }
+
+    public get hasGoldenTicket(): boolean {
+        return this.instance.has_golden_ticket;
+    }
+
+    public get hasIssuanceTransaction(): boolean {
+        return this.instance.has_issuance_transaction;
+    }
+
+    public get issuanceTransactionIndex(): bigint {
+        return this.instance.issuance_transaction_index;
+    }
+
+    public get hasFeeTransaction(): boolean {
+        return this.instance.has_fee_transaction;
+    }
+
+    public get hasStakingTransaction(): boolean {
+        return this.instance.has_staking_transaction;
+    }
+
+    public get goldenTicketIndex(): bigint {
+        return this.instance.golden_ticket_index;
+    }
+
+    public get feeTransactionIndex(): bigint {
+        return this.instance.fee_transaction_index;
+    }
+
 }
