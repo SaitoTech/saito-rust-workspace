@@ -127,92 +127,84 @@ export default class Block extends WasmWrapper<WasmBlock> {
         this.instance.deserialize(buffer);
     }
 
-    public get getTotalFees(): bigint {
+    public get totalFees(): bigint {
         return this.instance.total_fees;
     }
 
-    public get getTotalFeesNew(): bigint {
-        return this.instance.total_fees_new;
-    }
-
-    public get getTotalFeesAtr(): bigint {
-        return this.instance.total_fees_atr;
-    }
-
-    public get getAvgTotalFees(): bigint {
-        return this.instance.avg_total_fees;
-    }
-
-    public get getAvgTotalFeesNew(): bigint {
-        return this.instance.avg_total_fees_new;
-    }
-
-    public get getAvgTotalFeesAtr(): bigint {
-        return this.instance.avg_total_fees_atr;
-    }
-
-    public get getTotalPayoutRouting(): bigint {
-        return this.instance.total_payout_routing;
-    }
-
-    public get getTotalPayoutMining(): bigint {
-        return this.instance.total_payout_mining;
-    }
-
-    public get getTotalPayoutTreasury(): bigint {
-        return this.instance.total_payout_treasury;
-    }
-
-    public get getTotalPayoutGraveyard(): bigint {
-        return this.instance.total_payout_graveyard;
-    }
-
-    public get getTotalPayoutAtr(): bigint {
-        return this.instance.total_payout_atr;
-    }
-
-    public get getAvgPayoutAtr(): bigint {
-        return this.instance.avg_payout_routing;
-    }
-
-    public get getAvgPayoutMining(): bigint {
-        return this.instance.avg_payout_mining;
-    }
-
-    public get getAvgPayoutTreasury(): bigint {
-        return this.instance.avg_payout_treasury;
-    }
-
-    public get getAvgPayoutGraveyard(): bigint {
-        return this.instance.avg_payout_graveyard;
-    }
-
-    public get getAvgPayoutAtr(): bigint {
-        return this.instance.avg_payout_atr;
-    }
-
-    public get getAvgfreePerByte(): bigint {
+    public get avgFeePerByte(): bigint {
         return this.instance.avg_fee_per_byte;
     }
 
-    public get getFeePerByte(): bigint {
-        return this.instance.fee_per_byte;
+    public get avgIncome(): bigint {
+        return this.instance.avg_income;
     }
 
-    public get getAvgNolanBroadcastPerBlock(): bigint {
+    public get avgNolanRebroadcastPerBlock(): bigint {
         return this.instance.avg_nolan_rebroadcast_per_block;
     }
 
-    public get getBurnFee(): bigint {
+    public get avgTotalFees(): bigint {
+        return this.instance.avg_total_fees;
+    }
+
+    public get burnFee(): bigint {
         return this.instance.burnfee;
     }
 
-    public get getDifficulty(): bigint {
+    public get difficulty(): bigint {
         return this.instance.difficulty;
     }
 
-    public get getPreviousBlockUnpaid(): bigint {
-        return this.instance.previous_block_unpaid;
+    public get forceLoaded(): boolean {
+        return this.instance.force_loaded;
+    }
+
+    public get ftIndex(): number {
+        return this.instance.ft_index;
+    }
+
+    public get ftNum(): number {
+        return this.instance.ft_num;
+    }
+
+    public get gtIndex(): number {
+        return this.instance.gt_index;
+    }
+
+    public get gtNum(): number {
+        return this.instance.gt_num;
+    }
+
+    public get itIndex(): number {
+        return this.instance.it_index;
+    }
+
+    public get inLongestChain(): boolean {
+        return this.instance.in_longest_chain;
+    }
+
+    public get rebroadcastHash(): string {
+        return this.instance.rebroadcast_hash;
+    }
+
+    public get it_num(): number {
+        return this.instance.it_num;
+    }
+
+    public get totalRebroadcastFeesNolan(): bigint {
+        return this.instance.total_rebroadcast_fees_nolan;
+    }
+
+    public get totalRebroadcastNolan(): bigint {
+        return this.instance.total_rebroadcast_nolan;
+    }
+
+    public get totalRebroadcastSlips(): bigint {
+        return this.instance.total_rebroadcast_slips;
+    }
+
+    public get totalRebroadcastStakingPayoutsNolan(): bigint {
+        return this.instance.total_rebroadcast_staking_payouts_nolan;
     }
 
 }
