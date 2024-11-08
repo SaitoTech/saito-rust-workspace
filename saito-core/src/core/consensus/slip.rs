@@ -23,6 +23,7 @@ pub enum SlipType {
     RouterInput = 6,
     RouterOutput = 7,
     BlockStake = 8,
+    Bound = 9,
 }
 
 #[serde_with::serde_as]

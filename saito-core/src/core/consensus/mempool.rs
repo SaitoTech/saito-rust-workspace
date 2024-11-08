@@ -113,7 +113,7 @@ impl Mempool {
             public_key = wallet.public_key;
             transaction.generate(&public_key, 0, 0);
 
-            tx_valid = transaction.validate(&blockchain.utxoset, &blockchain);
+            tx_valid = transaction.validate(&blockchain.utxoset, blockchain);
         }
 
         // validate
