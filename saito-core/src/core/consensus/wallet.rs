@@ -229,6 +229,7 @@ impl Wallet {
 
         if let SlipType::BlockStake = slip.slip_type {
             self.staking_slips.insert(wallet_slip.utxokey);
+        } else if let SlipType::Bound = slip.slip_type {
         } else {
             self.available_balance += slip.amount;
             self.unspent_slips.insert(wallet_slip.utxokey);
@@ -286,7 +287,6 @@ impl Wallet {
         network: Option<&Network>,
     ) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = Vec::new();
-        let mut outputs: Vec<Slip> = Vec::new();
         let mut nolan_in: Currency = 0;
         let mut nolan_out: Currency = 0;
         let my_public_key = self.public_key;
@@ -335,27 +335,34 @@ impl Wallet {
             nolan_out = nolan_in - nolan_requested;
         }
 
+        let mut outputs: Vec<Slip> = Vec::new();
         // add change address
-        let mut output = Slip::default();
-        output.public_key = my_public_key;
-        output.amount = nolan_out;
+        let output = Slip {
+            public_key: my_public_key,
+            amount: nolan_out,
+            ..Default::default()
+        };
         outputs.push(output);
 
         // ensure not empty
         if inputs.is_empty() {
-            let mut input = Slip::default();
-            input.public_key = my_public_key;
-            input.amount = 0;
-            input.block_id = 0;
-            input.tx_ordinal = 0;
+            let input = Slip {
+                public_key: my_public_key,
+                amount: 0,
+                block_id: 0,
+                tx_ordinal: 0,
+                ..Default::default()
+            };
             inputs.push(input);
         }
         if outputs.is_empty() {
-            let mut output = Slip::default();
-            output.public_key = my_public_key;
-            output.amount = 0;
-            output.block_id = 0;
-            output.tx_ordinal = 0;
+            let output = Slip {
+                public_key: my_public_key,
+                amount: 0,
+                block_id: 0,
+                tx_ordinal: 0,
+                ..Default::default()
+            };
             outputs.push(output);
         }
         if let Some(network) = network {

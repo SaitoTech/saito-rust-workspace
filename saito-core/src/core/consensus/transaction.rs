@@ -35,6 +35,7 @@ pub enum TransactionType {
     /// Issues funds for an address at the start of the network
     Issuance = 6,
     BlockStake = 7,
+    Bound = 8,
 }
 
 #[serde_with::serde_as]
@@ -211,9 +212,11 @@ impl Transaction {
 
         let mut transaction = Transaction::default();
         if total_requested == 0 {
-            let mut slip = Slip::default();
-            slip.amount = 0;
-            slip.public_key = wallet.public_key;
+            let slip = Slip {
+                public_key: wallet.public_key,
+                amount: 0,
+                ..Default::default()
+            };
             transaction.add_from_slip(slip);
         } else {
             let (input_slips, output_slips) = wallet.generate_slips(total_requested, network);
@@ -229,9 +232,11 @@ impl Transaction {
             let key = keys.pop().unwrap();
             let payment = payments.pop().unwrap();
 
-            let mut output = Slip::default();
-            output.public_key = key;
-            output.amount = payment;
+            let output = Slip {
+                public_key: key,
+                amount: payment,
+                ..Default::default()
+            };
             transaction.add_to_slip(output);
         }
 
@@ -347,7 +352,7 @@ impl Transaction {
     /// [output][output][output]...
     /// [message]
     /// [hop][hop][hop]...
-    pub fn deserialize_from_net(bytes: &Vec<u8>) -> Result<Transaction, Error> {
+    pub fn deserialize_from_net(bytes: &[u8]) -> Result<Transaction, Error> {
         // trace!(
         //     "deserializing tx from buffer with length : {:?}",
         //     bytes.len()
@@ -456,7 +461,7 @@ impl Transaction {
 
     // generates
     //
-    // when the block is created, block.generate() is called to fill in all of the
+    // when the block is created, block.generate() is called to fill in all the
     // dynamic data related to the block creator. that function in turn calls tx.generate()
     // to ensure that transaction data is generated properly. this includes:
     //
@@ -485,11 +490,6 @@ impl Transaction {
 
     // calculate total fees in block
     pub fn generate_total_fees(&mut self, tx_index: u64, block_id: u64) {
-        // trace!(
-        //     "generating total fees for tx : {:?}",
-        //     self.hash_for_signature.unwrap().to_hex()
-        // );
-
         // calculate nolan in / out, fees
         // generate utxoset key for every slip
         let nolan_in = self
@@ -497,6 +497,10 @@ impl Transaction {
             .iter_mut()
             .map(|slip| {
                 slip.generate_utxoset_key();
+                if let SlipType::Bound = slip.slip_type {
+                    // we are not counting the value in Bound slips
+                    return 0;
+                }
                 slip.amount
             })
             .sum::<Currency>();
@@ -506,12 +510,16 @@ impl Transaction {
             .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
-                if slip.slip_type != SlipType::ATR {
+                if slip.slip_type != SlipType::ATR || slip.slip_type != SlipType::Bound {
                     slip.block_id = block_id;
                     slip.tx_ordinal = tx_index;
                     slip.slip_index = index as u8;
                 }
                 slip.generate_utxoset_key();
+                if let SlipType::Bound = slip.slip_type {
+                    // we are not counting the value in Bound slips
+                    return 0;
+                }
                 slip.amount
             })
             .sum::<Currency>();
@@ -580,14 +588,6 @@ impl Transaction {
         }
 
         self.total_work_for_me = routing_work_available_to_public_key;
-        // trace!(
-        //     "total work : {:?} for tx : {:?}. total fees : {:?} total in : {:?} total_out : {:?}",
-        //     self.total_work_for_me,
-        //     self.signature.to_hex(),
-        //     self.total_fees,
-        //     self.total_in,
-        //     self.total_out
-        // );
     }
 
     //
@@ -604,16 +604,16 @@ impl Transaction {
     pub fn get_winning_routing_node(&self, random_hash: SaitoHash) -> SaitoPublicKey {
         //
         // if there are no routing paths, we return the sender of
-        // the payment, as they're got all of the routing work by
+        // the payment, as they're got all the routing work by
         // definition. this is the edge-case where sending a tx
         // can make you money.
         //
         if self.path.is_empty() {
-            if !self.from.is_empty() {
-                return self.from[0].public_key;
+            return if !self.from.is_empty() {
+                self.from[0].public_key
             } else {
-                return [0; 33];
-            }
+                [0; 33]
+            };
         }
 
         // no winning transaction should have no fees unless the
@@ -730,7 +730,7 @@ impl Transaction {
             (self.to.len() as u32).to_be_bytes().as_slice(),
             (self.data.len() as u32).to_be_bytes().as_slice(),
             (path_len as u32).to_be_bytes().as_slice(),
-            &self.signature.as_slice(),
+            self.signature.as_slice(),
             self.timestamp.to_be_bytes().as_slice(),
             self.txs_replacements.to_be_bytes().as_slice(),
             (self.transaction_type as u8).to_be_bytes().as_slice(),
@@ -741,8 +741,8 @@ impl Transaction {
         ]
         .concat();
 
-        if !opt_hop.is_none() {
-            buffer.extend(opt_hop.unwrap().serialize_for_net());
+        if let Some(hop) = opt_hop {
+            buffer.extend(hop.serialize_for_net());
         }
         buffer
     }
@@ -953,6 +953,37 @@ impl Transaction {
         // golden ticket transactions
         //
         if transaction_type == TransactionType::GoldenTicket {}
+
+        if transaction_type == TransactionType::Bound {
+            // TODO : check if bound slips have matching normal slips
+
+            // first input slip should be non-zero
+            if let Some(slip) = self.from.first() {
+                if slip.amount == 0 {
+                    // first slip should have a value to make sure the NFT creator cannot mint multiple transactions with the same hash
+                    return false;
+                }
+            } else {
+                return false;
+            }
+
+            // validate input bound slips
+
+            // validate output bound slips
+        } else {
+            if self
+                .from
+                .iter()
+                .any(|slip| slip.slip_type == SlipType::Bound)
+            {
+                // only bound txs can have bound slips
+                return false;
+            }
+            if self.to.iter().any(|slip| slip.slip_type == SlipType::Bound) {
+                // only bound txs can have bound slips
+                return false;
+            }
+        }
 
         //
         // all Transactions
