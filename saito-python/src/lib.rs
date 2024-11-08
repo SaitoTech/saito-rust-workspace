@@ -24,7 +24,8 @@ fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
 
 #[pyfunction]
 async fn initialize() {
-    println!("Hello, world!");
+    println!("222");
+    crate::saitowasm::initialize().await;
 }
 
 /// A Python module implemented in Rust.
