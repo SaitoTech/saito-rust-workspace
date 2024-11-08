@@ -299,12 +299,10 @@ const STYLE: Style<'static> = Style::default();
 //     console_log(&message, &level_style, &file_line_style, &text_style);
 // }
 
-#[pyfunction]
-pub async fn initialize(
-    json: String,
-    private_key: String,
-    log_level_num: u8,
-    hasten_multiplier: u64,
+pub async fn initialize(// json: String,
+    // private_key: String,
+    // log_level_num: u8,
+    // hasten_multiplier: u64,
 ) {
     // let log_level = match log_level_num {
     //     0 => log::Level::Error,
@@ -323,33 +321,35 @@ pub async fn initialize(
     trace!("trace test");
     debug!("debug test");
     info!("initializing saito-wasm");
+    error!("444");
 
     let mut enable_stats = true;
-    {
-        info!("setting configs...");
-        let mut configs = CONFIGS.write().await;
-        info!("config lock acquired");
-
-        let str: String = json.into();
-        let config = WasmConfiguration::new_from_json(str.as_str());
-
-        if config.is_err() {
-            error!("failed parsing configs. {:?}", config.err().unwrap());
-        } else {
-            let config = config.unwrap();
-            if config.is_browser() {
-                enable_stats = false;
-            }
-            info!("config : {:?}", config);
-            configs.replace(&config);
-        }
-    }
+    // {
+    //     info!("setting configs...");
+    //     let mut configs = CONFIGS.write().await;
+    //     info!("config lock acquired");
+    //
+    //     let str: String = json.into();
+    //     let config = WasmConfiguration::new_from_json(str.as_str());
+    //
+    //     if config.is_err() {
+    //         error!("failed parsing configs. {:?}", config.err().unwrap());
+    //     } else {
+    //         let config = config.unwrap();
+    //         if config.is_browser() {
+    //             enable_stats = false;
+    //         }
+    //         info!("config : {:?}", config);
+    //         configs.replace(&config);
+    //     }
+    // }
 
     let mut saito = SAITO.lock().await;
 
-    saito.replace(new(hasten_multiplier, enable_stats));
+    saito.replace(new(1, enable_stats));
 
-    let private_key: SaitoPrivateKey = string_to_hex(private_key).unwrap();
+    // let private_key: SaitoPrivateKey = string_to_hex(private_key).unwrap();
+    let private_key: SaitoPrivateKey = [0; 32];
     {
         let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
         if private_key != [0; 32] {
