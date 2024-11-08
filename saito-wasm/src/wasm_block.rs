@@ -69,7 +69,7 @@ impl WasmBlock {
 
     #[wasm_bindgen(getter = avg_fee_per_byte)]
     pub fn avg_fee_per_byte(&self) -> u64 {
-        self.block.cv.avg_fee_per_byte
+        self.block.avg_fee_per_byte
     }
 
     // #[wasm_bindgen(getter = block_payout)]
@@ -91,7 +91,7 @@ impl WasmBlock {
 
     #[wasm_bindgen(getter = burnfee)]
     pub fn burnfee(&self) -> u64 {
-        self.block.cv.burnfee
+        self.block.burnfee
     }
 
     #[wasm_bindgen(getter = ft_num)]
@@ -124,12 +124,12 @@ impl WasmBlock {
 
     #[wasm_bindgen(getter = total_fees)]
     pub fn total_fees(&self) -> u64 {
-        self.block.cv.total_fees
+        self.block.total_fees
     }
 
     #[wasm_bindgen(getter = difficulty)]
     pub fn difficulty(&self) -> u64 {
-        self.block.cv.difficulty
+        self.block.difficulty
     }
 
     #[wasm_bindgen(getter = rebroadcasts)]
@@ -150,45 +150,45 @@ impl WasmBlock {
 
     #[wasm_bindgen(getter = total_rebroadcast_slips)]
     pub fn total_rebroadcast_slips(&self) -> u64 {
-        self.block.cv.total_rebroadcast_slips
+        self.block.total_rebroadcast_slips
     }
 
     #[wasm_bindgen(getter = total_rebroadcast_nolan)]
     pub fn total_rebroadcast_nolan(&self) -> u64 {
-        self.block.cv.total_rebroadcast_nolan
+        self.block.total_rebroadcast_nolan
     }
 
     #[wasm_bindgen(getter = total_rebroadcast_fees_nolan)]
-    pub fn total_rebroadcast_fees_nolan(&self) -> u64 {
+    pub fn total_rebroadcast_fees_nolan(&self) -> Currency {
         self.block.cv.total_rebroadcast_fees_nolan
     }
 
     #[wasm_bindgen(getter = total_rebroadcast_staking_payouts_nolan)]
-    pub fn total_rebroadcast_staking_payouts_nolan(&self) -> u64 {
+    pub fn total_rebroadcast_staking_payouts_nolan(&self) -> Currency {
         self.block.cv.total_rebroadcast_staking_payouts_nolan
     }
 
     #[wasm_bindgen(getter =  avg_nolan_rebroadcast_per_block)]
     pub fn avg_nolan_rebroadcast_per_block(&self) -> u64 {
-        self.block.cv.avg_nolan_rebroadcast_per_block
+        self.block.avg_nolan_rebroadcast_per_block
     }
 
     #[wasm_bindgen(getter = rebroadcast_hash)]
     pub fn rebroadcast_hash(&self) -> JsString {
         // Convert the byte array to a JsValue
-        // JsValue::from_serde(&self.block.cv.rebroadcast_hash).unwrap()
-        self.block.cv.rebroadcast_hash.to_hex().into()
+        // JsValue::from_serde(&self.block.rebroadcast_hash).unwrap()
+        self.block.rebroadcast_hash.to_hex().into()
     }
 
     // TODO -- deprecated
     #[wasm_bindgen(getter = avg_income)]
     pub fn avg_income(&self) -> u64 {
-        self.block.cv.avg_total_fees
+        self.block.avg_total_fees
     }
 
     #[wasm_bindgen(getter = avg_total_fees)]
     pub fn avg_total_fees(&self) -> u64 {
-        self.block.cv.avg_total_fees
+        self.block.avg_total_fees
     }
 
     #[wasm_bindgen(getter = id)]
@@ -289,6 +289,116 @@ impl WasmBlock {
     #[wasm_bindgen(getter)]
     pub fn graveyard(&self) -> Currency {
         self.block.graveyard
+    }
+
+    #[wasm_bindgen(getter = total_fees_new)]
+    pub fn total_fees_new(&self) -> Currency {
+        self.block.total_fees_new
+    }
+
+    #[wasm_bindgen(getter = total_fees_atr)]
+    pub fn total_fees_atr(&self) -> Currency {
+        self.block.total_fees_atr
+    }
+
+    #[wasm_bindgen(getter = avg_total_fees_new)]
+    pub fn avg_total_fees_new(&self) -> Currency {
+        self.block.avg_total_fees_new
+    }
+
+    #[wasm_bindgen(getter = avg_total_fees_atr)]
+    pub fn avg_total_fees_atr(&self) -> Currency {
+        self.block.avg_total_fees_atr
+    }
+
+    #[wasm_bindgen(getter = total_payout_routing)]
+    pub fn total_payout_routing(&self) -> Currency {
+        self.block.total_payout_routing
+    }
+
+    #[wasm_bindgen(getter = total_payout_mining)]
+    pub fn total_payout_mining(&self) -> Currency {
+        self.block.total_payout_mining
+    }
+
+    #[wasm_bindgen(getter = total_payout_treasury)]
+    pub fn total_payout_treasury(&self) -> Currency {
+        self.block.total_payout_treasury
+    }
+
+    #[wasm_bindgen(getter = total_payout_graveyard)]
+    pub fn total_payout_graveyard(&self) -> Currency {
+        self.block.total_payout_graveyard
+    }
+
+    #[wasm_bindgen(getter = avg_payout_routing)]
+    pub fn avg_payout_routing(&self) -> Currency {
+        self.block.avg_payout_routing
+    }
+
+    #[wasm_bindgen(getter = avg_payout_treasury)]
+    pub fn avg_payout_treasury(&self) -> Currency {
+        self.block.avg_payout_treasury
+    }
+
+    #[wasm_bindgen(getter = avg_payout_graveyard)]
+    pub fn avg_payout_graveyard(&self) -> Currency {
+        self.block.avg_payout_graveyard
+    }
+
+    #[wasm_bindgen(getter = avg_payout_atr)]
+    pub fn avg_payout_atr(&self) -> Currency {
+        self.block.avg_payout_atr
+    }
+
+    #[wasm_bindgen(getter = fee_per_byte)]
+    pub fn fee_per_byte(&self) -> Currency {
+        self.block.fee_per_byte
+    }
+
+    #[wasm_bindgen(getter = previous_block_unpaid)]
+    pub fn previous_block_unpaid(&self) -> Currency {
+        self.block.previous_block_unpaid
+    }
+
+    #[wasm_bindgen(getter = total_work)]
+    pub fn total_work(&self) -> Currency {
+        self.block.total_work
+    }
+
+    #[wasm_bindgen(getter = has_golden_ticket)]
+    pub fn has_golden_ticket(&self) -> bool {
+        self.block.has_golden_ticket
+    }
+
+    #[wasm_bindgen(getter = has_issuance_transaction)]
+    pub fn has_issuance_transaction(&self) -> bool {
+        self.block.has_issuance_transaction
+    }
+
+    #[wasm_bindgen(getter = issuance_transaction_index)]
+    pub fn issuance_transaction_index(&self) -> u64 {
+        self.block.issuance_transaction_index
+    }
+
+    #[wasm_bindgen(getter = has_fee_transaction)]
+    pub fn has_fee_transaction(&self) -> bool {
+        self.block.has_fee_transaction
+    }
+
+    #[wasm_bindgen(getter = has_staking_transaction)]
+    pub fn has_staking_transaction(&self) -> bool {
+        self.block.has_staking_transaction
+    }
+
+    #[wasm_bindgen(getter = golden_ticket_index)]
+    pub fn golden_ticket_index(&self) -> u64 {
+        self.block.golden_ticket_index
+    }
+
+    #[wasm_bindgen(getter = fee_transaction_index)]
+    pub fn fee_transaction_index(&self) -> u64 {
+        self.block.fee_transaction_index
     }
 }
 
