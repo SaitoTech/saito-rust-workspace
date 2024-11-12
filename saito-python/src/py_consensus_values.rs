@@ -3,7 +3,7 @@ use saito_core::core::consensus::block::ConsensusValues;
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::defs::PrintForLog;
 
-use crate::wasm_transaction::WasmTransaction;
+use crate::py_transaction::WasmTransaction;
 
 #[pyclass]
 #[derive(Clone)]

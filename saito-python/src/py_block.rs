@@ -5,8 +5,8 @@ use saito_core::core::consensus::block::{Block, BlockType};
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::defs::{Currency, PrintForLog, Timestamp};
 
-use crate::saitowasm::{string_to_hex, string_to_key};
-use crate::wasm_transaction::WasmTransaction;
+use crate::py_transaction::WasmTransaction;
+use crate::saitopython::{string_to_hex, string_to_key};
 
 #[pyclass]
 pub struct WasmBlock {

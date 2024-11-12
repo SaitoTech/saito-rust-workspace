@@ -32,12 +32,12 @@ use secp256k1::SECP256K1;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 
-use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
-use crate::wasm_configuration::WasmConfiguration;
-use crate::wasm_io_handler::WasmIoHandler;
-use crate::wasm_peer::WasmPeer;
-use crate::wasm_time_keeper::WasmTimeKeeper;
-use crate::wasm_transaction::WasmTransaction;
+use crate::py_balance_snapshot::WasmBalanceSnapshot;
+use crate::py_configuration::WasmConfiguration;
+use crate::py_io_handler::PyIoHandler;
+use crate::py_peer::WasmPeer;
+use crate::py_time_keeper::WasmTimeKeeper;
+use crate::py_transaction::WasmTransaction;
 
 pub struct SaitoWasm {
     pub(crate) routing_thread: RoutingThread,
@@ -102,7 +102,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             timer: timer.clone(),
             wallet_lock: wallet.clone(),
             network: Network::new(
-                Box::new(WasmIoHandler {}),
+                Box::new(PyIoHandler {}),
                 peers.clone(),
                 context.wallet_lock.clone(),
                 context.config_lock.clone(),
@@ -129,13 +129,13 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             block_producing_timer: 0,
             timer: timer.clone(),
             network: Network::new(
-                Box::new(WasmIoHandler {}),
+                Box::new(PyIoHandler {}),
                 peers.clone(),
                 context.wallet_lock.clone(),
                 configuration.clone(),
                 timer.clone(),
             ),
-            storage: Storage::new(Box::new(WasmIoHandler {})),
+            storage: Storage::new(Box::new(PyIoHandler {})),
             stats: ConsensusStats::new(sender_to_stat.clone()),
             txs_for_mempool: vec![],
             stat_sender: sender_to_stat.clone(),
@@ -187,7 +187,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
         },
         stat_thread: StatThread {
             stat_queue: Default::default(),
-            io_interface: Box::new(WasmIoHandler {}),
+            io_interface: Box::new(PyIoHandler {}),
             enabled: enable_stats,
         },
         receiver_for_router: receiver_in_blockchain,

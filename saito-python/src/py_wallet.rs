@@ -11,9 +11,9 @@ use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublic
 use saito_core::core::io::network::Network;
 use saito_core::core::io::storage::Storage;
 
-use crate::saitowasm::string_to_hex;
-use crate::wasm_io_handler::WasmIoHandler;
-use crate::wasm_transaction::WasmTransaction;
+use crate::py_io_handler::PyIoHandler;
+use crate::py_transaction::WasmTransaction;
+use crate::saitopython::string_to_hex;
 
 #[pyclass]
 #[derive(Clone)]
@@ -30,19 +30,19 @@ pub struct WasmWalletSlip {
 impl WasmWallet {
     pub async fn save(&self) {
         let mut wallet = self.wallet.write().await;
-        Wallet::save(&mut wallet, &(WasmIoHandler {})).await;
+        Wallet::save(&mut wallet, &(PyIoHandler {})).await;
     }
     pub async fn reset(&mut self) {
         self.wallet
             .write()
             .await
-            .reset(&mut Storage::new(Box::new(WasmIoHandler {})), None)
+            .reset(&mut Storage::new(Box::new(PyIoHandler {})), None)
             .await;
     }
 
     pub async fn load(&mut self) {
         let mut wallet = self.wallet.write().await;
-        Wallet::load(&mut wallet, &(WasmIoHandler {})).await;
+        Wallet::load(&mut wallet, &(PyIoHandler {})).await;
     }
 
     pub async fn get_public_key(&self) -> String {

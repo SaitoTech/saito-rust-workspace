@@ -1,18 +1,18 @@
-pub mod saitowasm;
-pub mod wasm_balance_snapshot;
-pub mod wasm_block;
-pub mod wasm_blockchain;
-pub mod wasm_configuration;
-pub mod wasm_consensus_values;
-pub mod wasm_hop;
-pub mod wasm_io_handler;
-pub mod wasm_peer;
-pub mod wasm_peer_service;
-pub mod wasm_slip;
-pub mod wasm_task_runner;
-pub mod wasm_time_keeper;
-pub mod wasm_transaction;
-pub mod wasm_wallet;
+pub mod py_balance_snapshot;
+pub mod py_block;
+pub mod py_blockchain;
+pub mod py_configuration;
+pub mod py_consensus_values;
+pub mod py_hop;
+pub mod py_io_handler;
+pub mod py_peer;
+pub mod py_peer_service;
+pub mod py_slip;
+pub mod py_task_runner;
+pub mod py_time_keeper;
+pub mod py_transaction;
+pub mod py_wallet;
+pub mod saitopython;
 
 use pyo3::prelude::*;
 
@@ -25,7 +25,7 @@ fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
 #[pyfunction]
 async fn initialize() {
     println!("222");
-    crate::saitowasm::initialize().await;
+    crate::saitopython::initialize().await;
 }
 
 /// A Python module implemented in Rust.
