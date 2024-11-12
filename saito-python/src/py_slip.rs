@@ -9,11 +9,11 @@ use crate::saitopython::{string_to_hex, string_to_key};
 
 // #[derive(Serialize, Deserialize)]
 #[pyclass]
-pub struct WasmSlip {
+pub struct PySlip {
     pub(crate) slip: Slip,
 }
 
-impl WasmSlip {
+impl PySlip {
     pub fn amount(&self) -> u64 {
         self.slip.amount
     }
@@ -65,8 +65,8 @@ impl WasmSlip {
         key.into()
     }
 
-    pub fn new() -> WasmSlip {
-        WasmSlip {
+    pub fn new() -> PySlip {
+        PySlip {
             slip: Slip {
                 public_key: [0; 33],
                 amount: 0,
@@ -81,8 +81,8 @@ impl WasmSlip {
     }
 }
 
-impl WasmSlip {
-    pub fn new_from_slip(slip: Slip) -> WasmSlip {
-        WasmSlip { slip }
+impl PySlip {
+    pub fn new_from_slip(slip: Slip) -> PySlip {
+        PySlip { slip }
     }
 }

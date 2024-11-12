@@ -1,16 +1,19 @@
 use async_trait::async_trait;
 use lazy_static::lazy_static;
-use log::{debug, trace};
+use log::{debug, error, trace};
 use saito_core::core::consensus::peers::peer_service::PeerService;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::defs::{BlockId, PeerIndex, SaitoHash, BLOCK_FILE_EXTENSION};
 use saito_core::core::io::interface_io::{InterfaceEvent, InterfaceIO};
+use saito_core::core::io::network_event::NetworkEvent;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::fs;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::path::Path;
-use tokio::fs::File;
+use std::sync::Mutex;
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::Sender;
 
 pub fn configure_storage() -> String {
@@ -18,6 +21,30 @@ pub fn configure_storage() -> String {
         String::from("./data/test/blocks/")
     } else {
         String::from("./data/blocks/")
+    }
+}
+#[derive(Debug)]
+pub struct IoEvent {
+    pub event_processor_id: u8,
+    pub event_id: u64,
+    pub event: NetworkEvent,
+}
+
+lazy_static! {
+    static ref EVENT_COUNTER: Mutex<u64> = Mutex::new(0);
+}
+
+impl IoEvent {
+    pub fn new(event: NetworkEvent) -> IoEvent {
+        let mut value = EVENT_COUNTER.lock().unwrap();
+        *value = *value + 1;
+        assert_ne!(*value, 0);
+        // trace!("new event created : {:?}", *value);
+        IoEvent {
+            event_processor_id: 0,
+            event_id: value.clone(),
+            event,
+        }
     }
 }
 
@@ -30,7 +57,15 @@ pub struct PyIoHandler {
     handler_id: u8,
     open_files: HashMap<String, File>,
 }
-
+impl PyIoHandler {
+    pub fn new() -> Self {
+        PyIoHandler {
+            sender: (),
+            handler_id: 0,
+            open_files: Default::default(),
+        }
+    }
+}
 #[async_trait]
 impl InterfaceIO for PyIoHandler {
     async fn send_message(&self, peer_index: u64, buffer: &[u8]) -> Result<(), Error> {

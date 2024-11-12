@@ -32,12 +32,12 @@ use secp256k1::SECP256K1;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 
-use crate::py_balance_snapshot::WasmBalanceSnapshot;
-use crate::py_configuration::WasmConfiguration;
+use crate::py_balance_snapshot::PyBalanceSnapshot;
+use crate::py_configuration::PyConfiguration;
 use crate::py_io_handler::PyIoHandler;
-use crate::py_peer::WasmPeer;
-use crate::py_time_keeper::WasmTimeKeeper;
-use crate::py_transaction::WasmTransaction;
+use crate::py_peer::PyPeer;
+use crate::py_time_keeper::PyTimeKeeper;
+use crate::py_transaction::PyTransaction;
 
 pub struct SaitoWasm {
     pub(crate) routing_thread: RoutingThread,
@@ -58,7 +58,7 @@ pub struct SaitoWasm {
 lazy_static! {
     pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true)));
     static ref CONFIGS: Arc<RwLock<dyn Configuration + Send + Sync>> =
-        Arc::new(RwLock::new(WasmConfiguration::new()));
+        Arc::new(RwLock::new(PyConfiguration::new()));
     static ref PRIVATE_KEY: Mutex<String> = Mutex::new("".to_string());
 }
 
@@ -87,7 +87,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
         tokio::sync::mpsc::channel(channel_size);
 
     let timer = Timer {
-        time_reader: Arc::new(WasmTimeKeeper {}),
+        time_reader: Arc::new(PyTimeKeeper {}),
         hasten_multiplier: haste_multiplier,
         start_time: 0 as Timestamp,
     };
@@ -736,7 +736,7 @@ pub async fn process_stat_interval(current_time: Timestamp) {
         .await;
 }
 
-pub async fn get_peer(peer_index: u64) -> Option<WasmPeer> {
+pub async fn get_peer(peer_index: u64) -> Option<PyPeer> {
     let saito = SAITO.lock().await;
     let peers = saito
         .as_ref()
@@ -752,10 +752,10 @@ pub async fn get_peer(peer_index: u64) -> Option<WasmPeer> {
         return None;
     }
     let peer = peer.cloned().unwrap();
-    Some(WasmPeer::new_from_peer(peer))
+    Some(PyPeer::new_from_peer(peer))
 }
 
-pub async fn update_from_balance_snapshot(snapshot: WasmBalanceSnapshot) {
+pub async fn update_from_balance_snapshot(snapshot: PyBalanceSnapshot) {
     let saito = SAITO.lock().await;
     let mut wallet = saito
         .as_ref()
@@ -776,7 +776,7 @@ pub fn generate_private_key() -> String {
     private_key.to_hex().into()
 }
 
-pub async fn propagate_transaction(tx: &WasmTransaction) {
+pub async fn propagate_transaction(tx: &PyTransaction) {
     trace!("propagate_transaction");
 
     let mut saito = SAITO.lock().await;

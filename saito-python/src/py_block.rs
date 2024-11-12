@@ -5,7 +5,7 @@ use saito_core::core::consensus::block::{Block, BlockType};
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::defs::{Currency, PrintForLog, Timestamp};
 
-use crate::py_transaction::WasmTransaction;
+use crate::py_transaction::PyTransaction;
 use crate::saitopython::{string_to_hex, string_to_key};
 
 #[pyclass]
@@ -19,23 +19,23 @@ impl WasmBlock {
             block: Block::new(),
         }
     }
-    pub fn get_transactions(&self) -> Vec<WasmTransaction> {
-        let txs: Vec<WasmTransaction> = self
+    pub fn get_transactions(&self) -> Vec<PyTransaction> {
+        let txs: Vec<PyTransaction> = self
             .block
             .transactions
             .iter()
-            .map(|tx| WasmTransaction::from_transaction(tx.clone()))
+            .map(|tx| PyTransaction::from_transaction(tx.clone()))
             .collect();
 
         txs
     }
 
-    pub fn fee_transaction(&self) -> WasmTransaction {
+    pub fn fee_transaction(&self) -> PyTransaction {
         if let Some(tx) = &self.block.cv.fee_transaction {
-            let tx = WasmTransaction::from_transaction(tx.clone());
+            let tx = PyTransaction::from_transaction(tx.clone());
             tx
         } else {
-            let tx = WasmTransaction {
+            let tx = PyTransaction {
                 tx: Transaction::default(),
             };
             tx

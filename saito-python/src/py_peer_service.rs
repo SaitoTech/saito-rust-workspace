@@ -3,19 +3,19 @@ use saito_core::core::consensus::peers::peer_service::PeerService;
 use serde::{Deserialize, Serialize};
 
 #[pyclass]
-pub struct WasmPeerServiceList {
-    pub(crate) services: Vec<WasmPeerService>,
+pub struct PyPeerServiceList {
+    pub(crate) services: Vec<PyPeerService>,
 }
 
 #[pyclass]
 #[derive(Clone, Serialize, Deserialize)]
-pub struct WasmPeerService {
+pub struct PyPeerService {
     pub(crate) service: PeerService,
 }
 
-impl WasmPeerService {
-    pub fn new() -> WasmPeerService {
-        WasmPeerService {
+impl PyPeerService {
+    pub fn new() -> PyPeerService {
+        PyPeerService {
             service: PeerService {
                 service: "".to_string(),
                 domain: "".to_string(),
@@ -45,11 +45,11 @@ impl WasmPeerService {
     }
 }
 
-impl WasmPeerServiceList {
-    pub fn push(&mut self, service: WasmPeerService) {
+impl PyPeerServiceList {
+    pub fn push(&mut self, service: PyPeerService) {
         self.services.push(service);
     }
-    pub fn new() -> WasmPeerServiceList {
-        WasmPeerServiceList { services: vec![] }
+    pub fn new() -> PyPeerServiceList {
+        PyPeerServiceList { services: vec![] }
     }
 }

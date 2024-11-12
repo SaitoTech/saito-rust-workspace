@@ -1,19 +1,19 @@
 use saito_core::core::util::balance_snapshot::BalanceSnapshot;
 
-pub struct WasmBalanceSnapshot {
+pub struct PyBalanceSnapshot {
     snapshot: BalanceSnapshot,
 }
 
-impl WasmBalanceSnapshot {
-    pub fn new(snapshot: BalanceSnapshot) -> WasmBalanceSnapshot {
-        WasmBalanceSnapshot { snapshot }
+impl PyBalanceSnapshot {
+    pub fn new(snapshot: BalanceSnapshot) -> PyBalanceSnapshot {
+        PyBalanceSnapshot { snapshot }
     }
     pub fn get_snapshot(self) -> BalanceSnapshot {
         self.snapshot
     }
 }
 
-impl WasmBalanceSnapshot {
+impl PyBalanceSnapshot {
     pub fn get_file_name(&self) -> String {
         self.snapshot.get_file_name().into()
     }

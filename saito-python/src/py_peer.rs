@@ -7,11 +7,11 @@ use saito_core::core::defs::{PeerIndex, PrintForLog, SaitoPublicKey};
 
 #[pyclass]
 #[derive(Clone)]
-pub struct WasmPeer {
+pub struct PyPeer {
     peer: Peer,
 }
 
-impl WasmPeer {
+impl PyPeer {
     pub fn get_public_key(&self) -> String {
         if self.peer.get_public_key().is_none() {
             warn!("peer : {:?} public key is not set", self.peer.index);
@@ -26,8 +26,8 @@ impl WasmPeer {
     pub fn get_peer_index(&self) -> u64 {
         self.peer.index
     }
-    pub fn new(peer_index: PeerIndex) -> WasmPeer {
-        WasmPeer {
+    pub fn new(peer_index: PeerIndex) -> PyPeer {
+        PyPeer {
             peer: Peer::new(peer_index),
         }
     }
@@ -56,8 +56,8 @@ impl WasmPeer {
     }
 }
 
-impl WasmPeer {
-    pub fn new_from_peer(peer: Peer) -> WasmPeer {
-        WasmPeer { peer }
+impl PyPeer {
+    pub fn new_from_peer(peer: Peer) -> PyPeer {
+        PyPeer { peer }
     }
 }

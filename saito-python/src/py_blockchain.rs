@@ -7,11 +7,11 @@ use saito_core::core::defs::{BlockId, PrintForLog, SaitoHash};
 
 #[pyclass]
 #[derive(Clone)]
-pub struct WasmBlockchain {
+pub struct PyBlockchain {
     pub(crate) blockchain_lock: Arc<RwLock<Blockchain>>,
 }
 
-impl WasmBlockchain {
+impl PyBlockchain {
     pub async fn reset(&self) {
         let mut blockchain = self.blockchain_lock.write().await;
         blockchain.reset().await;

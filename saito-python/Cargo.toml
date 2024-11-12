@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = "0.22.0"
 saito-core = { path = "../saito-core" }
-tokio = "1.36.0"
+tokio = { version = "1.36.0", features = ["full"] }
 lazy_static = "1.4.0"
 log = "0.4.21"
 serde = { version = "1.0.203", features = ["derive"] }

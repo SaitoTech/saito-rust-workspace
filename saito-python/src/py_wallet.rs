@@ -12,22 +12,22 @@ use saito_core::core::io::network::Network;
 use saito_core::core::io::storage::Storage;
 
 use crate::py_io_handler::PyIoHandler;
-use crate::py_transaction::WasmTransaction;
+use crate::py_transaction::PyTransaction;
 use crate::saitopython::string_to_hex;
 
 #[pyclass]
 #[derive(Clone)]
-pub struct WasmWallet {
+pub struct PyWallet {
     pub(crate) wallet: Arc<RwLock<Wallet>>,
     pub(crate) network: Arc<Network>,
 }
 
 #[pyclass]
-pub struct WasmWalletSlip {
+pub struct PyWalletSlip {
     slip: WalletSlip,
 }
 
-impl WasmWallet {
+impl PyWallet {
     pub async fn save(&self) {
         let mut wallet = self.wallet.write().await;
         Wallet::save(&mut wallet, &(PyIoHandler {})).await;
@@ -96,7 +96,7 @@ impl WasmWallet {
         wallet.get_available_balance()
     }
 
-    pub async fn add_slip(&mut self, slip: WasmWalletSlip) {
+    pub async fn add_slip(&mut self, slip: PyWalletSlip) {
         let wallet_slip = slip.slip;
         let mut wallet = self.wallet.write().await;
         let slip = Slip::parse_slip_from_utxokey(&wallet_slip.utxokey).unwrap();
@@ -109,7 +109,7 @@ impl WasmWallet {
         );
     }
 
-    pub async fn add_to_pending(&mut self, tx: &WasmTransaction) {
+    pub async fn add_to_pending(&mut self, tx: &PyTransaction) {
         let mut wallet = self.wallet.write().await;
         let mut tx = tx.clone().tx;
         tx.generate(&wallet.public_key, 0, 0);
@@ -129,22 +129,22 @@ impl WasmWallet {
     // }
 }
 
-impl WasmWallet {
-    pub fn new_from(wallet: Arc<RwLock<Wallet>>, network: Network) -> WasmWallet {
-        WasmWallet {
+impl PyWallet {
+    pub fn new_from(wallet: Arc<RwLock<Wallet>>, network: Network) -> PyWallet {
+        PyWallet {
             wallet,
             network: Arc::new(network),
         }
     }
 }
 
-impl WasmWalletSlip {
-    pub fn new(slip: WalletSlip) -> WasmWalletSlip {
-        WasmWalletSlip { slip }
+impl PyWalletSlip {
+    pub fn new(slip: WalletSlip) -> PyWalletSlip {
+        PyWalletSlip { slip }
     }
 }
 
-impl WasmWalletSlip {
+impl PyWalletSlip {
     pub fn get_utxokey(&self) -> String {
         let key: String = self.slip.utxokey.to_hex();
         key.into()
@@ -195,8 +195,8 @@ impl WasmWalletSlip {
     pub fn set_lc(&mut self, lc: bool) {
         self.slip.lc = lc;
     }
-    pub fn new_() -> WasmWalletSlip {
-        WasmWalletSlip {
+    pub fn new_() -> PyWalletSlip {
+        PyWalletSlip {
             slip: WalletSlip::new(),
         }
     }

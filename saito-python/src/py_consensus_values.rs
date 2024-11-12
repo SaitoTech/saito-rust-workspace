@@ -3,7 +3,7 @@ use saito_core::core::consensus::block::ConsensusValues;
 use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::defs::PrintForLog;
 
-use crate::py_transaction::WasmTransaction;
+use crate::py_transaction::PyTransaction;
 
 #[pyclass]
 #[derive(Clone)]
@@ -17,12 +17,12 @@ impl WasmConsensusValues {
     }
 
     // #[wasm_bindgen(getter= fee_transaction)]
-    pub fn fee_transaction(&self) -> WasmTransaction {
+    pub fn fee_transaction(&self) -> PyTransaction {
         if let Some(tx) = &self.cv.fee_transaction {
-            let tx = WasmTransaction::from_transaction(tx.clone());
+            let tx = PyTransaction::from_transaction(tx.clone());
             tx
         } else {
-            let tx = WasmTransaction {
+            let tx = PyTransaction {
                 tx: Transaction::default(),
             };
             tx

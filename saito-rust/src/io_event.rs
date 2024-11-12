@@ -23,7 +23,7 @@ impl IoEvent {
         // trace!("new event created : {:?}", *value);
         IoEvent {
             event_processor_id: 0,
-            event_id: value.clone(),
+            event_id: *value,
             event,
         }
     }

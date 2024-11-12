@@ -12,7 +12,7 @@ use saito_core::core::util::configuration::{
 
 #[pyclass]
 #[derive(Deserialize, Debug)]
-pub struct WasmConfiguration {
+pub struct PyConfiguration {
     server: Option<Server>,
     peers: Vec<PeerConfig>,
     blockchain: Option<BlockchainConfig>,
@@ -20,9 +20,9 @@ pub struct WasmConfiguration {
     browser_mode: bool,
 }
 
-impl WasmConfiguration {
-    pub fn new() -> WasmConfiguration {
-        WasmConfiguration {
+impl PyConfiguration {
+    pub fn new() -> PyConfiguration {
+        PyConfiguration {
             server: Option::Some(Server {
                 host: "localhost".to_string(),
                 port: 12100,
@@ -47,12 +47,12 @@ impl WasmConfiguration {
     }
 }
 
-impl WasmConfiguration {
-    pub fn new_from_json(json: &str) -> Result<WasmConfiguration, std::io::Error> {
+impl PyConfiguration {
+    pub fn new_from_json(json: &str) -> Result<PyConfiguration, std::io::Error> {
         // info!("new from json : {:?}", json);
         let configs = Figment::new()
             .merge(Json::string(json))
-            .extract::<WasmConfiguration>();
+            .extract::<PyConfiguration>();
         if configs.is_err() {
             error!(
                 "failed parsing json string to configs. {:?}",
@@ -65,7 +65,7 @@ impl WasmConfiguration {
     }
 }
 
-impl Configuration for WasmConfiguration {
+impl Configuration for PyConfiguration {
     fn get_server_configs(&self) -> Option<&Server> {
         return self.server.as_ref();
     }

@@ -4,18 +4,18 @@ use pyo3::pyclass;
 use saito_core::core::consensus::transaction::{Transaction, TransactionType};
 use saito_core::core::defs::{Currency, PrintForLog, Timestamp};
 
-use crate::py_slip::WasmSlip;
+use crate::py_slip::PySlip;
 use crate::saitopython::{string_to_hex, string_to_key, SAITO};
 
 #[pyclass]
 #[derive(Clone)]
-pub struct WasmTransaction {
+pub struct PyTransaction {
     pub(crate) tx: Transaction,
 }
 
-impl WasmTransaction {
-    pub fn new() -> WasmTransaction {
-        WasmTransaction {
+impl PyTransaction {
+    pub fn new() -> PyTransaction {
+        PyTransaction {
             tx: Transaction::default(),
         }
     }
@@ -27,11 +27,11 @@ impl WasmTransaction {
         self.tx.signature = string_to_hex(signature).unwrap();
     }
 
-    pub fn add_to_slip(&mut self, slip: WasmSlip) {
+    pub fn add_to_slip(&mut self, slip: PySlip) {
         self.tx.add_to_slip(slip.slip.clone());
     }
 
-    pub fn add_from_slip(&mut self, slip: WasmSlip) {
+    pub fn add_from_slip(&mut self, slip: PySlip) {
         self.tx.add_from_slip(slip.slip.clone());
     }
 
@@ -96,8 +96,8 @@ impl WasmTransaction {
     // }
 }
 
-impl WasmTransaction {
-    pub fn from_transaction(transaction: Transaction) -> WasmTransaction {
-        WasmTransaction { tx: transaction }
+impl PyTransaction {
+    pub fn from_transaction(transaction: Transaction) -> PyTransaction {
+        PyTransaction { tx: transaction }
     }
 }
