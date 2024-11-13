@@ -1161,9 +1161,7 @@ pub async fn disable_producing_blocks_by_timer() {
 }
 #[wasm_bindgen]
 pub async fn produce_block_with_gt() {
-    info!("111");
     let mut saito = SAITO.lock().await;
-    info!("222");
 
     {
         let miner = &mut saito.as_mut().unwrap().mining_thread;
