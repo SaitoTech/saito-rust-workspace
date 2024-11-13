@@ -123,7 +123,8 @@ impl ConsensusThread {
         }
     }
 
-    pub async fn produce_block(&mut self, timestamp: Timestamp) {
+    pub async fn produce_block(&mut self, timestamp: Timestamp, produce_without_limits: bool) {
+        debug!("producing a block");
         let configs = self.network.config_lock.read().await;
 
         let mut blockchain = self.blockchain_lock.write().await;
@@ -154,7 +155,9 @@ impl ConsensusThread {
         }
 
         let mut block = None;
-        if !configs.is_browser() && !configs.is_spv_mode() && !blockchain.blocks.is_empty() {
+        if (produce_without_limits || (!configs.is_browser() && !configs.is_spv_mode()))
+            && !blockchain.blocks.is_empty()
+        {
             block = mempool
                 .bundle_block(
                     blockchain.deref_mut(),
@@ -164,6 +167,8 @@ impl ConsensusThread {
                     &self.storage,
                 )
                 .await;
+        } else {
+            info!("skipped bundling block");
         }
         if let Some(block) = block {
             debug!(
@@ -278,7 +283,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         // generate blocks
         self.block_producing_timer += duration_value;
         if self.produce_blocks_by_timer && self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
-            self.produce_block(timestamp).await;
+            self.produce_block(timestamp, false).await;
 
             work_done = true;
         }
