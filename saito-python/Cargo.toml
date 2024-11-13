@@ -9,7 +9,7 @@ name = "saito_python"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.22.0"
+pyo3 = "0.20.3"
 saito-core = { path = "../saito-core" }
 tokio = { version = "1.36.0", features = ["full"] }
 lazy_static = "1.4.0"
@@ -23,7 +23,9 @@ figment = { version = "0.10.12", features = ["json"] }
 serde_json = { version = "1.0.117" }
 num-derive = { version = "0.4.2" }
 num-traits = { version = "0.2.19" }
+pyo3-log = "0.11.0"
 hex = "0.4.3"
+pyo3-async = { version = "0.3.2", features = ["default"] }
 
-[features]
-default = ["pyo3/experimental-async"]
+#[features]
+#default = ["pyo3/experimental-async"]

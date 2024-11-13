@@ -14,8 +14,8 @@ pub mod py_transaction;
 pub mod py_wallet;
 pub mod saitopython;
 
+use log::info;
 use pyo3::prelude::*;
-
 /// Formats the sum of two numbers as string.
 #[pyfunction]
 fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
@@ -25,6 +25,8 @@ fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
 #[pyfunction]
 async fn initialize() {
     println!("222");
+    pyo3_log::init();
+    info!("log test");
     crate::saitopython::initialize().await;
 }
 

@@ -102,7 +102,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             timer: timer.clone(),
             wallet_lock: wallet.clone(),
             network: Network::new(
-                Box::new(PyIoHandler {}),
+                Box::new(PyIoHandler::default()),
                 peers.clone(),
                 context.wallet_lock.clone(),
                 context.config_lock.clone(),
@@ -129,13 +129,13 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
             block_producing_timer: 0,
             timer: timer.clone(),
             network: Network::new(
-                Box::new(PyIoHandler {}),
+                Box::new(PyIoHandler::default()),
                 peers.clone(),
                 context.wallet_lock.clone(),
                 configuration.clone(),
                 timer.clone(),
             ),
-            storage: Storage::new(Box::new(PyIoHandler {})),
+            storage: Storage::new(Box::new(PyIoHandler::default())),
             stats: ConsensusStats::new(sender_to_stat.clone()),
             txs_for_mempool: vec![],
             stat_sender: sender_to_stat.clone(),
@@ -187,7 +187,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
         },
         stat_thread: StatThread {
             stat_queue: Default::default(),
-            io_interface: Box::new(PyIoHandler {}),
+            io_interface: Box::new(PyIoHandler::default()),
             enabled: enable_stats,
         },
         receiver_for_router: receiver_in_blockchain,

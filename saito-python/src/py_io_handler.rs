@@ -52,20 +52,19 @@ lazy_static! {
     pub static ref BLOCKS_DIR_PATH: String = configure_storage();
     pub static ref WALLET_DIR_PATH: String = String::from("./data/wallet");
 }
+#[derive(Default)]
 pub struct PyIoHandler {
-    sender: Sender<IoEvent>,
-    handler_id: u8,
+    // sender: Sender<IoEvent>,
+    // handler_id: u8,
     open_files: HashMap<String, File>,
 }
-impl PyIoHandler {
-    pub fn new() -> Self {
-        PyIoHandler {
-            sender: (),
-            handler_id: 0,
-            open_files: Default::default(),
-        }
-    }
-}
+// impl Default for PyIoHandler {
+//     fn default() -> Self {
+//         PyIoHandler {
+//             open_files: Default::default(),
+//         }
+//     }
+// }
 #[async_trait]
 impl InterfaceIO for PyIoHandler {
     async fn send_message(&self, peer_index: u64, buffer: &[u8]) -> Result<(), Error> {
@@ -107,12 +106,12 @@ impl InterfaceIO for PyIoHandler {
     }
 
     async fn disconnect_from_peer(&self, peer_index: u64) -> Result<(), Error> {
-        self.sender
-            .send(IoEvent::new(NetworkEvent::DisconnectFromPeer {
-                peer_index,
-            }))
-            .await
-            .unwrap();
+        // self.sender
+        //     .send(IoEvent::new(NetworkEvent::DisconnectFromPeer {
+        //         peer_index,
+        //     }))
+        //     .await
+        //     .unwrap();
         Ok(())
     }
 
@@ -135,10 +134,10 @@ impl InterfaceIO for PyIoHandler {
             url: url.to_string(),
         });
 
-        self.sender
-            .send(event)
-            .await
-            .expect("failed sending to io controller");
+        // self.sender
+        //     .send(event)
+        //     .await
+        //     .expect("failed sending to io controller");
 
         Ok(())
     }
