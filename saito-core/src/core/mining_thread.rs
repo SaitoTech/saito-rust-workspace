@@ -46,8 +46,7 @@ pub struct MiningThread {
 
 impl MiningThread {
     pub async fn mine(&mut self) -> Option<GoldenTicket> {
-        assert!(self.miner_active);
-
+        // assert!(self.miner_active, "Miner is not active");
         if self.public_key == [0; 33] {
             let wallet = self.wallet_lock.read().await;
             if wallet.public_key == [0; 33] {

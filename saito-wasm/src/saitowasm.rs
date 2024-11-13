@@ -1150,13 +1150,14 @@ pub async fn write_issuance_file(threshold: Currency) {
 }
 
 #[wasm_bindgen]
-pub async fn disable_bundling_blocks_by_timer() {
+pub async fn disable_producing_blocks_by_timer() {
     let mut saito = SAITO.lock().await;
     saito
         .as_mut()
         .unwrap()
         .consensus_thread
         .produce_blocks_by_timer = false;
+    // saito.as_mut().unwrap().mining_thread.enabled = true;
 }
 #[wasm_bindgen]
 pub async fn produce_block_with_gt() {

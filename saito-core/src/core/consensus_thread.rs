@@ -124,6 +124,7 @@ impl ConsensusThread {
     }
 
     pub async fn produce_block(&mut self, timestamp: Timestamp) {
+        debug!("producing a block");
         let configs = self.network.config_lock.read().await;
 
         let mut blockchain = self.blockchain_lock.write().await;
