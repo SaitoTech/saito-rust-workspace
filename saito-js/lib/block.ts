@@ -295,4 +295,12 @@ export default class Block extends WasmWrapper<WasmBlock> {
         return this.instance.fee_transaction_index;
     }
 
+    public get totalPayoutAtr(): bigint {
+        return this.instance.total_payout_atr;
+    }
+
+    public get avgPayoutMining(): bigint {
+        return this.instance.avg_payout_mining;
+    }
+
 }

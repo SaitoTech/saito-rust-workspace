@@ -400,6 +400,16 @@ impl WasmBlock {
     pub fn fee_transaction_index(&self) -> u64 {
         self.block.fee_transaction_index
     }
+
+    #[wasm_bindgen(getter = total_payout_atr)]
+    pub fn total_payout_atr(&self) -> u64 {
+        self.block.total_payout_atr
+    }
+
+    #[wasm_bindgen(getter = avg_payout_mining)]
+    pub fn avg_payout_mining(&self) -> u64 {
+        self.block.avg_payout_mining
+    }
 }
 
 impl WasmBlock {
