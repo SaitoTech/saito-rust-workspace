@@ -124,7 +124,7 @@ impl ConsensusThread {
     }
 
     pub async fn produce_block(&mut self, timestamp: Timestamp, produce_without_limits: bool) {
-        debug!("producing a block");
+        trace!("producing a block");
         let configs = self.network.config_lock.read().await;
 
         let mut blockchain = self.blockchain_lock.write().await;
@@ -168,7 +168,7 @@ impl ConsensusThread {
                 )
                 .await;
         } else {
-            info!("skipped bundling block");
+            trace!("skipped bundling block");
         }
         if let Some(block) = block {
             debug!(

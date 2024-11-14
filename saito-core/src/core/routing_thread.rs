@@ -703,7 +703,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
 
         let mut work_done = false;
 
-        const RECONNECTION_PERIOD: Timestamp = 10_000;
+        const RECONNECTION_PERIOD: Timestamp = Duration::from_secs(2).as_millis() as Timestamp;
         self.reconnection_timer += duration_value;
         let current_time = self.timer.get_timestamp_in_ms();
         if self.reconnection_timer >= RECONNECTION_PERIOD {

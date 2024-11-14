@@ -110,39 +110,42 @@ export default class WebSharedMethods extends CustomSharedMethods {
     }
 
     sendMessage(peerIndex: bigint, buffer: Uint8Array): void {
-        if (Saito.getInstance().stunManager.isStunPeer(peerIndex)) {
-            const stunPeer = Saito.getInstance().stunManager.getStunPeer(peerIndex);
-            if (stunPeer) {
-                //@ts-ignore
-                const { peerConnection, publicKey } = stunPeer; 
-                //@ts-ignore
-                const dc = peerConnection.dc;
-                if (dc) {
-                    if (dc.readyState === 'open') {
-                        console.log(`Sending message to STUN peer ${peerIndex} via data channel`);
-                        try {
-                            dc.send(buffer);
-                        } catch (error) {
-                            console.error(`Error sending message to STUN peer ${peerIndex} via data channel:`, error);
+        try {
+            if (Saito.getInstance().stunManager.isStunPeer(peerIndex)) {
+                const stunPeer = Saito.getInstance().stunManager.getStunPeer(peerIndex);
+                if (stunPeer) {
+                    //@ts-ignore
+                    const {peerConnection, publicKey} = stunPeer;
+                    //@ts-ignore
+                    const dc = peerConnection.dc;
+                    if (dc) {
+                        if (dc.readyState === 'open') {
+                            console.log(`Sending message to STUN peer ${peerIndex} via data channel`);
+                            try {
+                                dc.send(buffer);
+                            } catch (error) {
+                                console.error(`Error sending message to STUN peer ${peerIndex} via data channel:`, error);
+                            }
+                        } else {
+                            console.warn(`Data channel for STUN peer ${peerIndex} is not open. Current state: ${dc.readyState}`);
                         }
                     } else {
-                        console.warn(`Data channel for STUN peer ${peerIndex} is not open. Current state: ${dc.readyState}`);
+                        console.warn(`Data channel for STUN peer ${peerIndex} is not initialized`);
                     }
                 } else {
-                    console.warn(`Data channel for STUN peer ${peerIndex} is not initialized`);
+                    console.warn(`STUN peer ${peerIndex} not found`);
                 }
-            } else {
-                console.warn(`STUN peer ${peerIndex} not found`);
+                return;
             }
-            return;
-        }
 
-        
-        let socket = Saito.getInstance().getSocket(peerIndex);
-        if (socket) {
-            socket.send(buffer);
-        } else {
-            console.error(`No WebSocket found for peer ${peerIndex}`);
+            let socket = Saito.getInstance().getSocket(peerIndex);
+            if (socket) {
+                socket.send(buffer);
+            } else {
+                console.error(`No WebSocket found for peer ${peerIndex}`);
+            }
+        } catch (e) {
+            console.error(e);
         }
     }
 
