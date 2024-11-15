@@ -119,6 +119,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
                 context.config_lock.clone(),
                 timer.clone(),
             ),
+            storage: Storage::new(Box::new(WasmIoHandler {})),
             reconnection_timer: 0,
             peer_removal_timer: 0,
             peer_file_write_timer: 0,

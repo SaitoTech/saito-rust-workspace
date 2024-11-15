@@ -183,6 +183,7 @@ pub mod test {
                         context.config_lock.clone(),
                         timer.clone(),
                     ),
+                    storage: Storage::new(Box::new(TestIOHandler {})),
                     reconnection_timer: 0,
                     peer_removal_timer: 0,
                     peer_file_write_timer: 0,

@@ -1,10 +1,4 @@
-use async_trait::async_trait;
-use log::{debug, info, trace, warn};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{RwLock, RwLockReadGuard};
-
+use crate::core::consensus::block::BlockType;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
@@ -19,6 +13,7 @@ use crate::core::defs::{
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::{Network, PeerDisconnectType};
 use crate::core::io::network_event::NetworkEvent;
+use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;
@@ -30,6 +25,12 @@ use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
+use async_trait::async_trait;
+use log::{debug, info, trace, warn};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 #[derive(Debug)]
 pub enum RoutingEvent {
@@ -89,6 +90,7 @@ pub struct RoutingThread {
     pub timer: Timer,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub network: Network,
+    pub storage: Storage,
     pub reconnection_timer: Timestamp,
     pub peer_removal_timer: Timestamp,
     pub peer_file_write_timer: Timestamp,
@@ -227,17 +229,21 @@ impl RoutingThread {
             fork_id.to_hex()
         );
         let blockchain = self.blockchain_lock.read().await;
-        let peer_public_key;
+        let peer_key_list;
         {
             let peers = self.network.peer_lock.read().await;
-            peer_public_key = peers
-                .find_peer_by_index(peer_index)
-                .unwrap()
-                .get_public_key()
-                .unwrap();
+            let peer = peers.find_peer_by_index(peer_index).unwrap();
+            peer_key_list = peer.key_list.clone();
         }
 
-        let ghost = Self::generate_ghost_chain(block_id, fork_id, blockchain, peer_public_key);
+        let ghost = Self::generate_ghost_chain(
+            block_id,
+            fork_id,
+            &blockchain,
+            peer_key_list,
+            &self.storage,
+        )
+        .await;
 
         debug!("sending ghost chain to peer : {:?}", peer_index);
         // debug!("ghost : {:?}", ghost);
@@ -249,11 +255,12 @@ impl RoutingThread {
             .unwrap();
     }
 
-    pub(crate) fn generate_ghost_chain(
+    pub(crate) async fn generate_ghost_chain(
         block_id: u64,
         fork_id: SaitoHash,
-        blockchain: RwLockReadGuard<Blockchain>,
-        peer_public_key: SaitoPublicKey,
+        blockchain: &Blockchain,
+        peer_key_list: Vec<SaitoPublicKey>,
+        storage: &Storage,
     ) -> GhostChainSync {
         let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
 
@@ -300,9 +307,20 @@ impl RoutingThread {
                     ghost.previous_block_hashes.push(block.previous_block_hash);
                     ghost.block_ids.push(block.id);
 
-                    // TODO : shouldn't this check for whole key list instead of peer's key?
+                    let mut clone = block.clone();
+                    if !clone
+                        .upgrade_block_to_block_type(BlockType::Full, &storage, true)
+                        .await
+                    {
+                        warn!(
+                            "couldn't upgrade block : {:?}-{:?} for ghost chain generation",
+                            block_id,
+                            block.hash.to_hex()
+                        );
+                    }
+
                     // whether this block has any txs which the peer will be interested in
-                    ghost.txs.push(block.has_keylist_txs(vec![peer_public_key]));
+                    ghost.txs.push(block.has_keylist_txs(&peer_key_list));
                 }
             }
         }
@@ -860,8 +878,14 @@ mod tests {
             let fork_id = tester.get_fork_id(50).await;
             let blockchain = tester.routing_thread.blockchain_lock.read().await;
 
-            let ghost_chain =
-                RoutingThread::generate_ghost_chain(50, fork_id, blockchain, peer_public_key);
+            let ghost_chain = RoutingThread::generate_ghost_chain(
+                50,
+                fork_id,
+                &blockchain,
+                vec![peer_public_key],
+                &tester.routing_thread.storage,
+            )
+            .await;
 
             assert_eq!(ghost_chain.block_ids.len(), 10);
             assert_eq!(ghost_chain.block_ts.len(), 10);
@@ -890,8 +914,14 @@ mod tests {
             let block_id = 101;
             let fork_id = tester.get_fork_id(block_id).await;
             let blockchain = tester.routing_thread.blockchain_lock.read().await;
-            let ghost_chain =
-                RoutingThread::generate_ghost_chain(block_id, fork_id, blockchain, peer_public_key);
+            let ghost_chain = RoutingThread::generate_ghost_chain(
+                block_id,
+                fork_id,
+                &blockchain,
+                vec![peer_public_key],
+                &tester.routing_thread.storage,
+            )
+            .await;
 
             assert_eq!(ghost_chain.block_ids.len(), 5);
             assert_eq!(ghost_chain.block_ts.len(), 5);

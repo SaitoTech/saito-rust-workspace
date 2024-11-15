@@ -346,6 +346,7 @@ async fn run_routing_event_processor(
     fetch_batch_size: usize,
     time_keeper_origin: &Timer,
 ) -> (Sender<NetworkEvent>, JoinHandle<()>) {
+    let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
     let routing_event_processor = RoutingThread {
         blockchain_lock: context.blockchain_lock.clone(),
         mempool_lock: context.mempool_lock.clone(),
@@ -365,6 +366,7 @@ async fn run_routing_event_processor(
             configs_lock.clone(),
             time_keeper_origin.clone(),
         ),
+        storage: Storage::new(Box::new(RustIOHandler::new(sender, 1))),
         reconnection_timer: 0,
         peer_removal_timer: 0,
         peer_file_write_timer: 0,

@@ -2676,9 +2676,9 @@ impl Block {
             }
         }
     }
-    pub fn has_keylist_txs(&self, keylist: Vec<SaitoPublicKey>) -> bool {
+    pub fn has_keylist_txs(&self, keylist: &Vec<SaitoPublicKey>) -> bool {
         for key in keylist {
-            if self.transaction_map.contains_key(&key) {
+            if self.transaction_map.contains_key(key) {
                 return true;
             }
         }
