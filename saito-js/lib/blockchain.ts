@@ -208,7 +208,6 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
   }
 
   public async setSafeToPruneTransaction(blockId: bigint) {
-    console.log('saito-js setSafeToPruneTransaction blockId: ', blockId);
     return this.instance.set_safe_to_prune_transaction(blockId);
   }
 }

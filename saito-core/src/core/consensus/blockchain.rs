@@ -142,12 +142,9 @@ impl Blockchain {
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
     ) -> AddBlockResult {
-
-        info!("inside addBlock ////////");
-
         block.generate();
 
-        info!(
+        debug!(
             "adding block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count (spv/total) : {:?}/{:?}",
             block.hash.to_hex(),
             block.block_type,
@@ -1464,7 +1461,7 @@ impl Blockchain {
         delete_block_id: u64,
         storage: &Storage,
     ) -> WalletUpdateStatus {
-        info!(
+        trace!(
             "removing data including from disk at id {}",
             delete_block_id
         );
@@ -1478,7 +1475,7 @@ impl Blockchain {
             }
         }
 
-        info!("number of hashes to remove {}", block_hashes_copy.len());
+        trace!("number of hashes to remove {}", block_hashes_copy.len());
 
         let mut wallet_update_status = WALLET_NOT_UPDATED;
         for hash in block_hashes_copy {
@@ -1499,9 +1496,6 @@ impl Blockchain {
         // ask block to delete itself / utxo-wise
         {
             let block = self.blocks.get(&delete_block_hash).unwrap();
-
-            info!("deleting block {}", block.id);
-
             let block_filename = storage.generate_block_filepath(block);
 
             // remove slips from wallet
@@ -1537,13 +1531,7 @@ impl Blockchain {
         if PRUNE_AFTER_BLOCKS > self.get_latest_block_id() {
             return;
         }
-
-
-        info!("self.get_latest_block_id() {:?}", self.get_latest_block_id());
-
         let prune_blocks_at_block_id = self.get_latest_block_id() - PRUNE_AFTER_BLOCKS;
-
-        info!("prune_blocks_at_block_id {}", prune_blocks_at_block_id);
 
         let mut block_hashes_copy: Vec<SaitoHash> = vec![];
 
@@ -1556,19 +1544,12 @@ impl Blockchain {
             }
         }
 
-        info!("is_spv {}", is_spv);        
 
         for hash in block_hashes_copy {
             // ask the block to remove its transactions
             {
                 let block = self.get_mut_block(&hash);
-
-                info!("block hash inside downgrade {:?}", hash);
-                info!("block hash inside downgrade {:?}", hash.to_hex());
-
                 if let Some(block) = block {
-
-                    info!("is safe_to_delete inside downgrade {:?}", block.safe_to_delete);
                     if block.safe_to_delete {
                         block
                             .downgrade_block_to_block_type(BlockType::Pruned, is_spv)
@@ -1882,11 +1863,6 @@ impl Blockchain {
       if let Some(block_hash) = block_hash_option {
         if let Some(block) = self.blocks.get_mut(&block_hash) {
           block.safe_to_delete = true;
-          info!(
-            "Block with block_id {:?} and block_hash {:?} marked as safe to delete",
-            block_id,
-            block_hash.to_hex()
-          );
         } 
       } 
     }
