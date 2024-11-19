@@ -500,6 +500,8 @@ impl Blockchain {
                     block.block_type
                 );
             }
+
+            self.set_safe_to_prune_transaction(block_id);
         }
 
         // TODO: clean up mempool - I think we shouldn't cleanup mempool here.
@@ -1532,7 +1534,6 @@ impl Blockchain {
             return;
         }
         let prune_blocks_at_block_id = self.get_latest_block_id() - PRUNE_AFTER_BLOCKS;
-
         let mut block_hashes_copy: Vec<SaitoHash> = vec![];
 
         {
@@ -1544,13 +1545,12 @@ impl Blockchain {
             }
         }
 
-
         for hash in block_hashes_copy {
             // ask the block to remove its transactions
             {
                 let block = self.get_mut_block(&hash);
                 if let Some(block) = block {
-                    if block.safe_to_delete {
+                    if block.safe_to_prune_transactions || (block.id > PRUNE_AFTER_BLOCKS) {
                         block
                             .downgrade_block_to_block_type(BlockType::Pruned, is_spv)
                             .await;
@@ -1857,16 +1857,14 @@ impl Blockchain {
     }
 
     pub fn set_safe_to_prune_transaction(&mut self, block_id: u64) {
-      info!("blockchain.rs set_safe_to_prune_transaction {:?}", block_id);
-      let block_hash_option = self.blockring.get_block_hash_by_block_id(block_id);
+        let block_hash_option = self.blockring.get_block_hash_by_block_id(block_id);
 
-      if let Some(block_hash) = block_hash_option {
-        if let Some(block) = self.blocks.get_mut(&block_hash) {
-          block.safe_to_delete = true;
-        } 
-      } 
+        if let Some(block_hash) = block_hash_option {
+            if let Some(block) = self.blocks.get_mut(&block_hash) {
+                block.safe_to_prune_transactions = true;
+            }
+        }
     }
-
 }
 
 #[cfg(test)]

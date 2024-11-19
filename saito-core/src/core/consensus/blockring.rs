@@ -201,7 +201,7 @@ impl BlockRing {
         }
     }
 
-     pub fn get_block_hash_by_block_id(&self, block_id: u64) -> Option<SaitoHash> {
+    pub fn get_block_hash_by_block_id(&self, block_id: u64) -> Option<SaitoHash> {
         let insert_pos = (block_id % RING_BUFFER_LENGTH) as usize;
         self.ring[insert_pos]
             .block_ids
