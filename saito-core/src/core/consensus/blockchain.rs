@@ -1528,7 +1528,6 @@ impl Blockchain {
     }
 
     async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
-        info!("downgrading blockchain data");
         // downgrade blocks still on the chain
         if PRUNE_AFTER_BLOCKS > self.get_latest_block_id() {
             return;
