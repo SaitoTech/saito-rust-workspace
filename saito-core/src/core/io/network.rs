@@ -675,6 +675,7 @@ mod tests {
     use crate::core::util::{configuration::PeerConfig, test::test_manager};
     use rand::Rng;
 
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_keylist_rate_limiter() {
         let mut t1 = test_manager::test::TestManager::default();

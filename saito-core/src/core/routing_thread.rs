@@ -938,11 +938,11 @@ mod tests {
             )
             .await;
 
-            assert_eq!(ghost_chain.block_ids.len(), 10);
-            assert_eq!(ghost_chain.block_ts.len(), 10);
-            assert_eq!(ghost_chain.gts.len(), 10);
-            assert_eq!(ghost_chain.prehashes.len(), 10);
-            assert_eq!(ghost_chain.previous_block_hashes.len(), 10);
+            assert_eq!(ghost_chain.block_ids.len(), 50);
+            assert_eq!(ghost_chain.block_ts.len(), 50);
+            assert_eq!(ghost_chain.gts.len(), 50);
+            assert_eq!(ghost_chain.prehashes.len(), 50);
+            assert_eq!(ghost_chain.previous_block_hashes.len(), 50);
             assert!(ghost_chain.txs.iter().all(|x| !(*x)));
         }
 
