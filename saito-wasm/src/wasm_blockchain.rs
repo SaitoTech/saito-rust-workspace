@@ -104,4 +104,9 @@ impl WasmBlockchain {
         }
         arr
     }
+
+    pub async fn set_safe_to_prune_transaction(&self, block_id: u64) {
+        let mut blockchain = self.blockchain_lock.write().await;
+        return blockchain.set_safe_to_prune_transaction(block_id);
+    }
 }

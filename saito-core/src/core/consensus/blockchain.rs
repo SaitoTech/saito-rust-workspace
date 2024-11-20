@@ -499,9 +499,12 @@ impl Blockchain {
                     block.block_type
                 );
             }
+
             if let Some(fork_id) = self.generate_fork_id(block_id) {
                 self.set_fork_id(fork_id);
             }
+
+            self.set_safe_to_prune_transaction(block_id);
         }
 
         // TODO: clean up mempool - I think we shouldn't cleanup mempool here.
@@ -1597,13 +1600,11 @@ impl Blockchain {
     }
 
     async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
-        trace!("downgrading blockchain data");
         // downgrade blocks still on the chain
         if PRUNE_AFTER_BLOCKS > self.get_latest_block_id() {
             return;
         }
         let prune_blocks_at_block_id = self.get_latest_block_id() - PRUNE_AFTER_BLOCKS;
-
         let mut block_hashes_copy: Vec<SaitoHash> = vec![];
 
         {
@@ -1620,9 +1621,11 @@ impl Blockchain {
             {
                 let block = self.get_mut_block(&hash);
                 if let Some(block) = block {
-                    block
-                        .downgrade_block_to_block_type(BlockType::Pruned, is_spv)
-                        .await;
+                    if block.safe_to_prune_transactions || (block.id > PRUNE_AFTER_BLOCKS) {
+                        block
+                            .downgrade_block_to_block_type(BlockType::Pruned, is_spv)
+                            .await;
+                    }
                 } else {
                     warn!("block : {:?} not found to downgrade", hash.to_hex());
                 }
@@ -1928,6 +1931,16 @@ impl Blockchain {
         }
 
         true
+    }
+
+    pub fn set_safe_to_prune_transaction(&mut self, block_id: u64) {
+        let block_hash_option = self.blockring.get_block_hash_by_block_id(block_id);
+
+        if let Some(block_hash) = block_hash_option {
+            if let Some(block) = self.blocks.get_mut(&block_hash) {
+                block.safe_to_prune_transactions = true;
+            }
+        }
     }
 }
 

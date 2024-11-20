@@ -364,6 +364,8 @@ pub struct Block {
     pub transaction_map: AHashMap<SaitoPublicKey, bool>,
     #[serde(skip)]
     pub force_loaded: bool,
+    // used for checking, before pruning txs from block on downgrade
+    pub safe_to_prune_transactions: bool,
 }
 
 impl Block {
@@ -426,6 +428,7 @@ impl Block {
             transaction_map: Default::default(),
             cv: ConsensusValues::default(),
             force_loaded: false,
+            safe_to_prune_transactions: false,
         }
     }
 

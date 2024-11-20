@@ -210,4 +210,8 @@ export default class Blockchain extends WasmWrapper<WasmBlockchain> {
     public async setForkId(forkId: string) {
         return this.instance.set_fork_id(forkId);
     }
+
+    public async setSafeToPruneTransaction(blockId: bigint) {
+      return this.instance.set_safe_to_prune_transaction(blockId);
+    }
 }
