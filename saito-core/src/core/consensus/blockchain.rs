@@ -499,7 +499,7 @@ impl Blockchain {
                     block.block_type
                 );
             }
-            
+
             if let Some(fork_id) = self.generate_fork_id(block_id) {
                 self.set_fork_id(fork_id);
             }
