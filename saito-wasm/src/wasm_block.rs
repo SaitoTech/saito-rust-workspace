@@ -274,7 +274,7 @@ impl WasmBlock {
     }
     pub fn has_keylist_txs(&self, keylist: Array) -> bool {
         let keylist = Self::convert_keylist(keylist);
-        return self.block.has_keylist_txs(keylist);
+        self.block.has_keylist_txs(&keylist)
     }
     pub fn generate_lite_block(&self, keylist: Array) -> WasmBlock {
         let keylist = Self::convert_keylist(keylist);
