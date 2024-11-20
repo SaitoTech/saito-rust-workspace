@@ -38,6 +38,7 @@ impl Storage {
     pub fn new(io_interface: Box<dyn InterfaceIO + Send + Sync>) -> Storage {
         Storage { io_interface }
     }
+    // TODO : remove if not used
     /// read from a path to a Vec<u8>
     pub async fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
         let buffer = self.io_interface.read_value(path).await;
@@ -50,6 +51,7 @@ impl Storage {
         Ok(buffer)
     }
 
+    // TODO : remove if not used
     pub async fn write(&mut self, data: &[u8], filename: &str) {
         self.io_interface
             .write_value(filename, data)

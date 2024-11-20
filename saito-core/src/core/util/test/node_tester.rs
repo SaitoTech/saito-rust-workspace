@@ -459,6 +459,7 @@ pub mod test {
                 .read()
                 .await
                 .generate_fork_id(block_id)
+                .unwrap()
         }
         pub async fn add_transaction(&mut self, transaction: Transaction) {
             self.consensus_thread

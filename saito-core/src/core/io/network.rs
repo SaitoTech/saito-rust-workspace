@@ -356,17 +356,26 @@ impl Network {
         peer_index: u64,
         blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
-        debug!("requesting blockchain from peer : {:?}", peer_index);
-
         let configs = self.config_lock.read().await;
         let blockchain = blockchain_lock.read().await;
-        let fork_id = *blockchain.get_fork_id();
         let buffer: Vec<u8>;
+        debug!(
+            "requesting blockchain from peer : {:?} latest_block_id : {:?}, last_block_id : {:?}",
+            peer_index,
+            blockchain.get_latest_block_id(),
+            blockchain.last_block_id
+        );
 
         if configs.is_spv_mode() {
             let request;
             {
-                if blockchain.last_block_id > blockchain.get_latest_block_id() {
+                debug!(
+                    "blockchain last block id : {:?}, latest block id : {:?}",
+                    blockchain.last_block_id,
+                    blockchain.get_latest_block_id()
+                );
+                if blockchain.last_block_id >= blockchain.get_latest_block_id() {
+                    let fork_id = blockchain.fork_id.unwrap_or([0; 32]);
                     debug!(
                         "blockchain request 1 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
                         blockchain.last_block_id,
@@ -378,7 +387,9 @@ impl Network {
                         latest_block_hash: blockchain.last_block_hash,
                         fork_id,
                     };
-                } else {
+                } else if let Some(fork_id) =
+                    blockchain.generate_fork_id(blockchain.get_latest_block_id())
+                {
                     debug!(
                         "blockchain request 2 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
                         blockchain.get_latest_block_id(),
@@ -390,6 +401,18 @@ impl Network {
                         latest_block_hash: blockchain.get_latest_block_hash(),
                         fork_id,
                     };
+                } else {
+                    debug!(
+                        "blockchain request 3 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
+                        blockchain.get_latest_block_id(),
+                        blockchain.get_latest_block_hash().to_hex(),
+                        [0; 32]
+                    );
+                    request = BlockchainRequest {
+                        latest_block_id: blockchain.get_latest_block_id(),
+                        latest_block_hash: blockchain.get_latest_block_hash(),
+                        fork_id: [0; 32],
+                    };
                 }
             }
             debug!("sending ghost chain request to peer : {:?}", peer_index);
@@ -400,11 +423,32 @@ impl Network {
             )
             .serialize();
         } else {
-            let request = BlockchainRequest {
-                latest_block_id: blockchain.get_latest_block_id(),
-                latest_block_hash: blockchain.get_latest_block_hash(),
-                fork_id,
-            };
+            let request;
+            if let Some(fork_id) = blockchain.generate_fork_id(blockchain.get_latest_block_id()) {
+                request = BlockchainRequest {
+                    latest_block_id: blockchain.get_latest_block_id(),
+                    latest_block_hash: blockchain.get_latest_block_hash(),
+                    fork_id,
+                };
+                debug!(
+                    "blockchain request 4 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
+                    blockchain.get_latest_block_id(),
+                    blockchain.get_latest_block_hash().to_hex(),
+                    fork_id.to_hex()
+                );
+            } else {
+                request = BlockchainRequest {
+                    latest_block_id: blockchain.get_latest_block_id(),
+                    latest_block_hash: blockchain.get_latest_block_hash(),
+                    fork_id: [0; 32],
+                };
+                debug!(
+                    "blockchain request 5 : latest_id: {:?} latest_hash: {:?} fork_id: {:?}",
+                    blockchain.get_latest_block_id(),
+                    blockchain.get_latest_block_hash().to_hex(),
+                    [0; 32]
+                );
+            }
             debug!("sending blockchain request to peer : {:?}", peer_index);
             buffer = Message::BlockchainRequest(request).serialize();
         }
