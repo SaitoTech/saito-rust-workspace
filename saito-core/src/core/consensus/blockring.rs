@@ -1,4 +1,4 @@
-use log::{debug, trace};
+use log::trace;
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::ringitem::RingItem;
