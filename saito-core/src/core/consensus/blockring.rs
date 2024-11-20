@@ -18,7 +18,7 @@ pub struct BlockRing {
     // contiguous entries for rapid lookups, inserts and updates?
     //
     pub ring: Vec<RingItem>,
-    lc_pos: Option<usize>,
+    pub lc_pos: Option<usize>,
     pub empty: bool,
 }
 
@@ -28,7 +28,7 @@ impl BlockRing {
     pub fn new() -> Self {
         let mut init_ring: Vec<RingItem> = vec![];
         for _i in 0..RING_BUFFER_LENGTH {
-            init_ring.push(RingItem::new());
+            init_ring.push(RingItem::default());
         }
 
         BlockRing {
@@ -77,21 +77,23 @@ impl BlockRing {
         }
     }
 
-    pub fn get_longest_chain_block_hash_at_block_id(&self, id: u64) -> SaitoHash {
+    pub fn get_longest_chain_block_hash_at_block_id(&self, id: u64) -> Option<SaitoHash> {
         let insert_pos = (id % RING_BUFFER_LENGTH) as usize;
-        // debug!(
-        //     "insert_pos : {:?}, id : {:?}, ring_length : {:?}",
-        //     insert_pos, id, RING_BUFFER_LENGTH
-        // );
+        trace!(
+            "blockring -> insert_pos : {:?}, id : {:?}, ring_length : {:?}",
+            insert_pos,
+            id,
+            RING_BUFFER_LENGTH
+        );
         match self.ring[insert_pos].lc_pos {
             Some(lc_pos) => {
-                // debug!(
-                //     "lc_pos : {:?}, ring_size : {:?} hash_count : {:?}",
-                //     lc_pos,
-                //     self.ring.len(),
-                //     self.ring[insert_pos].block_hashes.len()
-                // );
-                self.ring[insert_pos].block_hashes[lc_pos]
+                trace!(
+                    "lc_pos : {:?}, ring_size : {:?} hash_count : {:?}",
+                    lc_pos,
+                    self.ring.len(),
+                    self.ring[insert_pos].block_hashes.len()
+                );
+                Some(self.ring[insert_pos].block_hashes[lc_pos])
             }
             None => {
                 trace!(
@@ -99,7 +101,7 @@ impl BlockRing {
                     id,
                     insert_pos
                 );
-                [0; 32]
+                None
             }
         }
     }
@@ -135,15 +137,15 @@ impl BlockRing {
     }
 
     pub fn on_chain_reorganization(&mut self, block_id: u64, hash: SaitoHash, lc: bool) -> bool {
-        trace!(
-            "blockring.on_chain_reorg : block_id = {:?}, hash = {:?}",
-            block_id,
-            hash.to_hex()
-        );
         let insert_pos = block_id % RING_BUFFER_LENGTH;
-        if !self.ring[insert_pos as usize].on_chain_reorganization(hash, lc) {
-            return false;
-        }
+        self.ring[insert_pos as usize].on_chain_reorganization(hash, lc);
+        trace!(
+            "blockring.on_chain_reorg : block_id = {:?}, hash = {:?}, insert_pos = {:?}, lc_pos = {:?}",
+            block_id,
+            hash.to_hex(),
+            insert_pos,
+             self.ring[insert_pos as usize].lc_pos
+        );
         if lc {
             self.lc_pos = Some(insert_pos as usize);
         } else {
@@ -170,7 +172,7 @@ impl BlockRing {
                     // but try to find it
                     // let previous_block_index_lc_pos = self.ring[previous_block_index as usize].lc_pos;
                     if let Some(previous_block_index_lc_pos) =
-                        self.ring[previous_block_index as usize].lc_pos
+                        self.ring[previous_block_index].lc_pos
                     {
                         if self.ring[previous_block_index].block_ids.len()
                             > previous_block_index_lc_pos
@@ -239,10 +241,7 @@ mod tests {
         assert_eq!(blockring.is_empty(), true);
         assert_eq!(blockring.get_latest_block_hash(), [0; 32]);
         assert_eq!(blockring.get_latest_block_id(), 0);
-        assert_eq!(
-            blockring.get_longest_chain_block_hash_at_block_id(0),
-            [0; 32]
-        );
+        assert_eq!(blockring.get_longest_chain_block_hash_at_block_id(0), None);
         assert_eq!(
             blockring.contains_block_hash_at_block_id(block.id, block.hash),
             false
@@ -255,7 +254,9 @@ mod tests {
         assert_eq!(blockring.get_latest_block_hash(), block_hash);
         assert_eq!(blockring.get_latest_block_id(), block_id);
         assert_eq!(
-            blockring.get_longest_chain_block_hash_at_block_id(block_id),
+            blockring
+                .get_longest_chain_block_hash_at_block_id(block_id)
+                .unwrap(),
             block_hash
         );
         assert_eq!(
@@ -276,10 +277,7 @@ mod tests {
         assert_eq!(blockring.is_empty(), true);
         assert_eq!(blockring.get_latest_block_hash(), [0; 32]);
         assert_eq!(blockring.get_latest_block_id(), 0);
-        assert_eq!(
-            blockring.get_longest_chain_block_hash_at_block_id(0),
-            [0; 32]
-        );
+        assert_eq!(blockring.get_longest_chain_block_hash_at_block_id(0), None);
         assert_eq!(
             blockring.contains_block_hash_at_block_id(block.id, block.hash),
             false
@@ -292,7 +290,9 @@ mod tests {
         assert_eq!(blockring.get_latest_block_hash(), block_hash);
         assert_eq!(blockring.get_latest_block_id(), block_id);
         assert_eq!(
-            blockring.get_longest_chain_block_hash_at_block_id(block_id),
+            blockring
+                .get_longest_chain_block_hash_at_block_id(block_id)
+                .unwrap(),
             block_hash
         );
         assert_eq!(

@@ -402,8 +402,9 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         .unwrap_or([0; 32]);
                 blockchain.lowest_acceptable_block_id =
                     blockchain_configs.lowest_acceptable_block_id;
-                blockchain.fork_id =
-                    SaitoHash::from_hex(blockchain_configs.fork_id.as_str()).unwrap_or([0; 32]);
+                blockchain.fork_id = Some(
+                    SaitoHash::from_hex(blockchain_configs.fork_id.as_str()).unwrap_or([0; 32]),
+                );
             } else {
                 info!("blockchain state is not loaded");
             }
@@ -411,7 +412,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
         let configs = self.config_lock.read().await;
         let mut blockchain = self.blockchain_lock.write().await;
-        {
+        if !configs.is_browser() {
             let mut list = self
                 .storage
                 .load_block_name_list()

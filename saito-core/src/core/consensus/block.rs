@@ -1317,180 +1317,186 @@ impl Block {
         // automatic transaction rebroadcasts / atr
         //
         if self.id > GENESIS_PERIOD {
-            let pruned_block_hash = blockchain
+            if let Some(pruned_block_hash) = blockchain
                 .blockring
-                .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD);
-            if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
-                let result = storage
-                    .load_block_from_disk(storage.generate_block_filepath(pruned_block).as_str())
-                    .await;
-                if result.is_err() {
-                    error!(
-                        "couldn't load block for ATR from disk. block hash : {:?}",
-                        pruned_block.hash.to_hex()
-                    );
-                    error!("{:?}", result.err().unwrap());
-                } else {
-                    let mut atr_block = result.unwrap();
-                    atr_block.generate();
-                    assert_ne!(
-                        atr_block.block_type,
-                        BlockType::Pruned,
-                        "block should be fetched fully before this"
-                    );
-
-                    //
-                    // estimate amount looping around chain
-                    //
-                    let total_utxo_staked =
-                        GENESIS_PERIOD * previous_block_avg_nolan_rebroadcast_per_block;
-
-                    //
-                    // divide the treasury
-                    //
-                    let expected_atr_payout = if total_utxo_staked > 0 {
-                        previous_block_treasury / total_utxo_staked
+                .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD)
+            {
+                if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
+                    let result = storage
+                        .load_block_from_disk(
+                            storage.generate_block_filepath(pruned_block).as_str(),
+                        )
+                        .await;
+                    if result.is_err() {
+                        error!(
+                            "couldn't load block for ATR from disk. block hash : {:?}",
+                            pruned_block.hash.to_hex()
+                        );
+                        error!("{:?}", result.err().unwrap());
                     } else {
-                        0
-                    };
-
-                    //
-                    // +1 gives us payout multiplier
-                    //
-                    let expected_atr_multiplier = 1 + expected_atr_payout;
-
-                    //
-                    // loop through block to find eligible transactions
-                    //
-                    for transaction in &atr_block.transactions {
-                        let mut outputs = vec![];
-                        let mut total_nolan_eligible_for_atr_payout: Currency = 0;
+                        let mut atr_block = result.unwrap();
+                        atr_block.generate();
+                        assert_ne!(
+                            atr_block.block_type,
+                            BlockType::Pruned,
+                            "block should be fetched fully before this"
+                        );
 
                         //
-                        // find eligible outputs
+                        // estimate amount looping around chain
                         //
-                        for output in transaction.to.iter() {
-                            if output.validate(&blockchain.utxoset) {
-                                outputs.push(output);
-                                total_nolan_eligible_for_atr_payout += output.amount;
-                            }
-                        }
+                        let total_utxo_staked =
+                            GENESIS_PERIOD * previous_block_avg_nolan_rebroadcast_per_block;
 
                         //
-                        // now process each output
+                        // divide the treasury
                         //
-                        if !outputs.is_empty() {
-                            let tx_size = transaction.get_serialized_size() as u64;
-                            let atr_fee = tx_size * previous_block_avg_fee_per_byte;
+                        let expected_atr_payout = if total_utxo_staked > 0 {
+                            previous_block_treasury / total_utxo_staked
+                        } else {
+                            0
+                        };
+
+                        //
+                        // +1 gives us payout multiplier
+                        //
+                        let expected_atr_multiplier = 1 + expected_atr_payout;
+
+                        //
+                        // loop through block to find eligible transactions
+                        //
+                        for transaction in &atr_block.transactions {
+                            let mut outputs = vec![];
+                            let mut total_nolan_eligible_for_atr_payout: Currency = 0;
 
                             //
-                            // every output pays the rebroadcast fee
+                            // find eligible outputs
                             //
-                            for output in outputs {
-                                let atr_payout_for_slip = output.amount * expected_atr_multiplier;
-                                let surplus_payout_to_subtract_from_treasury =
-                                    atr_payout_for_slip - output.amount;
-                                let atr_fee_for_slip = atr_fee;
-
-                                //
-                                // the only slips that are eligible for payout are those where there is a surplus
-                                // left over after the payout is added and then the fee is deducted. slips that do
-                                // not pass this criteria have their fee collected but are not issued a payout.
-                                //
-                                if atr_payout_for_slip > atr_fee {
-                                    cv.total_rebroadcast_nolan += output.amount;
-                                    cv.total_rebroadcast_slips += 1;
-
-                                    //
-                                    // clone the slip, update the amount
-                                    //
-                                    let mut slip = output.clone();
-                                    slip.slip_type = SlipType::ATR;
-                                    slip.amount = atr_payout_for_slip - atr_fee_for_slip;
-
-                                    //
-                                    // track payouts and fees
-                                    //
-                                    cv.total_payout_atr += surplus_payout_to_subtract_from_treasury;
-                                    cv.total_fees_atr += atr_fee_for_slip;
-
-                                    //
-                                    // create our ATR rebroadcast transaction
-                                    //
-                                    let rebroadcast_tx =
-                                        Transaction::create_rebroadcast_transaction(
-                                            transaction,
-                                            slip,
-                                            output.clone(),
-                                        );
-
-                                    //
-                                    // update rebroadcast_hash (all ATRs)
-                                    //
-                                    let mut vbytes: Vec<u8> = vec![];
-                                    vbytes.extend(&cv.rebroadcast_hash);
-                                    vbytes.extend(&rebroadcast_tx.serialize_for_signature());
-                                    cv.rebroadcast_hash = hash(&vbytes);
-                                    cv.rebroadcasts.push(rebroadcast_tx);
-                                } else {
-                                    //
-                                    // this UTXO will be worth less than zero if the atr_payout is
-                                    // added and then the atr_fee is deducted. so we do not rebroadcast
-                                    // it but collect the dust as a fee paid to the blockchain by the
-                                    // utxo with gratitude for its release.
-                                    //
-                                    cv.total_rebroadcast_nolan += output.amount;
-                                    cv.total_fees_atr += output.amount;
+                            for output in transaction.to.iter() {
+                                if output.validate(&blockchain.utxoset) {
+                                    outputs.push(output);
+                                    total_nolan_eligible_for_atr_payout += output.amount;
                                 }
                             }
-                        } // output loop
-                    }
 
-                    //
-                    // if ATR payouts are too large, adjust payout downwards
-                    //
-                    // because we are approximating the amount of the treasury to pay based on our
-                    // expectation of how many UTXO are looping through the chain, we can hit a problem
-                    // if this block has a very large amount of SAITO -- enough to blow out the payout
-                    // to a much larger portion of the treasury than desireable.
-                    //
-                    // we handle this by limiting the amount of the treasury that we will issue each
-                    // block to no more than 5% of the amount in the treasury. this prevents attackers
-                    // from flushing the treasury out to their own wallet by massively increasing the
-                    // amount of SAITO being rebroadcast in a single block.
-                    //
-                    if cv.total_payout_atr > (self.treasury as f64 * 0.05) as u64 {
-                        let max_total_payout = (self.treasury as f64 * 0.05) as u64;
-                        let unadjusted_total_nolan = cv.total_rebroadcast_nolan;
-                        let adjusted_atr_payout_multiplier =
-                            max_total_payout / unadjusted_total_nolan;
-                        let adjusted_output_multiplier = 1 + adjusted_atr_payout_multiplier;
-                        let adjusted_total_rebroadcast_staking_payouts_nolan: Currency = 0;
-                        let adjusted_total_rebroadcast_fees_nolan: Currency = 0;
+                            //
+                            // now process each output
+                            //
+                            if !outputs.is_empty() {
+                                let tx_size = transaction.get_serialized_size() as u64;
+                                let atr_fee = tx_size * previous_block_avg_fee_per_byte;
+
+                                //
+                                // every output pays the rebroadcast fee
+                                //
+                                for output in outputs {
+                                    let atr_payout_for_slip =
+                                        output.amount * expected_atr_multiplier;
+                                    let surplus_payout_to_subtract_from_treasury =
+                                        atr_payout_for_slip - output.amount;
+                                    let atr_fee_for_slip = atr_fee;
+
+                                    //
+                                    // the only slips that are eligible for payout are those where there is a surplus
+                                    // left over after the payout is added and then the fee is deducted. slips that do
+                                    // not pass this criteria have their fee collected but are not issued a payout.
+                                    //
+                                    if atr_payout_for_slip > atr_fee {
+                                        cv.total_rebroadcast_nolan += output.amount;
+                                        cv.total_rebroadcast_slips += 1;
+
+                                        //
+                                        // clone the slip, update the amount
+                                        //
+                                        let mut slip = output.clone();
+                                        slip.slip_type = SlipType::ATR;
+                                        slip.amount = atr_payout_for_slip - atr_fee_for_slip;
+
+                                        //
+                                        // track payouts and fees
+                                        //
+                                        cv.total_payout_atr +=
+                                            surplus_payout_to_subtract_from_treasury;
+                                        cv.total_fees_atr += atr_fee_for_slip;
+
+                                        //
+                                        // create our ATR rebroadcast transaction
+                                        //
+                                        let rebroadcast_tx =
+                                            Transaction::create_rebroadcast_transaction(
+                                                transaction,
+                                                slip,
+                                                output.clone(),
+                                            );
+
+                                        //
+                                        // update rebroadcast_hash (all ATRs)
+                                        //
+                                        let mut vbytes: Vec<u8> = vec![];
+                                        vbytes.extend(&cv.rebroadcast_hash);
+                                        vbytes.extend(&rebroadcast_tx.serialize_for_signature());
+                                        cv.rebroadcast_hash = hash(&vbytes);
+                                        cv.rebroadcasts.push(rebroadcast_tx);
+                                    } else {
+                                        //
+                                        // this UTXO will be worth less than zero if the atr_payout is
+                                        // added and then the atr_fee is deducted. so we do not rebroadcast
+                                        // it but collect the dust as a fee paid to the blockchain by the
+                                        // utxo with gratitude for its release.
+                                        //
+                                        cv.total_rebroadcast_nolan += output.amount;
+                                        cv.total_fees_atr += output.amount;
+                                    }
+                                }
+                            } // output loop
+                        }
 
                         //
-                        // we re-determine our multiplier for the ATR payout based on our
-                        // max_total_payout divided by the unadjusted_total_nolan that we
-                        // are rebroadcasting.
+                        // if ATR payouts are too large, adjust payout downwards
                         //
-                        cv.total_payout_atr = 0;
-                        for rebroadcast_tx in &mut cv.rebroadcasts {
+                        // because we are approximating the amount of the treasury to pay based on our
+                        // expectation of how many UTXO are looping through the chain, we can hit a problem
+                        // if this block has a very large amount of SAITO -- enough to blow out the payout
+                        // to a much larger portion of the treasury than desireable.
+                        //
+                        // we handle this by limiting the amount of the treasury that we will issue each
+                        // block to no more than 5% of the amount in the treasury. this prevents attackers
+                        // from flushing the treasury out to their own wallet by massively increasing the
+                        // amount of SAITO being rebroadcast in a single block.
+                        //
+                        if cv.total_payout_atr > (self.treasury as f64 * 0.05) as u64 {
+                            let max_total_payout = (self.treasury as f64 * 0.05) as u64;
+                            let unadjusted_total_nolan = cv.total_rebroadcast_nolan;
+                            let adjusted_atr_payout_multiplier =
+                                max_total_payout / unadjusted_total_nolan;
+                            let adjusted_output_multiplier = 1 + adjusted_atr_payout_multiplier;
+                            let adjusted_total_rebroadcast_staking_payouts_nolan: Currency = 0;
+                            let adjusted_total_rebroadcast_fees_nolan: Currency = 0;
+
                             //
-                            // update the amount that is in the output transaction according
-                            // to the amount in the input transaction. since this isn't a common
-                            // edge-case and cannot be systematically abused we're going to forgo
-                            // the rebroadcast fee in this case, and assume it is covered by the
-                            // reduced payout.
+                            // we re-determine our multiplier for the ATR payout based on our
+                            // max_total_payout divided by the unadjusted_total_nolan that we
+                            // are rebroadcasting.
                             //
-                            rebroadcast_tx.to[0].amount =
-                                rebroadcast_tx.from[0].amount * adjusted_output_multiplier;
-                            cv.total_fees_atr = 0;
-                            cv.total_payout_atr += rebroadcast_tx.to[0].amount;
-                            cv.total_payout_atr -= rebroadcast_tx.from[0].amount;
+                            cv.total_payout_atr = 0;
+                            for rebroadcast_tx in &mut cv.rebroadcasts {
+                                //
+                                // update the amount that is in the output transaction according
+                                // to the amount in the input transaction. since this isn't a common
+                                // edge-case and cannot be systematically abused we're going to forgo
+                                // the rebroadcast fee in this case, and assume it is covered by the
+                                // reduced payout.
+                                //
+                                rebroadcast_tx.to[0].amount =
+                                    rebroadcast_tx.from[0].amount * adjusted_output_multiplier;
+                                cv.total_fees_atr = 0;
+                                cv.total_payout_atr += rebroadcast_tx.to[0].amount;
+                                cv.total_payout_atr -= rebroadcast_tx.from[0].amount;
+                            }
                         }
                     }
-                }
-            } // block
+                } // block
+            }
         } // if at least 1 genesis period deep
 
         //
@@ -1991,10 +1997,11 @@ impl Block {
         //
         if block_type == BlockType::Full {
             if is_spv {
+                debug!("cannot upgrade block to full in spv mode");
                 return false;
             }
             let new_block = storage
-                .load_block_from_disk(storage.generate_block_filepath(&self).as_str())
+                .load_block_from_disk(storage.generate_block_filepath(self).as_str())
                 .await;
             if new_block.is_err() {
                 error!(
@@ -2005,6 +2012,11 @@ impl Block {
             }
             let mut new_block = new_block.unwrap();
 
+            debug!(
+                "upgraded tx counts : {:?} vs {:?}",
+                self.transactions.len(),
+                new_block.transactions.len()
+            );
             // in-memory swap copying txs in block from mempool
             mem::swap(&mut new_block.transactions, &mut self.transactions);
 
@@ -2679,9 +2691,9 @@ impl Block {
             }
         }
     }
-    pub fn has_keylist_txs(&self, keylist: Vec<SaitoPublicKey>) -> bool {
+    pub fn has_keylist_txs(&self, keylist: &Vec<SaitoPublicKey>) -> bool {
         for key in keylist {
-            if self.transaction_map.contains_key(&key) {
+            if self.transaction_map.contains_key(key) {
                 return true;
             }
         }

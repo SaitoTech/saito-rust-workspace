@@ -1,10 +1,4 @@
-use async_trait::async_trait;
-use log::{debug, info, trace, warn};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{RwLock, RwLockReadGuard};
-
+use crate::core::consensus::block::BlockType;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use crate::core::consensus::mempool::Mempool;
@@ -19,6 +13,7 @@ use crate::core::defs::{
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::{Network, PeerDisconnectType};
 use crate::core::io::network_event::NetworkEvent;
+use crate::core::io::storage::Storage;
 use crate::core::mining_thread::MiningEvent;
 use crate::core::msg::block_request::BlockchainRequest;
 use crate::core::msg::ghost_chain_sync::GhostChainSync;
@@ -30,6 +25,13 @@ use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
+use async_trait::async_trait;
+use log::{debug, error, info, trace, warn};
+use std::ops::Deref;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::RwLock;
 
 #[derive(Debug)]
 pub enum RoutingEvent {
@@ -89,6 +91,7 @@ pub struct RoutingThread {
     pub timer: Timer,
     pub wallet_lock: Arc<RwLock<Wallet>>,
     pub network: Network,
+    pub storage: Storage,
     pub reconnection_timer: Timestamp,
     pub peer_removal_timer: Timestamp,
     pub peer_file_write_timer: Timestamp,
@@ -194,7 +197,10 @@ impl RoutingThread {
                     .await
                     .unwrap();
             }
-            _ => unreachable!(),
+            Message::Block(_) => {
+                error!("received block message");
+                unreachable!();
+            }
         }
     }
     /// Processes a received ghost chain request from a peer to sync itself with the blockchain
@@ -227,17 +233,21 @@ impl RoutingThread {
             fork_id.to_hex()
         );
         let blockchain = self.blockchain_lock.read().await;
-        let peer_public_key;
+        let peer_key_list;
         {
             let peers = self.network.peer_lock.read().await;
-            peer_public_key = peers
-                .find_peer_by_index(peer_index)
-                .unwrap()
-                .get_public_key()
-                .unwrap();
+            let peer = peers.find_peer_by_index(peer_index).unwrap();
+            peer_key_list = peer.key_list.clone();
         }
 
-        let ghost = Self::generate_ghost_chain(block_id, fork_id, blockchain, peer_public_key);
+        let ghost = Self::generate_ghost_chain(
+            block_id,
+            fork_id,
+            &blockchain,
+            peer_key_list,
+            &self.storage,
+        )
+        .await;
 
         debug!("sending ghost chain to peer : {:?}", peer_index);
         // debug!("ghost : {:?}", ghost);
@@ -249,11 +259,12 @@ impl RoutingThread {
             .unwrap();
     }
 
-    pub(crate) fn generate_ghost_chain(
+    pub(crate) async fn generate_ghost_chain(
         block_id: u64,
         fork_id: SaitoHash,
-        blockchain: RwLockReadGuard<Blockchain>,
-        peer_public_key: SaitoPublicKey,
+        blockchain: &Blockchain,
+        peer_key_list: Vec<SaitoPublicKey>,
+        storage: &Storage,
     ) -> GhostChainSync {
         let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
 
@@ -266,7 +277,8 @@ impl RoutingThread {
 
         let start = blockchain
             .blockring
-            .get_longest_chain_block_hash_at_block_id(last_shared_ancestor);
+            .get_longest_chain_block_hash_at_block_id(last_shared_ancestor)
+            .unwrap_or([0; 32]);
 
         let latest_block_id = blockchain.blockring.get_latest_block_id();
         debug!("latest_block_id : {:?}", latest_block_id);
@@ -283,26 +295,38 @@ impl RoutingThread {
             gts: vec![],
         };
         for i in (last_shared_ancestor + 1)..=latest_block_id {
-            let hash = blockchain
+            if let Some(hash) = blockchain
                 .blockring
-                .get_longest_chain_block_hash_at_block_id(i);
-            if hash != [0; 32] {
+                .get_longest_chain_block_hash_at_block_id(i)
+            {
                 let block = blockchain.get_block(&hash);
                 if let Some(block) = block {
-                    debug!(
-                        "pushing block : {:?} at index : {:?}",
-                        block.hash.to_hex(),
-                        i
-                    );
                     ghost.gts.push(block.has_golden_ticket);
                     ghost.block_ts.push(block.timestamp);
                     ghost.prehashes.push(block.pre_hash);
                     ghost.previous_block_hashes.push(block.previous_block_hash);
                     ghost.block_ids.push(block.id);
 
-                    // TODO : shouldn't this check for whole key list instead of peer's key?
+                    let mut clone = block.clone();
+                    if !clone
+                        .upgrade_block_to_block_type(BlockType::Full, storage, false)
+                        .await
+                    {
+                        warn!(
+                            "couldn't upgrade block : {:?}-{:?} for ghost chain generation",
+                            clone.id,
+                            clone.hash.to_hex()
+                        );
+                    }
+                    debug!(
+                        "pushing block : {:?} at index : {:?} with txs : {:?} has txs : {:?}",
+                        clone.hash.to_hex(),
+                        i,
+                        clone.transactions.len(),
+                        clone.has_keylist_txs(&peer_key_list)
+                    );
                     // whether this block has any txs which the peer will be interested in
-                    ghost.txs.push(block.has_keylist_txs(vec![peer_public_key]));
+                    ghost.txs.push(clone.has_keylist_txs(&peer_key_list));
                 }
             }
         }
@@ -368,20 +392,19 @@ impl RoutingThread {
         );
 
         for i in last_shared_ancestor..(blockchain.blockring.get_latest_block_id() + 1) {
-            let block_hash = blockchain
+            if let Some(block_hash) = blockchain
                 .blockring
-                .get_longest_chain_block_hash_at_block_id(i);
-            if block_hash == [0; 32] {
-                // TODO : can the block hash not be in the ring if we are going through the longest chain ?
+                .get_longest_chain_block_hash_at_block_id(i)
+            {
+                let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
+                self.network
+                    .io_interface
+                    .send_message(peer_index, buffer.as_slice())
+                    .await
+                    .unwrap();
+            } else {
                 continue;
             }
-            // trace!("sending block header for : {:?}", block_hash.to_hex());
-            let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
-            self.network
-                .io_interface
-                .send_message(peer_index, buffer.as_slice())
-                .await
-                .unwrap();
         }
     }
     async fn process_incoming_block_hash(
@@ -495,7 +518,11 @@ impl RoutingThread {
         debug!("processing ghost chain from peer : {:?}", peer_index);
 
         let mut previous_block_hash = chain.start;
+        let configs = self.config_lock.read().await;
         let mut blockchain = self.blockchain_lock.write().await;
+        let mut lowest_id_to_reorg = 0;
+        let mut lowest_hash_to_reorg = [0; 32];
+        let mut need_blocks_fetched = false;
         for i in 0..chain.prehashes.len() {
             let buf = [
                 previous_block_hash.as_slice(),
@@ -517,7 +544,12 @@ impl RoutingThread {
                         self.network.peer_lock.clone(),
                     )
                     .await;
+                need_blocks_fetched = true;
             } else {
+                if !need_blocks_fetched {
+                    lowest_id_to_reorg = chain.block_ids[i];
+                    lowest_hash_to_reorg = block_hash;
+                }
                 debug!(
                     "ghost block : {:?} doesn't have txs for me. not fetching",
                     block_hash.to_hex()
@@ -533,6 +565,42 @@ impl RoutingThread {
             }
             previous_block_hash = block_hash;
         }
+        debug!(
+            "calling reorg with lowest values : {:?}-{:?}",
+            lowest_id_to_reorg,
+            lowest_hash_to_reorg.to_hex()
+        );
+
+        blockchain.blockring.on_chain_reorganization(
+            lowest_id_to_reorg,
+            lowest_hash_to_reorg,
+            true,
+        );
+        blockchain
+            .on_chain_reorganization(
+                lowest_id_to_reorg,
+                lowest_hash_to_reorg,
+                true,
+                &self.storage,
+                configs.deref(),
+            )
+            .await;
+
+        if let Some(fork_id) = blockchain.generate_fork_id(blockchain.last_block_id) {
+            blockchain.set_fork_id(fork_id);
+        } else {
+            // blockchain.set_fork_id([0; 32]);
+            trace!(
+                "fork id not generated for last block id : {:?} after ghost chain processing",
+                blockchain.last_block_id
+            );
+        }
+        self.network
+            .io_interface
+            .send_interface_event(InterfaceEvent::BlockAddSuccess(
+                lowest_hash_to_reorg,
+                lowest_id_to_reorg,
+            ));
     }
 
     // TODO : remove if not required
@@ -860,14 +928,20 @@ mod tests {
             let fork_id = tester.get_fork_id(50).await;
             let blockchain = tester.routing_thread.blockchain_lock.read().await;
 
-            let ghost_chain =
-                RoutingThread::generate_ghost_chain(50, fork_id, blockchain, peer_public_key);
+            let ghost_chain = RoutingThread::generate_ghost_chain(
+                50,
+                fork_id,
+                &blockchain,
+                vec![peer_public_key],
+                &tester.routing_thread.storage,
+            )
+            .await;
 
-            assert_eq!(ghost_chain.block_ids.len(), 10);
-            assert_eq!(ghost_chain.block_ts.len(), 10);
-            assert_eq!(ghost_chain.gts.len(), 10);
-            assert_eq!(ghost_chain.prehashes.len(), 10);
-            assert_eq!(ghost_chain.previous_block_hashes.len(), 10);
+            assert_eq!(ghost_chain.block_ids.len(), 50);
+            assert_eq!(ghost_chain.block_ts.len(), 50);
+            assert_eq!(ghost_chain.gts.len(), 50);
+            assert_eq!(ghost_chain.prehashes.len(), 50);
+            assert_eq!(ghost_chain.previous_block_hashes.len(), 50);
             assert!(ghost_chain.txs.iter().all(|x| !(*x)));
         }
 
@@ -890,8 +964,14 @@ mod tests {
             let block_id = 101;
             let fork_id = tester.get_fork_id(block_id).await;
             let blockchain = tester.routing_thread.blockchain_lock.read().await;
-            let ghost_chain =
-                RoutingThread::generate_ghost_chain(block_id, fork_id, blockchain, peer_public_key);
+            let ghost_chain = RoutingThread::generate_ghost_chain(
+                block_id,
+                fork_id,
+                &blockchain,
+                vec![peer_public_key],
+                &tester.routing_thread.storage,
+            )
+            .await;
 
             assert_eq!(ghost_chain.block_ids.len(), 5);
             assert_eq!(ghost_chain.block_ts.len(), 5);
