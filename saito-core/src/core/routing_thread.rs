@@ -656,17 +656,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         match event {
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                {
-                    let mut peers = self.network.peer_lock.write().await;
-                    let peer = peers.find_peer_by_index_mut(peer_index)?;
-
-                    let time: u64 = self.timer.get_timestamp_in_ms();
-                    peer.message_limiter.increase();
-                    if peer.has_message_limit_exceeded(time) {
-                        info!("peers exceeded for messages from peer : {:?}", peer_index);
-                        return None;
-                    }
-                }
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
@@ -681,10 +670,26 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                         .unwrap();
                     return None;
                 }
+                let message = message.unwrap();
+                {
+                    // TODO : move this before deserialization to avoid spending CPU time on it. moved here to just print message type
+                    let mut peers = self.network.peer_lock.write().await;
+                    let peer = peers.find_peer_by_index_mut(peer_index)?;
 
+                    let time: u64 = self.timer.get_timestamp_in_ms();
+                    peer.message_limiter.increase();
+                    if peer.has_message_limit_exceeded(time) {
+                        info!(
+                            "peers exceeded for messages from peer : {:?} - {:?} : type : {:?}",
+                            peer_index,
+                            peer.public_key.unwrap_or([0; 33]).to_base58(),
+                            message.get_type_value()
+                        );
+                        return None;
+                    }
+                }
                 self.stats.total_incoming_messages.increment();
-                self.process_incoming_message(peer_index, message.unwrap())
-                    .await;
+                self.process_incoming_message(peer_index, message).await;
                 return Some(());
             }
             NetworkEvent::PeerConnectionResult { result } => {

@@ -91,7 +91,7 @@ impl WasmBlockchain {
         let hash = blockchain
             .blockring
             .get_longest_chain_block_hash_at_block_id(block_id)
-            .unwrap();
+            .unwrap_or([0; 32]);
         hash.to_hex().into()
     }
     pub async fn get_hashes_at_id(&self, block_id: u64) -> js_sys::Array {
