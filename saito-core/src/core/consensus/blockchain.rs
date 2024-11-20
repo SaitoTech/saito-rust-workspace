@@ -1601,10 +1601,11 @@ impl Blockchain {
 
     async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
         // downgrade blocks still on the chain
-        if PRUNE_AFTER_BLOCKS > self.get_latest_block_id() {
+        let latest_block_id = self.get_latest_block_id(); 
+        if PRUNE_AFTER_BLOCKS > latest_block_id {
             return;
         }
-        let prune_blocks_at_block_id = self.get_latest_block_id() - PRUNE_AFTER_BLOCKS;
+        let prune_blocks_at_block_id = latest_block_id - PRUNE_AFTER_BLOCKS;
         let mut block_hashes_copy: Vec<SaitoHash> = vec![];
 
         {
@@ -1620,8 +1621,8 @@ impl Blockchain {
             // ask the block to remove its transactions
             {
                 let block = self.get_mut_block(&hash);
-                if let Some(block) = block {
-                    if block.safe_to_prune_transactions || (block.id > PRUNE_AFTER_BLOCKS) {
+                if let Some(block) = block {                
+                    if block.safe_to_prune_transactions || ((latest_block_id - block.id) > PRUNE_AFTER_BLOCKS) {
                         block
                             .downgrade_block_to_block_type(BlockType::Pruned, is_spv)
                             .await;
