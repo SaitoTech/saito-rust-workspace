@@ -1621,7 +1621,7 @@ impl Blockchain {
             {
                 let block = self.get_mut_block(&hash);
                 if let Some(block) = block {
-                    if block.safe_to_prune_transactions || (block.id > PRUNE_AFTER_BLOCKS) {
+                    if block.safe_to_prune_transactions {
                         block
                             .downgrade_block_to_block_type(BlockType::Pruned, is_spv)
                             .await;
