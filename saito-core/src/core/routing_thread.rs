@@ -321,13 +321,13 @@ impl RoutingThread {
                     }
                     debug!(
                         "pushing block : {:?} at index : {:?} with txs : {:?} has txs : {:?}",
-                        block.hash.to_hex(),
+                        clone.hash.to_hex(),
                         i,
-                        block.transactions.len(),
-                        block.has_keylist_txs(&peer_key_list)
+                        clone.transactions.len(),
+                        clone.has_keylist_txs(&peer_key_list)
                     );
                     // whether this block has any txs which the peer will be interested in
-                    ghost.txs.push(block.has_keylist_txs(&peer_key_list));
+                    ghost.txs.push(clone.has_keylist_txs(&peer_key_list));
                 }
             }
         }

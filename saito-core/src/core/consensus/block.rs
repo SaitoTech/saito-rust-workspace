@@ -2009,6 +2009,11 @@ impl Block {
             }
             let mut new_block = new_block.unwrap();
 
+            debug!(
+                "upgraded tx counts : {:?} vs {:?}",
+                self.transactions.len(),
+                new_block.transactions.len()
+            );
             // in-memory swap copying txs in block from mempool
             mem::swap(&mut new_block.transactions, &mut self.transactions);
 
