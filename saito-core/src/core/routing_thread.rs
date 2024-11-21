@@ -233,11 +233,12 @@ impl RoutingThread {
             fork_id.to_hex()
         );
         let blockchain = self.blockchain_lock.read().await;
-        let peer_key_list;
+        let mut peer_key_list: Vec<SaitoPublicKey> = vec![];
         {
             let peers = self.network.peer_lock.read().await;
             let peer = peers.find_peer_by_index(peer_index).unwrap();
-            peer_key_list = peer.key_list.clone();
+            peer_key_list.push(peer.public_key.unwrap());
+            peer_key_list.append(&mut peer.key_list.clone());
         }
 
         let ghost = Self::generate_ghost_chain(
@@ -270,9 +271,17 @@ impl RoutingThread {
 
         debug!("last_shared_ancestor 1 : {:?}", last_shared_ancestor);
 
-        if last_shared_ancestor == 0 && blockchain.get_latest_block_id() > 10 {
-            // if we cannot find the last shared ancestor in a long chain, we just need to sync the latest 10 blocks
-            last_shared_ancestor = blockchain.get_latest_block_id() - 10;
+        debug!(
+            "peer key list: {:?}",
+            peer_key_list
+                .iter()
+                .map(|pk| pk.to_hex())
+                .collect::<Vec<String>>()
+        );
+
+        if last_shared_ancestor == 0 {
+            // if we cannot find the last shared ancestor in a long chain, we just need to sync from peer's block id
+            last_shared_ancestor = block_id;
         }
 
         let start = blockchain
@@ -571,38 +580,40 @@ impl RoutingThread {
             lowest_hash_to_reorg.to_hex()
         );
 
-        blockchain.blockring.on_chain_reorganization(
-            lowest_id_to_reorg,
-            lowest_hash_to_reorg,
-            true,
-        );
-        blockchain
-            .on_chain_reorganization(
+        if lowest_id_to_reorg != 0 {
+            blockchain.blockring.on_chain_reorganization(
                 lowest_id_to_reorg,
                 lowest_hash_to_reorg,
                 true,
-                &self.storage,
-                configs.deref(),
-            )
-            .await;
-
-        if let Some(fork_id) = blockchain.generate_fork_id(blockchain.last_block_id) {
-            if fork_id != [0; 32] {
-                blockchain.set_fork_id(fork_id);
-            }
-        } else {
-            // blockchain.set_fork_id([0; 32]);
-            trace!(
-                "fork id not generated for last block id : {:?} after ghost chain processing",
-                blockchain.last_block_id
             );
+            blockchain
+                .on_chain_reorganization(
+                    lowest_id_to_reorg,
+                    lowest_hash_to_reorg,
+                    true,
+                    &self.storage,
+                    configs.deref(),
+                )
+                .await;
+
+            if let Some(fork_id) = blockchain.generate_fork_id(blockchain.last_block_id) {
+                if fork_id != [0; 32] {
+                    blockchain.set_fork_id(fork_id);
+                }
+            } else {
+                // blockchain.set_fork_id([0; 32]);
+                trace!(
+                    "fork id not generated for last block id : {:?} after ghost chain processing",
+                    blockchain.last_block_id
+                );
+            }
+            self.network
+                .io_interface
+                .send_interface_event(InterfaceEvent::BlockAddSuccess(
+                    lowest_hash_to_reorg,
+                    lowest_id_to_reorg,
+                ));
         }
-        self.network
-            .io_interface
-            .send_interface_event(InterfaceEvent::BlockAddSuccess(
-                lowest_hash_to_reorg,
-                lowest_id_to_reorg,
-            ));
     }
 
     // TODO : remove if not required
