@@ -587,7 +587,9 @@ impl RoutingThread {
             .await;
 
         if let Some(fork_id) = blockchain.generate_fork_id(blockchain.last_block_id) {
-            blockchain.set_fork_id(fork_id);
+            if fork_id != [0; 32] {
+                blockchain.set_fork_id(fork_id);
+            }
         } else {
             // blockchain.set_fork_id([0; 32]);
             trace!(

@@ -501,7 +501,9 @@ impl Blockchain {
             }
 
             if let Some(fork_id) = self.generate_fork_id(block_id) {
-                self.set_fork_id(fork_id);
+                if fork_id != [0; 32] {
+                    self.set_fork_id(fork_id);
+                }
             }
 
             self.set_safe_to_prune_transaction(block_id);
@@ -636,7 +638,7 @@ impl Blockchain {
                 fork_id[index] = block_hash[index];
                 fork_id[index + 1] = block_hash[index + 1];
             } else {
-                trace!(
+                debug!(
                     "no block at block id : {:?} in the longest chain",
                     current_block_id
                 );
@@ -1486,7 +1488,9 @@ impl Blockchain {
 
             // generate fork_id
             if let Some(fork_id) = self.generate_fork_id(block_id) {
-                self.set_fork_id(fork_id);
+                if fork_id != [0; 32] {
+                    self.set_fork_id(fork_id);
+                }
             } else {
                 debug!(
                     "cannot set fork id as fork id cannot be generated for block id : {:?}",
@@ -1852,6 +1856,7 @@ impl Blockchain {
         self.lowest_acceptable_block_id = 0;
         self.lowest_acceptable_timestamp = 0;
         self.lowest_acceptable_block_hash = [0; 32];
+        self.fork_id = Some([0; 32]);
         self.save().await;
     }
 
