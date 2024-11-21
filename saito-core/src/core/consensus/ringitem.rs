@@ -8,7 +8,7 @@ use crate::core::defs::SaitoHash;
 // made available for fast-access through a slice with the same lifetime as the vector
 // itself.
 //
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RingItem {
     pub lc_pos: Option<usize>,
     pub block_hashes: Vec<SaitoHash>,
@@ -16,14 +16,6 @@ pub struct RingItem {
 }
 
 impl RingItem {
-    pub fn new() -> Self {
-        Self {
-            lc_pos: None,
-            block_hashes: vec![],
-            block_ids: vec![],
-        }
-    }
-
     pub fn add_block(&mut self, block_id: u64, hash: SaitoHash) {
         self.block_hashes.push(hash);
         self.block_ids.push(block_id);
@@ -56,14 +48,12 @@ impl RingItem {
         self.lc_pos = new_lc_pos;
     }
 
-    pub fn on_chain_reorganization(&mut self, hash: SaitoHash, lc: bool) -> bool {
+    pub fn on_chain_reorganization(&mut self, hash: SaitoHash, lc: bool) {
         if !lc {
             self.lc_pos = None;
         } else {
             self.lc_pos = self.block_hashes.iter().position(|b_hash| b_hash == &hash);
         }
-
-        true
     }
 }
 
@@ -75,7 +65,7 @@ mod tests {
 
     #[test]
     fn ringitem_new_test() {
-        let ringitem = RingItem::new();
+        let ringitem = RingItem::default();
         assert_eq!(ringitem.block_hashes.len() as u64, 0);
         assert_eq!(ringitem.block_ids.len() as u64, 0);
         assert_eq!(ringitem.lc_pos, None);
@@ -83,7 +73,7 @@ mod tests {
 
     #[test]
     fn ringitem_add_and_delete_block() {
-        let mut ringitem = RingItem::new();
+        let mut ringitem = RingItem::default();
         let mut block = Block::new();
         block.generate_hash();
         let block_id = block.id;

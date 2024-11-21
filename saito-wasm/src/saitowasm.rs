@@ -75,6 +75,7 @@ lazy_static! {
 
 pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
     info!("creating new saito wasm instance");
+    console_error_panic_hook::set_once();
 
     let wallet = Arc::new(RwLock::new(Wallet::new([0; 32], [0; 33])));
 
@@ -119,6 +120,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
                 context.config_lock.clone(),
                 timer.clone(),
             ),
+            storage: Storage::new(Box::new(WasmIoHandler {})),
             reconnection_timer: 0,
             peer_removal_timer: 0,
             peer_file_write_timer: 0,

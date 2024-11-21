@@ -141,9 +141,8 @@ impl TransactionGenerator {
                     return;
                 }
 
-                for peer in peers.index_to_peers.iter() {
-                    to_public_key = peer.1.get_public_key().clone().unwrap();
-                    break;
+                if let Some(peer) = peers.index_to_peers.iter().next() {
+                    to_public_key = peer.1.get_public_key().unwrap();
                 }
                 assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
                 assert_ne!(to_public_key, self.public_key);
@@ -328,9 +327,8 @@ impl TransactionGenerator {
         {
             let peers = self.peer_lock.read().await;
 
-            for peer in peers.index_to_peers.iter() {
-                to_public_key = peer.1.get_public_key().clone().unwrap();
-                break;
+            if let Some(peer) = peers.index_to_peers.iter().next() {
+                to_public_key = peer.1.get_public_key().unwrap();
             }
             // assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
             assert_ne!(to_public_key, self.public_key);
