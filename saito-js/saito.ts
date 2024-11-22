@@ -26,7 +26,7 @@ export default class Saito {
     stunManager: StunPeer;
     factory = new Factory();
     promises = new Map<number, any>();
-    private callbackIndex: number = 1;
+    private callbackIndex: number = 0;
     private wallet: Wallet | null = null;
     private blockchain: Blockchain | null = null;
     private static wasmMemory: WebAssembly.Memory | null = null;
@@ -372,19 +372,20 @@ export default class Saito {
         peerIndex: bigint,
         waitForReply: boolean
     ): Promise<Uint8Array> {
-        let callbackIndex = this.callbackIndex++;
         if (waitForReply) {
-            return new Promise((resolve, reject) => {
-                this.promises.set(callbackIndex, {
+            return new Promise(async (resolve, reject) => {
+                this.callbackIndex++;
+                await this.promises.set(this.callbackIndex, {
                     resolve,
                     reject,
                 });
-                Saito.getLibInstance().send_api_call(buffer, callbackIndex, peerIndex);
+                Saito.getLibInstance().send_api_call(buffer, this.callbackIndex, peerIndex);
             });
         } else {
             return Saito.getLibInstance().send_api_call(buffer, callbackIndex, peerIndex);
         }
     }
+
 
     public async sendApiSuccess(msgId: number, buffer: Uint8Array, peerIndex: bigint) {
         return Saito.getLibInstance().send_api_success(buffer, msgId, peerIndex);
