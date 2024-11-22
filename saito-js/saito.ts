@@ -382,7 +382,7 @@ export default class Saito {
                 Saito.getLibInstance().send_api_call(buffer, this.callbackIndex, peerIndex);
             });
         } else {
-            return Saito.getLibInstance().send_api_call(buffer, callbackIndex, peerIndex);
+            return Saito.getLibInstance().send_api_call(buffer, this.callbackIndex, peerIndex);
         }
     }
 
