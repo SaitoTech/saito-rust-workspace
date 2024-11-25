@@ -461,6 +461,7 @@ impl Network {
             .send_message(peer_index, buffer.as_slice())
             .await
             .unwrap();
+        trace!("blockchain request sent to peer : {:?}", peer_index);
     }
     pub async fn process_incoming_block_hash(
         &mut self,
@@ -623,7 +624,7 @@ impl Network {
     }
 
     pub async fn connect_to_static_peers(&mut self, current_time: Timestamp) {
-        trace!("connecting to static peers...");
+        // trace!("connecting to static peers...");
         let mut peers = self.peer_lock.write().await;
         for (peer_index, peer) in &mut peers.index_to_peers {
             let url = peer.get_url();

@@ -289,11 +289,11 @@ impl Mempool {
             return None;
         }
         if !self.blocks_queue.is_empty() {
-            trace!("there are blocks in queue");
+            trace!("there are blocks in queue. so cannot bundle new block");
             return None;
         }
         if self.transactions.is_empty() || !self.new_tx_added {
-            trace!("there are no transactions in queue");
+            trace!("there are no transactions in queue to bundle new block");
             return None;
         }
         if !blockchain.is_golden_ticket_count_valid(
