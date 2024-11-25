@@ -11,7 +11,7 @@ use crate::core::process::version::Version;
 use crate::core::util;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{generate_random_bytes, sign, verify};
-use log::{debug, info, warn};
+use log::{debug, info, trace, warn};
 use std::cmp::Ordering;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
@@ -74,7 +74,7 @@ impl Peer {
             core_version: Default::default(),
             key_list_limiter: RateLimiter::builder(100, Duration::from_secs(60)),
             handshake_limiter: RateLimiter::builder(100, Duration::from_secs(60)),
-            message_limiter: RateLimiter::builder(1000, Duration::from_secs(1)),
+            message_limiter: RateLimiter::builder(100_000, Duration::from_secs(1)),
             invalid_block_limiter: RateLimiter::builder(10, Duration::from_secs(3600)),
             public_key: None,
             peer_type: PeerType::Default,
@@ -388,7 +388,7 @@ impl Peer {
     ) {
         if self.last_msg_at + WS_KEEP_ALIVE_PERIOD < current_time {
             self.last_msg_at = current_time;
-            // trace!("sending ping to peer : {:?}", self.index);
+            trace!("sending ping to peer : {:?}", self.index);
             io_handler
                 .send_message(self.index, Message::Ping().serialize().as_slice())
                 .await

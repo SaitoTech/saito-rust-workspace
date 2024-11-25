@@ -229,7 +229,7 @@ impl RoutingThread {
         debug!("processing ghost chain request from peer : {:?}. block_id : {:?} block_hash: {:?} fork_id: {:?}",
             peer_index,
             block_id,
-           block_hash.to_hex(),
+            block_hash.to_hex(),
             fork_id.to_hex()
         );
         let blockchain = self.blockchain_lock.read().await;
@@ -405,6 +405,11 @@ impl RoutingThread {
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(i)
             {
+                trace!(
+                    "sending block header hash: {:?} to peer : {:?}",
+                    block_hash.to_hex(),
+                    peer_index
+                );
                 let buffer = Message::BlockHeaderHash(block_hash, i).serialize();
                 self.network
                     .io_interface
@@ -460,7 +465,6 @@ impl RoutingThread {
     }
 
     async fn fetch_next_blocks(&mut self) -> bool {
-        // trace!("fetching next blocks from peers");
         let mut work_done = false;
         {
             let blockchain = self.blockchain_lock.read().await;
@@ -471,6 +475,7 @@ impl RoutingThread {
         let map = self.blockchain_sync_state.get_blocks_to_fetch_per_peer();
 
         let fetching_count = self.blockchain_sync_state.get_fetching_block_count();
+        trace!("fetching next blocks : {:?} from peers", fetching_count);
         self.network
             .io_interface
             .send_interface_event(InterfaceEvent::BlockFetchStatus(fetching_count as BlockId));
@@ -638,7 +643,7 @@ impl RoutingThread {
 
             for (peer_index, peer) in peers.index_to_peers.iter_mut() {
                 if peer.public_key.is_none() {
-                    info!("public key not set yet for peer : {:?}", peer_index);
+                    trace!("public key not set yet for peer : {:?}", peer_index);
                     continue;
                 }
                 data.push(PeerStateEntry {
@@ -669,6 +674,23 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         match event {
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
+                {
+                    // TODO : move this before deserialization to avoid spending CPU time on it. moved here to just print message type
+                    let mut peers = self.network.peer_lock.write().await;
+                    let peer = peers.find_peer_by_index_mut(peer_index)?;
+
+                    let time: u64 = self.timer.get_timestamp_in_ms();
+                    peer.message_limiter.increase();
+                    if peer.has_message_limit_exceeded(time) {
+                        info!(
+                            "peers exceeded for messages from peer : {:?} - {:?} - rates : {:?}",
+                            peer_index,
+                            peer.public_key.unwrap_or([0; 33]).to_base58(),
+                            peer.message_limiter
+                        );
+                        return None;
+                    }
+                }
                 let buffer_len = buffer.len();
                 let message = Message::deserialize(buffer);
                 if message.is_err() {
@@ -684,23 +706,7 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     return None;
                 }
                 let message = message.unwrap();
-                {
-                    // TODO : move this before deserialization to avoid spending CPU time on it. moved here to just print message type
-                    let mut peers = self.network.peer_lock.write().await;
-                    let peer = peers.find_peer_by_index_mut(peer_index)?;
 
-                    let time: u64 = self.timer.get_timestamp_in_ms();
-                    peer.message_limiter.increase();
-                    if peer.has_message_limit_exceeded(time) {
-                        info!(
-                            "peers exceeded for messages from peer : {:?} - {:?} : type : {:?}",
-                            peer_index,
-                            peer.public_key.unwrap_or([0; 33]).to_base58(),
-                            message.get_type_value()
-                        );
-                        return None;
-                    }
-                }
                 self.stats.total_incoming_messages.increment();
                 self.process_incoming_message(peer_index, message).await;
                 return Some(());

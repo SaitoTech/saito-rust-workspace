@@ -6,7 +6,7 @@ use std::time::Duration;
 const PEER_STATE_FILENAME: &str = "./data/peer_state.txt";
 
 pub(crate) const PEER_STATE_WRITE_PERIOD: Timestamp =
-    Duration::from_secs(1).as_millis() as Timestamp;
+    Duration::from_secs(5).as_millis() as Timestamp;
 
 #[derive(Debug, Clone)]
 pub(crate) struct PeerStateEntry {
@@ -62,9 +62,9 @@ impl PeerStateWriter {
         let line =
             "peer_index,public_key,limited_till,msg_limit,invalid_blocks_limit,same_depth_limit,too_far_block_limit,handshake_limit,keylist_limit\r\n"
                 .to_string();
-        io_handler
-            .write_value(PEER_STATE_FILENAME, line.as_bytes())
-            .await?;
+        // io_handler
+        //     .write_value(PEER_STATE_FILENAME, line.as_bytes())
+        //     .await?;
 
         for data in data.iter() {
             let line = format!(
