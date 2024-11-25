@@ -1384,6 +1384,10 @@ impl Blockchain {
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
     ) -> WindingResult {
+        debug!(
+            "unwind_chain: current_wind_index : {:?} new_chain_len: {:?} old_chain_len: {:?} failed : {:?}",
+            current_unwind_index,new_chain.len(),old_chain.len(), wind_failure
+        );
         let block_id;
         let block_hash;
         let mut wallet_updated = WALLET_NOT_UPDATED;

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use reqwest::Client;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -156,7 +156,7 @@ impl NetworkController {
         buffer: Vec<u8>,
         exceptions: Vec<u64>,
     ) {
-        // trace!("sending message : {:?} to all", buffer[0]);
+        trace!("sending message : {:?} to all", buffer[0]);
         let mut sockets = sockets.lock().await;
         let mut peers_with_errors: Vec<u64> = Default::default();
 

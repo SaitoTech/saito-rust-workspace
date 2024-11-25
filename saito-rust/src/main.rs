@@ -18,7 +18,7 @@ use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing_subscriber::filter::Directive;
+use tracing_subscriber::filter::{Directive, FilterFn};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
@@ -531,9 +531,15 @@ fn setup_log() {
     let filter = filter.add_directive(Directive::from_str("reqwest::async_impl=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("reqwest::connect=info").unwrap());
     let filter = filter.add_directive(Directive::from_str("warp::filters=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("tokio::task=info").unwrap());
+    let filter = filter.add_directive(Directive::from_str("runtime::resource=info").unwrap());
+
     // let filter = filter.add_directive(Directive::from_str("saito_stats=info").unwrap());
 
     let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
+    // let fmt_layer = fmt_layer.with_filter(FilterFn::new(|meta| {
+    //     !meta.target().contains("waker.clone") && !meta.target().contains("waker.drop") &&
+    // }));
 
     tracing_subscriber::registry().with(fmt_layer).init();
 }
