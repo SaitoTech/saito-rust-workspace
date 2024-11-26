@@ -18,7 +18,7 @@ use tokio::select;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing_subscriber::filter::{Directive, FilterFn};
+use tracing_subscriber::filter::Directive;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
