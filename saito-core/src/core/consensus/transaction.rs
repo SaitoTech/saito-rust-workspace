@@ -999,7 +999,9 @@ impl Transaction {
             return false;
         }
 
+        // trace!("validating transaction against utxo ...");
         let inputs_validate = self.validate_against_utxoset(utxoset);
+        // trace!("validated transaction against utxo !");
         inputs_validate
     }
 
