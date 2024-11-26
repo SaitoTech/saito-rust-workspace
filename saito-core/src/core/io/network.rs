@@ -472,7 +472,8 @@ impl Network {
         mempool_lock: Arc<RwLock<Mempool>>,
     ) -> Option<()> {
         trace!(
-            "processing incoming block hash : {:?} from peer : {:?}",
+            "fetching block : {:?}-{:?} from peer : {:?}",
+            block_id,
             block_hash.to_hex(),
             peer_index
         );
