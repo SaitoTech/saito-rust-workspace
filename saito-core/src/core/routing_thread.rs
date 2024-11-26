@@ -449,6 +449,13 @@ impl RoutingThread {
             block_hash.to_hex(),
             peer_index
         );
+        {
+            let blockchain = self.blockchain_lock.read().await;
+            if !blockchain.blocks.is_empty() && blockchain.lowest_acceptable_block_id >= block_id {
+                debug!("skipping block header : {:?}-{:?} from peer : {:?} since our lowest acceptable id : {:?}",block_id,block_hash.to_hex(),peer_index, blockchain.lowest_acceptable_block_id);
+                return;
+            }
+        }
 
         let peers = self.network.peer_lock.read().await;
         let wallet = self.wallet_lock.read().await;
