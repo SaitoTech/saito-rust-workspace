@@ -118,11 +118,11 @@ impl RoutingThread {
     /// ```
     ///
     /// ```
-    async fn process_incoming_message(&mut self, peer_index: u64, message: Message) {
+    async fn process_incoming_message(&mut self, peer_index: PeerIndex, message: Message) {
         self.network.update_peer_timer(peer_index).await;
         match message {
             Message::HandshakeChallenge(challenge) => {
-                debug!("received handshake challenge");
+                debug!("received handshake challenge from peer : {:?}", peer_index);
                 self.network
                     .handle_handshake_challenge(
                         peer_index,
@@ -150,6 +150,13 @@ impl RoutingThread {
                     .await;
             }
             Message::BlockchainRequest(request) => {
+                {
+                    let configs = self.config_lock.read().await;
+                    if configs.is_browser() || configs.is_spv_mode() {
+                        // not processing incoming blockchain request. since we cannot provide any blocks
+                        return;
+                    }
+                }
                 self.process_incoming_blockchain_request(request, peer_index)
                     .await;
             }
@@ -194,8 +201,7 @@ impl RoutingThread {
             Message::KeyListUpdate(key_list) => {
                 self.network
                     .handle_received_key_list(peer_index, key_list)
-                    .await
-                    .unwrap();
+                    .await;
             }
             Message::Block(_) => {
                 error!("received block message");
@@ -369,11 +375,20 @@ impl RoutingThread {
             .handle_peer_disconnect(peer_index, disconnect_type)
             .await;
     }
-    pub async fn set_my_key_list(&mut self, key_list: Vec<SaitoPublicKey>) {
+    pub async fn set_my_key_list(&mut self, mut key_list: Vec<SaitoPublicKey>) {
         let mut wallet = self.wallet_lock.write().await;
 
-        wallet.set_key_list(key_list);
-        self.network.send_key_list(&wallet.key_list).await;
+        key_list.sort();
+        // check if key list is different from what we already have
+        if wallet
+            .key_list
+            .iter()
+            .zip(key_list.iter())
+            .any(|(a, b)| a != b)
+        {
+            wallet.set_key_list(key_list);
+            self.network.send_key_list(&wallet.key_list).await;
+        }
     }
 
     pub async fn process_incoming_blockchain_request(
@@ -406,7 +421,8 @@ impl RoutingThread {
                 .get_longest_chain_block_hash_at_block_id(i)
             {
                 trace!(
-                    "sending block header hash: {:?} to peer : {:?}",
+                    "sending block header hash: {:?}-{:?} to peer : {:?}",
+                    i,
                     block_hash.to_hex(),
                     peer_index
                 );
@@ -428,10 +444,18 @@ impl RoutingThread {
         peer_index: u64,
     ) {
         debug!(
-            "processing incoming block hash : {:?} from peer : {:?}",
+            "processing incoming block hash : {:?}-{:?} from peer : {:?}",
+            block_id,
             block_hash.to_hex(),
             peer_index
         );
+        {
+            let blockchain = self.blockchain_lock.read().await;
+            if !blockchain.blocks.is_empty() && blockchain.lowest_acceptable_block_id >= block_id {
+                debug!("skipping block header : {:?}-{:?} from peer : {:?} since our lowest acceptable id : {:?}",block_id,block_hash.to_hex(),peer_index, blockchain.lowest_acceptable_block_id);
+                return;
+            }
+        }
 
         let peers = self.network.peer_lock.read().await;
         let wallet = self.wallet_lock.read().await;
