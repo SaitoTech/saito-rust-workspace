@@ -1184,12 +1184,23 @@ impl Blockchain {
         // happen first.
         let block_hash = new_chain.get(current_wind_index).unwrap();
 
+        debug!(
+            "winding hash: {:?}", 
+	    block_hash
+        );
+
         self.upgrade_blocks_for_wind_chain(storage, configs, block_hash)
             .await;
 
         let block = self.blocks.get(block_hash).unwrap();
+
         let does_block_validate;
         {
+            debug!(
+              "winding hash validates: {:?}", 
+	       block_hash
+            );
+
             // does_block_validate = current_wind_index == 0
             //     || block
             //         .validate(self, &self.utxoset, configs, storage, &wallet)
@@ -1401,6 +1412,11 @@ impl Blockchain {
                 .await;
             block_id = block.id;
             block_hash = block.hash;
+
+            debug!(
+                "unwinding hash: {:?} w/id {:?}", 
+	        block_hash, block_id
+            );
 
             // utxoset update
             block.on_chain_reorganization(&mut self.utxoset, false);
