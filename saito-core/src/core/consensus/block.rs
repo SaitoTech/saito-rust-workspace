@@ -1581,7 +1581,11 @@ impl Block {
             // load the previous block
             //
             if let Some(previous_block) = blockchain.blocks.get(&self.previous_block_hash) {
-                debug!("previous block exists!");
+                debug!(
+                    "previous block : {:?}-{:?} exists!",
+                    previous_block.id,
+                    previous_block.hash.to_hex()
+                );
 
                 //
                 // half to miner (capped @ 1.5x)
@@ -2172,10 +2176,13 @@ impl Block {
             return false;
         }
 
+        info!("validate block : {:?}-{:?}", self.id, self.hash.to_hex());
+
         //
         // generate "consensus values"
         //
         let cv = self.generate_consensus_values(blockchain, storage).await;
+        trace!("consensus values generated : {:?}", cv);
 
         //
         // total_fees
@@ -2522,7 +2529,7 @@ impl Block {
                 // we confirm that the golden ticket is targetting the block hash
                 // of the previous block. the solution is invalid if it is not
                 // current with the state of the chain..
-                //
+                trace!("validating gt...");
                 if !gt.validate(previous_block.difficulty) {
                     error!(
                         "ERROR 801923: Golden Ticket solution does not validate against previous_block_hash : {:?}, difficulty : {:?}, random : {:?}, public_key : {:?} target : {:?}",
@@ -2542,6 +2549,7 @@ impl Block {
                     );
                     return false;
                 }
+                trace!("gt validated !");
             } else {
                 //
                 // if there is no golden ticket, our previous block's total_fees will
@@ -2668,12 +2676,17 @@ impl Block {
         // class. Note that we are passing in a read-only copy of our UTXOSet so
         // as to determine spendability.
 
+        trace!(
+            "validating transactions ... count : {:?}",
+            self.transactions.len()
+        );
         let transactions_valid = iterate!(self.transactions, 100)
             .all(|tx: &Transaction| tx.validate(utxoset, blockchain));
 
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");
         }
+        trace!("transactions validated");
 
         transactions_valid
     }

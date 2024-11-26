@@ -133,7 +133,7 @@ impl InterfaceIO for RustIOHandler {
     }
 
     async fn write_value(&self, key: &str, value: &[u8]) -> Result<(), Error> {
-        trace!("writing value to disk : {:?}", key);
+        // trace!("writing value to disk : {:?}", key);
         let filename = key;
         let path = Path::new(filename);
         if path.parent().is_some() {
@@ -151,7 +151,7 @@ impl InterfaceIO for RustIOHandler {
     }
 
     async fn append_value(&mut self, key: &str, value: &[u8]) -> Result<(), Error> {
-        trace!("appending value to disk : {:?}", key);
+        // trace!("appending value to disk : {:?}", key);
 
         if !self.open_files.contains_key(key) {
             debug!("file is not yet opened to append. opening file : {:?}", key);
