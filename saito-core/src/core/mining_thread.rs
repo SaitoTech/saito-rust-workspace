@@ -2,14 +2,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info};
+use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{BlockId, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp};
+use crate::core::defs::{
+    BlockId, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER,
+};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::keep_time::Timer;
 use crate::core::process::process_event::ProcessEvent;
@@ -94,6 +96,11 @@ impl ProcessEvent<MiningEvent> for MiningThread {
                 if let Some(gt) = self.mine().await {
                     self.miner_active = false;
                     self.mined_golden_tickets += 1;
+                    info!(
+                        "sending mined gt target: {:?} to consensus thread. channel_capacity : {:?}",
+                        gt.target.to_hex(),
+                        self.sender_to_mempool.capacity()
+                    );
                     self.sender_to_mempool
                         .send(ConsensusEvent::NewGoldenTicket { golden_ticket: gt })
                         .await
@@ -156,5 +163,9 @@ impl ProcessEvent<MiningEvent> for MiningThread {
                            self.miner_active,
                            self.target.to_hex());
         self.stat_sender.send(stat).await.unwrap();
+    }
+
+    fn is_ready_to_process(&self) -> bool {
+        self.sender_to_mempool.capacity() > CHANNEL_SAFE_BUFFER
     }
 }

@@ -1783,6 +1783,7 @@ impl Blockchain {
         }
 
         if let Some(sender) = sender_to_router {
+            debug!("sending blockchain updated event to router. channel_capacity : {:?} block_hash : {:?}", sender.capacity(),block_hash.to_hex());
             sender
                 .send(RoutingEvent::BlockchainUpdated(block_hash))
                 .await

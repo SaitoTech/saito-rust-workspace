@@ -59,7 +59,7 @@ impl ProcessEvent<String> for StatThread {
             return None;
         }
         self.stat_queue.push_back(event);
-        return Some(());
+        Some(())
     }
 
     async fn on_init(&mut self) {
@@ -75,4 +75,8 @@ impl ProcessEvent<String> for StatThread {
     }
 
     async fn on_stat_interval(&mut self, _current_time: Timestamp) {}
+
+    fn is_ready_to_process(&self) -> bool {
+        true
+    }
 }

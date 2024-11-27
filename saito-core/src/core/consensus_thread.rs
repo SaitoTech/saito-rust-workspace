@@ -13,7 +13,9 @@ use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
-use crate::core::defs::{PrintForLog, SaitoHash, StatVariable, Timestamp, STAT_BIN_COUNT};
+use crate::core::defs::{
+    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
+};
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::io::storage::Storage;
@@ -126,6 +128,7 @@ impl ConsensusThread {
     pub async fn produce_block(&mut self, timestamp: Timestamp, produce_without_limits: bool) {
         let configs = self.network.config_lock.read().await;
 
+        trace!("locking blockchain 3");
         let mut blockchain = self.blockchain_lock.write().await;
         let mut mempool = self.mempool_lock.write().await;
 
@@ -218,6 +221,7 @@ impl ConsensusThread {
                 *propagated = true;
             }
         }
+        trace!("releasing blockchain 3");
     }
 
     async fn produce_genesis_block(&mut self, timestamp: Timestamp) {
@@ -246,6 +250,10 @@ impl ConsensusThread {
     }
 
     pub async fn add_gt_to_mempool(&mut self, golden_ticket: GoldenTicket) {
+        debug!(
+            "adding received new golden ticket : {:?} to mempool",
+            golden_ticket.target.to_hex()
+        );
         let mut mempool = self.mempool_lock.write().await;
         let public_key;
         let private_key;
@@ -296,16 +304,12 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     async fn process_event(&mut self, event: ConsensusEvent) -> Option<()> {
         match event {
             ConsensusEvent::NewGoldenTicket { golden_ticket } => {
-                debug!(
-                    "received new golden ticket : {:?}",
-                    golden_ticket.target.to_hex()
-                );
-
                 self.add_gt_to_mempool(golden_ticket).await;
                 Some(())
             }
             ConsensusEvent::BlockFetched { block, .. } => {
                 let configs = self.config_lock.read().await;
+                trace!("locking blockchain 4");
                 let mut blockchain = self.blockchain_lock.write().await;
 
                 {
@@ -337,6 +341,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         configs.deref(),
                     )
                     .await;
+                trace!("releasing blockchain 4");
 
                 Some(())
             }
@@ -496,6 +501,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         {
             let stat;
             {
+                trace!("locking blockchain 5");
                 let blockchain = self.blockchain_lock.read().await;
 
                 stat = format!(
@@ -509,6 +515,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     blockchain.blocks.iter().map(|(_hash, block)| { block.transactions.len() }).sum::<usize>()
                     );
             }
+            trace!("releasing blockchain 5");
             self.stat_sender.send(stat).await.unwrap();
         }
         {
@@ -537,5 +544,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             );
             self.stat_sender.send(stat).await.unwrap();
         }
+    }
+
+    fn is_ready_to_process(&self) -> bool {
+        self.sender_to_miner.capacity() > CHANNEL_SAFE_BUFFER
+            && self.sender_to_router.capacity() > CHANNEL_SAFE_BUFFER
     }
 }

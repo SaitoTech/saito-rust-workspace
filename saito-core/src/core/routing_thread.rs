@@ -8,7 +8,7 @@ use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
 use crate::core::defs::{
     BlockHash, BlockId, PeerIndex, PrintForLog, SaitoHash, SaitoPublicKey, StatVariable, Timestamp,
-    STAT_BIN_COUNT,
+    CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::{Network, PeerDisconnectType};
@@ -178,8 +178,9 @@ impl RoutingThread {
             }
             Message::ApplicationMessage(api_message) => {
                 trace!(
-                    "processing application msg with buffer size : {:?}",
-                    api_message.data.len()
+                    "processing application msg with buffer size : {:?} from peer : {:?}",
+                    api_message.data.len(),
+                    peer_index
                 );
                 self.network
                     .io_interface
@@ -450,12 +451,14 @@ impl RoutingThread {
             peer_index
         );
         {
+            trace!("locking blockchain 6");
             let blockchain = self.blockchain_lock.read().await;
             if !blockchain.blocks.is_empty() && blockchain.lowest_acceptable_block_id >= block_id {
                 debug!("skipping block header : {:?}-{:?} from peer : {:?} since our lowest acceptable id : {:?}",block_id,block_hash.to_hex(),peer_index, blockchain.lowest_acceptable_block_id);
                 return;
             }
         }
+        trace!("releasing blockchain 6");
 
         let peers = self.network.peer_lock.read().await;
         let wallet = self.wallet_lock.read().await;
@@ -741,7 +744,6 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
                     return Some(());
                 }
             }
-
             NetworkEvent::AddStunPeer {
                 peer_index,
                 public_key,
@@ -949,6 +951,15 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             peers_in_handshake,
         );
         self.stat_sender.send(stat).await.unwrap();
+    }
+
+    fn is_ready_to_process(&self) -> bool {
+        self.sender_to_miner.capacity() > CHANNEL_SAFE_BUFFER
+            && self.sender_to_consensus.capacity() > CHANNEL_SAFE_BUFFER
+            && self
+                .senders_to_verification
+                .iter()
+                .all(|sender| sender.capacity() > CHANNEL_SAFE_BUFFER)
     }
 }
 

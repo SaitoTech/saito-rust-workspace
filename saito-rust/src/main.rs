@@ -30,8 +30,8 @@ use saito_core::core::consensus::peers::peer_collection::PeerCollection;
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
-    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, PROJECT_PUBLIC_KEY,
-    STAT_BIN_COUNT,
+    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, CHANNEL_SAFE_BUFFER,
+    PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
@@ -99,8 +99,9 @@ where
     T: Send + Debug + 'static,
 {
     let time_keeper = time_keeper_origin.clone();
+    let t_name = thread_name.to_string();
     tokio::task::Builder::new()
-        .name(thread_name)
+        .name(thread_name.clone())
         .spawn(async move {
             info!("new thread started");
             // let mut work_done;
@@ -113,38 +114,42 @@ where
             let mut stat_interval = tokio::time::interval(Duration::from_millis(stat_timer_in_ms));
 
             loop {
+                let ready = event_processor.is_ready_to_process();
+                if !ready{
+                    debug!("event processor : {:?} not ready. channels are filled",t_name);
+                }
                 select! {
-                    result = receive_event(&mut network_event_receiver), if network_event_receiver.is_some()=>{
-                        if result.is_some() {
-                            let event: NetworkEvent = result.unwrap();
-                            event_processor.process_network_event(event).await;
+                        result = receive_event(&mut event_receiver), if event_receiver.is_some() && ready=>{
+                            if result.is_some() {
+                                let event = result.unwrap();
+                                event_processor.process_event(event).await;
+                            }
                         }
-                    }
-                    result= receive_event(&mut event_receiver), if event_receiver.is_some()=>{
-                        if result.is_some() {
-                            let event = result.unwrap();
-                            event_processor.process_event(event).await;
+                        result = receive_event(&mut network_event_receiver), if network_event_receiver.is_some() && ready=>{
+                            if result.is_some() {
+                                let event: NetworkEvent = result.unwrap();
+                                event_processor.process_network_event(event).await;
+                            }
                         }
-                    }
-                    _ = interval.tick()=>{
-                            event_processor
-                               .process_timer_event(interval.period())
-                               .await;
-                    }
-                    _ = stat_interval.tick()=>{
-                        {
-                            let current_instant = Instant::now();
-
-                            let duration = current_instant.duration_since(last_stat_time);
-                            if duration > Duration::from_millis(stat_timer_in_ms) {
-                                last_stat_time = current_instant;
+                        _ = interval.tick()=>{
                                 event_processor
-                                    .on_stat_interval(time_keeper.get_timestamp_in_ms())
-                                    .await;
+                                   .process_timer_event(interval.period())
+                                   .await;
+                        }
+                        _ = stat_interval.tick()=>{
+                            {
+                                let current_instant = Instant::now();
+
+                                let duration = current_instant.duration_since(last_stat_time);
+                                if duration > Duration::from_millis(stat_timer_in_ms) {
+                                    last_stat_time = current_instant;
+                                    event_processor
+                                        .on_stat_interval(time_keeper.get_timestamp_in_ms())
+                                        .await;
+                                }
                             }
                         }
                     }
-                }
             }
         })
         .unwrap()
@@ -585,6 +590,7 @@ async fn run_node(
         let configs = configs_lock.read().await;
 
         channel_size = configs.get_server_configs().unwrap().channel_size as usize;
+        assert!(channel_size > CHANNEL_SAFE_BUFFER * 2);
         thread_sleep_time_in_ms = configs
             .get_server_configs()
             .unwrap()

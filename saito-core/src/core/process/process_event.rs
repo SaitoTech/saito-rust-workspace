@@ -56,4 +56,6 @@ where
     async fn on_init(&mut self);
 
     async fn on_stat_interval(&mut self, current_time: Timestamp);
+
+    fn is_ready_to_process(&self) -> bool;
 }
