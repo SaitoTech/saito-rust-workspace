@@ -101,7 +101,7 @@ where
     let time_keeper = time_keeper_origin.clone();
     let t_name = thread_name.to_string();
     tokio::task::Builder::new()
-        .name(thread_name.clone())
+        .name(thread_name)
         .spawn(async move {
             info!("new thread started");
             // let mut work_done;
