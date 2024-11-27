@@ -357,6 +357,7 @@ impl Network {
         blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
         let configs = self.config_lock.read().await;
+        trace!("locking blockchain 1");
         let blockchain = blockchain_lock.read().await;
         let buffer: Vec<u8>;
         debug!(
@@ -456,6 +457,7 @@ impl Network {
         // We need blockchain lock till here to avoid integrity issues
         drop(blockchain);
         drop(configs);
+        trace!("releasing blockchain 1");
 
         self.io_interface
             .send_message(peer_index, buffer.as_slice())
@@ -477,16 +479,22 @@ impl Network {
             block_hash.to_hex(),
             peer_index
         );
-        let configs = self.config_lock.read().await;
         let block_exists;
         let my_public_key;
-        {
-            let blockchain = blockchain_lock.read().await;
-            let mempool = mempool_lock.read().await;
-            let wallet = self.wallet_lock.read().await;
 
-            block_exists = blockchain.is_block_indexed(block_hash)
-                || mempool.blocks_queue.iter().any(|b| b.hash == block_hash);
+        {
+            trace!("locking blockchain 2");
+            let blockchain = blockchain_lock.read().await;
+            if blockchain.is_block_indexed(block_hash) {
+                block_exists = true;
+            } else {
+                let mempool = mempool_lock.read().await;
+                block_exists = mempool.blocks_queue.iter().any(|b| b.hash == block_hash);
+            }
+        }
+        trace!("releasing blockchain 2");
+        {
+            let wallet = self.wallet_lock.read().await;
             my_public_key = wallet.public_key;
         }
         if block_exists {
@@ -499,6 +507,7 @@ impl Network {
         }
         let url;
         {
+            let configs = self.config_lock.read().await;
             let peers = self.peer_lock.read().await;
             let wallet = self.wallet_lock.read().await;
 

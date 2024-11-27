@@ -22,6 +22,8 @@ pub type UtxoSet = AHashMap<SaitoUTXOSetKey, bool>;
 pub type PeerIndex = u64;
 pub type BlockId = u64;
 
+pub const CHANNEL_SAFE_BUFFER: usize = 16;
+
 pub const NOLAN_PER_SAITO: Currency = 100_000_000;
 
 pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";

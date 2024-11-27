@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, warn};
+use log::{debug, trace, warn};
 use rayon::prelude::*;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -14,7 +14,9 @@ use crate::core::consensus::peers::peer_collection::PeerCollection;
 use crate::core::consensus::transaction::Transaction;
 use crate::core::consensus::wallet::Wallet;
 use crate::core::consensus_thread::ConsensusEvent;
-use crate::core::defs::{BlockHash, BlockId, PeerIndex, PrintForLog, StatVariable, Timestamp};
+use crate::core::defs::{
+    BlockHash, BlockId, PeerIndex, PrintForLog, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER,
+};
 use crate::core::io::network_event::NetworkEvent;
 use crate::core::process::process_event::ProcessEvent;
 use crate::drain;
@@ -41,6 +43,7 @@ pub struct VerificationThread {
 impl VerificationThread {
     pub async fn verify_tx(&mut self, mut transaction: Transaction) {
         let public_key;
+        trace!("locking blockchain 7");
         let blockchain = self.blockchain_lock.read().await;
         let wallet = self.wallet_lock.read().await;
         public_key = wallet.public_key;
@@ -61,6 +64,7 @@ impl VerificationThread {
             .send(ConsensusEvent::NewTransaction { transaction })
             .await
             .unwrap();
+        trace!("releasing blockchain 7");
     }
     pub async fn verify_txs(&mut self, transactions: &mut VecDeque<Transaction>) {
         self.processed_txs.increment_by(transactions.len() as u64);
@@ -68,6 +72,7 @@ impl VerificationThread {
         let prev_count = transactions.len();
         let txs: Vec<Transaction>;
         {
+            trace!("locking blockchain 8");
             let blockchain = self.blockchain_lock.read().await;
 
             let public_key;
@@ -90,6 +95,7 @@ impl VerificationThread {
                 })
                 .collect();
         }
+        trace!("releasing blockchain 8");
 
         let invalid_txs = prev_count - txs.len();
         for transaction in txs {
@@ -196,5 +202,9 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
         self.invalid_txs.calculate_stats(current_time).await;
         self.processed_txs.calculate_stats(current_time).await;
         self.processed_blocks.calculate_stats(current_time).await;
+    }
+
+    fn is_ready_to_process(&self) -> bool {
+        self.sender_to_consensus.capacity() > CHANNEL_SAFE_BUFFER
     }
 }

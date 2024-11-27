@@ -16,7 +16,7 @@ use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
-    Timestamp, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
+    Timestamp, CHANNEL_SAFE_BUFFER, PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
 };
 use saito_core::core::io::network::{Network, PeerDisconnectType};
 use saito_core::core::io::network_event::NetworkEvent;
@@ -82,6 +82,14 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
     let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> = CONFIGS.clone();
 
     let channel_size = 1_000_000;
+
+    if channel_size < CHANNEL_SAFE_BUFFER * 2 {
+        error!(
+            "channel_size < CHANNEL_SAFE_BUFFER x 2 : {:?}",
+            CHANNEL_SAFE_BUFFER * 2
+        );
+        panic!("cannot continue");
+    }
 
     let peers = Arc::new(RwLock::new(PeerCollection::default()));
     let context = Context {
@@ -624,111 +632,80 @@ pub async fn process_failed_block_fetch(hash: js_sys::Uint8Array, block_id: u64,
 #[wasm_bindgen]
 pub async fn process_timer_event(duration_in_ms: u64) {
     let mut saito = SAITO.lock().await;
+    let saito = saito.as_mut().unwrap();
 
     let duration = Duration::from_millis(duration_in_ms);
     const EVENT_LIMIT: u32 = 100;
     let mut event_counter = 0;
 
-    while let Ok(event) = saito.as_mut().unwrap().receiver_for_router.try_recv() {
-        let _result = saito
-            .as_mut()
-            .unwrap()
-            .routing_thread
-            .process_event(event)
-            .await;
+    while let Ok(event) = saito.receiver_for_router.try_recv() {
+        let _result = saito.routing_thread.process_event(event).await;
         event_counter += 1;
         if event_counter >= EVENT_LIMIT {
             break;
         }
+        if !saito.routing_thread.is_ready_to_process() {
+            break;
+        }
     }
 
-    saito
-        .as_mut()
-        .unwrap()
-        .routing_thread
-        .process_timer_event(duration)
-        .await;
+    saito.routing_thread.process_timer_event(duration).await;
 
     event_counter = 0;
-    while let Ok(event) = saito.as_mut().unwrap().receiver_for_consensus.try_recv() {
-        let _result = saito
-            .as_mut()
-            .unwrap()
-            .consensus_thread
-            .process_event(event)
-            .await;
+    while let Ok(event) = saito.receiver_for_consensus.try_recv() {
+        let _result = saito.consensus_thread.process_event(event).await;
         event_counter += 1;
         if event_counter >= EVENT_LIMIT {
             break;
         }
+        if !saito.consensus_thread.is_ready_to_process() {
+            break;
+        }
     }
 
-    saito
-        .as_mut()
-        .unwrap()
-        .consensus_thread
-        .process_timer_event(duration)
-        .await;
+    saito.consensus_thread.process_timer_event(duration).await;
 
     event_counter = 0;
-    while let Ok(event) = saito.as_mut().unwrap().receiver_for_verification.try_recv() {
-        let _result = saito
-            .as_mut()
-            .unwrap()
-            .verification_thread
-            .process_event(event)
-            .await;
+    while let Ok(event) = saito.receiver_for_verification.try_recv() {
+        let _result = saito.verification_thread.process_event(event).await;
         event_counter += 1;
         if event_counter >= EVENT_LIMIT {
+            break;
+        }
+        if !saito.verification_thread.is_ready_to_process() {
             break;
         }
     }
 
     saito
-        .as_mut()
-        .unwrap()
         .verification_thread
         .process_timer_event(duration)
         .await;
 
     event_counter = 0;
-    while let Ok(event) = saito.as_mut().unwrap().receiver_for_miner.try_recv() {
-        let _result = saito
-            .as_mut()
-            .unwrap()
-            .mining_thread
-            .process_event(event)
-            .await;
+    while let Ok(event) = saito.receiver_for_miner.try_recv() {
+        let _result = saito.mining_thread.process_event(event).await;
         event_counter += 1;
         if event_counter >= EVENT_LIMIT {
             break;
         }
+        if !saito.mining_thread.is_ready_to_process() {
+            break;
+        }
     }
 
-    saito
-        .as_mut()
-        .unwrap()
-        .mining_thread
-        .process_timer_event(duration)
-        .await;
+    saito.mining_thread.process_timer_event(duration).await;
 
-    saito
-        .as_mut()
-        .unwrap()
-        .stat_thread
-        .process_timer_event(duration)
-        .await;
+    saito.stat_thread.process_timer_event(duration).await;
 
     event_counter = 0;
-    while let Ok(event) = saito.as_mut().unwrap().receiver_for_stats.try_recv() {
-        let _result = saito
-            .as_mut()
-            .unwrap()
-            .stat_thread
-            .process_event(event)
-            .await;
+    while let Ok(event) = saito.receiver_for_stats.try_recv() {
+        let _result = saito.stat_thread.process_event(event).await;
         event_counter += 1;
         if event_counter >= EVENT_LIMIT {
+            break;
+        }
+        if !saito.stat_thread.is_ready_to_process() {
             break;
         }
     }

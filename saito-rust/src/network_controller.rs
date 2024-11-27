@@ -487,10 +487,12 @@ pub async fn run_network_controller(
         port = configs.get_server_configs().unwrap().port;
         host = configs.get_server_configs().unwrap().host.clone();
 
+        trace!("locking blockchain 9");
         let blockchain = blockchain_lock.read().await;
         let wallet = blockchain.wallet_lock.read().await;
         public_key = wallet.public_key;
     }
+    trace!("releasing blockchain 9");
 
     info!("starting server on : {:?}", url);
     let sender_clone = sender_to_core.clone();
