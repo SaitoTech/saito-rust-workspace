@@ -65,7 +65,7 @@ impl PeerStateWriter {
     ) -> Result<(), Error> {
         if !io_handler.is_existing_file(PEER_STATE_FILENAME).await {
             let line =
-                "peer_index,ip,public_key,limited_till,msg_limit,invalid_blocks_limit,same_depth_limit,too_far_block_limit,handshake_limit,keylist_limit\r\n"
+                "current_time,peer_index,ip,public_key,limited_till,msg_limit,invalid_blocks_limit,same_depth_limit,too_far_block_limit,handshake_limit,keylist_limit\r\n"
                     .to_string();
             io_handler
                 .write_value(PEER_STATE_FILENAME, line.as_bytes())
@@ -74,7 +74,8 @@ impl PeerStateWriter {
 
         for data in data.iter() {
             let line = format!(
-                "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}\r\n",
+                "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}\r\n",
+                data.current_time,
                 data.peer_index,
                 data.peer_address,
                 data.public_key.to_base58(),
