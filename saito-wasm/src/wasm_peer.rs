@@ -77,6 +77,18 @@ impl WasmPeer {
     pub fn has_service(&self, service: JsString) -> bool {
         self.peer.has_service(service.into())
     }
+
+    // pub fn set_ip(&mut self, ip: JsString) {
+    //     let s = ip.as_string();
+    //     if s.is_none() {
+    //         debug!("cannot parse ip string : {:?}", ip);
+    //         return;
+    //     }
+    //     let s: String = s.unwrap();
+    //     if let Ok(address) = IpAddr::from_str(&s) {
+    //         self.peer.ip_address = Some(address);
+    //     }
+    // }
 }
 
 impl WasmPeer {

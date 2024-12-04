@@ -20,7 +20,7 @@ export default class WebSharedMethods extends CustomSharedMethods {
 
             socket.onopen = () => {
                 try {
-                    Saito.getLibInstance().process_new_peer(peer_index);
+                    Saito.getLibInstance().process_new_peer(peer_index, url);
                     console.log("connected to : " + url + " with peer index : " + peer_index);
                 } catch (error) {
                     console.error(error);

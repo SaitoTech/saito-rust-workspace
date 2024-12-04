@@ -43,4 +43,5 @@ export default class Peer extends WasmWrapper<WasmPeer> {
         return this.instance.has_service(service);
     }
 
+   
 }
