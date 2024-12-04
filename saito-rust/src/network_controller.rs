@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,7 +17,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
@@ -123,6 +123,24 @@ impl NetworkController {
             let result = result.unwrap();
             let socket: WebSocketStream<MaybeTlsStream<TcpStream>> = result.0;
 
+            let ip = match socket.get_ref() {
+                MaybeTlsStream::NativeTls(s) => {
+                    if let Ok(socket_address) = s.get_ref().get_ref().get_ref().peer_addr() {
+                        Some(socket_address.ip().to_string())
+                    } else {
+                        None
+                    }
+                }
+                MaybeTlsStream::Plain(t) => {
+                    if let Ok(socket_address) = t.peer_addr() {
+                        Some(socket_address.ip().to_string())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+
             let network_controller = io_controller.read().await;
 
             let sender_to_controller = network_controller.sender_to_saito_controller.clone();
@@ -136,6 +154,7 @@ impl NetworkController {
             NetworkController::send_new_peer(
                 event_id,
                 peer_index,
+                ip,
                 network_controller.sockets.clone(),
                 PeerSender::Tungstenite(socket_sender),
                 PeerReceiver::Tungstenite(socket_receiver),
@@ -299,6 +318,7 @@ impl NetworkController {
     pub async fn send_new_peer(
         event_id: u64,
         peer_index: u64,
+        ip: Option<String>,
         sockets: Arc<Mutex<HashMap<u64, PeerSender>>>,
         sender: PeerSender,
         receiver: PeerReceiver,
@@ -315,7 +335,7 @@ impl NetworkController {
                 event_processor_id: 1,
                 event_id,
                 event: NetworkEvent::PeerConnectionResult {
-                    result: Ok(peer_index),
+                    result: Ok((peer_index, ip)),
                 },
             })
             .await
@@ -694,15 +714,18 @@ fn run_websocket_server(
             let sender_to_io = sender_clone.clone();
             let ws_route = warp::path("wsopen")
                 .and(warp::ws())
-                .map(move |ws: warp::ws::Ws| {
+                .and(warp::addr::remote())
+                .map(move |ws: warp::ws::Ws, addr: Option<SocketAddr>| {
                     debug!("incoming connection received");
                     let clone = io_controller.clone();
                     let peers = peers_lock_1.clone();
                     let sender_to_io = sender_to_io.clone();
                     let ws = ws.max_message_size(10_000_000_000);
                     let ws = ws.max_frame_size(10_000_000_000);
+
                     ws.on_upgrade(move |socket| async move {
                         debug!("socket connection established");
+
                         let (sender, receiver) = socket.split();
 
                         let network_controller = clone.read().await;
@@ -716,6 +739,7 @@ fn run_websocket_server(
                         NetworkController::send_new_peer(
                             0,
                             peer_index,
+                            addr.map(|a| a.ip().to_string()),
                             network_controller.sockets.clone(),
                             PeerSender::Warp(sender),
                             PeerReceiver::Warp(receiver),

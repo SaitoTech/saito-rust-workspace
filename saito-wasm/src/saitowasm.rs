@@ -1,5 +1,6 @@
 use std::io::{Error, ErrorKind};
-
+use std::net::IpAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -499,16 +500,22 @@ pub async fn get_block(block_hash: JsString) -> Result<WasmBlock, JsValue> {
 }
 
 #[wasm_bindgen]
-pub async fn process_new_peer(peer_index: PeerIndex) {
-    debug!("process_new_peer : {:?}", peer_index);
+pub async fn process_new_peer(peer_index: PeerIndex, ip: JsString) {
+    debug!("process_new_peer : {:?} - {:?}", peer_index, ip);
     let mut saito = SAITO.lock().await;
+    let s = ip.as_string();
+    if s.is_none() {
+        debug!("cannot parse ip string : {:?}", ip);
+        return;
+    }
+    let ip = s;
 
     saito
         .as_mut()
         .unwrap()
         .routing_thread
         .process_network_event(NetworkEvent::PeerConnectionResult {
-            result: Ok(peer_index),
+            result: Ok((peer_index, ip)),
         })
         .await;
 }
