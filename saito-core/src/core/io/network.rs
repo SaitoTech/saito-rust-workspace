@@ -1,5 +1,4 @@
 use std::io::{Error, ErrorKind};
-use std::net::IpAddr;
 use std::sync::Arc;
 
 use log::{debug, error, info, trace, warn};

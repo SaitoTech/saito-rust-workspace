@@ -1,6 +1,5 @@
 use crate::core::defs::{BlockId, PeerIndex, SaitoHash, SaitoPublicKey};
 use crate::core::io::network::PeerDisconnectType;
-use std::net::IpAddr;
 
 #[derive(Debug)]
 pub enum NetworkEvent {

@@ -27,7 +27,6 @@ use crate::core::util::crypto::hash;
 use crate::core::verification_thread::VerifyRequest;
 use async_trait::async_trait;
 use log::{debug, error, info, trace, warn};
-use std::net::IpAddr;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
