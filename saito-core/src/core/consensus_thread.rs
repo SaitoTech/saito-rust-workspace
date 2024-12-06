@@ -170,7 +170,7 @@ impl ConsensusThread {
                 )
                 .await;
         } else {
-            trace!("skipped bundling block");
+            trace!("skipped bundling block. : produce_without_limits = {:?}, is_browser : {:?} block_count : {:?}", produce_without_limits, !configs.is_browser() && !configs.is_spv_mode(),blockchain.blocks.len());
         }
         if let Some(block) = block {
             debug!(
@@ -422,7 +422,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 .load_block_name_list()
                 .await
                 .expect("cannot load block file list");
-            // let mempool = self.mempool.read().await;
             if configs.get_peer_configs().is_empty() && list.is_empty() {
                 self.generate_genesis_block = true;
             }
