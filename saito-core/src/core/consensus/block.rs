@@ -3247,7 +3247,7 @@ mod tests {
         t.initialize_with_timestamp(100, 10000, 0).await;
 
         // check if epoch length is 10
-        assert_eq!(GENESIS_PERIOD, 10, "Genesis period is not 10");
+        assert_eq!(GENESIS_PERIOD, 100, "Genesis period is not 10");
 
         // create 10 blocks
         for _i in 0..GENESIS_PERIOD {
@@ -3313,9 +3313,9 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn atr_test_2() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
         let mut tester = NodeTester::default();
-        tester.delete_blocks().await.unwrap();
 
         let public_key = tester.get_public_key().await;
         tester

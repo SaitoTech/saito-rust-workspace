@@ -127,10 +127,27 @@ impl Debug for GhostChainSync {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::msg::ghost_chain_sync::GhostChainSync;
 
-    #[ignore]
     #[test]
     fn serialize_test() {
-        todo!()
+        let chain = GhostChainSync {
+            start: [1; 32],
+            prehashes: vec![[2; 32], [3; 32]],
+            previous_block_hashes: vec![[4; 32], [5; 32]],
+            block_ids: vec![10, 20],
+            block_ts: vec![100, 200],
+            txs: vec![false, true],
+            gts: vec![true, false],
+        };
+        let buffer = chain.serialize();
+        let chain2 = GhostChainSync::deserialize(buffer);
+        assert_eq!(chain.start, chain2.start);
+        assert_eq!(chain.prehashes, chain2.prehashes);
+        assert_eq!(chain.previous_block_hashes, chain2.previous_block_hashes);
+        assert_eq!(chain.block_ids, chain2.block_ids);
+        assert_eq!(chain.block_ts, chain2.block_ts);
+        assert_eq!(chain.txs, chain2.txs);
+        assert_eq!(chain.gts, chain2.gts);
     }
 }

@@ -937,7 +937,6 @@ mod tests {
     use saito_core::core::util::crypto::generate_random_bytes;
     use tokio_tungstenite::connect_async;
 
-    #[ignore]
     #[tokio::test]
     async fn multi_peer_perf_test() {
         // pretty_env_logger::init();

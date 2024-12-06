@@ -72,6 +72,7 @@ impl ProcessEvent<String> for StatThread {
             .write_value(STAT_FILENAME, vec![].as_slice())
             .await
             .unwrap();
+        info!("stat thread is on");
     }
 
     async fn on_stat_interval(&mut self, _current_time: Timestamp) {}
