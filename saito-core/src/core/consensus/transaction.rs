@@ -1068,8 +1068,8 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::defs::{PrintForLog, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
-    use crate::core::util::crypto::{generate_keys, verify, verify_signature};
+    use crate::core::defs::{PrintForLog, SaitoPrivateKey, SaitoPublicKey};
+    use crate::core::util::crypto::generate_keys;
 
     use super::*;
 
