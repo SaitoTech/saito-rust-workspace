@@ -8,6 +8,7 @@ echo "OS = ${OS_NAME}"
 if [[ "$OS_NAME" = "Darwin" ]]; then
   echo "Setting clang path..."
   # check the wiki for installing clang
+  # https://github.com/SaitoTech/saito-rust-workspace/blob/develop/LINK_MAC.md
   export CC=/opt/homebrew/opt/llvm/bin/clang
 else
   # add for other OSes if needed
