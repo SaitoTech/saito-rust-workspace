@@ -118,7 +118,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
         if !self.enabled {
             return None;
         }
-        return match event {
+        match event {
             MiningEvent::LongestChainBlockAdded {
                 hash,
                 difficulty,
@@ -137,7 +137,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
                 self.mining_start = self.timer.get_timestamp_in_ms();
                 Some(())
             }
-        };
+        }
     }
 
     async fn on_init(&mut self) {

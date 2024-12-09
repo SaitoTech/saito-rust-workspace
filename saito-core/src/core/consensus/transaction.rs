@@ -1068,8 +1068,8 @@ impl Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::defs::{PrintForLog, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
-    use crate::core::util::crypto::{generate_keys, verify, verify_signature};
+    use crate::core::defs::{PrintForLog, SaitoPrivateKey, SaitoPublicKey};
+    use crate::core::util::crypto::generate_keys;
 
     use super::*;
 
@@ -1243,34 +1243,5 @@ mod tests {
 
         let deserialized_tx = Transaction::deserialize_from_net(&serialized_tx).unwrap();
         assert_eq!(mock_tx, deserialized_tx);
-    }
-
-    // TODO : change the uuid related changes in SLR and add the tx buffer to the test
-    #[ignore]
-    #[test]
-    fn deserialize_test_against_slr() {
-        let tx_buffer_txt = "00000001000000010000000300000000dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec0000017d26dd628a000000010303cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b00000000000001590000616263";
-        let buffer = hex::decode(tx_buffer_txt).unwrap();
-
-        let mut tx = Transaction::deserialize_from_net(&buffer).unwrap();
-
-        assert_eq!(tx.timestamp, 1637034582);
-        assert_eq!(tx.transaction_type, TransactionType::ATR);
-
-        assert_eq!(tx.signature.to_hex(), "dc9f23b0d0feb6609170abddcd5a1de249432b3e6761b8aac39b6e1b5bcb6bef73c1b8af4f394e2b3d983b81ba3e0888feaab092fa1754de8896e22dcfbeb4ec");
-        let public_key: SaitoPublicKey = tx.from[0].public_key;
-        assert_eq!(
-            public_key.to_hex(),
-            "03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610"
-        );
-        tx.generate(&public_key, 0, 0);
-        let sig: SaitoSignature = tx.signature;
-
-        assert_eq!(hex::decode("0000017d26dd628a03cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce7610dcf6cceb74717f98c3f7239459bb36fdcd8f350eedbfccfbebf7c0b0161fcd8b000000000000007b0a0103cb14a56ddc769932baba62c22773aaf6d26d799b548c8b8f654fb92d25ce76100000000000000000000000000000000000000000000000000000000000000000000000000000015900000000000100000003616263").unwrap()
-                   , tx.serialize_for_signature());
-        let result = verify(tx.serialize_for_signature().as_slice(), &sig, &public_key);
-        assert!(result);
-        let result = verify_signature(tx.hash_for_signature.as_ref().unwrap(), &sig, &public_key);
-        assert!(result);
     }
 }

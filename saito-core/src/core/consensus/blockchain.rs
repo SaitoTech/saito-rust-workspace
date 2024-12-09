@@ -1095,52 +1095,59 @@ impl Blockchain {
         is_browser: bool,
         is_spv: bool,
     ) -> bool {
-        let mut golden_tickets_found = 0;
-        let mut search_depth_index = 0;
-        let mut latest_block_hash = previous_block_hash;
+        // let mut golden_tickets_found = 0;
+        // let mut search_depth_index = 0;
+        // let mut latest_block_hash = previous_block_hash;
+        //
+        // for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR {
+        //     search_depth_index += 1;
+        //
+        //     if let Some(block) = self.get_block_sync(&latest_block_hash) {
+        //         if i == 0 && block.id < MIN_GOLDEN_TICKETS_DENOMINATOR {
+        //             golden_tickets_found = MIN_GOLDEN_TICKETS_DENOMINATOR;
+        //             break;
+        //         }
+        //
+        //         // the latest block will not have has_golden_ticket set yet
+        //         // so it is possible we undercount the latest block. this
+        //         // is dealt with by manually checking for the existence of
+        //         // a golden ticket if we only have 1 golden ticket below.
+        //         if block.has_golden_ticket {
+        //             golden_tickets_found += 1;
+        //         }
+        //         latest_block_hash = block.previous_block_hash;
+        //     } else {
+        //         break;
+        //     }
+        // }
+        //
+        // if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
+        //     && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
+        //     && current_block_has_golden_ticket
+        // {
+        //     golden_tickets_found += 1;
+        // }
+        //
+        // if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
+        //     && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
+        // {
+        //     info!(
+        //         "not enough golden tickets : found = {:?} depth = {:?}",
+        //         golden_tickets_found, search_depth_index
+        //     );
+        //     // TODO : browsers might want to implement this check somehow
+        //     if !is_browser && !is_spv {
+        //         return false;
+        //     }
+        // }
+        // true
 
-        for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR {
-            search_depth_index += 1;
-
-            if let Some(block) = self.get_block_sync(&latest_block_hash) {
-                if i == 0 && block.id < MIN_GOLDEN_TICKETS_DENOMINATOR {
-                    golden_tickets_found = MIN_GOLDEN_TICKETS_DENOMINATOR;
-                    break;
-                }
-
-                // the latest block will not have has_golden_ticket set yet
-                // so it is possible we undercount the latest block. this
-                // is dealt with by manually checking for the existence of
-                // a golden ticket if we only have 1 golden ticket below.
-                if block.has_golden_ticket {
-                    golden_tickets_found += 1;
-                }
-                latest_block_hash = block.previous_block_hash;
-            } else {
-                break;
-            }
-        }
-
-        if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
-            && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
-            && current_block_has_golden_ticket
-        {
-            golden_tickets_found += 1;
-        }
-
-        if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
-            && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
-        {
-            info!(
-                "not enough golden tickets : found = {:?} depth = {:?}",
-                golden_tickets_found, search_depth_index
-            );
-            // TODO : browsers might want to implement this check somehow
-            if !is_browser && !is_spv {
-                return false;
-            }
-        }
-        true
+        is_golden_ticket_count_valid_(
+            previous_block_hash,
+            current_block_has_golden_ticket,
+            is_browser || is_spv,
+            |hash| self.get_block_sync(&hash),
+        )
     }
 
     // when new_chain and old_chain are generated the block_hashes are added
@@ -1969,25 +1976,81 @@ impl Blockchain {
     }
 }
 
+fn is_golden_ticket_count_valid_<'a, F: Fn(SaitoHash) -> Option<&'a Block>>(
+    previous_block_hash: SaitoHash,
+    current_block_has_golden_ticket: bool,
+    bypass: bool,
+    get_block: F,
+) -> bool {
+    let mut golden_tickets_found = 0;
+    let mut search_depth_index = 0;
+    let mut latest_block_hash = previous_block_hash;
+
+    for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR - 1 {
+        search_depth_index += 1;
+
+        if let Some(block) = get_block(latest_block_hash) {
+            if i == 0 && block.id < MIN_GOLDEN_TICKETS_DENOMINATOR {
+                golden_tickets_found = MIN_GOLDEN_TICKETS_DENOMINATOR;
+                break;
+            }
+
+            // the latest block will not have has_golden_ticket set yet
+            // so it is possible we undercount the latest block. this
+            // is dealt with by manually checking for the existence of
+            // a golden ticket if we only have 1 golden ticket below.
+            if block.has_golden_ticket {
+                golden_tickets_found += 1;
+            }
+            latest_block_hash = block.previous_block_hash;
+        } else {
+            break;
+        }
+    }
+
+    if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
+        && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR - 1
+        && current_block_has_golden_ticket
+    {
+        golden_tickets_found += 1;
+    }
+
+    if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
+        && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR - 1
+    {
+        info!(
+            "not enough golden tickets : found = {:?} depth = {:?} current_block_has_golden_ticket : {:?}",
+            golden_tickets_found, search_depth_index, current_block_has_golden_ticket
+        );
+        // TODO : browsers might want to implement this check somehow
+        if !bypass {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
-    use log::{debug, error, info};
-    use std::fs;
-    use std::ops::Deref;
-    use std::sync::Arc;
-    use std::time::Duration;
-    use tokio::sync::RwLock;
-
+    use crate::core::consensus::block::Block;
     use crate::core::consensus::blockchain::{
-        bit_pack, bit_unpack, AddBlockResult, Blockchain, DEFAULT_SOCIAL_STAKE,
+        bit_pack, bit_unpack, is_golden_ticket_count_valid_, AddBlockResult, Blockchain,
+        DEFAULT_SOCIAL_STAKE,
     };
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
-    use crate::core::defs::{ForkId, PrintForLog, SaitoPublicKey, NOLAN_PER_SAITO};
+    use crate::core::defs::{ForkId, PrintForLog, SaitoHash, SaitoPublicKey, NOLAN_PER_SAITO};
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, hash};
     use crate::core::util::test::node_tester::test::NodeTester;
     use crate::core::util::test::test_manager::test::TestManager;
+    use ahash::HashMap;
+    use log::{debug, error, info};
+    use std::fs;
+    use std::ops::Deref;
+    use std::sync::Arc;
+
+    use tokio::sync::RwLock;
 
     // fn init_testlog() {
     //     let _ = pretty_env_logger::try_init();
@@ -3295,75 +3358,6 @@ mod tests {
         let _ = fs::remove_file(filepath);
     }
 
-    #[ignore]
-    #[tokio::test]
-    #[serial_test::serial]
-    async fn add_block_from_mempool_test() {
-        // pretty_env_logger::init();
-        let mut t = TestManager::default();
-        let block1;
-        let mut parent_block_hash;
-        let mut parent_block_id;
-        let mut ts;
-
-        // block 1
-        t.initialize(100, 1_000_000_000).await;
-
-        {
-            let blockchain = t.blockchain_lock.write().await;
-
-            block1 = blockchain.get_latest_block().unwrap();
-            parent_block_hash = block1.hash;
-            parent_block_id = block1.id;
-            ts = block1.timestamp;
-        }
-
-        for _i in 0..50 {
-            // block 2
-            let mut block2 = t
-                .create_block(
-                    parent_block_hash, // hash of parent block
-                    ts + 120000,       // timestamp
-                    10,                // num transactions
-                    0,                 // amount
-                    0,                 // fee
-                    false,             // mine golden ticket
-                )
-                .await;
-            block2.id = parent_block_id + 1;
-            info!("block generate : {:?}", block2.id);
-            block2.generate(); // generate hashes
-            block2.sign(&t.wallet_lock.read().await.private_key);
-            parent_block_hash = block2.hash;
-            parent_block_id = block2.id;
-            ts = block2.timestamp;
-
-            let mut mempool = t.mempool_lock.write().await;
-            mempool.add_block(block2);
-        }
-
-        {
-            let configs = t.config_lock.read().await;
-            let mut blockchain = t.blockchain_lock.write().await;
-
-            blockchain
-                .add_blocks_from_mempool(
-                    t.mempool_lock.clone(),
-                    Some(&t.network),
-                    &mut t.storage,
-                    Some(t.sender_to_miner.clone()),
-                    None,
-                    configs.deref(),
-                )
-                .await;
-        }
-
-        {
-            let blockchain = t.blockchain_lock.read().await;
-            assert_eq!(blockchain.blocks.len(), 6);
-        }
-    }
-
     #[tokio::test]
     #[serial_test::serial]
     async fn ghost_chain_hash_test() {
@@ -3417,6 +3411,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn ghost_chain_content_test() {
+        NodeTester::delete_blocks().await.unwrap();
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
@@ -3444,6 +3439,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_fork_id_difference() {
         // pretty_env_logger::init()
+        NodeTester::delete_blocks().await.unwrap();
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
@@ -3470,6 +3466,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_block_generation_without_fees() {
         // pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
@@ -3482,6 +3479,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_block_generation_with_fees() {
         // pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
@@ -3491,85 +3489,603 @@ mod tests {
         tester.wait_till_block_id_with_txs(5, 0, 10).await.unwrap()
     }
 
-    #[ignore]
     #[tokio::test]
     #[serial_test::serial]
-    async fn load_abandoned_block() {
-        pretty_env_logger::init();
-        let block_hash;
-        {
-            let mut tester = NodeTester::default();
-            tester.delete_blocks().await.unwrap();
-            tester
-                .init_with_staking(0, 100, 100000 * NOLAN_PER_SAITO)
-                .await
-                .unwrap();
+    async fn is_golden_ticket_count_valid_test_all_gts() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = true;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
 
-            tester.wait_till_block_id_with_txs(10, 0, 10).await.unwrap();
-            block_hash = tester
-                .routing_thread
-                .blockchain_lock
-                .read()
-                .await
-                .get_latest_block_hash();
-        }
-        // check if there are 100 blocks in disk
-        {
-            let mut result = tokio::fs::read_dir("./data/blocks").await.unwrap();
-            let mut count = 0;
-            loop {
-                let entry = result.next_entry().await;
-                match entry {
-                    Ok(entry) => {
-                        if entry.is_none() {
-                            break;
-                        }
-                        let entry = entry.unwrap();
-                        let file_name = entry.file_name().to_str().unwrap().to_string();
-                        if !file_name.contains(block_hash.to_hex().as_str()) {
-                            // remove all the blocks except the last
-                            info!("removing file : {:?}", file_name);
-                            tokio::fs::remove_file(
-                                ("./data/blocks/".to_string() + file_name.as_str()).as_str(),
-                            )
-                            .await
-                            .unwrap();
-                        }
-                        count += 1;
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
-            }
-            assert_eq!(count, 10);
-        }
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = true;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
 
-        {
-            let mut tester = NodeTester::default();
-            tester.timeout_in_ms = Duration::new(100, 0).as_millis() as u64;
-            tester.init().await.unwrap();
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = true;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
 
-            tester.wait_till_block_id_with_txs(10, 0, 10).await.unwrap();
-        }
-        {
-            let mut result = tokio::fs::read_dir("./data/blocks").await.unwrap();
-            let mut count = 0;
-            loop {
-                let entry = result.next_entry().await;
-                match entry {
-                    Ok(entry) => {
-                        if entry.is_none() {
-                            break;
-                        }
-                        count += 1;
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
-            }
-            assert_eq!(count, 11);
-        }
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = true;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = true;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = true;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], false, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(result);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_no_gts() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = false;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = false;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = false;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], false, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(!result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_gt_in_block_and_in_hand() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = false;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = false;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = true;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], true, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_one_gt() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = false;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = false;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = true;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], false, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(!result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_one_gt_in_hand() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = false;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = false;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = false;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], true, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(!result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_2_gt() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = false;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = true;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = true;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], false, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_faraway_gt() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = true;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = false;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = true;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], false, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(!result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_faraway_gt_with_one_in_hand() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = true;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = false;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = false;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], true, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(!result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_faraway_gt_with_one_in_hand_2() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 10;
+        block.has_golden_ticket = true;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 11;
+        block.has_golden_ticket = true;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 12;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 13;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 14;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 15;
+        block.has_golden_ticket = false;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], true, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_early_blocks() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 1;
+        block.has_golden_ticket = true;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 2;
+        block.has_golden_ticket = true;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 3;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 4;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 5;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 6;
+        block.has_golden_ticket = false;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], false, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(!result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_early_blocks_2() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 1;
+        block.has_golden_ticket = false;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 2;
+        block.has_golden_ticket = false;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 3;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 4;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], false, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(result);
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn is_golden_ticket_count_valid_test_early_blocks_3() {
+        let mut blocks: HashMap<SaitoHash, Block> = Default::default();
+        let mut block = Block::new();
+        block.id = 1;
+        block.has_golden_ticket = true;
+        block.hash = [2; 32];
+        block.previous_block_hash = [1; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 2;
+        block.has_golden_ticket = false;
+        block.hash = [3; 32];
+        block.previous_block_hash = [2; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 3;
+        block.has_golden_ticket = false;
+        block.hash = [4; 32];
+        block.previous_block_hash = [3; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 4;
+        block.has_golden_ticket = false;
+        block.hash = [5; 32];
+        block.previous_block_hash = [4; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 5;
+        block.has_golden_ticket = false;
+        block.hash = [6; 32];
+        block.previous_block_hash = [5; 32];
+        blocks.insert(block.hash, block);
+
+        let mut block = Block::new();
+        block.id = 6;
+        block.has_golden_ticket = false;
+        block.hash = [7; 32];
+        block.previous_block_hash = [6; 32];
+        blocks.insert(block.hash, block);
+
+        let result = is_golden_ticket_count_valid_([7; 32], true, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(!result);
     }
 }
