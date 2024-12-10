@@ -150,16 +150,18 @@ impl Network {
             error!("unknown peer : {:?} disconnected", peer_index);
         }
     }
-    pub async fn handle_new_peer(&mut self, peer_index: u64) {
+    pub async fn handle_new_peer(&mut self, peer_index: u64, ip_addr: Option<String>) {
         // TODO : if an incoming peer is same as static peer, handle the scenario;
         let mut peers = self.peer_lock.write().await;
         if let Some(peer) = peers.find_peer_by_index_mut(peer_index) {
             debug!("static peer : {:?} connected", peer_index);
             peer.peer_status = PeerStatus::Connecting;
+            peer.ip_address = ip_addr;
         } else {
             debug!("new peer added : {:?}", peer_index);
             let mut peer = Peer::new(peer_index);
             peer.peer_status = PeerStatus::Connecting;
+            peer.ip_address = ip_addr;
             peers.index_to_peers.insert(peer_index, peer);
         }
 

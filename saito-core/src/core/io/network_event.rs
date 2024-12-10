@@ -23,7 +23,7 @@ pub enum NetworkEvent {
         peer_index: u64,
     },
     PeerConnectionResult {
-        result: Result<u64, std::io::Error>,
+        result: Result<(u64, Option<String>), std::io::Error>,
     },
     AddStunPeer {
         peer_index: u64,

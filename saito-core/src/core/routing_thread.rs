@@ -349,9 +349,9 @@ impl RoutingThread {
         ghost
     }
 
-    async fn handle_new_peer(&mut self, peer_index: u64) {
+    async fn handle_new_peer(&mut self, peer_index: u64, ip: Option<String>) {
         trace!("handling new peer : {:?}", peer_index);
-        self.network.handle_new_peer(peer_index).await;
+        self.network.handle_new_peer(peer_index, ip).await;
     }
 
     async fn handle_new_stun_peer(&mut self, peer_index: u64, public_key: SaitoPublicKey) {
@@ -668,11 +668,7 @@ impl RoutingThread {
 
             let current_time = self.timer.get_timestamp_in_ms();
 
-            for (peer_index, peer) in peers.index_to_peers.iter_mut() {
-                if peer.public_key.is_none() {
-                    trace!("public key not set yet for peer : {:?}", peer_index);
-                    continue;
-                }
+            for (_, peer) in peers.index_to_peers.iter_mut() {
                 data.push(PeerStateEntry {
                     peer_index: peer.index,
                     public_key: peer.public_key.unwrap_or([0; 33]),
@@ -683,6 +679,8 @@ impl RoutingThread {
                     handshake_limit_exceeded: peer.has_handshake_limit_exceeded(current_time),
                     keylist_limit_exceeded: peer.has_key_list_limit_exceeded(current_time),
                     limited_till: None,
+                    current_time,
+                    peer_address: peer.ip_address.clone().unwrap_or("NA".to_string()),
                 });
             }
             peers
@@ -740,7 +738,8 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
             }
             NetworkEvent::PeerConnectionResult { result } => {
                 if result.is_ok() {
-                    self.handle_new_peer(result.unwrap()).await;
+                    let (peer_index, ip) = result.unwrap();
+                    self.handle_new_peer(peer_index, ip).await;
                     return Some(());
                 }
             }
@@ -974,6 +973,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_ghost_chain_gen() {
         // pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
         tester

@@ -56,6 +56,7 @@ pub struct Peer {
     pub invalid_block_limiter: RateLimiter,
     pub public_key: Option<SaitoPublicKey>,
     pub peer_type: PeerType,
+    pub ip_address: Option<String>,
 }
 
 impl Peer {
@@ -78,6 +79,7 @@ impl Peer {
             invalid_block_limiter: RateLimiter::builder(10, Duration::from_secs(3600)),
             public_key: None,
             peer_type: PeerType::Default,
+            ip_address: None,
         }
     }
 

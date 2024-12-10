@@ -266,8 +266,8 @@ export default class Saito {
         }
     }
 
-    public async processNewPeer(index: bigint, peer_config: any): Promise<void> {
-        return Saito.getLibInstance().process_new_peer(index, peer_config);
+    public async processNewPeer(index: bigint, ip: string): Promise<void> {
+        return Saito.getLibInstance().process_new_peer(index, ip);
     }
 
 

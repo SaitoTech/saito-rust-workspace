@@ -115,3 +115,10 @@ RUST_LOG=debug cargo run
 After completing these steps, the Saito Rust workspace should be up and running on your system. You can modify the
 configs/config.json file as needed to customize your setup. For further assistance, consult the official Saito
 documentation or reach out to the Saito community.
+
+# Building and Linking WASM libs
+
+You can run "[build_link_npms.sh](scripts/build_link_npms.sh)" inside the workspace directory to automatically build and
+link saito npm packages.
+
+Please check the [LINK.md](LINK.md) and [LINK_MAC.md](LINK_MAC.md) for more details.

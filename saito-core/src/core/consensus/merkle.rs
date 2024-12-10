@@ -493,10 +493,10 @@ mod tests {
             MerkleTree::compute_combined_hash(tx1.hash_for_signature, tx2.hash_for_signature);
 
         dbg!(combined_hash);
-        tx1.hash_for_signature = tx1.hash_for_signature;
+        tx1.hash_for_signature = tx2.hash_for_signature;
         tx1.transaction_type = TransactionType::SPV;
         tx1.txs_replacements = 2;
-        return tx1;
+        tx1
         // spv_tx.transaction_type = TransactionType::SPV;
         // spv_tx.txs_replacements = 1; // Represents the combination of two transactions
         // spv_tx.hash_for_signature = Some(combined_hash);

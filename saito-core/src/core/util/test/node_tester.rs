@@ -163,7 +163,7 @@ pub mod test {
 
             let timer = Timer {
                 time_reader: Arc::new(TestTimeKeeper {}),
-                hasten_multiplier: 1_000_000,
+                hasten_multiplier: 10_000,
                 start_time: TestTimeKeeper {}.get_timestamp_in_ms(),
             };
 
@@ -264,7 +264,7 @@ pub mod test {
                 stat_thread: StatThread {
                     stat_queue: Default::default(),
                     io_interface: Box::new(TestIOHandler {}),
-                    enabled: false,
+                    enabled: true,
                 },
                 timer,
                 receiver_for_router: receiver_in_blockchain,
@@ -295,8 +295,6 @@ pub mod test {
             staking_period: u64,
             additional_funds: Currency,
         ) -> Result<(), Error> {
-            self.delete_blocks().await?;
-
             let public_key = self.get_public_key().await;
             self.set_staking_requirement(staking_requirement, staking_period)
                 .await;
@@ -490,7 +488,7 @@ pub mod test {
             blockchain.social_stake_period = period;
         }
 
-        pub async fn delete_blocks(&self) -> Result<(), Error> {
+        pub async fn delete_blocks() -> Result<(), Error> {
             tokio::fs::create_dir_all("./data/blocks").await?;
             tokio::fs::remove_dir_all("./data/blocks/").await?;
             Ok(())
