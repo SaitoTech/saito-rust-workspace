@@ -1149,11 +1149,22 @@ pub async fn produce_block_with_gt() {
     let mut saito = SAITO.lock().await;
 
     {
+        let blockchain_lock = saito.as_ref().unwrap().blockchain.blockchain_lock.clone();
         let miner = &mut saito.as_mut().unwrap().mining_thread;
-        info!("mining for a gt...");
+        if miner.target == [0; 32] {
+            let blockchain = blockchain_lock.read().await;
+            if let Some(block) = blockchain.get_latest_block() {
+                miner.difficulty = block.difficulty;
+                miner.target = block.hash;
+                miner.target_id = block.id;
+            } else {
+                warn!("couldn't find the latest block");
+            }
+        }
+        info!("mining for a gt. target : {:?}", miner.target.to_hex());
         loop {
             if let Some(gt) = miner.mine().await {
-                info!("gt found");
+                info!("gt found : {:?}", gt.target.to_hex());
                 saito
                     .as_mut()
                     .unwrap()
@@ -1171,12 +1182,21 @@ pub async fn produce_block_with_gt() {
         .consensus_thread
         .timer
         .get_timestamp_in_ms();
-    saito
-        .as_mut()
-        .unwrap()
-        .consensus_thread
-        .produce_block(timestamp, true)
-        .await;
+
+    info!("waiting till a block is produced");
+    for _ in 0..1000 {
+        if saito
+            .as_mut()
+            .unwrap()
+            .consensus_thread
+            .produce_block(timestamp, true, false)
+            .await
+        {
+            info!("produced block with gt");
+            return;
+        }
+    }
+    info!("couldn't produce block");
 }
 
 #[wasm_bindgen]
@@ -1188,12 +1208,20 @@ pub async fn produce_block_without_gt() {
         .consensus_thread
         .timer
         .get_timestamp_in_ms();
-    saito
-        .as_mut()
-        .unwrap()
-        .consensus_thread
-        .produce_block(timestamp, true)
-        .await;
+    info!("waiting till a block is produced");
+    for _ in 0..1000 {
+        if saito
+            .as_mut()
+            .unwrap()
+            .consensus_thread
+            .produce_block(timestamp, true, false)
+            .await
+        {
+            info!("produced block with no gt.");
+            return;
+        }
+    }
+    info!("couldn't produce block");
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
