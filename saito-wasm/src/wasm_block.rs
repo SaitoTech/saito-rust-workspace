@@ -40,86 +40,14 @@ impl WasmBlock {
         array
     }
 
-    #[wasm_bindgen(getter= fee_transaction)]
-    pub fn fee_transaction(&self) -> JsValue {
-        if let Some(tx) = &self.block.cv.fee_transaction {
-            let tx = WasmTransaction::from_transaction(tx.clone());
-            JsValue::from(tx)
-        } else {
-            let tx = WasmTransaction {
-                tx: Transaction::default(),
-            };
-            JsValue::from(tx)
-        }
-    }
-
-    #[wasm_bindgen(getter = it_num)]
-    pub fn it_num(&self) -> u8 {
-        self.block.cv.it_num
-    }
-
-    #[wasm_bindgen(getter = it_index)]
-    pub fn it_index(&self) -> u32 {
-        if let Some(it_index) = self.block.cv.it_index {
-            it_index as u32
-        } else {
-            0
-        }
-    }
-
     #[wasm_bindgen(getter = avg_fee_per_byte)]
     pub fn avg_fee_per_byte(&self) -> u64 {
         self.block.avg_fee_per_byte
     }
 
-    // #[wasm_bindgen(getter = block_payout)]
-    // pub fn get_block_payout(&self) -> Array {
-    //     let mut block_payout: Vec<WasmBlockPayout> = self
-    //         .block
-    //         .cv
-    //         .block_payout
-    //         .iter()
-    //         .map(|bp| WasmBlockPayout::from_block_payout(bp.clone()))
-    //         .collect();
-    //     let array = js_sys::Array::new_with_length(block_payout.len() as u32);
-
-    //     for (i, bpo) in block_payout.drain(..).enumerate() {
-    //         array.set(i as u32, JsValue::from(bpo));
-    //     }
-    //     array
-    // }
-
     #[wasm_bindgen(getter = burnfee)]
     pub fn burnfee(&self) -> u64 {
         self.block.burnfee
-    }
-
-    #[wasm_bindgen(getter = ft_num)]
-    pub fn ft_num(&self) -> u8 {
-        self.block.cv.ft_num
-    }
-
-    #[wasm_bindgen(getter = ft_index)]
-    pub fn ft_index(&self) -> u32 {
-        if let Some(ft_index) = self.block.cv.ft_index {
-            ft_index as u32
-        } else {
-            0
-        }
-    }
-
-    #[wasm_bindgen(getter = gt_num)]
-    pub fn gt_num(&self) -> u8 {
-        self.block.cv.gt_num
-    }
-
-    #[wasm_bindgen(getter = gt_index)]
-    pub fn gt_index(&self) -> u32 {
-        if let Some(gt_index) = self.block.cv.gt_index {
-            gt_index as u32
-        } else {
-            0
-        }
     }
 
     #[wasm_bindgen(getter = total_fees)]
@@ -132,22 +60,6 @@ impl WasmBlock {
         self.block.difficulty
     }
 
-    #[wasm_bindgen(getter = rebroadcasts)]
-    pub fn rebroadcasts(&self) -> Array {
-        let mut txs: Vec<WasmTransaction> = self
-            .block
-            .cv
-            .rebroadcasts
-            .iter()
-            .map(|tx| WasmTransaction::from_transaction(tx.clone()))
-            .collect();
-        let array = js_sys::Array::new_with_length(txs.len() as u32);
-        for (i, tx) in txs.drain(..).enumerate() {
-            array.set(i as u32, JsValue::from(tx));
-        }
-        array
-    }
-
     #[wasm_bindgen(getter = total_rebroadcast_slips)]
     pub fn total_rebroadcast_slips(&self) -> u64 {
         self.block.total_rebroadcast_slips
@@ -156,16 +68,6 @@ impl WasmBlock {
     #[wasm_bindgen(getter = total_rebroadcast_nolan)]
     pub fn total_rebroadcast_nolan(&self) -> u64 {
         self.block.total_rebroadcast_nolan
-    }
-
-    #[wasm_bindgen(getter = total_rebroadcast_fees_nolan)]
-    pub fn total_rebroadcast_fees_nolan(&self) -> Currency {
-        self.block.cv.total_rebroadcast_fees_nolan
-    }
-
-    #[wasm_bindgen(getter = total_rebroadcast_staking_payouts_nolan)]
-    pub fn total_rebroadcast_staking_payouts_nolan(&self) -> Currency {
-        self.block.cv.total_rebroadcast_staking_payouts_nolan
     }
 
     #[wasm_bindgen(getter =  avg_nolan_rebroadcast_per_block)]
@@ -244,12 +146,6 @@ impl WasmBlock {
     #[wasm_bindgen(getter = force_loaded)]
     pub fn force_loaded(&self) -> bool {
         self.block.force_loaded
-    }
-
-    #[wasm_bindgen(getter = cv)]
-    pub fn get_cv(&self) -> JsValue {
-        let cv = &self.block.cv;
-        JsValue::from(WasmConsensusValues::from_cv(cv.clone()))
     }
 
     #[wasm_bindgen(getter = file_name)]
