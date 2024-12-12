@@ -11,7 +11,7 @@ use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::mempool::Mempool;
 use saito_core::core::consensus::peers::peer_collection::PeerCollection;
-use saito_core::core::consensus::transaction::Transaction;
+use saito_core::core::consensus::transaction::{Transaction, TransactionType};
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
@@ -1176,6 +1176,30 @@ pub async fn produce_block_with_gt() {
         }
     }
 
+    {
+        let blockchain_lock = saito.as_ref().unwrap().blockchain.blockchain_lock.clone();
+        let mempool_lock = saito
+            .as_ref()
+            .unwrap()
+            .consensus_thread
+            .mempool_lock
+            .clone();
+        let wallet_lock = saito.as_ref().unwrap().wallet.wallet.clone();
+        let blockchain = blockchain_lock.read().await;
+        let mut mempool = mempool_lock.write().await;
+        let mut wallet = wallet_lock.write().await;
+        let public_key = wallet.public_key;
+        if let Ok(mut tx) = Transaction::create(&mut wallet, public_key, 0, 0, false, None) {
+            info!("created tx");
+            tx.transaction_type = TransactionType::Vip;
+            tx.sign(&wallet.private_key);
+            info!("tx signed");
+            drop(wallet);
+            mempool.add_transaction_if_validates(tx, &blockchain).await;
+            info!("Tx added to mempool");
+        }
+    }
+
     let timestamp = saito
         .as_ref()
         .unwrap()
@@ -1202,6 +1226,26 @@ pub async fn produce_block_with_gt() {
 #[wasm_bindgen]
 pub async fn produce_block_without_gt() {
     let mut saito = SAITO.lock().await;
+
+    {
+        let blockchain_lock = saito.as_ref().unwrap().blockchain.blockchain_lock.clone();
+        let mempool_lock = saito
+            .as_ref()
+            .unwrap()
+            .consensus_thread
+            .mempool_lock
+            .clone();
+        let wallet_lock = saito.as_ref().unwrap().wallet.wallet.clone();
+        let blockchain = blockchain_lock.read().await;
+        let mut mempool = mempool_lock.write().await;
+        let mut wallet = wallet_lock.write().await;
+        let public_key = wallet.public_key;
+        if let Ok(mut tx) = Transaction::create(&mut wallet, public_key, 0, 0, false, None) {
+            tx.sign(&wallet.private_key);
+            mempool.add_transaction_if_validates(tx, &blockchain).await;
+            info!("Tx added to mempool");
+        }
+    }
     let timestamp = saito
         .as_ref()
         .unwrap()
