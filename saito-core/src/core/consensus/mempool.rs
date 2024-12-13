@@ -159,7 +159,7 @@ impl Mempool {
 
     pub async fn bundle_block(
         &mut self,
-        blockchain: &mut Blockchain,
+        blockchain: &Blockchain,
         current_timestamp: Timestamp,
         gt_tx: Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),

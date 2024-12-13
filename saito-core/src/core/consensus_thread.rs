@@ -5,7 +5,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use log::{debug, info, trace};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockchain::Blockchain;
@@ -124,18 +124,52 @@ impl ConsensusThread {
             info!("added issuance init tx for : {:?}", tx.signature.to_hex());
         }
     }
-
     pub async fn produce_block(
         &mut self,
         timestamp: Timestamp,
+        gt_result: Option<&Transaction>,
+        mempool: &mut Mempool,
+        blockchain: &Blockchain,
+        configs: &(dyn Configuration + Send + Sync),
+    ) -> Option<Block> {
+        trace!("locking blockchain 3");
+
+        self.block_producing_timer = 0;
+
+        let block = mempool
+            .bundle_block(
+                blockchain,
+                timestamp,
+                gt_result.cloned(),
+                configs,
+                &self.storage,
+            )
+            .await;
+        if let Some(block) = block {
+            trace!(
+                "mempool size after creating block : {:?}",
+                mempool.transactions.len()
+            );
+
+            self.txs_for_mempool.clear();
+
+            return Some(block);
+        }
+        None
+    }
+    pub async fn bundle_block(
+        &mut self,
+        timestamp: Timestamp,
         produce_without_limits: bool,
-        propagate_gt: bool,
     ) -> bool {
-        let configs = self.network.config_lock.read().await;
+        let config_lock = self.config_lock.clone();
+        let configs = config_lock.read().await;
 
         trace!("locking blockchain 3");
-        let mut blockchain = self.blockchain_lock.write().await;
-        let mut mempool = self.mempool_lock.write().await;
+        let blockchain_lock = self.blockchain_lock.clone();
+        let mempool_lock = self.mempool_lock.clone();
+        let mut blockchain = blockchain_lock.write().await;
+        let mut mempool = mempool_lock.write().await;
 
         if !self.txs_for_mempool.is_empty() {
             for tx in self.txs_for_mempool.iter() {
@@ -164,13 +198,13 @@ impl ConsensusThread {
         if (produce_without_limits || (!configs.is_browser() && !configs.is_spv_mode()))
             && !blockchain.blocks.is_empty()
         {
-            block = mempool
-                .bundle_block(
-                    blockchain.deref_mut(),
+            block = self
+                .produce_block(
                     timestamp,
-                    gt_result.clone(),
+                    gt_result.as_ref(),
+                    &mut mempool,
+                    &blockchain,
                     configs.deref(),
-                    &self.storage,
                 )
                 .await;
         } else {
@@ -191,7 +225,6 @@ impl ConsensusThread {
             );
 
             mempool.add_block(block);
-            self.txs_for_mempool.clear();
             // dropping the lock here since blockchain needs the write lock to add blocks
             drop(mempool);
             self.stats.blocks_created.increment();
@@ -208,7 +241,7 @@ impl ConsensusThread {
 
             debug!("blocks added to blockchain");
             return true;
-        } else if propagate_gt {
+        } else {
             // route messages to peers
             for tx in self.txs_for_mempool.drain(..) {
                 self.network.propagate_transaction(&tx).await;
@@ -229,8 +262,6 @@ impl ConsensusThread {
                 *propagated = true;
             }
             return true;
-        } else {
-            debug!("block not created");
         }
         trace!("releasing blockchain 3");
         false
@@ -302,7 +333,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         // generate blocks
         self.block_producing_timer += duration_value;
         if self.produce_blocks_by_timer && self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
-            self.produce_block(timestamp, false, true).await;
+            self.bundle_block(timestamp, false).await;
 
             work_done = true;
         }
