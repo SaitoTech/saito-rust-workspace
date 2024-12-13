@@ -1145,7 +1145,7 @@ pub async fn disable_producing_blocks_by_timer() {
     // saito.as_mut().unwrap().mining_thread.enabled = true;
 }
 #[wasm_bindgen]
-pub async fn produce_block_with_gt() {
+pub async fn produce_block_with_gt() -> bool {
     let mut saito = SAITO.lock().await;
 
     {
@@ -1217,14 +1217,15 @@ pub async fn produce_block_with_gt() {
             .await
         {
             info!("produced block with gt");
-            return;
+            return true;
         }
     }
     info!("couldn't produce block");
+    false
 }
 
 #[wasm_bindgen]
-pub async fn produce_block_without_gt() {
+pub async fn produce_block_without_gt() -> bool {
     let mut saito = SAITO.lock().await;
 
     {
@@ -1241,7 +1242,11 @@ pub async fn produce_block_without_gt() {
         let mut wallet = wallet_lock.write().await;
         let public_key = wallet.public_key;
         if let Ok(mut tx) = Transaction::create(&mut wallet, public_key, 0, 0, false, None) {
+            info!("created tx");
+            tx.transaction_type = TransactionType::Vip;
             tx.sign(&wallet.private_key);
+            info!("tx signed");
+            drop(wallet);
             mempool.add_transaction_if_validates(tx, &blockchain).await;
             info!("Tx added to mempool");
         }
@@ -1262,10 +1267,11 @@ pub async fn produce_block_without_gt() {
             .await
         {
             info!("produced block with no gt.");
-            return;
+            return true;
         }
     }
     info!("couldn't produce block");
+    false
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {
