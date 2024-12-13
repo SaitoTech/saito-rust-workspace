@@ -5,11 +5,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 use saito_core::core::consensus::block::{Block, BlockType};
-use saito_core::core::consensus::transaction::Transaction;
 use saito_core::core::defs::{Currency, PrintForLog, SaitoPublicKey, Timestamp};
 
 use crate::saitowasm::{string_to_hex, string_to_key};
-use crate::wasm_consensus_values::WasmConsensusValues;
 use crate::wasm_transaction::WasmTransaction;
 
 #[wasm_bindgen]
