@@ -72,7 +72,7 @@ impl MiningThread {
                 gt.public_key.to_base58(),
                 hash(&gt.serialize_for_net()).to_hex(),
                 self.difficulty,
-                (self.timer.get_timestamp_in_ms()-self.mining_start)
+                self.timer.get_timestamp_in_ms()-self.mining_start
             );
 
             return Some(gt);
