@@ -31,26 +31,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
                 timestamp: this.instance.timestamp,
                 creator: this.instance.creator,
                 file_name: this.instance.file_name,
-                cv: {
-                    fee_transaction: this.fee_transaction,
-                    ft_num: this.instance.ft_num,
-                    ft_index: this.instance.ft_index,
-                    gt_index: this.instance.gt_index,
-                    it_index: this.instance.it_index,
-                    it_num: this.instance.it_num,
-                    total_rebroadcast_slips: this.instance.total_rebroadcast_slips,
-                    total_rebroadcast_nolan: this.instance.total_rebroadcast_nolan,
-                    total_rebroadcast_fees_nolan: this.instance.total_rebroadcast_fees_nolan,
-                    total_rebroadcast_staking_payouts_nolan: this.instance.total_rebroadcast_staking_payouts_nolan,
-                    avg_total_fees: this.instance.avg_total_fees,
-                    avg_fee_per_byte: this.instance.avg_fee_per_byte,
-                    avg_nolan_rebroadcast_per_block: this.instance.avg_nolan_rebroadcast_per_block,
-                    rebroadcast_hash: this.instance.rebroadcast_hash,
-                    rebroadcasts: this.instance.rebroadcasts,
-                    difficulty: this.instance.difficulty,
-                    burnfee: this.instance.burnfee,
-                    total_fees: this.instance.total_fees,
-                },
                 has_keylist_txs: this.instance.has_keylist_txs,
                 graveyard: this.instance.graveyard,
                 treasury: this.instance.treasury
@@ -86,11 +66,7 @@ export default class Block extends WasmWrapper<WasmBlock> {
         return this.instance.type;
     }
 
-    public get fee_transaction(): Transaction {
-        return Saito.getInstance().factory.createTransaction(this.instance.fee_transaction);
-    }
-
-
+  
     public get previousBlockHash(): string {
         return this.instance.previous_block_hash;
     }
@@ -159,25 +135,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
         return this.instance.force_loaded;
     }
 
-    public get ftIndex(): number {
-        return this.instance.ft_index;
-    }
-
-    public get ftNum(): number {
-        return this.instance.ft_num;
-    }
-
-    public get gtIndex(): number {
-        return this.instance.gt_index;
-    }
-
-    public get gtNum(): number {
-        return this.instance.gt_num;
-    }
-
-    public get itIndex(): number {
-        return this.instance.it_index;
-    }
 
     public get inLongestChain(): boolean {
         return this.instance.in_longest_chain;
@@ -185,14 +142,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
 
     public get rebroadcastHash(): string {
         return this.instance.rebroadcast_hash;
-    }
-
-    public get it_num(): number {
-        return this.instance.it_num;
-    }
-
-    public get totalRebroadcastFeesNolan(): bigint {
-        return this.instance.total_rebroadcast_fees_nolan;
     }
 
     public get totalRebroadcastNolan(): bigint {
@@ -203,9 +152,6 @@ export default class Block extends WasmWrapper<WasmBlock> {
         return this.instance.total_rebroadcast_slips;
     }
 
-    public get totalRebroadcastStakingPayoutsNolan(): bigint {
-        return this.instance.total_rebroadcast_staking_payouts_nolan;
-    }
 
     public get totalFeesNew(): bigint {
         return this.instance.total_fees_new;

@@ -442,7 +442,7 @@ impl Block {
     pub async fn create(
         transactions: &mut AHashMap<SaitoSignature, Transaction>,
         previous_block_hash: SaitoHash,
-        blockchain: &mut Blockchain,
+        blockchain: &Blockchain,
         current_timestamp: Timestamp,
         public_key: &SaitoPublicKey,
         private_key: &SaitoPrivateKey,

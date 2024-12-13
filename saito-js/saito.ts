@@ -524,19 +524,21 @@ export default class Saito {
         }
     }
 
-    public async produceBlockWithGt() {
+    public async produceBlockWithGt(): Promise<boolean> {
         try {
             return Saito.getLibInstance().produce_block_with_gt();
         } catch (e) {
             console.error(e);
+            return false;
         }
     }
 
-    public async produceBlockWithoutGt() {
+    public async produceBlockWithoutGt(): Promise<boolean> {
         try {
             return Saito.getLibInstance().produce_block_without_gt();
         } catch (error) {
             console.error(error);
+            return false;
         }
     }
 }

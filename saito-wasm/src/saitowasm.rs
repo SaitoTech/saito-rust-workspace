@@ -1,4 +1,5 @@
 use std::io::{Error, ErrorKind};
+use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,7 +12,7 @@ use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::mempool::Mempool;
 use saito_core::core::consensus::peers::peer_collection::PeerCollection;
-use saito_core::core::consensus::transaction::Transaction;
+use saito_core::core::consensus::transaction::{Transaction, TransactionType};
 use saito_core::core::consensus::wallet::Wallet;
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
@@ -1145,23 +1146,69 @@ pub async fn disable_producing_blocks_by_timer() {
     // saito.as_mut().unwrap().mining_thread.enabled = true;
 }
 #[wasm_bindgen]
-pub async fn produce_block_with_gt() {
+pub async fn produce_block_with_gt() -> bool {
     let mut saito = SAITO.lock().await;
+
+    let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
+    let blockchain_lock = saito.as_ref().unwrap().blockchain.blockchain_lock.clone();
+    let mempool_lock = saito
+        .as_ref()
+        .unwrap()
+        .consensus_thread
+        .mempool_lock
+        .clone();
+    let wallet_lock = saito.as_ref().unwrap().wallet.wallet.clone();
+
+    let configs = config_lock.read().await;
+    let blockchain = blockchain_lock.read().await;
+    let mut mempool = mempool_lock.write().await;
+    let public_key;
+    let private_key;
+    {
+        let wallet = wallet_lock.read().await;
+        public_key = wallet.public_key;
+        private_key = wallet.private_key;
+    }
+
+    let gt_tx: Transaction;
 
     {
         let miner = &mut saito.as_mut().unwrap().mining_thread;
-        info!("mining for a gt...");
+        if miner.target == [0; 32] {
+            let blockchain = blockchain_lock.read().await;
+            if let Some(block) = blockchain.get_latest_block() {
+                miner.difficulty = block.difficulty;
+                miner.target = block.hash;
+                miner.target_id = block.id;
+            } else {
+                warn!("couldn't find the latest block");
+            }
+        }
+        info!("mining for a gt. target : {:?}", miner.target.to_hex());
+
         loop {
             if let Some(gt) = miner.mine().await {
-                info!("gt found");
-                saito
-                    .as_mut()
-                    .unwrap()
-                    .consensus_thread
-                    .add_gt_to_mempool(gt)
-                    .await;
+                info!("gt found : {:?}", gt.target.to_hex());
+
+                let transaction =
+                    Wallet::create_golden_ticket_transaction(gt, &public_key, &private_key).await;
+
+                gt_tx = transaction;
                 break;
             }
+        }
+    }
+
+    {
+        let mut wallet = wallet_lock.write().await;
+        if let Ok(mut tx) = Transaction::create(&mut wallet, public_key, 0, 0, false, None) {
+            drop(wallet);
+            info!("created tx");
+            tx.transaction_type = TransactionType::Vip;
+            tx.sign(&private_key);
+            info!("tx signed");
+            mempool.add_transaction_if_validates(tx, &blockchain).await;
+            info!("Tx added to mempool");
         }
     }
 
@@ -1171,29 +1218,120 @@ pub async fn produce_block_with_gt() {
         .consensus_thread
         .timer
         .get_timestamp_in_ms();
-    saito
-        .as_mut()
-        .unwrap()
-        .consensus_thread
-        .produce_block(timestamp, true)
-        .await;
+
+    info!("waiting till a block is produced");
+    for _ in 0..1000 {
+        if let Some(block) = saito
+            .as_mut()
+            .unwrap()
+            .consensus_thread
+            .produce_block(
+                timestamp,
+                Some(&gt_tx),
+                mempool.deref_mut(),
+                blockchain.deref(),
+                configs.deref(),
+            )
+            .await
+        {
+            info!("produced block with gt");
+            drop(mempool);
+            drop(blockchain);
+            drop(configs);
+            saito
+                .as_mut()
+                .unwrap()
+                .consensus_thread
+                .process_event(ConsensusEvent::BlockFetched {
+                    peer_index: 0,
+                    block,
+                })
+                .await;
+            return true;
+        }
+    }
+    warn!("couldn't produce block");
+    false
 }
 
 #[wasm_bindgen]
-pub async fn produce_block_without_gt() {
+pub async fn produce_block_without_gt() -> bool {
     let mut saito = SAITO.lock().await;
+
+    let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
+    let blockchain_lock = saito.as_ref().unwrap().blockchain.blockchain_lock.clone();
+    let mempool_lock = saito
+        .as_ref()
+        .unwrap()
+        .consensus_thread
+        .mempool_lock
+        .clone();
+    let wallet_lock = saito.as_ref().unwrap().wallet.wallet.clone();
+
+    let configs = config_lock.read().await;
+    let blockchain = blockchain_lock.read().await;
+    let mut mempool = mempool_lock.write().await;
+    let public_key;
+    let private_key;
+    {
+        let wallet = wallet_lock.read().await;
+        public_key = wallet.public_key;
+        private_key = wallet.private_key;
+    }
+
+    {
+        let mut wallet = wallet_lock.write().await;
+        if let Ok(mut tx) = Transaction::create(&mut wallet, public_key, 0, 0, false, None) {
+            drop(wallet);
+            info!("created tx");
+            tx.transaction_type = TransactionType::Vip;
+            tx.sign(&private_key);
+            info!("tx signed");
+            mempool.add_transaction_if_validates(tx, &blockchain).await;
+            info!("Tx added to mempool");
+        }
+    }
+
     let timestamp = saito
         .as_ref()
         .unwrap()
         .consensus_thread
         .timer
         .get_timestamp_in_ms();
-    saito
-        .as_mut()
-        .unwrap()
-        .consensus_thread
-        .produce_block(timestamp, true)
-        .await;
+
+    info!("waiting till a block is produced");
+    for _ in 0..1000 {
+        if let Some(block) = saito
+            .as_mut()
+            .unwrap()
+            .consensus_thread
+            .produce_block(
+                timestamp,
+                None,
+                mempool.deref_mut(),
+                blockchain.deref(),
+                configs.deref(),
+            )
+            .await
+        {
+            info!("produced block with gt");
+            drop(mempool);
+            drop(blockchain);
+            drop(configs);
+            saito
+                .as_mut()
+                .unwrap()
+                .consensus_thread
+                .process_event(ConsensusEvent::BlockFetched {
+                    peer_index: 0,
+                    block,
+                })
+                .await;
+            return true;
+        }
+    }
+    warn!("couldn't produce block");
+    false
 }
 
 pub fn generate_keys_wasm() -> (SaitoPublicKey, SaitoPrivateKey) {

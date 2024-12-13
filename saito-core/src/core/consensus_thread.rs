@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -124,13 +124,52 @@ impl ConsensusThread {
             info!("added issuance init tx for : {:?}", tx.signature.to_hex());
         }
     }
+    pub async fn produce_block(
+        &mut self,
+        timestamp: Timestamp,
+        gt_result: Option<&Transaction>,
+        mempool: &mut Mempool,
+        blockchain: &Blockchain,
+        configs: &(dyn Configuration + Send + Sync),
+    ) -> Option<Block> {
+        trace!("locking blockchain 3");
 
-    pub async fn produce_block(&mut self, timestamp: Timestamp, produce_without_limits: bool) {
-        let configs = self.network.config_lock.read().await;
+        self.block_producing_timer = 0;
+
+        let block = mempool
+            .bundle_block(
+                blockchain,
+                timestamp,
+                gt_result.cloned(),
+                configs,
+                &self.storage,
+            )
+            .await;
+        if let Some(block) = block {
+            trace!(
+                "mempool size after creating block : {:?}",
+                mempool.transactions.len()
+            );
+
+            self.txs_for_mempool.clear();
+
+            return Some(block);
+        }
+        None
+    }
+    pub async fn bundle_block(
+        &mut self,
+        timestamp: Timestamp,
+        produce_without_limits: bool,
+    ) -> bool {
+        let config_lock = self.config_lock.clone();
+        let configs = config_lock.read().await;
 
         trace!("locking blockchain 3");
-        let mut blockchain = self.blockchain_lock.write().await;
-        let mut mempool = self.mempool_lock.write().await;
+        let blockchain_lock = self.blockchain_lock.clone();
+        let mempool_lock = self.mempool_lock.clone();
+        let mut blockchain = blockchain_lock.write().await;
+        let mut mempool = mempool_lock.write().await;
 
         if !self.txs_for_mempool.is_empty() {
             for tx in self.txs_for_mempool.iter() {
@@ -155,22 +194,24 @@ impl ConsensusThread {
                 gt_propagated = *propagated;
             }
         }
-
         let mut block = None;
         if (produce_without_limits || (!configs.is_browser() && !configs.is_spv_mode()))
             && !blockchain.blocks.is_empty()
         {
-            block = mempool
-                .bundle_block(
-                    blockchain.deref_mut(),
+            block = self
+                .produce_block(
                     timestamp,
-                    gt_result.clone(),
+                    gt_result.as_ref(),
+                    &mut mempool,
+                    &blockchain,
                     configs.deref(),
-                    &self.storage,
                 )
                 .await;
         } else {
-            trace!("skipped bundling block. : produce_without_limits = {:?}, is_browser : {:?} block_count : {:?}", produce_without_limits, !configs.is_browser() && !configs.is_spv_mode(),blockchain.blocks.len());
+            debug!("skipped bundling block. : produce_without_limits = {:?}, is_browser : {:?} block_count : {:?}",
+                produce_without_limits,
+                !configs.is_browser() && !configs.is_spv_mode(),
+                blockchain.blocks.len());
         }
         if let Some(block) = block {
             debug!(
@@ -184,7 +225,6 @@ impl ConsensusThread {
             );
 
             mempool.add_block(block);
-            self.txs_for_mempool.clear();
             // dropping the lock here since blockchain needs the write lock to add blocks
             drop(mempool);
             self.stats.blocks_created.increment();
@@ -200,6 +240,7 @@ impl ConsensusThread {
                 .await;
 
             debug!("blocks added to blockchain");
+            return true;
         } else {
             // route messages to peers
             for tx in self.txs_for_mempool.drain(..) {
@@ -220,8 +261,10 @@ impl ConsensusThread {
                     .unwrap();
                 *propagated = true;
             }
+            return true;
         }
         trace!("releasing blockchain 3");
+        false
     }
 
     async fn produce_genesis_block(&mut self, timestamp: Timestamp) {
@@ -290,7 +333,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         // generate blocks
         self.block_producing_timer += duration_value;
         if self.produce_blocks_by_timer && self.block_producing_timer >= BLOCK_PRODUCING_TIMER {
-            self.produce_block(timestamp, false).await;
+            self.bundle_block(timestamp, false).await;
 
             work_done = true;
         }
@@ -512,7 +555,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     blockchain.get_latest_block_id(),
                     blockchain.blocks.iter().filter(|(_hash, block)| { block.block_type == BlockType::Full }).count(),
                     blockchain.blocks.iter().map(|(_hash, block)| { block.transactions.len() }).sum::<usize>()
-                    );
+                );
             }
             trace!("releasing blockchain 5");
             self.stat_sender.send(stat).await.unwrap();
