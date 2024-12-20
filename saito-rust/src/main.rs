@@ -585,7 +585,7 @@ async fn run_node(
     let stat_timer_in_ms;
     let verification_thread_count;
     let fetch_batch_size;
-
+    let genesis_period;
     {
         let configs = configs_lock.read().await;
 
@@ -598,6 +598,7 @@ async fn run_node(
         stat_timer_in_ms = configs.get_server_configs().unwrap().stat_timer_in_ms;
         verification_thread_count = configs.get_server_configs().unwrap().verification_threads;
         fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
+        genesis_period = configs.get_consensus_config().unwrap().genesis_period;
         assert_ne!(fetch_batch_size, 0);
     }
 
@@ -629,7 +630,7 @@ async fn run_node(
         hasten_multiplier,
         start_time: TimeKeeper {}.get_timestamp_in_ms(),
     };
-    let context = Context::new(configs_lock.clone(), wallet_lock);
+    let context = Context::new(configs_lock.clone(), wallet_lock, genesis_period);
 
     let peers_lock = Arc::new(RwLock::new(PeerCollection::default()));
 
@@ -773,7 +774,16 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(100);
         Wallet::load(&mut wallet, &(RustIOHandler::new(sender, 1))).await;
     }
-    let context = Context::new(configs_clone.clone(), wallet);
+    let context = Context::new(
+        configs_clone.clone(),
+        wallet,
+        configs_clone
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .genesis_period,
+    );
 
     let (sender_to_network_controller, _receiver_in_network_controller) =
         tokio::sync::mpsc::channel::<IoEvent>(100000);

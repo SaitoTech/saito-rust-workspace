@@ -11,15 +11,14 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
 use crate::core::consensus::block::{Block, BlockType};
-use crate::core::consensus::blockring::{BlockRing, RING_BUFFER_LENGTH};
+use crate::core::consensus::blockring::BlockRing;
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDATED};
 use crate::core::defs::{
     BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
-    Timestamp, UtxoSet, GENESIS_PERIOD, MAX_STAKER_RECURSION, MIN_GOLDEN_TICKETS_DENOMINATOR,
-    MIN_GOLDEN_TICKETS_NUMERATOR, PRUNE_AFTER_BLOCKS,
+    Timestamp, UtxoSet, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -99,10 +98,10 @@ pub struct Blockchain {
 
 impl Blockchain {
     #[allow(clippy::new_without_default)]
-    pub fn new(wallet_lock: Arc<RwLock<Wallet>>) -> Self {
+    pub fn new(wallet_lock: Arc<RwLock<Wallet>>, genesis_period: BlockId) -> Self {
         Blockchain {
             utxoset: AHashMap::new(),
-            blockring: BlockRing::new(),
+            blockring: BlockRing::new(genesis_period),
             blocks: AHashMap::new(),
             wallet_lock,
             genesis_block_id: 0,
@@ -183,7 +182,13 @@ impl Blockchain {
                     .any(|b| block.previous_block_hash == b.hash);
 
                 return if !previous_block_fetched
-                    && block.id > max(1, self.get_latest_block_id().saturating_sub(GENESIS_PERIOD))
+                    && block.id
+                        > max(
+                            1,
+                            self.get_latest_block_id().saturating_sub(
+                                configs.get_consensus_config().unwrap().genesis_period,
+                            ),
+                        )
                 {
                     const BLOCK_DIFF_BEFORE_FETCHING_CHAIN: BlockId = 1000;
                     if block.id.abs_diff(self.get_latest_block_id())
@@ -543,10 +548,11 @@ impl Blockchain {
         storage: &mut Storage,
         configs: &(dyn Configuration + Send + Sync),
     ) {
-        if self.get_latest_block_id() > GENESIS_PERIOD {
+        if self.get_latest_block_id() > configs.get_consensus_config().unwrap().genesis_period {
             if let Some(pruned_block_hash) =
                 self.blockring.get_longest_chain_block_hash_at_block_id(
-                    self.get_latest_block_id() - GENESIS_PERIOD,
+                    self.get_latest_block_id()
+                        - configs.get_consensus_config().unwrap().genesis_period,
                 )
             {
                 let block = self.get_mut_block(&pruned_block_hash).unwrap();
@@ -1353,9 +1359,13 @@ impl Blockchain {
             .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_spv_mode())
             .await;
 
-        let latest_block_id = block.id;
+        let latest_block_id: BlockId = block.id;
 
-        for i in 1..MAX_STAKER_RECURSION {
+        for i in 1..configs
+            .get_consensus_config()
+            .unwrap()
+            .max_staker_recursions
+        {
             if i >= latest_block_id {
                 break;
             }
@@ -1488,7 +1498,7 @@ impl Blockchain {
                 "last block id : {:?} is later than this block id : {:?}. skipping reorg",
                 self.last_block_id, block_id
             );
-            self.downgrade_blockchain_data(configs.is_spv_mode()).await;
+            self.downgrade_blockchain_data(configs).await;
             return true;
         }
 
@@ -1510,7 +1520,7 @@ impl Blockchain {
             }
 
             // update genesis period, purge old data
-            wallet_updated |= self.update_genesis_period(storage).await;
+            wallet_updated |= self.update_genesis_period(storage, configs).await;
 
             // generate fork_id
             if let Some(fork_id) = self.generate_fork_id(block_id) {
@@ -1525,12 +1535,16 @@ impl Blockchain {
             }
         }
 
-        self.downgrade_blockchain_data(configs.is_spv_mode()).await;
+        self.downgrade_blockchain_data(configs).await;
 
         wallet_updated
     }
 
-    async fn update_genesis_period(&mut self, storage: &Storage) -> WalletUpdateStatus {
+    async fn update_genesis_period(
+        &mut self,
+        storage: &Storage,
+        configs: &(dyn Configuration + Send + Sync),
+    ) -> WalletUpdateStatus {
         // we need to make sure this is not a random block that is disconnected
         // from our previous genesis_id. If there is no connection between it
         // and us, then we cannot delete anything as otherwise the provision of
@@ -1540,10 +1554,12 @@ impl Blockchain {
         // so we check that our block is the head of the longest-chain and only
         // update the genesis period when that is the case.
         let latest_block_id = self.get_latest_block_id();
-        if latest_block_id >= ((GENESIS_PERIOD * 2) + 1) {
+        if latest_block_id >= ((configs.get_consensus_config().unwrap().genesis_period * 2) + 1) {
             // prune blocks
-            let purge_bid = latest_block_id - (GENESIS_PERIOD * 2);
-            self.genesis_block_id = latest_block_id - GENESIS_PERIOD;
+            let purge_bid =
+                latest_block_id - (configs.get_consensus_config().unwrap().genesis_period * 2);
+            self.genesis_block_id =
+                latest_block_id - configs.get_consensus_config().unwrap().genesis_period;
             debug!("genesis block id set as : {:?}", self.genesis_block_id);
 
             // in either case, we are OK to throw out everything below the
@@ -1629,12 +1645,13 @@ impl Blockchain {
         wallet_update_status
     }
 
-    async fn downgrade_blockchain_data(&mut self, is_spv: bool) {
+    async fn downgrade_blockchain_data(&mut self, configs: &(dyn Configuration + Send + Sync)) {
         // downgrade blocks still on the chain
-        if PRUNE_AFTER_BLOCKS > self.get_latest_block_id() {
+        if configs.get_consensus_config().unwrap().prune_after_blocks > self.get_latest_block_id() {
             return;
         }
-        let prune_blocks_at_block_id = self.get_latest_block_id() - PRUNE_AFTER_BLOCKS;
+        let prune_blocks_at_block_id =
+            self.get_latest_block_id() - configs.get_consensus_config().unwrap().prune_after_blocks;
         let mut block_hashes_copy: Vec<SaitoHash> = vec![];
 
         {
@@ -1653,7 +1670,7 @@ impl Blockchain {
                 if let Some(block) = block {
                     if block.safe_to_prune_transactions {
                         block
-                            .downgrade_block_to_block_type(BlockType::Pruned, is_spv)
+                            .downgrade_block_to_block_type(BlockType::Pruned, configs.is_spv_mode())
                             .await;
                     }
                 } else {
@@ -1848,7 +1865,7 @@ impl Blockchain {
             previous_block_hash.to_hex(),
             ts
         );
-
+        let ring_buffer_size = self.blockring.get_ring_buffer_size();
         let mut block = Block::new();
         block.id = id;
         block.previous_block_hash = previous_block_hash;
@@ -1864,8 +1881,8 @@ impl Blockchain {
         }
         if !self.blockring.contains_block_hash_at_block_id(id, hash) {
             self.blockring.add_block(&block);
-            self.blockring.lc_pos = Some((id % RING_BUFFER_LENGTH) as usize);
-            self.blockring.ring[(id % RING_BUFFER_LENGTH) as usize].lc_pos = Some(0);
+            self.blockring.lc_pos = Some((id % ring_buffer_size) as usize);
+            self.blockring.ring[(id % ring_buffer_size) as usize].lc_pos = Some(0);
         } else {
             debug!("didn't add ghost block : {:?}-{:?}", id, hash.to_hex());
         }
@@ -2061,7 +2078,7 @@ mod tests {
         let keys = generate_keys();
 
         let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
-        let blockchain = Blockchain::new(wallet);
+        let blockchain = Blockchain::new(wallet, 1_000);
 
         assert_eq!(blockchain.fork_id, None);
         assert_eq!(blockchain.genesis_block_id, 0);
@@ -2071,7 +2088,7 @@ mod tests {
     async fn test_add_block() {
         let keys = generate_keys();
         let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
-        let blockchain = Blockchain::new(wallet);
+        let blockchain = Blockchain::new(wallet, 1_000);
 
         assert_eq!(blockchain.fork_id, None);
         assert_eq!(blockchain.genesis_block_id, 0);

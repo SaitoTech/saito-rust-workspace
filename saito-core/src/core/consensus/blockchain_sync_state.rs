@@ -473,6 +473,7 @@ mod tests {
     use std::ops::Deref;
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn multiple_forks_from_multiple_peers_test() {
         let t = TestManager::default();
         let mut state = BlockchainSyncState::new(10);

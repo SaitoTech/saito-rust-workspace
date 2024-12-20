@@ -7,11 +7,11 @@ use crate::core::defs::{Currency, Timestamp};
 
 //
 // our target blocktime
-#[cfg(not(test))]
-pub const HEARTBEAT: Timestamp = Duration::from_secs(5).as_millis() as Timestamp;
-
-#[cfg(test)]
-pub const HEARTBEAT: Timestamp = Duration::from_millis(100).as_millis() as Timestamp;
+// #[cfg(not(test))]
+// pub const HEARTBEAT: Timestamp = Duration::from_secs(5).as_millis() as Timestamp;
+//
+// #[cfg(test)]
+// pub const HEARTBEAT: Timestamp = Duration::from_millis(100).as_millis() as Timestamp;
 //
 // Burn Fee
 //
@@ -40,6 +40,7 @@ impl BurnFee {
         burn_fee_previous_block: Currency,
         current_block_timestamp_in_ms: Timestamp,
         previous_block_timestamp_in_ms: Timestamp,
+        heartbeat: Timestamp,
     ) -> Currency {
         // impossible if times misordered
         //
@@ -52,7 +53,7 @@ impl BurnFee {
             1,
         );
 
-        if elapsed_time >= (2 * HEARTBEAT) {
+        if elapsed_time >= (2 * heartbeat) {
             return 0;
         }
 
@@ -77,6 +78,7 @@ impl BurnFee {
         burn_fee_previous_block: Currency,
         current_block_timestamp_in_ms: Timestamp,
         previous_block_timestamp_in_ms: Timestamp,
+        heartbeat: Timestamp,
     ) -> Currency {
         debug!("calculate burnfee : previous block burn fee = {:?} current timestamp = {:?} prev block timestamp : {:?}",
             burn_fee_previous_block, current_block_timestamp_in_ms, previous_block_timestamp_in_ms);
@@ -96,7 +98,7 @@ impl BurnFee {
 
         let burn_fee_previous_block_as_float: f64 = burn_fee_previous_block as f64 / 100_000_000.0;
 
-        let res0 = HEARTBEAT as f64 / timestamp_difference as f64;
+        let res0 = heartbeat as f64 / timestamp_difference as f64;
         let res1 = res0.sqrt();
         let res2: f64 = burn_fee_previous_block_as_float * res1;
         let new_burnfee: Currency = (res2 * 100_000_000.0).round() as Currency;
@@ -115,13 +117,18 @@ mod tests {
     fn burnfee_return_work_needed_test() {
         // if our elapsed time is twice our heartbeat, return 0
         assert_eq!(
-            BurnFee::return_routing_work_needed_to_produce_block_in_nolan(10, 2 * HEARTBEAT, 0),
+            BurnFee::return_routing_work_needed_to_produce_block_in_nolan(10, 2 * 2_000, 0, 1_000),
             0
         );
 
         // if their is no difference, the value should be the start value * 10^8
         assert_eq!(
-            BurnFee::return_routing_work_needed_to_produce_block_in_nolan(10_0000_0000, 0, 0),
+            BurnFee::return_routing_work_needed_to_produce_block_in_nolan(
+                10_0000_0000,
+                0,
+                0,
+                1_000
+            ),
             10_000_000_000_000_000_000,
         );
     }
@@ -129,14 +136,15 @@ mod tests {
     #[test]
     fn burnfee_burn_fee_adjustment_test() {
         // if the difference in timestamps is equal to HEARTBEAT, our start value should not change
-        let mut new_start_burnfee = BurnFee::calculate_burnfee_for_block(100_000_000, HEARTBEAT, 0);
+        let mut new_start_burnfee =
+            BurnFee::calculate_burnfee_for_block(100_000_000, 1_000, 0, 1_000);
         assert_eq!(new_start_burnfee, 100_000_000);
 
         // the difference should be the square root of HEARBEAT over the difference in timestamps
-        new_start_burnfee = BurnFee::calculate_burnfee_for_block(100_000_000, HEARTBEAT / 10, 0);
+        new_start_burnfee = BurnFee::calculate_burnfee_for_block(100_000_000, 1_000 / 10, 0, 1_000);
         assert_eq!(
             new_start_burnfee,
-            (100_000_000.0 * (10 as f64).sqrt()).round() as Currency
+            (100_000_000.0 * 10f64.sqrt()).round() as Currency
         );
     }
 
@@ -150,6 +158,7 @@ mod tests {
             burn_fee_previous_block,
             current_block_timestamp,
             previous_block_timestamp,
+            100,
         );
         assert_eq!(burnfee, 150755672);
     }

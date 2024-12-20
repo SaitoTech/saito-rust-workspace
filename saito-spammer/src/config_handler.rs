@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use log::{debug, error};
 use saito_core::core::util::configuration::{
-    BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
+    BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server,
 };
 
 #[derive(Deserialize, Debug, Clone)]
@@ -27,6 +27,7 @@ pub struct SpammerConfigs {
     spammer: Spammer,
     #[serde(skip)]
     lite: bool,
+    consensus: Option<ConsensusConfig>,
 }
 
 impl SpammerConfigs {
@@ -59,6 +60,7 @@ impl SpammerConfigs {
                 stop_after: 0,
             },
             lite: false,
+            consensus: None,
         }
     }
 
@@ -102,6 +104,10 @@ impl Configuration for SpammerConfigs {
         self.server = config.get_server_configs().cloned().unwrap();
         self.peers = config.get_peer_configs().clone();
         self.lite = config.is_spv_mode();
+    }
+
+    fn get_consensus_config(&self) -> Option<&ConsensusConfig> {
+        self.consensus.as_ref()
     }
 }
 

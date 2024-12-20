@@ -28,16 +28,16 @@ pub const NOLAN_PER_SAITO: Currency = 100_000_000;
 
 pub const PROJECT_PUBLIC_KEY: &'static str = "q6TTBeSStCLXEPoS5TUVAxNiGGnRDZQenpvAXXAfTmtA";
 
-#[cfg(test)]
-pub const GENESIS_PERIOD: u64 = 100;
+// #[cfg(test)]
+// pub const GENESIS_PERIOD: u64 = 100;
 
-#[cfg(not(test))]
-pub const GENESIS_PERIOD: u64 = 100_000;
+// #[cfg(not(test))]
+// pub const GENESIS_PERIOD: u64 = 100_000;
 
 // prune blocks from index after N blocks
-pub const PRUNE_AFTER_BLOCKS: u64 = 8;
+// pub const PRUNE_AFTER_BLOCKS: u64 = 8;
 // max recursion when paying stakers -- number of blocks including  -- number of blocks including GTT
-pub const MAX_STAKER_RECURSION: u64 = 3;
+// pub const MAX_STAKER_RECURSION: u64 = 3;
 // max token supply - used in validating block #1
 pub const MAX_TOKEN_SUPPLY: Currency = 1_000_000_000_000_000_000;
 // minimum golden tickets required ( NUMBER_OF_TICKETS / number of preceding blocks )
