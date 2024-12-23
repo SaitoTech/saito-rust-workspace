@@ -25,7 +25,7 @@ pub mod test {
     use crate::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
     use crate::core::stat_thread::StatThread;
     use crate::core::util::configuration::{
-        BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
+        BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server,
     };
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
@@ -50,7 +50,9 @@ pub mod test {
                 .as_millis() as Timestamp
         }
     }
-
+    fn get_default_consensus() -> Option<ConsensusConfig> {
+        Some(ConsensusConfig::default())
+    }
     #[derive(Deserialize, Debug)]
     pub struct TestConfiguration {
         server: Option<Server>,
@@ -58,6 +60,8 @@ pub mod test {
         blockchain: Option<BlockchainConfig>,
         spv_mode: bool,
         browser_mode: bool,
+        #[serde(default = "get_default_consensus")]
+        consensus: Option<ConsensusConfig>,
     }
     impl Configuration for TestConfiguration {
         fn get_server_configs(&self) -> Option<&Server> {
@@ -87,11 +91,15 @@ pub mod test {
         fn replace(&mut self, config: &dyn Configuration) {
             todo!()
         }
+
+        fn get_consensus_config(&self) -> Option<&ConsensusConfig> {
+            self.consensus.as_ref()
+        }
     }
     impl Default for TestConfiguration {
         fn default() -> Self {
             TestConfiguration {
-                server: Option::Some(Server {
+                server: Some(Server {
                     host: "localhost".to_string(),
                     port: 12100,
                     protocol: "http".to_string(),
@@ -111,6 +119,12 @@ pub mod test {
                 blockchain: None,
                 spv_mode: false,
                 browser_mode: false,
+                consensus: Some(ConsensusConfig {
+                    genesis_period: 100,
+                    heartbeat_interval: 5_000,
+                    prune_after_blocks: 8,
+                    max_staker_recursions: 3,
+                }),
             }
         }
     }
@@ -146,7 +160,7 @@ pub mod test {
 
             let peers = Arc::new(RwLock::new(PeerCollection::default()));
             let context = Context {
-                blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
+                blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet.clone(), 100))),
                 mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
                 wallet_lock: wallet.clone(),
                 config_lock: configuration.clone(),

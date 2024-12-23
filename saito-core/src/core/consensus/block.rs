@@ -18,7 +18,7 @@ use crate::core::consensus::slip::{Slip, SlipType, SLIP_SIZE};
 use crate::core::consensus::transaction::{Transaction, TransactionType, TRANSACTION_SIZE};
 use crate::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey,
-    SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION, GENESIS_PERIOD,
+    SaitoSignature, SaitoUTXOSetKey, Timestamp, UtxoSet, BLOCK_FILE_EXTENSION,
 };
 use crate::core::io::storage::Storage;
 use crate::core::util::configuration::Configuration;
@@ -527,7 +527,9 @@ impl Block {
         //
         // consensus values
         //
-        let mut cv: ConsensusValues = block.generate_consensus_values(blockchain, storage).await;
+        let mut cv: ConsensusValues = block
+            .generate_consensus_values(blockchain, storage, configs)
+            .await;
         block.cv = cv.clone();
 
         //
@@ -1202,6 +1204,7 @@ impl Block {
         &self,
         blockchain: &Blockchain,
         storage: &Storage,
+        configs: &(dyn Configuration + Send + Sync),
     ) -> ConsensusValues {
         //
         // we will reference these variables
@@ -1295,6 +1298,7 @@ impl Block {
                 previous_block.burnfee,
                 self.timestamp,
                 previous_block.timestamp,
+                configs.get_consensus_config().unwrap().heartbeat_interval,
             );
 
             //
@@ -1316,10 +1320,12 @@ impl Block {
         //
         // automatic transaction rebroadcasts / atr
         //
-        if self.id > GENESIS_PERIOD {
+        if self.id > configs.get_consensus_config().unwrap().genesis_period {
             if let Some(pruned_block_hash) = blockchain
                 .blockring
-                .get_longest_chain_block_hash_at_block_id(self.id - GENESIS_PERIOD)
+                .get_longest_chain_block_hash_at_block_id(
+                    self.id - configs.get_consensus_config().unwrap().genesis_period,
+                )
             {
                 if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
                     let result = storage
@@ -1346,7 +1352,8 @@ impl Block {
                         // estimate amount looping around chain
                         //
                         let total_utxo_staked =
-                            GENESIS_PERIOD * previous_block_avg_nolan_rebroadcast_per_block;
+                            configs.get_consensus_config().unwrap().genesis_period
+                                * previous_block_avg_nolan_rebroadcast_per_block;
 
                         //
                         // divide the treasury
@@ -1515,21 +1522,21 @@ impl Block {
         // avg_fee_per_byte
         //
         let adjustment = (previous_block_avg_fee_per_byte as i128 - cv.fee_per_byte as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_fee_per_byte = (previous_block_avg_fee_per_byte as i128 - adjustment) as Currency;
 
         //
         // avg_total_fees
         //
         let adjustment = (previous_block_avg_total_fees as i128 - cv.total_fees as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_total_fees = (previous_block_avg_total_fees as i128 - adjustment) as Currency;
 
         //
         // avg_total_fees_new
         //
         let adjustment = (previous_block_avg_total_fees_new as i128 - cv.total_fees_new as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_total_fees_new =
             (previous_block_avg_total_fees_new as i128 - adjustment) as Currency;
 
@@ -1537,7 +1544,7 @@ impl Block {
         // avg_total_fees_atr
         //
         let adjustment = (previous_block_avg_total_fees_atr as i128 - cv.total_fees_atr as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_total_fees_atr =
             (previous_block_avg_total_fees_atr as i128 - adjustment) as Currency;
 
@@ -1550,7 +1557,7 @@ impl Block {
         //
         let adjustment = (previous_block_avg_nolan_rebroadcast_per_block as i128
             - cv.total_rebroadcast_nolan as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_nolan_rebroadcast_per_block =
             (previous_block_avg_nolan_rebroadcast_per_block as i128 - adjustment) as Currency;
 
@@ -1751,7 +1758,7 @@ impl Block {
         //
         let adjustment = (previous_block_avg_payout_routing as i128
             - cv.total_payout_routing as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_payout_routing =
             (previous_block_avg_payout_routing as i128 - adjustment) as Currency;
 
@@ -1760,7 +1767,7 @@ impl Block {
         //
         let adjustment = (previous_block_avg_payout_mining as i128
             - cv.total_payout_mining as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_payout_mining = (previous_block_avg_payout_mining as i128 - adjustment) as Currency;
 
         //
@@ -1768,7 +1775,7 @@ impl Block {
         //
         let adjustment = (previous_block_avg_payout_treasury as i128
             - cv.total_payout_treasury as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_payout_treasury =
             (previous_block_avg_payout_treasury as i128 - adjustment) as Currency;
 
@@ -1777,7 +1784,7 @@ impl Block {
         //
         let adjustment = (previous_block_avg_payout_graveyard as i128
             - cv.total_payout_graveyard as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_payout_graveyard =
             (previous_block_avg_payout_graveyard as i128 - adjustment) as Currency;
 
@@ -1785,7 +1792,7 @@ impl Block {
         // average atr payout
         //
         let adjustment = (previous_block_avg_payout_atr as i128 - cv.total_payout_atr as i128)
-            / GENESIS_PERIOD as i128;
+            / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_payout_atr = (previous_block_avg_payout_atr as i128 - adjustment) as Currency;
 
         cv
@@ -2146,7 +2153,8 @@ impl Block {
         //
         assert!(self.id > 0);
         if configs.is_spv_mode() {
-            self.generate_consensus_values(blockchain, storage).await;
+            self.generate_consensus_values(blockchain, storage, configs)
+                .await;
             return true;
         }
 
@@ -2181,7 +2189,9 @@ impl Block {
         //
         // generate "consensus values"
         //
-        let cv = self.generate_consensus_values(blockchain, storage).await;
+        let cv = self
+            .generate_consensus_values(blockchain, storage, configs)
+            .await;
         trace!("consensus values generated : {:?}", cv);
 
         //
@@ -2480,6 +2490,7 @@ impl Block {
                     previous_block.burnfee,
                     self.timestamp,
                     previous_block.timestamp,
+                    configs.get_consensus_config().unwrap().heartbeat_interval,
                 );
             if self.total_work < amount_of_routing_work_needed {
                 error!("Error 510293: block lacking adequate routing work from creator. actual : {:?} expected : {:?}",self.total_work, amount_of_routing_work_needed);
@@ -2734,8 +2745,7 @@ mod tests {
     use crate::core::consensus::transaction::{Transaction, TransactionType};
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
-        Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, GENESIS_PERIOD,
-        NOLAN_PER_SAITO,
+        Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, NOLAN_PER_SAITO,
     };
     use crate::core::io::storage::Storage;
     use crate::core::util::crypto::{generate_keys, verify_signature};
@@ -3245,12 +3255,18 @@ mod tests {
         let mut t = TestManager::default();
 
         t.initialize_with_timestamp(100, 10000, 0).await;
-
+        let genesis_period = t
+            .config_lock
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .genesis_period;
         // check if epoch length is 10
-        assert_eq!(GENESIS_PERIOD, 100, "Genesis period is not 10");
+        assert_eq!(genesis_period, 100, "Genesis period is not 10");
 
         // create 10 blocks
-        for _i in 0..GENESIS_PERIOD {
+        for _i in 0..genesis_period {
             let mut block = t
                 .create_block(
                     t.latest_block_hash,
@@ -3332,10 +3348,17 @@ mod tests {
         tester.set_issuance(issuance).await.unwrap();
 
         tester.init().await.unwrap();
-
+        let genesis_period = tester
+            .routing_thread
+            .config_lock
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .genesis_period;
         tester.wait_till_block_id(1).await.unwrap();
 
-        for i in 1..GENESIS_PERIOD {
+        for i in 1..genesis_period {
             let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
             tester.add_transaction(tx).await;
             tester.wait_till_block_id(i + 1).await.unwrap();
@@ -3349,7 +3372,7 @@ mod tests {
         assert!(!have_atr_slips);
         drop(wallet);
 
-        tester.wait_till_block_id(GENESIS_PERIOD).await.unwrap();
+        tester.wait_till_block_id(genesis_period).await.unwrap();
         {
             let wallet = tester.consensus_thread.wallet_lock.read().await;
             let atr_slip_count = wallet
@@ -3364,7 +3387,7 @@ mod tests {
             let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
             tester.add_transaction(tx).await;
 
-            tester.wait_till_block_id(GENESIS_PERIOD + 1).await.unwrap();
+            tester.wait_till_block_id(genesis_period + 1).await.unwrap();
 
             let wallet = tester.consensus_thread.wallet_lock.read().await;
             let atr_slip_count = wallet
@@ -3378,8 +3401,8 @@ mod tests {
         {
             let blockchain = tester.consensus_thread.blockchain_lock.read().await;
             let block = blockchain.get_latest_block().unwrap();
-            assert_eq!(blockchain.get_latest_block_id(), GENESIS_PERIOD + 1);
-            assert_eq!(block.id, GENESIS_PERIOD + 1);
+            assert_eq!(blockchain.get_latest_block_id(), genesis_period + 1);
+            assert_eq!(block.id, genesis_period + 1);
             let mut have_atr_tx = false;
             for tx in block.transactions.iter() {
                 if tx.transaction_type == TransactionType::ATR {
@@ -3393,7 +3416,7 @@ mod tests {
             let tx = tester.create_transaction(10, 0, public_key).await.unwrap();
             tester.add_transaction(tx).await;
 
-            tester.wait_till_block_id(GENESIS_PERIOD + 2).await.unwrap();
+            tester.wait_till_block_id(genesis_period + 2).await.unwrap();
 
             let wallet = tester.consensus_thread.wallet_lock.read().await;
             let atr_slip_count = wallet
@@ -3406,8 +3429,8 @@ mod tests {
         {
             let blockchain = tester.consensus_thread.blockchain_lock.read().await;
             let block = blockchain.get_latest_block().unwrap();
-            assert_eq!(blockchain.get_latest_block_id(), GENESIS_PERIOD + 2);
-            assert_eq!(block.id, GENESIS_PERIOD + 2);
+            assert_eq!(blockchain.get_latest_block_id(), genesis_period + 2);
+            assert_eq!(block.id, genesis_period + 2);
             let mut have_atr_tx = false;
             for tx in block.transactions.iter() {
                 if tx.transaction_type == TransactionType::ATR {

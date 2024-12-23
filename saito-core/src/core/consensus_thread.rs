@@ -428,6 +428,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
         {
             let configs = self.config_lock.read().await;
+            info!(
+                "genesis_period : {:?}",
+                configs.get_consensus_config().unwrap().genesis_period
+            );
             let mut blockchain = self.blockchain_lock.write().await;
             let blockchain_configs = configs.get_blockchain_configs();
             if let Some(blockchain_configs) = blockchain_configs {

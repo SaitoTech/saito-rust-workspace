@@ -2,9 +2,7 @@ use log::trace;
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::ringitem::RingItem;
-use crate::core::defs::{BlockId, PrintForLog, SaitoHash, GENESIS_PERIOD};
-
-pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
+use crate::core::defs::{BlockId, PrintForLog, SaitoHash};
 
 //
 // TODO -- shift to a RingBuffer ? or Slice-VecDeque so that we can have
@@ -20,14 +18,15 @@ pub struct BlockRing {
     pub ring: Vec<RingItem>,
     pub lc_pos: Option<usize>,
     pub empty: bool,
+    pub genesis_period: BlockId,
 }
 
 impl BlockRing {
     /// Create new `BlockRing`
     #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub fn new(genesis_period: BlockId) -> Self {
         let mut init_ring: Vec<RingItem> = vec![];
-        for _i in 0..RING_BUFFER_LENGTH {
+        for _i in 0..(genesis_period * 2) {
             init_ring.push(RingItem::default());
         }
 
@@ -35,11 +34,14 @@ impl BlockRing {
             ring: init_ring,
             lc_pos: None,
             empty: true,
+            genesis_period,
         }
     }
-
+    pub fn get_ring_buffer_size(&self) -> BlockId {
+        self.genesis_period * 2
+    }
     pub fn add_block(&mut self, block: &Block) {
-        let insert_pos = block.id % RING_BUFFER_LENGTH;
+        let insert_pos = block.id % self.get_ring_buffer_size();
         trace!(
             "blockring.add_block : {:?} at pos = {:?}",
             block.hash.to_hex(),
@@ -49,7 +51,7 @@ impl BlockRing {
     }
 
     pub fn contains_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
-        let insert_pos = block_id % RING_BUFFER_LENGTH;
+        let insert_pos = block_id % self.get_ring_buffer_size();
         self.ring[insert_pos as usize].contains_block_hash(block_hash)
     }
 
@@ -78,12 +80,12 @@ impl BlockRing {
     }
 
     pub fn get_longest_chain_block_hash_at_block_id(&self, id: u64) -> Option<SaitoHash> {
-        let insert_pos = (id % RING_BUFFER_LENGTH) as usize;
+        let insert_pos = (id % self.get_ring_buffer_size()) as usize;
         trace!(
             "blockring -> insert_pos : {:?}, id : {:?}, ring_length : {:?}",
             insert_pos,
             id,
-            RING_BUFFER_LENGTH
+            self.get_ring_buffer_size()
         );
         match self.ring[insert_pos].lc_pos {
             Some(lc_pos) => {
@@ -107,7 +109,7 @@ impl BlockRing {
     }
 
     pub fn is_block_hash_at_block_id(&self, block_id: u64, block_hash: SaitoHash) -> bool {
-        let insert_pos = block_id % RING_BUFFER_LENGTH;
+        let insert_pos = block_id % self.get_ring_buffer_size();
         for i in 0..self.ring[insert_pos as usize].block_hashes.len() {
             if self.ring[insert_pos as usize].block_hashes[i] == block_hash {
                 return true;
@@ -121,12 +123,12 @@ impl BlockRing {
     }
 
     pub fn delete_block(&mut self, block_id: u64, block_hash: SaitoHash) {
-        let insert_pos = block_id % RING_BUFFER_LENGTH;
+        let insert_pos = block_id % self.get_ring_buffer_size();
         self.ring[insert_pos as usize].delete_block(block_id, block_hash);
     }
 
     pub fn get_block_hashes_at_block_id(&self, block_id: u64) -> Vec<SaitoHash> {
-        let insert_pos = block_id % RING_BUFFER_LENGTH;
+        let insert_pos = block_id % self.get_ring_buffer_size();
         let mut v: Vec<SaitoHash> = vec![];
         for i in 0..self.ring[insert_pos as usize].block_hashes.len() {
             if self.ring[insert_pos as usize].block_ids[i] == block_id {
@@ -137,7 +139,7 @@ impl BlockRing {
     }
 
     pub fn on_chain_reorganization(&mut self, block_id: u64, hash: SaitoHash, lc: bool) -> bool {
-        let insert_pos = block_id % RING_BUFFER_LENGTH;
+        let insert_pos = block_id % self.get_ring_buffer_size();
         self.ring[insert_pos as usize].on_chain_reorganization(hash, lc);
         trace!(
             "blockring.on_chain_reorg : block_id = {:?}, hash = {:?}, insert_pos = {:?}, lc_pos = {:?}",
@@ -163,7 +165,7 @@ impl BlockRing {
                     let previous_block_index: usize = if lc_pos > 0 {
                         lc_pos - 1
                     } else {
-                        RING_BUFFER_LENGTH as usize - 1
+                        self.get_ring_buffer_size() as usize - 1
                     };
 
                     // reset to lc_pos to unknown
@@ -192,7 +194,7 @@ impl BlockRing {
     }
 
     pub fn print_lc(&self) {
-        for i in 0..GENESIS_PERIOD {
+        for i in 0..self.genesis_period {
             if !self.ring[i as usize].block_hashes.is_empty() {
                 trace!(
                     "Block {:?}: {:?}",
@@ -204,7 +206,7 @@ impl BlockRing {
     }
 
     pub fn get_block_hash_by_block_id(&self, block_id: u64) -> Option<SaitoHash> {
-        let insert_pos = (block_id % RING_BUFFER_LENGTH) as usize;
+        let insert_pos = (block_id % self.get_ring_buffer_size()) as usize;
         self.ring[insert_pos]
             .block_ids
             .iter()
@@ -217,20 +219,17 @@ impl BlockRing {
 mod tests {
     use crate::core::consensus::block::Block;
     use crate::core::consensus::blockring::BlockRing;
-    use crate::core::defs::GENESIS_PERIOD;
-
-    pub const RING_BUFFER_LENGTH: u64 = 2 * GENESIS_PERIOD;
 
     #[test]
     fn blockring_new_test() {
-        let blockring = BlockRing::new();
-        assert_eq!(blockring.ring.len() as u64, RING_BUFFER_LENGTH);
+        let blockring = BlockRing::new(1_000);
+        assert_eq!(blockring.ring.len() as u64, 2_000);
         assert_eq!(blockring.lc_pos, None);
     }
 
     #[test]
     fn blockring_add_block_test() {
-        let mut blockring = BlockRing::new();
+        let mut blockring = BlockRing::new(1_000);
         let mut block = Block::new();
         block.id = 1;
         block.generate_hash();
@@ -267,7 +266,7 @@ mod tests {
 
     #[test]
     fn blockring_delete_block_test() {
-        let mut blockring = BlockRing::new();
+        let mut blockring = BlockRing::new(1_000);
         let mut block = Block::new();
         block.generate_hash();
         let block_hash = block.hash;
@@ -331,7 +330,7 @@ mod tests {
         block4.generate();
         block5.generate();
 
-        let mut blockring = BlockRing::new();
+        let mut blockring = BlockRing::new(1_000);
 
         blockring.add_block(&block1);
         blockring.add_block(&block2);

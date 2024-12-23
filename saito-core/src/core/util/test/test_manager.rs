@@ -56,7 +56,9 @@ pub mod test {
     use crate::core::io::storage::Storage;
     use crate::core::mining_thread::MiningEvent;
     use crate::core::process::keep_time::{KeepTime, Timer};
-    use crate::core::util::configuration::{BlockchainConfig, Configuration, PeerConfig, Server};
+    use crate::core::util::configuration::{
+        BlockchainConfig, Configuration, ConsensusConfig, PeerConfig, Server,
+    };
     use crate::core::util::crypto::{generate_keys, generate_random_bytes, hash, verify_signature};
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
 
@@ -96,10 +98,17 @@ pub mod test {
             let wallet = Wallet::new(keys.1, keys.0);
             let peers = Arc::new(RwLock::new(PeerCollection::default()));
             let wallet_lock = Arc::new(RwLock::new(wallet));
-            let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone())));
+            let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone(), 100)));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
-            let configs = Arc::new(RwLock::new(TestConfiguration {}));
+            let configs = Arc::new(RwLock::new(TestConfiguration {
+                consensus: ConsensusConfig {
+                    genesis_period: 100,
+                    heartbeat_interval: 100,
+                    prune_after_blocks: 8,
+                    max_staker_recursions: 3,
+                },
+            }));
 
             let issuance_path = TestManager::get_test_issuance_file().unwrap();
 
@@ -146,7 +155,7 @@ pub mod test {
             };
             let target_filename = format!("issuance-{}.txt", counter);
             let target_path = temp_dir.join(target_filename);
-            fs::copy(&source_path, &target_path)?;
+            fs::copy(source_path, &target_path)?;
             // Update the counter in the file for the next instance
             let mut file = fs::File::create(&issuance_counter_path)?;
             writeln!(file, "{}", counter + 1)?;
@@ -1076,7 +1085,9 @@ pub mod test {
         }
     }
 
-    struct TestConfiguration {}
+    struct TestConfiguration {
+        consensus: ConsensusConfig,
+    }
 
     impl Debug for TestConfiguration {
         fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -1111,6 +1122,10 @@ pub mod test {
 
         fn replace(&mut self, _config: &dyn Configuration) {
             todo!()
+        }
+
+        fn get_consensus_config(&self) -> Option<&ConsensusConfig> {
+            Some(&self.consensus)
         }
     }
 }
