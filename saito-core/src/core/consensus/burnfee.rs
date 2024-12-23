@@ -1,5 +1,4 @@
 use std::cmp::max;
-use std::time::Duration;
 
 use log::debug;
 
