@@ -312,6 +312,7 @@ impl Mempool {
                 previous_block.burnfee,
                 current_timestamp,
                 previous_block.timestamp,
+                configs.get_consensus_config().unwrap().heartbeat_interval,
             );
             let time_elapsed = current_timestamp - previous_block.timestamp;
 
@@ -389,7 +390,6 @@ mod tests {
 
     use tokio::sync::RwLock;
 
-    use crate::core::consensus::burnfee::HEARTBEAT;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{SaitoPrivateKey, SaitoPublicKey};
     use crate::core::util::test::test_manager::test::{create_timestamp, TestManager};
@@ -437,7 +437,6 @@ mod tests {
         }
 
         let ts = create_timestamp();
-        let _next_block_timestamp = ts + (HEARTBEAT * 2);
 
         let configs = t.config_lock.read().await;
         let blockchain = blockchain_lock.read().await;

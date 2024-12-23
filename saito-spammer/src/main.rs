@@ -452,7 +452,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stat_timer_in_ms;
     let verification_thread_count;
     let fetch_batch_size: usize;
-
+    let genesis_period;
     {
         let configs = configs_lock.read().await;
 
@@ -464,6 +464,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stat_timer_in_ms = configs.get_server_configs().unwrap().stat_timer_in_ms;
         verification_thread_count = configs.get_server_configs().unwrap().verification_threads;
         fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
+        genesis_period = configs.get_consensus_config().unwrap().genesis_period;
     }
 
     let timer = Timer {
@@ -490,7 +491,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let (sender, _receiver) = tokio::sync::mpsc::channel::<IoEvent>(channel_size);
         Wallet::load(&mut wallet, &(RustIOHandler::new(sender, 1))).await;
     }
-    let context = Context::new(configs_clone.clone(), wallet);
+    let context = Context::new(configs_clone.clone(), wallet, genesis_period);
 
     let peers_lock = Arc::new(RwLock::new(PeerCollection::default()));
 

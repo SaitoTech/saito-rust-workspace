@@ -68,13 +68,13 @@ pub struct SaitoWasm {
 }
 
 lazy_static! {
-    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true)));
+    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true, 100_000)));
     static ref CONFIGS: Arc<RwLock<dyn Configuration + Send + Sync>> =
         Arc::new(RwLock::new(WasmConfiguration::new()));
     static ref PRIVATE_KEY: Mutex<String> = Mutex::new("".to_string());
 }
 
-pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
+pub fn new(haste_multiplier: u64, enable_stats: bool, genesis_period: BlockId) -> SaitoWasm {
     info!("creating new saito wasm instance");
     console_error_panic_hook::set_once();
 
@@ -94,7 +94,7 @@ pub fn new(haste_multiplier: u64, enable_stats: bool) -> SaitoWasm {
 
     let peers = Arc::new(RwLock::new(PeerCollection::default()));
     let context = Context {
-        blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet.clone()))),
+        blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet.clone(), genesis_period))),
         mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet_lock: wallet.clone(),
         config_lock: configuration.clone(),
@@ -347,6 +347,7 @@ pub async fn initialize(
     info!("initializing saito-wasm");
 
     let mut enable_stats = true;
+    let mut genesis_period = 100_000;
     {
         info!("setting configs...");
         let mut configs = CONFIGS.write().await;
@@ -363,13 +364,14 @@ pub async fn initialize(
                 enable_stats = false;
             }
             info!("config : {:?}", config);
+            genesis_period = configs.get_consensus_config().unwrap().genesis_period;
             configs.replace(&config);
         }
     }
 
     let mut saito = SAITO.lock().await;
 
-    saito.replace(new(hasten_multiplier, enable_stats));
+    saito.replace(new(hasten_multiplier, enable_stats, genesis_period));
 
     let private_key: SaitoPrivateKey = string_to_hex(private_key).or(Err(JsValue::from(
         "Failed parsing private key string to key",

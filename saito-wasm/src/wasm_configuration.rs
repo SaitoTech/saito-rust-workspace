@@ -7,9 +7,11 @@ use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
 use saito_core::core::util::configuration::{
-    BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
+    BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server,
 };
-
+fn get_default_consensus() -> Option<ConsensusConfig> {
+    Some(ConsensusConfig::default())
+}
 #[wasm_bindgen]
 #[derive(Deserialize, Debug)]
 pub struct WasmConfiguration {
@@ -18,6 +20,8 @@ pub struct WasmConfiguration {
     blockchain: Option<BlockchainConfig>,
     spv_mode: bool,
     browser_mode: bool,
+    #[serde(default = "get_default_consensus")]
+    consensus: Option<ConsensusConfig>,
 }
 
 #[wasm_bindgen]
@@ -25,7 +29,7 @@ impl WasmConfiguration {
     #[wasm_bindgen(constructor)]
     pub fn new() -> WasmConfiguration {
         WasmConfiguration {
-            server: Option::Some(Server {
+            server: Some(Server {
                 host: "localhost".to_string(),
                 port: 12100,
                 protocol: "http".to_string(),
@@ -45,6 +49,7 @@ impl WasmConfiguration {
             blockchain: None,
             spv_mode: false,
             browser_mode: false,
+            consensus: Some(ConsensusConfig::default()),
         }
     }
 }
@@ -69,11 +74,11 @@ impl WasmConfiguration {
 
 impl Configuration for WasmConfiguration {
     fn get_server_configs(&self) -> Option<&Server> {
-        return self.server.as_ref();
+        self.server.as_ref()
     }
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
-        return &self.peers;
+        &self.peers
     }
 
     fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
@@ -105,5 +110,10 @@ impl Configuration for WasmConfiguration {
         self.spv_mode = config.is_spv_mode();
         self.browser_mode = config.is_browser();
         self.blockchain = config.get_blockchain_configs();
+        self.consensus = config.get_consensus_config().cloned();
+    }
+
+    fn get_consensus_config(&self) -> Option<&ConsensusConfig> {
+        self.consensus.as_ref()
     }
 }

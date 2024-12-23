@@ -2,11 +2,15 @@ use figment::providers::{Format, Json};
 use figment::Figment;
 use log::{debug, error, info};
 use saito_core::core::util::configuration::{
-    BlockchainConfig, Configuration, Endpoint, PeerConfig, Server,
+    BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server,
 };
 use serde::{Deserialize, Serialize};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+
+fn get_default_consensus() -> Option<ConsensusConfig> {
+    Some(ConsensusConfig::default())
+}
 
 #[derive(Deserialize, Debug, Serialize)]
 pub struct NodeConfigurations {
@@ -15,6 +19,8 @@ pub struct NodeConfigurations {
     #[serde(skip)]
     lite: bool,
     spv_mode: Option<bool>,
+    #[serde(default = "get_default_consensus")]
+    consensus: Option<ConsensusConfig>,
 }
 
 impl NodeConfigurations {
@@ -46,6 +52,12 @@ impl Default for NodeConfigurations {
             peers: vec![],
             lite: false,
             spv_mode: Some(false),
+            consensus: Some(ConsensusConfig {
+                genesis_period: 100_000,
+                heartbeat_interval: 5_000,
+                prune_after_blocks: 8,
+                max_staker_recursions: 3,
+            }),
         }
     }
 }
@@ -85,6 +97,11 @@ impl Configuration for NodeConfigurations {
         self.peers = config.get_peer_configs().clone();
         self.spv_mode = Some(config.is_spv_mode());
         self.lite = config.is_spv_mode();
+        self.consensus = config.get_consensus_config().cloned();
+    }
+
+    fn get_consensus_config(&self) -> Option<&ConsensusConfig> {
+        self.consensus.as_ref()
     }
 }
 
