@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
+fn get_default_consensus() -> Option<ConsensusConfig> {
+    Some(ConsensusConfig::default())
+}
+
 #[derive(Deserialize, Debug, Serialize)]
 pub struct NodeConfigurations {
     server: Server,
@@ -15,6 +19,7 @@ pub struct NodeConfigurations {
     #[serde(skip)]
     lite: bool,
     spv_mode: Option<bool>,
+    #[serde(default = "get_default_consensus")]
     consensus: Option<ConsensusConfig>,
 }
 
@@ -92,6 +97,7 @@ impl Configuration for NodeConfigurations {
         self.peers = config.get_peer_configs().clone();
         self.spv_mode = Some(config.is_spv_mode());
         self.lite = config.is_spv_mode();
+        self.consensus = config.get_consensus_config().cloned();
     }
 
     fn get_consensus_config(&self) -> Option<&ConsensusConfig> {

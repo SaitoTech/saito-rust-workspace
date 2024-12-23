@@ -19,7 +19,9 @@ pub struct Spammer {
     pub tx_fee: u64,
     pub stop_after: u64,
 }
-
+fn get_default_consensus() -> Option<ConsensusConfig> {
+    Some(ConsensusConfig::default())
+}
 #[derive(Deserialize, Debug, Clone)]
 pub struct SpammerConfigs {
     server: Server,
@@ -27,6 +29,7 @@ pub struct SpammerConfigs {
     spammer: Spammer,
     #[serde(skip)]
     lite: bool,
+    #[serde(default = "get_default_consensus")]
     consensus: Option<ConsensusConfig>,
 }
 
@@ -60,7 +63,7 @@ impl SpammerConfigs {
                 stop_after: 0,
             },
             lite: false,
-            consensus: None,
+            consensus: Some(ConsensusConfig::default()),
         }
     }
 
@@ -104,6 +107,7 @@ impl Configuration for SpammerConfigs {
         self.server = config.get_server_configs().cloned().unwrap();
         self.peers = config.get_peer_configs().clone();
         self.lite = config.is_spv_mode();
+        self.consensus = config.get_consensus_config().cloned();
     }
 
     fn get_consensus_config(&self) -> Option<&ConsensusConfig> {

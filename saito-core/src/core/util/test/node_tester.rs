@@ -50,7 +50,9 @@ pub mod test {
                 .as_millis() as Timestamp
         }
     }
-
+    fn get_default_consensus() -> Option<ConsensusConfig> {
+        Some(ConsensusConfig::default())
+    }
     #[derive(Deserialize, Debug)]
     pub struct TestConfiguration {
         server: Option<Server>,
@@ -58,6 +60,7 @@ pub mod test {
         blockchain: Option<BlockchainConfig>,
         spv_mode: bool,
         browser_mode: bool,
+        #[serde(default = "get_default_consensus")]
         consensus: Option<ConsensusConfig>,
     }
     impl Configuration for TestConfiguration {

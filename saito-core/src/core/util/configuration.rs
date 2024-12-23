@@ -97,6 +97,16 @@ pub struct ConsensusConfig {
     #[serde(default = "get_default_max_staker_recursions")]
     pub max_staker_recursions: BlockId,
 }
+impl Default for ConsensusConfig {
+    fn default() -> Self {
+        ConsensusConfig {
+            genesis_period: 100_000,
+            heartbeat_interval: 5_000,
+            prune_after_blocks: 8,
+            max_staker_recursions: 3,
+        }
+    }
+}
 
 pub trait Configuration: Debug {
     fn get_server_configs(&self) -> Option<&Server>;
