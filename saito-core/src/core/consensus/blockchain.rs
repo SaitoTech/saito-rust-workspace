@@ -1222,7 +1222,7 @@ impl Blockchain {
 
         let mut wallet_updated = WALLET_NOT_UPDATED;
 
-        return if does_block_validate {
+        if does_block_validate {
             // blockring update
             self.blockring
                 .on_chain_reorganization(block.id, block.hash, true);
@@ -1323,7 +1323,7 @@ impl Blockchain {
                 // unwinding starts from the BEGINNING of the vector
                 WindingResult::Unwind(0, true, chain_to_unwind, wallet_updated)
             }
-        };
+        }
     }
 
     ///  ensure previous blocks that may be needed to calculate the staking

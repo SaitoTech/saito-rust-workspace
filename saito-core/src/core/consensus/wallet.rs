@@ -104,11 +104,19 @@ impl Wallet {
         trace!("wallet saved");
     }
 
-    pub async fn reset(&mut self, _storage: &mut Storage, network: Option<&Network>) {
+    pub async fn reset(
+        &mut self,
+        _storage: &mut Storage,
+        network: Option<&Network>,
+        keep_keys: bool,
+    ) {
         info!("resetting wallet");
-        let keys = generate_keys();
-        self.public_key = keys.0;
-        self.private_key = keys.1;
+        if !keep_keys {
+            let keys = generate_keys();
+            self.public_key = keys.0;
+            self.private_key = keys.1;
+        }
+
         self.pending_txs.clear();
         self.available_balance = 0;
         self.slips.clear();
@@ -236,10 +244,11 @@ impl Wallet {
         }
 
         debug!(
-            "adding slip of type : {:?} with value : {:?} to wallet : {:?}",
+            "adding slip of type : {:?} with value : {:?} to wallet : {:?} slip : {:?}",
             wallet_slip.slip_type,
             wallet_slip.amount,
-            wallet_slip.utxokey.to_hex()
+            wallet_slip.utxokey.to_hex(),
+            Slip::parse_slip_from_utxokey(&wallet_slip.utxokey).unwrap()
         );
         self.slips.insert(wallet_slip.utxokey, wallet_slip);
         if let Some(network) = network {

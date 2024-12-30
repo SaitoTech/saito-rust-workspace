@@ -29,8 +29,8 @@ export default class Wallet extends WasmWrapper<WasmWallet> {
         return this.instance.load();
     }
 
-    public async reset() {
-        return this.instance.reset();
+    public async reset(keepKeys: boolean) {
+        return this.instance.reset(keepKeys);
     }
 
     public async getPublicKey() {
@@ -110,7 +110,8 @@ export class WalletSlip extends WasmWrapper<WasmWalletSlip> {
             blockId: this.instance.get_block_id(),
             txIndex: this.instance.get_tx_ordinal(),
             slipIndex: this.instance.get_slip_index(),
-            amount: this.instance.get_amount()
+            amount: this.instance.get_amount(),
+            slipType: this.instance.get_slip_type(),
         };
     }
 
@@ -122,5 +123,6 @@ export class WalletSlip extends WasmWrapper<WasmWalletSlip> {
         this.instance.set_tx_ordinal(BigInt(json.txIndex));
         this.instance.set_slip_index(json.slipIndex);
         this.instance.set_amount(BigInt(json.amount));
+        this.instance.set_slip_type(json.slipType);
     }
 }
