@@ -2,12 +2,13 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use js_sys::{Array, JsString};
-use log::{error, warn};
+use log::{error, info, warn};
+use num_traits::FromPrimitive;
 use tokio::sync::RwLock;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use saito_core::core::consensus::slip::Slip;
+use saito_core::core::consensus::slip::{Slip, SlipType};
 use saito_core::core::consensus::wallet::{Wallet, WalletSlip};
 use saito_core::core::defs::{Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey};
 use saito_core::core::io::network::Network;
@@ -35,11 +36,15 @@ impl WasmWallet {
         let mut wallet = self.wallet.write().await;
         Wallet::save(&mut wallet, &(WasmIoHandler {})).await;
     }
-    pub async fn reset(&mut self) {
+    pub async fn reset(&mut self, keep_keys: bool) {
         self.wallet
             .write()
             .await
-            .reset(&mut Storage::new(Box::new(WasmIoHandler {})), None)
+            .reset(
+                &mut Storage::new(Box::new(WasmIoHandler {})),
+                None,
+                keep_keys,
+            )
             .await;
     }
 
@@ -96,6 +101,7 @@ impl WasmWallet {
     }
     pub async fn get_balance(&self) -> Currency {
         let wallet = self.wallet.read().await;
+        info!("get balance : {:?}", wallet.get_available_balance());
         wallet.get_available_balance()
     }
     pub async fn get_pending_txs(&self) -> js_sys::Array {
@@ -110,6 +116,7 @@ impl WasmWallet {
     pub async fn get_slips(&self) -> js_sys::Array {
         let wallet = self.wallet.read().await;
         let slips = &wallet.slips;
+        info!("get slips. count : {:?}", slips.len());
 
         let array = js_sys::Array::new_with_length(slips.len() as u32);
 
@@ -228,6 +235,12 @@ impl WasmWalletSlip {
     }
     pub fn set_lc(&mut self, lc: bool) {
         self.slip.lc = lc;
+    }
+    pub fn get_slip_type(&self) -> u8 {
+        self.slip.slip_type as u8
+    }
+    pub fn set_slip_type(&mut self, slip_type: u8) {
+        self.slip.slip_type = SlipType::from_u8(slip_type).unwrap_or(self.slip.slip_type);
     }
     #[wasm_bindgen(constructor)]
     pub fn new_() -> WasmWalletSlip {
