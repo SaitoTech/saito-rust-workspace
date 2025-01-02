@@ -1280,7 +1280,13 @@ pub async fn produce_block_without_gt() -> bool {
         public_key = wallet.public_key;
         private_key = wallet.private_key;
     }
-
+    {
+        info!(
+            "clearing {:?} gts from mempool...",
+            mempool.golden_tickets.len()
+        );
+        mempool.golden_tickets.clear();
+    }
     {
         let mut wallet = wallet_lock.write().await;
         if let Ok(mut tx) = Transaction::create(&mut wallet, public_key, 0, 0, false, None) {
