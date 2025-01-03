@@ -210,7 +210,7 @@ impl ConsensusThread {
         } else {
             debug!("skipped bundling block. : produce_without_limits = {:?}, is_browser : {:?} block_count : {:?}",
                 produce_without_limits,
-                !configs.is_browser() && !configs.is_spv_mode(),
+                configs.is_browser() || configs.is_spv_mode(),
                 blockchain.blocks.len());
         }
         if let Some(block) = block {
@@ -243,6 +243,10 @@ impl ConsensusThread {
             return true;
         } else {
             // route messages to peers
+            trace!(
+                "since a block was not produced, propagating {:?} txs to peers",
+                self.txs_for_mempool.len()
+            );
             for tx in self.txs_for_mempool.drain(..) {
                 self.network.propagate_transaction(&tx).await;
             }
@@ -395,8 +399,10 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     let mut mempool = self.mempool_lock.write().await;
 
                     self.stats.received_gts.increment();
+                    trace!("adding golden ticket to mempool");
                     mempool.add_golden_ticket(transaction).await;
                 } else {
+                    trace!("adding transaction to mempool");
                     self.txs_for_mempool.push(transaction);
                 }
 
