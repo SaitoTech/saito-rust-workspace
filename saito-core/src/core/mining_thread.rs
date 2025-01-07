@@ -124,7 +124,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
                 difficulty,
                 block_id,
             } => {
-                debug!(
+                info!(
                     "Activating miner with hash : {:?} and difficulty : {:?} for block_id : {:?}",
                     hash.to_hex(),
                     difficulty,

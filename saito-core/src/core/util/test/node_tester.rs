@@ -7,6 +7,7 @@ pub mod test {
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peers::peer_collection::PeerCollection;
 
+    use crate::core::consensus::slip::Slip;
     use crate::core::consensus::transaction::Transaction;
     use crate::core::consensus::wallet::Wallet;
     use crate::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
@@ -30,9 +31,9 @@ pub mod test {
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
     use crate::core::verification_thread::{VerificationThread, VerifyRequest};
-    use log::info;
+    use log::{info, warn};
     use serde::Deserialize;
-    use std::io::Error;
+    use std::io::{Error, ErrorKind};
     use std::ops::DerefMut;
     use std::sync::Arc;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -144,6 +145,7 @@ pub mod test {
         context: Context,
         pub timeout_in_ms: u64,
         last_run_time: Timestamp,
+        pub initial_token_supply: Currency,
     }
 
     impl Default for NodeTester {
@@ -289,6 +291,7 @@ pub mod test {
                 receiver_for_stats: receiver_in_stats,
                 timeout_in_ms: Duration::new(10, 0).as_millis() as u64,
                 last_run_time: 0,
+                initial_token_supply: 0,
             }
         }
     }
@@ -535,15 +538,40 @@ pub mod test {
             tx.sign(&wallet.private_key);
             Ok(tx)
         }
-        pub async fn set_issuance(&self, entries: Vec<(String, Currency)>) -> Result<(), Error> {
+        pub async fn set_issuance(
+            &mut self,
+            entries: Vec<(String, Currency)>,
+        ) -> Result<(), Error> {
             let mut content = String::new();
 
             for (key, amount) in entries {
+                self.initial_token_supply += amount;
                 content += (amount.to_string() + "\t" + key.as_str() + "\t" + "Normal\n").as_str();
             }
 
             tokio::fs::create_dir_all("./data/issuance/").await?;
             tokio::fs::write("./data/issuance/issuance", content.as_bytes()).await
+        }
+        pub async fn check_total_supply(&self) -> Result<(), Error> {
+            let mut current_supply = 0;
+            let blockchain = self.consensus_thread.blockchain_lock.read().await;
+            blockchain
+                .utxoset
+                .iter()
+                .filter(|(_, value)| **value)
+                .for_each(|(key, _)| {
+                    let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+
+                    current_supply += slip.amount;
+                });
+
+            if current_supply != self.initial_token_supply {
+                warn!("Current supply is {}", current_supply);
+                warn!("Initial token supply is {}", self.initial_token_supply);
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
+
+            Ok(())
         }
     }
 }
