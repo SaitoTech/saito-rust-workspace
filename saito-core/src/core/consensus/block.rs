@@ -1673,7 +1673,7 @@ impl Block {
                     	    graveyard_contribution += expected_router2_payout - maximum_router2_payout;
                     	    router2_payout = maximum_router2_payout;
                 	} else {    
-                	    router2_payout = expected_treasuryminer_payout;
+                	    router2_payout = expected_router2_payout;
                 	}       
                         router2_publickey =
                             previous_previous_block.find_winning_router(next_random_number);
