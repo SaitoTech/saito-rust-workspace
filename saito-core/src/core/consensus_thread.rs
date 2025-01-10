@@ -620,11 +620,11 @@ mod tests {
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
         let public_key = tester.get_public_key().await;
-        tester
-            .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
-            .await;
+        // tester
+        //     .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
+        //     .await;
         let issuance = vec![
-            (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
+            // (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
             (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
             (
                 "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
@@ -656,6 +656,28 @@ mod tests {
             .unwrap();
         tester.add_transaction(tx).await;
         tester.wait_till_block_id(3).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let tx = tester
+            .create_transaction(10_000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(4).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let tx = tester
+            .create_transaction(10_000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(5).await.unwrap();
         tester
             .check_total_supply()
             .await

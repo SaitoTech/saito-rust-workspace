@@ -512,8 +512,8 @@ impl Block {
         //
         // golden ticket
         //
-        if golden_ticket.is_some() {
-            block.transactions.push(golden_ticket.unwrap());
+        if let Some(gt) = golden_ticket {
+            block.transactions.push(gt);
         }
 
         //

@@ -555,19 +555,48 @@ pub mod test {
         pub async fn check_total_supply(&self) -> Result<(), Error> {
             let mut current_supply = 0;
             let blockchain = self.consensus_thread.blockchain_lock.read().await;
-            blockchain
+            let amount_in_utxo = blockchain
                 .utxoset
                 .iter()
                 .filter(|(_, value)| **value)
-                .for_each(|(key, _)| {
+                .map(|(key, _)| {
                     let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+                    slip.amount
+                })
+                .sum::<Currency>();
 
-                    current_supply += slip.amount;
-                });
+            current_supply += amount_in_utxo;
+
+            let latest_block = blockchain
+                .get_latest_block()
+                .expect("There should be a latest block in blockchain");
+            current_supply += latest_block.graveyard;
+            current_supply += latest_block.treasury;
+            current_supply += latest_block.previous_block_unpaid;
+            current_supply += latest_block.total_fees;
 
             if current_supply != self.initial_token_supply {
+                warn!(
+                    "diff : {}",
+                    self.initial_token_supply as i64 - current_supply as i64
+                );
                 warn!("Current supply is {}", current_supply);
                 warn!("Initial token supply is {}", self.initial_token_supply);
+                warn!("Social Stake is {}", blockchain.social_stake_amount);
+                warn!("Graveyard is {}", latest_block.graveyard);
+                warn!("Treasury is {}", latest_block.treasury);
+                warn!("Unpaid fees is {}", latest_block.previous_block_unpaid);
+                warn!("Block fee is {}", latest_block.total_fees);
+                warn!("Amount in utxo {}", amount_in_utxo);
+
+                blockchain
+                    .utxoset
+                    .iter()
+                    .filter(|(_, value)| **value)
+                    .for_each(|(key, _)| {
+                        let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+                        info!("Utxo : {:?} : {}", slip.public_key.to_base58(), slip.amount);
+                    });
                 return Err(Error::from(ErrorKind::InvalidData));
             }
 

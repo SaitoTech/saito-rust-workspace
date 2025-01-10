@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{crate_version, App, Arg};
-use log::info;
 use log::{debug, error};
+use log::{info, trace};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::select;
