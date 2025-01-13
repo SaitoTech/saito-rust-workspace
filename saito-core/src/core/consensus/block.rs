@@ -1620,7 +1620,6 @@ impl Block {
                 }
                 router1_publickey = previous_block.find_winning_router(next_random_number);
 
-
                 //
                 // finding a router consumes 2 hashes
                 //
@@ -1666,15 +1665,18 @@ impl Block {
                         //
                         // half to router (capped @ 1.5)
                         //
-                        let expected_router2_payout = previous_previous_block.total_fees - expected_treasury_contribution2;
-			// note avg used is previous block for consistency with state
-                	let maximum_router2_payout = (previous_block.avg_total_fees as f64 * 1.5) as u64;
-                	if expected_router2_payout > maximum_router2_payout {
-                    	    graveyard_contribution += expected_router2_payout - maximum_router2_payout;
-                    	    router2_payout = maximum_router2_payout;
-                	} else {    
-                	    router2_payout = expected_router2_payout;
-                	}       
+                        let expected_router2_payout =
+                            previous_previous_block.total_fees - expected_treasury_contribution2;
+                        // note avg used is previous block for consistency with state
+                        let maximum_router2_payout =
+                            (previous_block.avg_total_fees as f64 * 1.5) as u64;
+                        if expected_router2_payout > maximum_router2_payout {
+                            graveyard_contribution +=
+                                expected_router2_payout - maximum_router2_payout;
+                            router2_payout = maximum_router2_payout;
+                        } else {
+                            router2_payout = expected_router2_payout;
+                        }
                         router2_publickey =
                             previous_previous_block.find_winning_router(next_random_number);
 
