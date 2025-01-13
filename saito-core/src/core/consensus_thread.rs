@@ -132,7 +132,7 @@ impl ConsensusThread {
         blockchain: &Blockchain,
         configs: &(dyn Configuration + Send + Sync),
     ) -> Option<Block> {
-        trace!("locking blockchain 3");
+        // trace!("locking blockchain 3");
 
         self.block_producing_timer = 0;
 
@@ -165,7 +165,7 @@ impl ConsensusThread {
         let config_lock = self.config_lock.clone();
         let configs = config_lock.read().await;
 
-        trace!("locking blockchain 3");
+        // trace!("locking blockchain 3");
         let blockchain_lock = self.blockchain_lock.clone();
         let mempool_lock = self.mempool_lock.clone();
         let mut blockchain = blockchain_lock.write().await;
@@ -208,10 +208,10 @@ impl ConsensusThread {
                 )
                 .await;
         } else {
-            debug!("skipped bundling block. : produce_without_limits = {:?}, is_browser : {:?} block_count : {:?}",
-                produce_without_limits,
-                configs.is_browser() || configs.is_spv_mode(),
-                blockchain.blocks.len());
+            // debug!("skipped bundling block. : produce_without_limits = {:?}, is_browser : {:?} block_count : {:?}",
+            //     produce_without_limits,
+            //     configs.is_browser() || configs.is_spv_mode(),
+            //     blockchain.blocks.len());
         }
         if let Some(block) = block {
             debug!(
@@ -243,12 +243,14 @@ impl ConsensusThread {
             return true;
         } else {
             // route messages to peers
-            trace!(
-                "since a block was not produced, propagating {:?} txs to peers",
-                self.txs_for_mempool.len()
-            );
-            for tx in self.txs_for_mempool.drain(..) {
-                self.network.propagate_transaction(&tx).await;
+            if !self.txs_for_mempool.is_empty() {
+                trace!(
+                    "since a block was not produced, propagating {:?} txs to peers",
+                    self.txs_for_mempool.len()
+                );
+                for tx in self.txs_for_mempool.drain(..) {
+                    self.network.propagate_transaction(&tx).await;
+                }
             }
             // route golden tickets to peers
             if gt_result.is_some() && !gt_propagated {
@@ -267,7 +269,7 @@ impl ConsensusThread {
             }
             return true;
         }
-        trace!("releasing blockchain 3");
+        // trace!("releasing blockchain 3");
         false
     }
 
@@ -356,7 +358,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             }
             ConsensusEvent::BlockFetched { block, .. } => {
                 let configs = self.config_lock.read().await;
-                trace!("locking blockchain 4");
+                // trace!("locking blockchain 4");
                 let mut blockchain = self.blockchain_lock.write().await;
 
                 {
@@ -388,7 +390,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                         configs.deref(),
                     )
                     .await;
-                trace!("releasing blockchain 4");
+                // trace!("releasing blockchain 4");
 
                 Some(())
             }
@@ -553,7 +555,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
         {
             let stat;
             {
-                trace!("locking blockchain 5");
+                // trace!("locking blockchain 5");
                 let blockchain = self.blockchain_lock.read().await;
 
                 stat = format!(
@@ -567,7 +569,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     blockchain.blocks.iter().map(|(_hash, block)| { block.transactions.len() }).sum::<usize>()
                 );
             }
-            trace!("releasing blockchain 5");
+            // trace!("releasing blockchain 5");
             self.stat_sender.send(stat).await.unwrap();
         }
         {
@@ -601,5 +603,85 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
     fn is_ready_to_process(&self) -> bool {
         self.sender_to_miner.capacity() > CHANNEL_SAFE_BUFFER
             && self.sender_to_router.capacity() > CHANNEL_SAFE_BUFFER
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::core::defs::{PrintForLog, NOLAN_PER_SAITO};
+    use crate::core::util::crypto::generate_keys;
+    use crate::core::util::test::node_tester::test::NodeTester;
+
+    #[ignore]
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn total_supply_test() {
+        pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
+        let peer_public_key = generate_keys().0;
+        let mut tester = NodeTester::default();
+        let public_key = tester.get_public_key().await;
+        // tester
+        //     .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
+        //     .await;
+        let issuance = vec![
+            // (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50_000 * NOLAN_PER_SAITO,
+            ),
+        ];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let tx = tester
+            .create_transaction(10_000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(2).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let tx = tester
+            .create_transaction(10_000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(3).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let tx = tester
+            .create_transaction(10_000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(4).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let tx = tester
+            .create_transaction(10_000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(5).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
     }
 }

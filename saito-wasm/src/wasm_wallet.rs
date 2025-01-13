@@ -101,7 +101,7 @@ impl WasmWallet {
     }
     pub async fn get_balance(&self) -> Currency {
         let wallet = self.wallet.read().await;
-        info!("get balance : {:?}", wallet.get_available_balance());
+        // info!("get balance : {:?}", wallet.get_available_balance());
         wallet.get_available_balance()
     }
     pub async fn get_pending_txs(&self) -> js_sys::Array {
