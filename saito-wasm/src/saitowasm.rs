@@ -4,6 +4,16 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
+use crate::wasm_block::WasmBlock;
+use crate::wasm_blockchain::WasmBlockchain;
+use crate::wasm_configuration::WasmConfiguration;
+use crate::wasm_io_handler::WasmIoHandler;
+use crate::wasm_peer::WasmPeer;
+use crate::wasm_slip::WasmSlip;
+use crate::wasm_time_keeper::WasmTimeKeeper;
+use crate::wasm_transaction::WasmTransaction;
+use crate::wasm_wallet::WasmWallet;
 use js_sys::{Array, BigInt, JsString, Uint8Array};
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn, Level, Log, Metadata, Record};
@@ -38,17 +48,6 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 use web_sys::console;
-
-use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
-use crate::wasm_block::WasmBlock;
-use crate::wasm_blockchain::WasmBlockchain;
-use crate::wasm_configuration::WasmConfiguration;
-use crate::wasm_io_handler::WasmIoHandler;
-use crate::wasm_peer::WasmPeer;
-use crate::wasm_slip::WasmSlip;
-use crate::wasm_time_keeper::WasmTimeKeeper;
-use crate::wasm_transaction::WasmTransaction;
-use crate::wasm_wallet::WasmWallet;
 
 #[wasm_bindgen]
 pub struct SaitoWasm {

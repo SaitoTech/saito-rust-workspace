@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info};
+use log::info;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -124,7 +124,7 @@ impl ProcessEvent<MiningEvent> for MiningThread {
                 difficulty,
                 block_id,
             } => {
-                debug!(
+                info!(
                     "Activating miner with hash : {:?} and difficulty : {:?} for block_id : {:?}",
                     hash.to_hex(),
                     difficulty,

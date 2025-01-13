@@ -451,14 +451,14 @@ impl RoutingThread {
             peer_index
         );
         {
-            trace!("locking blockchain 6");
+            // trace!("locking blockchain 6");
             let blockchain = self.blockchain_lock.read().await;
             if !blockchain.blocks.is_empty() && blockchain.lowest_acceptable_block_id >= block_id {
                 debug!("skipping block header : {:?}-{:?} from peer : {:?} since our lowest acceptable id : {:?}",block_id,block_hash.to_hex(),peer_index, blockchain.lowest_acceptable_block_id);
                 return;
             }
         }
-        trace!("releasing blockchain 6");
+        // trace!("releasing blockchain 6");
 
         let peers = self.network.peer_lock.read().await;
         let wallet = self.wallet_lock.read().await;
@@ -502,7 +502,7 @@ impl RoutingThread {
         let map = self.blockchain_sync_state.get_blocks_to_fetch_per_peer();
 
         let fetching_count = self.blockchain_sync_state.get_fetching_block_count();
-        trace!("fetching next blocks : {:?} from peers", fetching_count);
+        // trace!("fetching next blocks : {:?} from peers", fetching_count);
         self.network
             .io_interface
             .send_interface_event(InterfaceEvent::BlockFetchStatus(fetching_count as BlockId));
