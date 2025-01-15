@@ -6,6 +6,7 @@ use std::{i128, mem};
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
+use num_traits::Zero;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -995,22 +996,22 @@ impl Block {
 
         let z = primitive_types::U256::from_big_endian(&y.to_be_bytes());
         let zy = x.rem(z);
-        let winning_nolan: Currency = zy.low_u64();
+        let winning_nolan: Currency = std::cmp::max(zy.low_u64(), 1);
+
         // we may need function-timelock object if we need to recreate
         // an ATR transaction to pick the winning routing node.
         let winning_tx_placeholder: Transaction;
-        let mut winning_tx: &Transaction;
 
         //
         // winning TX contains the winning nolan
         //
         // either a fee-paying transaction or an ATR transaction
-        winning_tx = &self.transactions[0];
+        let mut winning_tx = &self.transactions[0];
         for transaction in &self.transactions {
-            if transaction.cumulative_fees > winning_nolan {
+            if transaction.cumulative_fees >= winning_nolan {
+                winning_tx = transaction;
                 break;
             }
-            winning_tx = &transaction;
         }
 
         //
@@ -1022,6 +1023,11 @@ impl Block {
                 Transaction::deserialize_from_net(&tmptx).expect("buffer to be valid");
             winning_tx = &winning_tx_placeholder;
         }
+        assert_ne!(
+            winning_tx.cumulative_fees,
+            Currency::zero(),
+            "winning tx doesn't have fees"
+        );
 
         // hash random number to pick routing node
         winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
@@ -1754,7 +1760,7 @@ impl Block {
                     if let Some(previous_previous_block) =
                         blockchain.blocks.get(&previous_block.previous_block_hash)
                     {
-                        graveyard_contribution;
+                        graveyard_contribution += previous_block.previous_block_unpaid;
                     }
                 }
             }

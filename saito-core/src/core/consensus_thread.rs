@@ -612,7 +612,6 @@ mod tests {
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::node_tester::test::NodeTester;
 
-    #[ignore]
     #[tokio::test]
     #[serial_test::serial]
     async fn total_supply_test() {
