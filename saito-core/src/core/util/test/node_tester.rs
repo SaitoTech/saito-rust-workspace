@@ -575,20 +575,20 @@ pub mod test {
             current_supply += latest_block.previous_block_unpaid;
             current_supply += latest_block.total_fees;
 
-            if current_supply != self.initial_token_supply {
-                warn!(
-                    "diff : {}",
-                    self.initial_token_supply as i64 - current_supply as i64
-                );
-                warn!("Current supply is {}", current_supply);
-                warn!("Initial token supply is {}", self.initial_token_supply);
-                warn!("Social Stake is {}", blockchain.social_stake_amount);
-                warn!("Graveyard is {}", latest_block.graveyard);
-                warn!("Treasury is {}", latest_block.treasury);
-                warn!("Unpaid fees is {}", latest_block.previous_block_unpaid);
-                warn!("Block fee is {}", latest_block.total_fees);
-                warn!("Amount in utxo {}", amount_in_utxo);
+            warn!(
+                "diff : {}",
+                self.initial_token_supply as i64 - current_supply as i64
+            );
+            warn!("Current supply is {}", current_supply);
+            warn!("Initial token supply is {}", self.initial_token_supply);
+            warn!("Social Stake is {}", blockchain.social_stake_amount);
+            warn!("Graveyard is {}", latest_block.graveyard);
+            warn!("Treasury is {}", latest_block.treasury);
+            warn!("Unpaid fees is {}", latest_block.previous_block_unpaid);
+            warn!("Block fee is {}", latest_block.total_fees);
+            warn!("Amount in utxo {}", amount_in_utxo);
 
+            if current_supply != self.initial_token_supply {
                 blockchain
                     .utxoset
                     .iter()

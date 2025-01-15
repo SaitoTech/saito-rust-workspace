@@ -662,10 +662,7 @@ impl Transaction {
             }
         }
 
-        //
-        // we should never reach this
-        //
-        [0; 33]
+        unreachable!("winning routing node should've been found before this");
     }
 
     /// Runs when the chain is re-organized
