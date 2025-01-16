@@ -53,8 +53,8 @@ pub struct Wallet {
     pub public_key: SaitoPublicKey,
     pub private_key: SaitoPrivateKey,
     pub slips: AHashMap<SaitoUTXOSetKey, WalletSlip>,
-    unspent_slips: AHashSet<SaitoUTXOSetKey>,
-    staking_slips: AHashSet<SaitoUTXOSetKey>,
+    pub unspent_slips: AHashSet<SaitoUTXOSetKey>,
+    pub staking_slips: AHashSet<SaitoUTXOSetKey>,
     pub filename: String,
     pub filepass: String,
     available_balance: Currency,
@@ -528,9 +528,9 @@ impl Wallet {
             staking_amount, latest_unlocked_block_id, self.staking_slips.len()
         );
 
-        let mut inputs: Vec<Slip> = vec![];
+        let mut selected_staking_inputs: Vec<Slip> = vec![];
         let mut collected_amount: Currency = 0;
-        let mut keys_to_remove = vec![];
+        let mut unlocked_slips_to_remove = vec![];
 
         for key in self.staking_slips.iter() {
             let slip = self.slips.get(key).unwrap();
@@ -541,10 +541,11 @@ impl Wallet {
 
             collected_amount += slip.amount;
 
-            keys_to_remove.push(*key);
-            inputs.push(slip.to_slip());
+            unlocked_slips_to_remove.push(*key);
+            selected_staking_inputs.push(slip.to_slip());
 
             if collected_amount >= staking_amount {
+                // we have enough staking slips
                 break;
             }
         }
@@ -552,9 +553,9 @@ impl Wallet {
         let mut should_break_slips = false;
         if collected_amount < staking_amount {
             debug!("not enough funds in staking slips. searching in normal slips. current_balance : {:?}",self.available_balance);
-            let required_from_unspent = staking_amount - collected_amount;
-            let mut collected_from_unspent: Currency = 0;
-            let mut keys_to_remove = vec![];
+            let required_from_unspent_slips = staking_amount - collected_amount;
+            let mut collected_from_unspent_slips: Currency = 0;
+            let mut unspent_slips_to_remove = vec![];
 
             let mut unspent_slips = self.unspent_slips.iter().collect::<Vec<&SaitoUTXOSetKey>>();
             unspent_slips.sort_by(|slip, slip2| {
@@ -565,33 +566,33 @@ impl Wallet {
             for key in unspent_slips {
                 let slip = self.slips.get(key).unwrap();
 
-                collected_from_unspent += slip.amount;
+                collected_from_unspent_slips += slip.amount;
 
-                inputs.push(slip.to_slip());
-                keys_to_remove.push(*key);
+                selected_staking_inputs.push(slip.to_slip());
+                unspent_slips_to_remove.push(*key);
 
-                if collected_from_unspent >= required_from_unspent {
+                if collected_from_unspent_slips >= required_from_unspent_slips {
                     // if we only have a single slip, and we access it for staking, we need to break it into multiple slips
                     should_break_slips = self.unspent_slips.len() == 1;
                     break;
                 }
             }
 
-            if collected_from_unspent < required_from_unspent {
+            if collected_from_unspent_slips < required_from_unspent_slips {
                 warn!("couldn't collect enough funds upto requested staking amount. requested: {:?}, collected: {:?} required_from_unspent: {:?}",
-                    staking_amount,collected_amount,required_from_unspent);
+                    staking_amount,collected_amount,required_from_unspent_slips);
                 warn!("wallet balance : {:?}", self.available_balance);
                 return Err(Error::from(ErrorKind::NotFound));
             }
 
-            for key in keys_to_remove {
+            for key in unspent_slips_to_remove {
                 self.unspent_slips.remove(&key);
             }
-            collected_amount += collected_from_unspent;
-            self.available_balance -= collected_from_unspent;
+            collected_amount += collected_from_unspent_slips;
+            self.available_balance -= collected_from_unspent_slips;
         }
 
-        for key in keys_to_remove {
+        for key in unlocked_slips_to_remove {
             self.staking_slips.remove(&key);
         }
 
@@ -627,7 +628,7 @@ impl Wallet {
             }
         }
 
-        Ok((inputs, outputs))
+        Ok((selected_staking_inputs, outputs))
     }
 }
 

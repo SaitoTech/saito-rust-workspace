@@ -47,7 +47,7 @@ const FORK_ID_WEIGHTS: [u64; 16] = [
 // pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
 pub const DEFAULT_SOCIAL_STAKE: Currency = 0;
 
-pub const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 100;
+pub const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 60;
 
 #[derive(Debug)]
 pub enum AddBlockResult {
