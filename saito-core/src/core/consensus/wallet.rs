@@ -751,7 +751,7 @@ mod tests {
         let mut t = TestManager::default();
         {
             let mut blockchain = t.blockchain_lock.write().await;
-            blockchain.social_stake_amount = 0;
+            blockchain.social_stake_requirement = 0;
         }
         t.initialize(1, 500).await;
 

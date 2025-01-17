@@ -2455,7 +2455,7 @@ impl Block {
         //
         // social staking transactions (if required)
         //
-        if blockchain.social_stake_amount != 0 && cv.st_num != 1 && self.id > 1 {
+        if blockchain.social_stake_requirement != 0 && cv.st_num != 1 && self.id > 1 {
             error!(
                 "block : {:?} does not have a staking transaction",
                 self.hash.to_hex()

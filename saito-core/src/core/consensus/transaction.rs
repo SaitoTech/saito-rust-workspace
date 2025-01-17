@@ -828,10 +828,10 @@ impl Transaction {
                 }
             }
 
-            if total_stakes < blockchain.social_stake_amount {
+            if total_stakes < blockchain.social_stake_requirement {
                 error!(
                     "Not enough funds staked. expected: {:?}, staked: {:?}",
-                    blockchain.social_stake_amount, total_stakes
+                    blockchain.social_stake_requirement, total_stakes
                 );
                 return false;
             }
