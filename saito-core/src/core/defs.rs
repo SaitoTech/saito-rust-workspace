@@ -1,11 +1,13 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
 use ahash::AHashMap;
 use tokio::sync::mpsc::Sender;
 
 pub type Currency = u64;
+
 /// Time in milliseconds
 pub type Timestamp = u64;
 pub type SaitoSignature = [u8; 64];

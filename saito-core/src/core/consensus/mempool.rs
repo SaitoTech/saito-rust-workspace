@@ -205,7 +205,7 @@ impl Mempool {
 
             staking_tx = wallet
                 .create_staking_transaction(
-                    blockchain.social_stake_amount,
+                    blockchain.social_stake_requirement,
                     blockchain.get_latest_unlocked_stake_block_id(),
                 )
                 .ok()?;

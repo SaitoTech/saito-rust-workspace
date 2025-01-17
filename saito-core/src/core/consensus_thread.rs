@@ -732,24 +732,24 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
-    async fn total_supply_test_with_staking() {
+    async fn total_supply_test_with_staking_for_slip_count() {
         pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
         let public_key = tester.get_public_key().await;
         tester
-            .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, DEFAULT_SOCIAL_STAKE_PERIOD)
+            .set_staking_requirement(2 * NOLAN_PER_SAITO, DEFAULT_SOCIAL_STAKE_PERIOD)
             .await;
         let issuance = vec![
             (
                 public_key.to_base58(),
-                DEFAULT_SOCIAL_STAKE_PERIOD * 2_000_000 * NOLAN_PER_SAITO,
+                DEFAULT_SOCIAL_STAKE_PERIOD * 2 * NOLAN_PER_SAITO,
             ),
-            (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100 * NOLAN_PER_SAITO),
             (
                 "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
-                50_000 * NOLAN_PER_SAITO,
+                50 * NOLAN_PER_SAITO,
             ),
         ];
         tester.set_issuance(issuance).await.unwrap();
@@ -785,6 +785,17 @@ mod tests {
                     .staking_slips
                     .len() as u64,
                 std::cmp::min(DEFAULT_SOCIAL_STAKE_PERIOD, i - 1)
+            );
+            let available_balance = tester
+                .consensus_thread
+                .wallet_lock
+                .read()
+                .await
+                .get_available_balance();
+            assert!(
+                available_balance
+                    + std::cmp::min(DEFAULT_SOCIAL_STAKE_PERIOD, i - 1) * 2 * NOLAN_PER_SAITO
+                    <= tester.initial_token_supply
             );
         }
     }
