@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
 use ahash::AHashMap;
