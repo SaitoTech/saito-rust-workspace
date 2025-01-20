@@ -171,7 +171,7 @@ pub mod test {
 
         pub async fn disable_staking(&mut self) {
             let mut blockchain = self.blockchain_lock.write().await;
-            blockchain.social_stake_amount = 0;
+            blockchain.social_stake_requirement = 0;
         }
 
         pub async fn enable_staking(&mut self, mut stake_value: Currency) {
@@ -179,7 +179,7 @@ pub mod test {
             if stake_value == 0 {
                 stake_value = DEFAULT_SOCIAL_STAKE;
             }
-            blockchain.social_stake_amount = stake_value;
+            blockchain.social_stake_requirement = stake_value;
         }
 
         pub async fn convert_issuance_to_hashmap(
@@ -601,7 +601,7 @@ pub mod test {
             let is_staking_enabled;
             {
                 let blockchain = self.blockchain_lock.read().await;
-                is_staking_enabled = blockchain.social_stake_amount != 0;
+                is_staking_enabled = blockchain.social_stake_requirement != 0;
             }
 
             self.create_block_with_staking(
@@ -687,7 +687,7 @@ pub mod test {
                 let blockchain = self.blockchain_lock.read().await;
                 let mut wallet = self.wallet_lock.write().await;
                 let result = wallet.create_staking_transaction(
-                    blockchain.social_stake_amount,
+                    blockchain.social_stake_requirement,
                     blockchain.get_latest_unlocked_stake_block_id(),
                 );
                 assert!(result.is_ok());

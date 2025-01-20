@@ -47,7 +47,7 @@ const FORK_ID_WEIGHTS: [u64; 16] = [
 // pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
 pub const DEFAULT_SOCIAL_STAKE: Currency = 0;
 
-pub const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 100;
+pub const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 60;
 
 #[derive(Debug)]
 pub enum AddBlockResult {
@@ -92,7 +92,7 @@ pub struct Blockchain {
     pub lowest_acceptable_block_hash: SaitoHash,
     pub lowest_acceptable_block_id: u64,
 
-    pub social_stake_amount: Currency,
+    pub social_stake_requirement: Currency,
     pub social_stake_period: u64,
 }
 
@@ -116,7 +116,7 @@ impl Blockchain {
             lowest_acceptable_block_hash: [0; 32],
             lowest_acceptable_block_id: 0,
             // blocks_fetching: Default::default(),
-            social_stake_amount: DEFAULT_SOCIAL_STAKE,
+            social_stake_requirement: DEFAULT_SOCIAL_STAKE,
             social_stake_period: DEFAULT_SOCIAL_STAKE_PERIOD,
         }
     }
@@ -2906,7 +2906,7 @@ mod tests {
         {
             let blockchain = t.blockchain_lock.read().await;
 
-            if blockchain.social_stake_amount == 0 {
+            if blockchain.social_stake_requirement == 0 {
                 // this test won't pass if staking is not available
                 return;
             }

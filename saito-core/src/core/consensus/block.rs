@@ -1052,7 +1052,7 @@ impl Block {
     pub fn generate(&mut self) -> bool {
         let creator_public_key = &self.creator;
 
-        self.total_rebroadcast_nolan = 0;
+        //self.total_rebroadcast_nolan = 0;
         self.total_rebroadcast_slips = 0;
         self.rebroadcast_hash = [0; 32];
 
@@ -1148,7 +1148,8 @@ impl Block {
                     for slip in transaction.to.iter() {
                         if matches!(slip.slip_type, SlipType::ATR) {
                             self.total_rebroadcast_slips += 1;
-                            self.total_rebroadcast_nolan += slip.amount;
+                            // deprecated
+                            //self.total_rebroadcast_nolan += slip.amount;
                         }
                     }
                 }
@@ -2455,7 +2456,7 @@ impl Block {
         //
         // social staking transactions (if required)
         //
-        if blockchain.social_stake_amount != 0 && cv.st_num != 1 && self.id > 1 {
+        if blockchain.social_stake_requirement != 0 && cv.st_num != 1 && self.id > 1 {
             error!(
                 "block : {:?} does not have a staking transaction",
                 self.hash.to_hex()
@@ -2615,13 +2616,14 @@ impl Block {
             );
             return false;
         }
-        if cv.total_rebroadcast_nolan != self.total_rebroadcast_nolan {
-            error!(
-                "ERROR 294018: rebroadcast nolan amount incorrect. expected : {:?} actual : {:?}",
-                cv.total_rebroadcast_nolan, self.total_rebroadcast_nolan
-            );
-            return false;
-        }
+        // deprecated -- Jan 20, 2025
+        //if cv.total_rebroadcast_nolan != self.total_rebroadcast_nolan {
+        //    error!(
+        //        "ERROR 294018: rebroadcast nolan amount incorrect. expected : {:?} actual : {:?}",
+        //        cv.total_rebroadcast_nolan, self.total_rebroadcast_nolan
+        //    );
+        //    return false;
+        //}
         if cv.rebroadcast_hash != self.rebroadcast_hash {
             error!("ERROR 123422: hash of rebroadcast transactions incorrect");
             return false;

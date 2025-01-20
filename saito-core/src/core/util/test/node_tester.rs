@@ -497,11 +497,11 @@ pub mod test {
                 .blockchain_lock
                 .write()
                 .await
-                .social_stake_amount = if enable { DEFAULT_SOCIAL_STAKE } else { 0 };
+                .social_stake_requirement = if enable { DEFAULT_SOCIAL_STAKE } else { 0 };
         }
         pub async fn set_staking_requirement(&self, amount: Currency, period: u64) {
             let mut blockchain = self.routing_thread.blockchain_lock.write().await;
-            blockchain.social_stake_amount = amount;
+            blockchain.social_stake_requirement = amount;
             blockchain.social_stake_period = period;
         }
 
@@ -581,22 +581,30 @@ pub mod test {
             );
             warn!("Current supply is {}", current_supply);
             warn!("Initial token supply is {}", self.initial_token_supply);
-            warn!("Social Stake is {}", blockchain.social_stake_amount);
+            warn!(
+                "Social Stake Requirement is {}",
+                blockchain.social_stake_requirement
+            );
             warn!("Graveyard is {}", latest_block.graveyard);
             warn!("Treasury is {}", latest_block.treasury);
             warn!("Unpaid fees is {}", latest_block.previous_block_unpaid);
             warn!("Block fee is {}", latest_block.total_fees);
             warn!("Amount in utxo {}", amount_in_utxo);
+            blockchain
+                .utxoset
+                .iter()
+                .filter(|(_, value)| **value)
+                .for_each(|(key, _)| {
+                    let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+                    info!(
+                        "Utxo : {:?} : {} : {:?}",
+                        slip.public_key.to_base58(),
+                        slip.amount,
+                        slip.slip_type
+                    );
+                });
 
             if current_supply != self.initial_token_supply {
-                blockchain
-                    .utxoset
-                    .iter()
-                    .filter(|(_, value)| **value)
-                    .for_each(|(key, _)| {
-                        let slip = Slip::parse_slip_from_utxokey(key).unwrap();
-                        info!("Utxo : {:?} : {}", slip.public_key.to_base58(), slip.amount);
-                    });
                 return Err(Error::from(ErrorKind::InvalidData));
             }
 

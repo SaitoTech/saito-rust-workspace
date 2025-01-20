@@ -608,6 +608,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
 #[cfg(test)]
 mod tests {
+    use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::defs::{PrintForLog, NOLAN_PER_SAITO};
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::node_tester::test::NodeTester;
@@ -615,7 +616,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn total_supply_test() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
@@ -682,5 +683,120 @@ mod tests {
             .check_total_supply()
             .await
             .expect("total supply should not change");
+    }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn total_supply_test_with_ATR() {
+        // pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
+        let peer_public_key = generate_keys().0;
+        let mut tester = NodeTester::default();
+        let public_key = tester.get_public_key().await;
+        // tester
+        //     .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
+        //     .await;
+        let issuance = vec![
+            // (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50_000 * NOLAN_PER_SAITO,
+            ),
+        ];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let genesis_period = tester
+            .consensus_thread
+            .config_lock
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .genesis_period;
+        for i in 2..2 * genesis_period + 2 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn total_supply_test_with_staking_for_slip_count() {
+        pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
+        let peer_public_key = generate_keys().0;
+        let mut tester = NodeTester::default();
+        let public_key = tester.get_public_key().await;
+        tester
+            .set_staking_requirement(2 * NOLAN_PER_SAITO, DEFAULT_SOCIAL_STAKE_PERIOD)
+            .await;
+        let issuance = vec![
+            (
+                public_key.to_base58(),
+                DEFAULT_SOCIAL_STAKE_PERIOD * 2 * NOLAN_PER_SAITO,
+            ),
+            (public_key.to_base58(), 100 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50 * NOLAN_PER_SAITO,
+            ),
+        ];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let genesis_period = tester
+            .consensus_thread
+            .config_lock
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .genesis_period;
+        for i in 2..2 * genesis_period + 2 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+            assert_eq!(
+                tester
+                    .consensus_thread
+                    .wallet_lock
+                    .read()
+                    .await
+                    .staking_slips
+                    .len() as u64,
+                std::cmp::min(DEFAULT_SOCIAL_STAKE_PERIOD, i - 1)
+            );
+            let available_balance = tester
+                .consensus_thread
+                .wallet_lock
+                .read()
+                .await
+                .get_available_balance();
+            assert!(
+                available_balance
+                    + std::cmp::min(DEFAULT_SOCIAL_STAKE_PERIOD, i - 1) * 2 * NOLAN_PER_SAITO
+                    <= tester.initial_token_supply
+            );
+        }
     }
 }
