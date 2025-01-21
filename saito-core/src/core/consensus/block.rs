@@ -1307,6 +1307,12 @@ impl Block {
                 configs.get_consensus_config().unwrap().heartbeat_interval,
             );
 
+            info!("cv.burnfee: {:?}", cv.burnfee);
+
+            if cv.burnfee == 0 {
+                cv.burnfee = 1;
+            }
+
             //
             // difficulty
             //
@@ -1813,13 +1819,6 @@ impl Block {
         let adjustment = (previous_block_avg_payout_atr as i128 - cv.total_payout_atr as i128)
             / configs.get_consensus_config().unwrap().genesis_period as i128;
         cv.avg_payout_atr = (previous_block_avg_payout_atr as i128 - adjustment) as Currency;
-
-        info!("cv.burnfee: {:?}", cv.burnfee);
-
-        if cv.burnfee == 0 {
-            cv.burnfee = 1;
-        }
-
 
         cv
     }
