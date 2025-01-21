@@ -1307,8 +1307,6 @@ impl Block {
                 configs.get_consensus_config().unwrap().heartbeat_interval,
             );
 
-            info!("cv.burnfee: {:?}", cv.burnfee);
-
             if cv.burnfee == 0 {
                 cv.burnfee = 1;
             }
