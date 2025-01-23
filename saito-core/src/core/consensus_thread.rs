@@ -686,7 +686,7 @@ mod tests {
     }
     #[tokio::test]
     #[serial_test::serial]
-    async fn total_supply_test_with_ATR() {
+    async fn total_supply_test_with_atr() {
         // pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
@@ -733,7 +733,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn total_supply_test_with_staking_for_slip_count() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
@@ -797,6 +797,135 @@ mod tests {
                     + std::cmp::min(DEFAULT_SOCIAL_STAKE_PERIOD, i - 1) * 2 * NOLAN_PER_SAITO
                     <= tester.initial_token_supply
             );
+        }
+    }
+
+    #[ignore]
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn blockchain_state_over_atr() {
+        pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
+        let peer_public_key = generate_keys().0;
+        let mut tester = NodeTester::new(3);
+        let public_key = tester.get_public_key().await;
+        // tester
+        //     .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
+        //     .await;
+        let issuance = vec![
+            // (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50_000 * NOLAN_PER_SAITO,
+            ),
+        ];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let genesis_period = tester
+            .consensus_thread
+            .config_lock
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .genesis_period;
+        assert_eq!(genesis_period, 3, "genesis period should be 3");
+
+        let tx = tester
+            .create_transaction(1000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(2).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let tx = tester
+            .create_transaction(1000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(3).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block = blockchain.get_latest_block().expect("block should exist");
+            assert_eq!(block.total_fees_atr, 0);
+        }
+        let tx = tester
+            .create_transaction(1000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(4).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block = blockchain.get_latest_block().expect("block should exist");
+            assert!(block.total_fees_atr > 0);
+        }
+
+        let tx = tester
+            .create_transaction(1000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(5).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block = blockchain.get_latest_block().expect("block should exist");
+            assert!(block.total_fees_atr > 0);
+        }
+
+        let tx = tester
+            .create_transaction(1000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(6).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block = blockchain.get_latest_block().expect("block should exist");
+            assert!(block.total_fees_atr > 0);
+        }
+
+        let tx = tester
+            .create_transaction(1000, 1000, public_key)
+            .await
+            .unwrap();
+        tester.add_transaction(tx).await;
+        tester.wait_till_block_id(7).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block = blockchain.get_latest_block().expect("block should exist");
+            assert!(block.total_fees_atr > 0);
         }
     }
 }

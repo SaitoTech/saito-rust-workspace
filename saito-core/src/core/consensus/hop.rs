@@ -1,9 +1,10 @@
+use std::fmt::Display;
 use std::io::{Error, ErrorKind};
 
 use serde::{Deserialize, Serialize};
 
 use crate::core::consensus::transaction::Transaction;
-use crate::core::defs::{SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
+use crate::core::defs::{PrintForLog, SaitoPrivateKey, SaitoPublicKey, SaitoSignature};
 use crate::core::util::crypto::sign;
 
 pub const HOP_SIZE: usize = 130;
@@ -18,7 +19,15 @@ pub struct Hop {
     #[serde_as(as = "[_; 64]")]
     pub sig: SaitoSignature,
 }
-
+impl Display for Hop {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        writeln!(f, "Hop : {{")?;
+        writeln!(f, " from : {}", self.from.to_base58())?;
+        writeln!(f, " to : {}", self.to.to_base58())?;
+        writeln!(f, " sig: {}", self.sig.to_hex())?;
+        writeln!(f, "}}")
+    }
+}
 impl Default for Hop {
     fn default() -> Self {
         Hop {

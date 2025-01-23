@@ -1,4 +1,5 @@
 use ahash::AHashSet;
+use std::fmt::{Display, Formatter, Pointer};
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::blockchain::Blockchain;
@@ -66,6 +67,50 @@ pub struct Transaction {
     pub total_work_for_me: Currency,
     /// cumulative fees for this tx-in-block
     pub cumulative_fees: Currency,
+}
+
+impl Display for Transaction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "++++++++++++++++++++++++++++++++++++++++++++++++++")?;
+        writeln!(f, "Tx : {{")?;
+        writeln!(f, " type : {:?}", self.transaction_type)?;
+        writeln!(f, " data_size : {:?} ", self.data.len())?;
+        writeln!(f, " timestamp : {:?} ", self.timestamp)?;
+        writeln!(f, " signature : {:?} ", self.signature.to_hex())?;
+        writeln!(
+            f,
+            " hash : {:?} ",
+            self.hash_for_signature.unwrap_or_default().to_hex()
+        )?;
+        writeln!(f, " total_in : {:?} ", self.total_in)?;
+        writeln!(f, " total_out : {:?} ", self.total_out)?;
+        writeln!(f, " total_fees : {:?} ", self.total_fees)?;
+        writeln!(f, " total_work_for_me : {:?} ", self.total_work_for_me)?;
+        writeln!(f, " cumulative_fees : {:?} ", self.cumulative_fees)?;
+        writeln!(f, " from slips : count : {:?}", self.from.len())?;
+        if !self.from.is_empty() {
+            writeln!(f, "---------------------------------------------")?;
+        }
+        for slip in self.from.iter() {
+            writeln!(f, "{}", slip)?;
+        }
+        if !self.to.is_empty() {
+            writeln!(f, "---------------------------------------------")?;
+        }
+        writeln!(f, " to slips : count : {:?}", self.to.len())?;
+        for slip in self.to.iter() {
+            writeln!(f, "{}", slip)?;
+        }
+        if !self.path.is_empty() {
+            writeln!(f, "---------------------------------------------")?;
+        }
+        writeln!(f, " path :  length : {:?}", self.path.len())?;
+        for hop in self.path.iter() {
+            writeln!(f, "{}", hop)?;
+        }
+        writeln!(f, "}}")?;
+        writeln!(f, "++++++++++++++++++++++++++++++++++++++++++++++++++")
+    }
 }
 
 impl Default for Transaction {
@@ -290,9 +335,13 @@ impl Transaction {
     /// ```
     pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
-        to_slip: Slip,
+        mut to_slip: Slip,
         from_slip: Slip,
     ) -> Transaction {
+        debug!(
+            "creating rebroadcast transaction \nfrom : {} \nto : {} \ntx_to_rebroadcast: {}",
+            from_slip, to_slip, transaction_to_rebroadcast
+        );
         let mut transaction = Transaction::default();
 
         transaction.transaction_type = TransactionType::ATR;
@@ -318,10 +367,14 @@ impl Transaction {
         assert_eq!(to_slip.slip_type, SlipType::ATR);
         transaction.add_to_slip(to_slip);
 
+        transaction.generate_total_fees(0, 0);
+
         // signature is the ORIGINAL signature. this transaction
         // will fail its signature check and then get analysed as
         // a rebroadcast transaction because of its transaction type.
         transaction.signature = transaction_to_rebroadcast.signature;
+
+        debug!("generated rebroadcast transaction: {}", transaction);
 
         transaction
     }
