@@ -1,14 +1,14 @@
-use std::convert::TryInto;
-use std::io::{Error, ErrorKind};
-use std::ops::Rem;
-use std::{i128, mem};
-
 use ahash::AHashMap;
 use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::Zero;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
+use std::fmt::{Display, Formatter};
+use std::io::{Error, ErrorKind};
+use std::ops::Rem;
+use std::{i128, mem};
 
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::burnfee::BurnFee;
@@ -368,6 +368,12 @@ pub struct Block {
     // used for checking, before pruning txs from block on downgrade
     pub safe_to_prune_transactions: bool,
 }
+
+// impl Display for Block {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+//         todo!()
+//     }
+// }
 
 impl Block {
     #[allow(clippy::new_without_default)]
@@ -1460,6 +1466,7 @@ impl Block {
                                         //
                                         cv.total_rebroadcast_nolan += output.amount;
                                         cv.total_fees_atr += output.amount;
+                                        debug!("we dont rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
                                     }
                                 }
                             } // output loop
@@ -2625,7 +2632,7 @@ impl Block {
         //    return false;
         //}
         if cv.rebroadcast_hash != self.rebroadcast_hash {
-            error!("ERROR 123422: hash of rebroadcast transactions incorrect");
+            error!("ERROR 123422: hash of rebroadcast transactions incorrect. expected : {:?} actual : {:?}",cv.rebroadcast_hash.to_hex(), self.rebroadcast_hash.to_hex());
             return false;
         }
 
