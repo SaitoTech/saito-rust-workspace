@@ -150,19 +150,29 @@ pub mod test {
 
     impl Default for NodeTester {
         fn default() -> Self {
+            Self::new(100)
+        }
+    }
+    impl NodeTester {
+        pub fn new(genesis_period: BlockId) -> Self {
             let (public_key, private_key) = generate_keys();
             let wallet = Arc::new(RwLock::new(Wallet::new(private_key, public_key)));
 
             info!("node tester public key : {:?}", public_key.to_base58());
 
+            let mut configuration = TestConfiguration::default();
+            configuration.consensus.as_mut().unwrap().genesis_period = genesis_period;
             let configuration: Arc<RwLock<dyn Configuration + Send + Sync>> =
-                Arc::new(RwLock::new(TestConfiguration::default()));
+                Arc::new(RwLock::new(configuration));
 
             let channel_size = 1_000_000;
 
             let peers = Arc::new(RwLock::new(PeerCollection::default()));
             let context = Context {
-                blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet.clone(), 100))),
+                blockchain_lock: Arc::new(RwLock::new(Blockchain::new(
+                    wallet.clone(),
+                    genesis_period,
+                ))),
                 mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
                 wallet_lock: wallet.clone(),
                 config_lock: configuration.clone(),
@@ -294,8 +304,6 @@ pub mod test {
                 initial_token_supply: 0,
             }
         }
-    }
-    impl NodeTester {
         pub async fn init(&mut self) -> Result<(), Error> {
             self.consensus_thread.on_init().await;
             self.routing_thread.on_init().await;
@@ -588,6 +596,8 @@ pub mod test {
             warn!("Graveyard is {}", latest_block.graveyard);
             warn!("Treasury is {}", latest_block.treasury);
             warn!("Unpaid fees is {}", latest_block.previous_block_unpaid);
+            warn!("Total Fees ATR is {}", latest_block.total_fees_atr);
+            warn!("Total Fees New is {}", latest_block.total_fees_new);
             warn!("Block fee is {}", latest_block.total_fees);
             warn!("Amount in utxo {}", amount_in_utxo);
             blockchain
@@ -605,6 +615,16 @@ pub mod test {
                 });
 
             if current_supply != self.initial_token_supply {
+                return Err(Error::from(ErrorKind::InvalidData));
+            }
+            if latest_block.total_fees != latest_block.total_fees_new + latest_block.total_fees_atr
+            {
+                warn!(
+                    "total fees : {:?} doesn't equal to new fees : {:?} + atr fees {:?}",
+                    latest_block.total_fees,
+                    latest_block.total_fees_new,
+                    latest_block.total_fees_atr
+                );
                 return Err(Error::from(ErrorKind::InvalidData));
             }
 

@@ -222,7 +222,7 @@ impl Wallet {
         network: Option<&Network>,
     ) {
         if self.slips.contains_key(&slip.get_utxoset_key()) {
-            debug!("wallet already has slip : {:?}", slip);
+            debug!("wallet already has slip : {}", slip);
             return;
         }
         let mut wallet_slip = WalletSlip::new();
@@ -244,7 +244,7 @@ impl Wallet {
         }
 
         debug!(
-            "adding slip of type : {:?} with value : {:?} to wallet : {:?} slip : {:?}",
+            "adding slip of type : {:?} with value : {:?} to wallet : {:?} \nslip : {}",
             wallet_slip.slip_type,
             wallet_slip.amount,
             wallet_slip.utxokey.to_hex(),
