@@ -986,8 +986,6 @@ impl Block {
     // find winning router in block path
     //
     pub fn find_winning_router(&self, random_number: SaitoHash) -> SaitoPublicKey {
-        info!("finding winning_router for block: ${:?}", self.id);
-        info!("******************************************************************************");
         let winner_pubkey: SaitoPublicKey;
 
         // find winning nolan
@@ -1021,18 +1019,9 @@ impl Block {
                 break;
             }
         }
-
-        info!("transactions inside block: ${:?}", self.id);
-        info!("transactions: ${:?}", self.transactions);
-        info!("******************************************************************************");
-
-        info!("winning_tx1: ${:?}", winning_tx);
-        info!("******************************************************************************");
-
         //
         // if winner is atr, we take inside TX
         //
-
 
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.data.to_vec();
@@ -1044,16 +1033,10 @@ impl Block {
                 winning_tx.cumulative_fees,
                 Currency::zero(),
                 "winning tx doesn't have fees"
-            );    
+            );
         }
-
-        info!("winning_tx2: ${:?}", winning_tx);
-        info!("******************************************************************************");
-
         // hash random number to pick routing node
         winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
-        
-        info!("winner_pubkey: ${:?}", winner_pubkey);
         winner_pubkey
     }
 
@@ -1120,11 +1103,6 @@ impl Block {
         // we take advantage of the sweep to perform other pre-validation work
         // like counting up our ATR transactions and generating the hash
         // commitment for all of our rebroadcasts.
-        info!("block_id: ${:?}", self.id);
-        info!("block transactions: ${:?}", self.transactions);
-        info!("******************************************************************************");
-
-
         for i in 0..self.transactions.len() {
             let transaction = &mut self.transactions[i];
 
@@ -1360,11 +1338,6 @@ impl Block {
         // automatic transaction rebroadcasts / atr
         //
         if self.id > configs.get_consensus_config().unwrap().genesis_period {
-
-            info!("self.id: ${:?}", self.id);
-            info!("configs.get_consensus_config().unwrap().genesis_period: ${:?}", configs.get_consensus_config().unwrap().genesis_period);
-            info!("self.id - configs.get_consensus_config().unwrap().genesis_period: ${:?}", self.id - configs.get_consensus_config().unwrap().genesis_period); 
-
             if let Some(pruned_block_hash) = blockchain
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(
@@ -1663,8 +1636,6 @@ impl Block {
                 } else {
                     router1_payout = expected_router_payout;
                 }
-                info!("before find_winning_router 1");
-                info!("******************************************************************************");
                 router1_publickey = previous_block.find_winning_router(next_random_number);
 
                 //
@@ -1724,8 +1695,6 @@ impl Block {
                         } else {
                             router2_payout = expected_router2_payout;
                         }
-                        info!("before find_winning_router 2");
-                        info!("******************************************************************************");
                         router2_publickey =
                             previous_previous_block.find_winning_router(next_random_number);
 
