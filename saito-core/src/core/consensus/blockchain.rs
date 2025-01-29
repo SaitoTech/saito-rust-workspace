@@ -639,6 +639,7 @@ impl Blockchain {
             current_block_id -= weight;
 
             // index to update
+
             let index = 2 * i;
             if let Some(block_hash) = self
                 .blockring
@@ -737,6 +738,7 @@ impl Blockchain {
 
             // index in fork_id hash
             let index = 2 * index;
+
             // compare input hash to my hash
             if let Some(block_hash) = self
                 .blockring
@@ -833,7 +835,7 @@ impl Blockchain {
         if latest_block_id > count {
             min_id = latest_block_id - count;
         }
-        info!("------------------------------------------------------");
+        debug!("------------------------------------------------------");
         while current_id > 0 && current_id >= min_id {
             if current_id < (2 * configs.get_consensus_config().unwrap().genesis_period) {
                 break;
