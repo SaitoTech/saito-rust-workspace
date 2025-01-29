@@ -311,7 +311,12 @@ impl Blockchain {
                         block_id + 1,
                         disconnected_block_id
                     );
+
+                    info!("get_longest_chain_block_hash_at_block_id insid eadd_block *****************************");
                     for i in block_id + 1..=disconnected_block_id {
+
+                        info!("i = ${:?}", i);
+
                         if let Some(disconnected_block_hash) =
                             self.blockring.get_longest_chain_block_hash_at_block_id(i)
                         {
@@ -549,6 +554,14 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
     ) {
         if self.get_latest_block_id() > configs.get_consensus_config().unwrap().genesis_period {
+            
+            info!("get_longest_chain_block_hash_at_block_id insid prune_blocks_after_add_block *****************************");
+
+            info!("self.get_latest_block_id(): ${:?}", self.get_latest_block_id());
+            info!("configs.get_consensus_config().unwrap().genesis_period: ${:?}", configs.get_consensus_config().unwrap().genesis_period);
+            info!("self.get_latest_block_id - configs.get_consensus_config().unwrap().genesis_period: ${:?}", (self.get_latest_block_id()
+                        - configs.get_consensus_config().unwrap().genesis_period)); 
+
             if let Some(pruned_block_hash) =
                 self.blockring.get_longest_chain_block_hash_at_block_id(
                     self.get_latest_block_id()
@@ -639,6 +652,11 @@ impl Blockchain {
 
             // index to update
             let index = 2 * i;
+
+            info!("get_longest_chain_block_hash_at_block_id insid generate_fork_id *****************************");
+
+            info!("current_block_id: ${:?}", current_block_id);
+
 
             if let Some(block_hash) = self
                 .blockring
@@ -738,6 +756,10 @@ impl Blockchain {
             // index in fork_id hash
             let index = 2 * index;
 
+            info!("get_longest_chain_block_hash_at_block_id insid generate_last_shared_ancestor_when_peer_behind *****************************");
+
+            info!("block_id: ${:?}", block_id);
+
             // compare input hash to my hash
             if let Some(block_hash) = self
                 .blockring
@@ -805,6 +827,11 @@ impl Blockchain {
             // index in fork_id hash
             let index = 2 * index;
 
+
+            info!("get_longest_chain_block_hash_at_block_id insid generate_last_shared_ancestor_when_peer_ahead *****************************");
+
+            info!("block_id: ${:?}", block_id);
+
             // compare input hash to my hash
             if let Some(block_hash) = self
                 .blockring
@@ -826,7 +853,7 @@ impl Blockchain {
         }
         None
     }
-    fn print(&self, count: u64) {
+    fn print(&self, count: u64, configs: &(dyn Configuration + Send + Sync)) {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
@@ -834,8 +861,18 @@ impl Blockchain {
         if latest_block_id > count {
             min_id = latest_block_id - count;
         }
-        debug!("------------------------------------------------------");
+        info!("------------------------------------------------------");
+
+        info!("print - get_longest_chain_block_hash_at_block_id ***********");
+        info!("min_id: ${:?}", min_id);
+
         while current_id > 0 && current_id >= min_id {
+
+            if current_id < (2* configs.get_consensus_config().unwrap().genesis_period) {
+                info!("current_id ${:?} is going below ${:?}:", current_id, (2* configs.get_consensus_config().unwrap().genesis_period));
+                break;
+            }
+
             if let Some(hash) = self
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(current_id)
@@ -843,13 +880,13 @@ impl Blockchain {
                 if hash == [0; 32] {
                     break;
                 }
-                debug!("{} - {:?}", current_id, hash.to_hex());
+                info!("{} - {:?}", current_id, hash.to_hex());
                 current_id -= 1;
             } else {
                 break;
             }
         }
-        debug!("------------------------------------------------------");
+        info!("------------------------------------------------------");
     }
 
     pub fn get_latest_block(&self) -> Option<&Block> {
@@ -880,6 +917,7 @@ impl Blockchain {
     }
 
     pub fn get_block(&self, block_hash: &SaitoHash) -> Option<&Block> {
+        info!("blockchain.rs 1 ${:?}", block_hash);
         self.blocks.get(block_hash)
     }
 
@@ -1361,6 +1399,9 @@ impl Blockchain {
 
         let latest_block_id: BlockId = block.id;
 
+
+        info!("get_longest_chain_block_hash_at_block_id inside upgrade_blocks_for_wind_chain *****************************");
+
         for i in 1..configs
             .get_consensus_config()
             .unwrap()
@@ -1370,6 +1411,12 @@ impl Blockchain {
                 break;
             }
             let bid = latest_block_id - i;
+
+            info!("latest_block_id: ${:?}", latest_block_id);
+            info!("bid: ${:?}", bid);
+            info!("******************************************************");
+
+
             if let Some(previous_block_hash) =
                 self.blockring.get_longest_chain_block_hash_at_block_id(bid)
             {
@@ -1745,11 +1792,14 @@ impl Blockchain {
                     }
                 }
             }
+
+            info!("print inside add_blocks_from_mempool");
+
             if sender_to_miner.is_some() {
-                self.print(10);
+                self.print(10, configs);
             }
 
-            debug!(
+            info!(
                 "added blocks to blockchain. added back : {:?}",
                 mempool.blocks_queue.len()
             );
