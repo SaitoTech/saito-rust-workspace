@@ -311,6 +311,7 @@ impl Blockchain {
                         block_id + 1,
                         disconnected_block_id
                     );
+
                     for i in block_id + 1..=disconnected_block_id {
                         if let Some(disconnected_block_hash) =
                             self.blockring.get_longest_chain_block_hash_at_block_id(i)
@@ -638,8 +639,8 @@ impl Blockchain {
             current_block_id -= weight;
 
             // index to update
-            let index = 2 * i;
 
+            let index = 2 * i;
             if let Some(block_hash) = self
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(current_block_id)
@@ -826,7 +827,7 @@ impl Blockchain {
         }
         None
     }
-    fn print(&self, count: u64) {
+    fn print(&self, count: u64, configs: &(dyn Configuration + Send + Sync)) {
         let latest_block_id = self.get_latest_block_id();
         let mut current_id = latest_block_id;
 
@@ -836,6 +837,10 @@ impl Blockchain {
         }
         debug!("------------------------------------------------------");
         while current_id > 0 && current_id >= min_id {
+            if current_id < (2 * configs.get_consensus_config().unwrap().genesis_period) {
+                break;
+            }
+
             if let Some(hash) = self
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(current_id)
@@ -1360,7 +1365,6 @@ impl Blockchain {
             .await;
 
         let latest_block_id: BlockId = block.id;
-
         for i in 1..configs
             .get_consensus_config()
             .unwrap()
@@ -1745,8 +1749,9 @@ impl Blockchain {
                     }
                 }
             }
+
             if sender_to_miner.is_some() {
-                self.print(10);
+                self.print(10, configs);
             }
 
             debug!(
