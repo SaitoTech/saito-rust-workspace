@@ -1032,7 +1032,8 @@ impl Block {
             assert_ne!(
                 winning_tx.cumulative_fees,
                 Currency::zero(),
-                "winning tx doesn't have fees"
+                "winning tx doesn't have fees {}",
+                winning_tx
             );
         }
         // hash random number to pick routing node
