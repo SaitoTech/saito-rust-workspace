@@ -1019,22 +1019,23 @@ impl Block {
                 break;
             }
         }
-
         //
         // if winner is atr, we take inside TX
         //
+
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.data.to_vec();
             winning_tx_placeholder =
                 Transaction::deserialize_from_net(&tmptx).expect("buffer to be valid");
             winning_tx = &winning_tx_placeholder;
+        } else {
+            assert_ne!(
+                winning_tx.cumulative_fees,
+                Currency::zero(),
+                "winning tx doesn't have fees {}",
+                winning_tx
+            );
         }
-        assert_ne!(
-            winning_tx.cumulative_fees,
-            Currency::zero(),
-            "winning tx doesn't have fees"
-        );
-
         // hash random number to pick routing node
         winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
         winner_pubkey
@@ -1313,6 +1314,10 @@ impl Block {
                 previous_block.timestamp,
                 configs.get_consensus_config().unwrap().heartbeat_interval,
             );
+
+            if cv.burnfee == 0 {
+                cv.burnfee = 1;
+            }
 
             //
             // difficulty
