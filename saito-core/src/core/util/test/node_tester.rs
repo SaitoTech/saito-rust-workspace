@@ -598,7 +598,7 @@ pub mod test {
             warn!("Unpaid fees is {}", latest_block.previous_block_unpaid);
             warn!("Total Fees ATR is {}", latest_block.total_fees_atr);
             warn!("Total Fees New is {}", latest_block.total_fees_new);
-            warn!("Block fee is {}", latest_block.total_fees);
+            warn!("Total Fee is {}", latest_block.total_fees);
             warn!("Amount in utxo {}", amount_in_utxo);
             blockchain
                 .utxoset
