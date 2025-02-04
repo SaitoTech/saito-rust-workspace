@@ -1,5 +1,5 @@
 use ahash::AHashSet;
-use std::fmt::{Display, Formatter, Pointer};
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::blockchain::Blockchain;
@@ -335,7 +335,7 @@ impl Transaction {
     /// ```
     pub fn create_rebroadcast_transaction(
         transaction_to_rebroadcast: &Transaction,
-        mut to_slip: Slip,
+        to_slip: Slip,
         from_slip: Slip,
     ) -> Transaction {
         debug!(
