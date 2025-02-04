@@ -1,7 +1,7 @@
 use crate::core::consensus::peers::peer::{Peer, PeerStatus};
 use crate::core::consensus::peers::peer_state_writer::PeerStateWriter;
-use crate::core::defs::{PeerIndex, SaitoPublicKey, Timestamp};
-use log::info;
+use crate::core::defs::{PeerIndex, PrintForLog, SaitoPublicKey, Timestamp};
+use log::{debug, info};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -46,18 +46,29 @@ impl PeerCollection {
     }
 
     pub fn remove_reconnected_peer(&mut self, public_key: &SaitoPublicKey) -> Option<Peer> {
-        let peer_index;
+        let mut peer_index = None;
         {
-            let peer = self.find_peer_by_address(&public_key)?;
-            if let PeerStatus::Connected = peer.peer_status {
-                // since peer is already connected
+            for (index, peer) in self.index_to_peers.iter() {
+                if peer.public_key.unwrap() == *public_key {
+                    if let PeerStatus::Connected = peer.peer_status {
+                        debug!("peer : {:?} with key : {:?} is already connected", peer.index, public_key.to_base58());
+                        // since peer is already connected
+                        continue;
+                    }
+                    debug!("old peer found for key : {:?}", public_key.to_base58());
+                    peer_index = Some(*index);
+                    break;
+                }
+            }
+            if peer_index.is_none() {
+                debug!("peer with key : {:?} not found", public_key.to_base58());
                 return None;
             }
-            peer_index = peer.index;
         }
 
-        let peer = self.index_to_peers.remove(&peer_index)?;
+        let peer = self.index_to_peers.remove(&peer_index.unwrap())?;
         self.address_to_peers.remove(&peer.public_key?);
+        debug!("removed reconnected peer : {:?} with key : {:?}. current peer count : {:?}", peer_index, peer.public_key.unwrap().to_base58(), self.index_to_peers.len());
 
         Some(peer)
     }

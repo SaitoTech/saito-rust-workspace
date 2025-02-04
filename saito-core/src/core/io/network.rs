@@ -278,9 +278,13 @@ impl Network {
             let peer = peers
                 .find_peer_by_index_mut(peer_index)
                 .expect("peer should exist here since it was accessed previously");
-            peer.join_as_reconnection(old_peer)
+            peer.join_as_reconnection(old_peer);
         } else {
             peers.address_to_peers.insert(public_key, peer_index);
+        }
+
+        for (index, peer) in &peers.index_to_peers {
+            debug!("peer : {:?} with key : {:?} is currently connected : {:?}", index, peer.public_key.unwrap().to_base58(), peer.peer_status);
         }
 
         self.io_interface

@@ -1,4 +1,4 @@
-use log::trace;
+use log::{debug, trace};
 
 use crate::core::consensus::block::Block;
 use crate::core::consensus::ringitem::RingItem;
@@ -123,6 +123,11 @@ impl BlockRing {
     }
 
     pub fn delete_block(&mut self, block_id: u64, block_hash: SaitoHash) {
+        debug!(
+            "blockring.delete_block : block_id = {:?}, block_hash = {:?}",
+            block_id,
+            block_hash.to_hex()
+        );
         let insert_pos = block_id % self.get_ring_buffer_size();
         self.ring[insert_pos as usize].delete_block(block_id, block_hash);
     }

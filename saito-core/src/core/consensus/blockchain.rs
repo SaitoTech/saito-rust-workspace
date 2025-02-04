@@ -372,26 +372,26 @@ impl Blockchain {
             );
             self.blocks.get_mut(&block_hash).unwrap().in_longest_chain = true;
 
-            debug!(
-                "Full block count before= {:?}",
-                self.blocks
-                    .iter()
-                    .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
-                    .count()
-            );
+            // debug!(
+            //     "Full block count before= {:?}",
+            //     self.blocks
+            //         .iter()
+            //         .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
+            //         .count()
+            // );
 
             let (does_new_chain_validate, wallet_updated) = self
                 .validate(new_chain.as_slice(), old_chain.as_slice(), storage, configs)
                 .await;
 
-            debug!(
-                "Full block count after= {:?} wallet_updated= {:?}",
-                self.blocks
-                    .iter()
-                    .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
-                    .count(),
-                wallet_updated
-            );
+            // debug!(
+            //     "Full block count after= {:?} wallet_updated= {:?}",
+            //     self.blocks
+            //         .iter()
+            //         .filter(|(_, block)| matches!(block.block_type, BlockType::Full))
+            //         .count(),
+            //     wallet_updated
+            // );
 
             if does_new_chain_validate {
                 self.add_block_success(block_hash, storage, mempool, configs)
@@ -1558,7 +1558,12 @@ impl Blockchain {
         // so we check that our block is the head of the longest-chain and only
         // update the genesis period when that is the case.
         let latest_block_id = self.get_latest_block_id();
-        if latest_block_id >= ((configs.get_consensus_config().unwrap().genesis_period * 2) + 1) {
+        let block_limit = configs.get_consensus_config().unwrap().genesis_period * 2 + 1;
+        debug!(
+            "latest block id : {:?} block limit : {:?}. upgrading genesis_period. : {:?}",
+            latest_block_id, block_limit, latest_block_id >= block_limit
+        );
+        if latest_block_id >= block_limit {
             // prune blocks
             let purge_bid =
                 latest_block_id - (configs.get_consensus_config().unwrap().genesis_period * 2);
@@ -1585,8 +1590,8 @@ impl Blockchain {
         delete_block_id: u64,
         storage: &Storage,
     ) -> WalletUpdateStatus {
-        trace!(
-            "removing data including from disk at id {}",
+        info!(
+            "removing blocks from disk at id {}",
             delete_block_id
         );
 
@@ -1657,6 +1662,11 @@ impl Blockchain {
         let prune_blocks_at_block_id =
             self.get_latest_block_id() - configs.get_consensus_config().unwrap().prune_after_blocks;
         let mut block_hashes_copy: Vec<SaitoHash> = vec![];
+        debug!(
+            "downgrading blockchain data. latest block id : {:?}. prune blocks at : {:?}",
+            self.get_latest_block_id(),
+            prune_blocks_at_block_id
+        );
 
         {
             let block_hashes = self

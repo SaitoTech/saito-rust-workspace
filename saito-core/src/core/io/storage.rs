@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use bs58;
-use log::{debug, error, warn};
+use log::{debug, error, info, warn};
 use tokio::sync::RwLock;
 
 use crate::core::consensus::block::{Block, BlockType};
@@ -170,6 +170,7 @@ impl Storage {
     }
 
     pub async fn delete_block_from_disk(&self, filename: &str) -> bool {
+        info!("deleting block from disk : {:?}", filename);
         self.io_interface.remove_value(filename).await.is_ok()
     }
 
