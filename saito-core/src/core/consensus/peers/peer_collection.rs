@@ -51,7 +51,11 @@ impl PeerCollection {
             for (index, peer) in self.index_to_peers.iter() {
                 if peer.public_key.unwrap() == *public_key {
                     if let PeerStatus::Connected = peer.peer_status {
-                        debug!("peer : {:?} with key : {:?} is already connected", peer.index, public_key.to_base58());
+                        debug!(
+                            "peer : {:?} with key : {:?} is already connected",
+                            peer.index,
+                            public_key.to_base58()
+                        );
                         // since peer is already connected
                         continue;
                     }
@@ -68,7 +72,12 @@ impl PeerCollection {
 
         let peer = self.index_to_peers.remove(&peer_index.unwrap())?;
         self.address_to_peers.remove(&peer.public_key?);
-        debug!("removed reconnected peer : {:?} with key : {:?}. current peer count : {:?}", peer_index, peer.public_key.unwrap().to_base58(), self.index_to_peers.len());
+        debug!(
+            "removed reconnected peer : {:?} with key : {:?}. current peer count : {:?}",
+            peer_index,
+            peer.public_key.unwrap().to_base58(),
+            self.index_to_peers.len()
+        );
 
         Some(peer)
     }

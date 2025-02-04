@@ -284,7 +284,12 @@ impl Network {
         }
 
         for (index, peer) in &peers.index_to_peers {
-            debug!("peer : {:?} with key : {:?} is currently connected : {:?}", index, peer.public_key.unwrap().to_base58(), peer.peer_status);
+            debug!(
+                "peer : {:?} with key : {:?} is currently connected : {:?}",
+                index,
+                peer.public_key.unwrap().to_base58(),
+                peer.peer_status
+            );
         }
 
         self.io_interface

@@ -1561,7 +1561,9 @@ impl Blockchain {
         let block_limit = configs.get_consensus_config().unwrap().genesis_period * 2 + 1;
         debug!(
             "latest block id : {:?} block limit : {:?}. upgrading genesis_period. : {:?}",
-            latest_block_id, block_limit, latest_block_id >= block_limit
+            latest_block_id,
+            block_limit,
+            latest_block_id >= block_limit
         );
         if latest_block_id >= block_limit {
             // prune blocks
@@ -1590,10 +1592,7 @@ impl Blockchain {
         delete_block_id: u64,
         storage: &Storage,
     ) -> WalletUpdateStatus {
-        info!(
-            "removing blocks from disk at id {}",
-            delete_block_id
-        );
+        info!("removing blocks from disk at id {}", delete_block_id);
 
         let mut block_hashes_copy: Vec<SaitoHash> = vec![];
 
