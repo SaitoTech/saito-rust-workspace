@@ -846,7 +846,12 @@ impl Transaction {
         self.signature = sign(&buffer, private_key);
     }
 
-    pub fn validate(&self, utxoset: &UtxoSet, blockchain: &Blockchain) -> bool {
+    pub fn validate(
+        &self,
+        utxoset: &UtxoSet,
+        blockchain: &Blockchain,
+        validate_against_utxo: bool,
+    ) -> bool {
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
         // matches our self-generated safety check. We do not need to validate
@@ -1049,10 +1054,14 @@ impl Transaction {
             return false;
         }
 
-        // trace!("validating transaction against utxo ...");
-        let inputs_validate = self.validate_against_utxoset(utxoset);
-        // trace!("validated transaction against utxo !");
-        inputs_validate
+        return if validate_against_utxo {
+            // trace!("validating transaction against utxo ...");
+            let inputs_validate = self.validate_against_utxoset(utxoset);
+            // trace!("validated transaction against utxo !");
+            inputs_validate
+        } else {
+            true
+        };
     }
 
     pub fn validate_against_utxoset(&self, utxoset: &UtxoSet) -> bool {
