@@ -2178,6 +2178,7 @@ impl Block {
         utxoset: &UtxoSet,
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
+        validate_against_utxo: bool,
     ) -> bool {
         //
         // TODO SYNC : Add the code to check whether this is the genesis block and skip validations
@@ -2228,7 +2229,7 @@ impl Block {
         //
         // total_fees
         //
-        if cv.total_fees != self.total_fees {
+        if validate_against_utxo && cv.total_fees != self.total_fees {
             error!(
                 "total_fees error: {:?} expected : {:?}",
                 self.total_fees, cv.total_fees
@@ -2250,7 +2251,7 @@ impl Block {
         //
         // total_fees_atr
         //
-        if cv.total_fees_atr != self.total_fees_atr {
+        if validate_against_utxo && cv.total_fees_atr != self.total_fees_atr {
             error!(
                 "total_fees_atr error: {:?} expected : {:?}",
                 self.total_fees_atr, cv.total_fees_atr
@@ -2261,7 +2262,7 @@ impl Block {
         //
         // avg_total_fees
         //
-        if cv.avg_total_fees != self.avg_total_fees {
+        if validate_against_utxo && cv.avg_total_fees != self.avg_total_fees {
             error!(
                 "avg_total_fees error: {:?} expected : {:?}",
                 self.avg_total_fees, cv.avg_total_fees
@@ -2283,7 +2284,7 @@ impl Block {
         //
         // avg_total_fees_atr
         //
-        if cv.avg_total_fees_atr != self.avg_total_fees_atr {
+        if validate_against_utxo && cv.avg_total_fees_atr != self.avg_total_fees_atr {
             error!(
                 "avg_total_fees_atr error: {:?} expected : {:?}",
                 self.avg_total_fees_atr, cv.avg_total_fees_atr
@@ -2426,7 +2427,9 @@ impl Block {
         //
         // consensus values -> difficulty (mining/payout unlock difficulty)
         //
-        if cv.avg_nolan_rebroadcast_per_block != self.avg_nolan_rebroadcast_per_block {
+        if validate_against_utxo
+            && cv.avg_nolan_rebroadcast_per_block != self.avg_nolan_rebroadcast_per_block
+        {
             error!(
                 "ERROR 202392: avg_nolan_rebroadcast_per_block is invalid. expected: {:?} vs actual : {:?}",
                 cv.avg_nolan_rebroadcast_per_block, self.avg_nolan_rebroadcast_per_block
@@ -2620,7 +2623,7 @@ impl Block {
         // which we counted in the generate_metadata() function, with the
         // expected number given the consensus values we calculated earlier.
         //
-        if cv.total_rebroadcast_slips != self.total_rebroadcast_slips {
+        if validate_against_utxo && cv.total_rebroadcast_slips != self.total_rebroadcast_slips {
             error!(
                 "ERROR 624442: rebroadcast slips total incorrect. expected : {:?} actual : {:?}",
                 cv.total_rebroadcast_slips, self.total_rebroadcast_slips
@@ -2635,7 +2638,7 @@ impl Block {
         //    );
         //    return false;
         //}
-        if cv.rebroadcast_hash != self.rebroadcast_hash {
+        if validate_against_utxo && cv.rebroadcast_hash != self.rebroadcast_hash {
             error!("ERROR 123422: hash of rebroadcast transactions incorrect. expected : {:?} actual : {:?}",cv.rebroadcast_hash.to_hex(), self.rebroadcast_hash.to_hex());
             return false;
         }
@@ -2724,7 +2727,7 @@ impl Block {
             self.transactions.len()
         );
         let transactions_valid = iterate!(self.transactions, 100)
-            .all(|tx: &Transaction| tx.validate(utxoset, blockchain));
+            .all(|tx: &Transaction| tx.validate(utxoset, blockchain, validate_against_utxo));
 
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");

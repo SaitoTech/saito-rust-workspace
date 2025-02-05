@@ -596,7 +596,7 @@ impl Blockchain {
                     // TODO : what other types should be added back to the mempool
                     if tx.transaction_type == TransactionType::Normal {
                         // TODO : is there a way to not validate these again ?
-                        return tx.validate(&self.utxoset, self);
+                        return tx.validate(&self.utxoset, self, true);
                     }
                     false
                 })
@@ -1222,7 +1222,28 @@ impl Blockchain {
             //     || block
             //         .validate(self, &self.utxoset, configs, storage, &wallet)
             //         .await;
-            does_block_validate = block.validate(self, &self.utxoset, configs, storage).await;
+            let has_first_block = self
+                .blockring
+                .get_longest_chain_block_hash_at_block_id(1)
+                .is_some();
+            let has_genesis_period_of_blocks = self.get_latest_block_id()
+                > configs.get_consensus_config().unwrap().genesis_period + self.genesis_block_id;
+            let validate_against_utxo = has_first_block || has_genesis_period_of_blocks;
+
+            does_block_validate = block
+                .validate(self, &self.utxoset, configs, storage, validate_against_utxo)
+                .await;
+
+            if !does_block_validate {
+                debug!("validate against utxo: {:?}, has_first_block : {:?}, has_genesis_period_of_blocks : {:?}", 
+                    validate_against_utxo,has_first_block,has_genesis_period_of_blocks);
+                debug!("latest_block_id = {:?}", self.get_latest_block_id());
+                debug!("genesis_block_id = {:?}", self.genesis_block_id);
+                debug!(
+                    "genesis_period = {:?}",
+                    configs.get_consensus_config().unwrap().genesis_period
+                );
+            }
         }
 
         let mut wallet_updated = WALLET_NOT_UPDATED;
