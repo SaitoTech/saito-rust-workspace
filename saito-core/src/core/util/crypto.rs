@@ -2,9 +2,10 @@ use crate::core::defs::{PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey,
 use blake3::Hasher;
 use block_modes::BlockMode;
 pub use merkle::MerkleTree;
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng, SeedableRng};
 use secp256k1::ecdsa;
 pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
+use tokio::sync::Mutex;
 
 // type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
@@ -63,24 +64,38 @@ pub fn generate_keypair_from_private_key(slice: &[u8]) -> (SaitoPublicKey, Saito
     (public_key.serialize(), secret_bytes)
 }
 
-pub fn sign_blob<'a, 'b>(
-    vbytes: &'a mut Vec<u8>,
-    private_key: &'b SaitoPrivateKey,
-) -> &'a mut Vec<u8> {
+pub fn sign_blob<'a>(vbytes: &'a mut Vec<u8>, private_key: &SaitoPrivateKey) -> &'a mut Vec<u8> {
     let sig = sign(&hash(vbytes.as_ref()), private_key);
     vbytes.extend(&sig);
     vbytes
 }
+#[cfg(test)]
+lazy_static::lazy_static! {
+    pub static ref TEST_RNG: Mutex<rand::rngs::StdRng> = Mutex::new(create_test_rng());
+}
 
-pub fn generate_random_bytes(len: u64) -> Vec<u8> {
+fn create_test_rng() -> rand::rngs::StdRng {
+    rand::rngs::StdRng::from_seed([0; 32])
+}
+
+pub async fn generate_random_bytes(len: u64) -> Vec<u8> {
     if len == 0 {
         let x: Vec<u8> = vec![];
         return x;
     }
     // Don't have to be cryptographically secure, since we only need a random hash and only check the signature of that in return
-    let mut rng = thread_rng();
 
-    (0..len).map(|_| rng.gen::<u8>()).collect()
+    #[cfg(not(test))]
+    {
+        let mut rng = thread_rng();
+        (0..len).map(|_| rng.gen::<u8>()).collect()
+    }
+    #[cfg(test)]
+    {
+        // let mut rng = TEST_RNG.clone();
+        let mut rng = TEST_RNG.lock().await;
+        (0..len).map(|_| rng.gen::<u8>()).collect()
+    }
 }
 
 pub fn hash(data: &[u8]) -> SaitoHash {

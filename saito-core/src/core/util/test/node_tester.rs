@@ -607,10 +607,11 @@ pub mod test {
                 .for_each(|(key, _)| {
                     let slip = Slip::parse_slip_from_utxokey(key).unwrap();
                     info!(
-                        "Utxo : {:?} : {} : {:?}",
+                        "Utxo : {:?} : {} : {:?}, block : {:?}",
                         slip.public_key.to_base58(),
                         slip.amount,
-                        slip.slip_type
+                        slip.slip_type,
+                        slip.block_id
                     );
                 });
 

@@ -49,7 +49,8 @@ impl VerificationThread {
         public_key = wallet.public_key;
         transaction.generate(&public_key, 0, 0);
 
-        if !transaction.validate(&blockchain.utxoset, &blockchain) {
+        // TODO : should we skip validation against utxo if we don't have the full utxo ?
+        if !transaction.validate(&blockchain.utxoset, &blockchain, true) {
             debug!(
                 "transaction : {:?} not valid",
                 transaction.signature.to_hex()
@@ -82,7 +83,7 @@ impl VerificationThread {
                 .filter_map(|mut transaction| {
                     transaction.generate(&public_key, 0, 0);
 
-                    if !transaction.validate(&blockchain.utxoset, &blockchain) {
+                    if !transaction.validate(&blockchain.utxoset, &blockchain, true) {
                         debug!(
                             "transaction : {:?} not valid",
                             transaction.signature.to_hex()

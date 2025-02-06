@@ -99,19 +99,19 @@ mod tests {
         assert_eq!(GoldenTicket::validate_hashing_difficulty(&hash2, 5), false);
     }
 
-    #[test]
-    fn golden_ticket_extremes_test() {
+    #[tokio::test]
+    async fn golden_ticket_extremes_test() {
         let keys = generate_keys();
         let wallet = Wallet::new(keys.1, keys.0);
 
-        let random = hash(&generate_random_bytes(32));
-        let target = hash(&random.to_vec());
+        let random = hash(&generate_random_bytes(32).await);
+        let target = hash(random.as_ref());
         let public_key = wallet.public_key;
 
         let gt = GoldenTicket::create(target, random, public_key);
 
-        assert_eq!(gt.validate(0), true);
-        assert_eq!(gt.validate(256), false);
+        assert!(gt.validate(0));
+        assert!(!gt.validate(256));
     }
     #[test]
     fn gt_against_slr() {

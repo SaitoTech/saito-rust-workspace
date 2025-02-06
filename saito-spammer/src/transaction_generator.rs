@@ -225,7 +225,7 @@ impl TransactionGenerator {
             self.tx_size as i64 - (*total_output_slips_created + 1) as i64 * SLIP_SIZE as i64;
 
         if remaining_bytes > 0 {
-            transaction.data = generate_random_bytes(remaining_bytes as u64);
+            transaction.data = generate_random_bytes(remaining_bytes as u64).await;
         }
 
         transaction.timestamp = self.time_keeper.get_timestamp_in_ms();
