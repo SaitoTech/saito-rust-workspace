@@ -956,7 +956,7 @@ mod tests {
             let mut socket = result.0;
 
             let challenge = HandshakeChallenge {
-                challenge: generate_random_bytes(32).try_into().unwrap(),
+                challenge: generate_random_bytes(32).await.try_into().unwrap(),
             };
             // challenge_for_peer = Some(challenge.challenge);
             let message = Message::HandshakeChallenge(challenge);

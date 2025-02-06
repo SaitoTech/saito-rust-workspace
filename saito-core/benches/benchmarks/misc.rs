@@ -35,8 +35,8 @@ fn join() {
     assert!(buffer.len() > 0);
 }
 
-fn gen_random_bytes(len: u64) {
-    let buf = generate_random_bytes(len);
+async fn gen_random_bytes(len: u64) {
+    let buf = generate_random_bytes(len).await;
     assert_eq!(buf.len(), len as usize);
 }
 

@@ -2108,6 +2108,7 @@ dependencies = [
  "criterion",
  "futures",
  "hex",
+ "lazy_static",
  "log",
  "merkle",
  "mockall",

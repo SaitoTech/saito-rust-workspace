@@ -38,12 +38,12 @@ mod tests {
     use crate::core::util::crypto::generate_random_bytes;
     use crate::core::util::serialize::Serialize;
 
-    #[test]
-    fn test_serialize_with_full_fork_id() {
+    #[tokio::test]
+    async fn test_serialize_with_full_fork_id() {
         let request = BlockchainRequest {
             latest_block_id: 10,
-            latest_block_hash: generate_random_bytes(32).try_into().unwrap(),
-            fork_id: generate_random_bytes(32).try_into().unwrap(),
+            latest_block_hash: generate_random_bytes(32).await.try_into().unwrap(),
+            fork_id: generate_random_bytes(32).await.try_into().unwrap(),
         };
         let buffer = request.serialize();
         assert_eq!(buffer.len(), 72);
