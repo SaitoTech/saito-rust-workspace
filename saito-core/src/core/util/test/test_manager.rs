@@ -728,12 +728,12 @@ pub mod test {
 
                 public_key = wallet.public_key;
             }
-            let mut random_bytes = hash(&generate_random_bytes(32));
+            let mut random_bytes = hash(&generate_random_bytes(32).await);
 
             let mut gt = GoldenTicket::create(block_hash, random_bytes, public_key);
 
             while !gt.validate(block_difficulty) {
-                random_bytes = hash(&generate_random_bytes(32));
+                random_bytes = hash(&generate_random_bytes(32).await);
                 gt = GoldenTicket::create(block_hash, random_bytes, public_key);
             }
 

@@ -147,7 +147,7 @@ impl Peer {
         debug!("initiating handshake : {:?}", self.index);
 
         let challenge = HandshakeChallenge {
-            challenge: generate_random_bytes(32).try_into().unwrap(),
+            challenge: generate_random_bytes(32).await.try_into().unwrap(),
         };
         debug!(
             "generated challenge : {:?} for peer : {:?}",
@@ -193,7 +193,7 @@ impl Peer {
         let response = HandshakeResponse {
             public_key: wallet.public_key,
             signature: sign(challenge.challenge.as_slice(), &wallet.private_key),
-            challenge: generate_random_bytes(32).try_into().unwrap(),
+            challenge: generate_random_bytes(32).await.try_into().unwrap(),
             is_lite,
             block_fetch_url,
             services: io_handler.get_my_services(),

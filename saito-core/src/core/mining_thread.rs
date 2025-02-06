@@ -59,7 +59,7 @@ impl MiningThread {
             info!("node public key = {:?}", self.public_key.to_base58());
         }
 
-        let random_bytes = hash(&generate_random_bytes(32));
+        let random_bytes = hash(&generate_random_bytes(32).await);
         // The new way of validation will be wasting a GT instance if the validation fails
         // old way used a static method instead
         let gt = GoldenTicket::create(self.target, random_bytes, self.public_key);
