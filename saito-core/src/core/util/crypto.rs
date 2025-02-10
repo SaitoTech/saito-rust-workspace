@@ -5,7 +5,6 @@ pub use merkle::MerkleTree;
 use rand::{thread_rng, Rng, SeedableRng};
 use secp256k1::ecdsa;
 pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
-use tokio::sync::Mutex;
 
 // type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
