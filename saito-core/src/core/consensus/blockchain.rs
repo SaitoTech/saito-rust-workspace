@@ -1106,53 +1106,6 @@ impl Blockchain {
         is_browser: bool,
         is_spv: bool,
     ) -> bool {
-        // let mut golden_tickets_found = 0;
-        // let mut search_depth_index = 0;
-        // let mut latest_block_hash = previous_block_hash;
-        //
-        // for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR {
-        //     search_depth_index += 1;
-        //
-        //     if let Some(block) = self.get_block_sync(&latest_block_hash) {
-        //         if i == 0 && block.id < MIN_GOLDEN_TICKETS_DENOMINATOR {
-        //             golden_tickets_found = MIN_GOLDEN_TICKETS_DENOMINATOR;
-        //             break;
-        //         }
-        //
-        //         // the latest block will not have has_golden_ticket set yet
-        //         // so it is possible we undercount the latest block. this
-        //         // is dealt with by manually checking for the existence of
-        //         // a golden ticket if we only have 1 golden ticket below.
-        //         if block.has_golden_ticket {
-        //             golden_tickets_found += 1;
-        //         }
-        //         latest_block_hash = block.previous_block_hash;
-        //     } else {
-        //         break;
-        //     }
-        // }
-        //
-        // if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
-        //     && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
-        //     && current_block_has_golden_ticket
-        // {
-        //     golden_tickets_found += 1;
-        // }
-        //
-        // if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
-        //     && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
-        // {
-        //     info!(
-        //         "not enough golden tickets : found = {:?} depth = {:?}",
-        //         golden_tickets_found, search_depth_index
-        //     );
-        //     // TODO : browsers might want to implement this check somehow
-        //     if !is_browser && !is_spv {
-        //         return false;
-        //     }
-        // }
-        // true
-
         is_golden_ticket_count_valid_(
             previous_block_hash,
             current_block_has_golden_ticket,
@@ -2038,12 +1991,13 @@ fn is_golden_ticket_count_valid_<'a, F: Fn(SaitoHash) -> Option<&'a Block>>(
     let mut search_depth_index = 0;
     let mut latest_block_hash = previous_block_hash;
 
-    for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR {
+    for i in 0..MIN_GOLDEN_TICKETS_DENOMINATOR - 1 {
         search_depth_index += 1;
 
         if let Some(block) = get_block(latest_block_hash) {
-            if i == 0 && block.id < MIN_GOLDEN_TICKETS_DENOMINATOR {
-                golden_tickets_found = MIN_GOLDEN_TICKETS_DENOMINATOR;
+            // for the first few blocks we cannot validate for gts. therefore we break the loop
+            if i == 0 && block.id < MIN_GOLDEN_TICKETS_DENOMINATOR - 1 {
+                golden_tickets_found = MIN_GOLDEN_TICKETS_NUMERATOR;
                 break;
             }
 
