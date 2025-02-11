@@ -659,11 +659,11 @@ impl Block {
         //
         block.total_fees = block.total_fees_new + block.total_fees_atr;
 
-        info!("**************************************************************");
-        info!("block.total_fees_new create(): ${:?}", block.total_fees_new);
-        info!("block.total_fees_atr create(): ${:?}", block.total_fees_atr);
-        info!("block.total_fees create(): ${:?}", block.total_fees);
-        info!("**************************************************************");
+        // info!("**************************************************************");
+        // info!("block.total_fees_new create(): ${:?}", block.total_fees_new);
+        // info!("block.total_fees_atr create(): ${:?}", block.total_fees_atr);
+        // info!("block.total_fees create(): ${:?}", block.total_fees);
+        // info!("**************************************************************");
 
         //
         // avg total fees
@@ -843,6 +843,9 @@ impl Block {
         // finally run generate()
         //
         block.generate();
+
+        info!("create() called");
+        //info!("self.total_fees: ${:?}", self.total_fees);
 
         block
     }
@@ -1052,6 +1055,10 @@ impl Block {
         block.total_payout_graveyard = total_payout_graveyard;
         block.total_payout_atr = total_payout_atr;
         block.total_fees = total_fees;
+
+
+        //info!("block.total_fees deserialize_from_net: ${:?}", block.total_fees);
+
         block.total_fees_new = total_fees_new;
         block.total_fees_atr = total_fees_atr;
         block.fee_per_byte = fee_per_byte;
@@ -1168,6 +1175,7 @@ impl Block {
     // cumulative block fees they contain.
     //
     pub fn generate(&mut self) -> bool {
+
         let creator_public_key = &self.creator;
 
         //self.total_rebroadcast_nolan = 0;
@@ -1284,17 +1292,17 @@ impl Block {
         self.golden_ticket_index = golden_ticket_index;
         self.issuance_transaction_index = issuance_transaction_index;
 
-        //
-        // update block with total fees
-        //
-        self.total_fees = cumulative_fees;
 
         info!("**************************************************************");
         info!("cumulative_fees generate(): ${:?}", cumulative_fees);
-        info!("self.total_fees generate(): ${:?}", self.total_fees);
+        //info!("self.total_fees generate(): ${:?}", self.total_fees);
+        // info!("block.total_fees: ${:?}", block.total_fees);
         info!("**************************************************************");
 
         self.total_work = total_work;
+
+        info!("generate() called");
+        info!("self.total_fees: ${:?}", self.total_fees);
 
         true
     }
@@ -1655,6 +1663,10 @@ impl Block {
         // total fees
         //
         cv.total_fees = cv.total_fees_new + cv.total_fees_atr;
+
+        // info!("**************************************************");
+        // info!("cv.total_fees generate_consensus_values : ${:?}", cv.total_fees);
+        // info!("**************************************************");
 
         //
         // fee_per_byte
@@ -2315,6 +2327,12 @@ impl Block {
         block.total_fees_atr = self.total_fees_atr;
         block.fee_per_byte = self.fee_per_byte;
         block.hash = self.hash;
+
+        // info!("**************************************************************");
+        // info!("block.total_fees generate_lite_block(): ${:?}", block.total_fees);
+        // info!("**************************************************************");
+
+
 
         block.merkle_root = self.generate_merkle_root(true, true);
 
