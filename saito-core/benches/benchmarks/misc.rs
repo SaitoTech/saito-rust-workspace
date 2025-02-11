@@ -17,14 +17,14 @@ fn append() {
     let mut v = vec![];
     v.append(&mut buffer);
     v.append(&mut buffer2);
-    assert!(v.len() > 0);
+    assert!(!v.is_empty());
 }
 
 fn concat() {
     let buffer = [0; 33];
     let buffer2 = [0; 32];
     let buffer = [buffer.as_slice(), buffer2.as_slice()].concat();
-    assert!(buffer.len() > 0);
+    assert!(!buffer.is_empty());
 }
 
 fn join() {
@@ -32,7 +32,7 @@ fn join() {
     let buf2 = [0; 32];
 
     let buffer = [buffer.as_slice(), buf2.as_slice()].join(&0);
-    assert!(buffer.len() > 0);
+    assert!(!buffer.is_empty());
 }
 
 async fn gen_random_bytes(len: u64) {

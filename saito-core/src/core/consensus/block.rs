@@ -5,6 +5,7 @@ use num_traits::Zero;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;
 use std::{i128, mem};
@@ -129,6 +130,52 @@ pub struct ConsensusValues {
     pub expected_difficulty: u64,
 }
 
+impl Display for ConsensusValues {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "ConsensusValues {{ fee_transaction: {:?}, st_num: {}, st_index: {:?}, it_num: {}, it_index: {:?}, ft_num: {}, ft_index: {:?}, gt_num: {}, gt_index: {:?}, total_fees: {}, total_fees_new: {}, total_fees_atr: {}, avg_total_fees: {}, avg_total_fees_new: {}, avg_total_fees_atr: {}, total_bytes_new: {}, total_payout_routing: {}, total_payout_mining: {}, total_payout_treasury: {}, total_payout_graveyard: {}, total_payout_atr: {}, avg_payout_routing: {}, avg_payout_mining: {}, avg_payout_treasury: {}, avg_payout_graveyard: {}, avg_payout_atr: {}, avg_fee_per_byte: {}, fee_per_byte: {}, burnfee: {}, difficulty: {}, rebroadcasts: {:?}, total_rebroadcast_slips: {}, total_rebroadcast_nolan: {}, rebroadcast_hash: {:?}, avg_nolan_rebroadcast_per_block: {}, total_rebroadcast_fees_nolan: {}, total_rebroadcast_staking_payouts_nolan: {}, expected_difficulty: {} }}",
+            self.fee_transaction,
+            self.st_num,
+            self.st_index,
+            self.it_num,
+            self.it_index,
+            self.ft_num,
+            self.ft_index,
+            self.gt_num,
+            self.gt_index,
+            self.total_fees,
+            self.total_fees_new,
+            self.total_fees_atr,
+            self.avg_total_fees,
+            self.avg_total_fees_new,
+            self.avg_total_fees_atr,
+            self.total_bytes_new,
+            self.total_payout_routing,
+            self.total_payout_mining,
+            self.total_payout_treasury,
+            self.total_payout_graveyard,
+            self.total_payout_atr,
+            self.avg_payout_routing,
+            self.avg_payout_mining,
+            self.avg_payout_treasury,
+            self.avg_payout_graveyard,
+            self.avg_payout_atr,
+            self.avg_fee_per_byte,
+            self.fee_per_byte,
+            self.burnfee,
+            self.difficulty,
+            self.rebroadcasts.len(),
+            self.total_rebroadcast_slips,
+            self.total_rebroadcast_nolan,
+            self.rebroadcast_hash.to_hex(),
+            self.avg_nolan_rebroadcast_per_block,
+            self.total_rebroadcast_fees_nolan,
+            self.total_rebroadcast_staking_payouts_nolan,
+            self.expected_difficulty)
+    }
+}
+
 impl ConsensusValues {
     #[allow(clippy::too_many_arguments)]
     pub fn new() -> ConsensusValues {
@@ -185,7 +232,10 @@ impl ConsensusValues {
             expected_difficulty: 0,
         }
     }
-    pub fn default() -> ConsensusValues {
+}
+
+impl Default for ConsensusValues {
+    fn default() -> ConsensusValues {
         ConsensusValues {
             fee_transaction: None,
 
@@ -368,11 +418,65 @@ pub struct Block {
     pub safe_to_prune_transactions: bool,
 }
 
-// impl Display for Block {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         todo!()
-//     }
-// }
+impl Display for Block {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Block {{ id: {}, timestamp: {}, previous_block_hash: {:?}, creator: {:?}, merkle_root: {:?}, signature: {:?}, graveyard: {}, treasury: {}, total_fees: {}, total_fees_new: {}, total_fees_atr: {}, avg_total_fees: {}, avg_total_fees_new: {}, avg_total_fees_atr: {}, total_payout_routing: {}, total_payout_mining: {}, total_payout_treasury: {}, total_payout_graveyard: {}, total_payout_atr: {}, avg_payout_routing: {}, avg_payout_mining: {}, avg_payout_treasury: {}, avg_payout_graveyard: {}, avg_payout_atr: {}, avg_fee_per_byte: {}, fee_per_byte: {}, avg_nolan_rebroadcast_per_block: {}, burnfee: {}, difficulty: {}, previous_block_unpaid: {}, hash: {:?}, total_work: {}, in_longest_chain: {}, has_golden_ticket: {}, has_issuance_transaction: {}, issuance_transaction_index: {}, has_fee_transaction: {}, has_staking_transaction: {}, golden_ticket_index: {}, fee_transaction_index: {}, total_rebroadcast_slips: {}, total_rebroadcast_nolan: {}, rebroadcast_hash: {}, block_type: {:?}, cv: {}, routed_from_peer: {:?} ",
+            self.id,
+            self.timestamp,
+            self.previous_block_hash.to_hex(),
+            self.creator.to_base58(),
+            self.merkle_root.to_hex(),
+            self.signature.to_hex(),
+            self.graveyard,
+            self.treasury,
+            self.total_fees,
+            self.total_fees_new,
+            self.total_fees_atr,
+            self.avg_total_fees,
+            self.avg_total_fees_new,
+            self.avg_total_fees_atr,
+            self.total_payout_routing,
+            self.total_payout_mining,
+            self.total_payout_treasury,
+            self.total_payout_graveyard,
+            self.total_payout_atr,
+            self.avg_payout_routing,
+            self.avg_payout_mining,
+            self.avg_payout_treasury,
+            self.avg_payout_graveyard,
+            self.avg_payout_atr,
+            self.avg_fee_per_byte,
+            self.fee_per_byte,
+            self.avg_nolan_rebroadcast_per_block,
+            self.burnfee,
+            self.difficulty,
+            self.previous_block_unpaid,
+            self.hash.to_hex(),
+            self.total_work,
+            self.in_longest_chain,
+            self.has_golden_ticket,
+            self.has_issuance_transaction,
+            self.issuance_transaction_index,
+            self.has_fee_transaction,
+            self.has_staking_transaction,
+            self.golden_ticket_index,
+            self.fee_transaction_index,
+            self.total_rebroadcast_slips,
+            self.total_rebroadcast_nolan,
+            self.rebroadcast_hash.to_hex(),
+            self.block_type,
+            self.cv,
+            self.routed_from_peer,
+        ).unwrap();
+        writeln!(f, " transactions : ").unwrap();
+        for (index, tx) in self.transactions.iter().enumerate() {
+            writeln!(f, "tx {} : {}", index, tx).unwrap();
+        }
+        writeln!(f, "}}")
+    }
+}
 
 impl Block {
     #[allow(clippy::new_without_default)]
@@ -462,35 +566,35 @@ impl Block {
         );
 
         let mut previous_block_id = 0;
-        let mut previous_block_timestamp = 0;
+        let mut _previous_block_timestamp = 0;
         let mut previous_block_graveyard = 0;
         let mut previous_block_treasury = 0;
         let mut previous_block_total_fees = 0;
-        let mut previous_block_avg_total_fees = 0;
-        let mut previous_block_avg_total_fees_new = 0;
-        let mut previous_block_avg_total_fees_atr = 0;
-        let mut previous_block_avg_payout_routing = 0;
-        let mut previous_block_avg_payout_mining = 0;
-        let mut previous_block_avg_payout_treasury = 0;
-        let mut previous_block_avg_payout_graveyard = 0;
-        let mut previous_block_avg_payout_atr = 0;
-        let mut previous_block_avg_fee_per_byte = 0;
+        let mut _previous_block_avg_total_fees = 0;
+        let mut _previous_block_avg_total_fees_new = 0;
+        let mut _previous_block_avg_total_fees_atr = 0;
+        let mut _previous_block_avg_payout_routing = 0;
+        let mut _previous_block_avg_payout_mining = 0;
+        let mut _previous_block_avg_payout_treasury = 0;
+        let mut _previous_block_avg_payout_graveyard = 0;
+        let mut _previous_block_avg_payout_atr = 0;
+        let mut _previous_block_avg_fee_per_byte = 0;
 
         if let Some(previous_block) = blockchain.blocks.get(&previous_block_hash) {
             previous_block_id = previous_block.id;
             previous_block_total_fees = previous_block.total_fees;
-            previous_block_timestamp = previous_block.timestamp;
+            _previous_block_timestamp = previous_block.timestamp;
             previous_block_graveyard = previous_block.graveyard;
             previous_block_treasury = previous_block.treasury;
-            previous_block_avg_total_fees = previous_block.avg_total_fees;
-            previous_block_avg_total_fees_new = previous_block.avg_total_fees_new;
-            previous_block_avg_total_fees_atr = previous_block.avg_total_fees_atr;
-            previous_block_avg_payout_routing = previous_block.avg_payout_routing;
-            previous_block_avg_payout_mining = previous_block.avg_payout_mining;
-            previous_block_avg_payout_treasury = previous_block.avg_payout_treasury;
-            previous_block_avg_payout_graveyard = previous_block.avg_payout_graveyard;
-            previous_block_avg_payout_atr = previous_block.avg_payout_atr;
-            previous_block_avg_fee_per_byte = previous_block.avg_fee_per_byte;
+            _previous_block_avg_total_fees = previous_block.avg_total_fees;
+            _previous_block_avg_total_fees_new = previous_block.avg_total_fees_new;
+            _previous_block_avg_total_fees_atr = previous_block.avg_total_fees_atr;
+            _previous_block_avg_payout_routing = previous_block.avg_payout_routing;
+            _previous_block_avg_payout_mining = previous_block.avg_payout_mining;
+            _previous_block_avg_payout_treasury = previous_block.avg_payout_treasury;
+            _previous_block_avg_payout_graveyard = previous_block.avg_payout_graveyard;
+            _previous_block_avg_payout_atr = previous_block.avg_payout_atr;
+            _previous_block_avg_fee_per_byte = previous_block.avg_fee_per_byte;
         }
 
         //
@@ -1345,19 +1449,12 @@ impl Block {
                 )
             {
                 if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
-                    let result = storage
+                    if let Ok(mut atr_block) = storage
                         .load_block_from_disk(
                             storage.generate_block_filepath(pruned_block).as_str(),
                         )
-                        .await;
-                    if result.is_err() {
-                        error!(
-                            "couldn't load block for ATR from disk. block hash : {:?}",
-                            pruned_block.hash.to_hex()
-                        );
-                        error!("{:?}", result.err().unwrap());
-                    } else {
-                        let mut atr_block = result.unwrap();
+                        .await
+                    {
                         atr_block.generate();
                         assert_ne!(
                             atr_block.block_type,
@@ -1398,6 +1495,7 @@ impl Block {
                             //
                             for output in transaction.to.iter() {
                                 if output.validate(&blockchain.utxoset) {
+                                    debug!("output slip is valid. so checking for rebroadcasting. slip : {}",output);
                                     outputs.push(output);
                                     total_nolan_eligible_for_atr_payout += output.amount;
                                 }
@@ -1495,8 +1593,8 @@ impl Block {
                             let adjusted_atr_payout_multiplier =
                                 max_total_payout / unadjusted_total_nolan;
                             let adjusted_output_multiplier = 1 + adjusted_atr_payout_multiplier;
-                            let adjusted_total_rebroadcast_staking_payouts_nolan: Currency = 0;
-                            let adjusted_total_rebroadcast_fees_nolan: Currency = 0;
+                            let _adjusted_total_rebroadcast_staking_payouts_nolan: Currency = 0;
+                            let _adjusted_total_rebroadcast_fees_nolan: Currency = 0;
 
                             //
                             // we re-determine our multiplier for the ATR payout based on our
@@ -1519,6 +1617,11 @@ impl Block {
                                 cv.total_payout_atr -= rebroadcast_tx.from[0].amount;
                             }
                         }
+                    } else {
+                        error!(
+                            "couldn't load block for ATR from disk. block hash : {:?}",
+                            pruned_block.hash.to_hex()
+                        );
                     }
                 } // block
             }
@@ -1620,8 +1723,16 @@ impl Block {
                 if expected_miner_payout > maximum_miner_payout {
                     graveyard_contribution += expected_miner_payout - maximum_miner_payout;
                     miner_payout = maximum_miner_payout;
+                    debug!(
+                        "block : {} miner payout set as maximum payout : {}. expected payout : {}",
+                        self.id, miner_payout, expected_miner_payout
+                    );
                 } else {
                     miner_payout = expected_miner_payout;
+                    debug!(
+                        "block : {} miner payout set as expected payout : {}. maximum payout : {}",
+                        self.id, miner_payout, maximum_miner_payout
+                    );
                 }
                 miner_publickey = golden_ticket.public_key;
 
@@ -1633,8 +1744,16 @@ impl Block {
                 if expected_router_payout > maximum_router_payout {
                     graveyard_contribution += expected_router_payout - maximum_router_payout;
                     router1_payout = maximum_router_payout;
+                    debug!(
+                        "block : {} router1 payout set as maximum payout : {}. expected payout : {}",
+                        self.id, router1_payout, expected_router_payout
+                    );
                 } else {
                     router1_payout = expected_router_payout;
+                    debug!(
+                        "block : {} router1 payout set as expected payout : {}. maximum payout : {}",
+                        self.id, router1_payout, maximum_router_payout
+                    );
                 }
                 router1_publickey = previous_block.find_winning_router(next_random_number);
 
@@ -1731,6 +1850,8 @@ impl Block {
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
+            } else {
+                debug!("miner_publickey is not set. not adding to fee transaction");
             }
             if router1_publickey != [0; 33] {
                 let mut output = Slip::default();
@@ -1742,6 +1863,8 @@ impl Block {
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
+            } else {
+                debug!("router1_publickey is not set. not adding to fee transaction");
             }
             if router2_publickey != [0; 33] {
                 let mut output = Slip::default();
@@ -1753,6 +1876,8 @@ impl Block {
                 output.block_id = self.id;
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
+            } else {
+                debug!("router2_publickey is not set. not adding to fee transaction");
             }
 
             cv.total_payout_mining = miner_payout;
@@ -2224,7 +2349,7 @@ impl Block {
         let cv = self
             .generate_consensus_values(blockchain, storage, configs)
             .await;
-        trace!("consensus values generated : {:?}", cv);
+        trace!("consensus values generated : {}", cv);
 
         //
         // total_fees

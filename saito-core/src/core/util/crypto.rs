@@ -5,7 +5,6 @@ pub use merkle::MerkleTree;
 use rand::{thread_rng, Rng, SeedableRng};
 use secp256k1::ecdsa;
 pub use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
-use tokio::sync::Mutex;
 
 // type Aes128Cbc = Cbc<Aes128, Pkcs7>;
 
@@ -71,7 +70,7 @@ pub fn sign_blob<'a>(vbytes: &'a mut Vec<u8>, private_key: &SaitoPrivateKey) -> 
 }
 #[cfg(test)]
 lazy_static::lazy_static! {
-    pub static ref TEST_RNG: Mutex<rand::rngs::StdRng> = Mutex::new(create_test_rng());
+    pub static ref TEST_RNG: tokio::sync::Mutex<rand::rngs::StdRng>  = tokio::sync::Mutex::new(create_test_rng());
 }
 
 fn create_test_rng() -> rand::rngs::StdRng {

@@ -39,6 +39,7 @@ pub mod test {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::sync::mpsc::Receiver;
     use tokio::sync::RwLock;
+    use tracing_subscriber::field::debug;
 
     #[derive(Clone)]
     pub struct TestTimeKeeper {}
@@ -142,7 +143,6 @@ pub mod test {
         receiver_for_miner: Receiver<MiningEvent>,
         receiver_for_verification: Receiver<VerifyRequest>,
         receiver_for_stats: Receiver<String>,
-        context: Context,
         pub timeout_in_ms: u64,
         last_run_time: Timestamp,
         pub initial_token_supply: Currency,
@@ -297,7 +297,6 @@ pub mod test {
                 receiver_for_consensus: receiver_in_mempool,
                 receiver_for_miner: receiver_in_miner,
                 receiver_for_verification: receiver_in_verification,
-                context,
                 receiver_for_stats: receiver_in_stats,
                 timeout_in_ms: Duration::new(10, 0).as_millis() as u64,
                 last_run_time: 0,
@@ -569,6 +568,15 @@ pub mod test {
                 .filter(|(_, value)| **value)
                 .map(|(key, _)| {
                     let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+                    info!(
+                        "Utxo : {:?} : {} : {:?}, block : {}-{}-{}",
+                        slip.public_key.to_base58(),
+                        slip.amount,
+                        slip.slip_type,
+                        slip.block_id,
+                        slip.tx_ordinal,
+                        slip.slip_index
+                    );
                     slip.amount
                 })
                 .sum::<Currency>();
@@ -600,22 +608,14 @@ pub mod test {
             warn!("Total Fees New is {}", latest_block.total_fees_new);
             warn!("Total Fee is {}", latest_block.total_fees);
             warn!("Amount in utxo {}", amount_in_utxo);
-            blockchain
-                .utxoset
-                .iter()
-                .filter(|(_, value)| **value)
-                .for_each(|(key, _)| {
-                    let slip = Slip::parse_slip_from_utxokey(key).unwrap();
-                    info!(
-                        "Utxo : {:?} : {} : {:?}, block : {:?}",
-                        slip.public_key.to_base58(),
-                        slip.amount,
-                        slip.slip_type,
-                        slip.block_id
-                    );
-                });
 
             if current_supply != self.initial_token_supply {
+                warn!(
+                    "current supply : {:?} doesn't equal to initial supply : {:?}",
+                    current_supply, self.initial_token_supply
+                );
+                let block = blockchain.get_latest_block().unwrap();
+                info!("block : {}", block);
                 return Err(Error::from(ErrorKind::InvalidData));
             }
             if latest_block.total_fees != latest_block.total_fees_new + latest_block.total_fees_atr
