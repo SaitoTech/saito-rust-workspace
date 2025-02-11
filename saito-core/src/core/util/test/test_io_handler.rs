@@ -43,7 +43,7 @@ pub mod test {
 
         async fn connect_to_peer(
             &mut self,
-            url: String,
+            _url: String,
             peer_index: PeerIndex,
         ) -> Result<(), Error> {
             debug!("connecting to peer : {:?}", peer_index);

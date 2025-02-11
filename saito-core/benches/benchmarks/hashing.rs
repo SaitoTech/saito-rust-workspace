@@ -1,13 +1,13 @@
 use blake3::Hasher;
 use criterion::{criterion_group, Criterion};
 
-fn hash_fn_serial(buffer: &Vec<u8>) {
+fn hash_fn_serial(buffer: &[u8]) {
     let mut hasher = Hasher::new();
     hasher.update(buffer);
     hasher.finalize();
 }
 
-fn hash_fn_parallel(buffer: &Vec<u8>) {
+fn hash_fn_parallel(buffer: &[u8]) {
     let mut hasher = Hasher::new();
     hasher.update_rayon(buffer);
     hasher.finalize();

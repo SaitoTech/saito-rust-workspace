@@ -72,25 +72,25 @@ pub struct Transaction {
 impl Display for Transaction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "++++++++++++++++++++++++++++++++++++++++++++++++++")?;
-        writeln!(f, "Tx : {{")?;
-        writeln!(f, " type : {:?}", self.transaction_type)?;
-        writeln!(f, " data_size : {:?} ", self.data.len())?;
-        writeln!(f, " timestamp : {:?} ", self.timestamp)?;
-        writeln!(f, " signature : {:?} ", self.signature.to_hex())?;
         writeln!(
             f,
-            " hash : {:?} ",
-            self.hash_for_signature.unwrap_or_default().to_hex()
+            "Tx : {{ type : {:?}, data_size : {:?}, timestamp : {:?}, signature : {:?}, hash : {:?}, total_in : {:?}, total_out : {:?}, total_fees : {:?}, total_work_for_me : {:?}, cumulative_fees : {:?}, from slips : count : {:?} }}",
+            self.transaction_type,
+            self.data.len(),
+            self.timestamp,
+            self.signature.to_hex(),
+            self.hash_for_signature.unwrap_or_default().to_hex(),
+            self.total_in,
+            self.total_out,
+            self.total_fees,
+            self.total_work_for_me,
+            self.cumulative_fees,
+            self.from.len()
         )?;
-        writeln!(f, " total_in : {:?} ", self.total_in)?;
-        writeln!(f, " total_out : {:?} ", self.total_out)?;
-        writeln!(f, " total_fees : {:?} ", self.total_fees)?;
-        writeln!(f, " total_work_for_me : {:?} ", self.total_work_for_me)?;
-        writeln!(f, " cumulative_fees : {:?} ", self.cumulative_fees)?;
-        writeln!(f, " from slips : count : {:?}", self.from.len())?;
         if !self.from.is_empty() {
             writeln!(f, "---------------------------------------------")?;
         }
+        writeln!(f, " from slips : count : {:?}", self.from.len())?;
         for slip in self.from.iter() {
             writeln!(f, "{}", slip)?;
         }
@@ -720,6 +720,12 @@ impl Transaction {
 
     /// Runs when the chain is re-organized
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) {
+        debug!(
+            "tx reorg : {:?} with {} inputs and {} outputs",
+            self.signature.to_hex(),
+            self.from.len(),
+            self.to.len()
+        );
         let mut input_slip_spendable = true;
         let mut output_slip_spendable = false;
 
@@ -1138,7 +1144,7 @@ mod tests {
         assert_eq!(tx.timestamp, 0);
         assert_eq!(tx.from, vec![]);
         assert_eq!(tx.to, vec![]);
-        assert_eq!(tx.data, vec![]);
+        assert_eq!(tx.data, Vec::<u8>::new());
         assert_eq!(tx.transaction_type, TransactionType::Normal);
         assert_eq!(tx.signature, [0; 64]);
         assert_eq!(tx.hash_for_signature, None);

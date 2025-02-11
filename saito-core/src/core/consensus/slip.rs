@@ -44,15 +44,17 @@ pub struct Slip {
 }
 impl Display for Slip {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Slip : {{")?;
-        writeln!(f, " key : {:?}", self.public_key.to_base58())?;
-        writeln!(f, " type : {:?}", self.slip_type)?;
-        writeln!(f, " amount : {:?}", self.amount)?;
-        writeln!(f, " slip_index : {:?}", self.slip_index)?;
-        writeln!(f, " tx_ordinal : {:?}", self.tx_ordinal)?;
-        writeln!(f, " block_id : {:?}", self.block_id)?;
-        writeln!(f, " utxoset_key : {:?}", self.utxoset_key.to_hex())?;
-        writeln!(f, "}}")
+        writeln!(
+            f,
+            "Slip {{ key: {}, type: {:?}, amount: {}, location: {}-{}-{}, utxoset_key: {} }}",
+            self.public_key.to_base58(),
+            self.slip_type,
+            self.amount,
+            self.block_id,
+            self.tx_ordinal,
+            self.slip_index,
+            self.utxoset_key.to_hex()
+        )
     }
 }
 impl Default for Slip {

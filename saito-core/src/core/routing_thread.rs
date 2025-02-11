@@ -202,7 +202,8 @@ impl RoutingThread {
             Message::KeyListUpdate(key_list) => {
                 self.network
                     .handle_received_key_list(peer_index, key_list)
-                    .await;
+                    .await
+                    .unwrap();
             }
             Message::Block(_) => {
                 error!("received block message");

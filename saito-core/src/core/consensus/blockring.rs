@@ -95,7 +95,9 @@ impl BlockRing {
                     self.ring.len(),
                     self.ring[insert_pos].block_hashes.len()
                 );
-                Some(self.ring[insert_pos].block_hashes[lc_pos])
+                let ring_item = self.ring.get(insert_pos)?;
+                let hash = ring_item.block_hashes.get(lc_pos)?;
+                Some(*hash)
             }
             None => {
                 trace!(
