@@ -70,7 +70,7 @@ pub fn sign_blob<'a>(vbytes: &'a mut Vec<u8>, private_key: &SaitoPrivateKey) -> 
 }
 #[cfg(test)]
 lazy_static::lazy_static! {
-    pub static ref TEST_RNG: Mutex<rand::rngs::StdRng> = Mutex::new(create_test_rng());
+    pub static ref TEST_RNG: tokio::sync::Mutex<rand::rngs::StdRng>  = tokio::sync::Mutex::new(create_test_rng());
 }
 
 fn create_test_rng() -> rand::rngs::StdRng {

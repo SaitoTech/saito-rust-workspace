@@ -2349,7 +2349,7 @@ impl Block {
         let cv = self
             .generate_consensus_values(blockchain, storage, configs)
             .await;
-        trace!("consensus values generated : {:?}", cv);
+        trace!("consensus values generated : {}", cv);
 
         //
         // total_fees

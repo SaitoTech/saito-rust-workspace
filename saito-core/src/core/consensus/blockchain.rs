@@ -1,5 +1,6 @@
 use std::cmp::max;
 use std::collections::VecDeque;
+use std::f32::MIN;
 use std::fmt::Debug;
 use std::io::Error;
 use std::sync::Arc;
@@ -1988,6 +1989,7 @@ fn is_golden_ticket_count_valid_<'a, F: Fn(SaitoHash) -> Option<&'a Block>>(
     get_block: F,
 ) -> bool {
     let mut golden_tickets_found = 0;
+    let mut required_tickets = 0;
     let mut search_depth_index = 0;
     let mut latest_block_hash = previous_block_hash;
 
@@ -1995,12 +1997,6 @@ fn is_golden_ticket_count_valid_<'a, F: Fn(SaitoHash) -> Option<&'a Block>>(
         search_depth_index += 1;
 
         if let Some(block) = get_block(latest_block_hash) {
-            // for the first few blocks we cannot validate for gts. therefore we break the loop
-            if i == 0 && block.id < MIN_GOLDEN_TICKETS_DENOMINATOR - 1 {
-                golden_tickets_found = MIN_GOLDEN_TICKETS_NUMERATOR;
-                break;
-            }
-
             // the latest block will not have has_golden_ticket set yet
             // so it is possible we undercount the latest block. this
             // is dealt with by manually checking for the existence of
@@ -2008,25 +2004,51 @@ fn is_golden_ticket_count_valid_<'a, F: Fn(SaitoHash) -> Option<&'a Block>>(
             if block.has_golden_ticket {
                 golden_tickets_found += 1;
             }
+            if i == 0 {
+                // 3/7 => [1,2,3,4,5,6 + 7(current)]. but we only check the first 6 since we start from previous block.
+                // if we only have 5 blocks, we need 1 golden ticket. if we have 6 blocks, we need 2 golden tickets. if current block has golden ticket, we need 3 golden tickets.
+                required_tickets = MIN_GOLDEN_TICKETS_NUMERATOR
+                    .saturating_sub(MIN_GOLDEN_TICKETS_DENOMINATOR.saturating_sub(block.id));
+            }
             latest_block_hash = block.previous_block_hash;
         } else {
             break;
         }
     }
 
-    if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
-        && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
-        && current_block_has_golden_ticket
-    {
+    if current_block_has_golden_ticket {
         golden_tickets_found += 1;
     }
+    // if search_depth_index < MIN_GOLDEN_TICKETS_DENOMINATOR - MIN_GOLDEN_TICKETS_NUMERATOR {
+    //     // we need to check for search_depth here because we need to have at least MIN_GOLDEN_TICKETS_DENOMINATOR blocks loaded before we can check for golden tickets
+    //     debug!(
+    //         "returning true since search depth {} is not enough. current_block_has_golden_ticket : {:?} golden_tickets_found : {:?} required_tickets : {}",
+    //         search_depth_index, current_block_has_golden_ticket, golden_tickets_found, required_tickets
+    //     );
+    //     return true;
+    // }
+    // else if search_depth_index == MIN_GOLDEN_TICKETS_DENOMINATOR - 1 {
+    //     // we only have enough blocks to check for a single golden ticket
+    //     debug!(
+    //         "search depth is exactly MIN_GOLDEN_TICKETS_DENOMINATOR - 1. current_block_has_golden_ticket : {:?} golden_tickets_found : {:?} required_tickets : {}",
+    //         current_block_has_golden_ticket, golden_tickets_found, required_tickets
+    //     );
+    //     required_tickets = 1;
+    // }
+    // TODO : uncomment above after fixing and remove this
+    if search_depth_index < MIN_GOLDEN_TICKETS_DENOMINATOR - 1 {
+        // we need to check for search_depth here because we need to have at least MIN_GOLDEN_TICKETS_DENOMINATOR blocks loaded before we can check for golden tickets
+        debug!(
+            "returning true since search depth {} is not enough. current_block_has_golden_ticket : {:?} golden_tickets_found : {:?} required_tickets : {}",
+            search_depth_index, current_block_has_golden_ticket, golden_tickets_found, required_tickets
+        );
+        return true;
+    }
 
-    if golden_tickets_found < MIN_GOLDEN_TICKETS_NUMERATOR
-        && search_depth_index >= MIN_GOLDEN_TICKETS_DENOMINATOR
-    {
+    if golden_tickets_found < required_tickets {
         info!(
-            "not enough golden tickets : found = {:?} depth = {:?} current_block_has_golden_ticket : {:?}",
-            golden_tickets_found, search_depth_index, current_block_has_golden_ticket
+            "not enough golden tickets : found = {:?} depth = {:?} current_block_has_golden_ticket : {:?} required_tickets : {}",
+            golden_tickets_found, search_depth_index, current_block_has_golden_ticket, required_tickets
         );
         // TODO : browsers might want to implement this check somehow
         if !bypass {
@@ -2318,6 +2340,7 @@ mod tests {
         // let fmt_layer = tracing_subscriber::fmt::Layer::default().with_filter(filter);
         //
         // tracing_subscriber::registry().with(fmt_layer).init();
+        // pretty_env_logger::init();
 
         let mut t = TestManager::default();
         let block1;
@@ -2353,7 +2376,7 @@ mod tests {
                 1,           // num transactions
                 0,           // amount
                 0,           // fee
-                false,       // mine golden ticket
+                true,        // mine golden ticket
             )
             .await;
         block2.generate(); // generate hashes
@@ -2512,11 +2535,11 @@ mod tests {
                 block4_hash.to_hex()
             );
             assert_ne!(blockchain.get_latest_block_id(), block4_id);
+            assert_ne!(blockchain.get_latest_block_id(), block5_id);
             assert_ne!(
                 blockchain.get_latest_block_hash().to_hex(),
                 block5_hash.to_hex()
             );
-            assert_ne!(blockchain.get_latest_block_id(), block5_id);
             assert_eq!(blockchain.get_latest_block_hash(), block6_hash);
             assert_eq!(blockchain.get_latest_block_id(), block6_id);
             assert_eq!(blockchain.get_latest_block_id(), 6);
@@ -2532,7 +2555,7 @@ mod tests {
                 1,           // num transactions
                 0,           // amount
                 0,           // fee
-                false,       // mine golden ticket
+                true,        // mine golden ticket
             )
             .await;
         block7.generate(); // generate hashes
@@ -2555,11 +2578,11 @@ mod tests {
             assert_ne!(blockchain.get_latest_block_id(), block4_id);
             assert_ne!(blockchain.get_latest_block_hash(), block5_hash);
             assert_ne!(blockchain.get_latest_block_id(), block5_id);
-            assert_eq!(blockchain.get_latest_block_hash(), block6_hash);
-            assert_eq!(blockchain.get_latest_block_id(), block6_id);
-            assert_ne!(blockchain.get_latest_block_hash(), block7_hash);
-            assert_ne!(blockchain.get_latest_block_id(), block7_id);
-            assert_eq!(blockchain.get_latest_block_id(), 6);
+            assert_ne!(blockchain.get_latest_block_hash(), block6_hash);
+            assert_ne!(blockchain.get_latest_block_id(), block6_id);
+            assert_eq!(blockchain.get_latest_block_hash(), block7_hash);
+            assert_eq!(blockchain.get_latest_block_id(), block7_id);
+            assert_eq!(blockchain.get_latest_block_id(), 7);
         }
 
         t.check_blockchain().await;
@@ -3550,6 +3573,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn is_golden_ticket_count_valid_test_no_gts() {
+        // pretty_env_logger::init();
         let mut blocks: HashMap<SaitoHash, Block> = Default::default();
         let mut block = Block::new();
         block.id = 10;
@@ -3593,7 +3617,23 @@ mod tests {
         block.previous_block_hash = [6; 32];
         blocks.insert(block.hash, block);
 
+        let mut block = Block::new();
+        block.id = 16;
+        block.has_golden_ticket = false;
+        block.hash = [8; 32];
+        block.previous_block_hash = [7; 32];
+        blocks.insert(block.hash, block);
+
+        // let result = is_golden_ticket_count_valid_([6; 32], false, false, |block_hash| {
+        //     blocks.get(&block_hash)
+        // });
+        // assert!(result);
         let result = is_golden_ticket_count_valid_([7; 32], false, false, |block_hash| {
+            blocks.get(&block_hash)
+        });
+        assert!(!result);
+
+        let result = is_golden_ticket_count_valid_([8; 32], false, false, |block_hash| {
             blocks.get(&block_hash)
         });
         assert!(!result);
