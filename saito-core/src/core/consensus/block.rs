@@ -1548,6 +1548,16 @@ impl Block {
                                         slip.slip_type = SlipType::ATR;
                                         slip.amount = atr_payout_for_slip - atr_fee_for_slip;
 
+					//
+					// we update the "input" slip so that it 
+					// will result in cumulative fees being
+					// calculated correctly when the TX is
+					// examined....
+					//
+                                        let mut from_slip = output.clone();
+					from_slip.amount = atr_payout_for_slip;
+
+
                                         //
                                         // track payouts and fees
                                         //
@@ -1562,7 +1572,7 @@ impl Block {
                                             Transaction::create_rebroadcast_transaction(
                                                 transaction,
                                                 slip,
-                                                output.clone(),
+                                                from_slip,
                                             );
 
                                         //
