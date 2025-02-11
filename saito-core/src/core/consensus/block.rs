@@ -642,10 +642,7 @@ impl Block {
             .await;
         block.cv = cv.clone();
 
-        //
-        // total fees
-        //
-        block.total_fees = cv.total_fees;
+        
 
         //
         // total fees new
@@ -656,6 +653,17 @@ impl Block {
         // total fees atr
         //
         block.total_fees_atr = cv.total_fees_atr;
+
+        //
+        // total fees
+        //
+        block.total_fees = block.total_fees_new + block.total_fees_atr;
+
+        info!("**************************************************************");
+        info!("block.total_fees_new create(): ${:?}", block.total_fees_new);
+        info!("block.total_fees_atr create(): ${:?}", block.total_fees_atr);
+        info!("block.total_fees create(): ${:?}", block.total_fees);
+        info!("**************************************************************");
 
         //
         // avg total fees
@@ -1280,6 +1288,12 @@ impl Block {
         // update block with total fees
         //
         self.total_fees = cumulative_fees;
+
+        info!("**************************************************************");
+        info!("cumulative_fees generate(): ${:?}", cumulative_fees);
+        info!("self.total_fees generate(): ${:?}", self.total_fees);
+        info!("**************************************************************");
+
         self.total_work = total_work;
 
         true
