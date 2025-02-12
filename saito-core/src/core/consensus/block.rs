@@ -68,6 +68,8 @@ pub struct ConsensusValues {
     pub total_fees_new: Currency,
     // total fees -- only atr transactions
     pub total_fees_atr: Currency,
+    // total fees -- only fees from txs in block
+    pub total_fees_cumulative: Currency,
 
     // smoothed avg fees -- new and atr transactions
     pub avg_total_fees: Currency,
@@ -127,6 +129,8 @@ pub struct ConsensusValues {
 
     pub total_rebroadcast_staking_payouts_nolan: Currency,
 
+    pub total_fees_paid_by_nonrebroadcast_atr_transactions: Currency,
+
     pub expected_difficulty: u64,
 }
 
@@ -134,7 +138,7 @@ impl Display for ConsensusValues {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "ConsensusValues {{ fee_transaction: {:?}, st_num: {}, st_index: {:?}, it_num: {}, it_index: {:?}, ft_num: {}, ft_index: {:?}, gt_num: {}, gt_index: {:?}, total_fees: {}, total_fees_new: {}, total_fees_atr: {}, avg_total_fees: {}, avg_total_fees_new: {}, avg_total_fees_atr: {}, total_bytes_new: {}, total_payout_routing: {}, total_payout_mining: {}, total_payout_treasury: {}, total_payout_graveyard: {}, total_payout_atr: {}, avg_payout_routing: {}, avg_payout_mining: {}, avg_payout_treasury: {}, avg_payout_graveyard: {}, avg_payout_atr: {}, avg_fee_per_byte: {}, fee_per_byte: {}, burnfee: {}, difficulty: {}, rebroadcasts: {:?}, total_rebroadcast_slips: {}, total_rebroadcast_nolan: {}, rebroadcast_hash: {:?}, avg_nolan_rebroadcast_per_block: {}, total_rebroadcast_fees_nolan: {}, total_rebroadcast_staking_payouts_nolan: {}, expected_difficulty: {} }}",
+            "ConsensusValues {{ fee_transaction: {:?}, st_num: {}, st_index: {:?}, it_num: {}, it_index: {:?}, ft_num: {}, ft_index: {:?}, gt_num: {}, gt_index: {:?}, total_fees: {}, total_fees_new: {}, total_fees_atr: {}, total_fees_cumulative: {}, avg_total_fees: {}, avg_total_fees_new: {}, avg_total_fees_atr: {}, total_bytes_new: {}, total_payout_routing: {}, total_payout_mining: {}, total_payout_treasury: {}, total_payout_graveyard: {}, total_payout_atr: {}, avg_payout_routing: {}, avg_payout_mining: {}, avg_payout_treasury: {}, avg_payout_graveyard: {}, avg_payout_atr: {}, avg_fee_per_byte: {}, fee_per_byte: {}, burnfee: {}, difficulty: {}, rebroadcasts: {:?}, total_rebroadcast_slips: {}, total_rebroadcast_nolan: {}, rebroadcast_hash: {:?}, avg_nolan_rebroadcast_per_block: {}, total_rebroadcast_fees_nolan: {}, total_rebroadcast_staking_payouts_nolan: {}, total_fees_paid_by_nonrebroadcast_atr_transactions: {}, expected_difficulty: {} }}",
             self.fee_transaction,
             self.st_num,
             self.st_index,
@@ -147,6 +151,7 @@ impl Display for ConsensusValues {
             self.total_fees,
             self.total_fees_new,
             self.total_fees_atr,
+            self.total_fees_cumulative,
             self.avg_total_fees,
             self.avg_total_fees_new,
             self.avg_total_fees_atr,
@@ -172,6 +177,7 @@ impl Display for ConsensusValues {
             self.avg_nolan_rebroadcast_per_block,
             self.total_rebroadcast_fees_nolan,
             self.total_rebroadcast_staking_payouts_nolan,
+            self.total_fees_paid_by_nonrebroadcast_atr_transactions,
             self.expected_difficulty)
     }
 }
@@ -194,6 +200,7 @@ impl ConsensusValues {
             total_fees: 5000,
             total_fees_new: 0,
             total_fees_atr: 0,
+            total_fees_cumulative: 0,
 
             avg_total_fees: 0,
             avg_total_fees_new: 0,
@@ -228,6 +235,8 @@ impl ConsensusValues {
             total_rebroadcast_fees_nolan: 0,
 
             total_rebroadcast_staking_payouts_nolan: 0,
+
+	    total_fees_paid_by_nonrebroadcast_atr_transactions: 0,
 
             expected_difficulty: 0,
         }
@@ -251,6 +260,7 @@ impl Default for ConsensusValues {
             total_fees: 0,
             total_fees_new: 0,
             total_fees_atr: 0,
+            total_fees_cumulative: 0,
 
             avg_total_fees: 0,
             avg_total_fees_new: 0,
@@ -284,6 +294,8 @@ impl Default for ConsensusValues {
             total_rebroadcast_fees_nolan: 0,
 
             total_rebroadcast_staking_payouts_nolan: 0,
+
+	    total_fees_paid_by_nonrebroadcast_atr_transactions: 0,
 
             expected_difficulty: 0,
         }
@@ -655,6 +667,11 @@ impl Block {
         // total fees atr
         //
         block.total_fees_atr = cv.total_fees_atr;
+
+        //
+        // total fees atr
+        //
+        block.total_fees_cumulative = cv.total_fees_cumulative;
 
         //
         // total fees
@@ -1303,7 +1320,6 @@ impl Block {
         info!("**************************************************************");
 
         self.total_work = total_work;
-        self.total_fees_cumulative = 111;
 
         info!("generate() called");
         info!("self.total_fees: ${:?}", self.total_fees);
@@ -1604,11 +1620,17 @@ impl Block {
                                         //
                                         cv.total_rebroadcast_nolan += output.amount;
                                         cv.total_fees_atr += output.amount;
+					cv.total_fees_paid_by_nonrebroadcast_atr_transactions += output.amount;
                                         debug!("we dont rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
                                     }
                                 }
                             } // output loop
                         }
+
+			//
+			// total fees cumulative
+			//
+			cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
 
                         //
                         // if ATR payouts are too large, adjust payout downwards
@@ -1637,6 +1659,8 @@ impl Block {
                             // max_total_payout divided by the unadjusted_total_nolan that we
                             // are rebroadcasting.
                             //
+			    // TODO - fee handling is complicated with _atr and _cumulative
+			    //
                             cv.total_payout_atr = 0;
                             for rebroadcast_tx in &mut cv.rebroadcasts {
                                 //
@@ -1648,10 +1672,18 @@ impl Block {
                                 //
                                 rebroadcast_tx.to[0].amount =
                                     rebroadcast_tx.from[0].amount * adjusted_output_multiplier;
-                                cv.total_fees_atr = 0;
                                 cv.total_payout_atr += rebroadcast_tx.to[0].amount;
                                 cv.total_payout_atr -= rebroadcast_tx.from[0].amount;
                             }
+                            cv.total_fees_atr = 0;
+
+			    //
+			    // total fees cumulative
+			    //
+			    // total_fees_atr are zero, so the payout will just be from the routing node section
+			    //
+			    cv.total_fees_cumulative = cv.total_fees_new;
+
                         }
                     } else {
                         error!(
@@ -2426,6 +2458,17 @@ impl Block {
             error!(
                 "total_fees_atr error: {:?} expected : {:?}",
                 self.total_fees_atr, cv.total_fees_atr
+            );
+            return false;
+        }
+
+        //
+        // total_fees_cumulative
+        //
+        if validate_against_utxo && cv.total_fees_cumulative != self.total_fees_cumulative {
+            error!(
+                "total_fees_cumulative error: {:?} expected : {:?}",
+                self.total_fees_cumulative, cv.total_fees_cumulative
             );
             return false;
         }
