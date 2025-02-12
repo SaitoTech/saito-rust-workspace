@@ -333,6 +333,7 @@ pub struct Block {
     pub total_fees: Currency,
     pub total_fees_new: Currency,
     pub total_fees_atr: Currency,
+    pub total_fees_cumulative: Currency,  // Add new field
     pub avg_total_fees: Currency,
     pub avg_total_fees_new: Currency,
     pub avg_total_fees_atr: Currency,
@@ -494,6 +495,7 @@ impl Block {
             total_fees: 0,
             total_fees_new: 0,
             total_fees_atr: 0,
+            total_fees_cumulative: 0,  // Initialize new field
             avg_total_fees: 0,
             avg_total_fees_new: 0,
             avg_total_fees_atr: 0,
@@ -1055,6 +1057,7 @@ impl Block {
         block.total_payout_graveyard = total_payout_graveyard;
         block.total_payout_atr = total_payout_atr;
         block.total_fees = total_fees;
+        block.total_fees = 111;
 
 
         //info!("block.total_fees deserialize_from_net: ${:?}", block.total_fees);
@@ -1300,6 +1303,7 @@ impl Block {
         info!("**************************************************************");
 
         self.total_work = total_work;
+        self.total_fees_cumulative = 111;
 
         info!("generate() called");
         info!("self.total_fees: ${:?}", self.total_fees);
