@@ -671,6 +671,8 @@ impl Block {
         //
         // total fees atr
         //
+
+        info!("----------- cv.total_fees_cumulative: ------------- ${:?}", cv.total_fees_cumulative);
         block.total_fees_cumulative = cv.total_fees_cumulative;
 
         //
@@ -1583,7 +1585,7 @@ impl Block {
 					// examined....
 					//
                                         let mut from_slip = output.clone();
-					from_slip.amount = atr_payout_for_slip;
+					                   from_slip.amount = atr_payout_for_slip;
 
 
                                         //
@@ -1627,10 +1629,14 @@ impl Block {
                             } // output loop
                         }
 
-			//
-			// total fees cumulative
-			//
-			cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
+        			//
+        			// total fees cumulative
+        			//
+
+                    info!("***********SETTING total_fees_cumulative ***************");
+                    cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
+                    info!("//////////// cv.total_fees_cumulative //////////////////// ${:?}", cv.total_fees_cumulative);
+
 
                         //
                         // if ATR payouts are too large, adjust payout downwards
@@ -1677,14 +1683,14 @@ impl Block {
                             }
                             cv.total_fees_atr = 0;
 
-			    //
-			    // total fees cumulative
-			    //
-			    // total_fees_atr are zero, so the payout will just be from the routing node section
-			    //
-			    cv.total_fees_cumulative = cv.total_fees_new;
-
+            			    //
+            			    // total fees cumulative
+            			    //
+            			    // total_fees_atr are zero, so the payout will just be from the routing node section
+            			    //
+            			    cv.total_fees_cumulative = cv.total_fees_new;
                         }
+
                     } else {
                         error!(
                             "couldn't load block for ATR from disk. block hash : {:?}",
