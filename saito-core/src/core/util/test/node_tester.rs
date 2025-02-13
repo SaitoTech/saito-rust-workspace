@@ -28,7 +28,7 @@ pub mod test {
     use crate::core::util::configuration::{
         BlockchainConfig, Configuration, ConsensusConfig, Endpoint, PeerConfig, Server,
     };
-    use crate::core::util::crypto::generate_keys;
+    use crate::core::util::crypto::{generate_keypair_from_private_key, generate_keys};
     use crate::core::util::test::test_io_handler::test::TestIOHandler;
     use crate::core::verification_thread::{VerificationThread, VerifyRequest};
     use log::{info, warn};
@@ -39,7 +39,6 @@ pub mod test {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tokio::sync::mpsc::Receiver;
     use tokio::sync::RwLock;
-    use tracing_subscriber::field::debug;
 
     #[derive(Clone)]
     pub struct TestTimeKeeper {}
@@ -150,12 +149,20 @@ pub mod test {
 
     impl Default for NodeTester {
         fn default() -> Self {
-            Self::new(100)
+            Self::new(100, None, None)
         }
     }
     impl NodeTester {
-        pub fn new(genesis_period: BlockId) -> Self {
-            let (public_key, private_key) = generate_keys();
+        pub fn new(
+            genesis_period: BlockId,
+            private_key: Option<SaitoPrivateKey>,
+            mut timer: Option<Timer>,
+        ) -> Self {
+            let (public_key, private_key) = if let Some(private_key) = &private_key {
+                generate_keypair_from_private_key(private_key)
+            } else {
+                generate_keys()
+            };
             let wallet = Arc::new(RwLock::new(Wallet::new(private_key, public_key)));
 
             info!("node tester public key : {:?}", public_key.to_base58());
@@ -187,11 +194,13 @@ pub mod test {
             let (sender_to_verification, receiver_in_verification) =
                 tokio::sync::mpsc::channel(channel_size);
 
-            let timer = Timer {
-                time_reader: Arc::new(TestTimeKeeper {}),
-                hasten_multiplier: 10_000,
-                start_time: TestTimeKeeper {}.get_timestamp_in_ms(),
-            };
+            if timer.is_none() {
+                timer = Some(Timer {
+                    time_reader: Arc::new(TestTimeKeeper {}),
+                    hasten_multiplier: 10_000,
+                    start_time: TestTimeKeeper {}.get_timestamp_in_ms(),
+                });
+            }
 
             NodeTester {
                 routing_thread: RoutingThread {
@@ -200,14 +209,14 @@ pub mod test {
                     sender_to_consensus: sender_to_consensus.clone(),
                     sender_to_miner: sender_to_miner.clone(),
                     config_lock: context.config_lock.clone(),
-                    timer: timer.clone(),
+                    timer: timer.clone().unwrap(),
                     wallet_lock: wallet.clone(),
                     network: Network::new(
                         Box::new(TestIOHandler {}),
                         peers.clone(),
                         context.wallet_lock.clone(),
                         context.config_lock.clone(),
-                        timer.clone(),
+                        timer.clone().unwrap(),
                     ),
                     storage: Storage::new(Box::new(TestIOHandler {})),
                     reconnection_timer: 0,
@@ -229,13 +238,13 @@ pub mod test {
                     sender_to_miner: sender_to_miner.clone(),
                     // sender_global: (),
                     block_producing_timer: 0,
-                    timer: timer.clone(),
+                    timer: timer.clone().unwrap(),
                     network: Network::new(
                         Box::new(TestIOHandler {}),
                         peers.clone(),
                         context.wallet_lock.clone(),
                         configuration.clone(),
-                        timer.clone(),
+                        timer.clone().unwrap(),
                     ),
                     storage: Storage::new(Box::new(TestIOHandler {})),
                     stats: ConsensusStats::new(sender_to_stat.clone()),
@@ -247,7 +256,7 @@ pub mod test {
                 mining_thread: MiningThread {
                     wallet_lock: context.wallet_lock.clone(),
                     sender_to_mempool: sender_to_consensus.clone(),
-                    timer: timer.clone(),
+                    timer: timer.clone().unwrap(),
                     miner_active: false,
                     target: [0; 32],
                     target_id: 0,
@@ -292,7 +301,7 @@ pub mod test {
                     io_interface: Box::new(TestIOHandler {}),
                     enabled: true,
                 },
-                timer,
+                timer: timer.clone().unwrap(),
                 receiver_for_router: receiver_in_blockchain,
                 receiver_for_consensus: receiver_in_mempool,
                 receiver_for_miner: receiver_in_miner,
@@ -309,6 +318,12 @@ pub mod test {
             self.mining_thread.on_init().await;
             self.verification_thread.on_init().await;
             self.stat_thread.on_init().await;
+            self.initial_token_supply += self
+                .consensus_thread
+                .blockchain_lock
+                .read()
+                .await
+                .calculate_current_supply();
 
             Ok(())
         }
@@ -377,6 +392,7 @@ pub mod test {
         pub async fn wait_till_block_id(&mut self, block_id: BlockId) -> Result<(), Error> {
             let time_keeper = TestTimeKeeper {};
             let timeout = time_keeper.get_timestamp_in_ms() + self.timeout_in_ms;
+            info!("waiting for block id : {}", block_id);
             loop {
                 {
                     let blockchain = self.routing_thread.blockchain_lock.read().await;
@@ -566,16 +582,17 @@ pub mod test {
                 .utxoset
                 .iter()
                 .filter(|(_, value)| **value)
-                .map(|(key, _)| {
+                .map(|(key, value)| {
                     let slip = Slip::parse_slip_from_utxokey(key).unwrap();
                     info!(
-                        "Utxo : {:?} : {} : {:?}, block : {}-{}-{}",
+                        "Utxo : {:?} : {} : {:?}, block : {}-{}-{}, valid : {}",
                         slip.public_key.to_base58(),
                         slip.amount,
                         slip.slip_type,
                         slip.block_id,
                         slip.tx_ordinal,
-                        slip.slip_index
+                        slip.slip_index,
+                        value
                     );
                     slip.amount
                 })
