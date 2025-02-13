@@ -608,10 +608,13 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 
 #[cfg(test)]
 mod tests {
+    use log::info;
+
     use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::defs::{PrintForLog, NOLAN_PER_SAITO};
+    use crate::core::process::keep_time::KeepTime;
     use crate::core::util::crypto::generate_keys;
-    use crate::core::util::test::node_tester::test::NodeTester;
+    use crate::core::util::test::node_tester::test::{NodeTester, TestTimeKeeper};
 
     #[tokio::test]
     #[serial_test::serial]
@@ -732,6 +735,106 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
+    async fn total_supply_test_with_with_restarts_over_atr() {
+        pretty_env_logger::init();
+        NodeTester::delete_blocks().await.unwrap();
+        let mut tester = NodeTester::new(10, None, None);
+        let public_key = tester.get_public_key().await;
+        let private_key = tester.get_private_key().await;
+        // tester
+        //     .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
+        //     .await;
+        let issuance = vec![
+            // (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
+            (
+                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
+                50_000 * NOLAN_PER_SAITO,
+            ),
+        ];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let genesis_period = tester
+            .consensus_thread
+            .config_lock
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .genesis_period;
+        for i in 2..2 * genesis_period + 2 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+        let last_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        let timer = tester.consensus_thread.timer.clone();
+        drop(tester);
+
+        info!("loading the node again");
+
+        let mut tester = NodeTester::new(genesis_period, Some(private_key), Some(timer));
+        tester.init().await.unwrap();
+        let loaded_last_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(last_block_id, loaded_last_block_id);
+        for i in last_block_id + 1..last_block_id + 1 + genesis_period {
+            {
+                let wallet = tester.consensus_thread.wallet_lock.read().await;
+                info!(
+                    "current wallet balance : {:?} slip_count : {:?} unspent_slips : {}, i : {}",
+                    wallet.get_available_balance(),
+                    wallet.slips.len(),
+                    wallet.get_unspent_slip_count(),
+                    i
+                );
+                wallet.slips.iter().for_each(|(utxo_key, slip)| {
+                    info!(
+                        "slip : {}-{}-{} amount : {:?} type : {:?} spent : {:?}",
+                        slip.block_id,
+                        slip.tx_ordinal,
+                        slip.slip_index,
+                        slip.amount,
+                        slip.slip_type,
+                        slip.spent
+                    );
+                });
+            }
+
+            let tx = tester
+                .create_transaction(10, 10, public_key)
+                .await
+                .unwrap_or_else(|_| panic!("couldn't create tx. i : {}", i));
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
     async fn total_supply_test_with_staking_for_slip_count() {
         // pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
@@ -806,7 +909,7 @@ mod tests {
         pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
-        let mut tester = NodeTester::new(3);
+        let mut tester = NodeTester::new(3, None, None);
         let public_key = tester.get_public_key().await;
         // tester
         //     .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
