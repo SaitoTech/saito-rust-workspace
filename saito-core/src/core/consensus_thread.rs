@@ -517,6 +517,18 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 StatVariable::format_timestamp(self.timer.get_timestamp_in_ms()),
                 self.timer.get_timestamp_in_ms() - start_time
             );
+            {
+                if let Some(latest_block) = blockchain.get_latest_block() {
+                    self.sender_to_miner
+                        .send(MiningEvent::LongestChainBlockAdded {
+                            hash: latest_block.hash,
+                            difficulty: latest_block.difficulty,
+                            block_id: latest_block.id,
+                        })
+                        .await
+                        .unwrap();
+                }
+            }
         }
 
         debug!(
@@ -736,7 +748,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn total_supply_test_with_with_restarts_over_atr() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let mut tester = NodeTester::new(10, None, None);
         let public_key = tester.get_public_key().await;
@@ -906,7 +918,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn blockchain_state_over_atr() {
-        // pretty_env_logger::init();
+        pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::new(3, None, None);
