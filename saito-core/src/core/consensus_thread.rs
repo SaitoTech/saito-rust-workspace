@@ -906,7 +906,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn blockchain_state_over_atr() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::new(3, None, None);
