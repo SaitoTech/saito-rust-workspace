@@ -1485,11 +1485,16 @@ impl Block {
         //
         // automatic transaction rebroadcasts / atr
         //
-        if self.id > configs.get_consensus_config().unwrap().genesis_period {
+	// note that we do not rebroadcast the block that is "falling off" the genesis-loop
+	// but the block that precedes this. we make this decision to avoid the need to 
+	// track whether the ATR transactions were included in this block, since anything
+	// more than a genesis-period old is unspendable.
+	//
+        if self.id > (configs.get_consensus_config().unwrap().genesis_period+1) {
             if let Some(pruned_block_hash) = blockchain
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(
-                    self.id - configs.get_consensus_config().unwrap().genesis_period,
+                    self.id - (configs.get_consensus_config().unwrap().genesis_period+1),
                 )
             {
                 if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
