@@ -200,7 +200,7 @@ impl ConsensusValues {
             total_fees: 5000,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 0,
+            total_fees_cumulative: 99,
 
             avg_total_fees: 0,
             avg_total_fees_new: 0,
@@ -507,7 +507,7 @@ impl Block {
             total_fees: 0,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 0,  // Initialize new field
+            total_fees_cumulative: 11,  // Initialize new field
             avg_total_fees: 0,
             avg_total_fees_new: 0,
             avg_total_fees_atr: 0,
@@ -827,25 +827,15 @@ impl Block {
         // create hashmap of slips_spent_this_block (used to avoid doublespends)
         //
         if !block.created_hashmap_of_slips_spent_this_block {
-            debug!(
-                "creating hashmap of slips spent this block : {}...",
-                block.id
-            );
+            debug!("creating hashmap of slips spent this block...");
             for transaction in &block.transactions {
                 if transaction.transaction_type != TransactionType::Fee {
                     for input in transaction.from.iter() {
-                        let value = block
+                        block
                             .slips_spent_this_block
                             .entry(input.get_utxoset_key())
                             .and_modify(|e| *e += 1)
                             .or_insert(1);
-                        if *value > 1 {
-                            warn!(
-                                "double-spend detected in block {} : {}",
-                                block.id,
-                                input.get_utxoset_key().to_hex()
-                            );
-                        }
                     }
                 }
                 block.created_hashmap_of_slips_spent_this_block = true;
@@ -907,6 +897,7 @@ impl Block {
     /// [avg_fee_per_byte - 8 bytes - u64]
     /// [avg_nolan_rebroadcast_per_block - 8 bytes - u64]
     /// [previous_block_unpaid - 8 bytes - u64]
+
     /// [avg_total_fees - 8 bytes - u64]
     /// [avg_total_fees_new - 8 bytes - u64]
     /// [avg_total_fees_atr - 8 bytes - u64]
@@ -924,6 +915,7 @@ impl Block {
     /// [total_fees_new - 8 bytes - u64]
     /// [total_fees_atr - 8 bytes - u64]
     /// [fee_per_byte - 8 bytes - u64]
+
     /// [transaction][transaction][transaction]...
     pub fn deserialize_from_net(bytes: &[u8]) -> Result<Block, Error> {
         if bytes.len() < BLOCK_HEADER_SIZE {
@@ -1273,18 +1265,10 @@ impl Block {
                 && transaction.transaction_type != TransactionType::Fee
             {
                 for input in transaction.from.iter() {
-                    let value = self
-                        .slips_spent_this_block
+                    self.slips_spent_this_block
                         .entry(input.get_utxoset_key())
                         .and_modify(|e| *e += 1)
                         .or_insert(1);
-                    if *value > 1 {
-                        warn!(
-                            "double-spend detected in block {} : {}",
-                            self.id,
-                            input.get_utxoset_key().to_hex()
-                        );
-                    }
                 }
                 self.created_hashmap_of_slips_spent_this_block = true;
             }
@@ -1654,9 +1638,9 @@ impl Block {
         			// total fees cumulative
         			//
 
-                    info!("***********SETTING total_fees_cumulative ***************");
-                    cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
-                    info!("//////////// cv.total_fees_cumulative //////////////////// ${:?}", cv.total_fees_cumulative);
+                    // info!("***********SETTING total_fees_cumulative ***************");
+                    // cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
+                    // info!("//////////// cv.total_fees_cumulative //////////////////// ${:?}", cv.total_fees_cumulative);
 
 
                         //
@@ -1709,7 +1693,7 @@ impl Block {
             			    //
             			    // total_fees_atr are zero, so the payout will just be from the routing node section
             			    //
-            			    cv.total_fees_cumulative = cv.total_fees_new;
+            			    // cv.total_fees_cumulative = cv.total_fees_new;
                         }
 
                     } else {
