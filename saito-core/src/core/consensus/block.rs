@@ -26,7 +26,7 @@ use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 389;
+pub const BLOCK_HEADER_SIZE: usize = 381;
 
 //
 // ConsensusValues is an object that is generated that contains all of the
@@ -1275,10 +1275,18 @@ impl Block {
                 && transaction.transaction_type != TransactionType::Fee
             {
                 for input in transaction.from.iter() {
-                    self.slips_spent_this_block
+                    let value = self
+                        .slips_spent_this_block
                         .entry(input.get_utxoset_key())
                         .and_modify(|e| *e += 1)
                         .or_insert(1);
+                    if *value > 1 {
+                        warn!(
+                            "double-spend detected in block {} : {}",
+                            self.id,
+                            input.get_utxoset_key().to_hex()
+                        );
+                    }
                 }
                 self.created_hashmap_of_slips_spent_this_block = true;
             }
