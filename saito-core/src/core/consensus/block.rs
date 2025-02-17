@@ -1333,16 +1333,16 @@ impl Block {
         self.issuance_transaction_index = issuance_transaction_index;
 
 
-        info!("**************************************************************");
-        info!("cumulative_fees generate(): ${:?}", cumulative_fees);
-        //info!("self.total_fees generate(): ${:?}", self.total_fees);
-        // info!("block.total_fees: ${:?}", block.total_fees);
-        info!("**************************************************************");
+        // info!("**************************************************************");
+        // info!("cumulative_fees generate(): ${:?}", cumulative_fees);
+        // //info!("self.total_fees generate(): ${:?}", self.total_fees);
+        // // info!("block.total_fees: ${:?}", block.total_fees);
+        // info!("**************************************************************");
 
         self.total_work = total_work;
 
-        info!("generate() called");
-        info!("self.total_fees: ${:?}", self.total_fees);
+        // info!("generate() called");
+        // info!("self.total_fees: ${:?}", self.total_fees);
 
         true
     }
