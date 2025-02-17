@@ -1980,6 +1980,27 @@ impl Blockchain {
             }
         }
     }
+    pub fn calculate_current_supply(&self) -> Currency {
+        let mut current_supply = Currency::default();
+        self.utxoset.iter().for_each(|(key, value)| {
+            if !value {
+                return;
+            }
+            let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+            current_supply += slip.amount;
+        });
+
+        if let Some(latest_block) = self.get_latest_block() {
+            current_supply += latest_block.graveyard;
+            current_supply += latest_block.treasury;
+            current_supply += latest_block.previous_block_unpaid;
+            current_supply += latest_block.total_fees;
+        } else {
+            debug!("latest block not found in blockchain to calculate total supply");
+            return 0;
+        }
+        current_supply
+    }
 }
 
 fn is_golden_ticket_count_valid_<'a, F: Fn(SaitoHash) -> Option<&'a Block>>(
