@@ -1,4 +1,4 @@
-import type {WasmPeer, WasmPeerService} from "saito-wasm/pkg/node/index";
+import type { WasmPeer, WasmPeerService } from "saito-wasm/pkg/node/index";
 import WasmWrapper from "./wasm_wrapper";
 
 export default class Peer extends WasmWrapper<WasmPeer> {
@@ -42,6 +42,7 @@ export default class Peer extends WasmWrapper<WasmPeer> {
     public hasService(service: string): boolean {
         return this.instance.has_service(service);
     }
-
-   
+    public get status(): string {
+        return this.instance.status;
+    }
 }

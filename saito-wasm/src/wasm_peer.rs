@@ -78,6 +78,18 @@ impl WasmPeer {
         self.peer.has_service(service.into())
     }
 
+    #[wasm_bindgen(getter = status)]
+    pub fn get_status(&self) -> JsString {
+        match self.peer.peer_status {
+            saito_core::core::consensus::peers::peer::PeerStatus::Connected => "connected",
+            saito_core::core::consensus::peers::peer::PeerStatus::Disconnected(_, _) => {
+                "disconnected"
+            }
+            saito_core::core::consensus::peers::peer::PeerStatus::Connecting => "connecting",
+        }
+        .into()
+    }
+
     // pub fn set_ip(&mut self, ip: JsString) {
     //     let s = ip.as_string();
     //     if s.is_none() {
