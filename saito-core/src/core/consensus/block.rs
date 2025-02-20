@@ -2143,6 +2143,7 @@ impl Block {
     /// [total_fees_new - 8 bytes - u64]
     /// [total_fees_atr - 8 bytes - u64]
     /// [fee_per_byte - 8 bytes - u64]
+    /// [total_fees_cumulative - 8 bytes - u64]
 
     /// [transaction][transaction][transaction]...
     pub fn serialize_for_net(&self, block_type: BlockType) -> Vec<u8> {
