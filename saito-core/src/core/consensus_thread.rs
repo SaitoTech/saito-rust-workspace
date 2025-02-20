@@ -624,9 +624,9 @@ mod tests {
 
     use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::defs::{PrintForLog, NOLAN_PER_SAITO};
-    use crate::core::process::keep_time::KeepTime;
+
     use crate::core::util::crypto::generate_keys;
-    use crate::core::util::test::node_tester::test::{NodeTester, TestTimeKeeper};
+    use crate::core::util::test::node_tester::test::NodeTester;
 
     #[tokio::test]
     #[serial_test::serial]

@@ -49,19 +49,21 @@ impl PeerCollection {
         let mut peer_index = None;
         {
             for (index, peer) in self.index_to_peers.iter() {
-                if peer.public_key.unwrap() == *public_key {
-                    if let PeerStatus::Connected = peer.peer_status {
-                        debug!(
-                            "peer : {:?} with key : {:?} is already connected",
-                            peer.index,
-                            public_key.to_base58()
-                        );
-                        // since peer is already connected
-                        continue;
+                if let Some(key) = &peer.public_key {
+                    if *key == *public_key {
+                        if let PeerStatus::Connected = peer.peer_status {
+                            debug!(
+                                "peer : {:?} with key : {:?} is already connected",
+                                peer.index,
+                                public_key.to_base58()
+                            );
+                            // since peer is already connected
+                            continue;
+                        }
+                        debug!("old peer found for key : {:?}", public_key.to_base58());
+                        peer_index = Some(*index);
+                        break;
                     }
-                    debug!("old peer found for key : {:?}", public_key.to_base58());
-                    peer_index = Some(*index);
-                    break;
                 }
             }
             if peer_index.is_none() {
