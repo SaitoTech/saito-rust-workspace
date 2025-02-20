@@ -928,6 +928,8 @@ impl Block {
 
     /// [transaction][transaction][transaction]...
     pub fn deserialize_from_net(bytes: &[u8]) -> Result<Block, Error> {
+        
+        info!("BLOCK_HEADER_SIZE: ${:?} ", bytes.len());
         if bytes.len() < BLOCK_HEADER_SIZE {
             warn!(
                 "block buffer is smaller than header length. length : {:?}",
@@ -1087,7 +1089,7 @@ impl Block {
         block.total_payout_graveyard = total_payout_graveyard;
         block.total_payout_atr = total_payout_atr;
         block.total_fees = total_fees;
-        //block.total_fees_cumulative = 99;
+        //block.total_fees_cumulative = total_fees_cumulative;
 
         //info!("block.total_fees deserialize_from_net: ${:?}", block.total_fees);
 
@@ -1500,14 +1502,23 @@ impl Block {
             cv.difficulty = self.difficulty;
         }
 
+
+        //
+        // total fees cumulative
+        //
+        // cumulative fees are set as the total number of new fees, unless atr transactions
+        // exist in which case we will update this value to include the fees paid by the
+        // subset of ATR transactions which rebroadcast, etc.
+        cv.total_fees_cumulative = cv.total_fees_new;
+
         //
         // automatic transaction rebroadcasts / atr
         //
-	// note that we do not rebroadcast the block that is "falling off" the genesis-loop
-	// but the block that precedes this. we make this decision to avoid the need to 
-	// track whether the ATR transactions were included in this block, since anything
-	// more than a genesis-period old is unspendable.
-	//
+    	// note that we do not rebroadcast the block that is "falling off" the genesis-loop
+    	// but the block that precedes this. we make this decision to avoid the need to 
+    	// track whether the ATR transactions were included in this block, since anything
+    	// more than a genesis-period old is unspendable.
+    	//
         if self.id > (configs.get_consensus_config().unwrap().genesis_period+1) {
             if let Some(pruned_block_hash) = blockchain
                 .blockring
@@ -1655,6 +1666,9 @@ impl Block {
                         //
                         // total fees cumulative
                         //
+                        // cumulative fees are set as the total number of new fees, unless atr transactions
+                        // exist in which case we will update this value to include the fees paid by the
+                        // subset of ATR transactions which rebroadcast, etc.
                         cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
 
                         //
@@ -1701,12 +1715,6 @@ impl Block {
                                 cv.total_payout_atr -= rebroadcast_tx.from[0].amount;
                             }
                             cv.total_fees_atr = 0;
-                            //
-                            // total fees cumulative
-                            //
-                            // total_fees_atr are zero, so the payout will just be from the routing node section
-                            //
-                            cv.total_fees_cumulative = cv.total_fees_new;
                         }
 
                     } else {
@@ -2090,6 +2098,10 @@ impl Block {
     // but it is advised that the merkle_root be already calculated
     // to avoid speed issues.
     pub fn serialize_for_signature(&self) -> Vec<u8> {
+        
+        info!("cumulative @ serialize_for_signature:  ${:?}", self.total_fees_cumulative);
+        info!("cumulative bytes @ serialize_for_signature: ${:?}", self.total_fees_cumulative.to_be_bytes().as_slice());
+
         [
             self.id.to_be_bytes().as_slice(),
             self.timestamp.to_be_bytes().as_slice(),
@@ -2162,6 +2174,10 @@ impl Block {
                 .collect::<Vec<_>>()
                 .concat();
         }
+        
+        info!("serialize_for_net @ cumulative: ${:?}", self.total_fees_cumulative);
+        info!("serialize_for_net @ cumulative: ${:?}", self.total_fees_cumulative.to_be_bytes().as_slice());
+
         let buffer = [
             tx_len_buffer.as_slice(),
             self.id.to_be_bytes().as_slice(),
