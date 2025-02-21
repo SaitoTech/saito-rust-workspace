@@ -200,7 +200,7 @@ impl ConsensusValues {
             total_fees: 5000,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 0,
+            total_fees_cumulative: 99999,
 
             avg_total_fees: 0,
             avg_total_fees_new: 0,
@@ -260,7 +260,7 @@ impl Default for ConsensusValues {
             total_fees: 0,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 0,
+            total_fees_cumulative: 99999,
 
             avg_total_fees: 0,
             avg_total_fees_new: 0,
@@ -507,7 +507,7 @@ impl Block {
             total_fees: 0,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 0,
+            total_fees_cumulative: 77777,
             avg_total_fees: 0,
             avg_total_fees_new: 0,
             avg_total_fees_atr: 0,
@@ -2219,8 +2219,8 @@ impl Block {
 
         info!("********************************************************");
         info!("total_fees_cumulative value: {:?}", self.total_fees_cumulative);
-        info!("total_fees_cumulative buffer: {:?}", self.total_fees_cumulative.to_be_bytes().as_slice());
-        info!("serialize() buffer: {:?}", buffer);
+        // info!("total_fees_cumulative buffer: {:?}", self.total_fees_cumulative.to_be_bytes().as_slice());
+        // info!("serialize() buffer: {:?}", buffer);
         info!("********************************************************");
 
         buffer
