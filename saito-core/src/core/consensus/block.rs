@@ -929,7 +929,12 @@ impl Block {
     /// [transaction][transaction][transaction]...
     pub fn deserialize_from_net(bytes: &[u8]) -> Result<Block, Error> {
         
-        info!("BLOCK_HEADER_SIZE: ${:?} ", bytes.len());
+        // info!("********************************************************");
+        // info!("deserialize() buffer: {:?}", bytes);
+        // info!("********************************************************");
+
+        // info!("BLOCK_HEADER_SIZE: ${:?} ", bytes.len());
+        
         if bytes.len() < BLOCK_HEADER_SIZE {
             warn!(
                 "block buffer is smaller than header length. length : {:?}",
@@ -1089,13 +1094,12 @@ impl Block {
         block.total_payout_graveyard = total_payout_graveyard;
         block.total_payout_atr = total_payout_atr;
         block.total_fees = total_fees;
-        block.total_fees_cumulative = total_fees_cumulative;
-
-        //info!("block.total_fees deserialize_from_net: ${:?}", block.total_fees);
-
         block.total_fees_new = total_fees_new;
         block.total_fees_atr = total_fees_atr;
         block.fee_per_byte = fee_per_byte;
+        block.total_fees_cumulative = total_fees_cumulative;
+
+        info!("block.total_fees_cumulative @ deserialize_from_net: {:?}", block.total_fees_cumulative);
 
         block.transactions = transactions.to_vec();
 
@@ -2098,10 +2102,6 @@ impl Block {
     // but it is advised that the merkle_root be already calculated
     // to avoid speed issues.
     pub fn serialize_for_signature(&self) -> Vec<u8> {
-        
-        info!("cumulative @ serialize_for_signature:  ${:?}", self.total_fees_cumulative);
-        info!("cumulative bytes @ serialize_for_signature: ${:?}", self.total_fees_cumulative.to_be_bytes().as_slice());
-
         [
             self.id.to_be_bytes().as_slice(),
             self.timestamp.to_be_bytes().as_slice(),
@@ -2176,9 +2176,7 @@ impl Block {
                 .concat();
         }
         
-        info!("serialize_for_net @ cumulative: ${:?}", self.total_fees_cumulative);
-        info!("serialize_for_net @ cumulative: ${:?}", self.total_fees_cumulative.to_be_bytes().as_slice());
-
+        
         let buffer = [
             tx_len_buffer.as_slice(),
             self.id.to_be_bytes().as_slice(),
@@ -2218,6 +2216,12 @@ impl Block {
             tx_buf.as_slice(),
         ]
         .concat();
+
+        info!("********************************************************");
+        info!("total_fees_cumulative value: {:?}", self.total_fees_cumulative);
+        info!("total_fees_cumulative buffer: {:?}", self.total_fees_cumulative.to_be_bytes().as_slice());
+        info!("serialize() buffer: {:?}", buffer);
+        info!("********************************************************");
 
         buffer
     }
