@@ -26,7 +26,7 @@ use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::{hash, sign, verify_signature};
 use crate::iterate;
 
-pub const BLOCK_HEADER_SIZE: usize = 381;
+pub const BLOCK_HEADER_SIZE: usize = 389;
 
 //
 // ConsensusValues is an object that is generated that contains all of the
@@ -345,7 +345,7 @@ pub struct Block {
     pub total_fees: Currency,
     pub total_fees_new: Currency,
     pub total_fees_atr: Currency,
-    pub total_fees_cumulative: Currency,  // Add new field
+    pub total_fees_cumulative: Currency,
     pub avg_total_fees: Currency,
     pub avg_total_fees_new: Currency,
     pub avg_total_fees_atr: Currency,
@@ -507,7 +507,7 @@ impl Block {
             total_fees: 0,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 0,  // Initialize new field
+            total_fees_cumulative: 0,
             avg_total_fees: 0,
             avg_total_fees_new: 0,
             avg_total_fees_atr: 0,
@@ -1004,7 +1004,7 @@ impl Block {
         let total_fees_new: Currency = Currency::from_be_bytes(bytes[357..365].try_into().unwrap());
         let total_fees_atr: Currency = Currency::from_be_bytes(bytes[365..373].try_into().unwrap());
         let fee_per_byte: Currency = Currency::from_be_bytes(bytes[373..381].try_into().unwrap());
-        //let total_fees_cumulative: Currency = Currency::from_be_bytes(bytes[381..389].try_into().unwrap());
+        let total_fees_cumulative: Currency = Currency::from_be_bytes(bytes[381..389].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -1089,7 +1089,7 @@ impl Block {
         block.total_payout_graveyard = total_payout_graveyard;
         block.total_payout_atr = total_payout_atr;
         block.total_fees = total_fees;
-        //block.total_fees_cumulative = total_fees_cumulative;
+        block.total_fees_cumulative = total_fees_cumulative;
 
         //info!("block.total_fees deserialize_from_net: ${:?}", block.total_fees);
 
@@ -2214,7 +2214,7 @@ impl Block {
             self.total_fees_new.to_be_bytes().as_slice(),
             self.total_fees_atr.to_be_bytes().as_slice(),
             self.fee_per_byte.to_be_bytes().as_slice(),
-            //self.total_fees_cumulative.to_be_bytes().as_slice(),
+            self.total_fees_cumulative.to_be_bytes().as_slice(), // Added total_fees_cumulative
             tx_buf.as_slice(),
         ]
         .concat();
