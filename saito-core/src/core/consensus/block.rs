@@ -870,12 +870,14 @@ impl Block {
         //
         block.sign(private_key);
 
+        info!("block.total_fees_cumulative (A): {:?}", block.total_fees_cumulative);
+
         //
         // finally run generate()
         //
         block.generate();
 
-        info!("create() called");
+        info!("block.total_fees_cumulative (B): {:?}", block.total_fees_cumulative);
         //info!("self.total_fees: ${:?}", self.total_fees);
 
         block
@@ -2218,9 +2220,10 @@ impl Block {
         .concat();
 
         info!("********************************************************");
-        info!("total_fees_cumulative value: {:?}", self.total_fees_cumulative);
-        // info!("total_fees_cumulative buffer: {:?}", self.total_fees_cumulative.to_be_bytes().as_slice());
-        // info!("serialize() buffer: {:?}", buffer);
+        info!("////////////////////////////////////////////////////////");
+        info!("inside serialize_for_net(): ");
+        info!("block.total_fees_cumulative: {:?}", self.total_fees_cumulative);
+        info!("////////////////////////////////////////////////////////");
         info!("********************************************************");
 
         buffer
@@ -2410,6 +2413,7 @@ impl Block {
         block.total_fees_atr = self.total_fees_atr;
         block.fee_per_byte = self.fee_per_byte;
         block.hash = self.hash;
+        block.total_fees_cumulative = self.total_fees_cumulative;
 
         // info!("**************************************************************");
         // info!("block.total_fees generate_lite_block(): ${:?}", block.total_fees);
