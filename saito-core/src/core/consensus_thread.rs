@@ -780,7 +780,7 @@ mod tests {
             .get_consensus_config()
             .unwrap()
             .genesis_period;
-        
+
         for i in 2..2 * (genesis_period + 1) + 2 {
             let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
             tester.add_transaction(tx).await;
@@ -810,7 +810,7 @@ mod tests {
             .await
             .get_latest_block_id();
         assert_eq!(last_block_id, loaded_last_block_id);
-        
+
         for i in last_block_id + 1..last_block_id + 1 + (genesis_period + 1) {
             {
                 let wallet = tester.consensus_thread.wallet_lock.read().await;
