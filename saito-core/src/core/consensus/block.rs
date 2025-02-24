@@ -200,7 +200,7 @@ impl ConsensusValues {
             total_fees: 5000,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 99999,
+            total_fees_cumulative: 0,
 
             avg_total_fees: 0,
             avg_total_fees_new: 0,
@@ -507,7 +507,7 @@ impl Block {
             total_fees: 0,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 77777,
+            total_fees_cumulative: 0,
             avg_total_fees: 0,
             avg_total_fees_new: 0,
             avg_total_fees_atr: 0,
