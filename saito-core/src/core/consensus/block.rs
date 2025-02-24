@@ -260,7 +260,7 @@ impl Default for ConsensusValues {
             total_fees: 0,
             total_fees_new: 0,
             total_fees_atr: 0,
-            total_fees_cumulative: 99999,
+            total_fees_cumulative: 0,
 
             avg_total_fees: 0,
             avg_total_fees_new: 0,
@@ -667,13 +667,8 @@ impl Block {
         block.total_fees_atr = cv.total_fees_atr;
 
         //
-        // total fees atr
+        // total fees cumulative
         //
-
-        info!(
-            "----------- cv.total_fees_cumulative: ------------- ${:?}",
-            cv.total_fees_cumulative
-        );
         block.total_fees_cumulative = cv.total_fees_cumulative;
 
         //
