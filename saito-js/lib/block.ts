@@ -104,12 +104,10 @@ export default class Block extends WasmWrapper<WasmBlock> {
     }
 
     public get totalFees(): bigint {
-        console.log("totalFees block.ts ", this.instance.total_fees);
         return this.instance.total_fees;
     }
 
     public get totalFeesCumulative(): bigint {
-        console.log("totalFees block.ts ", this.instance.total_fees_cumulative);
         return this.instance.total_fees_cumulative;
     }
 

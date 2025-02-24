@@ -236,7 +236,7 @@ impl ConsensusValues {
 
             total_rebroadcast_staking_payouts_nolan: 0,
 
-	    total_fees_paid_by_nonrebroadcast_atr_transactions: 0,
+            total_fees_paid_by_nonrebroadcast_atr_transactions: 0,
 
             expected_difficulty: 0,
         }
@@ -295,7 +295,7 @@ impl Default for ConsensusValues {
 
             total_rebroadcast_staking_payouts_nolan: 0,
 
-	    total_fees_paid_by_nonrebroadcast_atr_transactions: 0,
+            total_fees_paid_by_nonrebroadcast_atr_transactions: 0,
 
             expected_difficulty: 0,
         }
@@ -656,8 +656,6 @@ impl Block {
             .await;
         block.cv = cv.clone();
 
-        
-
         //
         // total fees new
         //
@@ -672,19 +670,16 @@ impl Block {
         // total fees atr
         //
 
-        info!("----------- cv.total_fees_cumulative: ------------- ${:?}", cv.total_fees_cumulative);
+        info!(
+            "----------- cv.total_fees_cumulative: ------------- ${:?}",
+            cv.total_fees_cumulative
+        );
         block.total_fees_cumulative = cv.total_fees_cumulative;
 
         //
         // total fees
         //
         block.total_fees = block.total_fees_new + block.total_fees_atr;
-
-        // info!("**************************************************************");
-        // info!("block.total_fees_new create(): ${:?}", block.total_fees_new);
-        // info!("block.total_fees_atr create(): ${:?}", block.total_fees_atr);
-        // info!("block.total_fees create(): ${:?}", block.total_fees);
-        // info!("**************************************************************");
 
         //
         // avg total fees
@@ -870,15 +865,10 @@ impl Block {
         //
         block.sign(private_key);
 
-        info!("block.total_fees_cumulative (A): {:?}", block.total_fees_cumulative);
-
         //
         // finally run generate()
         //
         block.generate();
-
-        info!("block.total_fees_cumulative (B): {:?}", block.total_fees_cumulative);
-        //info!("self.total_fees: ${:?}", self.total_fees);
 
         block
     }
@@ -927,16 +917,10 @@ impl Block {
     /// [total_fees_new - 8 bytes - u64]
     /// [total_fees_atr - 8 bytes - u64]
     /// [fee_per_byte - 8 bytes - u64]
+    /// [total_fees_cumulative - 8 bytes - u64]
 
     /// [transaction][transaction][transaction]...
     pub fn deserialize_from_net(bytes: &[u8]) -> Result<Block, Error> {
-        
-        // info!("********************************************************");
-        // info!("deserialize() buffer: {:?}", bytes);
-        // info!("********************************************************");
-
-        // info!("BLOCK_HEADER_SIZE: ${:?} ", bytes.len());
-        
         if bytes.len() < BLOCK_HEADER_SIZE {
             warn!(
                 "block buffer is smaller than header length. length : {:?}",
@@ -1011,7 +995,8 @@ impl Block {
         let total_fees_new: Currency = Currency::from_be_bytes(bytes[357..365].try_into().unwrap());
         let total_fees_atr: Currency = Currency::from_be_bytes(bytes[365..373].try_into().unwrap());
         let fee_per_byte: Currency = Currency::from_be_bytes(bytes[373..381].try_into().unwrap());
-        let total_fees_cumulative: Currency = Currency::from_be_bytes(bytes[381..389].try_into().unwrap());
+        let total_fees_cumulative: Currency =
+            Currency::from_be_bytes(bytes[381..389].try_into().unwrap());
 
         let mut transactions = vec![];
         let mut start_of_transaction_data = BLOCK_HEADER_SIZE;
@@ -1100,8 +1085,6 @@ impl Block {
         block.total_fees_atr = total_fees_atr;
         block.fee_per_byte = fee_per_byte;
         block.total_fees_cumulative = total_fees_cumulative;
-
-        info!("block.total_fees_cumulative @ deserialize_from_net: {:?}", block.total_fees_cumulative);
 
         block.transactions = transactions.to_vec();
 
@@ -1215,7 +1198,6 @@ impl Block {
     // cumulative block fees they contain.
     //
     pub fn generate(&mut self) -> bool {
-
         let creator_public_key = &self.creator;
 
         //self.total_rebroadcast_nolan = 0;
@@ -1339,18 +1321,7 @@ impl Block {
         self.fee_transaction_index = fee_transaction_index;
         self.golden_ticket_index = golden_ticket_index;
         self.issuance_transaction_index = issuance_transaction_index;
-
-
-        // info!("**************************************************************");
-        // info!("cumulative_fees generate(): ${:?}", cumulative_fees);
-        // //info!("self.total_fees generate(): ${:?}", self.total_fees);
-        // // info!("block.total_fees: ${:?}", block.total_fees);
-        // info!("**************************************************************");
-
         self.total_work = total_work;
-
-        // info!("generate() called");
-        // info!("self.total_fees: ${:?}", self.total_fees);
 
         true
     }
@@ -1508,7 +1479,6 @@ impl Block {
             cv.difficulty = self.difficulty;
         }
 
-
         //
         // total fees cumulative
         //
@@ -1520,16 +1490,16 @@ impl Block {
         //
         // automatic transaction rebroadcasts / atr
         //
-    	// note that we do not rebroadcast the block that is "falling off" the genesis-loop
-    	// but the block that precedes this. we make this decision to avoid the need to 
-    	// track whether the ATR transactions were included in this block, since anything
-    	// more than a genesis-period old is unspendable.
-    	//
-        if self.id > (configs.get_consensus_config().unwrap().genesis_period+1) {
+        // note that we do not rebroadcast the block that is "falling off" the genesis-loop
+        // but the block that precedes this. we make this decision to avoid the need to
+        // track whether the ATR transactions were included in this block, since anything
+        // more than a genesis-period old is unspendable.
+        //
+        if self.id > (configs.get_consensus_config().unwrap().genesis_period + 1) {
             if let Some(pruned_block_hash) = blockchain
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(
-                    self.id - (configs.get_consensus_config().unwrap().genesis_period+1),
+                    self.id - (configs.get_consensus_config().unwrap().genesis_period + 1),
                 )
             {
                 if let Some(pruned_block) = blockchain.blocks.get(&pruned_block_hash) {
@@ -1618,15 +1588,14 @@ impl Block {
                                         slip.slip_type = SlipType::ATR;
                                         slip.amount = atr_payout_for_slip - atr_fee_for_slip;
 
-					//
-					// we update the "input" slip so that it 
-					// will result in cumulative fees being
-					// calculated correctly when the TX is
-					// examined....
-					//
+                                        //
+                                        // we update the "input" slip so that it
+                                        // will result in cumulative fees being
+                                        // calculated correctly when the TX is
+                                        // examined....
+                                        //
                                         let mut from_slip = output.clone();
-					                   from_slip.amount = atr_payout_for_slip;
-
+                                        from_slip.amount = atr_payout_for_slip;
 
                                         //
                                         // track payouts and fees
@@ -1662,7 +1631,8 @@ impl Block {
                                         //
                                         cv.total_rebroadcast_nolan += output.amount;
                                         cv.total_fees_atr += output.amount;
-					cv.total_fees_paid_by_nonrebroadcast_atr_transactions += output.amount;
+                                        cv.total_fees_paid_by_nonrebroadcast_atr_transactions +=
+                                            output.amount;
                                         debug!("we dont rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
                                     }
                                 }
@@ -1675,7 +1645,8 @@ impl Block {
                         // cumulative fees are set as the total number of new fees, unless atr transactions
                         // exist in which case we will update this value to include the fees paid by the
                         // subset of ATR transactions which rebroadcast, etc.
-                        cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
+                        cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr
+                            - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
 
                         //
                         // if ATR payouts are too large, adjust payout downwards
@@ -1704,8 +1675,8 @@ impl Block {
                             // max_total_payout divided by the unadjusted_total_nolan that we
                             // are rebroadcasting.
                             //
-			    // TODO - fee handling is complicated with _atr and _cumulative
-			    //
+                            // TODO - fee handling is complicated with _atr and _cumulative
+                            //
                             cv.total_payout_atr = 0;
                             for rebroadcast_tx in &mut cv.rebroadcasts {
                                 //
@@ -1722,7 +1693,6 @@ impl Block {
                             }
                             cv.total_fees_atr = 0;
                         }
-
                     } else {
                         error!(
                             "couldn't load block for ATR from disk. block hash : {:?}",
@@ -1737,10 +1707,6 @@ impl Block {
         // total fees
         //
         cv.total_fees = cv.total_fees_new + cv.total_fees_atr;
-
-        // info!("**************************************************");
-        // info!("cv.total_fees generate_consensus_values : ${:?}", cv.total_fees);
-        // info!("**************************************************");
 
         //
         // fee_per_byte
@@ -2124,7 +2090,6 @@ impl Block {
             self.avg_total_fees_atr.to_be_bytes().as_slice(),
             self.avg_payout_routing.to_be_bytes().as_slice(),
             self.avg_payout_mining.to_be_bytes().as_slice(),
-            //self.total_fees_cumulative.to_be_bytes().as_slice(),
         ]
         .concat()
     }
@@ -2177,8 +2142,7 @@ impl Block {
                 .collect::<Vec<_>>()
                 .concat();
         }
-        
-        
+
         let buffer = [
             tx_len_buffer.as_slice(),
             self.id.to_be_bytes().as_slice(),
@@ -2214,17 +2178,10 @@ impl Block {
             self.total_fees_new.to_be_bytes().as_slice(),
             self.total_fees_atr.to_be_bytes().as_slice(),
             self.fee_per_byte.to_be_bytes().as_slice(),
-            self.total_fees_cumulative.to_be_bytes().as_slice(), // Added total_fees_cumulative
+            self.total_fees_cumulative.to_be_bytes().as_slice(),
             tx_buf.as_slice(),
         ]
         .concat();
-
-        info!("********************************************************");
-        info!("////////////////////////////////////////////////////////");
-        info!("inside serialize_for_net(): ");
-        info!("block.total_fees_cumulative: {:?}", self.total_fees_cumulative);
-        info!("////////////////////////////////////////////////////////");
-        info!("********************************************************");
 
         buffer
     }
@@ -2414,12 +2371,6 @@ impl Block {
         block.fee_per_byte = self.fee_per_byte;
         block.hash = self.hash;
         block.total_fees_cumulative = self.total_fees_cumulative;
-
-        // info!("**************************************************************");
-        // info!("block.total_fees generate_lite_block(): ${:?}", block.total_fees);
-        // info!("**************************************************************");
-
-
 
         block.merkle_root = self.generate_merkle_root(true, true);
 

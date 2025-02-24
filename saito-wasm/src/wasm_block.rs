@@ -1,5 +1,5 @@
 use js_sys::{Array, JsString, Uint8Array};
-use log::{info, error};
+use log::error;
 use num_traits::FromPrimitive;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
@@ -50,13 +50,11 @@ impl WasmBlock {
 
     #[wasm_bindgen(getter = total_fees)]
     pub fn total_fees(&self) -> u64 {
-        info!("wasm_block.rs self.block.total_fees: ${:?}", self.block.total_fees);
         self.block.total_fees
     }
 
     #[wasm_bindgen(getter = total_fees_cumulative)]
     pub fn total_fees_cumulative(&self) -> u64 {
-        info!("wasm_block.rs self.block.total_fees_cumulative: ${:?}", self.block.total_fees_cumulative);
         self.block.total_fees_cumulative
     }
 
