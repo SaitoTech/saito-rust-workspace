@@ -780,7 +780,8 @@ mod tests {
             .get_consensus_config()
             .unwrap()
             .genesis_period;
-        for i in 2..2 * genesis_period + 2 {
+        
+        for i in 2..2 * (genesis_period + 1) + 2 {
             let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
             tester.add_transaction(tx).await;
             tester.wait_till_block_id(i).await.unwrap();
@@ -800,7 +801,7 @@ mod tests {
 
         info!("loading the node again");
 
-        let mut tester = NodeTester::new(genesis_period, Some(private_key), Some(timer));
+        let mut tester = NodeTester::new(genesis_period + 1, Some(private_key), Some(timer));
         tester.init().await.unwrap();
         let loaded_last_block_id = tester
             .consensus_thread
@@ -809,7 +810,8 @@ mod tests {
             .await
             .get_latest_block_id();
         assert_eq!(last_block_id, loaded_last_block_id);
-        for i in last_block_id + 1..last_block_id + 1 + genesis_period {
+        
+        for i in last_block_id + 1..last_block_id + 1 + (genesis_period + 1) {
             {
                 let wallet = tester.consensus_thread.wallet_lock.read().await;
                 info!(
