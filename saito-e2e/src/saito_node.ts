@@ -1,3 +1,5 @@
+const { exec } = require("child_process");
+
 export enum NodeType {
   RUST = "rust",
   SLR = "slr",
@@ -11,6 +13,7 @@ export class NodeConfig {
   nodeType: NodeType = NodeType.SLR;
   isGenesis: boolean = false;
   originalCodeLocation: string = "";
+  host: string = "localhost";
 }
 export default abstract class SaitoNode {
   private _dataDir: string = "./data";
@@ -38,10 +41,25 @@ export default abstract class SaitoNode {
   public get nodeDir(): string {
     return this._nodeDir;
   }
+  public get name(): string {
+    return this._config.name;
+  }
 
   async startNode() {
     console.log(`starting the node : ${this._index}...`);
-    return this.onStartNode();
+
+    await this.onStartNode();
+
+    for (let i = 0; i < 30; i++) {
+      const running = await this.isRunning();
+      if (running) {
+        console.log(`node started : ${this._index}`);
+        break;
+      } else {
+        console.log("waiting for node : " + this.name + " to start");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
   }
 
   protected abstract onStartNode(): Promise<void>;
@@ -71,18 +89,54 @@ export default abstract class SaitoNode {
   protected abstract onResetNode(): Promise<void>;
 
   async isRunning(): Promise<boolean> {
-    return this.checkRunning();
+    try {
+      await this.fetchValueFromNode("status");
+      return true;
+    } catch (error) {
+      console.error(error.message);
+      return false;
+    }
   }
 
-  protected abstract checkRunning(): Promise<boolean>;
-
-  public async getLatestBlockHash(): Promise<string> { return ""; }
-  public async getPeers() { }
-  public async sendMessage() { }
-
-  public async deploy() {
-
+  public async getLatestBlock(): Promise<{
+    hash: string;
+    id: number;
+    previous_block_hash: string;
+  }> {
+    const result = await this.fetchValueFromNode("block/latest");
+    return result as { hash: string; id: number; previous_block_hash: string };
   }
+  public async getPeers(): Promise<{ peers: string[] }> {
+    return (await this.fetchValueFromNode("peers/all")) as { peers: string[] };
+  }
+  public async transferFunds(amount: bigint, to: string) {
+    return await this.fetchValueFromNode(`transfer/${to}/${amount}`);
+  }
+  public async sendMessage() {}
+
+  public async fetchValueFromNode(path: string): Promise<unknown> {
+    return fetch(this.getUrl(path)).then((res) => res.json());
+  }
+  public getUrl(path: string): string {
+    return `http://${this._config.host}:${this._config.port}/test-api/${path}`;
+  }
+  public static async runCommand(command: string, cwd:string) {
+    await new Promise<void>((resolve, reject) => {
+        console.log("running command : " + command);
+        exec(command, { cwd: cwd }, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error running reset command: ${error.message}`);
+                reject(error);
+                return;
+            }
+            if (stderr) {
+                console.error(`Command stderr: ${stderr}`);
+            }
+            console.log(`Command stdout: ${stdout}`);
+            resolve();
+        });
+    });
+}
 }
 
 // API requirements.

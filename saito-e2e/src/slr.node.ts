@@ -6,9 +6,6 @@ import process from "process";
 import fs from "fs";
 
 export default class SlrNode extends SaitoNode {
-  protected checkRunning(): Promise<boolean> {
-    throw new Error("Method not implemented.");
-  }
   node: ChildProcess;
 
   protected async onResetNode(): Promise<void> {
@@ -33,11 +30,17 @@ export default class SlrNode extends SaitoNode {
 
   protected async onStartNode(): Promise<void> {
     const beforeTime = Date.now();
-    this.node = execFile("npm run dev", [], (error, stdout, stderr) => {
-      console.error(error);
-      console.log(stdout);
-      console.error(stderr);
-    });
+    this.node = execFile("npm", ["run", "dev"], { cwd: this.nodeDir },(error, stdout, stderr) => {
+      if (error) {
+          console.error(`Error: ${error.message}`);
+          return;
+      }
+      if (stderr) {
+          console.error(`Standard Error: ${stderr}`);
+          return;
+      }
+      console.log(`Standard Output: ${stdout}`);
+  });
     const afterTime = Date.now();
     console.log("starting the node took : " + (afterTime - beforeTime) + "ms");
   }

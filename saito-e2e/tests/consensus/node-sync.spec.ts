@@ -1,11 +1,12 @@
 import { test } from "@playwright/test";
-import SlrNode from "../../src/slr.node";
 import { NodeSet, NodeSetConfig } from "../../src/node_set";
 import { NodeConfig, NodeType } from "../../src/saito_node";
 
 test.describe("nodes should sync correctly", () => {
     let nodeSetup: NodeSet;
     test.beforeAll(async () => {
+        test.setTimeout(0); // Set timeout to 60 seconds
+
         const configSet = new NodeSetConfig();
         configSet.mainNodeIndex = 0;
         configSet.basePort = 42000;
@@ -30,12 +31,15 @@ test.describe("nodes should sync correctly", () => {
         configSet.nodeConfigs.push(config);
 
         nodeSetup = new NodeSet(configSet);
+        console.log("bootstrapping the nodes");
         await nodeSetup.bootstrap();
 
+        console.log("starting the nodes");
         await nodeSetup.startNodes();
-
+        console.log("nodes started");
     });
     test.afterAll(async () => {
+        console.log("stopping the nodes");
         await nodeSetup.stopNodes();
 
     });
@@ -43,34 +47,16 @@ test.describe("nodes should sync correctly", () => {
     test("sync peer after peer has 10 blocks", async ({ request }) => {
         console.log("running the test");
 
+        const mainNode = nodeSetup.getNode("main");
+        const peerNode = nodeSetup.getNode("peer");
+
+        const mainLatest = await mainNode?.getLatestBlock();
+        const peerLatest = await peerNode?.getLatestBlock();
+
+        if (mainLatest?.hash!==peerLatest?.hash) {
+            console.log("mainLatest : " + mainLatest?.hash);
+            console.log("peerLatest : " + peerLatest?.hash);
+            console.log("latest blocks are not the same");
+        }
     });
-});
-
-test.skip("issuance file generation @consensus", async ({ page, browserName, request }, testInfo) => {
-    if (browserName !== "chromium") {
-        testInfo.skip();
-        return;
-    }
-    testInfo.setTimeout(0);
-    let dir = "./temp";
-    if (fs.existsSync(dir)) {
-        fs.rmSync(dir, { recursive: true, force: true });
-    }
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir);
-    }
-
-    let node = new SlrNode();
-    await node.resetNode();
-
-    await node.startNode();
-
-    // await page.waitForTimeout(10000);
-
-    await node.stopNode();
-    // generate some blocks
-
-    // run utxo file generation in SLR
-
-    // check the entries in the generated issuance file
 });

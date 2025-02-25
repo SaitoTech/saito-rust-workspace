@@ -42,6 +42,9 @@ export class NodeSet {
     async stopNodes() {
         return Promise.all(this.nodes.map((node) => { return node.stopNode(); }));
     }
+    getNode(name:string):SaitoNode |undefined{
+        return this.nodes.find((node) => node.name === name);
+    }
 }
 
 export class Bootstrapper {
@@ -110,23 +113,7 @@ class NodeBootstrapper {
     }
 
 
-    async runCommand(command: string) {
-        await new Promise<void>((resolve, reject) => {
-            console.log("running command : " + command);
-            exec(command, { cwd: this.dir }, (error, stdout, stderr) => {
-                if (error) {
-                    console.error(`Error running reset command: ${error.message}`);
-                    reject(error);
-                    return;
-                }
-                if (stderr) {
-                    console.error(`Command stderr: ${stderr}`);
-                }
-                console.log(`Command stdout: ${stdout}`);
-                resolve();
-            });
-        });
-    }
+    
 }
 
 class RustBootstrapper extends NodeBootstrapper {
@@ -155,22 +142,22 @@ class SlrBootstrapper extends NodeBootstrapper {
             if (!this.config.originalCodeLocation) {
                 throw new Error("original code location is not set");
             }
-            await this.runCommand(`rsync -a --exclude='nettest' --exclude='node_modules' --exclude='.git' ${this.config.originalCodeLocation}/ ${this.dir}`);
+            await SaitoNode.runCommand(`rsync -a --exclude='nettest' --exclude='node_modules' --exclude='.git' ${this.config.originalCodeLocation}/ ${this.dir}`,this.dir);
         } else if (!await this.fileExists("README.md")) {
             if (!this.config.originalCodeLocation) {
                 throw new Error("original code location is not set");
             }
             await this.cleanDir(this.dir);
-            await this.runCommand(`rsync -a --exclude='nettest' --exclude='node_modules' --exclude='.git' ${this.config.originalCodeLocation}/ ${this.dir}`);
+            await SaitoNode.runCommand(`rsync -a --exclude='nettest' --exclude='node_modules' --exclude='.git' ${this.config.originalCodeLocation}/ ${this.dir}`,this.dir);
         }
         // install required dependencies
-        await this.runCommand("npm install");
+        await SaitoNode.runCommand("npm install",this.dir);
 
         // compile the project
-        await this.runCommand("npm run compile");
+        await SaitoNode.runCommand("npm run compile",this.dir);
 
         // run "npm run reset dev"
-        await this.runCommand("npm run reset dev");
+        await SaitoNode.runCommand("npm run reset dev",this.dir);
 
         // configurations
         // throw new Error("Method not implemented.");

@@ -2,9 +2,6 @@ import { type Page, type Locator } from "@playwright/test";
 import SaitoNode, { NodeConfig } from "./saito_node";
 
 export default class RustNode extends SaitoNode {
-  protected checkRunning(): Promise<boolean> {
-    throw new Error("Method not implemented.");
-  }
   protected onResetNode(): Promise<void> {
     throw new Error("Method not implemented.");
   }
