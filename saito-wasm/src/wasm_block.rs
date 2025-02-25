@@ -53,6 +53,11 @@ impl WasmBlock {
         self.block.total_fees
     }
 
+    #[wasm_bindgen(getter = total_fees_cumulative)]
+    pub fn total_fees_cumulative(&self) -> u64 {
+        self.block.total_fees_cumulative
+    }
+
     #[wasm_bindgen(getter = difficulty)]
     pub fn difficulty(&self) -> u64 {
         self.block.difficulty

@@ -107,6 +107,10 @@ export default class Block extends WasmWrapper<WasmBlock> {
         return this.instance.total_fees;
     }
 
+    public get totalFeesCumulative(): bigint {
+        return this.instance.total_fees_cumulative;
+    }
+
     public get avgFeePerByte(): bigint {
         return this.instance.avg_fee_per_byte;
     }
