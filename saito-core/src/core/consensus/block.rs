@@ -3594,14 +3594,16 @@ mod tests {
         tester.set_issuance(issuance).await.unwrap();
 
         tester.init().await.unwrap();
-        let genesis_period = tester
+        // atr rebroadcasts on genesis_period + 1
+        let genesis_period = (tester
             .routing_thread
             .config_lock
             .read()
             .await
             .get_consensus_config()
             .unwrap()
-            .genesis_period;
+            .genesis_period)
+            + 1;
         tester.wait_till_block_id(1).await.unwrap();
 
         for i in 1..genesis_period {
