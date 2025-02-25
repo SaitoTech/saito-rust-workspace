@@ -753,24 +753,15 @@ mod tests {
         let mut tester = NodeTester::new(10, None, None);
         let public_key = tester.get_public_key().await;
         let private_key = tester.get_private_key().await;
-        // tester
-        //     .set_staking_requirement(2_000_000 * NOLAN_PER_SAITO, 60)
-        //     .await;
+        
         let issuance = vec![
-            // (public_key.to_base58(), 100 * 2_000_000 * NOLAN_PER_SAITO),
             (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
-            (
-                "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
-                50_000 * NOLAN_PER_SAITO,
-            ),
+            ("27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(), 50_000 * NOLAN_PER_SAITO),
         ];
         tester.set_issuance(issuance).await.unwrap();
         tester.init().await.unwrap();
         tester.wait_till_block_id(1).await.unwrap();
-        tester
-            .check_total_supply()
-            .await
-            .expect("total supply should not change");
+        tester.check_total_supply().await.expect("total supply should not change");
 
         let genesis_period = tester
             .consensus_thread
@@ -780,16 +771,15 @@ mod tests {
             .get_consensus_config()
             .unwrap()
             .genesis_period;
-
-        for i in 2..2 * (genesis_period + 1) + 2 {
+        
+        let max_blocks = genesis_period + 2;
+        for i in 2..=max_blocks {
             let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
             tester.add_transaction(tx).await;
             tester.wait_till_block_id(i).await.unwrap();
-            tester
-                .check_total_supply()
-                .await
-                .expect("total supply should not change");
+            tester.check_total_supply().await.expect("total supply should not change");
         }
+
         let last_block_id = tester
             .consensus_thread
             .blockchain_lock
@@ -801,7 +791,7 @@ mod tests {
 
         info!("loading the node again");
 
-        let mut tester = NodeTester::new(genesis_period + 1, Some(private_key), Some(timer));
+        let mut tester = NodeTester::new(genesis_period, Some(private_key), Some(timer));
         tester.init().await.unwrap();
         let loaded_last_block_id = tester
             .consensus_thread
@@ -810,8 +800,8 @@ mod tests {
             .await
             .get_latest_block_id();
         assert_eq!(last_block_id, loaded_last_block_id);
-
-        for i in last_block_id + 1..last_block_id + 1 + (genesis_period + 1) {
+        
+        for i in last_block_id + 1..=std::cmp::min(last_block_id + genesis_period, max_blocks) {
             {
                 let wallet = tester.consensus_thread.wallet_lock.read().await;
                 info!(
@@ -840,12 +830,10 @@ mod tests {
                 .unwrap_or_else(|_| panic!("couldn't create tx. i : {}", i));
             tester.add_transaction(tx).await;
             tester.wait_till_block_id(i).await.unwrap();
-            tester
-                .check_total_supply()
-                .await
-                .expect("total supply should not change");
+            tester.check_total_supply().await.expect("total supply should not change");
         }
     }
+
 
     #[tokio::test]
     #[serial_test::serial]
