@@ -1,6 +1,6 @@
 import { type Page, type Locator } from "@playwright/test";
 import SaitoNode, { NodeConfig } from "./saito_node";
-import { ChildProcess, execFile, execSync } from "node:child_process";
+import { ChildProcess, execFile, execSync, spawn } from "node:child_process";
 
 import process from "process";
 import fs from "fs";
@@ -30,26 +30,30 @@ export default class SlrNode extends SaitoNode {
 
   protected async onStartNode(): Promise<void> {
     const beforeTime = Date.now();
-    this.node = execFile("npm", ["run", "dev"], { cwd: this.nodeDir },(error, stdout, stderr) => {
-      if (error) {
-          console.error(`Error: ${error.message}`);
-          return;
-      }
-      if (stderr) {
-          console.error(`Standard Error: ${stderr}`);
-          return;
-      }
-      console.log(`Standard Output: ${stdout}`);
-  });
+    this.node = spawn("npm", ["run", "dev"], { cwd: this.nodeDir });
+
+    this.node.stdout.on("data", (data) => {
+      console.log(`${this.name} : stdout: ${data}`);
+    });
+
+    this.node.stderr.on("data", (data) => {
+      console.error(`${this.name} : stderr: ${data}`);
+    });
+
+    this.node.on("close", (code) => {
+      console.log(`${this.name} : Child process exited with code ${code}`);
+    });
     const afterTime = Date.now();
-    console.log("starting the node took : " + (afterTime - beforeTime) + "ms");
+    console.log(`${this.name} : starting the node took : ${afterTime - beforeTime}ms`);
   }
 
   protected async onStopNode(): Promise<void> {
     const beforeTime = Date.now();
-    this.node.kill();
+    if (this.node) {
+      this.node.kill();
+    }
     const afterTime = Date.now();
-    console.log("stopping the node took : " + (afterTime - beforeTime) + "ms");
+    console.log(`${this.name} : stopping the node took : ${afterTime - beforeTime}ms`);
   }
 
   protected onSetIssuance(issuance: string[]): Promise<void> {
@@ -59,8 +63,5 @@ export default class SlrNode extends SaitoNode {
   constructor(config: NodeConfig) {
     super(config);
     console.log("cwd : " + process.cwd());
-
   }
-
-
 }

@@ -1,4 +1,4 @@
-const { exec } = require("child_process");
+const { exec, spawn } = require("child_process");
 
 export enum NodeType {
   RUST = "rust",
@@ -6,7 +6,8 @@ export enum NodeType {
 }
 
 export class NodeConfig {
-  peers: string[] = [];
+  peers: { host: string; port: number }[] = [];
+  peerLabels: string[] = [];
   port: number = 0;
   dir: string = "";
   name: string = "";
@@ -115,28 +116,51 @@ export default abstract class SaitoNode {
   public async sendMessage() {}
 
   public async fetchValueFromNode(path: string): Promise<unknown> {
-    return fetch(this.getUrl(path)).then((res) => res.json());
+    const url = this.getUrl(path);
+    console.log("url : " + url);
+    return fetch(url).then((res) => res.json());
   }
   public getUrl(path: string): string {
     return `http://${this._config.host}:${this._config.port}/test-api/${path}`;
   }
-  public static async runCommand(command: string, cwd:string) {
-    await new Promise<void>((resolve, reject) => {
-        console.log("running command : " + command);
-        exec(command, { cwd: cwd }, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error running reset command: ${error.message}`);
-                reject(error);
-                return;
-            }
-            if (stderr) {
-                console.error(`Command stderr: ${stderr}`);
-            }
-            console.log(`Command stdout: ${stdout}`);
-            resolve();
-        });
-    });
-}
+  public static async runCommand(command: string, cwd: string) {
+      return new Promise<void>((resolve, reject) => {
+          console.log("running command: " + command + " inside: " + cwd);
+          
+          // Split the command into the main command and its arguments
+          const parts = command.split(' ');
+          const cmd = parts[0];
+          const args = parts.slice(1);
+          
+          const childProcess = spawn(cmd, args, {
+              cwd: cwd,
+              shell: true, // Use shell to support piping, redirection, etc.
+          });
+  
+          childProcess.stdout.on('data', (data) => {
+              process.stdout.write(`${data}`);
+          });
+  
+          childProcess.stderr.on('data', (data) => {
+              process.stderr.write(`${data}`);
+          });
+  
+          childProcess.on('close', (code) => {
+              if (code === 0) {
+                  console.log("finished running command: " + command);
+                  resolve();
+              } else {
+                  console.error(`Command failed with exit code ${code}`);
+                  reject(new Error(`Command failed with exit code ${code}`));
+              }
+          });
+  
+          childProcess.on('error', (error) => {
+              console.error(`Failed to start command: ${error.message}`);
+              reject(error);
+          });
+      });
+  }
 }
 
 // API requirements.
