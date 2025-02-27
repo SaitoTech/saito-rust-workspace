@@ -15,6 +15,8 @@ export class NodeConfig {
   isGenesis: boolean = false;
   originalCodeLocation: string = "";
   host: string = "localhost";
+  privateKey: string = "";
+  publicKey: string = "";
 }
 export default abstract class SaitoNode {
   private _dataDir: string = "./data";
@@ -161,6 +163,7 @@ export default abstract class SaitoNode {
           });
       });
   }
+
 }
 
 // API requirements.

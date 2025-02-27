@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { NodeSet, NodeSetConfig } from "../../src/node_set";
+import { NodeSet, NodeSetConfig, TEST_KEY_PAIRS } from "../../src/node_set";
 import { NodeConfig, NodeType } from "../../src/saito_node";
 
 test.describe("nodes should sync correctly", () => {
@@ -18,6 +18,8 @@ test.describe("nodes should sync correctly", () => {
     config.isGenesis = true;
     config.nodeType = NodeType.SLR;
     config.port = 1;
+    config.privateKey = TEST_KEY_PAIRS[0]["private"];
+    config.publicKey = TEST_KEY_PAIRS[0]["public"];
     configSet.nodeConfigs.push(config);
 
     config = new NodeConfig();
@@ -26,6 +28,8 @@ test.describe("nodes should sync correctly", () => {
     config.nodeType = NodeType.SLR;
     config.port = 2;
     config.peerLabels = ["main"];
+    config.privateKey = TEST_KEY_PAIRS[1]["private"];
+    config.publicKey = TEST_KEY_PAIRS[1]["public"];
     configSet.nodeConfigs.push(config);
 
     nodeSetup = new NodeSet(configSet);
