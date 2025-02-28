@@ -196,25 +196,29 @@ class SlrBootstrapper extends NodeBootstrapper {
   async onBootstrap(): Promise<SaitoNode> {
     // clone the repo
     const currentDir = process.cwd();
-    if (await this.isDirEmpty(this.dir)) {
-      if (!this.config.originalCodeLocation) {
-        throw new Error("original code location is not set");
-      }
-      await fs.rm(this.dir, { recursive: true, force: true });
-      await SaitoNode.runCommand(
-        `rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
-        currentDir,
-      );
-    } else if (!(await this.fileExists("README.md"))) {
-      if (!this.config.originalCodeLocation) {
-        throw new Error("original code location is not set");
-      }
-      await this.cleanDir(this.dir);
-      await SaitoNode.runCommand(
-        `rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
-        currentDir,
-      );
+
+    // await fs.rm(this.dir, { recursive: true, force: true });
+    // if (await this.isDirEmpty(this.dir)) {
+    if (!this.config.originalCodeLocation) {
+      throw new Error("original code location is not set");
     }
+    await fs.rm(this.dir, { recursive: true, force: true });
+    await SaitoNode.runCommand(
+      `time rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
+      currentDir,
+    );
+    await SaitoNode.runCommand("time npm install", this.dir);
+    // process.exit(0);
+    // } else if (!(await this.fileExists("README.md"))) {
+    //   if (!this.config.originalCodeLocation) {
+    //     throw new Error("original code location is not set");
+    //   }
+    //   await this.cleanDir(this.dir);
+    //   await SaitoNode.runCommand(
+    //     `rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
+    //     currentDir,
+    //   );
+    // }
 
     // read the config file
     await SaitoNode.runCommand("cp config/options.conf.template config/options", this.dir);
@@ -233,7 +237,7 @@ class SlrBootstrapper extends NodeBootstrapper {
     configData.wallet.publicKey = this.config.publicKey;
     configData.wallet.slips = [];
 
-    await SaitoNode.runCommand("npm run reset dev", this.dir);
+    await SaitoNode.runCommand("npm run reset", this.dir);
 
     await fs.writeFile(configFilePath, JSON.stringify(configData, null, 2), "utf-8");
 

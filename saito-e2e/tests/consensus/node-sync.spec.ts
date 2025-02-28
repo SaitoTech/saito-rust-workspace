@@ -5,7 +5,7 @@ import { NodeConfig, NodeType } from "../../src/saito_node";
 test.describe("nodes should sync correctly", () => {
   let nodeSetup: NodeSet;
   test.beforeAll(async () => {
-    test.setTimeout(0); // Set timeout to 60 seconds
+    // test.setTimeout(0); // Set timeout to 60 seconds
 
     const configSet = new NodeSetConfig();
     configSet.mainNodeIndex = 0;
@@ -21,6 +21,8 @@ test.describe("nodes should sync correctly", () => {
     config.privateKey = TEST_KEY_PAIRS[0]["private"];
     config.publicKey = TEST_KEY_PAIRS[0]["public"];
     configSet.nodeConfigs.push(config);
+
+    configSet.issuance = [{ key: TEST_KEY_PAIRS[0]["public"], amount: BigInt(1000000000) }];
 
     config = new NodeConfig();
     config.name = "peer";
@@ -54,6 +56,9 @@ test.describe("nodes should sync correctly", () => {
     console.log("waiting for the nodes to sync");
     await new Promise((resolve) => setTimeout(resolve, 5000));
     console.log("done waiting");
+
+    const balances = await mainNode?.getBalances();
+    console.log("main balances : " + JSON.stringify(balances));
 
     const mainLatest = await mainNode?.getLatestBlock();
     const peerLatest = await peerNode?.getLatestBlock();
