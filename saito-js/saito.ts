@@ -4,7 +4,7 @@ import Block from "./lib/block";
 import Factory from "./lib/factory";
 import Peer from "./lib/peer";
 import StunPeer from "./lib/stun_peer";
-import Wallet, {DefaultEmptyPrivateKey} from "./lib/wallet";
+import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
 
@@ -372,6 +372,16 @@ export default class Saito {
         peerIndex: bigint,
         waitForReply: boolean
     ): Promise<Uint8Array> {
+        if (peerIndex !== BigInt(0)) {
+            let peer = await this.getPeer(peerIndex);
+            if (peer === null) {
+                throw new Error("peer not found");
+            }
+            if (peer.status !== "connected") {
+                throw new Error("peer not connected");
+            }
+        }
+
         if (waitForReply) {
             return new Promise(async (resolve, reject) => {
                 this.callbackIndex++;
@@ -421,7 +431,7 @@ export default class Saito {
             .catch((error) => {
                 console.error(error);
                 if (callback) {
-                    return callback({err: error.toString()});
+                    return callback({ err: error.toString() });
                 }
             });
     }

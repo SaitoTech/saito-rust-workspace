@@ -96,6 +96,15 @@ impl BlockRing {
                     self.ring[insert_pos].block_hashes.len()
                 );
                 let ring_item = self.ring.get(insert_pos)?;
+                let item_id = ring_item.block_ids.get(lc_pos)?;
+                if item_id != &id {
+                    trace!(
+                        "get_longest_chain_block_hash_by_block_id : {:?} insert_pos = {:?} is not set",
+                        id,
+                        insert_pos
+                    );
+                    return None;
+                }
                 let hash = ring_item.block_hashes.get(lc_pos)?;
                 Some(*hash)
             }

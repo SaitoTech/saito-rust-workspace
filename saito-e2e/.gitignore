@@ -3,3 +3,4 @@ node_modules/
 /playwright-report/
 /playwright/.cache/
 .idea/
+temp_test_directory/

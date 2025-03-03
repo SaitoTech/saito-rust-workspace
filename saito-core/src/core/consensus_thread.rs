@@ -778,6 +778,8 @@ mod tests {
             .unwrap()
             .genesis_period;
 
+        assert_eq!(genesis_period, 10, "genesis period should be 10");
+
         let max_blocks = genesis_period + 2;
         for i in 2..=max_blocks {
             let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
@@ -789,7 +791,7 @@ mod tests {
                 .expect("total supply should not change");
         }
 
-        let last_block_id = tester
+        let mut last_block_id = tester
             .consensus_thread
             .blockchain_lock
             .read()
@@ -798,51 +800,60 @@ mod tests {
         let timer = tester.consensus_thread.timer.clone();
         drop(tester);
 
-        info!("loading the node again");
+        for _ in 0..10 {
+            info!("----------- ------------- ------------- loading the node again : last_block_id : {}", last_block_id);
 
-        let mut tester = NodeTester::new(genesis_period, Some(private_key), Some(timer));
-        tester.init().await.unwrap();
-        let loaded_last_block_id = tester
-            .consensus_thread
-            .blockchain_lock
-            .read()
-            .await
-            .get_latest_block_id();
-        assert_eq!(last_block_id, loaded_last_block_id);
+            let mut tester =
+                NodeTester::new(genesis_period, Some(private_key), Some(timer.clone()));
+            tester.init().await.unwrap();
+            let loaded_last_block_id = tester
+                .consensus_thread
+                .blockchain_lock
+                .read()
+                .await
+                .get_latest_block_id();
+            assert_eq!(last_block_id, loaded_last_block_id);
 
-        for i in last_block_id + 1..=std::cmp::min(last_block_id + genesis_period, max_blocks) {
-            {
-                let wallet = tester.consensus_thread.wallet_lock.read().await;
-                info!(
+            for i in last_block_id + 1..=last_block_id + (genesis_period as f64 * 1.5f64) as u64 {
+                {
+                    let wallet = tester.consensus_thread.wallet_lock.read().await;
+                    info!(
                     "current wallet balance : {:?} slip_count : {:?} unspent_slips : {}, i : {}",
                     wallet.get_available_balance(),
                     wallet.slips.len(),
                     wallet.get_unspent_slip_count(),
                     i
                 );
-                wallet.slips.iter().for_each(|(utxo_key, slip)| {
-                    info!(
-                        "slip : {}-{}-{} amount : {:?} type : {:?} spent : {:?}",
-                        slip.block_id,
-                        slip.tx_ordinal,
-                        slip.slip_index,
-                        slip.amount,
-                        slip.slip_type,
-                        slip.spent
-                    );
-                });
-            }
+                    wallet.slips.iter().for_each(|(utxo_key, slip)| {
+                        info!(
+                            "slip : {}-{}-{} amount : {:?} type : {:?} spent : {:?}",
+                            slip.block_id,
+                            slip.tx_ordinal,
+                            slip.slip_index,
+                            slip.amount,
+                            slip.slip_type,
+                            slip.spent
+                        );
+                    });
+                }
 
-            let tx = tester
-                .create_transaction(10, 10, public_key)
+                let tx = tester
+                    .create_transaction(10, 10, public_key)
+                    .await
+                    .unwrap_or_else(|_| panic!("couldn't create tx. i : {}", i));
+                tester.add_transaction(tx).await;
+                tester.wait_till_block_id(i).await.unwrap();
+                tester
+                    .check_total_supply()
+                    .await
+                    .expect("total supply should not change");
+            }
+            last_block_id = tester
+                .consensus_thread
+                .blockchain_lock
+                .read()
                 .await
-                .unwrap_or_else(|_| panic!("couldn't create tx. i : {}", i));
-            tester.add_transaction(tx).await;
-            tester.wait_till_block_id(i).await.unwrap();
-            tester
-                .check_total_supply()
-                .await
-                .expect("total supply should not change");
+                .get_latest_block_id();
         }
     }
 
@@ -919,7 +930,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn blockchain_state_over_atr() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         NodeTester::delete_blocks().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::new(3, None, None);

@@ -2506,7 +2506,7 @@ impl Block {
         //
         // total_payout_routing
         //
-        if cv.total_payout_routing != self.total_payout_routing {
+        if validate_against_utxo && cv.total_payout_routing != self.total_payout_routing {
             error!(
                 "total_payout_routing error: {:?} expected : {:?}",
                 self.total_payout_routing, cv.total_payout_routing
@@ -2517,7 +2517,7 @@ impl Block {
         //
         // total_payout_mining
         //
-        if cv.total_payout_mining != self.total_payout_mining {
+        if validate_against_utxo && cv.total_payout_mining != self.total_payout_mining {
             error!(
                 "total_payout_mining error: {:?} expected : {:?}",
                 self.total_payout_mining, cv.total_payout_mining
@@ -2528,7 +2528,7 @@ impl Block {
         //
         // total_payout_treasury
         //
-        if cv.total_payout_treasury != self.total_payout_treasury {
+        if validate_against_utxo && cv.total_payout_treasury != self.total_payout_treasury {
             error!(
                 "total_payout_treasury error: {:?} expected : {:?}",
                 self.total_payout_treasury, cv.total_payout_treasury
@@ -2539,7 +2539,7 @@ impl Block {
         //
         // total_payout_graveyard
         //
-        if cv.total_payout_graveyard != self.total_payout_graveyard {
+        if validate_against_utxo && cv.total_payout_graveyard != self.total_payout_graveyard {
             error!(
                 "total_payout_graveyard error: {:?} expected : {:?}",
                 self.total_payout_graveyard, cv.total_payout_graveyard
@@ -2550,7 +2550,7 @@ impl Block {
         //
         // total_payout_atr
         //
-        if cv.total_payout_atr != self.total_payout_atr {
+        if validate_against_utxo && cv.total_payout_atr != self.total_payout_atr {
             error!(
                 "total_payout_atr error: {:?} expected : {:?}",
                 self.total_payout_atr, cv.total_payout_atr
@@ -2561,7 +2561,7 @@ impl Block {
         //
         // avg_payout_routing
         //
-        if cv.avg_payout_routing != self.avg_payout_routing {
+        if validate_against_utxo && cv.avg_payout_routing != self.avg_payout_routing {
             error!(
                 "avg_payout_routing error: {:?} expected : {:?}",
                 self.avg_payout_routing, cv.avg_payout_routing
@@ -2572,7 +2572,7 @@ impl Block {
         //
         // avg_payout_mining
         //
-        if cv.avg_payout_mining != self.avg_payout_mining {
+        if validate_against_utxo && cv.avg_payout_mining != self.avg_payout_mining {
             error!(
                 "avg_payout_mining error: {:?} expected : {:?}",
                 self.avg_payout_mining, cv.avg_payout_mining
@@ -2583,7 +2583,7 @@ impl Block {
         //
         // total_payout_treasury
         //
-        if cv.avg_payout_treasury != self.avg_payout_treasury {
+        if validate_against_utxo && cv.avg_payout_treasury != self.avg_payout_treasury {
             error!(
                 "avg_payout_treasury error: {:?} expected : {:?}",
                 self.avg_payout_treasury, cv.avg_payout_treasury
@@ -2594,7 +2594,7 @@ impl Block {
         //
         // avg_payout_graveyard
         //
-        if cv.avg_payout_graveyard != self.avg_payout_graveyard {
+        if validate_against_utxo && cv.avg_payout_graveyard != self.avg_payout_graveyard {
             error!(
                 "avg_payout_graveyard error: {:?} expected : {:?}",
                 self.avg_payout_graveyard, cv.avg_payout_graveyard
@@ -2706,7 +2706,7 @@ impl Block {
             let mut expected_treasury = previous_block.treasury;
             expected_treasury += cv.total_payout_treasury;
             expected_treasury -= cv.total_payout_atr;
-            if self.treasury != expected_treasury {
+            if validate_against_utxo && self.treasury != expected_treasury {
                 error!(
                     "ERROR 820391: treasury does not validate: {} expected versus {} found",
                     expected_treasury, self.treasury,
@@ -2719,7 +2719,7 @@ impl Block {
             //
             let mut expected_graveyard = previous_block.graveyard;
             expected_graveyard += cv.total_payout_graveyard;
-            if self.graveyard != expected_graveyard {
+            if validate_against_utxo && self.graveyard != expected_graveyard {
                 error!(
                     "ERROR 123243: graveyard does not validate: {} expected versus {} found",
                     expected_graveyard, self.graveyard,
@@ -2889,7 +2889,7 @@ impl Block {
                 let hash1 = hash(&fee_transaction_expected.serialize_for_signature());
                 let hash2 = hash(&fee_transaction_in_block.serialize_for_signature());
 
-                if hash1 != hash2 {
+                if validate_against_utxo && hash1 != hash2 {
                     error!(
                         "ERROR 892032: block {} fee transaction doesn't match cv-expected fee transaction",
                         self.id
