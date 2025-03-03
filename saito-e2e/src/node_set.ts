@@ -7,10 +7,25 @@ const { exec } = require("child_process");
 const TEST_DIR = "temp_test_directory";
 const SLR_DIR = "../../saito-lite-rust";
 
+export const TEST_KEY_PAIRS = [
+  {
+    public: "m8Kdxz9kh5WoZqVNNk5y3Z2hD3kmW9riQit9xdD7tuhb",
+    private: "9acbe64cc3071b9d003fe5898bbff9ebd3941b0bc5ccaf33326b9a910322c3c5",
+  },
+  {
+    public: "qWBSxv9iofhmLE4dbadpQpv5q91LnsK7HurZqXReY9gW",
+    private: "27bf5790a18620cc3e061fc7e03a7c06b8f61d29bde725b441da3d4672f31507",
+  },
+  {
+    public: "uNZuPrKFQUVvUX8JA61sht9Mc1r1UN5uud42YBRcXe6w",
+    private: "2a3db4b5f11645f58bf0d5074311b06ff2ef2411481f4b91c0348a597da33f60",
+  },
+];
+
 export class NodeSetConfig {
   nodeConfigs: NodeConfig[] = [];
   mainNodeIndex: number = 0;
-  issuance: string[] = [];
+  issuance: { key: string; amount: bigint }[] = [];
   genesisPeriod: bigint = BigInt(100);
   parentDir: string = "";
   basePort: number = 42000;
@@ -50,7 +65,14 @@ export class NodeSet {
       console.assert(config.port < 100);
       console.assert(this.config.basePort > 10000);
       const port = this.config.basePort + config.port;
+      if (config.isGenesis) {
+        await this.writeIssuance(this.config.issuance, dir);
+      }
+
+      console.log("assigned public key : " + config.publicKey + " for node : " + config.name);
+
       const node = await Bootstrapper.bootstrap({ ...config, dir: dir, port: port });
+
       this.nodes.push(node);
     }
   }
@@ -71,6 +93,17 @@ export class NodeSet {
   }
   getNode(name: string): SaitoNode | undefined {
     return this.nodes.find((node) => node.name === name);
+  }
+  async writeIssuance(issuance: { key: string; amount: bigint }[], dir: string) {
+    const issuanceFile = path.join(dir, "data", "issuance", "issuance");
+    await fs.mkdir(path.join(dir, "data/issuance"), { recursive: true });
+    let issuanceContent = "";
+
+    for (const entry of issuance) {
+      issuanceContent += `${entry.key}\t${entry.amount}\tNormal\n`;
+    }
+
+    await fs.writeFile(issuanceFile, issuanceContent, "utf-8");
   }
 }
 
@@ -97,6 +130,7 @@ class NodeBootstrapper {
       throw new Error("directory path not set");
     }
     await fs.mkdir(this.dir, { recursive: true });
+
     return await this.onBootstrap();
   }
   protected async onBootstrap(): Promise<SaitoNode> {
@@ -162,25 +196,29 @@ class SlrBootstrapper extends NodeBootstrapper {
   async onBootstrap(): Promise<SaitoNode> {
     // clone the repo
     const currentDir = process.cwd();
-    if (await this.isDirEmpty(this.dir)) {
-      if (!this.config.originalCodeLocation) {
-        throw new Error("original code location is not set");
-      }
-      await fs.rm(this.dir, { recursive: true, force: true });
-      await SaitoNode.runCommand(
-        `rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
-        currentDir,
-      );
-    } else if (!(await this.fileExists("README.md"))) {
-      if (!this.config.originalCodeLocation) {
-        throw new Error("original code location is not set");
-      }
-      await this.cleanDir(this.dir);
-      await SaitoNode.runCommand(
-        `rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
-        currentDir,
-      );
+
+    // await fs.rm(this.dir, { recursive: true, force: true });
+    // if (await this.isDirEmpty(this.dir)) {
+    if (!this.config.originalCodeLocation) {
+      throw new Error("original code location is not set");
     }
+    await fs.rm(this.dir, { recursive: true, force: true });
+    await SaitoNode.runCommand(
+      `time rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
+      currentDir,
+    );
+    await SaitoNode.runCommand("time npm install", this.dir);
+    // process.exit(0);
+    // } else if (!(await this.fileExists("README.md"))) {
+    //   if (!this.config.originalCodeLocation) {
+    //     throw new Error("original code location is not set");
+    //   }
+    //   await this.cleanDir(this.dir);
+    //   await SaitoNode.runCommand(
+    //     `rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
+    //     currentDir,
+    //   );
+    // }
 
     // read the config file
     await SaitoNode.runCommand("cp config/options.conf.template config/options", this.dir);
@@ -195,7 +233,11 @@ class SlrBootstrapper extends NodeBootstrapper {
       return { host: peer.host, port: peer.port, protocol: "http", synctype: "full" };
     });
 
-    await SaitoNode.runCommand("npm run reset dev", this.dir);
+    configData.wallet.privateKey = this.config.privateKey;
+    configData.wallet.publicKey = this.config.publicKey;
+    configData.wallet.slips = [];
+
+    await SaitoNode.runCommand("npm run reset", this.dir);
 
     await fs.writeFile(configFilePath, JSON.stringify(configData, null, 2), "utf-8");
 

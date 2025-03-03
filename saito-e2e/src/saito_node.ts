@@ -15,12 +15,13 @@ export class NodeConfig {
   isGenesis: boolean = false;
   originalCodeLocation: string = "";
   host: string = "localhost";
+  privateKey: string = "";
+  publicKey: string = "";
 }
 export default abstract class SaitoNode {
   private _dataDir: string = "./data";
   private _nodeDir: string = ".";
   private _config: NodeConfig;
-  private _index: number = -1;
 
   constructor(config: NodeConfig) {
     this._config = config;
@@ -47,14 +48,14 @@ export default abstract class SaitoNode {
   }
 
   async startNode() {
-    console.log(`starting the node : ${this._index}...`);
+    console.log(`starting the node : ${this.name}...`);
 
     await this.onStartNode();
 
     for (let i = 0; i < 30; i++) {
       const running = await this.isRunning();
       if (running) {
-        console.log(`node started : ${this._index}`);
+        console.log(`node started : ${this.name}`);
         break;
       } else {
         console.log("waiting for node : " + this.name + " to start");
@@ -66,7 +67,7 @@ export default abstract class SaitoNode {
   protected abstract onStartNode(): Promise<void>;
 
   async stopNode() {
-    console.log(`stopping the node : ${this._index}...`);
+    console.log(`stopping the node : ${this.name}...`);
     return this.onStopNode();
   }
 
@@ -83,7 +84,7 @@ export default abstract class SaitoNode {
   protected abstract onSetIssuance(issuance: string[]): Promise<void>;
 
   async resetNode() {
-    console.log(`resetting the node : ${this._index}`);
+    console.log(`resetting the node : ${this.name}`);
     return this.onResetNode();
   }
 
@@ -112,6 +113,9 @@ export default abstract class SaitoNode {
   }
   public async transferFunds(amount: bigint, to: string) {
     return await this.fetchValueFromNode(`transfer/${to}/${amount}`);
+  }
+  public async getBalances():Promise<unknown> {
+    return await this.fetchValueFromNode("balances");
   }
   public async sendMessage() {}
 
@@ -161,6 +165,7 @@ export default abstract class SaitoNode {
           });
       });
   }
+
 }
 
 // API requirements.
