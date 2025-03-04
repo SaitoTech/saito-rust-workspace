@@ -1156,19 +1156,23 @@ impl Block {
         // winning TX contains the winning nolan
         //
         // either a fee-paying transaction or an ATR transaction
-        let mut winning_tx = &Transaction::default();
+        let mut tx: Option<&Transaction> = None;
         for transaction in &self.transactions {
             if transaction.cumulative_fees >= winning_nolan {
-                winning_tx = transaction;
+                tx = Some(transaction);
                 break;
             }
         }
 
-        info!("winning_tx 1: {:?}", winning_tx);
-        if std::ptr::eq(winning_tx, &Transaction::default()) {
+        // If no valid transaction is found, payout to burn address and return early
+        if tx.is_none() {
             winner_pubkey = [0; 33];
             return winner_pubkey;
         }
+
+        // Safe to unwrap since we know it's `Some`
+        let mut winning_tx = tx.unwrap();
+
         //
         // if winner is atr, we take inside TX
         //
