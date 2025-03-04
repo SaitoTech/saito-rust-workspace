@@ -674,6 +674,9 @@ impl Block {
         //
         // total fees
         //
+        //
+        // 10,000,000,010   =  10,000,000,000 + 10;
+        //
         block.total_fees = block.total_fees_new + block.total_fees_atr;
 
         //
@@ -1123,12 +1126,17 @@ impl Block {
     //
     pub fn find_winning_router(&self, random_number: SaitoHash) -> SaitoPublicKey {
         let winner_pubkey: SaitoPublicKey;
+
         // find winning nolan
         let x = primitive_types::U256::from_big_endian(&random_number);
+
+        info!("winning nolan (x): {:?}", x);
 
         // fee calculation should be the same used in block when
         // generating the fee transaction.
         let y = self.total_fees;
+
+        info!("total_fees (y): {:?}", y);
 
         // if there are no fees, payout to burn address
         if y == 0 {
@@ -1156,16 +1164,14 @@ impl Block {
             }
         }
 
-        // if there are no tx with cumulative_fees >= winning_nolan, payout to burn address
+        info!("winning_tx 1: {:?}", winning_tx);
         if std::ptr::eq(winning_tx, &Transaction::default()) {
             winner_pubkey = [0; 33];
             return winner_pubkey;
         }
-
         //
         // if winner is atr, we take inside TX
         //
-
         if winning_tx.transaction_type == TransactionType::ATR {
             let tmptx = winning_tx.data.to_vec();
             winning_tx_placeholder =
@@ -1179,6 +1185,7 @@ impl Block {
                 winning_tx
             );
         }
+
         // hash random number to pick routing node
         winner_pubkey = winning_tx.get_winning_routing_node(hash(random_number.as_ref()));
         winner_pubkey
@@ -1366,6 +1373,7 @@ impl Block {
         storage: &Storage,
         configs: &(dyn Configuration + Send + Sync),
     ) -> ConsensusValues {
+        info!("Inside generate_consensus_values");
         //
         // we will reference these variables
         //
@@ -1396,6 +1404,8 @@ impl Block {
             // Issuance
             // BlockStake
             //
+
+            info!("transaction: {:?}", transaction);
 
             if transaction.is_fee_transaction() {
                 cv.ft_num += 1;
@@ -1498,6 +1508,9 @@ impl Block {
         // more than a genesis-period old is unspendable.
         //
         if self.id > (configs.get_consensus_config().unwrap().genesis_period + 1) {
+
+            info!("Inside ATR...");
+
             if let Some(pruned_block_hash) = blockchain
                 .blockring
                 .get_longest_chain_block_hash_at_block_id(
@@ -1517,6 +1530,8 @@ impl Block {
                             BlockType::Pruned,
                             "block should be fetched fully before this"
                         );
+
+                        info!("atr_block: {:?}", atr_block);
 
                         //
                         // estimate amount looping around chain
@@ -1543,6 +1558,9 @@ impl Block {
                         // loop through block to find eligible transactions
                         //
                         for transaction in &atr_block.transactions {
+
+                            info!("transaction in atr_block: {:?}", transaction);
+
                             let mut outputs = vec![];
                             let mut total_nolan_eligible_for_atr_payout: Currency = 0;
 
@@ -1551,7 +1569,7 @@ impl Block {
                             //
                             for output in transaction.to.iter() {
                                 if output.validate(&blockchain.utxoset) {
-                                    debug!("output slip is valid. so checking for rebroadcasting. slip : {}",output);
+                                    info!("output slip is valid. so checking for rebroadcasting. slip : {}",output);
                                     outputs.push(output);
                                     total_nolan_eligible_for_atr_payout += output.amount;
                                 }
@@ -1560,6 +1578,7 @@ impl Block {
                             //
                             // now process each output
                             //
+                            info!("processing each output...");
                             if !outputs.is_empty() {
                                 let tx_size = transaction.get_serialized_size() as u64;
                                 let atr_fee = tx_size * previous_block_avg_fee_per_byte;
@@ -1567,7 +1586,12 @@ impl Block {
                                 //
                                 // every output pays the rebroadcast fee
                                 //
+
+                                info!("outputs in above transaction: ");
+
                                 for output in outputs {
+                                
+                                    info!("output in outputs: {:?}", output);
                                     let atr_payout_for_slip =
                                         output.amount * expected_atr_multiplier;
                                     let surplus_payout_to_subtract_from_treasury =
@@ -1579,16 +1603,27 @@ impl Block {
                                     // left over after the payout is added and then the fee is deducted. slips that do
                                     // not pass this criteria have their fee collected but are not issued a payout.
                                     //
+
+                                    info!("atr_payout_for_slip: {:?}", atr_payout_for_slip);
+                                    info!("atr_fee: {:?}", atr_fee);
+                                    info!("Is atr_payout_for_slip > atr_fee: {:?}", (atr_payout_for_slip > atr_fee));
+
                                     if atr_payout_for_slip > atr_fee {
                                         cv.total_rebroadcast_nolan += output.amount;
                                         cv.total_rebroadcast_slips += 1;
 
+
+
                                         //
                                         // clone the slip, update the amount
                                         //
+                                        info!("clone the slip, update the amount");
                                         let mut slip = output.clone();
                                         slip.slip_type = SlipType::ATR;
                                         slip.amount = atr_payout_for_slip - atr_fee_for_slip;
+
+
+                                        info!("slip: {:?}", slip);
 
                                         //
                                         // we update the "input" slip so that it
@@ -1596,12 +1631,15 @@ impl Block {
                                         // calculated correctly when the TX is
                                         // examined....
                                         //
+
+                                        info!("update the 'input' slip");
                                         let mut from_slip = output.clone();
                                         from_slip.amount = atr_payout_for_slip;
 
                                         //
                                         // track payouts and fees
                                         //
+                                        info!("track payouts and fees");
                                         cv.total_payout_atr +=
                                             surplus_payout_to_subtract_from_treasury;
                                         cv.total_fees_atr += atr_fee_for_slip;
@@ -1609,12 +1647,15 @@ impl Block {
                                         //
                                         // create our ATR rebroadcast transaction
                                         //
+                                        info!("create our ATR rebroadcast transaction");
                                         let rebroadcast_tx =
                                             Transaction::create_rebroadcast_transaction(
                                                 transaction,
                                                 slip,
                                                 from_slip,
                                             );
+
+                                        info!("rebroadcast_tx: {:?}", rebroadcast_tx);
 
                                         //
                                         // update rebroadcast_hash (all ATRs)
@@ -1624,6 +1665,9 @@ impl Block {
                                         vbytes.extend(&rebroadcast_tx.serialize_for_signature());
                                         cv.rebroadcast_hash = hash(&vbytes);
                                         cv.rebroadcasts.push(rebroadcast_tx);
+
+                                        info!("cv.rebroadcast_hash: {:?}",cv.rebroadcast_hash);
+                                        info!("cv.rebroadcasts: {:?}", cv.rebroadcasts);
                                     } else {
                                         //
                                         // this UTXO will be worth less than zero if the atr_payout is
@@ -1635,7 +1679,7 @@ impl Block {
                                         cv.total_fees_atr += output.amount;
                                         cv.total_fees_paid_by_nonrebroadcast_atr_transactions +=
                                             output.amount;
-                                        debug!("we dont rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
+                                        info!("we dont rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
                                     }
                                 }
                             } // output loop
@@ -1650,6 +1694,9 @@ impl Block {
                         cv.total_fees_cumulative = cv.total_fees_new + cv.total_fees_atr
                             - cv.total_fees_paid_by_nonrebroadcast_atr_transactions;
 
+                        info!("cv.total_fees_new {:?} + cv.total_fees_atr {:?} - cv.total_fees_paid_by_nonrebroadcast_atr_transactions {:?}", cv.total_fees_new,cv.total_fees_atr,cv.total_fees_paid_by_nonrebroadcast_atr_transactions);
+                        info!("cv.total_fees_cumulative: {:?}", cv.total_fees_cumulative);
+
                         //
                         // if ATR payouts are too large, adjust payout downwards
                         //
@@ -1663,6 +1710,11 @@ impl Block {
                         // from flushing the treasury out to their own wallet by massively increasing the
                         // amount of SAITO being rebroadcast in a single block.
                         //
+
+                        info!("if ATR payouts are too large, adjust payout downwards");
+                        info!("cv.total_payout_atr: {:?}", cv.total_payout_atr);
+                        info!("(self.treasury as f64 * 0.05): {:?}", (self.treasury as f64 * 0.05));
+                        info!("cv.total_payout_atr > (self.treasury as f64 * 0.05): {:?}", (cv.total_payout_atr > (self.treasury as f64 * 0.05) as u64));
                         if cv.total_payout_atr > (self.treasury as f64 * 0.05) as u64 {
                             let max_total_payout = (self.treasury as f64 * 0.05) as u64;
                             let unadjusted_total_nolan = cv.total_rebroadcast_nolan;
@@ -1681,6 +1733,7 @@ impl Block {
                             //
                             cv.total_payout_atr = 0;
                             for rebroadcast_tx in &mut cv.rebroadcasts {
+                                info!("rebroadcast_tx: {:?}", rebroadcast_tx);
                                 //
                                 // update the amount that is in the output transaction according
                                 // to the amount in the input transaction. since this isn't a common
@@ -1690,13 +1743,19 @@ impl Block {
                                 //
                                 rebroadcast_tx.to[0].amount =
                                     rebroadcast_tx.from[0].amount * adjusted_output_multiplier;
+
+                                info!("rebroadcast_tx.to[0].amount: {:?}", rebroadcast_tx.to[0].amount);
+                                info!("rebroadcast_tx.from[0].amount: {:?}", rebroadcast_tx.from[0].amount);
+
                                 cv.total_payout_atr += rebroadcast_tx.to[0].amount;
                                 cv.total_payout_atr -= rebroadcast_tx.from[0].amount;
+
+                                info!("cv.total_payout_atr: {:?}", cv.total_payout_atr);
                             }
                             cv.total_fees_atr = 0;
                         }
                     } else {
-                        error!(
+                        info!(
                             "couldn't load block for ATR from disk. block hash : {:?}",
                             pruned_block.hash.to_hex()
                         );
@@ -1918,7 +1977,7 @@ impl Block {
             let mut transaction = Transaction::default();
             transaction.transaction_type = TransactionType::Fee;
             transaction.timestamp = self.timestamp;
-
+            
             if miner_publickey != [0; 33] && miner_payout > 0 {
                 let mut output = Slip::default();
                 output.public_key = miner_publickey;
@@ -1930,11 +1989,9 @@ impl Block {
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             } else {
-                debug!(
-                    "miner_publickey is not set or payout is zero. Not adding to fee transaction"
-                );
+                debug!("miner_publickey is not set or payout is zero. Not adding to fee transaction");
             }
-
+            
             if router1_publickey != [0; 33] && router1_payout > 0 {
                 let mut output = Slip::default();
                 output.public_key = router1_publickey;
@@ -1946,11 +2003,9 @@ impl Block {
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             } else {
-                debug!(
-                    "router1_publickey is not set or payout is zero. Not adding to fee transaction"
-                );
+                debug!("router1_publickey is not set or payout is zero. Not adding to fee transaction");
             }
-
+            
             if router2_publickey != [0; 33] && router2_payout > 0 {
                 let mut output = Slip::default();
                 output.public_key = router2_publickey;
@@ -1962,13 +2017,11 @@ impl Block {
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             } else {
-                debug!(
-                    "router2_publickey is not set or payout is zero. Not adding to fee transaction"
-                );
+                debug!("router2_publickey is not set or payout is zero. Not adding to fee transaction");
             }
-
+            
             cv.total_payout_mining = miner_payout;
-            cv.total_payout_routing = router1_payout + router2_payout;
+            cv.total_payout_routing = router1_payout + router2_payout;    
             cv.fee_transaction = Some(transaction);
         } else {
             //
@@ -3618,8 +3671,7 @@ mod tests {
             .await
             .get_consensus_config()
             .unwrap()
-            .genesis_period)
-            + 1;
+            .genesis_period) + 1;
         tester.wait_till_block_id(1).await.unwrap();
 
         for i in 1..genesis_period {
