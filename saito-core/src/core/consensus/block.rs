@@ -1123,9 +1123,9 @@ impl Block {
     //
     pub fn find_winning_router(&self, random_number: SaitoHash) -> SaitoPublicKey {
         let winner_pubkey: SaitoPublicKey;
+
         // find winning nolan
         let x = primitive_types::U256::from_big_endian(&random_number);
-
         // fee calculation should be the same used in block when
         // generating the fee transaction.
         let y = self.total_fees;
@@ -1156,7 +1156,7 @@ impl Block {
             }
         }
 
-        // if there are no tx with cumulative_fees >= winning_nolan, payout to burn address
+        // if no transaction has cumulative_fees >= winning_nolan, payout to burn address
         if std::ptr::eq(winning_tx, &Transaction::default()) {
             winner_pubkey = [0; 33];
             return winner_pubkey;
