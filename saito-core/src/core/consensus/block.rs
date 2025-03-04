@@ -1123,9 +1123,9 @@ impl Block {
     //
     pub fn find_winning_router(&self, random_number: SaitoHash) -> SaitoPublicKey {
         let winner_pubkey: SaitoPublicKey;
-
         // find winning nolan
         let x = primitive_types::U256::from_big_endian(&random_number);
+
         // fee calculation should be the same used in block when
         // generating the fee transaction.
         let y = self.total_fees;
@@ -1148,13 +1148,20 @@ impl Block {
         // winning TX contains the winning nolan
         //
         // either a fee-paying transaction or an ATR transaction
-        let mut winning_tx = &self.transactions[0];
+        let mut winning_tx = &Transaction::default();
         for transaction in &self.transactions {
             if transaction.cumulative_fees >= winning_nolan {
                 winning_tx = transaction;
                 break;
             }
         }
+
+        // if there are no tx with cumulative_fees >= winning_nolan, payout to burn address
+        if std::ptr::eq(winning_tx, &Transaction::default()) {
+            winner_pubkey = [0; 33];
+            return winner_pubkey;
+        }
+
         //
         // if winner is atr, we take inside TX
         //
@@ -1911,7 +1918,8 @@ impl Block {
             let mut transaction = Transaction::default();
             transaction.transaction_type = TransactionType::Fee;
             transaction.timestamp = self.timestamp;
-            if miner_publickey != [0; 33] {
+
+            if miner_publickey != [0; 33] && miner_payout > 0 {
                 let mut output = Slip::default();
                 output.public_key = miner_publickey;
                 output.amount = miner_payout;
@@ -1922,9 +1930,12 @@ impl Block {
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             } else {
-                debug!("miner_publickey is not set. not adding to fee transaction");
+                debug!(
+                    "miner_publickey is not set or payout is zero. Not adding to fee transaction"
+                );
             }
-            if router1_publickey != [0; 33] {
+
+            if router1_publickey != [0; 33] && router1_payout > 0 {
                 let mut output = Slip::default();
                 output.public_key = router1_publickey;
                 output.amount = router1_payout;
@@ -1935,9 +1946,12 @@ impl Block {
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             } else {
-                debug!("router1_publickey is not set. not adding to fee transaction");
+                debug!(
+                    "router1_publickey is not set or payout is zero. Not adding to fee transaction"
+                );
             }
-            if router2_publickey != [0; 33] {
+
+            if router2_publickey != [0; 33] && router2_payout > 0 {
                 let mut output = Slip::default();
                 output.public_key = router2_publickey;
                 output.amount = router2_payout;
@@ -1948,7 +1962,9 @@ impl Block {
                 transaction.add_to_slip(output.clone());
                 slip_index += 1;
             } else {
-                debug!("router2_publickey is not set. not adding to fee transaction");
+                debug!(
+                    "router2_publickey is not set or payout is zero. Not adding to fee transaction"
+                );
             }
 
             cv.total_payout_mining = miner_payout;
