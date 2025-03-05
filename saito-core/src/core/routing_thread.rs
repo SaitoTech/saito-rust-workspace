@@ -283,7 +283,7 @@ impl RoutingThread {
             "peer key list: {:?}",
             peer_key_list
                 .iter()
-                .map(|pk| pk.to_hex())
+                .map(|pk| pk.to_base58())
                 .collect::<Vec<String>>()
         );
 
