@@ -1166,12 +1166,15 @@ impl Block {
 
         // If no valid transaction is found, payout to burn address and return early
         if tx.is_none() {
+            info!("winning_tx is not valid ///////////");
             winner_pubkey = [0; 33];
             return winner_pubkey;
         }
 
         // Safe to unwrap since we know it's `Some`
         let mut winning_tx = tx.unwrap();
+
+        info!("winning_tx 1: {:?}", winning_tx);
 
         //
         // if winner is atr, we take inside TX
@@ -1181,7 +1184,9 @@ impl Block {
             winning_tx_placeholder =
                 Transaction::deserialize_from_net(&tmptx).expect("buffer to be valid");
             winning_tx = &winning_tx_placeholder;
+            info!("winning_tx 2 (atr): {:?}", winning_tx);
         } else {
+            info!("winning_tx 2: {:?}", winning_tx);
             assert_ne!(
                 winning_tx.cumulative_fees,
                 Currency::zero(),

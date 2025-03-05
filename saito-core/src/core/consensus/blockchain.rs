@@ -1919,9 +1919,19 @@ impl Blockchain {
             });
         slips
     }
-    pub fn get_balance_snapshot(&self, keys: Vec<SaitoPublicKey>) -> BalanceSnapshot {
+    pub fn get_balance_snapshot(
+        &self,
+        keys: Vec<SaitoPublicKey>,
+        configs: &(dyn Configuration + Send + Sync)
+    ) -> BalanceSnapshot {
+        let latest_block_id = self.get_latest_block_id();
+        let genesis_period = configs
+            .get_consensus_config()
+            .unwrap()
+            .genesis_period;
+
         let mut snapshot = BalanceSnapshot {
-            latest_block_id: self.get_latest_block_id(),
+            latest_block_id: latest_block_id,
             latest_block_hash: self.get_latest_block_hash(),
             timestamp: self.last_timestamp,
             slips: vec![],
@@ -1933,9 +1943,12 @@ impl Blockchain {
             .for_each(|(key, _)| {
                 let slip = Slip::parse_slip_from_utxokey(key).unwrap();
 
-                // if no keys provided we get the full picture
-                if keys.is_empty() || keys.contains(&slip.public_key) {
-                    snapshot.slips.push(slip);
+                // Check if UTXO is valid (not from an off-chain block)
+                if slip.block_id >= latest_block_id.saturating_sub(genesis_period) {
+                    // if no keys provided we get the full picture
+                    if keys.is_empty() || keys.contains(&slip.public_key) {
+                        snapshot.slips.push(slip);
+                    }
                 }
             });
 
