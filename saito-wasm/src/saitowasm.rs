@@ -872,9 +872,11 @@ pub async fn get_account_slips(public_key: JsString) -> Result<Array, JsValue> {
 
 #[wasm_bindgen]
 pub async fn get_balance_snapshot(keys: js_sys::Array) -> WasmBalanceSnapshot {
+    let saito = SAITO.lock().await;
+    let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
+    let configs = config_lock.read().await;
     let keys: Vec<SaitoPublicKey> = string_array_to_base58_keys(keys);
 
-    let saito = SAITO.lock().await;
     let blockchain = saito
         .as_ref()
         .unwrap()
@@ -882,7 +884,7 @@ pub async fn get_balance_snapshot(keys: js_sys::Array) -> WasmBalanceSnapshot {
         .blockchain_lock
         .read()
         .await;
-    let snapshot = blockchain.get_balance_snapshot(keys);
+    let snapshot = blockchain.get_balance_snapshot(keys, configs.deref());
 
     WasmBalanceSnapshot::new(snapshot)
 }
