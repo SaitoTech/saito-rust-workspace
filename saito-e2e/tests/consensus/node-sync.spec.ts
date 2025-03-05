@@ -5,7 +5,7 @@ import { NodeConfig, NodeType } from "../../src/saito_node";
 test.describe("nodes should sync correctly", () => {
   let nodeSetup: NodeSet;
   test.beforeAll(async () => {
-    // test.setTimeout(0); // Set timeout to 60 seconds
+    test.setTimeout(0); // Set timeout to 60 seconds
 
     const configSet = new NodeSetConfig();
     configSet.mainNodeIndex = 0;
