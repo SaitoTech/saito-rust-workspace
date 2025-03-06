@@ -63,7 +63,7 @@ impl Spammer {
     }
 
     async fn run(&mut self, mut receiver: Receiver<VecDeque<Transaction>>) {
-        let mut work_done ;
+        let mut work_done;
         let timer_in_milli;
         let burst_count;
         let stop_after;
