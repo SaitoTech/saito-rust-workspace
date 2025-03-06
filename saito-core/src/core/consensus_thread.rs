@@ -791,7 +791,14 @@ mod tests {
                 .await
                 .expect("total supply should not change");
             let wallet = tester.consensus_thread.wallet_lock.read().await;
-            assert_eq!(wallet.slips.iter().filter(|(_,slip)|slip.slip_type==SlipType::ATR).count(), 0);
+            assert_eq!(
+                wallet
+                    .slips
+                    .iter()
+                    .filter(|(_, slip)| slip.slip_type == SlipType::ATR)
+                    .count(),
+                0
+            );
         }
 
         let mut last_block_id = tester
@@ -839,7 +846,14 @@ mod tests {
                         );
                     });
                     // since we keep reusing the same slip, there shouldn't be old ATR slips in the wallet
-                    assert_eq!(wallet.slips.iter().filter(|(_,slip)|slip.slip_type==SlipType::ATR).count(), 0);
+                    assert_eq!(
+                        wallet
+                            .slips
+                            .iter()
+                            .filter(|(_, slip)| slip.slip_type == SlipType::ATR)
+                            .count(),
+                        0
+                    );
                 }
 
                 let tx = tester
