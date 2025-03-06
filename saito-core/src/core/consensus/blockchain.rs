@@ -491,9 +491,9 @@ impl Blockchain {
     ) {
         debug!("add_block_success : {:?}", block_hash.to_hex());
 
-        let mut block_id = 0;
-        let mut block_type = BlockType::Pruned;
-        let mut tx_count = 0;
+        let block_id;
+        let block_type;
+        let tx_count;
         // save to disk
         {
             let block = self.get_block(&block_hash).unwrap();

@@ -20,10 +20,10 @@ use crate::transaction_generator::{GeneratorState, TransactionGenerator};
 
 pub struct Spammer {
     sender_to_network: Sender<IoEvent>,
-    peer_lock: Arc<RwLock<PeerCollection>>,
+    // peer_lock: Arc<RwLock<PeerCollection>>,
     config_lock: Arc<RwLock<SpammerConfigs>>,
     bootstrap_done: bool,
-    sent_tx_count: u64,
+    // sent_tx_count: u64,
     tx_generator: TransactionGenerator,
 }
 
@@ -45,10 +45,10 @@ impl Spammer {
         }
         Spammer {
             sender_to_network,
-            peer_lock: peers_lock.clone(),
+            // peer_lock: peers_lock.clone(),
             config_lock: configs_lock.clone(),
             bootstrap_done: false,
-            sent_tx_count: 0,
+            // sent_tx_count: 0,
             tx_generator: TransactionGenerator::create(
                 wallet_lock.clone(),
                 peers_lock.clone(),
@@ -63,7 +63,7 @@ impl Spammer {
     }
 
     async fn run(&mut self, mut receiver: Receiver<VecDeque<Transaction>>) {
-        let mut work_done = false;
+        let mut work_done;
         let timer_in_milli;
         let burst_count;
         let stop_after;

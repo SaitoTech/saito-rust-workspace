@@ -378,7 +378,7 @@ export default class Saito {
                 throw new Error("peer not found");
             }
             if (peer.status !== "connected") {
-                throw new Error("peer not connected");
+                throw new Error(`peer : ${peer.peerIndex} not connected. status : ${peer.status}`);
             }
         }
 
@@ -429,7 +429,7 @@ export default class Saito {
                 }
             })
             .catch((error) => {
-                console.error(error);
+                console.info("couldn't send api call : ", error);
                 if (callback) {
                     return callback({ err: error.toString() });
                 }

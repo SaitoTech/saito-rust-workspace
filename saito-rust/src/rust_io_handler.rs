@@ -143,7 +143,7 @@ impl InterfaceIO for RustIOHandler {
         }
         let mut file = File::create(filename).await?;
 
-        let result = file.write_all(value).await?;
+        file.write_all(value).await?;
 
         // TODO : write the file to a temp file and move to avoid file corruptions
 
