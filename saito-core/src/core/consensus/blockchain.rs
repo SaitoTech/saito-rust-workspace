@@ -1,6 +1,5 @@
 use std::cmp::max;
 use std::collections::VecDeque;
-use std::f32::MIN;
 use std::fmt::Debug;
 use std::io::Error;
 use std::sync::Arc;
@@ -1228,7 +1227,11 @@ impl Blockchain {
             {
                 let mut wallet = self.wallet_lock.write().await;
 
-                wallet_updated |= wallet.on_chain_reorganization(block, true);
+                wallet_updated |= wallet.on_chain_reorganization(
+                    block,
+                    true,
+                    configs.get_consensus_config().unwrap().genesis_period,
+                );
             }
             let block_id = block.id;
 
@@ -1436,7 +1439,11 @@ impl Blockchain {
 
             // wallet update
             let mut wallet = self.wallet_lock.write().await;
-            wallet_updated |= wallet.on_chain_reorganization(block, false);
+            wallet_updated |= wallet.on_chain_reorganization(
+                block,
+                false,
+                configs.get_consensus_config().unwrap().genesis_period,
+            );
         }
         wallet_updated |= self
             .on_chain_reorganization(block_id, block_hash, false, storage, configs)

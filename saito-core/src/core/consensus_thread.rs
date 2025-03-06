@@ -623,6 +623,7 @@ mod tests {
     use log::info;
 
     use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
+    use crate::core::consensus::slip::SlipType;
     use crate::core::defs::{PrintForLog, NOLAN_PER_SAITO};
 
     use crate::core::util::crypto::generate_keys;
@@ -789,6 +790,15 @@ mod tests {
                 .check_total_supply()
                 .await
                 .expect("total supply should not change");
+            let wallet = tester.consensus_thread.wallet_lock.read().await;
+            assert_eq!(
+                wallet
+                    .slips
+                    .iter()
+                    .filter(|(_, slip)| slip.slip_type == SlipType::ATR)
+                    .count(),
+                0
+            );
         }
 
         let mut last_block_id = tester
@@ -819,12 +829,12 @@ mod tests {
                     let wallet = tester.consensus_thread.wallet_lock.read().await;
                     info!(
                     "current wallet balance : {:?} slip_count : {:?} unspent_slips : {}, i : {}",
-                    wallet.get_available_balance(),
-                    wallet.slips.len(),
-                    wallet.get_unspent_slip_count(),
-                    i
-                );
-                    wallet.slips.iter().for_each(|(utxo_key, slip)| {
+                        wallet.get_available_balance(),
+                        wallet.slips.len(),
+                        wallet.get_unspent_slip_count(),
+                        i
+                    );
+                    wallet.slips.iter().for_each(|(_, slip)| {
                         info!(
                             "slip : {}-{}-{} amount : {:?} type : {:?} spent : {:?}",
                             slip.block_id,
@@ -835,6 +845,15 @@ mod tests {
                             slip.spent
                         );
                     });
+                    // since we keep reusing the same slip, there shouldn't be old ATR slips in the wallet
+                    assert_eq!(
+                        wallet
+                            .slips
+                            .iter()
+                            .filter(|(_, slip)| slip.slip_type == SlipType::ATR)
+                            .count(),
+                        0
+                    );
                 }
 
                 let tx = tester
