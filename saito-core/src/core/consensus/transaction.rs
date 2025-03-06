@@ -665,6 +665,11 @@ impl Transaction {
             return if !self.from.is_empty() {
                 self.from[0].public_key
             } else {
+                //
+                // if there is no routing path and there are no FROM UTXO then this is a
+                // fee transaction or issuance transaction. in these cases we choose to
+                // graveyard the payout as this should encourage winners to move their
+                // payouts, which reinforces the longest chain.
                 [0; 33]
             };
         }
