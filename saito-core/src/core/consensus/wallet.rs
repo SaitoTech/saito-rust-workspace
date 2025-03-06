@@ -149,7 +149,12 @@ impl Wallet {
         self.public_key = bytes[32..65].try_into().unwrap();
     }
 
-    pub fn on_chain_reorganization(&mut self, block: &Block, lc: bool) -> WalletUpdateStatus {
+    pub fn on_chain_reorganization(
+        &mut self,
+        block: &Block,
+        lc: bool,
+        genesis_period: BlockId,
+    ) -> WalletUpdateStatus {
         let mut wallet_changed = WALLET_NOT_UPDATED;
         if lc {
             for (index, tx) in block.transactions.iter().enumerate() {
@@ -171,6 +176,9 @@ impl Wallet {
                         self.add_slip(block.id, index as u64, output, true, None);
                     }
                 }
+            }
+            if block.id > genesis_period {
+                self.remove_old_slips(block.id - genesis_period);
             }
         } else {
             for (index, tx) in block.transactions.iter().enumerate() {
@@ -211,6 +219,21 @@ impl Wallet {
         }
 
         wallet_changed
+    }
+
+    pub fn remove_old_slips(&mut self, block_id: BlockId) {
+        let mut keys_to_remove = vec![];
+        for (key, slip) in self.slips.iter() {
+            if slip.block_id < block_id {
+                keys_to_remove.push(*key);
+            }
+        }
+
+        for key in keys_to_remove {
+            let slip = Slip::parse_slip_from_utxokey(&key).unwrap();
+            debug!("removing old slip : {}", slip);
+            self.delete_slip(&slip, None);
+        }
     }
 
     pub fn add_slip(
