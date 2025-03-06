@@ -358,7 +358,7 @@ impl NetworkController {
         info!("disconnect peer : {:?}", peer_index);
         let mut sockets = sockets.lock().await;
         let socket = sockets.remove(&peer_index);
-        if let Some(socket) = socket {
+        if let Some(_socket) = socket {
             // TODO : disconnect the socket here
         }
 

@@ -1938,32 +1938,40 @@ impl Block {
                 );
             }
 
-            if router1_publickey != [0; 33] && router1_payout > 0 {
-                let mut output = Slip::default();
-                output.public_key = router1_publickey;
-                output.amount = router1_payout;
-                output.slip_type = SlipType::RouterOutput;
-                output.slip_index = slip_index;
-                output.tx_ordinal = total_number_of_non_fee_transactions + 1;
-                output.block_id = self.id;
-                transaction.add_to_slip(output.clone());
-                slip_index += 1;
+            if router1_payout > 0 {
+                if router1_publickey != [0; 33] {
+                    let mut output = Slip::default();
+                    output.public_key = router1_publickey;
+                    output.amount = router1_payout;
+                    output.slip_type = SlipType::RouterOutput;
+                    output.slip_index = slip_index;
+                    output.tx_ordinal = total_number_of_non_fee_transactions + 1;
+                    output.block_id = self.id;
+                    transaction.add_to_slip(output.clone());
+                    slip_index += 1;
+                } else {
+                    graveyard_contribution += router1_payout;
+                }
             } else {
                 debug!(
                     "router1_publickey is not set or payout is zero. Not adding to fee transaction"
                 );
             }
 
-            if router2_publickey != [0; 33] && router2_payout > 0 {
-                let mut output = Slip::default();
-                output.public_key = router2_publickey;
-                output.amount = router2_payout;
-                output.slip_type = SlipType::RouterOutput;
-                output.slip_index = slip_index;
-                output.tx_ordinal = total_number_of_non_fee_transactions + 1;
-                output.block_id = self.id;
-                transaction.add_to_slip(output.clone());
-                slip_index += 1;
+            if router2_payout > 0 {
+                if router2_publickey != [0; 33] {
+                    let mut output = Slip::default();
+                    output.public_key = router2_publickey;
+                    output.amount = router2_payout;
+                    output.slip_type = SlipType::RouterOutput;
+                    output.slip_index = slip_index;
+                    output.tx_ordinal = total_number_of_non_fee_transactions + 1;
+                    output.block_id = self.id;
+                    transaction.add_to_slip(output.clone());
+                    slip_index += 1;
+                } else {
+                    graveyard_contribution += router2_payout;
+                }
             } else {
                 debug!(
                     "router2_publickey is not set or payout is zero. Not adding to fee transaction"

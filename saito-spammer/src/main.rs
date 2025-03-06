@@ -43,7 +43,7 @@ use saito_spammer::spammer::run_spammer;
 
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
-const MINING_EVENT_PROCESSOR_ID: u8 = 3;
+const _MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
 async fn run_thread<T>(
     mut event_processor: Box<(dyn ProcessEvent<T> + Send + 'static)>,
@@ -170,11 +170,6 @@ async fn run_consensus_event_processor(
     sender_to_stat: Sender<String>,
     timer: &Timer,
 ) -> JoinHandle<()> {
-    let result = std::env::var("GEN_TX");
-    let mut create_test_tx = false;
-    if result.is_ok() {
-        create_test_tx = result.unwrap().eq("1");
-    }
     let generate_genesis_block: bool;
     {
         let configs = context.config_lock.read().await;
