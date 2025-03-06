@@ -1,6 +1,5 @@
 use std::cmp::max;
 use std::collections::VecDeque;
-use std::f32::MIN;
 use std::fmt::Debug;
 use std::io::Error;
 use std::sync::Arc;
