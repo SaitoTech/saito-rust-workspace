@@ -52,7 +52,7 @@ use saito_rust::time_keeper::TimeKeeper;
 
 const ROUTING_EVENT_PROCESSOR_ID: u8 = 1;
 const CONSENSUS_EVENT_PROCESSOR_ID: u8 = 2;
-const MINING_EVENT_PROCESSOR_ID: u8 = 3;
+const _MINING_EVENT_PROCESSOR_ID: u8 = 3;
 
 async fn receive_event<T>(receiver: &mut Option<Receiver<T>>) -> Option<T> {
     if let Some(receiver) = receiver.as_mut() {
