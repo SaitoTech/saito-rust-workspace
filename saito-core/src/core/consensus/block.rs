@@ -1276,7 +1276,7 @@ impl Block {
                         .and_modify(|e| *e += 1)
                         .or_insert(1);
                     if *value > 1 {
-                        info!(
+                        warn!(
                             "double-spend detected in block {} : {}",
                             self.id,
                             input.get_utxoset_key().to_hex()
