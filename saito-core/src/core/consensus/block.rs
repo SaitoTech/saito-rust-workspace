@@ -2979,7 +2979,6 @@ impl Block {
 
         // validate double-spend inputs
         let mut slips_map = self.slips_spent_this_block.clone();
-        info!("slips_map: {:?}", slips_map);
         for transaction in &self.transactions {
             if transaction.transaction_type != TransactionType::Fee {
                 for input in transaction.from.iter() {
