@@ -813,6 +813,9 @@ impl Block {
             block.add_transaction(fee_tx);
         }
 
+        // commenting this double-spend from here
+        // this check is added to validate() now
+
         //
         // create hashmap of slips_spent_this_block (used to avoid doublespends)
         //
@@ -1256,6 +1259,9 @@ impl Block {
             cumulative_fees = transaction.generate_cumulative_fees(cumulative_fees);
 
             total_work += transaction.total_work_for_me;
+
+            // commenting this double-spend from here
+            // this check is added to validate() now
 
             // update slips_spent_this_block so that we have a record of
             // how many times input slips are spent in this block. we will
@@ -2983,7 +2989,7 @@ impl Block {
                         .or_insert(1);
 
                     if *value > 1 {
-                        info!(
+                        error!(
                             "double-spend detected in block {} : {}",
                             self.id,
                             input.get_utxoset_key().to_hex()
@@ -2993,8 +2999,6 @@ impl Block {
                 }
             }
         }
-
-        
 
         trace!("transactions validated");
 
