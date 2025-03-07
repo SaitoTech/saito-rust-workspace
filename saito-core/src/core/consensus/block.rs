@@ -813,38 +813,35 @@ impl Block {
             block.add_transaction(fee_tx);
         }
 
-        // commenting this double-spend from here
-        // this check is added to validate() now
-
         //
         // create hashmap of slips_spent_this_block (used to avoid doublespends)
         //
-        // if !block.created_hashmap_of_slips_spent_this_block {
-        //     info!(
-        //         "creating hashmap of slips spent this block : {}...",
-        //         block.id
-        //     );
-        //     for transaction in &block.transactions {
-        //         if transaction.transaction_type != TransactionType::Fee {
-        //             for input in transaction.from.iter() {
-        //                 let value = block
-        //                     .slips_spent_this_block
-        //                     .entry(input.get_utxoset_key())
-        //                     .and_modify(|e| *e += 1)
-        //                     .or_insert(1);
-        //                 if *value > 1 {
-        //                     info!(
-        //                         "double-spend detected in block {} : {}",
-        //                         block.id,
-        //                         input.get_utxoset_key().to_hex()
-        //                     );
-        //                 }
-        //             }
-        //         }
-        //         block.created_hashmap_of_slips_spent_this_block = true;
-        //     }
-        // }
-        // block.created_hashmap_of_slips_spent_this_block = true;
+        if !block.created_hashmap_of_slips_spent_this_block {
+            debug!(
+                "creating hashmap of slips spent this block : {}...",
+                block.id
+            );
+            for transaction in &block.transactions {
+                if transaction.transaction_type != TransactionType::Fee {
+                    for input in transaction.from.iter() {
+                        let value = block
+                            .slips_spent_this_block
+                            .entry(input.get_utxoset_key())
+                            .and_modify(|e| *e += 1)
+                            .or_insert(1);
+                        if *value > 1 {
+                            warn!(
+                                "double-spend detected in block {} : {}",
+                                block.id,
+                                input.get_utxoset_key().to_hex()
+                            );
+                        }
+                    }
+                }
+                block.created_hashmap_of_slips_spent_this_block = true;
+            }
+        }
+        block.created_hashmap_of_slips_spent_this_block = true;
 
         //
         // generate merkle root
@@ -1260,9 +1257,6 @@ impl Block {
 
             total_work += transaction.total_work_for_me;
 
-            // commenting this double-spend from here
-            // this check is added to validate() now
-
             // update slips_spent_this_block so that we have a record of
             // how many times input slips are spent in this block. we will
             // use this later to ensure there are no duplicates.
@@ -1272,25 +1266,25 @@ impl Block {
             // someone else -- i.e. we will think the slip is spent in the
             // block when generating the FEE TX to check against the in-block
             // fee tx.
-            // if !self.created_hashmap_of_slips_spent_this_block
-            //     && transaction.transaction_type != TransactionType::Fee
-            // {
-            //     for input in transaction.from.iter() {
-            //         let value = self
-            //             .slips_spent_this_block
-            //             .entry(input.get_utxoset_key())
-            //             .and_modify(|e| *e += 1)
-            //             .or_insert(1);
-            //         if *value > 1 {
-            //             info!(
-            //                 "double-spend detected in block {} : {}",
-            //                 self.id,
-            //                 input.get_utxoset_key().to_hex()
-            //             );
-            //         }
-            //     }
-            //     self.created_hashmap_of_slips_spent_this_block = true;
-            // }
+            if !self.created_hashmap_of_slips_spent_this_block
+                && transaction.transaction_type != TransactionType::Fee
+            {
+                for input in transaction.from.iter() {
+                    let value = self
+                        .slips_spent_this_block
+                        .entry(input.get_utxoset_key())
+                        .and_modify(|e| *e += 1)
+                        .or_insert(1);
+                    if *value > 1 {
+                        info!(
+                            "double-spend detected in block {} : {}",
+                            self.id,
+                            input.get_utxoset_key().to_hex()
+                        );
+                    }
+                }
+                self.created_hashmap_of_slips_spent_this_block = true;
+            }
 
             // also check the transactions for golden ticket and fees
             match transaction.transaction_type {
@@ -2978,23 +2972,22 @@ impl Block {
         }
 
         // validate double-spend inputs
-        let mut slips_map = self.slips_spent_this_block.clone();
+        let mut new_slips_map = std::collections::HashMap::new();
         for transaction in &self.transactions {
             if transaction.transaction_type != TransactionType::Fee {
                 for input in transaction.from.iter() {
-                    let value = slips_map
-                        .entry(input.get_utxoset_key())
-                        .and_modify(|e| *e += 1)
-                        .or_insert(1);
+                    let utxo_key = input.get_utxoset_key();
 
-                    if *value > 1 {
+                    if new_slips_map.contains_key(&utxo_key) {
                         error!(
                             "double-spend detected in block {} : {}",
                             self.id,
-                            input.get_utxoset_key().to_hex()
+                            utxo_key.to_hex()
                         );
                         return false;
                     }
+
+                    new_slips_map.insert(utxo_key, 1);
                 }
             }
         }
