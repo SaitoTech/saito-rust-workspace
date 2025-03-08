@@ -830,11 +830,7 @@ impl Block {
                             .and_modify(|e| *e += 1)
                             .or_insert(1);
                         if *value > 1 {
-                            warn!(
-                                "double-spend detected in block {} : {}",
-                                block.id,
-                                input
-                            );
+                            warn!("double-spend detected in block {} : {}", block.id, input);
                         }
                     }
                 }
@@ -1276,11 +1272,7 @@ impl Block {
                         .and_modify(|e| *e += 1)
                         .or_insert(1);
                     if *value > 1 {
-                        warn!(
-                            "double-spend detected in block {} : {}",
-                            self.id,
-                            input
-                        );
+                        warn!("double-spend detected in block {} : {}", self.id, input);
                     }
                 }
                 self.created_hashmap_of_slips_spent_this_block = true;
