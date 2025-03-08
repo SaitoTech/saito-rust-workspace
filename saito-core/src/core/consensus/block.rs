@@ -833,7 +833,7 @@ impl Block {
                             warn!(
                                 "double-spend detected in block {} : {}",
                                 block.id,
-                                input.get_utxoset_key().to_hex()
+                                input
                             );
                         }
                     }
@@ -1279,7 +1279,7 @@ impl Block {
                         warn!(
                             "double-spend detected in block {} : {}",
                             self.id,
-                            input.get_utxoset_key().to_hex()
+                            input
                         );
                     }
                 }
@@ -2964,8 +2964,31 @@ impl Block {
             "validating transactions ... count : {:?}",
             self.transactions.len()
         );
-        let transactions_valid = iterate!(self.transactions, 100)
-            .all(|tx: &Transaction| tx.validate(utxoset, blockchain, validate_against_utxo));
+        let mut new_slips_map = std::collections::HashMap::new();
+        let transactions_valid = self.transactions.iter().all(|tx: &Transaction| -> bool {
+            let valid_tx = tx.validate(utxoset, blockchain, validate_against_utxo);
+            // validate double-spend inputs
+            if valid_tx && tx.transaction_type != TransactionType::Fee {
+                for input in tx.from.iter() {
+                    if input.amount == 0 {
+                        continue;
+                    }
+                    let utxo_key = input.get_utxoset_key();
+
+                    if new_slips_map.contains_key(&utxo_key) {
+                        error!(
+                            "double-spend detected in block {} : {}",
+                            self.id,
+                            Slip::parse_slip_from_utxokey(&utxo_key).unwrap()
+                        );
+                        return false;
+                    }
+
+                    new_slips_map.insert(utxo_key, 1);
+                }
+            }
+            true
+        });
 
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");
