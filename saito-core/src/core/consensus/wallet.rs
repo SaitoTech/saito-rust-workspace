@@ -367,6 +367,13 @@ impl Wallet {
             nolan_out = nolan_in - nolan_requested;
         }
 
+        if nolan_in < nolan_requested {
+            warn!(
+                "insufficient funds in wallet. requested : {:?}, available : {:?}",
+                nolan_requested, nolan_in
+            );
+        }
+
         let mut outputs: Vec<Slip> = Vec::new();
         // add change address
         let output = Slip {
