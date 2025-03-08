@@ -830,11 +830,7 @@ impl Block {
                             .and_modify(|e| *e += 1)
                             .or_insert(1);
                         if *value > 1 {
-                            warn!(
-                                "double-spend detected in block {} : {}",
-                                block.id,
-                                input.get_utxoset_key().to_hex()
-                            );
+                            warn!("double-spend detected in block {} : {}", block.id, input);
                         }
                     }
                 }
@@ -1276,11 +1272,7 @@ impl Block {
                         .and_modify(|e| *e += 1)
                         .or_insert(1);
                     if *value > 1 {
-                        warn!(
-                            "double-spend detected in block {} : {}",
-                            self.id,
-                            input.get_utxoset_key().to_hex()
-                        );
+                        warn!("double-spend detected in block {} : {}", self.id, input);
                     }
                 }
                 self.created_hashmap_of_slips_spent_this_block = true;
@@ -2453,226 +2445,226 @@ impl Block {
             .await;
         trace!("consensus values generated : {}", cv);
 
-        //
-        // total_fees
-        //
-        if validate_against_utxo && cv.total_fees != self.total_fees {
-            error!(
-                "total_fees error: {:?} expected : {:?}",
-                self.total_fees, cv.total_fees
-            );
-            return false;
-        }
+        if validate_against_utxo {
+            //
+            // total_fees
+            //
+            if cv.total_fees != self.total_fees {
+                error!(
+                    "total_fees error: {:?} expected : {:?}",
+                    self.total_fees, cv.total_fees
+                );
+                return false;
+            }
 
-        //
-        // total_fees_new
-        //
-        if cv.total_fees_new != self.total_fees_new {
-            error!(
-                "total_fees_new error: {:?} expected : {:?}",
-                self.total_fees_new, cv.total_fees_new
-            );
-            return false;
-        }
+            //
+            // total_fees_new
+            //
+            if cv.total_fees_new != self.total_fees_new {
+                error!(
+                    "total_fees_new error: {:?} expected : {:?}",
+                    self.total_fees_new, cv.total_fees_new
+                );
+                return false;
+            }
 
-        //
-        // total_fees_atr
-        //
-        if validate_against_utxo && cv.total_fees_atr != self.total_fees_atr {
-            error!(
-                "total_fees_atr error: {:?} expected : {:?}",
-                self.total_fees_atr, cv.total_fees_atr
-            );
-            return false;
-        }
+            //
+            // total_fees_atr
+            //
+            if cv.total_fees_atr != self.total_fees_atr {
+                error!(
+                    "total_fees_atr error: {:?} expected : {:?}",
+                    self.total_fees_atr, cv.total_fees_atr
+                );
+                return false;
+            }
 
-        //
-        // total_fees_cumulative
-        //
-        if validate_against_utxo && cv.total_fees_cumulative != self.total_fees_cumulative {
-            error!(
-                "total_fees_cumulative error: {:?} expected : {:?}",
-                self.total_fees_cumulative, cv.total_fees_cumulative
-            );
-            return false;
-        }
+            //
+            // total_fees_cumulative
+            //
+            if cv.total_fees_cumulative != self.total_fees_cumulative {
+                error!(
+                    "total_fees_cumulative error: {:?} expected : {:?}",
+                    self.total_fees_cumulative, cv.total_fees_cumulative
+                );
+                return false;
+            }
 
-        //
-        // avg_total_fees
-        //
-        if validate_against_utxo && cv.avg_total_fees != self.avg_total_fees {
-            error!(
-                "avg_total_fees error: {:?} expected : {:?}",
-                self.avg_total_fees, cv.avg_total_fees
-            );
-            return false;
-        }
+            //
+            // avg_total_fees
+            //
+            if cv.avg_total_fees != self.avg_total_fees {
+                error!(
+                    "avg_total_fees error: {:?} expected : {:?}",
+                    self.avg_total_fees, cv.avg_total_fees
+                );
+                return false;
+            }
 
-        //
-        // avg_total_fees_new
-        //
-        if cv.avg_total_fees_new != self.avg_total_fees_new {
-            error!(
-                "avg_total_fees_new error: {:?} expected : {:?}",
-                self.avg_total_fees_new, cv.avg_total_fees_new
-            );
-            return false;
-        }
+            //
+            // avg_total_fees_new
+            //
+            if cv.avg_total_fees_new != self.avg_total_fees_new {
+                error!(
+                    "avg_total_fees_new error: {:?} expected : {:?}",
+                    self.avg_total_fees_new, cv.avg_total_fees_new
+                );
+                return false;
+            }
 
-        //
-        // avg_total_fees_atr
-        //
-        if validate_against_utxo && cv.avg_total_fees_atr != self.avg_total_fees_atr {
-            error!(
-                "avg_total_fees_atr error: {:?} expected : {:?}",
-                self.avg_total_fees_atr, cv.avg_total_fees_atr
-            );
-            return false;
-        }
+            //
+            // avg_total_fees_atr
+            //
+            if cv.avg_total_fees_atr != self.avg_total_fees_atr {
+                error!(
+                    "avg_total_fees_atr error: {:?} expected : {:?}",
+                    self.avg_total_fees_atr, cv.avg_total_fees_atr
+                );
+                return false;
+            }
 
-        //
-        // total_payout_routing
-        //
-        if validate_against_utxo && cv.total_payout_routing != self.total_payout_routing {
-            error!(
-                "total_payout_routing error: {:?} expected : {:?}",
-                self.total_payout_routing, cv.total_payout_routing
-            );
-            return false;
-        }
+            //
+            // total_payout_routing
+            //
+            if cv.total_payout_routing != self.total_payout_routing {
+                error!(
+                    "total_payout_routing error: {:?} expected : {:?}",
+                    self.total_payout_routing, cv.total_payout_routing
+                );
+                return false;
+            }
 
-        //
-        // total_payout_mining
-        //
-        if validate_against_utxo && cv.total_payout_mining != self.total_payout_mining {
-            error!(
-                "total_payout_mining error: {:?} expected : {:?}",
-                self.total_payout_mining, cv.total_payout_mining
-            );
-            return false;
-        }
+            //
+            // total_payout_mining
+            //
+            if cv.total_payout_mining != self.total_payout_mining {
+                error!(
+                    "total_payout_mining error: {:?} expected : {:?}",
+                    self.total_payout_mining, cv.total_payout_mining
+                );
+                return false;
+            }
 
-        //
-        // total_payout_treasury
-        //
-        if validate_against_utxo && cv.total_payout_treasury != self.total_payout_treasury {
-            error!(
-                "total_payout_treasury error: {:?} expected : {:?}",
-                self.total_payout_treasury, cv.total_payout_treasury
-            );
-            return false;
-        }
+            //
+            // total_payout_treasury
+            //
+            if cv.total_payout_treasury != self.total_payout_treasury {
+                error!(
+                    "total_payout_treasury error: {:?} expected : {:?}",
+                    self.total_payout_treasury, cv.total_payout_treasury
+                );
+                return false;
+            }
 
-        //
-        // total_payout_graveyard
-        //
-        if validate_against_utxo && cv.total_payout_graveyard != self.total_payout_graveyard {
-            error!(
-                "total_payout_graveyard error: {:?} expected : {:?}",
-                self.total_payout_graveyard, cv.total_payout_graveyard
-            );
-            return false;
-        }
+            //
+            // total_payout_graveyard
+            //
+            if cv.total_payout_graveyard != self.total_payout_graveyard {
+                error!(
+                    "total_payout_graveyard error: {:?} expected : {:?}",
+                    self.total_payout_graveyard, cv.total_payout_graveyard
+                );
+                return false;
+            }
 
-        //
-        // total_payout_atr
-        //
-        if validate_against_utxo && cv.total_payout_atr != self.total_payout_atr {
-            error!(
-                "total_payout_atr error: {:?} expected : {:?}",
-                self.total_payout_atr, cv.total_payout_atr
-            );
-            return false;
-        }
+            //
+            // total_payout_atr
+            //
+            if cv.total_payout_atr != self.total_payout_atr {
+                error!(
+                    "total_payout_atr error: {:?} expected : {:?}",
+                    self.total_payout_atr, cv.total_payout_atr
+                );
+                return false;
+            }
 
-        //
-        // avg_payout_routing
-        //
-        if validate_against_utxo && cv.avg_payout_routing != self.avg_payout_routing {
-            error!(
-                "avg_payout_routing error: {:?} expected : {:?}",
-                self.avg_payout_routing, cv.avg_payout_routing
-            );
-            return false;
-        }
+            //
+            // avg_payout_routing
+            //
+            if cv.avg_payout_routing != self.avg_payout_routing {
+                error!(
+                    "avg_payout_routing error: {:?} expected : {:?}",
+                    self.avg_payout_routing, cv.avg_payout_routing
+                );
+                return false;
+            }
 
-        //
-        // avg_payout_mining
-        //
-        if validate_against_utxo && cv.avg_payout_mining != self.avg_payout_mining {
-            error!(
-                "avg_payout_mining error: {:?} expected : {:?}",
-                self.avg_payout_mining, cv.avg_payout_mining
-            );
-            return false;
-        }
+            //
+            // avg_payout_mining
+            //
+            if cv.avg_payout_mining != self.avg_payout_mining {
+                error!(
+                    "avg_payout_mining error: {:?} expected : {:?}",
+                    self.avg_payout_mining, cv.avg_payout_mining
+                );
+                return false;
+            }
 
-        //
-        // total_payout_treasury
-        //
-        if validate_against_utxo && cv.avg_payout_treasury != self.avg_payout_treasury {
-            error!(
-                "avg_payout_treasury error: {:?} expected : {:?}",
-                self.avg_payout_treasury, cv.avg_payout_treasury
-            );
-            return false;
-        }
+            //
+            // total_payout_treasury
+            //
+            if cv.avg_payout_treasury != self.avg_payout_treasury {
+                error!(
+                    "avg_payout_treasury error: {:?} expected : {:?}",
+                    self.avg_payout_treasury, cv.avg_payout_treasury
+                );
+                return false;
+            }
 
-        //
-        // avg_payout_graveyard
-        //
-        if validate_against_utxo && cv.avg_payout_graveyard != self.avg_payout_graveyard {
-            error!(
-                "avg_payout_graveyard error: {:?} expected : {:?}",
-                self.avg_payout_graveyard, cv.avg_payout_graveyard
-            );
-            return false;
-        }
+            //
+            // avg_payout_graveyard
+            //
+            if cv.avg_payout_graveyard != self.avg_payout_graveyard {
+                error!(
+                    "avg_payout_graveyard error: {:?} expected : {:?}",
+                    self.avg_payout_graveyard, cv.avg_payout_graveyard
+                );
+                return false;
+            }
 
-        //
-        // total_payout_atr
-        //
-        if cv.avg_payout_atr != self.avg_payout_atr {
-            error!(
-                "avg_payout_atr error: {:?} expected : {:?}",
-                self.avg_payout_atr, cv.avg_payout_atr
-            );
-            return false;
-        }
+            //
+            // total_payout_atr
+            //
+            if cv.avg_payout_atr != self.avg_payout_atr {
+                error!(
+                    "avg_payout_atr error: {:?} expected : {:?}",
+                    self.avg_payout_atr, cv.avg_payout_atr
+                );
+                return false;
+            }
 
-        //
-        // avg_fee_per_byte
-        //
-        if cv.avg_fee_per_byte != self.avg_fee_per_byte {
-            error!(
-                "ERROR 202392: avg_fee_per_byte is invalid. expected: {:?} vs actual : {:?}",
-                cv.avg_fee_per_byte, self.avg_fee_per_byte
-            );
-            return false;
-        }
+            //
+            // avg_fee_per_byte
+            //
+            if cv.avg_fee_per_byte != self.avg_fee_per_byte {
+                error!(
+                    "ERROR 202392: avg_fee_per_byte is invalid. expected: {:?} vs actual : {:?}",
+                    cv.avg_fee_per_byte, self.avg_fee_per_byte
+                );
+                return false;
+            }
 
-        //
-        // fee_per_byte
-        //
-        if cv.fee_per_byte != self.fee_per_byte {
-            error!(
-                "ERROR 202392: fee_per_byte is invalid. expected: {:?} vs actual : {:?}",
-                cv.fee_per_byte, self.fee_per_byte
-            );
-            return false;
-        }
+            //
+            // fee_per_byte
+            //
+            if cv.fee_per_byte != self.fee_per_byte {
+                error!(
+                    "ERROR 202392: fee_per_byte is invalid. expected: {:?} vs actual : {:?}",
+                    cv.fee_per_byte, self.fee_per_byte
+                );
+                return false;
+            }
 
-        //
-        // consensus values -> difficulty (mining/payout unlock difficulty)
-        //
-        if validate_against_utxo
-            && cv.avg_nolan_rebroadcast_per_block != self.avg_nolan_rebroadcast_per_block
-        {
-            error!(
+            //
+            // consensus values -> difficulty (mining/payout unlock difficulty)
+            //
+            if cv.avg_nolan_rebroadcast_per_block != self.avg_nolan_rebroadcast_per_block {
+                error!(
                 "ERROR 202392: avg_nolan_rebroadcast_per_block is invalid. expected: {:?} vs actual : {:?}",
                 cv.avg_nolan_rebroadcast_per_block, self.avg_nolan_rebroadcast_per_block
             );
-            return false;
+                return false;
+            }
         }
 
         //
@@ -2964,8 +2956,31 @@ impl Block {
             "validating transactions ... count : {:?}",
             self.transactions.len()
         );
-        let transactions_valid = iterate!(self.transactions, 100)
-            .all(|tx: &Transaction| tx.validate(utxoset, blockchain, validate_against_utxo));
+        let mut new_slips_map = std::collections::HashMap::new();
+        let transactions_valid = self.transactions.iter().all(|tx: &Transaction| -> bool {
+            let valid_tx = tx.validate(utxoset, blockchain, validate_against_utxo);
+            // validate double-spend inputs
+            if valid_tx && tx.transaction_type != TransactionType::Fee {
+                for input in tx.from.iter() {
+                    if input.amount == 0 {
+                        continue;
+                    }
+                    let utxo_key = input.get_utxoset_key();
+
+                    if new_slips_map.contains_key(&utxo_key) {
+                        error!(
+                            "double-spend detected in block {} : {}",
+                            self.id,
+                            Slip::parse_slip_from_utxokey(&utxo_key).unwrap()
+                        );
+                        return false;
+                    }
+
+                    new_slips_map.insert(utxo_key, 1);
+                }
+            }
+            true
+        });
 
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");
