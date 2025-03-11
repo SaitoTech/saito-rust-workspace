@@ -1,5 +1,6 @@
 use ahash::{AHashMap, AHashSet};
 use log::{debug, info, trace, warn};
+use std::fmt::Display;
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::block::Block;
@@ -156,8 +157,10 @@ impl Wallet {
         genesis_period: BlockId,
     ) -> WalletUpdateStatus {
         let mut wallet_changed = WALLET_NOT_UPDATED;
+        debug!("tx count : {}",block.transactions.len());
+        let mut tx_index = 0;
         if lc {
-            for (index, tx) in block.transactions.iter().enumerate() {
+            for tx in block.transactions.iter() {
                 for input in tx.from.iter() {
                     if input.public_key == self.public_key {
                         if input.amount > 0 {
@@ -173,19 +176,24 @@ impl Wallet {
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
                         wallet_changed |= WALLET_UPDATED;
-                        self.add_slip(block.id, index as u64, output, true, None);
+                        self.add_slip(block.id, tx_index , output, true, None);
                     }
+                }
+                if let TransactionType::SPV = tx.transaction_type {
+                    tx_index += tx.txs_replacements as u64;
+                } else {
+                    tx_index += 1;
                 }
             }
             if block.id > genesis_period {
                 self.remove_old_slips(block.id - genesis_period);
             }
         } else {
-            for (index, tx) in block.transactions.iter().enumerate() {
+            for  tx in block.transactions.iter() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         wallet_changed |= WALLET_UPDATED;
-                        self.add_slip(block.id, index as u64, input, true, None);
+                        self.add_slip(block.id, tx_index, input, true, None);
                     }
                 }
                 for output in tx.to.iter() {
@@ -193,6 +201,11 @@ impl Wallet {
                         wallet_changed |= WALLET_UPDATED;
                         self.delete_slip(output, None);
                     }
+                }
+                if let TransactionType::SPV = tx.transaction_type {
+                    tx_index += tx.txs_replacements as u64;
+                } else {
+                    tx_index += 1;
                 }
             }
         }
@@ -697,6 +710,12 @@ impl WalletSlip {
     fn to_slip(&self) -> Slip {
         Slip::parse_slip_from_utxokey(&self.utxokey)
             .expect("since we already have a wallet slip, utxo key should be valid")
+    }
+}
+
+impl Display for WalletSlip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WalletSlip : utxokey : {:?}, amount : {:?}, block_id : {:?}, tx_ordinal : {:?}, lc : {:?}, slip_index : {:?}, spent : {:?}, slip_type : {:?}", self.utxokey.to_hex(), self.amount, self.block_id, self.tx_ordinal, self.lc, self.slip_index, self.spent, self.slip_type)
     }
 }
 
