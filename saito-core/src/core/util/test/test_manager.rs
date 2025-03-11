@@ -629,6 +629,9 @@ pub mod test {
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
 
+            let genesis_period = self.get_genesis_period().await;
+            let latest_block_id = self.get_latest_block_id().await;
+
             {
                 let wallet = self.wallet_lock.read().await;
 
@@ -648,6 +651,8 @@ pub mod test {
                         txs_fee,
                         false,
                         None,
+                        latest_block_id,
+                        genesis_period,
                     )
                     .unwrap();
                 }
@@ -782,6 +787,11 @@ pub mod test {
         pub async fn get_latest_block_id(&self) -> u64 {
             let blockchain = self.blockchain_lock.read().await;
             blockchain.blockring.get_latest_block_id()
+        }
+
+        pub async fn get_genesis_period(&self) -> u64 {
+            let configs = self.config_lock.read().await;
+            configs.get_consensus_config().unwrap().genesis_period
         }
 
         pub async fn initialize(&mut self, issuance_transactions: u64, issuance_amount: Currency) {
@@ -1018,6 +1028,9 @@ pub mod test {
             );
             let latest_block_hash = self.get_latest_block_hash().await;
 
+            let genesis_period = self.get_genesis_period().await;
+            let latest_block_id = self.get_latest_block_id().await;
+
             let timestamp = create_timestamp();
 
             let mut block = self
@@ -1043,6 +1056,8 @@ pub mod test {
                     0,
                     false,
                     None,
+                    latest_block_id,
+                    genesis_period,
                 )?;
                 tx.sign(&private_key);
                 block.add_transaction(tx);
