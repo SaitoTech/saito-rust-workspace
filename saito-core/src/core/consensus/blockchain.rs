@@ -600,7 +600,9 @@ impl Blockchain {
 
             let transactions: Vec<Transaction> = drain!(transactions, 10)
                 .filter(|tx| {
-                    if tx.transaction_type == TransactionType::Normal {
+                    if tx.transaction_type == TransactionType::Normal
+                        || tx.transaction_type == TransactionType::ATR
+                    {
                         let valid_tx = tx.validate(&self.utxoset, self, true);
 
                         // Check for double-spend in the same way as block.validate()
