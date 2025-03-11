@@ -408,6 +408,12 @@ pub async fn create_transaction(
         "Failed parsing public key string to key",
     )))?;
 
+    let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
+    let configs = config_lock.read().await;
+    let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+    let blockchain = saito.as_ref().unwrap().context.blockchain_lock.read().await;
+    let latest_block_id = blockchain.get_latest_block_id();
+
     let transaction = Transaction::create(
         &mut wallet,
         key,
@@ -415,6 +421,8 @@ pub async fn create_transaction(
         fee,
         force_merge,
         Some(&saito.as_ref().unwrap().consensus_thread.network),
+        latest_block_id,
+        genesis_period,
     );
     if transaction.is_err() {
         error!(
@@ -438,6 +446,12 @@ pub async fn create_transaction_with_multiple_payments(
     let saito = SAITO.lock().await;
     let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
 
+    let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
+    let configs = config_lock.read().await;
+    let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+    let blockchain = saito.as_ref().unwrap().context.blockchain_lock.read().await;
+    let latest_block_id = blockchain.get_latest_block_id();
+
     let keys: Vec<SaitoPublicKey> = string_array_to_base58_keys(public_keys);
     let amounts: Vec<Currency> = amounts.to_vec();
 
@@ -451,6 +465,8 @@ pub async fn create_transaction_with_multiple_payments(
         amounts,
         fee,
         Some(&saito.as_ref().unwrap().consensus_thread.network),
+        latest_block_id,
+        genesis_period,
     );
     if transaction.is_err() {
         error!(
@@ -1164,6 +1180,10 @@ pub async fn produce_block_with_gt() -> bool {
 
     let configs = config_lock.read().await;
     let blockchain = blockchain_lock.read().await;
+
+    let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+    let latest_block_id = blockchain.get_latest_block_id();
+
     let mut mempool = mempool_lock.write().await;
     let public_key;
     let private_key;
@@ -1204,7 +1224,16 @@ pub async fn produce_block_with_gt() -> bool {
 
     {
         let mut wallet = wallet_lock.write().await;
-        if let Ok(mut tx) = Transaction::create(&mut wallet, public_key, 0, 0, false, None) {
+        if let Ok(mut tx) = Transaction::create(
+            &mut wallet,
+            public_key,
+            0,
+            0,
+            false,
+            None,
+            latest_block_id,
+            genesis_period,
+        ) {
             drop(wallet);
             info!("created tx");
             tx.transaction_type = TransactionType::Vip;
@@ -1273,6 +1302,10 @@ pub async fn produce_block_without_gt() -> bool {
 
     let configs = config_lock.read().await;
     let blockchain = blockchain_lock.read().await;
+
+    let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+    let latest_block_id = blockchain.get_latest_block_id();
+
     let mut mempool = mempool_lock.write().await;
     let public_key;
     let private_key;
@@ -1290,7 +1323,16 @@ pub async fn produce_block_without_gt() -> bool {
     }
     {
         let mut wallet = wallet_lock.write().await;
-        if let Ok(mut tx) = Transaction::create(&mut wallet, public_key, 0, 0, false, None) {
+        if let Ok(mut tx) = Transaction::create(
+            &mut wallet,
+            public_key,
+            0,
+            0,
+            false,
+            None,
+            latest_block_id,
+            genesis_period,
+        ) {
             drop(wallet);
             info!("created tx");
             tx.transaction_type = TransactionType::Vip;

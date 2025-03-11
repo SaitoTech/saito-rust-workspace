@@ -330,6 +330,8 @@ impl Wallet {
         &mut self,
         nolan_requested: Currency,
         network: Option<&Network>,
+        latest_block_id: u64,
+        genesis_period: u64,
     ) -> (Vec<Slip>, Vec<Slip>) {
         let mut inputs: Vec<Slip> = Vec::new();
         let mut nolan_in: Currency = 0;
@@ -344,11 +346,23 @@ impl Wallet {
             let slip2 = Slip::parse_slip_from_utxokey(slip2).unwrap();
             slip.amount.cmp(&slip2.amount)
         });
+
         for key in unspent_slips {
+            let slip = self.slips.get_mut(key).expect("slip should be here");            
+
+            // Prevent using slips from blocks earlier than (latest_block_id - (genesis_period-1)
+            if slip.block_id <= latest_block_id.saturating_sub(genesis_period-1) {
+                debug!(
+                    "Skipping old slip from Block {:?} on Block {:?} to prevent double-spend: {:?}",
+                    slip.block_id, latest_block_id, slip
+                );
+                continue;
+            }
+
             if nolan_in >= nolan_requested {
                 break;
             }
-            let slip = self.slips.get_mut(key).expect("slip should be here");
+
             nolan_in += slip.amount;
 
             let mut input = Slip::default();
@@ -382,7 +396,7 @@ impl Wallet {
 
         if nolan_in < nolan_requested {
             warn!(
-                "insufficient funds in wallet. requested : {:?}, available : {:?}",
+                "Trying to spend more than available. requested : {:?}, available : {:?}",
                 nolan_requested, nolan_in
             );
         }
@@ -422,9 +436,10 @@ impl Wallet {
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }
-
+        
         (inputs, outputs)
     }
+
 
     pub fn sign(&self, message_bytes: &[u8]) -> SaitoSignature {
         sign(message_bytes, &self.private_key)
