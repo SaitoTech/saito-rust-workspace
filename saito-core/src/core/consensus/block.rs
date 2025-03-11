@@ -1208,11 +1208,15 @@ impl Block {
         //
         // allow transactions to generate themselves
         //
-        let _transactions_pre_calculated = &self
-            .transactions
-            .iter_mut()
-            .enumerate()
-            .all(|(index, tx)| tx.generate(creator_public_key, index as u64, self.id));
+        let mut tx_index: u64 = 0;
+        for tx in self.transactions.iter_mut() {
+            tx.generate(creator_public_key, tx_index, self.id);
+            if let TransactionType::SPV = tx.transaction_type {
+                tx_index += tx.txs_replacements as u64;
+            } else {
+                tx_index += 1;
+            }
+        }
 
         self.generate_transaction_hashmap();
 
