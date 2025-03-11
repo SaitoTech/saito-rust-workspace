@@ -284,6 +284,9 @@ impl Network {
         }
 
         for (index, peer) in &peers.index_to_peers {
+            if peer.public_key.is_none() {
+                continue;
+            }
             debug!(
                 "peer : {:?} with key : {:?} is currently connected : {:?}",
                 index,
