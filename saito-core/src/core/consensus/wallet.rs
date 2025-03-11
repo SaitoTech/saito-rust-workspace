@@ -157,7 +157,7 @@ impl Wallet {
         genesis_period: BlockId,
     ) -> WalletUpdateStatus {
         let mut wallet_changed = WALLET_NOT_UPDATED;
-        debug!("tx count : {}",block.transactions.len());
+        debug!("tx count : {}", block.transactions.len());
         let mut tx_index = 0;
         if lc {
             for tx in block.transactions.iter() {
@@ -176,7 +176,7 @@ impl Wallet {
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
                         wallet_changed |= WALLET_UPDATED;
-                        self.add_slip(block.id, tx_index , output, true, None);
+                        self.add_slip(block.id, tx_index, output, true, None);
                     }
                 }
                 if let TransactionType::SPV = tx.transaction_type {
@@ -189,7 +189,7 @@ impl Wallet {
                 self.remove_old_slips(block.id - genesis_period);
             }
         } else {
-            for  tx in block.transactions.iter() {
+            for tx in block.transactions.iter() {
                 for input in tx.from.iter() {
                     if input.amount > 0 && input.public_key == self.public_key {
                         wallet_changed |= WALLET_UPDATED;
