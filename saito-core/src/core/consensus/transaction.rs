@@ -208,7 +208,6 @@ impl Transaction {
         latest_block_id: u64,
         genesis_period: u64,
     ) -> Result<Transaction, Error> {
-
         Self::create_with_multiple_payments(
             wallet,
             vec![to_public_key],
@@ -271,7 +270,8 @@ impl Transaction {
             };
             transaction.add_from_slip(slip);
         } else {
-            let (input_slips, output_slips) = wallet.generate_slips(total_requested, network, latest_block_id, genesis_period);
+            let (input_slips, output_slips) =
+                wallet.generate_slips(total_requested, network, latest_block_id, genesis_period);
 
             for input in input_slips {
                 transaction.add_from_slip(input);
