@@ -348,10 +348,10 @@ impl Wallet {
         });
 
         for key in unspent_slips {
-            let slip = self.slips.get_mut(key).expect("slip should be here");            
+            let slip = self.slips.get_mut(key).expect("slip should be here");
 
             // Prevent using slips from blocks earlier than (latest_block_id - (genesis_period-1)
-            if slip.block_id <= latest_block_id.saturating_sub(genesis_period-1) {
+            if slip.block_id <= latest_block_id.saturating_sub(genesis_period - 1) {
                 debug!(
                     "Skipping old slip from Block {:?} on Block {:?} to prevent double-spend: {:?}",
                     slip.block_id, latest_block_id, slip
@@ -436,10 +436,9 @@ impl Wallet {
                 .io_interface
                 .send_interface_event(InterfaceEvent::WalletUpdate());
         }
-        
+
         (inputs, outputs)
     }
-
 
     pub fn sign(&self, message_bytes: &[u8]) -> SaitoSignature {
         sign(message_bytes, &self.private_key)
