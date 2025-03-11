@@ -592,48 +592,26 @@ impl Blockchain {
         let public_key;
         let wallet = mempool.wallet_lock.read().await;
         public_key = wallet.public_key;
-
         if block.creator == public_key {
             let transactions = &mut block.transactions;
             let prev_count = transactions.len();
-            let mut new_slips_map = std::collections::HashMap::new();
 
             let transactions: Vec<Transaction> = drain!(transactions, 10)
                 .filter(|tx| {
-                    if tx.transaction_type == TransactionType::Normal
-                        || tx.transaction_type == TransactionType::ATR
-                    {
-                        let valid_tx = tx.validate(&self.utxoset, self, true);
-
-                        // Check for double-spend in the same way as block.validate()
-                        if valid_tx {
-                            for input in tx.from.iter() {
-                                if input.amount == 0 {
-                                    continue;
-                                }
-                                let utxo_key = input.get_utxoset_key();
-                                if new_slips_map.contains_key(&utxo_key) {
-                                    error!(
-                                        "double-spend detected when adding back to mempool: {}",
-                                        Slip::parse_slip_from_utxokey(&utxo_key).unwrap()
-                                    );
-                                    return false; // Don't add double-spend TXs back to mempool
-                                }
-                                new_slips_map.insert(utxo_key, 1);
-                            }
-                            return true; // Add valid transactions back
-                        }
+                    // TODO : what other types should be added back to the mempool
+                    if tx.transaction_type == TransactionType::Normal {
+                        // TODO : is there a way to not validate these again ?
+                        return tx.validate(&self.utxoset, self, true);
                     }
                     false
                 })
                 .collect();
-
+            // transactions.retain(|tx| tx.validate(&self.utxoset));
             info!(
                 "adding {:?} transactions back to mempool. dropped {:?} invalid transactions",
                 transactions.len(),
                 (prev_count - transactions.len())
             );
-
             for tx in transactions {
                 mempool.transactions.insert(tx.signature, tx);
             }
