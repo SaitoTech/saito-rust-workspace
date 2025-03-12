@@ -202,8 +202,12 @@ impl TransactionGenerator {
         let payment_amount =
             total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
 
-        let latest_block_id = self.get_latest_block_id().await;
-        let genesis_period = self.get_genesis_period().await;
+        let genesis_period;
+        let latest_block_id;
+        {
+            genesis_period = self.get_genesis_period().await;
+            latest_block_id = self.get_latest_block_id().await;
+        }
 
         let mut wallet = self.wallet_lock.write().await;
 
@@ -275,7 +279,6 @@ impl TransactionGenerator {
 
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet_lock.clone();
-        let _blockchain = self.blockchain_lock.clone();
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
         let public_key = self.public_key;
         let count = self.tx_count;
@@ -283,8 +286,8 @@ impl TransactionGenerator {
         let payment = self.tx_payment;
         let fee = self.tx_fee;
 
-        let latest_block_id = self.get_latest_block_id().await;
         let genesis_period = self.get_genesis_period().await;
+        let latest_block_id = self.get_latest_block_id().await;
 
         tokio::spawn(async move {
             let sender = sender.clone();

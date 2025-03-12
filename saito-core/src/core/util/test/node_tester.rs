@@ -548,11 +548,11 @@ pub mod test {
             with_fee: Currency,
             to_key: SaitoPublicKey,
         ) -> Result<Transaction, Error> {
+            let configs = self.consensus_thread.config_lock.read().await;
+            let blockchain = self.consensus_thread.blockchain_lock.read().await;
             let mut wallet = self.routing_thread.wallet_lock.write().await;
 
-            let blockchain = self.consensus_thread.blockchain_lock.read().await;
             let latest_block_id = blockchain.get_latest_block_id();
-            let configs = self.consensus_thread.config_lock.read().await;
             let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
 
             let mut tx = Transaction::create(
