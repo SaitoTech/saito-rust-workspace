@@ -261,7 +261,13 @@ impl Mempool {
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 
-        self.utxo_map.clear();
+        for tx in &block.transactions {
+            for input in &tx.from {
+                let utxo_key = input.utxoset_key;
+                self.utxo_map.remove(&utxo_key);
+            }
+        }
+
         Some(block)
     }
 
