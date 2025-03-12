@@ -5,13 +5,15 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use bs58;
-use log::{debug, error, info, warn};
+use log::{debug, error, info, trace, warn};
 use tokio::sync::RwLock;
 
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::slip::{Slip, SlipType};
-use crate::core::defs::{PrintForLog, SaitoPublicKey, PROJECT_PUBLIC_KEY};
+use crate::core::defs::{
+    BlockId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey, PROJECT_PUBLIC_KEY,
+};
 use crate::core::io::interface_io::InterfaceIO;
 
 #[derive(Debug)]
@@ -306,6 +308,35 @@ impl Storage {
         let _ = self
             .write_utxoset_to_disk_path(balance_map, threshold, UTXOSTATE_FILE_PATH)
             .await;
+    }
+
+    pub async fn load_checkpoint_file(
+        &self,
+        block_hash: &SaitoHash,
+        block_id: BlockId,
+    ) -> Option<Vec<SaitoUTXOSetKey>> {
+        let file_path = self.io_interface.get_checkpoint_dir()
+            + format!("{}-{}.chk", block_id, block_hash.to_hex()).as_str();
+        if !self.io_interface.is_existing_file(&file_path).await {
+            debug!("no checkpoint file : {} exists for block", file_path,);
+            return None;
+        }
+        if let Ok(result) = self.io_interface.read_value(file_path.as_str()).await {
+            let mut contents = String::from_utf8(result).unwrap();
+            contents = contents.trim_end_matches('\r').to_string();
+            let lines: Vec<&str> = contents.split('\n').collect();
+            let mut keys: Vec<SaitoUTXOSetKey> = vec![];
+            for line in lines {
+                let line = line.trim_end_matches('\r');
+                if !line.is_empty() {
+                    if let Ok(key) = SaitoUTXOSetKey::from_hex(line) {
+                        keys.push(key);
+                    }
+                }
+            }
+            return Some(keys);
+        }
+        None
     }
 }
 

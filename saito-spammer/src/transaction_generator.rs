@@ -19,6 +19,7 @@ use saito_core::drain;
 use saito_rust::time_keeper::TimeKeeper;
 
 use crate::config_handler::SpammerConfigs;
+use saito_core::core::util::configuration::Configuration;
 
 #[derive(Clone, PartialEq)]
 pub enum GeneratorState {
@@ -41,6 +42,7 @@ pub struct TransactionGenerator {
     tx_payment: Currency,
     tx_fee: Currency,
     peer_lock: Arc<RwLock<PeerCollection>>,
+    configuration_lock: Arc<RwLock<SpammerConfigs>>,
 }
 
 impl TransactionGenerator {
@@ -76,6 +78,7 @@ impl TransactionGenerator {
             tx_payment,
             tx_fee,
             peer_lock: peers_lock.clone(),
+            configuration_lock,
         };
         {
             let wallet = wallet_lock.read().await;
@@ -199,12 +202,23 @@ impl TransactionGenerator {
         let payment_amount =
             total_nolans_requested_per_slip / output_slips_per_input_slip as Currency;
 
+        let genesis_period;
+        let latest_block_id;
+        {
+            genesis_period = self.get_genesis_period().await;
+            latest_block_id = self.get_latest_block_id().await;
+        }
+
         let mut wallet = self.wallet_lock.write().await;
 
         let mut transaction = Transaction::default();
 
-        let (input_slips, output_slips) =
-            wallet.generate_slips(total_nolans_requested_per_slip, None);
+        let (input_slips, output_slips) = wallet.generate_slips(
+            total_nolans_requested_per_slip,
+            None,
+            latest_block_id,
+            genesis_period,
+        );
 
         for slip in input_slips {
             transaction.add_from_slip(slip);
@@ -265,13 +279,16 @@ impl TransactionGenerator {
 
         let time_keeper = TimeKeeper {};
         let wallet = self.wallet_lock.clone();
-        let _blockchain = self.blockchain_lock.clone();
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1000);
         let public_key = self.public_key;
         let count = self.tx_count;
         let required_balance = (self.tx_payment + self.tx_fee) * count as Currency;
         let payment = self.tx_payment;
         let fee = self.tx_fee;
+
+        let genesis_period = self.get_genesis_period().await;
+        let latest_block_id = self.get_latest_block_id().await;
+
         tokio::spawn(async move {
             let sender = sender.clone();
             loop {
@@ -292,6 +309,8 @@ impl TransactionGenerator {
                                 fee,
                                 false,
                                 None,
+                                latest_block_id,
+                                genesis_period,
                             );
                             if transaction.is_err() {
                                 break;
@@ -358,5 +377,26 @@ impl TransactionGenerator {
         }
 
         // info!("Test transactions created, count : {:?}", txs.len());
+    }
+
+    async fn get_latest_block_id(&self) -> u64 {
+        let blockchain = self.blockchain_lock.read().await;
+        blockchain.blockring.get_latest_block_id()
+    }
+
+    async fn get_genesis_period(&self) -> u64 {
+        let config_guard = self.configuration_lock.read().await;
+
+        let config: &dyn Configuration = &*config_guard;
+
+        if let Some(consensus_config) = config.get_consensus_config() {
+            let period = consensus_config.genesis_period;
+            println!("genesis_period: {:?}", period);
+            period
+        } else {
+            println!("No consensus config available.");
+            // Default value if consensus config is not available
+            1000
+        }
     }
 }
