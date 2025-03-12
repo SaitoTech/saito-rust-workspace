@@ -430,6 +430,85 @@ impl Wallet {
         sign(message_bytes, &self.private_key)
     }
 
+
+
+
+    pub async fn create_bound_utxo_transaction(
+	block_id: u64 ,
+	transaction_id: u64 ,
+	slip_id: u64 ,
+	amount: Currency ,
+	fee: Currency ,
+	deposit: Currency ,
+	data : vec![] ,
+        recipient_public_key: &SaitoPublicKey,
+    ) -> Transaction {
+	
+	//
+	// create our Transaction
+	//
+        let mut transaction = Transaction::default();
+        transaction.transaction_type = TransactionType::BoundUtxo;
+
+
+	//
+	// find the input being spent to create
+	//
+        //transaction.add_from_slip(input1);
+
+	//
+	// when we CREATE a boundUTXO transaction, nodes need to confirm that 
+	// the ID that is set in the message field is the same as the first input
+	// that is spent to create the NFT. since we do not want nodes to have 
+	// to unpack the MSG JSON structure in order to validate the transaction
+	// we sepcify that the first N bytes are the sending UTXO key
+	//
+        //transaction.msg = SENDINGSLIPKEY + vec![];
+	//  
+	// because this is a BoundUTXO, we can check for this condition and avoid
+	// it when we unpack the transaction and create the JSON tree on an 
+	// application level.
+	//
+
+	//
+	// NFT output slip
+	//
+        let mut output1 = Slip::default();
+        output1.public_key = *recipient_public_key;
+        output1.amount = 1;
+        output1.block_id = 0;
+        output1.tx_ordinal = 0;
+	output1.type = SlipType::Bound;
+
+	//
+	// NFT output slip
+	//
+        let mut output1 = Slip::default();
+        output1.public_key = *recipient_public_key;
+        output1.amount = 1;
+        output1.block_id = 0;
+        output1.tx_ordinal = 0;
+	output1.type = SlipType::Normal;
+
+	//
+	// add inputs and outputs
+	//
+	transaction.add_from_slip(input1);
+        transaction.add_to_slip(output1);
+        transaction.add_to_slip(output2);
+
+	//
+	// hash and sign
+	//
+        let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
+        transaction.hash_for_signature = Some(hash_for_signature);
+        transaction.sign(&self.private_key);
+
+        transaction
+
+    }
+
+
     pub async fn create_golden_ticket_transaction(
         golden_ticket: GoldenTicket,
         public_key: &SaitoPublicKey,
