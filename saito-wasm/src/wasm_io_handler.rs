@@ -181,6 +181,9 @@ impl InterfaceIO for WasmIoHandler {
     fn get_block_dir(&self) -> String {
         "data/blocks/".to_string()
     }
+    fn get_checkpoint_dir(&self) -> String {
+        "data/checkpoints/".to_string()
+    }
 
     fn ensure_block_directory_exists(&self, block_dir_path: &str) -> Result<(), std::io::Error> {
         let result = MsgHandler::ensure_block_directory_exists(block_dir_path.to_string());

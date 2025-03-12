@@ -124,6 +124,7 @@ pub trait InterfaceIO: Debug {
     async fn remove_value(&self, key: &str) -> Result<(), Error>;
     /// Retrieve the prefix for all the keys for blocks
     fn get_block_dir(&self) -> String;
+    fn get_checkpoint_dir(&self) -> String;
 
     fn ensure_block_directory_exists(&self, block_dir: &str) -> Result<(), Error>;
 

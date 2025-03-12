@@ -1708,6 +1708,7 @@ impl Blockchain {
             debug!("blocks to add : {:?}", blocks.len());
             while let Some(block) = blocks.pop_front() {
                 let peer_index = block.routed_from_peer;
+                let block_id = block.id;
                 let result = self.add_block(block, storage, &mut mempool, configs).await;
                 match result {
                     AddBlockResult::BlockAddedSuccessfully(
@@ -1720,6 +1721,28 @@ impl Blockchain {
                         } else {
                             None
                         };
+
+                        // check for any checkpoint data and process them
+                        if let Some(checkpoints) =
+                            storage.load_checkpoint_file(&block_hash, block_id).await
+                        {
+                            let mut wallet = self.wallet_lock.write().await;
+                            for key in checkpoints {
+                                if let Some((key, _)) = self.utxoset.remove_entry(&key) {
+                                    if let Ok(slip) = Slip::parse_slip_from_utxokey(&key) {
+                                        wallet.delete_slip(&slip, None);
+                                        let block = self.blocks.get_mut(&block_hash).unwrap();
+                                        block.graveyard += slip.amount;
+                                        info!("skipping slip : {} according to the checkpoint file : {}-{}",
+                                            slip,block_id,block_hash.to_hex());
+                                    } else {
+                                        error!("Key : {:?} in checkpoint file : {}-{} cannot be parsed to a slip", key.to_hex(),block_id,block_hash.to_hex());
+                                        panic!("cannot continue loading blocks");
+                                    }
+                                }
+                            }
+                        }
+
                         // TODO : to fix blocks being pruned before js processing them, pass a parameter in add_block to not prune and then prune manually after adding all.
                         //  need to do that in batches to make sure too much memory is not being used.
                         self.handle_successful_block_addition(

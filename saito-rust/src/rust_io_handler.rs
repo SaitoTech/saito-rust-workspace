@@ -22,6 +22,7 @@ use crate::io_event::IoEvent;
 lazy_static! {
     pub static ref BLOCKS_DIR_PATH: String = configure_storage();
     pub static ref WALLET_DIR_PATH: String = String::from("./data/wallet");
+    pub static ref CHECKPOINT_DIR_PATH: String = String::from("./data/checkpoints");
 }
 pub fn configure_storage() -> String {
     if cfg!(test) {
@@ -257,6 +258,10 @@ impl InterfaceIO for RustIOHandler {
 
     fn get_block_dir(&self) -> String {
         BLOCKS_DIR_PATH.to_string()
+    }
+
+    fn get_checkpoint_dir(&self) -> String {
+        CHECKPOINT_DIR_PATH.to_string()
     }
 
     fn ensure_block_directory_exists(&self, block_dir_path: &str) -> Result<(), Error> {
