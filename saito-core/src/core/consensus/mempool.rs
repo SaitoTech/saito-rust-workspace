@@ -14,6 +14,7 @@ use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
+use crate::core::defs::SaitoUTXOSetKey;
 use crate::core::defs::{
     Currency, PrintForLog, SaitoHash, SaitoPublicKey, SaitoSignature, StatVariable, Timestamp,
 };
@@ -48,6 +49,7 @@ pub struct Mempool {
     routing_work_in_mempool: Currency,
     pub new_tx_added: bool,
     pub wallet_lock: Arc<RwLock<Wallet>>,
+    pub utxo_map: AHashMap<SaitoUTXOSetKey, u64>,
 }
 
 impl Mempool {
@@ -60,6 +62,7 @@ impl Mempool {
             routing_work_in_mempool: 0,
             new_tx_added: false,
             wallet_lock,
+            utxo_map: AHashMap::new(),
         }
     }
 
@@ -134,6 +137,17 @@ impl Mempool {
         // );
 
         debug_assert!(transaction.hash_for_signature.is_some());
+
+        if !transaction.from.is_empty() {
+            for input in transaction.from.iter() {
+                let utxo_key = input.utxoset_key;
+                if self.utxo_map.contains_key(&utxo_key) {
+                    // Duplicate input found, reject transaction
+                    return;
+                }
+            }
+        }
+
         // this assigns the amount of routing work that this transaction
         // contains to us, which is why we need to provide our public_key
         // so that we can calculate routing work.
@@ -151,8 +165,16 @@ impl Mempool {
             if let TransactionType::GoldenTicket = transaction.transaction_type {
                 panic!("golden tickets should be in gt collection");
             } else {
-                self.transactions.insert(transaction.signature, transaction);
+                self.transactions
+                    .insert(transaction.signature, transaction.clone());
                 self.new_tx_added = true;
+
+                if !transaction.from.is_empty() {
+                    for input in transaction.from.iter() {
+                        let utxo_key = input.utxoset_key;
+                        self.utxo_map.insert(utxo_key, 1);
+                    }
+                }
             }
         }
     }
@@ -239,6 +261,7 @@ impl Mempool {
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 
+        self.utxo_map.clear();
         Some(block)
     }
 
