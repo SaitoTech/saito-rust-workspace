@@ -629,6 +629,16 @@ pub mod test {
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
 
+            let mut configs = self.config_lock.read().await;
+            let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+
+            let (latest_block_id, latest_block_hash) = {
+                let blockchain = self.blockchain_lock.read().await;
+                let latest_block_id = blockchain.blockring.get_latest_block_id();
+                let latest_block_hash = blockchain.blockring.get_latest_block_hash();
+                (latest_block_id, latest_block_hash)
+            };
+
             {
                 let wallet = self.wallet_lock.read().await;
 
@@ -648,6 +658,8 @@ pub mod test {
                         txs_fee,
                         false,
                         None,
+                        latest_block_id,
+                        genesis_period,
                     )
                     .unwrap();
                 }
@@ -696,7 +708,6 @@ pub mod test {
                 transactions.insert(tx.signature, tx);
             }
 
-            let configs = self.config_lock.read().await;
             let mut blockchain = self.blockchain_lock.write().await;
 
             // create block
@@ -778,10 +789,6 @@ pub mod test {
                 .expect("latest block should exist")
                 .clone();
             block
-        }
-        pub async fn get_latest_block_id(&self) -> u64 {
-            let blockchain = self.blockchain_lock.read().await;
-            blockchain.blockring.get_latest_block_id()
         }
 
         pub async fn initialize(&mut self, issuance_transactions: u64, issuance_amount: Currency) {
@@ -1016,7 +1023,19 @@ pub mod test {
                 amount,
                 to_public_key.to_hex()
             );
-            let latest_block_hash = self.get_latest_block_hash().await;
+
+            let genesis_period;
+            {
+                let configs = self.config_lock.read().await;
+                genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+            }
+
+            let (latest_block_id, latest_block_hash) = {
+                let blockchain = self.blockchain_lock.read().await;
+                let latest_block_id = blockchain.blockring.get_latest_block_id();
+                let latest_block_hash = blockchain.blockring.get_latest_block_hash();
+                (latest_block_id, latest_block_hash)
+            };
 
             let timestamp = create_timestamp();
 
@@ -1043,6 +1062,8 @@ pub mod test {
                     0,
                     false,
                     None,
+                    latest_block_id,
+                    genesis_period,
                 )?;
                 tx.sign(&private_key);
                 block.add_transaction(tx);

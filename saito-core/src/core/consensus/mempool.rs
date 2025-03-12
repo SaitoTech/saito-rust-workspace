@@ -440,6 +440,9 @@ mod tests {
 
         let configs = t.config_lock.read().await;
         let blockchain = blockchain_lock.read().await;
+        let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+        let latest_block_id = blockchain.get_latest_block_id();
+
         let mut mempool = mempool_lock.write().await;
 
         let _txs = Vec::<Transaction>::new();
@@ -452,7 +455,8 @@ mod tests {
             {
                 let mut wallet = wallet_lock.write().await;
 
-                let (inputs, outputs) = wallet.generate_slips(720_000, None);
+                let (inputs, outputs) =
+                    wallet.generate_slips(720_000, None, latest_block_id, genesis_period);
                 tx.from = inputs;
                 tx.to = outputs;
                 // _i prevents sig from being identical during test

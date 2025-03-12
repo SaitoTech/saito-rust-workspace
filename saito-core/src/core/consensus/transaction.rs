@@ -205,6 +205,8 @@ impl Transaction {
         with_fee: Currency,
         _force_merge: bool,
         network: Option<&Network>,
+        latest_block_id: u64,
+        genesis_period: u64,
     ) -> Result<Transaction, Error> {
         Self::create_with_multiple_payments(
             wallet,
@@ -212,6 +214,8 @@ impl Transaction {
             vec![with_payment],
             with_fee,
             network,
+            latest_block_id,
+            genesis_period,
         )
     }
 
@@ -221,6 +225,8 @@ impl Transaction {
         mut payments: Vec<Currency>,
         mut with_fee: Currency,
         network: Option<&Network>,
+        latest_block_id: u64,
+        genesis_period: u64,
     ) -> Result<Transaction, Error> {
         let total_payment: Currency = payments.iter().sum();
         trace!(
@@ -264,7 +270,8 @@ impl Transaction {
             };
             transaction.add_from_slip(slip);
         } else {
-            let (input_slips, output_slips) = wallet.generate_slips(total_requested, network);
+            let (input_slips, output_slips) =
+                wallet.generate_slips(total_requested, network, latest_block_id, genesis_period);
 
             for input in input_slips {
                 transaction.add_from_slip(input);
