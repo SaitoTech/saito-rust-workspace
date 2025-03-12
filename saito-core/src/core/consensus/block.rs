@@ -429,6 +429,8 @@ pub struct Block {
     pub force_loaded: bool,
     // used for checking, before pruning txs from block on downgrade
     pub safe_to_prune_transactions: bool,
+    /// this block has a checkpoint. therefore we cannot reorg past this block.
+    pub has_checkpoint: bool,
 }
 
 impl Display for Block {
@@ -553,6 +555,7 @@ impl Block {
             cv: ConsensusValues::default(),
             force_loaded: false,
             safe_to_prune_transactions: false,
+            has_checkpoint: false,
         }
     }
 
@@ -3622,7 +3625,7 @@ mod tests {
     #[serial_test::serial]
     async fn atr_test_2() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::default();
 
         let public_key = tester.get_public_key().await;

@@ -533,6 +533,16 @@ pub mod test {
             tokio::fs::remove_dir_all("./data/blocks/").await?;
             Ok(())
         }
+        pub async fn delete_checkpoints() -> Result<(), Error> {
+            tokio::fs::create_dir_all("./data/checkpoints").await?;
+            tokio::fs::remove_dir_all("./data/checkpoints/").await?;
+            Ok(())
+        }
+        pub async fn delete_data() -> Result<(), Error> {
+            tokio::fs::create_dir_all("./data").await?;
+            tokio::fs::remove_dir_all("./data/").await?;
+            Ok(())
+        }
         pub async fn create_block(
             &self,
             parent_hash: SaitoHash,

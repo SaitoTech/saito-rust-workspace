@@ -626,7 +626,9 @@ mod tests {
 
     use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::consensus::slip::SlipType;
-    use crate::core::defs::{PrintForLog, NOLAN_PER_SAITO};
+    use crate::core::defs::{
+        PrintForLog, SaitoHash, SaitoUTXOSetKey, NOLAN_PER_SAITO, UTXO_KEY_LENGTH,
+    };
 
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::node_tester::test::NodeTester;
@@ -635,7 +637,7 @@ mod tests {
     #[serial_test::serial]
     async fn total_supply_test() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
         let public_key = tester.get_public_key().await;
@@ -706,7 +708,7 @@ mod tests {
     #[serial_test::serial]
     async fn total_supply_test_with_atr() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
         let public_key = tester.get_public_key().await;
@@ -752,7 +754,7 @@ mod tests {
     #[serial_test::serial]
     async fn total_supply_test_with_with_restarts_over_atr() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::new(10, None, None);
         let public_key = tester.get_public_key().await;
         let private_key = tester.get_private_key().await;
@@ -882,7 +884,7 @@ mod tests {
     #[serial_test::serial]
     async fn total_supply_test_with_staking_for_slip_count() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
         let public_key = tester.get_public_key().await;
@@ -952,7 +954,7 @@ mod tests {
     #[serial_test::serial]
     async fn blockchain_state_over_atr() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::new(3, None, None);
         let public_key = tester.get_public_key().await;
@@ -1075,4 +1077,148 @@ mod tests {
             // assert!(block.total_fees_atr > 0);
         }
     }
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn checkpoints_test() {
+        // pretty_env_logger::init();
+        NodeTester::delete_data().await.unwrap();
+        let mut tester = NodeTester::new(10, None, None);
+        let public_key = tester.get_public_key().await;
+        let private_key = tester.get_private_key().await;
+        let issuance = vec![(public_key.to_base58(), 100_000 * NOLAN_PER_SAITO)];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let mut utxokey = [0; UTXO_KEY_LENGTH];
+        // create a main fork first
+        for i in 2..=10 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+
+            if i == 6 {
+                utxokey = tx.from[0].utxoset_key;
+            }
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+
+        // create a checkpoint file for block 5
+        {
+            let io = tester.consensus_thread.storage.io_interface.as_ref();
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block_hash: SaitoHash = blockchain.blockring.get_block_hash_by_block_id(5).unwrap();
+            let file_path = format!("./data/checkpoints/{}-{}.chk", 5, block_hash.to_hex());
+            io.write_value(&file_path, utxokey.to_hex().as_bytes())
+                .await
+                .unwrap();
+        }
+        drop(tester);
+
+        // reload the node
+        let mut tester = NodeTester::new(10, Some(private_key), None);
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(5).await.unwrap();
+
+        // check if the latest block is 5
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        let latest_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id, 5);
+
+        NodeTester::delete_checkpoints().await.unwrap();
+    }
+
+    // #[tokio::test]
+    // #[serial_test::serial]
+    // async fn reorg_over_checkpoints() {
+    //     pretty_env_logger::init();
+    //     NodeTester::delete_data().await.unwrap();
+    //     let mut tester = NodeTester::new(10, None, None);
+    //     let public_key = tester.get_public_key().await;
+    //     let private_key = tester.get_private_key().await;
+    //     let issuance = vec![(public_key.to_base58(), 100_000 * NOLAN_PER_SAITO)];
+    //     tester.set_issuance(issuance).await.unwrap();
+    //     tester.init().await.unwrap();
+    //     tester.wait_till_block_id(1).await.unwrap();
+    //     tester
+    //         .check_total_supply()
+    //         .await
+    //         .expect("total supply should not change");
+
+    //     let mut utxokey = [0; UTXO_KEY_LENGTH];
+    //     let mut block_3_hash = [0; 32];
+    //     // create a main fork first
+    //     for i in 2..=10 {
+    //         let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+
+    //         if i == 6 {
+    //             utxokey = tx.from[0].utxoset_key;
+    //         }
+    //         tester.add_transaction(tx).await;
+    //         tester.wait_till_block_id(i).await.unwrap();
+    //         tester
+    //             .check_total_supply()
+    //             .await
+    //             .expect("total supply should not change");
+
+    //         if i == 3 {
+    //             let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+    //             block_3_hash = blockchain.blockring.get_block_hash_by_block_id(4).unwrap();
+    //         }
+    //     }
+
+    //     // create a checkpoint file for block 5
+    //     {
+    //         let io = tester.consensus_thread.storage.io_interface.as_ref();
+    //         let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+    //         let block_hash: SaitoHash = blockchain.blockring.get_block_hash_by_block_id(5).unwrap();
+    //         let file_path = format!("./data/checkpoints/{}-{}.chk", 5, block_hash.to_hex());
+    //         io.write_value(&file_path, utxokey.to_hex().as_bytes())
+    //             .await
+    //             .unwrap();
+    //     }
+    //     drop(tester);
+
+    //     // reload the node
+    //     let mut tester = NodeTester::new(10, Some(private_key), None);
+    //     tester.init().await.unwrap();
+    //     tester.wait_till_block_id(5).await.unwrap();
+
+    //     // check if the latest block is 5
+    //     tester
+    //         .check_total_supply()
+    //         .await
+    //         .expect("total supply should not change");
+    //     let latest_block_id = tester
+    //         .consensus_thread
+    //         .blockchain_lock
+    //         .read()
+    //         .await
+    //         .get_latest_block_id();
+    //     assert_eq!(latest_block_id, 5);
+
+    //     // create a fork starting from block 3
+
+    //     // check if the latest block is 5 still
+
+    //     // create a fork starting from block 5
+
+    //     // check if the latest block is 10
+    //     todo!()
+    // }
 }
