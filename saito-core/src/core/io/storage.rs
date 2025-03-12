@@ -318,10 +318,7 @@ impl Storage {
         let file_path = self.io_interface.get_checkpoint_dir()
             + format!("{}-{}.chk", block_id, block_hash.to_hex()).as_str();
         if !self.io_interface.is_existing_file(&file_path).await {
-            debug!(
-                "no checkpoint file : {} exists for block",
-                file_path,
-            );
+            debug!("no checkpoint file : {} exists for block", file_path,);
             return None;
         }
         if let Ok(result) = self.io_interface.read_value(file_path.as_str()).await {
