@@ -445,27 +445,42 @@ impl Wallet {
 
 
     pub async fn create_bound_utxo_transaction(
-	block_id: u64 ,
-	transaction_id: u64 ,
-	slip_id: u64 ,
-	amount: Currency ,
-	fee: Currency ,
-	deposit: Currency ,
-	data : vec![] ,
+        &self,
+    	block_id: u64 ,
+    	transaction_id: u64 ,
+    	slip_id: u64 ,
+    	amount: Currency ,
+    	fee: Currency ,
+    	deposit: Currency ,
+    	data: Vec<u32>,
         recipient_public_key: &SaitoPublicKey,
-    ) -> Transaction {
+    ) -> Result<Transaction, Error> {
 	
-	//
-	// create our Transaction
-	//
-        let mut transaction = Transaction::default();
-        transaction.transaction_type = TransactionType::BoundUtxo;
 
+    // Create a default Slip and populate it
+    let mut input_slip = Slip::default();
+    input_slip.public_key = self.public_key;
+    input_slip.amount = amount;
+    input_slip.slip_index = slip_id as u8;
+    input_slip.block_id = block_id;
+    input_slip.tx_ordinal = transaction_id;
+    input_slip.slip_type = SlipType::Normal;
+    input_slip.is_utxoset_key_set = true;
 
-	//
-	// find the input being spent to create
-	//
-        //transaction.add_from_slip(input1);
+    // Generate the correct UTXO key
+    input_slip.utxoset_key = input_slip.get_utxoset_key();
+
+    // Check if the UTXO is unspent
+    if !self.unspent_slips.contains(&input_slip.utxoset_key) {
+        return Err(Error::new(ErrorKind::NotFound, "UTXO not found in unspent_slips"));
+    }
+
+    // Create a new transaction
+    let mut transaction = Transaction::default();
+    transaction.transaction_type = TransactionType::Bound;
+
+    // Add the slip as an input
+    transaction.add_from_slip(input_slip);
 
 	//
 	// when we CREATE a boundUTXO transaction, nodes need to confirm that 
@@ -484,38 +499,42 @@ impl Wallet {
 	//
 	// NFT output slip
 	//
-        let mut output1 = Slip::default();
-        output1.public_key = *recipient_public_key;
-        output1.amount = 1;
-        output1.block_id = 0;
-        output1.tx_ordinal = 0;
-	output1.type = SlipType::Bound;
+    //     let mut output1 = Slip::default();
+    //     output1.public_key = *recipient_public_key;
+    //     output1.amount = 1;
+    //     output1.block_id = 0;
+    //     output1.tx_ordinal = 0;
+	// output1.type = SlipType::Bound;
 
 	//
 	// NFT output slip
 	//
-        let mut output1 = Slip::default();
-        output1.public_key = *recipient_public_key;
-        output1.amount = 1;
-        output1.block_id = 0;
-        output1.tx_ordinal = 0;
-	output1.type = SlipType::Normal;
+        // let mut output1 = Slip::default();
+        // output1.public_key = *recipient_public_key;
+        // output1.amount = 1;
+        // output1.block_id = 0;
+        // output1.tx_ordinal = 0;
+	    // output1.type = SlipType::Normal;
 
 	//
 	// add inputs and outputs
 	//
-	transaction.add_from_slip(input1);
-        transaction.add_to_slip(output1);
-        transaction.add_to_slip(output2);
+	// transaction.add_from_slip(input1);
+    //     transaction.add_to_slip(output1);
+    //     transaction.add_to_slip(output2);
 
 	//
 	// hash and sign
 	//
-        let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
-        transaction.hash_for_signature = Some(hash_for_signature);
-        transaction.sign(&self.private_key);
+        // let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
+        // transaction.hash_for_signature = Some(hash_for_signature);
+        // transaction.sign(&self.private_key);
 
-        transaction
+        if block_id == 0 {
+            return Err(Error::from(ErrorKind::NotFound));
+        }
+
+        Ok(transaction)
 
     }
 

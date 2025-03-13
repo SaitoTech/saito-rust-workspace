@@ -338,6 +338,44 @@ export default class Saito {
         return tx;
     }
 
+    public async createBoundUtxoTransaction<T extends Transaction>(
+        amt: bigint,   
+        bid: number,           
+        tid: number,           
+        sid: number,           
+        num: number,           
+        deposit: bigint,
+        change: bigint,        
+        image: string = ""         
+    ): Promise<T> {
+
+      console.log("values recieved at saito.ts:");
+      console.log(amt);
+      console.log(bid);
+      console.log(tid);
+      console.log(sid);
+      console.log(num);
+      console.log(deposit);
+      console.log(change);
+      console.log(image);
+
+        let wasmTx = await Saito.getLibInstance().create_bound_utxo_transaction(
+            amt,
+            bid,
+            tid,
+            sid,
+            num,
+            deposit,
+            change,
+            image
+        );
+
+        let tx = Saito.getInstance().factory.createTransaction(wasmTx) as T;
+        tx.timestamp = new Date().getTime();
+
+        return tx;
+    }
+
     public async getPeers(): Promise<Array<Peer>> {
         let peers = await Saito.getLibInstance().get_peers();
         return peers.map((peer: any) => {
