@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::golden_ticket::GoldenTicket;
-use crate::core::consensus::mempool::Mempool;
+use crate::core::consensus::mempool::{self, Mempool};
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
@@ -513,6 +513,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                     StatVariable::format_timestamp(self.timer.get_timestamp_in_ms())
                 );
             }
+            {
+                let mut mempool = self.mempool_lock.write().await;
+                info!("removing {} failed blocks from mempool so new blocks can be bundled after node loadup", mempool.blocks_queue.len());
+                mempool.blocks_queue.clear();
+            }
             info!(
                 "{:?} total blocks in blockchain. Timestamp : {:?}, elapsed_time : {:?}",
                 blockchain.blocks.len(),
@@ -624,14 +629,20 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 mod tests {
     use log::info;
 
+    use crate::core::consensus::block::{Block, BlockType};
     use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::consensus::slip::SlipType;
+    use crate::core::consensus::transaction::TransactionType;
     use crate::core::defs::{
         PrintForLog, SaitoHash, SaitoUTXOSetKey, NOLAN_PER_SAITO, UTXO_KEY_LENGTH,
     };
 
+    use crate::core::io::network_event::NetworkEvent;
+    use crate::core::process::keep_time::KeepTime;
+    use crate::core::process::process_event::ProcessEvent;
+    use crate::core::routing_thread::RoutingEvent;
     use crate::core::util::crypto::generate_keys;
-    use crate::core::util::test::node_tester::test::NodeTester;
+    use crate::core::util::test::node_tester::test::{NodeTester, TestTimeKeeper};
 
     #[tokio::test]
     #[serial_test::serial]
@@ -1143,82 +1154,161 @@ mod tests {
         NodeTester::delete_checkpoints().await.unwrap();
     }
 
-    // #[tokio::test]
-    // #[serial_test::serial]
-    // async fn reorg_over_checkpoints() {
-    //     pretty_env_logger::init();
-    //     NodeTester::delete_data().await.unwrap();
-    //     let mut tester = NodeTester::new(10, None, None);
-    //     let public_key = tester.get_public_key().await;
-    //     let private_key = tester.get_private_key().await;
-    //     let issuance = vec![(public_key.to_base58(), 100_000 * NOLAN_PER_SAITO)];
-    //     tester.set_issuance(issuance).await.unwrap();
-    //     tester.init().await.unwrap();
-    //     tester.wait_till_block_id(1).await.unwrap();
-    //     tester
-    //         .check_total_supply()
-    //         .await
-    //         .expect("total supply should not change");
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn reorg_over_checkpoints() {
+        // pretty_env_logger::init();
+        NodeTester::delete_data().await.unwrap();
+        let mut tester = NodeTester::new(10, None, None);
+        let public_key = tester.get_public_key().await;
+        let private_key = tester.get_private_key().await;
+        let issuance = vec![
+            (public_key.to_base58(), 100_000 * NOLAN_PER_SAITO),
+            (public_key.to_base58(), 10_000 * NOLAN_PER_SAITO),
+        ];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        let timer = tester.consensus_thread.timer.clone();
 
-    //     let mut utxokey = [0; UTXO_KEY_LENGTH];
-    //     let mut block_3_hash = [0; 32];
-    //     // create a main fork first
-    //     for i in 2..=10 {
-    //         let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+        let mut utxokey = [0; UTXO_KEY_LENGTH];
+        let mut block_3_hash = [0; 32];
+        let alternate_block_4;
+        // create a main fork first
+        for i in 2..=4 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
 
-    //         if i == 6 {
-    //             utxokey = tx.from[0].utxoset_key;
-    //         }
-    //         tester.add_transaction(tx).await;
-    //         tester.wait_till_block_id(i).await.unwrap();
-    //         tester
-    //             .check_total_supply()
-    //             .await
-    //             .expect("total supply should not change");
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
 
-    //         if i == 3 {
-    //             let blockchain = tester.consensus_thread.blockchain_lock.read().await;
-    //             block_3_hash = blockchain.blockring.get_block_hash_by_block_id(4).unwrap();
-    //         }
-    //     }
+            if i == 3 {
+                let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+                block_3_hash = blockchain.blockring.get_block_hash_by_block_id(3).unwrap();
+            }
+        }
 
-    //     // create a checkpoint file for block 5
-    //     {
-    //         let io = tester.consensus_thread.storage.io_interface.as_ref();
-    //         let blockchain = tester.consensus_thread.blockchain_lock.read().await;
-    //         let block_hash: SaitoHash = blockchain.blockring.get_block_hash_by_block_id(5).unwrap();
-    //         let file_path = format!("./data/checkpoints/{}-{}.chk", 5, block_hash.to_hex());
-    //         io.write_value(&file_path, utxokey.to_hex().as_bytes())
-    //             .await
-    //             .unwrap();
-    //     }
-    //     drop(tester);
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block_hash = blockchain.blockring.get_block_hash_by_block_id(4).unwrap();
+            alternate_block_4 = blockchain.get_block(&block_hash).unwrap().clone();
+            // need to remove this from disk to make sure it won't be loaded from disk when the node is restarted
+            std::fs::remove_file(format!(
+                "./data/blocks/{}",
+                alternate_block_4.get_file_name()
+            ))
+            .unwrap();
+        }
+        drop(tester);
 
-    //     // reload the node
-    //     let mut tester = NodeTester::new(10, Some(private_key), None);
-    //     tester.init().await.unwrap();
-    //     tester.wait_till_block_id(5).await.unwrap();
+        let mut tester = NodeTester::new(10, Some(private_key), Some(timer));
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(3).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        let timer = tester.consensus_thread.timer.clone();
 
-    //     // check if the latest block is 5
-    //     tester
-    //         .check_total_supply()
-    //         .await
-    //         .expect("total supply should not change");
-    //     let latest_block_id = tester
-    //         .consensus_thread
-    //         .blockchain_lock
-    //         .read()
-    //         .await
-    //         .get_latest_block_id();
-    //     assert_eq!(latest_block_id, 5);
+        for i in 4..=10 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
 
-    //     // create a fork starting from block 3
+            if i == 6 {
+                utxokey = tx.from[0].utxoset_key;
+            }
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
 
-    //     // check if the latest block is 5 still
+        // create a checkpoint file for block 5
+        {
+            info!("creating checkpoint for block 5");
+            let io = tester.consensus_thread.storage.io_interface.as_ref();
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block_hash: SaitoHash = blockchain.blockring.get_block_hash_by_block_id(5).unwrap();
+            let file_path = format!("./data/checkpoints/{}-{}.chk", 5, block_hash.to_hex());
+            io.write_value(&file_path, utxokey.to_hex().as_bytes())
+                .await
+                .unwrap();
+        }
+        drop(tester);
 
-    //     // create a fork starting from block 5
+        // reload the node
+        info!("-------------- reloading the node -----------------\n\n\n\n\n");
+        let mut tester = NodeTester::new(10, Some(private_key), Some(timer));
+        tester.init().await.unwrap();
+        tester
+            .run_until(TestTimeKeeper {}.get_timestamp_in_ms() + 5)
+            .await
+            .unwrap();
+        tester.wait_till_block_id(5).await.unwrap();
 
-    //     // check if the latest block is 10
-    //     todo!()
-    // }
+        // check if the latest block is 5
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        let latest_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id, 5);
+
+        info!("adding new txs to increase the chain length");
+        for i in 6..=10 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+
+            tester.add_transaction(tx).await;
+            info!("added tx : {}", i);
+            let latest_block_id = tester
+                .consensus_thread
+                .blockchain_lock
+                .read()
+                .await
+                .get_latest_block_id();
+            info!("latest block id : {}", latest_block_id);
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+
+        // create a fork starting from block 3
+        {
+            info!("adding alternate block 4");
+            tester
+                .add_block(alternate_block_4.clone())
+                .await;
+        }
+
+        // check if the latest block is 10 still
+        let latest_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id, 10);
+
+        // check that blockchain doesn't have the alternate block
+        {
+            let blockchain = tester.consensus_thread.blockchain_lock.read().await;
+            let block = blockchain.get_block(&alternate_block_4.hash);
+            assert!(block.is_none());
+        }
+    }
 }

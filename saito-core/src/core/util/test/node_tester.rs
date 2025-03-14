@@ -379,7 +379,7 @@ pub mod test {
             self.verification_thread.process_timer_event(duration).await;
             self.last_run_time = self.timer.get_timestamp_in_ms();
         }
-        async fn run_until(&mut self, timestamp: Timestamp) -> Result<(), Error> {
+        pub async fn run_until(&mut self, timestamp: Timestamp) -> Result<(), Error> {
             let time_keeper = TestTimeKeeper {};
             loop {
                 if time_keeper.get_timestamp_in_ms() >= timestamp {
