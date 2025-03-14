@@ -481,6 +481,87 @@ pub async fn create_transaction_with_multiple_payments(
 }
 
 #[wasm_bindgen]
+pub async fn create_bound_utxo_transaction(
+    amt: u64,
+    bid: u64,
+    tid: u64,
+    sid: u64,
+    num: u32,
+    deposit: u64,
+    change: u64,
+    data: String,
+    fee: u64,
+    recipient_public_key: JsString,
+) -> Result<WasmTransaction, JsValue> {
+    let saito = SAITO.lock().await;
+    let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
+    //let recipient_public_key: SaitoPublicKey = [0; 33]; // Default empty key
+
+    info!("Received in saitowasm.rs:");
+    info!("Amount: {}", amt);
+    info!("Bid: {}", bid);
+    info!("Tid: {}", tid);
+    info!("Sid: {}", sid);
+    info!("Num: {}", num);
+    info!("Deposit: {}", deposit);
+    info!("Change: {}", change);
+    info!("Image data JSON: {}", data);
+    info!("fee: {}", fee);
+    info!("recipient_public_key: {}", recipient_public_key);
+
+    // Convert the `data` string into a JSON object
+    let serialized_data = match serde_json::to_vec(&data) {
+        Ok(vec) => vec,
+        Err(e) => {
+            error!("Failed to serialize data: {}", e);
+            return Err(JsValue::from_str("Failed to serialize data"));
+        }
+    };
+
+    // Convert Vec<u8> into Vec<u32>
+    let serialized_data_u32: Vec<u32> = serialized_data
+        .chunks(4)
+        .map(|chunk| {
+            let mut bytes = [0u8; 4];
+            for (i, &byte) in chunk.iter().enumerate() {
+                bytes[i] = byte;
+            }
+            u32::from_le_bytes(bytes)
+        })
+        .collect();
+
+    let key = string_to_key(recipient_public_key).or(Err(JsValue::from(
+        "Failed parsing public key string to key",
+    )))?;
+
+    let transaction = wallet
+        .create_bound_utxo_transaction(
+            amt,
+            bid,
+            tid,
+            sid,
+            deposit,
+            change,
+            serialized_data_u32,
+            fee,
+            &key,
+        )
+        .await;
+
+    if transaction.is_err() {
+        error!(
+            "failed creating transaction. {:?}",
+            transaction.err().unwrap()
+        );
+        return Err(JsValue::from("Failed creating transaction"));
+    }
+
+    let transaction = transaction.unwrap();
+    let wasm_transaction = WasmTransaction::from_transaction(transaction);
+    Ok(wasm_transaction)
+}
+
+#[wasm_bindgen]
 pub async fn get_latest_block_hash() -> JsString {
     debug!("get_latest_block_hash");
     let saito = SAITO.lock().await;
