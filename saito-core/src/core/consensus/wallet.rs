@@ -512,7 +512,6 @@ impl Wallet {
         output_slip.public_key = *recipient_public_key;
         output_slip.amount = deposit;
         output_slip.slip_type = SlipType::Bound;
-        output_slip.generate_utxoset_key();
 
         let mut change_slip = Slip::default();
         change_slip.public_key = *recipient_public_key;
