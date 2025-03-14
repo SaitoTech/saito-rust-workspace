@@ -535,7 +535,17 @@ pub async fn create_bound_utxo_transaction(
     )))?;
 
     let transaction = wallet
-        .create_bound_utxo_transaction(bid, tid, sid, amt, deposit, serialized_data_u32, fee, &key)
+        .create_bound_utxo_transaction(
+            amt,
+            bid,
+            tid,
+            sid,
+            deposit,
+            change,
+            serialized_data_u32,
+            fee,
+            &key,
+        )
         .await;
 
     if transaction.is_err() {

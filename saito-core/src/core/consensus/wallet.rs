@@ -441,26 +441,22 @@ impl Wallet {
         sign(message_bytes, &self.private_key)
     }
 
-
-
-
     pub async fn create_bound_utxo_transaction(
         &self,
-    	block_id: u64 ,
-    	transaction_id: u64 ,
-    	slip_id: u64 ,
-    	amount: Currency ,
-    	deposit: Currency ,
-    	data: Vec<u32>,
+        amount: Currency,
+        block_id: u64,
+        transaction_id: u64,
+        slip_id: u64,
+        deposit: Currency,
+        change: Currency,
+        data: Vec<u32>,
         fee: Currency,
         recipient_public_key: &SaitoPublicKey,
     ) -> Result<Transaction, Error> {
-	
         if block_id == 0 {
             return Err(Error::from(ErrorKind::NotFound));
         }
 
-        // Create a default Slip and populate it
         let mut input_slip = Slip::default();
         input_slip.public_key = self.public_key;
         input_slip.amount = amount;
@@ -470,78 +466,72 @@ impl Wallet {
         input_slip.slip_type = SlipType::Normal;
         input_slip.is_utxoset_key_set = true;
 
-        // Generate the correct UTXO key
         let utxo_key = input_slip.get_utxoset_key();
         input_slip.utxoset_key = utxo_key;
-        
+
         // Check if the UTXO is unspent
         if !self.unspent_slips.contains(&utxo_key) {
             info!("UTXO Key not found: {:?}", utxo_key);
-            return Err(Error::new(ErrorKind::NotFound, format!("UTXO not found: {:?}", utxo_key)));
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("UTXO not found: {:?}", utxo_key),
+            ));
         }
 
-
-        // Create a new transaction
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Bound;
 
-        // Add the slip as an input
         transaction.add_from_slip(input_slip);
 
-    	//
-    	// when we CREATE a boundUTXO transaction, nodes need to confirm that 
-    	// the ID that is set in the message field is the same as the first input
-    	// that is spent to create the NFT. since we do not want nodes to have 
-    	// to unpack the MSG JSON structure in order to validate the transaction
-    	// we sepcify that the first N bytes are the sending UTXO key
-    	//
+        //
+        // when we CREATE a boundUTXO transaction, nodes need to confirm that
+        // the ID that is set in the message field is the same as the first input
+        // that is spent to create the NFT. since we do not want nodes to have
+        // to unpack the MSG JSON structure in order to validate the transaction
+        // we sepcify that the first N bytes are the sending UTXO key
+        //
 
+        let mut data_as_bytes: Vec<u8> = Vec::new();
+        for num in data {
+            data_as_bytes.extend(num.to_le_bytes()); // Convert u32 to 4 bytes (little-endian) and append
+        }
 
-        // Create tx msg by concatenating `utxoset_key` and `data`
+        // Merge `utxo_key` (already Vec<u8>) and converted `data_as_bytes`
+        let mut msg = utxo_key.to_vec(); // Convert utxo_key from `[u8; 59]` to Vec<u8>
+        msg.extend(data_as_bytes); // Append converted data
 
-         // Convert `utxo_key` (Vec<u8>) to `Vec<u32>`
-        let utxoset_key_u32: Vec<u32> = utxo_key.chunks(4).map(|chunk| {
-            let mut bytes = [0u8; 4];
-            for (i, &byte) in chunk.iter().enumerate() {
-                bytes[i] = byte;
-            }
-            u32::from_le_bytes(bytes)
-        }).collect();
+        transaction.data = msg; // Ensure tx.data is correctly set as Vec<u8>
 
-        // Merge `utxoset_key_u32` and `data` (both are Vec<u32>)
-        let mut msg: Vec<u32> = utxoset_key_u32;
-        msg.extend(data);
-
-        //  
-    	// because this is a BoundUTXO, we can check for this condition and avoid
-    	// it when we unpack the transaction and create the JSON tree on an 
-    	// application level.
-    	//
-
-    	//
-    	// NFT output slip
-    	//
+        //
+        // because this is a BoundUTXO, we can check for this condition and avoid
+        // it when we unpack the transaction and create the JSON tree on an
+        // application level.
+        //
 
         let mut output_slip = Slip::default();
         output_slip.public_key = *recipient_public_key;
-        output_slip.amount = 1;
-        // output_slip.block_id = 0;
-        // output_slip.tx_ordinal = 0;
+        output_slip.amount = deposit;
         output_slip.slip_type = SlipType::Bound;
-        transaction.add_to_slip(output_slip);
-    	
-    	//
-    	// hash and sign
-    	//
+        output_slip.generate_utxoset_key();
+
+        let mut change_slip = Slip::default();
+        change_slip.public_key = *recipient_public_key;
+        change_slip.amount = change;
+        change_slip.slip_type = SlipType::Normal;
+
+        transaction.add_to_slip(change_slip);
+
+        transaction.total_fees = fee;
+
+        //
+        // hash and sign
+        //
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.hash_for_signature = Some(hash_for_signature);
         transaction.sign(&self.private_key);
 
-
         Ok(transaction)
-
     }
-
 
     pub async fn create_golden_ticket_transaction(
         golden_ticket: GoldenTicket,
