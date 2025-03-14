@@ -346,7 +346,9 @@ export default class Saito {
         num: number,           
         deposit: bigint,
         change: bigint,        
-        image: string = ""         
+        data: string = "",
+        fee: bigint,
+        recipient_public_key: string,      
     ): Promise<T> {
 
       console.log("values recieved at saito.ts:");
@@ -357,7 +359,9 @@ export default class Saito {
       console.log(num);
       console.log(deposit);
       console.log(change);
-      console.log(image);
+      console.log(data);
+      console.log(fee);
+      console.log(recipient_public_key);
 
         let wasmTx = await Saito.getLibInstance().create_bound_utxo_transaction(
             amt,
@@ -367,7 +371,9 @@ export default class Saito {
             num,
             deposit,
             change,
-            image
+            data,
+            fee,
+            recipient_public_key
         );
 
         let tx = Saito.getInstance().factory.createTransaction(wasmTx) as T;
