@@ -1290,9 +1290,7 @@ mod tests {
         // create a fork starting from block 3
         {
             info!("adding alternate block 4");
-            tester
-                .add_block(alternate_block_4.clone())
-                .await;
+            tester.add_block(alternate_block_4.clone()).await;
         }
 
         // check if the latest block is 10 still
