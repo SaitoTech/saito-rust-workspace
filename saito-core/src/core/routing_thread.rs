@@ -974,7 +974,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_ghost_chain_gen() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let peer_public_key = generate_keys().0;
         let mut tester = NodeTester::default();
         tester

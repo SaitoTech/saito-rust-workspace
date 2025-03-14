@@ -1173,6 +1173,10 @@ impl Blockchain {
             .await;
 
         let block = self.blocks.get(block_hash).unwrap();
+        if block.has_checkpoint {
+            info!("block has checkpoint. cannot wind over this block");
+            return WindingResult::FinishWithFailure;
+        }
         let does_block_validate;
         {
             debug!("winding hash validates: {:?}", block_hash.to_hex());
@@ -1419,6 +1423,10 @@ impl Blockchain {
                 .blocks
                 .get_mut(&old_chain[current_unwind_index])
                 .unwrap();
+            if block.has_checkpoint {
+                info!("block has checkpoint. cannot unwind over this block");
+                return WindingResult::FinishWithFailure;
+            }
             block
                 .upgrade_block_to_block_type(BlockType::Full, storage, configs.is_spv_mode())
                 .await;
@@ -1733,6 +1741,7 @@ impl Blockchain {
                                         wallet.delete_slip(&slip, None);
                                         let block = self.blocks.get_mut(&block_hash).unwrap();
                                         block.graveyard += slip.amount;
+                                        block.has_checkpoint = true;
                                         info!("skipping slip : {} according to the checkpoint file : {}-{}",
                                             slip,block_id,block_hash.to_hex());
                                     } else {
@@ -3526,7 +3535,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn ghost_chain_content_test() {
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
@@ -3554,7 +3563,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_fork_id_difference() {
         // pretty_env_logger::init()
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(2_000_000 * NOLAN_PER_SAITO, 60, 100_000 * NOLAN_PER_SAITO)
@@ -3581,7 +3590,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_block_generation_without_fees() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
@@ -3594,7 +3603,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_block_generation_with_fees() {
         // pretty_env_logger::init();
-        NodeTester::delete_blocks().await.unwrap();
+        NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::default();
         tester
             .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
