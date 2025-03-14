@@ -379,7 +379,7 @@ pub mod test {
             self.verification_thread.process_timer_event(duration).await;
             self.last_run_time = self.timer.get_timestamp_in_ms();
         }
-        async fn run_until(&mut self, timestamp: Timestamp) -> Result<(), Error> {
+        pub async fn run_until(&mut self, timestamp: Timestamp) -> Result<(), Error> {
             let time_keeper = TestTimeKeeper {};
             loop {
                 if time_keeper.get_timestamp_in_ms() >= timestamp {
@@ -531,6 +531,16 @@ pub mod test {
         pub async fn delete_blocks() -> Result<(), Error> {
             tokio::fs::create_dir_all("./data/blocks").await?;
             tokio::fs::remove_dir_all("./data/blocks/").await?;
+            Ok(())
+        }
+        pub async fn delete_checkpoints() -> Result<(), Error> {
+            tokio::fs::create_dir_all("./data/checkpoints").await?;
+            tokio::fs::remove_dir_all("./data/checkpoints/").await?;
+            Ok(())
+        }
+        pub async fn delete_data() -> Result<(), Error> {
+            tokio::fs::create_dir_all("./data").await?;
+            tokio::fs::remove_dir_all("./data/").await?;
             Ok(())
         }
         pub async fn create_block(
