@@ -47,6 +47,14 @@ pub struct WalletSlip {
     pub slip_type: SlipType,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct NFT {
+    pub utxokey_bound: SaitoUTXOSetKey,
+    pub utxokey_normal: SaitoUTXOSetKey,
+    pub nft_id: Vec<u8>,
+    pub tx_sig: SaitoSignature,
+}
+
 /// The `Wallet` manages the public and private keypair of the node and holds the
 /// slips that are used to form transactions on the network.
 #[derive(Clone, Debug, PartialEq)]
@@ -64,6 +72,7 @@ pub struct Wallet {
     pub wallet_version: Version,
     pub core_version: Version,
     pub key_list: Vec<SaitoPublicKey>,
+    pub nft_slips: Vec<NFT>,
 }
 
 impl Wallet {
@@ -84,6 +93,7 @@ impl Wallet {
             wallet_version: Default::default(),
             core_version: read_pkg_version(),
             key_list: vec![],
+            nft_slips: Vec::new(),
         }
     }
 
@@ -173,12 +183,39 @@ impl Wallet {
                         }
                     }
                 }
+
+                let mut expected_normal_utxokey: Option<SaitoUTXOSetKey> = None;
                 for output in tx.to.iter() {
                     if output.amount > 0 && output.public_key == self.public_key {
+                        // Check if current output is an NFT slip (Bound)
+                        let is_nft_slip = self.nft_slips.iter().any(|nft| {
+                            if nft.utxokey_bound == output.utxoset_key {
+                                expected_normal_utxokey = Some(nft.utxokey_normal); // Store linked normal slip
+                                true
+                            } else {
+                                false
+                            }
+                        });
+
+                        if is_nft_slip {
+                            debug!("Skipping NFT bound slip: {:?}", output);
+                            continue;
+                        }
+
+                        // Check if current slip is the expected linked normal slip
+                        if let Some(expected_key) = expected_normal_utxokey {
+                            if output.utxoset_key == expected_key {
+                                debug!("Skipping linked NFT normal slip: {:?}", output);
+                                expected_normal_utxokey = None; // Reset after skipping
+                                continue;
+                            }
+                        }
+
                         wallet_changed |= WALLET_UPDATED;
                         self.add_slip(block.id, tx_index, output, true, None);
                     }
                 }
+
                 if let TransactionType::SPV = tx.transaction_type {
                     tx_index += tx.txs_replacements as u64;
                 } else {
@@ -442,7 +479,7 @@ impl Wallet {
     }
 
     pub async fn create_bound_utxo_transaction(
-        &self,
+        &mut self,
         amount: Currency,
         block_id: u64,
         transaction_id: u64,
@@ -493,33 +530,46 @@ impl Wallet {
 
         let mut data_as_bytes: Vec<u8> = Vec::new();
         for num in data {
-            data_as_bytes.extend(num.to_le_bytes()); // Convert u32 to 4 bytes (little-endian) and append
+            data_as_bytes.extend(num.to_le_bytes()); // Convert u32 to 4 bytes and append
         }
 
         // Merge `utxo_key` (already Vec<u8>) and converted `data_as_bytes`
         let mut msg = utxo_key.to_vec(); // Convert utxo_key from `[u8; 59]` to Vec<u8>
-        msg.extend(data_as_bytes); // Append converted data
+        let nft_id = msg.clone(); // Store input slip utxo_key as nft_id
+        msg.extend(data_as_bytes);
+        transaction.data = msg;
 
-        transaction.data = msg; // Ensure tx.data is correctly set as Vec<u8>
+        // first slip is BOUND type of NFT
+        let mut bound_slip = Slip::default();
+        bound_slip.public_key = *recipient_public_key;
+        bound_slip.amount = deposit;
+        bound_slip.slip_type = SlipType::Bound;
 
-        //
-        // because this is a BoundUTXO, we can check for this condition and avoid
-        // it when we unpack the transaction and create the JSON tree on an
-        // application level.
-        //
+        let utxokey_bound = bound_slip.get_utxoset_key();
+        bound_slip.utxoset_key = utxokey_bound;
+        transaction.add_to_slip(bound_slip);
 
-        let mut output_slip = Slip::default();
-        output_slip.public_key = *recipient_public_key;
-        output_slip.amount = deposit;
-        output_slip.slip_type = SlipType::Bound;
-        transaction.add_to_slip(output_slip);
+        // second immediate slip is linked normal slip
+        let mut normal_slip = Slip::default();
+        normal_slip.public_key = *recipient_public_key;
+        normal_slip.amount = deposit;
+        normal_slip.slip_type = SlipType::Normal;
 
-        let mut change_slip = Slip::default();
-        change_slip.public_key = *recipient_public_key;
-        change_slip.amount = change;
-        change_slip.slip_type = SlipType::Normal;
+        let utxokey_normal = normal_slip.get_utxoset_key();
+        normal_slip.utxoset_key = utxokey_normal;
+        transaction.add_to_slip(normal_slip);
 
-        transaction.add_to_slip(change_slip);
+        // third slip normal (optional) if there is
+        // remaining change
+        if change > 0 {
+            let mut change_slip = Slip::default();
+            change_slip.public_key = *recipient_public_key;
+            change_slip.amount = change;
+            change_slip.slip_type = SlipType::Normal;
+            transaction.add_to_slip(change_slip);
+        } else {
+            debug!("Skipping change slip as change amount is zero.");
+        }
 
         transaction.total_fees = fee;
 
@@ -529,6 +579,16 @@ impl Wallet {
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.hash_for_signature = Some(hash_for_signature);
         transaction.sign(&self.private_key);
+
+        let tx_sig = transaction.signature.clone();
+
+        // add nft slips to NFT struct
+        self.nft_slips.push(NFT {
+            utxokey_bound,
+            utxokey_normal,
+            nft_id,
+            tx_sig,
+        });
 
         Ok(transaction)
     }
@@ -775,6 +835,10 @@ impl Wallet {
         }
 
         Ok((selected_staking_inputs, outputs))
+    }
+
+    pub fn get_nft_slips(&self) -> &[NFT] {
+        &self.nft_slips
     }
 }
 
