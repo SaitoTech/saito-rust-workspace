@@ -828,7 +828,7 @@ impl Block {
             for transaction in &block.transactions {
                 if transaction.transaction_type != TransactionType::Fee {
                     for input in transaction.from.iter() {
-                        if input.amount <= 0 {
+                        if input.amount == 0 {
                             continue;
                         }
 
@@ -1279,7 +1279,7 @@ impl Block {
                 && transaction.transaction_type != TransactionType::Fee
             {
                 for input in transaction.from.iter() {
-                    if input.amount <= 0 {
+                    if input.amount == 0 {
                         continue;
                     }
 
