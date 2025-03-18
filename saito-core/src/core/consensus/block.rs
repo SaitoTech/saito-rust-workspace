@@ -829,7 +829,6 @@ impl Block {
                 if transaction.transaction_type != TransactionType::Fee {
                     for input in transaction.from.iter() {
                         if input.amount <= 0 {
-                            debug!("Skipping input with zero or negative amount: {:?}", input);
                             continue;
                         }
 
@@ -1281,7 +1280,6 @@ impl Block {
             {
                 for input in transaction.from.iter() {
                     if input.amount <= 0 {
-                        debug!("Skipping input with zero or negative amount: {:?}", input);
                         continue;
                     }
 
