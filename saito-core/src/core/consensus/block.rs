@@ -824,14 +824,21 @@ impl Block {
                 "creating hashmap of slips spent this block : {}...",
                 block.id
             );
+
             for transaction in &block.transactions {
                 if transaction.transaction_type != TransactionType::Fee {
                     for input in transaction.from.iter() {
+                        if input.amount <= 0 {
+                            debug!("Skipping input with zero or negative amount: {:?}", input);
+                            continue;
+                        }
+
                         let value = block
                             .slips_spent_this_block
                             .entry(input.get_utxoset_key())
                             .and_modify(|e| *e += 1)
                             .or_insert(1);
+
                         if *value > 1 {
                             warn!("double-spend detected in block {} : {}", block.id, input);
                         }
@@ -1273,6 +1280,11 @@ impl Block {
                 && transaction.transaction_type != TransactionType::Fee
             {
                 for input in transaction.from.iter() {
+                    if input.amount <= 0 {
+                        debug!("Skipping input with zero or negative amount: {:?}", input);
+                        continue;
+                    }
+
                     let value = self
                         .slips_spent_this_block
                         .entry(input.get_utxoset_key())
