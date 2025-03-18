@@ -585,13 +585,13 @@ impl Blockchain {
         }
 
         let mut block = block.unwrap();
+        self.blockring.delete_block(block.id, block.hash);
         self.add_block_transactions_back(mempool, &mut block).await;
     }
 
     async fn add_block_transactions_back(&mut self, mempool: &mut Mempool, block: &mut Block) {
-        let public_key;
         let wallet = mempool.wallet_lock.read().await;
-        public_key = wallet.public_key;
+        let public_key = wallet.public_key;
         if block.creator == public_key {
             let transactions = &mut block.transactions;
             let prev_count = transactions.len();
