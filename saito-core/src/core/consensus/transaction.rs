@@ -162,6 +162,8 @@ impl Transaction {
     pub fn add_from_slip(&mut self, input_slip: Slip) {
         if self.from.len() < u8::MAX as usize {
             self.from.push(input_slip);
+        } else {
+            warn!("cannot add more input slips to the transaction");
         }
     }
 
@@ -181,6 +183,8 @@ impl Transaction {
     pub fn add_to_slip(&mut self, output_slip: Slip) {
         if self.to.len() < u8::MAX as usize {
             self.to.push(output_slip);
+        } else {
+            warn!("cannot add more output slips to the transaction");
         }
     }
 
