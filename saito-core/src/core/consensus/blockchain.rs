@@ -2070,22 +2070,22 @@ impl Blockchain {
 
 pub fn generate_fork_id_weights(genesis_period: BlockId) -> [u64; 16] {
     const LENGTH: BlockId = 100_000;
-     [
+    [
         0,
         max((10 * genesis_period) / LENGTH, 1),
         max((10 * genesis_period) / LENGTH, 1),
         max((10 * genesis_period) / LENGTH, 1),
         max((10 * genesis_period) / LENGTH, 1),
         max((10 * genesis_period) / LENGTH, 1),
-        max((25*genesis_period)/LENGTH,1),
-        max((25*genesis_period)/LENGTH,1),
-        max((100*genesis_period)/LENGTH,1),
-        max((300*genesis_period)/LENGTH,1),
-        max((500*genesis_period)/LENGTH,1),
-        max((4000*genesis_period)/LENGTH,1),
-        max((10000*genesis_period)/LENGTH,1),
-        max((20000*genesis_period)/LENGTH,1),
-        max((50000*genesis_period)/LENGTH,1),
+        max((25 * genesis_period) / LENGTH, 1),
+        max((25 * genesis_period) / LENGTH, 1),
+        max((100 * genesis_period) / LENGTH, 1),
+        max((300 * genesis_period) / LENGTH, 1),
+        max((500 * genesis_period) / LENGTH, 1),
+        max((4000 * genesis_period) / LENGTH, 1),
+        max((10000 * genesis_period) / LENGTH, 1),
+        max((20000 * genesis_period) / LENGTH, 1),
+        max((50000 * genesis_period) / LENGTH, 1),
         genesis_period,
     ]
 }
