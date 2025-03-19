@@ -94,6 +94,7 @@ pub struct Blockchain {
 
     pub social_stake_requirement: Currency,
     pub social_stake_period: u64,
+    pub genesis_period: BlockId,
 }
 
 impl Blockchain {
@@ -118,6 +119,7 @@ impl Blockchain {
             // blocks_fetching: Default::default(),
             social_stake_requirement: DEFAULT_SOCIAL_STAKE,
             social_stake_period: DEFAULT_SOCIAL_STAKE_PERIOD,
+            genesis_period,
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -2064,6 +2066,28 @@ impl Blockchain {
         }
         current_supply
     }
+}
+
+pub fn generate_fork_id_weights(genesis_period: BlockId) -> [u64; 16] {
+    const LENGTH: BlockId = 100_000;
+    [
+        0,
+        max((10 * genesis_period) / LENGTH, 1),
+        max((10 * genesis_period) / LENGTH, 1),
+        max((10 * genesis_period) / LENGTH, 1),
+        max((10 * genesis_period) / LENGTH, 1),
+        max((10 * genesis_period) / LENGTH, 1),
+        max((25 * genesis_period) / LENGTH, 1),
+        max((25 * genesis_period) / LENGTH, 1),
+        max((100 * genesis_period) / LENGTH, 1),
+        max((300 * genesis_period) / LENGTH, 1),
+        max((500 * genesis_period) / LENGTH, 1),
+        max((4000 * genesis_period) / LENGTH, 1),
+        max((10000 * genesis_period) / LENGTH, 1),
+        max((20000 * genesis_period) / LENGTH, 1),
+        max((50000 * genesis_period) / LENGTH, 1),
+        genesis_period,
+    ]
 }
 
 fn is_golden_ticket_count_valid_<'a, F: Fn(SaitoHash) -> Option<&'a Block>>(

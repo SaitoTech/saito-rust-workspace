@@ -1302,6 +1302,11 @@ mod tests {
             .get_latest_block_id();
         assert_eq!(latest_block_id, 10);
 
+        tester
+            .run_until(TestTimeKeeper {}.get_timestamp_in_ms() + 5)
+            .await
+            .unwrap();
+
         // check that blockchain doesn't have the alternate block
         {
             let blockchain = tester.consensus_thread.blockchain_lock.read().await;
