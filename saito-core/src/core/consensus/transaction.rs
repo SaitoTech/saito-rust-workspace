@@ -160,7 +160,9 @@ impl Transaction {
     ///
     /// ```
     pub fn add_from_slip(&mut self, input_slip: Slip) {
-        self.from.push(input_slip);
+        if self.from.len() < u8::MAX as usize {
+            self.from.push(input_slip);
+        }
     }
 
     /// add output slip
@@ -177,7 +179,9 @@ impl Transaction {
     ///
     /// ```
     pub fn add_to_slip(&mut self, output_slip: Slip) {
-        self.to.push(output_slip);
+        if self.to.len() < u8::MAX as usize {
+            self.to.push(output_slip);
+        }
     }
 
     /// this function exists largely for testing. It attempts to attach the requested fee
@@ -425,11 +429,17 @@ impl Transaction {
                 .try_into()
                 .or(Err(Error::from(ErrorKind::InvalidData)))?,
         );
+        if inputs_len > u8::MAX as u32 {
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
         let outputs_len: u32 = u32::from_be_bytes(
             bytes[4..8]
                 .try_into()
                 .or(Err(Error::from(ErrorKind::InvalidData)))?,
         );
+        if outputs_len > u8::MAX as u32 {
+            return Err(Error::from(ErrorKind::InvalidData));
+        }
         let message_len: usize = u32::from_be_bytes(
             bytes[8..12]
                 .try_into()
@@ -774,6 +784,14 @@ impl Transaction {
         if opt_hop.is_some() {
             path_len += 1;
         }
+        if self.from.len() > u8::MAX as usize {
+            error!("ERROR: transaction has too many inputs");
+            return vec![];
+        }
+        if self.to.len() > u8::MAX as usize {
+            error!("ERROR: transaction has too many outputs");
+            return vec![];
+        }
         let inputs = self
             .from
             .iter()
@@ -870,6 +888,15 @@ impl Transaction {
         blockchain: &Blockchain,
         validate_against_utxo: bool,
     ) -> bool {
+        if self.from.len() > u8::MAX as usize {
+            error!("ERROR: transaction has too many inputs");
+            return false;
+        }
+        if self.to.len() > u8::MAX as usize {
+            error!("ERROR: transaction has too many outputs");
+            return false;
+        }
+
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
         // matches our self-generated safety check. We do not need to validate
@@ -1320,5 +1347,26 @@ mod tests {
 
         let deserialized_tx = Transaction::deserialize_from_net(&serialized_tx).unwrap();
         assert_eq!(mock_tx, deserialized_tx);
+    }
+    #[test]
+    fn slip_count_test() {
+        let mock_input = Slip::default();
+        let mock_output = Slip::default();
+        let mock_hop = Hop::default();
+
+        let mut mock_tx = Transaction::default();
+        for i in 0..1000 {
+            let mut mock_input = Slip::default();
+            mock_input.amount = i;
+            mock_tx.from.push(mock_input);
+        }
+        for i in 0..1000 {
+            let mut mock_output = Slip::default();
+            mock_output.amount = i;
+            mock_tx.to.push(mock_output);
+        }
+
+        let serialized_tx = mock_tx.serialize_for_net();
+        assert_eq!(serialized_tx.len(), 0);
     }
 }
