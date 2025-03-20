@@ -173,13 +173,13 @@ impl ConsensusThread {
         let mut blockchain = blockchain_lock.write().await;
         let mut mempool = mempool_lock.write().await;
 
-        if !self.txs_for_mempool.is_empty() {
-            for tx in self.txs_for_mempool.iter() {
-                if let TransactionType::GoldenTicket = tx.transaction_type {
-                    unreachable!("golden tickets shouldn't be here");
-                } else {
-                    mempool.add_transaction(tx.clone()).await;
-                }
+        for tx in self.txs_for_mempool.iter() {
+            if let TransactionType::GoldenTicket = tx.transaction_type {
+                unreachable!("golden tickets shouldn't be here");
+            } else {
+                mempool
+                    .add_transaction_if_validates(tx.clone(), &blockchain)
+                    .await;
             }
         }
 
@@ -632,15 +632,11 @@ mod tests {
     use crate::core::consensus::block::{Block, BlockType};
     use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::consensus::slip::SlipType;
-    use crate::core::consensus::transaction::TransactionType;
     use crate::core::defs::{
         PrintForLog, SaitoHash, SaitoUTXOSetKey, NOLAN_PER_SAITO, UTXO_KEY_LENGTH,
     };
 
-    use crate::core::io::network_event::NetworkEvent;
     use crate::core::process::keep_time::KeepTime;
-    use crate::core::process::process_event::ProcessEvent;
-    use crate::core::routing_thread::RoutingEvent;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::node_tester::test::{NodeTester, TestTimeKeeper};
 
@@ -664,6 +660,7 @@ mod tests {
             ),
         ];
         tester.set_issuance(issuance).await.unwrap();
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(1).await.unwrap();
         tester
@@ -735,6 +732,7 @@ mod tests {
             ),
         ];
         tester.set_issuance(issuance).await.unwrap();
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(1).await.unwrap();
         tester
@@ -778,6 +776,7 @@ mod tests {
             ),
         ];
         tester.set_issuance(issuance).await.unwrap();
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(1).await.unwrap();
         tester
@@ -830,6 +829,7 @@ mod tests {
 
             let mut tester =
                 NodeTester::new(genesis_period, Some(private_key), Some(timer.clone()));
+            tester.set_staking_enabled(false).await;
             tester.init().await.unwrap();
             let loaded_last_block_id = tester
                 .consensus_thread
@@ -981,6 +981,7 @@ mod tests {
             // ),
         ];
         tester.set_issuance(issuance).await.unwrap();
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(1).await.unwrap();
         tester
@@ -1098,6 +1099,7 @@ mod tests {
         let private_key = tester.get_private_key().await;
         let issuance = vec![(public_key.to_base58(), 100_000 * NOLAN_PER_SAITO)];
         tester.set_issuance(issuance).await.unwrap();
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(1).await.unwrap();
         tester
@@ -1135,6 +1137,7 @@ mod tests {
 
         // reload the node
         let mut tester = NodeTester::new(10, Some(private_key), None);
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(5).await.unwrap();
 
@@ -1157,7 +1160,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn reorg_over_checkpoints() {
-        // pretty_env_logger::init();
+        pretty_env_logger::init();
         NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::new(10, None, None);
         let public_key = tester.get_public_key().await;
@@ -1167,6 +1170,7 @@ mod tests {
             (public_key.to_base58(), 10_000 * NOLAN_PER_SAITO),
         ];
         tester.set_issuance(issuance).await.unwrap();
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(1).await.unwrap();
         tester
@@ -1209,6 +1213,7 @@ mod tests {
         drop(tester);
 
         let mut tester = NodeTester::new(10, Some(private_key), Some(timer));
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester.wait_till_block_id(3).await.unwrap();
         tester
@@ -1247,6 +1252,7 @@ mod tests {
         // reload the node
         info!("-------------- reloading the node -----------------\n\n\n\n\n");
         let mut tester = NodeTester::new(10, Some(private_key), Some(timer));
+        tester.set_staking_enabled(false).await;
         tester.init().await.unwrap();
         tester
             .run_until(TestTimeKeeper {}.get_timestamp_in_ms() + 5)

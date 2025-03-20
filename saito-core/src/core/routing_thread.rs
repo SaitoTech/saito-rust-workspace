@@ -275,6 +275,11 @@ impl RoutingThread {
         peer_key_list: Vec<SaitoPublicKey>,
         storage: &Storage,
     ) -> GhostChainSync {
+        debug!(
+            "generating ghost chain for block_id : {:?} fork_id : {:?}",
+            block_id,
+            fork_id.to_hex()
+        );
         let mut last_shared_ancestor = blockchain.generate_last_shared_ancestor(block_id, fork_id);
 
         debug!("last_shared_ancestor 1 : {:?}", last_shared_ancestor);
@@ -976,7 +981,7 @@ mod tests {
         // pretty_env_logger::init();
         NodeTester::delete_data().await.unwrap();
         let peer_public_key = generate_keys().0;
-        let mut tester = NodeTester::default();
+        let mut tester = NodeTester::new(1000, None, None);
         tester
             .init_with_staking(0, 60, 100_000 * NOLAN_PER_SAITO)
             .await
