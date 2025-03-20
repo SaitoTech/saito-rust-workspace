@@ -629,7 +629,7 @@ pub mod test {
             let private_key: SaitoPrivateKey;
             let public_key: SaitoPublicKey;
 
-            let mut configs = self.config_lock.read().await;
+            let configs = self.config_lock.read().await;
             let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
 
             let (latest_block_id, latest_block_hash) = {
@@ -722,8 +722,8 @@ pub mod test {
                 configs.deref(),
                 &self.storage,
             )
-            .await;
-            block.generate();
+            .await.unwrap();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             block
@@ -839,7 +839,7 @@ pub mod test {
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
-            block.generate();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             assert!(verify_signature(
@@ -887,7 +887,7 @@ pub mod test {
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
-            block.generate();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             assert!(verify_signature(
@@ -939,7 +939,7 @@ pub mod test {
                 block.merkle_root =
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
-            block.generate();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             assert!(verify_signature(
@@ -1076,7 +1076,7 @@ pub mod test {
                     block.generate_merkle_root(configs.is_browser(), configs.is_spv_mode());
             }
 
-            block.generate();
+            block.generate().unwrap();
             block.sign(&private_key);
 
             assert!(verify_signature(

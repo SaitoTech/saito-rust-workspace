@@ -166,7 +166,7 @@ impl WasmBlock {
         let buffer = buffer.to_vec();
         let mut block = Block::deserialize_from_net(&buffer).or(Err(JsValue::from("failed")))?;
 
-        block.generate();
+        block.generate().or(Err(JsValue::from("failed")))?;
         self.block = block;
 
         Ok(JsValue::from(""))

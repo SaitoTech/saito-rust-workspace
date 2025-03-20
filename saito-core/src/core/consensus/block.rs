@@ -5,6 +5,7 @@ use num_traits::Zero;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
+use std::f32::consts::E;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;
@@ -576,7 +577,7 @@ impl Block {
         golden_ticket: Option<Transaction>,
         configs: &(dyn Configuration + Send + Sync),
         storage: &Storage,
-    ) -> Block {
+    ) -> Result<Block, Error> {
         debug!(
             "Block::create : previous block hash : {:?}",
             previous_block_hash.to_hex()
@@ -832,8 +833,15 @@ impl Block {
                             .entry(input.get_utxoset_key())
                             .and_modify(|e| *e += 1)
                             .or_insert(1);
-                        if *value > 1 {
-                            warn!("double-spend detected in block {} : {}", block.id, input);
+                        if *value > 1 && input.amount > 0 {
+                            warn!(
+                                "double-spend detected in block {} : {} in block.create()",
+                                block.id, input
+                            );
+                            return Err(Error::new(
+                                ErrorKind::InvalidData,
+                                "double-spend detected",
+                            ));
                         }
                     }
                 }
@@ -853,18 +861,14 @@ impl Block {
         // part of the block data that is used to generate the final block hash.
         //
         block.generate_pre_hash();
-
-        //
-        //
-        //
         block.sign(private_key);
 
         //
         // finally run generate()
         //
-        block.generate();
+        block.generate()?;
 
-        block
+        Ok(block)
     }
 
     //
@@ -1201,7 +1205,7 @@ impl Block {
     // sweeping through the transactions to find out what percentage of the
     // cumulative block fees they contain.
     //
-    pub fn generate(&mut self) -> bool {
+    pub fn generate(&mut self) -> Result<(), Error> {
         let creator_public_key = &self.creator;
 
         //self.total_rebroadcast_nolan = 0;
@@ -1278,8 +1282,12 @@ impl Block {
                         .entry(input.get_utxoset_key())
                         .and_modify(|e| *e += 1)
                         .or_insert(1);
-                    if *value > 1 {
-                        warn!("double-spend detected in block {} : {}", self.id, input);
+                    if *value > 1  && input.amount > 0{
+                        warn!(
+                            "double-spend detected in block {} : {} in block.generate()",
+                            self.id, input
+                        );
+                        return Err(Error::new(ErrorKind::InvalidData, "double-spend detected"));
                     }
                 }
                 self.created_hashmap_of_slips_spent_this_block = true;
@@ -1327,7 +1335,7 @@ impl Block {
         self.issuance_transaction_index = issuance_transaction_index;
         self.total_work = total_work;
 
-        true
+        Ok(())
     }
 
     pub fn generate_hash(&mut self) -> SaitoHash {
@@ -1513,7 +1521,7 @@ impl Block {
                         )
                         .await
                     {
-                        atr_block.generate();
+                        atr_block.generate().unwrap();
                         assert_ne!(
                             atr_block.block_type,
                             BlockType::Pruned,
@@ -2288,7 +2296,10 @@ impl Block {
             mem::swap(&mut new_block.transactions, &mut self.transactions);
 
             // transactions need hashes
-            self.generate();
+            if self.generate().is_err() {
+                error!("failed to generate block after upgrade");
+                return false;
+            }
             self.block_type = BlockType::Full;
 
             return true;
@@ -2976,7 +2987,7 @@ impl Block {
 
                     if new_slips_map.contains_key(&utxo_key) {
                         error!(
-                            "double-spend detected in block {} : {}",
+                            "double-spend detected in block {} : {} in block.validate()",
                             self.id,
                             Slip::parse_slip_from_utxokey(&utxo_key).unwrap()
                         );
@@ -3083,7 +3094,7 @@ mod tests {
     #[test]
     fn block_generate_test() {
         let mut block = Block::new();
-        block.generate();
+        block.generate().unwrap();
 
         // block hashes should have updated
         assert_ne!(block.pre_hash, [0; 32]);
@@ -3171,7 +3182,7 @@ mod tests {
         block.burnfee = 2;
         block.difficulty = 3;
         block.transactions = vec![mock_tx, mock_tx2];
-        block.generate();
+        block.generate().unwrap();
 
         let serialized_block = block.serialize_for_net(BlockType::Full);
         let deserialized_block = Block::deserialize_from_net(&serialized_block).unwrap();
@@ -3211,7 +3222,7 @@ mod tests {
         assert_eq!(deserialized_block_header.difficulty, 3);
 
         let mut lite_block = block.generate_lite_block(vec![]);
-        lite_block.generate();
+        lite_block.generate().unwrap();
         assert_eq!(block.id, lite_block.id);
         assert_eq!(block.timestamp, lite_block.timestamp);
         assert_eq!(
@@ -3246,7 +3257,7 @@ mod tests {
         let wallet = Wallet::new(keys.1, keys.0);
         let mut block = Block::new();
         block.creator = wallet.public_key;
-        block.generate();
+        block.generate().unwrap();
         block.sign(&wallet.private_key);
         block.generate_hash();
 
@@ -3299,7 +3310,7 @@ mod tests {
         .to_vec();
 
         block.transactions = transactions;
-        block.generate();
+        block.generate().unwrap();
 
         // save to disk
         t.storage.write_block_to_disk(&mut block).await;
@@ -3364,13 +3375,13 @@ mod tests {
         assert_eq!(lite_block2.id, block2.id);
         assert_eq!(lite_block2.block_type, BlockType::Full);
 
-        lite_block2.generate();
+        lite_block2.generate().unwrap();
         assert_eq!(lite_block2.signature, block2.clone().signature);
         assert_eq!(lite_block2.hash, block2.hash);
 
         let buffer = lite_block2.serialize_for_net(BlockType::Pruned);
         let mut block2 = Block::deserialize_from_net(&buffer).unwrap();
-        block2.generate();
+        block2.generate().unwrap();
         assert_eq!(lite_block2.signature, block2.clone().signature);
         assert_eq!(lite_block2.hash, block2.hash);
 
@@ -3387,7 +3398,7 @@ mod tests {
                 true,                      // mine golden ticket
             )
             .await;
-        block3.generate(); // generate hashes
+        block3.generate().unwrap(); // generate hashes
         dbg!(block3.id);
     }
 
@@ -3440,7 +3451,7 @@ mod tests {
         }
 
         // Generate and sign the block
-        block.generate();
+        block.generate().unwrap();
         block.sign(&private_key);
 
         // Generate a lite block from the full block, using the public keys for SPV transactions
@@ -3487,7 +3498,7 @@ mod tests {
             )
             .await;
 
-        block.generate();
+        block.generate().unwrap();
 
         let mut tx_size = 0;
         let mut total_fees = 0;
@@ -3519,7 +3530,7 @@ mod tests {
             )
             .await;
 
-        block.generate();
+        block.generate().unwrap();
 
         let mut tx_size = 0;
         let mut total_fees = 0;
@@ -3572,7 +3583,7 @@ mod tests {
                     true,
                 )
                 .await;
-            block.generate();
+            block.generate().unwrap();
             t.add_block(block).await;
         }
 
@@ -3600,7 +3611,7 @@ mod tests {
                 true,
             )
             .await;
-        block.generate();
+        block.generate().unwrap();
         t.add_block(block).await;
 
         // check consensus values for 11th block

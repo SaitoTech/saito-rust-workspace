@@ -223,8 +223,8 @@ impl Mempool {
             configs,
             storage,
         )
-        .await;
-        block.generate();
+        .await.ok()?;
+        block.generate().ok()?;
         debug!(
             "block generated with work : {:?} and burnfee : {:?} gts : {:?}",
             block.total_work,
@@ -268,8 +268,8 @@ impl Mempool {
             configs,
             storage,
         )
-        .await;
-        block.generate();
+        .await.unwrap();
+        block.generate().unwrap();
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 

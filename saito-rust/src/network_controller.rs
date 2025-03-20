@@ -908,7 +908,10 @@ fn run_websocket_server(
                             return Err(warp::reject::not_found());
                         }
                         let mut block = block.unwrap();
-                        block.generate();
+                        if block.generate().is_err(){
+                            error!("failed generating block : {}", block_hash);
+                            return Err(warp::reject::not_found());
+                        }
                         let block = block.generate_lite_block(keylist);
                         let buffer = block.serialize_for_net(BlockType::Full);
                         Ok(warp::reply::with_status(buffer, StatusCode::OK))
