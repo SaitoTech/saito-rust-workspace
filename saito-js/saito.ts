@@ -376,6 +376,8 @@ export default class Saito {
             recipient_public_key
         );
 
+        console.log("saito.ts tx: ", wasmTx);
+
         let tx = Saito.getInstance().factory.createTransaction(wasmTx) as T;
         tx.timestamp = new Date().getTime();
 

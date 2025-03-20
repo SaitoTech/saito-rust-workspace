@@ -528,16 +528,35 @@ impl Wallet {
         // we sepcify that the first N bytes are the sending UTXO key
         //
 
+
+        info!("data: {:?}", data);
+        info!("                   ");
+
         let mut data_as_bytes: Vec<u8> = Vec::new();
         for num in data {
             data_as_bytes.extend(num.to_le_bytes()); // Convert u32 to 4 bytes and append
         }
 
+        info!("Generated utxo_key: {:?}", utxo_key);
+        info!("                   ");
+
+        info!("Converted data_as_bytes: {:?}", data_as_bytes);
+        info!("                   ");
+
         // Merge `utxo_key` (already Vec<u8>) and converted `data_as_bytes`
         let mut msg = utxo_key.to_vec(); // Convert utxo_key from `[u8; 59]` to Vec<u8>
-        let nft_id = msg.clone(); // Store input slip utxo_key as nft_id
+        //let nft_id = msg.clone(); // Store input slip utxo_key as nft_id
+
+        info!("tx msg 1: {:?}", msg);
+        info!("        ");
         msg.extend(data_as_bytes);
+
+        info!("tx msg 2: {:?}", msg);
+        info!("        ");
         transaction.data = msg;
+
+        info!("transaction.data: {:?}", transaction.data);
+        info!("        ");
 
         // first slip is BOUND type of NFT
         let mut bound_slip = Slip::default();
@@ -571,24 +590,27 @@ impl Wallet {
             debug!("Skipping change slip as change amount is zero.");
         }
 
-        transaction.total_fees = fee;
+//        transaction.total_fees = fee;
 
         //
         // hash and sign
         //
-        let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
-        transaction.hash_for_signature = Some(hash_for_signature);
-        transaction.sign(&self.private_key);
+        // let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
+        // transaction.hash_for_signature = Some(hash_for_signature);
+        // transaction.sign(&self.private_key);
 
-        let tx_sig = transaction.signature.clone();
+        // let tx_sig = transaction.signature.clone();
 
         // add nft slips to NFT struct
-        self.nft_slips.push(NFT {
-            utxokey_bound,
-            utxokey_normal,
-            nft_id,
-            tx_sig,
-        });
+        // self.nft_slips.push(NFT {
+        //     utxokey_bound,
+        //     utxokey_normal,
+        //     nft_id,
+        //     tx_sig,
+        // });
+
+        info!("final transaction: {:?}", transaction);
+        info!("        ");
 
         Ok(transaction)
     }

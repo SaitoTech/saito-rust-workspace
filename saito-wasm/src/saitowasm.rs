@@ -557,7 +557,11 @@ pub async fn create_bound_utxo_transaction(
     }
 
     let transaction = transaction.unwrap();
+    
+    info!("wasm transaction: {:}", transaction);
     let wasm_transaction = WasmTransaction::from_transaction(transaction);
+
+
     Ok(wasm_transaction)
 }
 

@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::blockchain::Blockchain;
-use log::{debug, error, trace, warn};
+use log::{debug, error, trace, warn, info};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
@@ -530,17 +530,31 @@ impl Transaction {
     // tx.work -> needed to confirm adequate routing work
     //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
+
+
+        info!("          ");
+        info!("tx generate: public_key: {:?} tx_index: {:?} block_id: {:?}", public_key, tx_index, block_id);
+        info!("          ");
+
+        info!("generate_hash_for_signature /////////");
+
         // ensure hash exists for signing
         self.generate_hash_for_signature();
 
+        info!("          ");
+        info!("generate_hash_for_signature /////////");
         // nolan_in, nolan_out, total fees
         self.generate_total_fees(tx_index, block_id);
 
+
+        info!("          ");
+        info!("generate_hash_for_signature /////////");
         // routing work for asserted public_key (creator)
         self.generate_total_work(public_key);
 
         true
     }
+
 
     // calculate cumulative fee share in block
     pub fn generate_cumulative_fees(&mut self, cumulative_fees: Currency) -> Currency {
@@ -570,7 +584,7 @@ impl Transaction {
             .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
-                if slip.slip_type != SlipType::ATR || slip.slip_type != SlipType::Bound {
+                if slip.slip_type != SlipType::ATR && slip.slip_type != SlipType::Bound  {
                     slip.block_id = block_id;
                     slip.tx_ordinal = tx_index;
                     slip.slip_index = index as u8;
@@ -646,7 +660,6 @@ impl Transaction {
             let half_of_routing_work: Currency = routing_work_available_to_public_key / 2;
             routing_work_available_to_public_key -= half_of_routing_work;
         }
-
         self.total_work_for_me = routing_work_available_to_public_key;
     }
 
@@ -1067,20 +1080,20 @@ impl Transaction {
                 return false;
             }
 
-            // the first UTXO_KEY_LENGTH bytes of data match
-            // the input slip’s UTXO key
-            if self.data.len() < UTXO_KEY_LENGTH {
-                error!("Bound transaction data is too short to contain a valid UTXO key.");
-                return false;
-            }
+            // // the first UTXO_KEY_LENGTH bytes of data match
+            // // the input slip’s UTXO key
+            // if self.data.len() < UTXO_KEY_LENGTH {
+            //     error!("Bound transaction data is too short to contain a valid UTXO key.");
+            //     return false;
+            // }
 
-            let expected_utxokey = &self.from[0].utxoset_key;
-            let extracted_utxokey: &[u8] = &self.data[..UTXO_KEY_LENGTH];
+            // let expected_utxokey = &self.from[0].utxoset_key;
+            // let extracted_utxokey: &[u8] = &self.data[..UTXO_KEY_LENGTH];
 
-            if extracted_utxokey != expected_utxokey {
-                error!("Bound transaction data does not start with the correct UTXO key.");
-                return false;
-            }
+            // if extracted_utxokey != expected_utxokey {
+            //     error!("Bound transaction data does not start with the correct UTXO key.");
+            //     return false;
+            // }
         } else {
             if self
                 .from
