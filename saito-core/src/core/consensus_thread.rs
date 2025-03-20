@@ -173,13 +173,13 @@ impl ConsensusThread {
         let mut blockchain = blockchain_lock.write().await;
         let mut mempool = mempool_lock.write().await;
 
-        if !self.txs_for_mempool.is_empty() {
-            for tx in self.txs_for_mempool.iter() {
-                if let TransactionType::GoldenTicket = tx.transaction_type {
-                    unreachable!("golden tickets shouldn't be here");
-                } else {
-                    mempool.add_transaction(tx.clone()).await;
-                }
+        for tx in self.txs_for_mempool.iter() {
+            if let TransactionType::GoldenTicket = tx.transaction_type {
+                unreachable!("golden tickets shouldn't be here");
+            } else {
+                mempool
+                    .add_transaction_if_validates(tx.clone(), &blockchain)
+                    .await;
             }
         }
 
