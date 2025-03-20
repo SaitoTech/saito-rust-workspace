@@ -5,7 +5,6 @@ use num_traits::Zero;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
-use std::f32::consts::E;
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::ops::Rem;

@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::golden_ticket::GoldenTicket;
-use crate::core::consensus::mempool::{self, Mempool};
+use crate::core::consensus::mempool::{Mempool};
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
@@ -26,7 +26,6 @@ use crate::core::routing_thread::RoutingEvent;
 use crate::core::util::configuration::Configuration;
 use crate::core::util::crypto::hash;
 
-use super::defs::{BlockId, SaitoUTXOSetKey};
 
 pub const BLOCK_PRODUCING_TIMER: u64 = Duration::from_millis(1000).as_millis() as u64;
 
@@ -629,11 +628,11 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 mod tests {
     use log::info;
 
-    use crate::core::consensus::block::{Block, BlockType};
+    
     use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::consensus::slip::SlipType;
     use crate::core::defs::{
-        PrintForLog, SaitoHash, SaitoUTXOSetKey, NOLAN_PER_SAITO, UTXO_KEY_LENGTH,
+        PrintForLog, SaitoHash, NOLAN_PER_SAITO, UTXO_KEY_LENGTH,
     };
 
     use crate::core::process::keep_time::KeepTime;
