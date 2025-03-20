@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 use bs58;
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use tokio::sync::RwLock;
 
 use crate::core::consensus::block::{Block, BlockType};
