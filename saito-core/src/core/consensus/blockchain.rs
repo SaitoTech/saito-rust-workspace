@@ -141,7 +141,10 @@ impl Blockchain {
         configs: &(dyn Configuration + Send + Sync),
     ) -> AddBlockResult {
         if block.generate().is_err() {
-            error!("block generation failed. not adding block : {:?}", block.hash.to_hex());
+            error!(
+                "block generation failed. not adding block : {:?}",
+                block.hash.to_hex()
+            );
             return AddBlockResult::FailedNotValid;
         }
 

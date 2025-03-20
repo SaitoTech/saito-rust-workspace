@@ -722,7 +722,8 @@ pub mod test {
                 configs.deref(),
                 &self.storage,
             )
-            .await.unwrap();
+            .await
+            .unwrap();
             block.generate().unwrap();
             block.sign(&private_key);
 
