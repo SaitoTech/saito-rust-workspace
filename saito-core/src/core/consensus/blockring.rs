@@ -340,11 +340,11 @@ mod tests {
         block4.id = 4;
         block5.id = 5;
 
-        block1.generate();
-        block2.generate();
-        block3.generate();
-        block4.generate();
-        block5.generate();
+        block1.generate().unwrap();
+        block2.generate().unwrap();
+        block3.generate().unwrap();
+        block4.generate().unwrap();
+        block5.generate().unwrap();
 
         let mut blockring = BlockRing::new(1_000);
 

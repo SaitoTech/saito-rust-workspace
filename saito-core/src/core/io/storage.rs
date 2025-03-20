@@ -146,7 +146,7 @@ impl Storage {
             }
             let mut block: Block = result.unwrap();
             block.force_loaded = true;
-            block.generate();
+            block.generate().unwrap();
             debug!("block : {:?} loaded from disk", block.hash.to_hex());
             mempool.add_block(block);
         }
@@ -407,7 +407,7 @@ mod test {
         trace!("block written to file : {}", filename);
         let retrieved_block = t.storage.load_block_from_disk(filename.as_str()).await;
         let mut actual_retrieved_block = retrieved_block.unwrap();
-        actual_retrieved_block.generate();
+        actual_retrieved_block.generate().unwrap();
 
         assert_eq!(block.timestamp, actual_retrieved_block.timestamp);
     }

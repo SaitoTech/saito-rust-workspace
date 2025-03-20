@@ -19,6 +19,7 @@ use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDA
 use crate::core::defs::{
     BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
     Timestamp, UtxoSet, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
+    NOLAN_PER_SAITO,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -139,7 +140,13 @@ impl Blockchain {
         mempool: &mut Mempool,
         configs: &(dyn Configuration + Send + Sync),
     ) -> AddBlockResult {
-        block.generate();
+        if block.generate().is_err() {
+            error!(
+                "block generation failed. not adding block : {:?}",
+                block.hash.to_hex()
+            );
+            return AddBlockResult::FailedNotValid;
+        }
 
         debug!(
             "adding block {:?} of type : {:?} with id : {:?} with latest id : {:?} with tx count (gt/spv/total) : {:?}/{:?}/{:?}",
@@ -2317,7 +2324,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block2.generate(); // generate hashes
+        block2.generate().unwrap(); // generate hashes
 
         let block2_hash = block2.hash;
         let block2_id = block2.id;
@@ -2347,7 +2354,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block3.generate(); // generate hashes
+        block3.generate().unwrap(); // generate hashes
 
         let block3_hash = block3.hash;
         let block3_id = block3.id;
@@ -2379,7 +2386,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block4.generate(); // generate hashes
+        block4.generate().unwrap(); // generate hashes
 
         let block4_hash = block4.hash;
         let block4_id = block4.id;
@@ -2413,7 +2420,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block5.generate(); // generate hashes
+        block5.generate().unwrap(); // generate hashes
 
         let block5_hash = block5.hash;
         let block5_id = block5.id;
@@ -2498,7 +2505,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block2.generate(); // generate hashes
+        block2.generate().unwrap(); // generate hashes
 
         let block2_hash = block2.hash;
         let block2_id = block2.id;
@@ -2528,7 +2535,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block3.generate(); // generate hashes
+        block3.generate().unwrap(); // generate hashes
 
         let block3_hash = block3.hash;
         let block3_id = block3.id;
@@ -2560,7 +2567,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block4.generate(); // generate hashes
+        block4.generate().unwrap(); // generate hashes
 
         let block4_hash = block4.hash;
         let block4_id = block4.id;
@@ -2594,7 +2601,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block5.generate(); // generate hashes
+        block5.generate().unwrap(); // generate hashes
 
         let block5_hash = block5.hash;
         let block5_id = block5.id;
@@ -2630,7 +2637,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block6.generate(); // generate hashes
+        block6.generate().unwrap(); // generate hashes
 
         let block6_hash = block6.hash;
         let block6_id = block6.id;
@@ -2677,7 +2684,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block7.generate(); // generate hashes
+        block7.generate().unwrap(); // generate hashes
 
         let block7_hash = block7.hash;
         let block7_id = block7.id;
@@ -2816,7 +2823,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block2.generate(); // generate hashes
+        block2.generate().unwrap(); // generate hashes
 
         let block2_hash = block2.hash;
         let block2_id = block2.id;
@@ -2846,7 +2853,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block3.generate(); // generate hashes
+        block3.generate().unwrap(); // generate hashes
 
         let block3_hash = block3.hash;
         let block3_id = block3.id;
@@ -2878,7 +2885,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block4.generate(); // generate hashes
+        block4.generate().unwrap(); // generate hashes
 
         let block4_hash = block4.hash;
         let block4_id = block4.id;
@@ -2912,7 +2919,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block5.generate(); // generate hashes
+        block5.generate().unwrap(); // generate hashes
 
         let block5_hash = block5.hash;
         let block5_id = block5.id;
@@ -2948,7 +2955,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block6.generate(); // generate hashes
+        block6.generate().unwrap(); // generate hashes
 
         let block6_hash = block6.hash;
         let block6_id = block6.id;
@@ -2986,7 +2993,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block7.generate(); // generate hashes
+        block7.generate().unwrap(); // generate hashes
 
         let block7_hash = block7.hash;
         let block7_id = block7.id;
@@ -3062,7 +3069,7 @@ mod tests {
             )
             .await;
 
-        block2.generate();
+        block2.generate().unwrap();
 
         let block2_hash = block2.hash;
         assert!(!block2.has_staking_transaction);
@@ -3089,7 +3096,7 @@ mod tests {
             )
             .await;
 
-        block2.generate(); // generate hashes
+        block2.generate().unwrap(); // generate hashes
 
         assert!(block2.has_staking_transaction);
 
@@ -3143,7 +3150,7 @@ mod tests {
             )
             .await;
 
-        block2.generate(); // generate hashes
+        block2.generate().unwrap(); // generate hashes
 
         let block2_hash = block2.hash;
         let block2_id = block2.id;
@@ -3168,7 +3175,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block3.generate(); // generate hashes
+        block3.generate().unwrap(); // generate hashes
         let block3_hash = block3.hash;
         let _block3_id = block3.id;
         t.add_block(block3).await;
@@ -3184,7 +3191,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block4.generate(); // generate hashes
+        block4.generate().unwrap(); // generate hashes
         let block4_hash = block4.hash;
         let _block4_id = block4.id;
         t.add_block(block4).await;
@@ -3200,7 +3207,7 @@ mod tests {
                 false,       // mine golden ticket
             )
             .await;
-        block5.generate(); // generate hashes
+        block5.generate().unwrap(); // generate hashes
         let block5_hash = block5.hash;
         let block5_id = block5.id;
         t.add_block(block5).await;
@@ -3223,7 +3230,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block3_2.generate(); // generate hashes
+        block3_2.generate().unwrap(); // generate hashes
         let block3_2_hash = block3_2.hash;
         let _block3_2_id = block3_2.id;
         t.add_block(block3_2).await;
@@ -3246,7 +3253,7 @@ mod tests {
                 true,          // mine golden ticket
             )
             .await;
-        block4_2.generate(); // generate hashes
+        block4_2.generate().unwrap(); // generate hashes
         let block4_2_hash = block4_2.hash;
         let _block4_2_id = block4_2.id;
         t.add_block(block4_2).await;
@@ -3269,7 +3276,7 @@ mod tests {
                 false,         // mine golden ticket
             )
             .await;
-        block5_2.generate(); // generate hashes
+        block5_2.generate().unwrap(); // generate hashes
         let block5_2_hash = block5_2.hash;
         let _block5_2_id = block5_2.id;
         t.add_block(block5_2).await;
@@ -3292,7 +3299,7 @@ mod tests {
                 true,          // mine golden ticket
             )
             .await;
-        block6_2.generate(); // generate hashes
+        block6_2.generate().unwrap(); // generate hashes
         let block6_2_hash = block6_2.hash;
         let block6_2_id = block6_2.id;
         t.add_block(block6_2).await;
@@ -3346,7 +3353,7 @@ mod tests {
                 true,        // mine golden ticket
             )
             .await;
-        block2.generate(); // generate hashes
+        block2.generate().unwrap(); // generate hashes
 
         let block2_hash = block2.hash;
         let _block2_id = block2.id;
@@ -3433,7 +3440,7 @@ mod tests {
                     true,        // mine golden ticket
                 )
                 .await;
-            block.generate(); // generate hashes
+            block.generate().unwrap(); // generate hashes
 
             let _block_hash = block.hash;
             let _block_id = block.id;
@@ -3541,7 +3548,7 @@ mod tests {
                 .await;
             block2.id = parent_block_id + 1;
             info!("block generate : {:?}", block2.id);
-            block2.generate(); // generate hashes
+            block2.generate().unwrap(); // generate hashes
             block2.sign(&t.wallet_lock.read().await.private_key);
             ts = block2.timestamp;
 

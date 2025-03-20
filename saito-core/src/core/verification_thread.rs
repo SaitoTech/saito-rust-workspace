@@ -134,7 +134,7 @@ impl VerificationThread {
         let mut block = result.unwrap();
         block.routed_from_peer = Some(peer_index);
 
-        block.generate();
+        block.generate().unwrap();
 
         if block.id != block_id || block.hash != block_hash {
             warn!(

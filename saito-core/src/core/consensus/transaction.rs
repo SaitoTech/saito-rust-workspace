@@ -901,6 +901,18 @@ impl Transaction {
             return false;
         }
 
+        if self
+            .from
+            .iter()
+            .map(|slip| slip.utxoset_key)
+            .collect::<Vec<_>>()
+            .len()
+            != self.from.len()
+        {
+            error!("ERROR: transaction : {} has duplicate inputs", self);
+            return false;
+        }
+
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
         // matches our self-generated safety check. We do not need to validate

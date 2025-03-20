@@ -8,7 +8,7 @@ use primitive_types::U256;
 use rayon::prelude::*;
 use tokio::sync::RwLock;
 
-use crate::core::consensus::block::Block;
+use crate::core::consensus::block::{self, Block};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
@@ -138,13 +138,15 @@ impl Mempool {
 
         debug_assert!(transaction.hash_for_signature.is_some());
 
-        if !transaction.from.is_empty() {
-            for input in transaction.from.iter() {
-                let utxo_key = input.utxoset_key;
-                if self.utxo_map.contains_key(&utxo_key) {
-                    // Duplicate input found, reject transaction
-                    return;
-                }
+        for input in transaction.from.iter() {
+            let utxo_key = input.utxoset_key;
+            if self.utxo_map.contains_key(&utxo_key) {
+                // Duplicate input found, reject transaction
+                warn!(
+                    "duplicate input : {} found in transaction : {}",
+                    input, transaction
+                );
+                return;
             }
         }
 
@@ -169,11 +171,9 @@ impl Mempool {
                     .insert(transaction.signature, transaction.clone());
                 self.new_tx_added = true;
 
-                if !transaction.from.is_empty() {
-                    for input in transaction.from.iter() {
-                        let utxo_key = input.utxoset_key;
-                        self.utxo_map.insert(utxo_key, 1);
-                    }
+                for input in transaction.from.iter() {
+                    let utxo_key = input.utxoset_key;
+                    self.utxo_map.insert(utxo_key, 1);
                 }
             }
         }
@@ -232,7 +232,8 @@ impl Mempool {
                 )
                 .ok()?;
         }
-        self.add_transaction(staking_tx).await;
+        self.add_transaction_if_validates(staking_tx, blockchain)
+            .await;
 
         let mut block = Block::create(
             &mut self.transactions,
@@ -245,8 +246,9 @@ impl Mempool {
             configs,
             storage,
         )
-        .await;
-        block.generate();
+        .await
+        .ok()?;
+        block.generate().ok()?;
         debug!(
             "block generated with work : {:?} and burnfee : {:?} gts : {:?}",
             block.total_work,
@@ -297,8 +299,9 @@ impl Mempool {
             configs,
             storage,
         )
-        .await;
-        block.generate();
+        .await
+        .unwrap();
+        block.generate().unwrap();
         self.new_tx_added = false;
         self.routing_work_in_mempool = 0;
 
