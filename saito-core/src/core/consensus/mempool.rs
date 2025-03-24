@@ -140,10 +140,10 @@ impl Mempool {
 
         for input in transaction.from.iter() {
             let utxo_key = input.utxoset_key;
-            if self.utxo_map.contains_key(&utxo_key) {
+            if self.utxo_map.contains_key(&utxo_key) && input.amount > 0 {
                 // Duplicate input found, reject transaction
                 warn!(
-                    "duplicate input : {} found in transaction : {}",
+                    "duplicate input : \n{} found in transaction : \n{}",
                     input, transaction
                 );
                 return;
