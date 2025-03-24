@@ -1080,20 +1080,20 @@ impl Transaction {
                 return false;
             }
 
-            // // the first UTXO_KEY_LENGTH bytes of data match
-            // // the input slip’s UTXO key
-            // if self.data.len() < UTXO_KEY_LENGTH {
-            //     error!("Bound transaction data is too short to contain a valid UTXO key.");
-            //     return false;
-            // }
+            // the first UTXO_KEY_LENGTH bytes of data match
+            // the input slip’s UTXO key
+            if self.data.len() < UTXO_KEY_LENGTH {
+                error!("Bound transaction data is too short to contain a valid UTXO key.");
+                return false;
+            }
 
-            // let expected_utxokey = &self.from[0].utxoset_key;
-            // let extracted_utxokey: &[u8] = &self.data[..UTXO_KEY_LENGTH];
+            let expected_utxokey = &self.from[0].utxoset_key;
+            let extracted_utxokey: &[u8] = &self.data[..UTXO_KEY_LENGTH];
 
-            // if extracted_utxokey != expected_utxokey {
-            //     error!("Bound transaction data does not start with the correct UTXO key.");
-            //     return false;
-            // }
+            if extracted_utxokey != expected_utxokey {
+                error!("Bound transaction data does not start with the correct UTXO key.");
+                return false;
+            }
         } else {
             if self
                 .from

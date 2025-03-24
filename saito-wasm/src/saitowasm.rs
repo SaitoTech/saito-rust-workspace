@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::wasm_balance_snapshot::WasmBalanceSnapshot;
+use crate::wasm_nft::WasmNFT;
 use crate::wasm_block::WasmBlock;
 use crate::wasm_blockchain::WasmBlockchain;
 use crate::wasm_configuration::WasmConfiguration;
@@ -23,7 +24,7 @@ use saito_core::core::consensus::context::Context;
 use saito_core::core::consensus::mempool::Mempool;
 use saito_core::core::consensus::peers::peer_collection::PeerCollection;
 use saito_core::core::consensus::transaction::{Transaction, TransactionType};
-use saito_core::core::consensus::wallet::Wallet;
+use saito_core::core::consensus::wallet::{Wallet, NFT}; 
 use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
 use saito_core::core::defs::{
     BlockId, Currency, PeerIndex, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable,
@@ -564,6 +565,21 @@ pub async fn create_bound_utxo_transaction(
 
     Ok(wasm_transaction)
 }
+
+
+#[wasm_bindgen]
+pub async fn get_nft_list() -> Result<Array, JsValue> {
+    let saito = SAITO.lock().await;
+    let wallet = saito.as_ref().unwrap().context.wallet_lock.read().await;
+
+    let nft_array = Array::new();
+    for nft in wallet.get_nft_list().iter() {
+        nft_array.push(&WasmNFT::from_nft(nft.clone()).into());
+    }
+
+    Ok(nft_array)
+}
+
 
 #[wasm_bindgen]
 pub async fn get_latest_block_hash() -> JsString {

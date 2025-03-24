@@ -13,6 +13,7 @@ mod wasm_task_runner;
 mod wasm_time_keeper;
 mod wasm_transaction;
 mod wasm_wallet;
+mod wasm_nft;
 
 #[cfg(test)]
 mod tests {

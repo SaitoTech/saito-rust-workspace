@@ -55,6 +55,18 @@ pub struct NFT {
     pub tx_sig: SaitoSignature,
 }
 
+impl Default for NFT {
+    fn default() -> Self {
+        Self {
+            utxokey_bound: [0; UTXO_KEY_LENGTH],
+            utxokey_normal: [0; UTXO_KEY_LENGTH],
+            nft_id: vec![],
+            tx_sig: [0; 64],
+        }
+    }
+}
+
+
 /// The `Wallet` manages the public and private keypair of the node and holds the
 /// slips that are used to form transactions on the network.
 #[derive(Clone, Debug, PartialEq)]
@@ -545,7 +557,7 @@ impl Wallet {
 
         // Merge `utxo_key` (already Vec<u8>) and converted `data_as_bytes`
         let mut msg = utxo_key.to_vec(); // Convert utxo_key from `[u8; 59]` to Vec<u8>
-        //let nft_id = msg.clone(); // Store input slip utxo_key as nft_id
+        let nft_id = msg.clone();
 
         info!("tx msg 1: {:?}", msg);
         info!("        ");
@@ -608,6 +620,32 @@ impl Wallet {
         //     nft_id,
         //     tx_sig,
         // });
+
+
+        // Hash and sign the transaction (assuming sign() exists)
+        let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
+        transaction.hash_for_signature = Some(hash_for_signature);
+        transaction.sign(&self.private_key);
+
+        // Extract transaction signature
+        let tx_sig = transaction.signature.clone();
+
+        // Create NFT object
+        let nft = NFT {
+            utxokey_bound,
+            utxokey_normal,
+            nft_id,
+            tx_sig,
+        };
+
+        // Add NFT to wallet storage
+        self.nft_slips.push(nft);
+
+
+        info!("        ");
+        info!("Added NFT to wallet: {:?}", self.nft_slips);
+        info!("        ");
+
 
         info!("final transaction: {:?}", transaction);
         info!("        ");
@@ -859,7 +897,7 @@ impl Wallet {
         Ok((selected_staking_inputs, outputs))
     }
 
-    pub fn get_nft_slips(&self) -> &[NFT] {
+    pub fn get_nft_list(&self) -> &[NFT] {
         &self.nft_slips
     }
 }

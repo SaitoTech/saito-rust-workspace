@@ -7,7 +7,7 @@ import StunPeer from "./lib/stun_peer";
 import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
-
+import Nft from "./lib/nft";
 
 export enum LogLevel {
     Error = 0,
@@ -535,6 +535,11 @@ export default class Saito {
     public async getBalanceSnapshot(keys: string[]): Promise<BalanceSnapshot> {
         let snapshot = await Saito.getLibInstance().get_balance_snapshot(keys);
         return new BalanceSnapshot(snapshot);
+    }
+
+    public async getNftList(): Promise<string> {
+        const nftList = (await Saito.getLibInstance().get_nft_list()).map(nft => new Nft(nft));
+        return JSON.stringify(nftList.map((nft: any) => nft.toJSON())); // Explicitly set nft as `any`
     }
 
     public async updateBalanceFrom(snapshot: BalanceSnapshot) {
