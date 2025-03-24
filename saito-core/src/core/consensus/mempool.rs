@@ -8,7 +8,7 @@ use primitive_types::U256;
 use rayon::prelude::*;
 use tokio::sync::RwLock;
 
-use crate::core::consensus::block::{self, Block};
+use crate::core::consensus::block::Block;
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::burnfee::BurnFee;
 use crate::core::consensus::golden_ticket::GoldenTicket;
@@ -140,10 +140,10 @@ impl Mempool {
 
         for input in transaction.from.iter() {
             let utxo_key = input.utxoset_key;
-            if self.utxo_map.contains_key(&utxo_key) {
+            if self.utxo_map.contains_key(&utxo_key) && input.amount > 0 {
                 // Duplicate input found, reject transaction
                 warn!(
-                    "duplicate input : {} found in transaction : {}",
+                    "duplicate input : \n{} found in transaction : \n{}",
                     input, transaction
                 );
                 return;
