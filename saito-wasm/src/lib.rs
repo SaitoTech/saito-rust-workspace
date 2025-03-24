@@ -6,6 +6,7 @@ mod wasm_configuration;
 mod wasm_consensus_values;
 mod wasm_hop;
 mod wasm_io_handler;
+mod wasm_nft;
 mod wasm_peer;
 mod wasm_peer_service;
 mod wasm_slip;
@@ -13,7 +14,6 @@ mod wasm_task_runner;
 mod wasm_time_keeper;
 mod wasm_transaction;
 mod wasm_wallet;
-mod wasm_nft;
 
 #[cfg(test)]
 mod tests {

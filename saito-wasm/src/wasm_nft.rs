@@ -46,7 +46,6 @@ impl WasmNFT {
         buffer.copy_from(self.nft.tx_sig.as_slice());
         buffer
     }
-
 }
 
 impl WasmNFT {

@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::blockchain::Blockchain;
-use log::{debug, error, trace, warn, info};
+use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
@@ -530,10 +530,11 @@ impl Transaction {
     // tx.work -> needed to confirm adequate routing work
     //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
-
-
         info!("          ");
-        info!("tx generate: public_key: {:?} tx_index: {:?} block_id: {:?}", public_key, tx_index, block_id);
+        info!(
+            "tx generate: public_key: {:?} tx_index: {:?} block_id: {:?}",
+            public_key, tx_index, block_id
+        );
         info!("          ");
 
         info!("generate_hash_for_signature /////////");
@@ -546,7 +547,6 @@ impl Transaction {
         // nolan_in, nolan_out, total fees
         self.generate_total_fees(tx_index, block_id);
 
-
         info!("          ");
         info!("generate_hash_for_signature /////////");
         // routing work for asserted public_key (creator)
@@ -554,7 +554,6 @@ impl Transaction {
 
         true
     }
-
 
     // calculate cumulative fee share in block
     pub fn generate_cumulative_fees(&mut self, cumulative_fees: Currency) -> Currency {
@@ -584,7 +583,7 @@ impl Transaction {
             .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
-                if slip.slip_type != SlipType::ATR && slip.slip_type != SlipType::Bound  {
+                if slip.slip_type != SlipType::ATR && slip.slip_type != SlipType::Bound {
                     slip.block_id = block_id;
                     slip.tx_ordinal = tx_index;
                     slip.slip_index = index as u8;

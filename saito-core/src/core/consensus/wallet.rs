@@ -66,7 +66,6 @@ impl Default for NFT {
     }
 }
 
-
 /// The `Wallet` manages the public and private keypair of the node and holds the
 /// slips that are used to form transactions on the network.
 #[derive(Clone, Debug, PartialEq)]
@@ -540,7 +539,6 @@ impl Wallet {
         // we sepcify that the first N bytes are the sending UTXO key
         //
 
-
         info!("data: {:?}", data);
         info!("                   ");
 
@@ -602,7 +600,7 @@ impl Wallet {
             debug!("Skipping change slip as change amount is zero.");
         }
 
-//        transaction.total_fees = fee;
+        //        transaction.total_fees = fee;
 
         //
         // hash and sign
@@ -620,7 +618,6 @@ impl Wallet {
         //     nft_id,
         //     tx_sig,
         // });
-
 
         // Hash and sign the transaction (assuming sign() exists)
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
@@ -641,11 +638,9 @@ impl Wallet {
         // Add NFT to wallet storage
         self.nft_slips.push(nft);
 
-
         info!("        ");
         info!("Added NFT to wallet: {:?}", self.nft_slips);
         info!("        ");
-
 
         info!("final transaction: {:?}", transaction);
         info!("        ");
