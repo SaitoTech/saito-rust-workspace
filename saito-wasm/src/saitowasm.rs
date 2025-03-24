@@ -49,9 +49,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 use web_sys::console;
-
 use std::convert::TryInto;
-
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
@@ -485,6 +483,90 @@ pub async fn create_transaction_with_multiple_payments(
 }
 
 #[wasm_bindgen]
+pub async fn create_bound_utxo_transaction(
+    amt: u64,
+    bid: u64,
+    tid: u64,
+    sid: u64,
+    num: u32,
+    deposit: u64,
+    change: u64,
+    data: String,
+    fee: u64,
+    recipient_public_key: JsString,
+) -> Result<WasmTransaction, JsValue> {
+    let saito = SAITO.lock().await;
+    let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
+    //let recipient_public_key: SaitoPublicKey = [0; 33]; // Default empty key
+
+    info!("Received in saitowasm.rs:");
+    info!("Amount: {}", amt);
+    info!("Bid: {}", bid);
+    info!("Tid: {}", tid);
+    info!("Sid: {}", sid);
+    info!("Num: {}", num);
+    info!("Deposit: {}", deposit);
+    info!("Change: {}", change);
+    info!("Image data JSON: {}", data);
+    info!("fee: {}", fee);
+    info!("recipient_public_key: {}", recipient_public_key);
+
+    // Convert the `data` string into a JSON object
+    let serialized_data = match serde_json::to_vec(&data) {
+        Ok(vec) => vec,
+        Err(e) => {
+            error!("Failed to serialize data: {}", e);
+            return Err(JsValue::from_str("Failed to serialize data"));
+        }
+    };
+
+    // Convert Vec<u8> into Vec<u32>
+    let serialized_data_u32: Vec<u32> = serialized_data
+        .chunks(4)
+        .map(|chunk| {
+            let mut bytes = [0u8; 4];
+            for (i, &byte) in chunk.iter().enumerate() {
+                bytes[i] = byte;
+            }
+            u32::from_le_bytes(bytes)
+        })
+        .collect();
+
+    let key = string_to_key(recipient_public_key).or(Err(JsValue::from(
+        "Failed parsing public key string to key",
+    )))?;
+
+    let transaction = wallet
+        .create_bound_utxo_transaction(
+            amt,
+            bid,
+            tid,
+            sid,
+            deposit,
+            change,
+            serialized_data_u32,
+            fee,
+            &key,
+        )
+        .await;
+
+    if transaction.is_err() {
+        error!(
+            "failed creating transaction. {:?}",
+            transaction.err().unwrap()
+        );
+        return Err(JsValue::from("Failed creating transaction"));
+    }
+
+    let transaction = transaction.unwrap();
+
+    info!("wasm transaction: {:}", transaction);
+    let wasm_transaction = WasmTransaction::from_transaction(transaction);
+
+    Ok(wasm_transaction)
+}
+
+#[wasm_bindgen]
 pub async fn send_bound_transaction(
     amt: u64,
     utxokey_bound: String,
@@ -519,60 +601,6 @@ pub async fn send_bound_transaction(
 
     let key = string_to_key(recipient_public_key).or(Err(JsValue::from(
         "Failed parsing public key string to key",
-    )))?;
-
-    let tx = wallet.send_bound_transaction(
-        amt,
-        utxo_bound,
-        utxo_normal,       
-        nft_id_vec,
-        num,
-        serialized_data_u32,
-        fee,
-        &key
-    ).await.map_err(|_| JsValue::from_str("Failed to transfer NFT transaction"))?;
-
-    let wasm_transaction = WasmTransaction::from_transaction(tx);
-    Ok(wasm_transaction)
-}
-
-
-
-#[wasm_bindgen]
-pub async fn send_bound_transaction(
-    amt: u64,
-    utxokey_bound: String,
-    utxokey_normal: String,   
-    nft_id: u32,
-    num: u32,
-    data: String,
-    fee: u64,
-    recipient_public_key: JsString,
-) -> Result<WasmTransaction, JsValue> {
-
-   let saito = SAITO.lock().await;
-    let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
-
-    let utxo_bound = string_to_utxokey(&utxokey_bound)
-        .map_err(|_| JsValue::from_str("Invalid bound UTXO key"))?;
-    
-    let utxo_normal = string_to_utxokey(&utxokey_normal)
-        .map_err(|_| JsValue::from_str("Invalid normal UTXO key"))?;
-    
-    let nft_id_vec = nft_id.to_le_bytes().to_vec();
-    
-    let serialized_data = serde_json::to_vec(&data)
-        .map_err(|_| JsValue::from_str("Failed to serialize data"))?;
-    let serialized_data_u32: Vec<u32> = serialized_data.chunks(4).map(|chunk| {
-        let mut bytes = [0u8; 4];
-        for (i, &b) in chunk.iter().enumerate() {
-            bytes[i] = b;
-        }
-        u32::from_le_bytes(bytes)
-    }).collect();
-
-    let key = string_to_key(recipient_public_key).or(Err(JsValue::from(
-    "Failed parsing public key string to key",
     )))?;
 
     let tx = wallet.send_bound_transaction(
@@ -1629,7 +1657,6 @@ pub fn string_to_utxoset_key(s: &str) -> Result<SaitoUTXOSetKey, Box<dyn std::er
     let arr: SaitoUTXOSetKey = bytes.as_slice().try_into()?;
     Ok(arr)
 }
-
 
 // #[cfg(test)]
 // mod test {
