@@ -18,7 +18,7 @@ use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDATED};
 use crate::core::defs::{
     BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
-    Timestamp, UtxoSet, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
+    Timestamp, UtxoSet, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR, NOLAN_PER_SAITO,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -44,8 +44,8 @@ const FORK_ID_WEIGHTS: [u64; 16] = [
     0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
 ];
 
-// pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
-pub const DEFAULT_SOCIAL_STAKE: Currency = 0;
+pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
+// pub const DEFAULT_SOCIAL_STAKE: Currency = 0;
 
 pub const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 60;
 
