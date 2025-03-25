@@ -41,7 +41,7 @@ pub mod test {
     use tokio::sync::RwLock;
 
     use crate::core::consensus::block::{Block, BlockType};
-    use crate::core::consensus::blockchain::{AddBlockResult, Blockchain, DEFAULT_SOCIAL_STAKE};
+    use crate::core::consensus::blockchain::{AddBlockResult, Blockchain};
     use crate::core::consensus::golden_ticket::GoldenTicket;
     use crate::core::consensus::mempool::Mempool;
     use crate::core::consensus::peers::peer_collection::PeerCollection;
@@ -50,7 +50,7 @@ pub mod test {
     use crate::core::consensus::wallet::Wallet;
     use crate::core::defs::{
         Currency, PrintForLog, SaitoHash, SaitoPrivateKey, SaitoPublicKey, SaitoSignature,
-        Timestamp, UtxoSet, PROJECT_PUBLIC_KEY,
+        Timestamp, UtxoSet, NOLAN_PER_SAITO, PROJECT_PUBLIC_KEY,
     };
     use crate::core::io::network::Network;
     use crate::core::io::storage::Storage;
@@ -98,7 +98,12 @@ pub mod test {
             let wallet = Wallet::new(keys.1, keys.0);
             let peers = Arc::new(RwLock::new(PeerCollection::default()));
             let wallet_lock = Arc::new(RwLock::new(wallet));
-            let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone(), 100)));
+            let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(
+                wallet_lock.clone(),
+                100,
+                0,
+                60,
+            )));
             let mempool_lock = Arc::new(RwLock::new(Mempool::new(wallet_lock.clone())));
             let (sender_to_miner, receiver_in_miner) = tokio::sync::mpsc::channel(1000);
             let configs = Arc::new(RwLock::new(TestConfiguration {
@@ -107,6 +112,8 @@ pub mod test {
                     heartbeat_interval: 100,
                     prune_after_blocks: 8,
                     max_staker_recursions: 3,
+                    default_social_stake: 0,
+                    default_social_stake_period: 60,
                 },
             }));
 
@@ -177,7 +184,7 @@ pub mod test {
         pub async fn enable_staking(&mut self, mut stake_value: Currency) {
             let mut blockchain = self.blockchain_lock.write().await;
             if stake_value == 0 {
-                stake_value = DEFAULT_SOCIAL_STAKE;
+                stake_value = 2_000_000 * NOLAN_PER_SAITO;
             }
             blockchain.social_stake_requirement = stake_value;
         }
