@@ -386,44 +386,44 @@ export default class Saito {
 
 
 
-    public async sendBoundTransaction(
-      amt: bigint,
-      utxokey_bound: string,
-      utxokey_normal: string,    
-      nft_id: number,
-      num: number,
-      data: string = "",
-      fee: bigint,
-      recipient_public_key: string
-    ): Promise<string> {
-      console.log("Transfer NFT parameters:");
-      console.log("Amount:", amt);
-      console.log("Bound UTXO Key:", utxokey_bound);
-      console.log("Normal UTXO Key:", utxokey_normal);
-      console.log("NFT id:", nft_id);
-      console.log("Slip num:", num);
-      console.log("Data:", data);
-      console.log("Fee:", fee);
-      console.log("New recipient public key:", recipient_public_key);
+    // public async sendBoundTransaction(
+    //   amt: bigint,
+    //   utxokey_bound: string,
+    //   utxokey_normal: string,    
+    //   nft_id: number,
+    //   num: number,
+    //   data: string = "",
+    //   fee: bigint,
+    //   recipient_public_key: string
+    // ): Promise<string> {
+    //   console.log("Transfer NFT parameters:");
+    //   console.log("Amount:", amt);
+    //   console.log("Bound UTXO Key:", utxokey_bound);
+    //   console.log("Normal UTXO Key:", utxokey_normal);
+    //   console.log("NFT id:", nft_id);
+    //   console.log("Slip num:", num);
+    //   console.log("Data:", data);
+    //   console.log("Fee:", fee);
+    //   console.log("New recipient public key:", recipient_public_key);
 
-      let wasmTx = await Saito.getLibInstance().send_bound_transaction(
-        amt,
-        utxokey_bound,
-        utxokey_normal,
-        nft_id,
-        num,
-        data,
-        fee,
-        recipient_public_key
-      );
+    //   let wasmTx = await Saito.getLibInstance().send_bound_transaction(
+    //     amt,
+    //     utxokey_bound,
+    //     utxokey_normal,
+    //     nft_id,
+    //     num,
+    //     data,
+    //     fee,
+    //     recipient_public_key
+    //   );
 
-      console.log("WASM NFT transfer transaction:", wasmTx);
+    //   console.log("WASM NFT transfer transaction:", wasmTx);
 
-      let tx = Saito.getInstance().factory.createTransaction(wasmTx);
-      tx.timestamp = new Date().getTime();
+    //   let tx = Saito.getInstance().factory.createTransaction(wasmTx);
+    //   tx.timestamp = new Date().getTime();
 
-      return JSON.stringify(tx);
-    }
+    //   return JSON.stringify(tx);
+    // }
 
 
 
