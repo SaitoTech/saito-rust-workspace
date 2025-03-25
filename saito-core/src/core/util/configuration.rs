@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use crate::core::defs::Currency;
 use crate::core::defs::{BlockId, Timestamp};
 use serde::Deserialize;
 use serde::Serialize;
@@ -41,6 +42,12 @@ fn get_default_reconnection_wait_time() -> Timestamp {
 }
 fn get_default_stat_timer() -> Timestamp {
     5_000
+}
+fn get_default_social_stake() -> Timestamp {
+    0
+}
+fn get_default_social_stake_period() -> Timestamp {
+    60
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Server {
@@ -96,7 +103,12 @@ pub struct ConsensusConfig {
     pub prune_after_blocks: u64,
     #[serde(default = "get_default_max_staker_recursions")]
     pub max_staker_recursions: BlockId,
+    #[serde(default = "get_default_social_stake")]
+    pub default_social_stake: Currency,
+    #[serde(default = "get_default_social_stake_period")]
+    pub default_social_stake_period: BlockId,
 }
+
 impl Default for ConsensusConfig {
     fn default() -> Self {
         ConsensusConfig {
@@ -104,6 +116,8 @@ impl Default for ConsensusConfig {
             heartbeat_interval: 5_000,
             prune_after_blocks: 8,
             max_staker_recursions: 3,
+            default_social_stake: 0,
+            default_social_stake_period: 60,
         }
     }
 }

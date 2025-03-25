@@ -440,6 +440,17 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 "genesis_period : {:?}",
                 configs.get_consensus_config().unwrap().genesis_period
             );
+            info!(
+                "default_social_stake : {:?}",
+                configs.get_consensus_config().unwrap().default_social_stake
+            );
+            info!(
+                "default_social_stake_period : {:?}",
+                configs
+                    .get_consensus_config()
+                    .unwrap()
+                    .default_social_stake_period
+            );
             let mut blockchain = self.blockchain_lock.write().await;
             let blockchain_configs = configs.get_blockchain_configs();
             if let Some(blockchain_configs) = blockchain_configs {
@@ -627,7 +638,6 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 mod tests {
     use log::info;
 
-    use crate::core::consensus::blockchain::DEFAULT_SOCIAL_STAKE_PERIOD;
     use crate::core::consensus::slip::SlipType;
     use crate::core::defs::{PrintForLog, SaitoHash, NOLAN_PER_SAITO, UTXO_KEY_LENGTH};
 
@@ -895,13 +905,10 @@ mod tests {
         let mut tester = NodeTester::default();
         let public_key = tester.get_public_key().await;
         tester
-            .set_staking_requirement(2 * NOLAN_PER_SAITO, DEFAULT_SOCIAL_STAKE_PERIOD)
+            .set_staking_requirement(2 * NOLAN_PER_SAITO, 60)
             .await;
         let issuance = vec![
-            (
-                public_key.to_base58(),
-                DEFAULT_SOCIAL_STAKE_PERIOD * 2 * NOLAN_PER_SAITO,
-            ),
+            (public_key.to_base58(), 60 * 2 * NOLAN_PER_SAITO),
             (public_key.to_base58(), 100 * NOLAN_PER_SAITO),
             (
                 "27UK2MuBTdeARhYp97XBnCovGkEquJjkrQntCgYoqj6GC".to_string(),
@@ -940,7 +947,7 @@ mod tests {
                     .await
                     .staking_slips
                     .len() as u64,
-                std::cmp::min(DEFAULT_SOCIAL_STAKE_PERIOD, i - 1)
+                std::cmp::min(60, i - 1)
             );
             let available_balance = tester
                 .consensus_thread
@@ -949,8 +956,7 @@ mod tests {
                 .await
                 .get_available_balance();
             assert!(
-                available_balance
-                    + std::cmp::min(DEFAULT_SOCIAL_STAKE_PERIOD, i - 1) * 2 * NOLAN_PER_SAITO
+                available_balance + std::cmp::min(60, i - 1) * 2 * NOLAN_PER_SAITO
                     <= tester.initial_token_supply
             );
         }

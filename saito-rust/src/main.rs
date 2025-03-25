@@ -586,6 +586,8 @@ async fn run_node(
     let verification_thread_count;
     let fetch_batch_size;
     let genesis_period;
+    let social_stake;
+    let social_stake_period;
     {
         let configs = configs_lock.read().await;
 
@@ -599,6 +601,11 @@ async fn run_node(
         verification_thread_count = configs.get_server_configs().unwrap().verification_threads;
         fetch_batch_size = configs.get_server_configs().unwrap().block_fetch_batch_size as usize;
         genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+        social_stake = configs.get_consensus_config().unwrap().default_social_stake;
+        social_stake_period = configs
+            .get_consensus_config()
+            .unwrap()
+            .default_social_stake_period;
         assert_ne!(fetch_batch_size, 0);
     }
 
@@ -630,7 +637,13 @@ async fn run_node(
         hasten_multiplier,
         start_time: TimeKeeper {}.get_timestamp_in_ms(),
     };
-    let context = Context::new(configs_lock.clone(), wallet_lock, genesis_period);
+    let context = Context::new(
+        configs_lock.clone(),
+        wallet_lock,
+        genesis_period,
+        social_stake,
+        social_stake_period,
+    );
 
     let peers_lock = Arc::new(RwLock::new(PeerCollection::default()));
 
@@ -783,6 +796,18 @@ pub async fn run_utxo_to_issuance_converter(threshold: Currency) {
             .get_consensus_config()
             .unwrap()
             .genesis_period,
+        configs_clone
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .default_social_stake,
+        configs_clone
+            .read()
+            .await
+            .get_consensus_config()
+            .unwrap()
+            .default_social_stake_period,
     );
 
     let (sender_to_network_controller, _receiver_in_network_controller) =

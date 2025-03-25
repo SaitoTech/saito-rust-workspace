@@ -1,7 +1,7 @@
 #[cfg(test)]
 pub mod test {
     use crate::core::consensus::block::{Block, BlockType};
-    use crate::core::consensus::blockchain::{Blockchain, DEFAULT_SOCIAL_STAKE};
+    use crate::core::consensus::blockchain::Blockchain;
     use crate::core::consensus::blockchain_sync_state::BlockchainSyncState;
     use crate::core::consensus::context::Context;
     use crate::core::consensus::mempool::Mempool;
@@ -125,6 +125,8 @@ pub mod test {
                     heartbeat_interval: 5_000,
                     prune_after_blocks: 8,
                     max_staker_recursions: 3,
+                    default_social_stake: 0,
+                    default_social_stake_period: 60,
                 }),
             }
         }
@@ -179,6 +181,8 @@ pub mod test {
                 blockchain_lock: Arc::new(RwLock::new(Blockchain::new(
                     wallet.clone(),
                     genesis_period,
+                    0,
+                    60,
                 ))),
                 mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
                 wallet_lock: wallet.clone(),
@@ -520,7 +524,7 @@ pub mod test {
                 .blockchain_lock
                 .write()
                 .await
-                .social_stake_requirement = if enable { DEFAULT_SOCIAL_STAKE } else { 0 };
+                .social_stake_requirement = if enable { 60 } else { 0 };
         }
         pub async fn set_staking_requirement(&self, amount: Currency, period: u64) {
             let mut blockchain = self.routing_thread.blockchain_lock.write().await;

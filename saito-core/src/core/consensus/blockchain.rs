@@ -19,7 +19,6 @@ use crate::core::consensus::wallet::{Wallet, WalletUpdateStatus, WALLET_NOT_UPDA
 use crate::core::defs::{
     BlockHash, BlockId, Currency, ForkId, PrintForLog, SaitoHash, SaitoPublicKey, SaitoUTXOSetKey,
     Timestamp, UtxoSet, MIN_GOLDEN_TICKETS_DENOMINATOR, MIN_GOLDEN_TICKETS_NUMERATOR,
-    NOLAN_PER_SAITO,
 };
 use crate::core::io::interface_io::InterfaceEvent;
 use crate::core::io::network::Network;
@@ -45,10 +44,10 @@ const FORK_ID_WEIGHTS: [u64; 16] = [
     0, 10, 10, 10, 10, 10, 25, 25, 100, 300, 500, 4000, 10000, 20000, 50000, 100000,
 ];
 
-pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
+// pub const DEFAULT_SOCIAL_STAKE: Currency = 2_000_000 * NOLAN_PER_SAITO;
 // pub const DEFAULT_SOCIAL_STAKE: Currency = 0;
 
-pub const DEFAULT_SOCIAL_STAKE_PERIOD: u64 = 60;
+// pub const DEFAULT_SOCIAL_STAKE_PERIOD: BlockId = 60;
 
 #[derive(Debug)]
 pub enum AddBlockResult {
@@ -100,7 +99,13 @@ pub struct Blockchain {
 
 impl Blockchain {
     #[allow(clippy::new_without_default)]
-    pub fn new(wallet_lock: Arc<RwLock<Wallet>>, genesis_period: BlockId) -> Self {
+    pub fn new(
+        wallet_lock: Arc<RwLock<Wallet>>,
+        genesis_period: BlockId,
+        social_stake: Currency,
+        social_stake_period: BlockId,
+    ) -> Self {
+        info!("initializing blockchain with genesis period : {:?}, social_stake : {:?}, social_stake_period : {:?}", genesis_period,social_stake,social_stake_period);
         Blockchain {
             utxoset: AHashMap::new(),
             blockring: BlockRing::new(genesis_period),
@@ -118,8 +123,8 @@ impl Blockchain {
             lowest_acceptable_block_hash: [0; 32],
             lowest_acceptable_block_id: 0,
             // blocks_fetching: Default::default(),
-            social_stake_requirement: DEFAULT_SOCIAL_STAKE,
-            social_stake_period: DEFAULT_SOCIAL_STAKE_PERIOD,
+            social_stake_requirement: social_stake,
+            social_stake_period,
             genesis_period,
         }
     }
@@ -2189,7 +2194,6 @@ mod tests {
     use crate::core::consensus::block::Block;
     use crate::core::consensus::blockchain::{
         bit_pack, bit_unpack, is_golden_ticket_count_valid_, AddBlockResult, Blockchain,
-        DEFAULT_SOCIAL_STAKE,
     };
     use crate::core::consensus::slip::Slip;
     use crate::core::consensus::wallet::Wallet;
@@ -2215,7 +2219,7 @@ mod tests {
         let keys = generate_keys();
 
         let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
-        let blockchain = Blockchain::new(wallet, 1_000);
+        let blockchain = Blockchain::new(wallet, 1_000, 0, 60);
 
         assert_eq!(blockchain.fork_id, None);
         assert_eq!(blockchain.genesis_block_id, 0);
@@ -2225,7 +2229,7 @@ mod tests {
     async fn test_add_block() {
         let keys = generate_keys();
         let wallet = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
-        let blockchain = Blockchain::new(wallet, 1_000);
+        let blockchain = Blockchain::new(wallet, 1_000, 0, 60);
 
         assert_eq!(blockchain.fork_id, None);
         assert_eq!(blockchain.genesis_block_id, 0);
@@ -3033,13 +3037,13 @@ mod tests {
         debug!("testing block_add_test_staking");
 
         let mut t = TestManager::default();
-        t.enable_staking(DEFAULT_SOCIAL_STAKE).await;
+        t.enable_staking(2_000_000 * NOLAN_PER_SAITO).await;
         let block1;
         let block1_hash;
         let ts;
 
         t.initialize(100, 200_000_000_000_000).await;
-        t.enable_staking(DEFAULT_SOCIAL_STAKE).await;
+        t.enable_staking(2_000_000 * NOLAN_PER_SAITO).await;
 
         {
             let blockchain = t.blockchain_lock.read().await;
