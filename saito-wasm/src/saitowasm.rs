@@ -67,13 +67,19 @@ pub struct SaitoWasm {
 }
 
 lazy_static! {
-    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true, 100_000)));
+    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true, 100_000, 0, 60)));
     static ref CONFIGS: Arc<RwLock<dyn Configuration + Send + Sync>> =
         Arc::new(RwLock::new(WasmConfiguration::new()));
     static ref PRIVATE_KEY: Mutex<String> = Mutex::new("".to_string());
 }
 
-pub fn new(haste_multiplier: u64, enable_stats: bool, genesis_period: BlockId) -> SaitoWasm {
+pub fn new(
+    haste_multiplier: u64,
+    enable_stats: bool,
+    genesis_period: BlockId,
+    social_stake: Currency,
+    social_stake_period: BlockId,
+) -> SaitoWasm {
     info!("creating new saito wasm instance");
     console_error_panic_hook::set_once();
 
@@ -93,7 +99,12 @@ pub fn new(haste_multiplier: u64, enable_stats: bool, genesis_period: BlockId) -
 
     let peers = Arc::new(RwLock::new(PeerCollection::default()));
     let context = Context {
-        blockchain_lock: Arc::new(RwLock::new(Blockchain::new(wallet.clone(), genesis_period))),
+        blockchain_lock: Arc::new(RwLock::new(Blockchain::new(
+            wallet.clone(),
+            genesis_period,
+            social_stake,
+            social_stake_period,
+        ))),
         mempool_lock: Arc::new(RwLock::new(Mempool::new(wallet.clone()))),
         wallet_lock: wallet.clone(),
         config_lock: configuration.clone(),
@@ -347,6 +358,8 @@ pub async fn initialize(
 
     let mut enable_stats = true;
     let mut genesis_period = 100_000;
+    let mut social_stake = 0;
+    let mut social_stake_period = 60;
     {
         info!("setting configs...");
         let mut configs = CONFIGS.write().await;
@@ -363,14 +376,27 @@ pub async fn initialize(
                 enable_stats = false;
             }
             info!("config : {:?}", config);
-            genesis_period = configs.get_consensus_config().unwrap().genesis_period;
             configs.replace(&config);
+            genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+            social_stake = configs.get_consensus_config().unwrap().default_social_stake;
+            social_stake_period = configs
+                .get_consensus_config()
+                .unwrap()
+                .default_social_stake_period;
         }
     }
 
     let mut saito = SAITO.lock().await;
 
-    saito.replace(new(hasten_multiplier, enable_stats, genesis_period));
+    info!("genesis_period = {:?}", genesis_period);
+    info!("social_stake = {:?}", social_stake);
+    saito.replace(new(
+        hasten_multiplier,
+        enable_stats,
+        genesis_period,
+        social_stake,
+        social_stake_period,
+    ));
 
     let private_key: SaitoPrivateKey = string_to_hex(private_key).or(Err(JsValue::from(
         "Failed parsing private key string to key",

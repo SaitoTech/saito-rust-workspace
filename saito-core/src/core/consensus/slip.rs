@@ -351,7 +351,12 @@ mod tests {
     async fn slip_addition_and_removal_from_utxoset() {
         let keys = generate_keys();
         let wallet_lock = Arc::new(RwLock::new(Wallet::new(keys.1, keys.0)));
-        let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(wallet_lock.clone(), 1000)));
+        let blockchain_lock = Arc::new(RwLock::new(Blockchain::new(
+            wallet_lock.clone(),
+            1000,
+            0,
+            60,
+        )));
         let mut blockchain = blockchain_lock.write().await;
 
         let mut slip = Slip::default();

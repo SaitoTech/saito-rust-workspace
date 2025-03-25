@@ -57,6 +57,8 @@ impl Default for NodeConfigurations {
                 heartbeat_interval: 5_000,
                 prune_after_blocks: 8,
                 max_staker_recursions: 3,
+                default_social_stake: 0,
+                default_social_stake_period: 60,
             }),
         }
     }
