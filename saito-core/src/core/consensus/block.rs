@@ -485,10 +485,10 @@ impl Display for Block {
             self.cv,
             self.routed_from_peer,
         ).unwrap();
-        writeln!(f, " transactions : ").unwrap();
-        for (index, tx) in self.transactions.iter().enumerate() {
-            writeln!(f, "tx {} : {}", index, tx).unwrap();
-        }
+        // writeln!(f, " transactions : ").unwrap();
+        // for (index, tx) in self.transactions.iter().enumerate() {
+        //     writeln!(f, "tx {} : {}", index, tx).unwrap();
+        // }
         writeln!(f, "}}")
     }
 }
