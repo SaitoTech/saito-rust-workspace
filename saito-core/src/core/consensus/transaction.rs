@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::blockchain::Blockchain;
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
@@ -544,12 +544,25 @@ impl Transaction {
     // tx.work -> needed to confirm adequate routing work
     //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
+        info!("          ");
+        info!(
+            "tx generate: public_key: {:?} tx_index: {:?} block_id: {:?}",
+            public_key, tx_index, block_id
+        );
+        info!("          ");
+
+        info!("generate_hash_for_signature /////////");
+
         // ensure hash exists for signing
         self.generate_hash_for_signature();
 
+        info!("          ");
+        info!("generate_hash_for_signature /////////");
         // nolan_in, nolan_out, total fees
         self.generate_total_fees(tx_index, block_id);
 
+        info!("          ");
+        info!("generate_hash_for_signature /////////");
         // routing work for asserted public_key (creator)
         self.generate_total_work(public_key);
 
@@ -584,7 +597,7 @@ impl Transaction {
             .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
-                if slip.slip_type != SlipType::ATR || slip.slip_type != SlipType::Bound {
+                if slip.slip_type != SlipType::ATR && slip.slip_type != SlipType::Bound {
                     slip.block_id = block_id;
                     slip.tx_ordinal = tx_index;
                     slip.slip_index = index as u8;
@@ -660,7 +673,6 @@ impl Transaction {
             let half_of_routing_work: Currency = routing_work_available_to_public_key / 2;
             routing_work_available_to_public_key -= half_of_routing_work;
         }
-
         self.total_work_for_me = routing_work_available_to_public_key;
     }
 
@@ -1071,21 +1083,59 @@ impl Transaction {
         if transaction_type == TransactionType::GoldenTicket {}
 
         if transaction_type == TransactionType::Bound {
-            // TODO : check if bound slips have matching normal slips
-
-            // first input slip should be non-zero
-            if let Some(slip) = self.from.first() {
-                if slip.amount == 0 {
-                    // first slip should have a value to make sure the NFT creator cannot mint multiple transactions with the same hash
-                    return false;
-                }
-            } else {
+            // ensure there is only one input slip
+            if self.from.len() != 1 {
+                error!("Bound transaction must have exactly 1 input slip.");
                 return false;
             }
 
-            // validate input bound slips
+            let slip = &self.from[0];
 
-            // validate output bound slips
+            // first slip shouldnt be bound
+            if slip.slip_type == SlipType::Bound {
+                error!("Bound transaction input slip cannot be of type Bound.");
+                return false;
+            }
+
+            // there are exactly 2 or 3 output slips
+            if self.to.len() < 2 || self.to.len() > 3 {
+                error!("Bound transaction must have exactly 2 or 3 output slips.");
+                return false;
+            }
+
+            // output contains at least 1 Bound slip and 1 Normal slip.
+            let mut has_bound = false;
+            let mut has_normal = false;
+
+            for slip in &self.to {
+                match slip.slip_type {
+                    SlipType::Bound => has_bound = true,
+                    SlipType::Normal => has_normal = true,
+                    _ => {}
+                }
+            }
+
+            if !has_bound || !has_normal {
+                error!(
+                    "Bound transaction must contain at least one Bound slip and one Normal slip."
+                );
+                return false;
+            }
+
+            // the first UTXO_KEY_LENGTH bytes of data match
+            // the input slip’s UTXO key
+            // if self.data.len() < UTXO_KEY_LENGTH {
+            //     error!("Bound transaction data is too short to contain a valid UTXO key.");
+            //     return false;
+            // }
+
+            // let expected_utxokey = &self.from[0].utxoset_key;
+            // let extracted_utxokey: &[u8] = &self.data[..UTXO_KEY_LENGTH];
+
+            // if extracted_utxokey != expected_utxokey {
+            //     error!("Bound transaction data does not start with the correct UTXO key.");
+            //     return false;
+            // }
         } else {
             if self
                 .from
