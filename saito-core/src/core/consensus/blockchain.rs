@@ -724,13 +724,12 @@ impl Blockchain {
         fork_id: SaitoHash,
         my_latest_block_id: u64,
     ) -> Option<u64> {
-        trace!("generate_last_shared_ancestor_when_peer_behind");
-        let mut block_id = peer_latest_block_id;
+        let mut block_id = my_latest_block_id;
         block_id = block_id - (block_id % 10);
 
-        trace!(
-            "peer_block_id : {:?}, my_block_id : {:?}",
-            block_id,
+        debug!(
+            "generate_last_shared_ancestor_when_peer_behind peer_block_id : {:?}, my_block_id : {:?}",
+            peer_latest_block_id,
             my_latest_block_id
         );
         for (index, weight) in FORK_ID_WEIGHTS.iter().enumerate() {
@@ -750,14 +749,13 @@ impl Blockchain {
                 index
             );
 
-            // do not loop around if block id < 0
-            // if my_block_id > peer_latest_block_id {
-            //     debug!(
-            //         "my_block_id {:?} > peer_latest_block_id : {:?}",
-            //         my_block_id, peer_latest_block_id
-            //     );
-            //     continue;
-            // }
+            if block_id > peer_latest_block_id {
+                trace!(
+                    "my_block_id {:?} > peer_latest_block_id : {:?}. skipping",
+                    block_id, peer_latest_block_id
+                );
+                continue;
+            }
 
             // index in fork_id hash
             let index = 2 * index;
@@ -790,13 +788,12 @@ impl Blockchain {
         fork_id: SaitoHash,
         my_latest_block_id: u64,
     ) -> Option<u64> {
-        trace!("generate_last_shared_ancestor_when_peer_ahead");
-        let mut block_id = my_latest_block_id;
+        let mut block_id = peer_latest_block_id;
         // roll back to last even 10 blocks
         block_id = block_id - (block_id % 10);
-        trace!(
-            "peer_block_id : {:?}, my_block_id : {:?}",
-            block_id,
+        debug!(
+            "generate_last_shared_ancestor_when_peer_ahead peer_block_id : {:?}, my_block_id : {:?}",
+            peer_latest_block_id,
             my_latest_block_id
         );
 
@@ -818,13 +815,13 @@ impl Blockchain {
                 index
             );
 
-            // if block_id > my_latest_block_id {
-            //     debug!(
-            //         "peer_block_id : {:?} is greater than my block id : {:?}",
-            //         block_id, my_latest_block_id
-            //     );
-            //     continue;
-            // }
+            if block_id > my_latest_block_id {
+                trace!(
+                    "peer_block_id : {:?} > my block id : {:?}. skipping",
+                    block_id, my_latest_block_id
+                );
+                continue;
+            }
 
             // index in fork_id hash
             let index = 2 * index;
