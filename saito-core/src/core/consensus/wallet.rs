@@ -532,92 +532,106 @@ impl Wallet {
         transaction.add_from_slip(input_slip);
 
         //
-        // when we CREATE a boundUTXO transaction, nodes need to confirm that
-        // the ID that is set in the message field is the same as the first input
-        // that is spent to create the NFT. since we do not want nodes to have
-        // to unpack the MSG JSON structure in order to validate the transaction
-        // we sepcify that the first N bytes are the sending UTXO key
+        // temporarily commenting tx.data
+        // until we figure out where to store nft img data
         //
 
-        info!("data: {:?}", data);
-        info!("                   ");
+        // info!("data: {:?}", data);
+        // info!("                   ");
 
-        let mut data_as_bytes: Vec<u8> = Vec::new();
-        for num in data {
-            data_as_bytes.extend(num.to_le_bytes()); // Convert u32 to 4 bytes and append
-        }
+        // let mut data_as_bytes: Vec<u8> = Vec::new();
+        // for num in data {
+        //     data_as_bytes.extend(num.to_le_bytes()); // Convert u32 to 4 bytes and append
+        // }
 
-        info!("Generated utxo_key: {:?}", utxo_key);
-        info!("                   ");
+        // info!("Generated utxo_key: {:?}", utxo_key);
+        // info!("                   ");
 
-        info!("Converted data_as_bytes: {:?}", data_as_bytes);
-        info!("                   ");
+        // info!("Converted data_as_bytes: {:?}", data_as_bytes);
+        // info!("                   ");
 
         // Merge `utxo_key` (already Vec<u8>) and converted `data_as_bytes`
         let mut msg = utxo_key.to_vec(); // Convert utxo_key from `[u8; 59]` to Vec<u8>
         let nft_id = msg.clone();
 
-        info!("tx msg 1: {:?}", msg);
-        info!("        ");
-        msg.extend(data_as_bytes);
+        // info!("tx msg 1: {:?}", msg);
+        // info!("        ");
+        // msg.extend(data_as_bytes);
 
-        info!("tx msg 2: {:?}", msg);
-        info!("        ");
-        transaction.data = msg;
+        // info!("tx msg 2: {:?}", msg);
+        // info!("        ");
+        // transaction.data = msg;
 
-        info!("transaction.data: {:?}", transaction.data);
-        info!("        ");
+        // info!("transaction.data: {:?}", transaction.data);
+        // info!("        ");
 
-        // first slip is BOUND type of NFT
-        let mut bound_slip = Slip::default();
-        bound_slip.public_key = *recipient_public_key;
-        bound_slip.amount = deposit;
-        bound_slip.slip_type = SlipType::Bound;
+        // ---- Output Slip [0]: NFT slip ----
+        let mut nft_slip = Slip::default();
+        nft_slip.public_key = self.public_key; // retains creator’s public key
+                                               // Set buyer’s location info (here we assume the location fields are updated to buyer’s)
+        nft_slip.block_id = block_id;
+        nft_slip.tx_ordinal = transaction_id;
+        nft_slip.slip_index = 0; // first output slip
+        nft_slip.amount = deposit; // NFT token amount
+        nft_slip.slip_type = SlipType::Bound; // mark as NFT (denoted “@”)
+        nft_slip.is_utxoset_key_set = true;
+        nft_slip.utxoset_key = nft_slip.get_utxoset_key();
+        let utxokey_bound = nft_slip.utxoset_key.clone();
+        transaction.add_to_slip(nft_slip);
 
-        let utxokey_bound = bound_slip.get_utxoset_key();
-        bound_slip.utxoset_key = utxokey_bound;
-        transaction.add_to_slip(bound_slip);
+        // ---- Output Slip [1]: Normal payment slip ----
+        let mut payment_slip = Slip::default();
+        payment_slip.public_key = *recipient_public_key; // buyer’s key
+        payment_slip.block_id = block_id;
+        payment_slip.tx_ordinal = transaction_id;
+        payment_slip.slip_index = 1;
+        payment_slip.amount = deposit;
+        payment_slip.slip_type = SlipType::Normal;
+        payment_slip.is_utxoset_key_set = true;
+        payment_slip.utxoset_key = payment_slip.get_utxoset_key();
+        let utxokey_normal = payment_slip.utxoset_key.clone();
+        transaction.add_to_slip(payment_slip);
 
-        // second immediate slip is linked normal slip
-        let mut normal_slip = Slip::default();
-        normal_slip.public_key = *recipient_public_key;
-        normal_slip.amount = deposit;
-        normal_slip.slip_type = SlipType::Normal;
+        // ---- Output Slip [2]: Combined slip for original location ----
+        let mut combined_slip = Slip::default();
+        // Build combined public key:
+        // First 17 bytes: original location (block_id (8 bytes), transaction_id (8 bytes), slip_id (1 byte))
+        // Remaining 16 bytes: last 16 bytes of the buyer’s public key
+        let mut original_location = Vec::new();
+        original_location.extend(&block_id.to_be_bytes());
+        original_location.extend(&transaction_id.to_be_bytes());
+        original_location.push(slip_id as u8); //(total 17)
+        let buyer_bytes = recipient_public_key.as_slice();
+        let buyer_tail = &buyer_bytes[17..33]; // 16 bytes
+        let mut combined_pubkey = Vec::new();
+        combined_pubkey.extend(&original_location);
+        combined_pubkey.extend(buyer_tail);
+        let combined_pubkey_array: [u8; 33] = combined_pubkey
+            .try_into()
+            .expect("combined public key must be 33 bytes");
+        combined_slip.public_key = combined_pubkey_array;
 
-        let utxokey_normal = normal_slip.get_utxoset_key();
-        normal_slip.utxoset_key = utxokey_normal;
-        transaction.add_to_slip(normal_slip);
+        combined_slip.block_id = block_id;
+        combined_slip.tx_ordinal = transaction_id;
+        combined_slip.slip_index = 2;
+        combined_slip.amount = 0;
+        combined_slip.slip_type = SlipType::Bound;
+        combined_slip.is_utxoset_key_set = true;
+        combined_slip.utxoset_key = combined_slip.get_utxoset_key();
+        transaction.add_to_slip(combined_slip);
 
-        // third slip normal (optional) if there is
-        // remaining change
+        // ---- Output Slip [4]: (optional) if there is
+        // remaining change from deposit amount
         if change > 0 {
             let mut change_slip = Slip::default();
             change_slip.public_key = *recipient_public_key;
+            change_slip.slip_index = 3;
             change_slip.amount = change;
             change_slip.slip_type = SlipType::Normal;
             transaction.add_to_slip(change_slip);
         } else {
             debug!("Skipping change slip as change amount is zero.");
         }
-
-        //        transaction.total_fees = fee;
-
-        //
-        // hash and sign
-        //
-        // let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
-        // transaction.hash_for_signature = Some(hash_for_signature);
-        // transaction.sign(&self.private_key);
-
-        // let tx_sig = transaction.signature.clone();
-
-        // add nft slips to NFT struct
-        // self.nft_slips.push(NFT {
-        //     utxokey_bound,
-        //     utxokey_normal,
-        //     nft_id,
-        //     tx_sig,
-        // });
 
         // Hash and sign the transaction (assuming sign() exists)
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
@@ -648,22 +662,22 @@ impl Wallet {
         Ok(transaction)
     }
 
-
     pub async fn send_bound_transaction(
         &mut self,
         amount: Currency,
-        utxokey_bound: SaitoUTXOSetKey, 
-        utxokey_normal: SaitoUTXOSetKey, 
+        utxokey_bound: SaitoUTXOSetKey,
+        utxokey_normal: SaitoUTXOSetKey,
         nft_id: Vec<u8>,
         num: u32,
-        data: Vec<u32>, 
+        data: Vec<u32>,
         fee: Currency,
         recipient_public_key: SaitoPublicKey,
     ) -> Result<Transaction, Error> {
-        
-        let pos = self.nft_slips.iter().position(|nft| {
-            nft.utxokey_bound == utxokey_bound && nft.nft_id == nft_id
-        }).ok_or(Error::new(ErrorKind::NotFound, "NFT not found"))?;
+        let pos = self
+            .nft_slips
+            .iter()
+            .position(|nft| nft.utxokey_bound == utxokey_bound && nft.nft_id == nft_id)
+            .ok_or(Error::new(ErrorKind::NotFound, "NFT not found"))?;
         let nft = self.nft_slips.remove(pos);
 
         // Verify that the provided normal UTXO key exists in the wallet's unspent slips.
@@ -719,7 +733,6 @@ impl Wallet {
         info!("NFT transfer transaction created: {:?}", transaction);
         Ok(transaction)
     }
-
 
     pub async fn create_golden_ticket_transaction(
         golden_ticket: GoldenTicket,

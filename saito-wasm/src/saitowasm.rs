@@ -45,11 +45,11 @@ use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::{generate_keypair_from_private_key, sign};
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 use secp256k1::SECP256K1;
+use std::convert::TryInto;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{Mutex, RwLock};
 use wasm_bindgen::prelude::*;
 use web_sys::console;
-use std::convert::TryInto;
 
 #[wasm_bindgen]
 pub struct SaitoWasm {
@@ -570,7 +570,7 @@ pub async fn create_bound_utxo_transaction(
 // pub async fn send_bound_transaction(
 //     amt: u64,
 //     utxokey_bound: String,
-//     utxokey_normal: String,   
+//     utxokey_normal: String,
 //     nft_id: u32,
 //     num: u32,
 //     data: String,
@@ -583,12 +583,12 @@ pub async fn create_bound_utxo_transaction(
 
 //     let utxo_bound = string_to_utxoset_key(&utxokey_bound)
 //         .map_err(|_| JsValue::from_str("Invalid bound UTXO key"))?;
-    
+
 //     let utxo_normal = string_to_utxoset_key(&utxokey_normal)
 //         .map_err(|_| JsValue::from_str("Invalid normal UTXO key"))?;
-    
+
 //     let nft_id_vec = nft_id.to_le_bytes().to_vec();
-    
+
 //     let serialized_data = serde_json::to_vec(&data)
 //         .map_err(|_| JsValue::from_str("Failed to serialize data"))?;
 //     let serialized_data_u32: Vec<u32> = serialized_data.chunks(4).map(|chunk| {
@@ -606,7 +606,7 @@ pub async fn create_bound_utxo_transaction(
 //     let tx = wallet.send_bound_transaction(
 //         amt,
 //         utxo_bound,
-//         utxo_normal,       
+//         utxo_normal,
 //         nft_id_vec,
 //         num,
 //         serialized_data_u32,
@@ -617,9 +617,6 @@ pub async fn create_bound_utxo_transaction(
 //     let wasm_transaction = WasmTransaction::from_transaction(tx);
 //     Ok(wasm_transaction)
 // }
-
-    
-
 
 #[wasm_bindgen]
 pub async fn get_nft_list() -> Result<Array, JsValue> {
