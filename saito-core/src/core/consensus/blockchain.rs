@@ -199,31 +199,35 @@ impl Blockchain {
             } else {
                 let previous_block_fetched = iterate!(mempool.blocks_queue, 100)
                     .any(|b| block.previous_block_hash == b.hash);
+                let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
 
-                return if !previous_block_fetched
-                    && block.id
-                        > max(
-                            1,
-                            self.get_latest_block_id().saturating_sub(
-                                configs.get_consensus_config().unwrap().genesis_period,
-                            ),
-                        )
-                {
-                    const BLOCK_DIFF_BEFORE_FETCHING_CHAIN: BlockId = 1000;
-                    if block.id.abs_diff(self.get_latest_block_id())
-                        < BLOCK_DIFF_BEFORE_FETCHING_CHAIN
+                return if !previous_block_fetched {
+                    if block.id > max(1, self.get_latest_block_id().saturating_sub(genesis_period))
                     {
-                        debug!(
-                            "need to fetch previous block : {:?}-{:?}",
-                            block.id - 1,
-                            block.previous_block_hash.to_hex()
-                        );
+                        let block_diff_before_fetching_chain: BlockId =
+                            std::cmp::min(1000, genesis_period);
+                        if block.id.abs_diff(self.get_latest_block_id())
+                            < block_diff_before_fetching_chain
+                        {
+                            debug!(
+                                "need to fetch previous block : {:?}-{:?}",
+                                block.id - 1,
+                                block.previous_block_hash.to_hex()
+                            );
 
-                        AddBlockResult::FailedButRetry(block, true, false)
-                    } else {
-                        info!("block : {:?}-{:?} is too distant with the current latest block : id={:?}. so need to fetch the whole blockchain from the peer to make sure this is not an attack",
+                            AddBlockResult::FailedButRetry(block, true, false)
+                        } else {
+                            info!("block : {:?}-{:?} is too distant with the current latest block : id={:?}. so need to fetch the whole blockchain from the peer to make sure this is not an attack",
                             block.id,block.hash.to_hex(),self.get_latest_block_id());
-                        AddBlockResult::FailedButRetry(block, false, true)
+                            AddBlockResult::FailedButRetry(block, false, true)
+                        }
+                    } else {
+                        debug!(
+                            "block : {:?}-{:?} is too old to be added to the blockchain",
+                            block.id,
+                            block.hash.to_hex()
+                        );
+                        AddBlockResult::FailedNotValid
                     }
                 } else {
                     debug!(
