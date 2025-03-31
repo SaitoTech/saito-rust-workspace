@@ -724,7 +724,7 @@ impl Blockchain {
         fork_id: SaitoHash,
         my_latest_block_id: u64,
     ) -> Option<u64> {
-        let mut block_id = my_latest_block_id;
+        let mut block_id = peer_latest_block_id;
         block_id = block_id - (block_id % 10);
 
         debug!(
@@ -735,7 +735,7 @@ impl Blockchain {
         for (index, weight) in FORK_ID_WEIGHTS.iter().enumerate() {
             if block_id < *weight {
                 trace!(
-                    "my_block_id : {:?} is less than weight : {:?}",
+                    "my_block_id : {:?} is less than weight : {:?}. returning 0",
                     block_id,
                     weight
                 );
@@ -749,14 +749,6 @@ impl Blockchain {
                 index
             );
 
-            if block_id > peer_latest_block_id {
-                trace!(
-                    "my_block_id {:?} > peer_latest_block_id : {:?}. skipping",
-                    block_id, peer_latest_block_id
-                );
-                continue;
-            }
-
             // index in fork_id hash
             let index = 2 * index;
 
@@ -766,9 +758,10 @@ impl Blockchain {
                 .get_longest_chain_block_hash_at_block_id(block_id)
             {
                 trace!(
-                    "comparing {:?} vs {:?}",
+                    "comparing {:?} vs {:?} at block_id : {}",
                     hex::encode(&fork_id[index..=index + 1]),
                     hex::encode(&block_hash[index..=index + 1]),
+                    block_id
                 );
                 if fork_id[index] == block_hash[index]
                     && fork_id[index + 1] == block_hash[index + 1]
@@ -788,7 +781,7 @@ impl Blockchain {
         fork_id: SaitoHash,
         my_latest_block_id: u64,
     ) -> Option<u64> {
-        let mut block_id = peer_latest_block_id;
+        let mut block_id = my_latest_block_id;
         // roll back to last even 10 blocks
         block_id = block_id - (block_id % 10);
         debug!(
@@ -801,7 +794,7 @@ impl Blockchain {
         for (index, weight) in FORK_ID_WEIGHTS.iter().enumerate() {
             if block_id < *weight {
                 trace!(
-                    "peer_block_id : {:?} is less than weight : {:?}",
+                    "peer_block_id : {:?} is less than weight : {:?}. returning 0",
                     block_id,
                     weight
                 );
@@ -815,14 +808,6 @@ impl Blockchain {
                 index
             );
 
-            if block_id > my_latest_block_id {
-                trace!(
-                    "peer_block_id : {:?} > my block id : {:?}. skipping",
-                    block_id, my_latest_block_id
-                );
-                continue;
-            }
-
             // index in fork_id hash
             let index = 2 * index;
 
@@ -832,9 +817,10 @@ impl Blockchain {
                 .get_longest_chain_block_hash_at_block_id(block_id)
             {
                 trace!(
-                    "comparing {:?} vs {:?}",
+                    "comparing {:?} vs {:?} at block_id : {}",
                     hex::encode(&fork_id[index..=index + 1]),
                     hex::encode(&block_hash[index..=index + 1]),
+                    block_id
                 );
                 if fork_id[index] == block_hash[index]
                     && fork_id[index + 1] == block_hash[index + 1]
