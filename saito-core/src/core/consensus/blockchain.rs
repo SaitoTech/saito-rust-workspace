@@ -199,31 +199,35 @@ impl Blockchain {
             } else {
                 let previous_block_fetched = iterate!(mempool.blocks_queue, 100)
                     .any(|b| block.previous_block_hash == b.hash);
+                let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
 
-                return if !previous_block_fetched
-                    && block.id
-                        > max(
-                            1,
-                            self.get_latest_block_id().saturating_sub(
-                                configs.get_consensus_config().unwrap().genesis_period,
-                            ),
-                        )
-                {
-                    const BLOCK_DIFF_BEFORE_FETCHING_CHAIN: BlockId = 1000;
-                    if block.id.abs_diff(self.get_latest_block_id())
-                        < BLOCK_DIFF_BEFORE_FETCHING_CHAIN
+                return if !previous_block_fetched {
+                    if block.id > max(1, self.get_latest_block_id().saturating_sub(genesis_period))
                     {
-                        debug!(
-                            "need to fetch previous block : {:?}-{:?}",
-                            block.id - 1,
-                            block.previous_block_hash.to_hex()
-                        );
+                        let block_diff_before_fetching_chain: BlockId =
+                            std::cmp::min(1000, genesis_period);
+                        if block.id.abs_diff(self.get_latest_block_id())
+                            < block_diff_before_fetching_chain
+                        {
+                            debug!(
+                                "need to fetch previous block : {:?}-{:?}",
+                                block.id - 1,
+                                block.previous_block_hash.to_hex()
+                            );
 
-                        AddBlockResult::FailedButRetry(block, true, false)
-                    } else {
-                        info!("block : {:?}-{:?} is too distant with the current latest block : id={:?}. so need to fetch the whole blockchain from the peer to make sure this is not an attack",
+                            AddBlockResult::FailedButRetry(block, true, false)
+                        } else {
+                            info!("block : {:?}-{:?} is too distant with the current latest block : id={:?}. so need to fetch the whole blockchain from the peer to make sure this is not an attack",
                             block.id,block.hash.to_hex(),self.get_latest_block_id());
-                        AddBlockResult::FailedButRetry(block, false, true)
+                            AddBlockResult::FailedButRetry(block, false, true)
+                        }
+                    } else {
+                        debug!(
+                            "block : {:?}-{:?} is too old to be added to the blockchain",
+                            block.id,
+                            block.hash.to_hex()
+                        );
+                        AddBlockResult::FailedNotValid
                     }
                 } else {
                     debug!(
@@ -720,19 +724,18 @@ impl Blockchain {
         fork_id: SaitoHash,
         my_latest_block_id: u64,
     ) -> Option<u64> {
-        trace!("generate_last_shared_ancestor_when_peer_behind");
         let mut block_id = peer_latest_block_id;
         block_id = block_id - (block_id % 10);
 
-        trace!(
-            "peer_block_id : {:?}, my_block_id : {:?}",
-            block_id,
+        debug!(
+            "generate_last_shared_ancestor_when_peer_behind peer_block_id : {:?}, my_block_id : {:?}",
+            peer_latest_block_id,
             my_latest_block_id
         );
         for (index, weight) in FORK_ID_WEIGHTS.iter().enumerate() {
             if block_id < *weight {
                 trace!(
-                    "my_block_id : {:?} is less than weight : {:?}",
+                    "my_block_id : {:?} is less than weight : {:?}. returning 0",
                     block_id,
                     weight
                 );
@@ -746,15 +749,6 @@ impl Blockchain {
                 index
             );
 
-            // do not loop around if block id < 0
-            // if my_block_id > peer_latest_block_id {
-            //     debug!(
-            //         "my_block_id {:?} > peer_latest_block_id : {:?}",
-            //         my_block_id, peer_latest_block_id
-            //     );
-            //     continue;
-            // }
-
             // index in fork_id hash
             let index = 2 * index;
 
@@ -764,9 +758,10 @@ impl Blockchain {
                 .get_longest_chain_block_hash_at_block_id(block_id)
             {
                 trace!(
-                    "comparing {:?} vs {:?}",
+                    "comparing {:?} vs {:?} at block_id : {}",
                     hex::encode(&fork_id[index..=index + 1]),
                     hex::encode(&block_hash[index..=index + 1]),
+                    block_id
                 );
                 if fork_id[index] == block_hash[index]
                     && fork_id[index + 1] == block_hash[index + 1]
@@ -786,13 +781,12 @@ impl Blockchain {
         fork_id: SaitoHash,
         my_latest_block_id: u64,
     ) -> Option<u64> {
-        trace!("generate_last_shared_ancestor_when_peer_ahead");
         let mut block_id = my_latest_block_id;
         // roll back to last even 10 blocks
         block_id = block_id - (block_id % 10);
-        trace!(
-            "peer_block_id : {:?}, my_block_id : {:?}",
-            block_id,
+        debug!(
+            "generate_last_shared_ancestor_when_peer_ahead peer_block_id : {:?}, my_block_id : {:?}",
+            peer_latest_block_id,
             my_latest_block_id
         );
 
@@ -800,7 +794,7 @@ impl Blockchain {
         for (index, weight) in FORK_ID_WEIGHTS.iter().enumerate() {
             if block_id < *weight {
                 trace!(
-                    "peer_block_id : {:?} is less than weight : {:?}",
+                    "peer_block_id : {:?} is less than weight : {:?}. returning 0",
                     block_id,
                     weight
                 );
@@ -814,14 +808,6 @@ impl Blockchain {
                 index
             );
 
-            // if block_id > my_latest_block_id {
-            //     debug!(
-            //         "peer_block_id : {:?} is greater than my block id : {:?}",
-            //         block_id, my_latest_block_id
-            //     );
-            //     continue;
-            // }
-
             // index in fork_id hash
             let index = 2 * index;
 
@@ -831,9 +817,10 @@ impl Blockchain {
                 .get_longest_chain_block_hash_at_block_id(block_id)
             {
                 trace!(
-                    "comparing {:?} vs {:?}",
+                    "comparing {:?} vs {:?} at block_id : {}",
                     hex::encode(&fork_id[index..=index + 1]),
                     hex::encode(&block_hash[index..=index + 1]),
+                    block_id
                 );
                 if fork_id[index] == block_hash[index]
                     && fork_id[index + 1] == block_hash[index + 1]
