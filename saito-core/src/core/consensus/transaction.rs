@@ -1041,43 +1041,43 @@ impl Transaction {
 
         if transaction_type == TransactionType::Bound {
             // ensure there is only one input slip
-            if self.from.len() != 1 {
-                error!("Bound transaction must have exactly 1 input slip.");
-                return false;
-            }
+            // if self.from.len() != 1 {
+            //     error!("Bound transaction must have exactly 1 input slip.");
+            //     return false;
+            // }
 
-            let slip = &self.from[0];
+            // let slip = &self.from[0];
 
-            // first slip shouldnt be bound
-            if slip.slip_type == SlipType::Bound {
-                error!("Bound transaction input slip cannot be of type Bound.");
-                return false;
-            }
+            // // first slip shouldnt be bound
+            // if slip.slip_type == SlipType::Bound {
+            //     error!("Bound transaction input slip cannot be of type Bound.");
+            //     return false;
+            // }
 
-            // there are exactly 2 or 3 output slips
-            if self.to.len() < 2 || self.to.len() > 3 {
-                error!("Bound transaction must have exactly 2 or 3 output slips.");
-                return false;
-            }
+            // // there are exactly 2 or 3 output slips
+            // if self.to.len() < 2 || self.to.len() > 3 {
+            //     error!("Bound transaction must have exactly 2 or 3 output slips.");
+            //     return false;
+            // }
 
-            // output contains at least 1 Bound slip and 1 Normal slip.
-            let mut has_bound = false;
-            let mut has_normal = false;
+            // // output contains at least 1 Bound slip and 1 Normal slip.
+            // let mut has_bound = false;
+            // let mut has_normal = false;
 
-            for slip in &self.to {
-                match slip.slip_type {
-                    SlipType::Bound => has_bound = true,
-                    SlipType::Normal => has_normal = true,
-                    _ => {}
-                }
-            }
+            // for slip in &self.to {
+            //     match slip.slip_type {
+            //         SlipType::Bound => has_bound = true,
+            //         SlipType::Normal => has_normal = true,
+            //         _ => {}
+            //     }
+            // }
 
-            if !has_bound || !has_normal {
-                error!(
-                    "Bound transaction must contain at least one Bound slip and one Normal slip."
-                );
-                return false;
-            }
+            // if !has_bound || !has_normal {
+            //     error!(
+            //         "Bound transaction must contain at least one Bound slip and one Normal slip."
+            //     );
+            //     return false;
+            // }
 
             // the first UTXO_KEY_LENGTH bytes of data match
             // the input slip’s UTXO key

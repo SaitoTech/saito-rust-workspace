@@ -496,8 +496,12 @@ pub async fn create_bound_utxo_transaction(
     recipient_public_key: JsString,
 ) -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.lock().await;
+    let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
+    let configs = config_lock.read().await;
+    let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+    let blockchain = saito.as_ref().unwrap().context.blockchain_lock.read().await;
+    let latest_block_id = blockchain.get_latest_block_id();
     let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
-    //let recipient_public_key: SaitoPublicKey = [0; 33]; // Default empty key
 
     info!("Received in saitowasm.rs:");
     info!("Amount: {}", amt);
@@ -543,10 +547,11 @@ pub async fn create_bound_utxo_transaction(
             tid,
             sid,
             deposit,
-            change,
             serialized_data_u32,
-            fee,
             &key,
+            Some(&saito.as_ref().unwrap().consensus_thread.network),
+            latest_block_id,
+            genesis_period,
         )
         .await;
 
