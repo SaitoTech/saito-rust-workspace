@@ -279,7 +279,7 @@ impl Wallet {
             self.unspent_slips.insert(wallet_slip.utxokey);
         }
 
-        debug!(
+        trace!(
             "adding slip of type : {:?} with value : {:?} to wallet : {:?} \nslip : {}",
             wallet_slip.slip_type,
             wallet_slip.amount,
@@ -340,12 +340,21 @@ impl Wallet {
 
         // grab inputs
         let mut keys_to_remove = Vec::new();
-        let mut unspent_slips = self.unspent_slips.iter().collect::<Vec<&SaitoUTXOSetKey>>();
-        unspent_slips.sort_by(|slip, slip2| {
-            let slip = Slip::parse_slip_from_utxokey(slip).unwrap();
-            let slip2 = Slip::parse_slip_from_utxokey(slip2).unwrap();
-            slip.amount.cmp(&slip2.amount)
-        });
+        let mut unspent_slips;
+        #[cfg(test)]
+        {
+            // this part is compiled for tests to make sure selected slips are predictable. otherwise we will get random slips from a hashset
+            unspent_slips = self.unspent_slips.iter().collect::<Vec<&SaitoUTXOSetKey>>();
+            unspent_slips.sort_by(|slip, slip2| {
+                let slip = Slip::parse_slip_from_utxokey(slip).unwrap();
+                let slip2 = Slip::parse_slip_from_utxokey(slip2).unwrap();
+                slip.amount.cmp(&slip2.amount)
+            });
+        }
+        #[cfg(not(test))]
+        {
+            unspent_slips = &self.unspent_slips;
+        }
 
         for key in unspent_slips {
             let slip = self.slips.get_mut(key).expect("slip should be here");
@@ -374,7 +383,7 @@ impl Wallet {
             slip.spent = true;
             self.available_balance -= slip.amount;
 
-            debug!(
+            trace!(
                 "marking slip : {:?} with value : {:?} as spent",
                 slip.utxokey.to_hex(),
                 slip.amount
@@ -482,11 +491,11 @@ impl Wallet {
     }
 
     pub fn delete_pending_transaction(&mut self, tx: &Transaction) -> bool {
-        let hash = tx.hash_for_signature.unwrap().clone();
+        let hash = tx.hash_for_signature.unwrap();
         if self.pending_txs.remove(&hash).is_some() {
             true
         } else {
-            debug!("Transaction not found in pending_txs");
+            // debug!("Transaction not found in pending_txs");
             false
         }
     }

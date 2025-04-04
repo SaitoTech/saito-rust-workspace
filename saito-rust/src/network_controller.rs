@@ -18,6 +18,7 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
+use warp::filters::trace;
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
@@ -175,7 +176,7 @@ impl NetworkController {
         buffer: Vec<u8>,
         exceptions: Vec<u64>,
     ) {
-        trace!("sending message : {:?} to all", buffer[0]);
+        trace!("sending buffer of size : {:?} to all", buffer.len());
         let mut sockets = sockets.lock().await;
         let mut peers_with_errors: Vec<u64> = Default::default();
 
@@ -186,7 +187,17 @@ impl NetworkController {
             }
             let socket = entry.1;
 
+            trace!(
+                "sending buffer of size : {:?} to peer : {:?}",
+                buffer.len(),
+                peer_index
+            );
             if !Self::send(socket, *peer_index, buffer.clone()).await {
+                warn!(
+                    "failed sending buffer of size : {:?} to peer : {:?}",
+                    buffer.len(),
+                    peer_index
+                );
                 peers_with_errors.push(*peer_index)
             }
         }
@@ -389,6 +400,7 @@ impl NetworkController {
                     PeerReceiver::Warp(mut receiver) => loop {
                         let result = receiver.next().await;
                         if result.is_none() {
+                            trace!("no message received");
                             continue;
                         }
                         let result = result.unwrap();
@@ -402,6 +414,7 @@ impl NetworkController {
 
                         if result.is_binary() {
                             let buffer = result.into_bytes();
+                            trace!("received buffer of size : {:?}", buffer.len());
 
                             let message = IoEvent {
                                 event_processor_id: 1,
@@ -418,6 +431,7 @@ impl NetworkController {
                     PeerReceiver::Tungstenite(mut receiver) => loop {
                         let result = receiver.next().await;
                         if result.is_none() {
+                            trace!("no message received");
                             continue;
                         }
                         let result = result.unwrap();
@@ -429,6 +443,7 @@ impl NetworkController {
                         let result = result.unwrap();
                         match result {
                             tokio_tungstenite::tungstenite::Message::Binary(buffer) => {
+                                trace!("received buffer of size : {:?}", buffer.len());
                                 let message = IoEvent {
                                     event_processor_id: 1,
                                     event_id: 0,

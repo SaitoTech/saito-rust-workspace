@@ -630,8 +630,10 @@ impl Transaction {
         if last_hop.to.ne(public_key) {
             self.total_work_for_me = 0;
             warn!(
-                "tx : {:?} last hop is not current node",
-                self.signature.to_hex()
+                "tx : {:?} last hop : {} is not current node : {}",
+                self.signature.to_hex(),
+                last_hop.to.to_base58(),
+                public_key.to_base58()
             );
             return;
         }
@@ -746,7 +748,7 @@ impl Transaction {
 
     /// Runs when the chain is re-organized
     pub fn on_chain_reorganization(&self, utxoset: &mut UtxoSet, longest_chain: bool) {
-        debug!(
+        trace!(
             "tx reorg : {:?} with {} inputs and {} outputs",
             self.signature.to_hex(),
             self.from.len(),

@@ -23,6 +23,15 @@
       "synctype": "full"
     }
   ],
+  "consensus":{
+        "genesis_period" : 100,
+        "heartbeat_interval" : 5000,
+        "prune_after_blocks" : 8,
+        "max_staker_recursions" : 3,
+        "default_social_stake":1000000,
+        "default_social_stake_period":60
+    },
+  "spv_mode": false,
   "spammer": {
     "timer_in_milli": 100,
     "burst_count": 100,
