@@ -2,8 +2,8 @@ use std::fmt::Debug;
 use std::panic;
 use std::time::{Duration, Instant};
 
-use log::info;
 use log::debug;
+use log::info;
 use tokio::select;
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
