@@ -274,6 +274,7 @@ impl ConsensusThread {
     }
 
     async fn produce_genesis_block(&mut self, timestamp: Timestamp) {
+        info!("producing genesis block");
         Self::generate_issuance_tx(
             self,
             self.mempool_lock.clone(),
@@ -289,6 +290,11 @@ impl ConsensusThread {
             let block = mempool
                 .bundle_genesis_block(&mut blockchain, timestamp, configs.deref(), &self.storage)
                 .await;
+            info!(
+                "produced genesis block : {:?} with id : {:?}",
+                block.hash.to_hex(),
+                block.id
+            );
 
             let _res = blockchain
                 .add_block(block, &mut self.storage, &mut mempool, configs.deref())

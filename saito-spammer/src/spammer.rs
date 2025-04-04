@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::info;
+use saito_core::core::consensus::peers::peer::PeerStatus;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
 
@@ -77,10 +78,24 @@ impl Spammer {
         }
 
         let sender = self.sender_to_network.clone();
+        let peer_lock = self.tx_generator.peer_lock.clone();
         tokio::spawn(async move {
             let mut total_count = 0;
             let mut count = burst_count;
             loop {
+                {
+                    let peers = peer_lock.read().await;
+                    if let Some((index, peer)) = peers.index_to_peers.iter().next() {
+                        if let PeerStatus::Connected = peer.peer_status {
+                            // info!("peer count : {}", peers.index_to_peers.len());
+                            // info!("peer status : {:?}", peer.peer_status);
+                        } else {
+                            info!("peer not connected. status : {:?}", peer.peer_status);
+                            tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
+                            continue;
+                        }
+                    }
+                }
                 if let Some(transactions) = receiver.recv().await {
                     info!(
                         "received {:?} txs to be sent. sender capacity : {:?} / {:?}",
@@ -113,14 +128,35 @@ impl Spammer {
                             std::process::exit(0);
                         }
                     }
-                    info!("sent all the txs received from generator");
+                    info!(
+                        "sent all the txs received from generator : total count : {:?}",
+                        total_count
+                    );
                 }
             }
         });
         tokio::task::yield_now().await;
         loop {
             work_done = false;
+
             if !self.bootstrap_done {
+                // if self.tx_generator.get_state() != GeneratorState::Done  {
+                //     self.tx_generator.check_blockchain_for_confirmation().await ;
+                // }
+                {
+                    let peers = self.tx_generator.peer_lock.read().await;
+                    if let Some((index, peer)) = peers.index_to_peers.iter().next() {
+                        if let PeerStatus::Connected = peer.peer_status {
+                            // info!("peer count : {}", peers.index_to_peers.len());
+                            // info!("peer status : {:?}", peer.peer_status);
+                            // to_public_key = peer.get_public_key().unwrap();
+                        } else {
+                            info!("peer not connected. status : {:?}", peer.peer_status);
+                            tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;
+                            continue;
+                        }
+                    }
+                }
                 self.tx_generator.on_new_block().await;
                 self.bootstrap_done = self.tx_generator.get_state() == GeneratorState::Done;
                 work_done = true;
@@ -141,15 +177,17 @@ pub async fn run_spammer(
     configs_lock: Arc<RwLock<SpammerConfigs>>,
 ) {
     info!("starting the spammer");
-    let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(1000);
-    let mut spammer = Spammer::new(
-        wallet_lock,
-        peers_lock,
-        blockchain_lock,
-        sender_to_network,
-        sender,
-        configs_lock,
-    )
-    .await;
-    spammer.run(receiver).await;
+    tokio::spawn(async move {
+        let (sender, receiver) = tokio::sync::mpsc::channel::<VecDeque<Transaction>>(1000);
+        let mut spammer = Spammer::new(
+            wallet_lock,
+            peers_lock,
+            blockchain_lock,
+            sender_to_network,
+            sender,
+            configs_lock,
+        )
+        .await;
+        spammer.run(receiver).await;
+    });
 }

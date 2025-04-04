@@ -174,10 +174,10 @@ export default class Transaction extends WasmWrapper<WasmTransaction> {
             try {
                 this.msg = JSON.parse(Buffer.from(this.data).toString("utf-8"));
             } catch (error) {
-                console.log("tx type = " + this.type);
-                console.log("buffer : " + this.data.byteLength, this.data);
-                console.log("failed parsing tx buffer into msg", Buffer.from(this.data).toString("utf-8"));
-                console.error(error);
+                // console.log("tx type = " + this.type);
+                // console.log("buffer : " + this.data.byteLength, this.data);
+                // console.log("failed parsing tx buffer into msg", Buffer.from(this.data).toString("utf-8"));
+                // console.error(error);
                 this.msg = {};
             }
         }

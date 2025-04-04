@@ -1570,7 +1570,7 @@ impl Block {
                             //
                             for output in transaction.to.iter() {
                                 if output.validate(&blockchain.utxoset) {
-                                    debug!("output slip is valid. so checking for rebroadcasting. slip : {}",output);
+                                    trace!("output slip is valid. so checking for rebroadcasting. slip : {}",output);
                                     outputs.push(output);
                                     total_nolan_eligible_for_atr_payout += output.amount;
                                 }
@@ -1654,7 +1654,7 @@ impl Block {
                                         cv.total_fees_atr += output.amount;
                                         cv.total_fees_paid_by_nonrebroadcast_atr_transactions +=
                                             output.amount;
-                                        debug!("we dont rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
+                                        trace!("we don't rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
                                     }
                                 }
                             } // output loop

@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use log::{debug, info};
 use rayon::prelude::*;
+use saito_core::core::consensus::peers::peer::PeerStatus;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -17,6 +18,7 @@ use saito_core::core::process::keep_time::KeepTime;
 use saito_core::core::util::crypto::generate_random_bytes;
 use saito_core::drain;
 use saito_rust::time_keeper::TimeKeeper;
+use tracing_subscriber::field::debug;
 
 use crate::config_handler::SpammerConfigs;
 use saito_core::core::util::configuration::Configuration;
@@ -29,7 +31,7 @@ pub enum GeneratorState {
 }
 
 pub struct TransactionGenerator {
-    state: GeneratorState,
+    pub state: GeneratorState,
     wallet_lock: Arc<RwLock<Wallet>>,
     blockchain_lock: Arc<RwLock<Blockchain>>,
     expected_slip_count: u64,
@@ -41,7 +43,7 @@ pub struct TransactionGenerator {
     sender: Sender<VecDeque<Transaction>>,
     tx_payment: Currency,
     tx_fee: Currency,
-    peer_lock: Arc<RwLock<PeerCollection>>,
+    pub peer_lock: Arc<RwLock<PeerCollection>>,
     configuration_lock: Arc<RwLock<SpammerConfigs>>,
 }
 
@@ -144,8 +146,13 @@ impl TransactionGenerator {
                     return;
                 }
 
-                if let Some(peer) = peers.index_to_peers.iter().next() {
-                    to_public_key = peer.1.get_public_key().unwrap();
+                if let Some((index, peer)) = peers.index_to_peers.iter().next() {
+                    if let PeerStatus::Connected = peer.peer_status {
+                        to_public_key = peer.get_public_key().unwrap();
+                    } else {
+                        info!("peer not connected. status : {:?}", peer.peer_status);
+                        return;
+                    }
                 }
                 assert_eq!(peers.address_to_peers.len(), 1usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
                 assert_ne!(to_public_key, self.public_key);
@@ -184,6 +191,11 @@ impl TransactionGenerator {
                 total_output_slips_created, self.tx_count
             );
         } else {
+            if unspent_slip_count >= self.tx_count {
+                self.state = GeneratorState::WaitingForBlockChainConfirmation;
+                info!("changing state to 'WaitingForBlockChainConfirmation' since we have enough slips");
+                return;
+            }
             info!(
                 "not enough slips. unspent slip count : {:?} tx count : {:?} expected slips : {:?}",
                 unspent_slip_count, self.tx_count, self.expected_slip_count
@@ -250,7 +262,7 @@ impl TransactionGenerator {
         transaction
     }
 
-    async fn check_blockchain_for_confirmation(&mut self) -> bool {
+    pub async fn check_blockchain_for_confirmation(&mut self) -> bool {
         info!("checking for blockchain confirmation...");
         let unspent_slip_count;
         {
@@ -274,7 +286,7 @@ impl TransactionGenerator {
         false
     }
 
-    async fn create_test_transactions(&mut self) {
+    pub async fn create_test_transactions(&mut self) {
         info!("creating test transactions : {:?}", self.tx_count);
 
         let time_keeper = TimeKeeper {};
@@ -290,18 +302,24 @@ impl TransactionGenerator {
         let latest_block_id = self.get_latest_block_id().await;
 
         tokio::spawn(async move {
+            info!(
+                "creating test transactions from new thread : count = {:?}",
+                count
+            );
             let sender = sender.clone();
             loop {
                 let mut work_done = false;
                 {
                     // let blockchain = lock_for_write!(blockchain, LOCK_ORDER_BLOCKCHAIN);
-
                     let mut wallet = wallet.write().await;
 
                     if wallet.get_available_balance() >= required_balance {
                         // assert_ne!(blockchain.utxoset.len(), 0);
                         let mut vec = VecDeque::with_capacity(count as usize);
-                        for _ in 0..count {
+                        for i in 0..count {
+                            if i % 100_000 == 0 {
+                                info!("creating test transactions : {:?}", i);
+                            }
                             let transaction = Transaction::create(
                                 &mut wallet,
                                 public_key,
@@ -313,6 +331,7 @@ impl TransactionGenerator {
                                 genesis_period,
                             );
                             if transaction.is_err() {
+                                debug!("transaction creation failed. {:?}", transaction);
                                 break;
                             }
                             let mut transaction = transaction.unwrap();
@@ -346,8 +365,14 @@ impl TransactionGenerator {
         {
             let peers = self.peer_lock.read().await;
 
-            if let Some(peer) = peers.index_to_peers.iter().next() {
-                to_public_key = peer.1.get_public_key().unwrap();
+            if let Some((index, peer)) = peers.index_to_peers.iter().next() {
+                // if let PeerStatus::Connected = peer.peer_status {
+                info!("peer count : {}", peers.index_to_peers.len());
+                info!("peer status : {:?}", peer.peer_status);
+                to_public_key = peer.get_public_key().unwrap();
+                // } else {
+                //     info!("peer not connected. status : {:?}", peer.peer_status);
+                // }
             }
             // assert_eq!(peers.address_to_peers.len(), 1 as usize, "we have assumed connecting to a single node. move add_hop to correct place if not.");
             assert_ne!(to_public_key, self.public_key);
@@ -391,7 +416,7 @@ impl TransactionGenerator {
 
         if let Some(consensus_config) = config.get_consensus_config() {
             let period = consensus_config.genesis_period;
-            println!("genesis_period: {:?}", period);
+            // println!("genesis_period: {:?}", period);
             period
         } else {
             println!("No consensus config available.");
