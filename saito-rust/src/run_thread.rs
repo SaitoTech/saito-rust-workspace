@@ -23,6 +23,11 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
+use crate::config_handler::{ConfigHandler, NodeConfigurations};
+use crate::io_event::IoEvent;
+use crate::network_controller::run_network_controller;
+use crate::rust_io_handler::RustIOHandler;
+use crate::time_keeper::TimeKeeper;
 use saito_core::core::consensus::blockchain::Blockchain;
 use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
 use saito_core::core::consensus::context::Context;
@@ -44,11 +49,6 @@ use saito_core::core::stat_thread::StatThread;
 use saito_core::core::util::configuration::Configuration;
 use saito_core::core::util::crypto::generate_keys;
 use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
-use crate::config_handler::{ConfigHandler, NodeConfigurations};
-use crate::io_event::IoEvent;
-use crate::network_controller::run_network_controller;
-use crate::rust_io_handler::RustIOHandler;
-use crate::time_keeper::TimeKeeper;
 
 pub async fn receive_event<T>(receiver: &mut Option<Receiver<T>>) -> Option<T> {
     if let Some(receiver) = receiver.as_mut() {

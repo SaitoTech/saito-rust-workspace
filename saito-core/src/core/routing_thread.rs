@@ -146,7 +146,11 @@ impl RoutingThread {
             }
 
             Message::Transaction(transaction) => {
-                trace!("received transaction : {} from peer : {:?}",transaction.signature.to_hex(), peer_index);
+                trace!(
+                    "received transaction : {} from peer : {:?}",
+                    transaction.signature.to_hex(),
+                    peer_index
+                );
                 self.stats.received_transactions.increment();
                 self.send_to_verification_thread(VerifyRequest::Transaction(transaction))
                     .await;
@@ -726,7 +730,11 @@ impl ProcessEvent<RoutingEvent> for RoutingThread {
     async fn process_network_event(&mut self, event: NetworkEvent) -> Option<()> {
         match event {
             NetworkEvent::IncomingNetworkMessage { peer_index, buffer } => {
-                trace!("processing incoming network message from peer : {:?} of size : {}", peer_index, buffer.len());
+                trace!(
+                    "processing incoming network message from peer : {:?} of size : {}",
+                    peer_index,
+                    buffer.len()
+                );
                 {
                     // TODO : move this before deserialization to avoid spending CPU time on it. moved here to just print message type
                     let mut peers = self.network.peer_lock.write().await;

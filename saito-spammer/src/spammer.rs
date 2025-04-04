@@ -128,7 +128,10 @@ impl Spammer {
                             std::process::exit(0);
                         }
                     }
-                    info!("sent all the txs received from generator : total count : {:?}", total_count);
+                    info!(
+                        "sent all the txs received from generator : total count : {:?}",
+                        total_count
+                    );
                 }
             }
         });
@@ -144,9 +147,9 @@ impl Spammer {
                     let peers = self.tx_generator.peer_lock.read().await;
                     if let Some((index, peer)) = peers.index_to_peers.iter().next() {
                         if let PeerStatus::Connected = peer.peer_status {
-                        // info!("peer count : {}", peers.index_to_peers.len());
-                        // info!("peer status : {:?}", peer.peer_status);
-                        // to_public_key = peer.get_public_key().unwrap();
+                            // info!("peer count : {}", peers.index_to_peers.len());
+                            // info!("peer status : {:?}", peer.peer_status);
+                            // to_public_key = peer.get_public_key().unwrap();
                         } else {
                             info!("peer not connected. status : {:?}", peer.peer_status);
                             tokio::time::sleep(Duration::from_millis(timer_in_milli)).await;

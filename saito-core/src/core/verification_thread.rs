@@ -180,7 +180,10 @@ impl ProcessEvent<VerifyRequest> for VerificationThread {
     }
 
     async fn process_event(&mut self, request: VerifyRequest) -> Option<()> {
-        trace!("verification thread processing event : {:?}", request.type_id());
+        trace!(
+            "verification thread processing event : {:?}",
+            request.type_id()
+        );
         match request {
             VerifyRequest::Transaction(transaction) => {
                 self.verify_tx(transaction).await;

@@ -445,7 +445,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Running saito");
 
     setup_log();
-    
+
     let public_key: SaitoPublicKey =
         hex::decode("03145c7e7644ab277482ba8801a515b8f1b62bcd7e4834a33258f438cd7e223849")
             .unwrap()
