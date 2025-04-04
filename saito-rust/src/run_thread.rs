@@ -1,54 +1,16 @@
-use std::cmp::min;
-use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::ops::Deref;
 use std::panic;
-use std::path::Path;
-use std::process;
-use std::str::FromStr;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use clap::{crate_version, App, Arg};
 use log::info;
-use log::{debug, error};
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use log::debug;
 use tokio::select;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::RwLock;
+use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
-use tracing_subscriber::filter::Directive;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
 
-use crate::config_handler::{ConfigHandler, NodeConfigurations};
-use crate::io_event::IoEvent;
-use crate::network_controller::run_network_controller;
-use crate::rust_io_handler::RustIOHandler;
-use crate::time_keeper::TimeKeeper;
-use saito_core::core::consensus::blockchain::Blockchain;
-use saito_core::core::consensus::blockchain_sync_state::BlockchainSyncState;
-use saito_core::core::consensus::context::Context;
-use saito_core::core::consensus::peers::peer_collection::PeerCollection;
-use saito_core::core::consensus::wallet::Wallet;
-use saito_core::core::consensus_thread::{ConsensusEvent, ConsensusStats, ConsensusThread};
-use saito_core::core::defs::{
-    Currency, PrintForLog, SaitoPrivateKey, SaitoPublicKey, StatVariable, CHANNEL_SAFE_BUFFER,
-    PROJECT_PUBLIC_KEY, STAT_BIN_COUNT,
-};
-use saito_core::core::io::network::Network;
 use saito_core::core::io::network_event::NetworkEvent;
-use saito_core::core::io::storage::Storage;
-use saito_core::core::mining_thread::{MiningEvent, MiningThread};
 use saito_core::core::process::keep_time::{KeepTime, Timer};
 use saito_core::core::process::process_event::ProcessEvent;
-use saito_core::core::routing_thread::{RoutingEvent, RoutingStats, RoutingThread};
-use saito_core::core::stat_thread::StatThread;
-use saito_core::core::util::configuration::Configuration;
-use saito_core::core::util::crypto::generate_keys;
-use saito_core::core::verification_thread::{VerificationThread, VerifyRequest};
 
 pub async fn receive_event<T>(receiver: &mut Option<Receiver<T>>) -> Option<T> {
     if let Some(receiver) = receiver.as_mut() {

@@ -18,7 +18,6 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
-use warp::filters::trace;
 use warp::http::StatusCode;
 use warp::ws::WebSocket;
 use warp::Filter;
