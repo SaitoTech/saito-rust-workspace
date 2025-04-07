@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use log::{debug, info, trace};
+use rayon::vec;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -14,7 +15,8 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
+    BlockHash, BlockId, PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER,
+    STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -459,31 +461,23 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             );
             let mut blockchain = self.blockchain_lock.write().await;
             let blockchain_configs = configs.get_blockchain_configs();
-            if let Some(blockchain_configs) = blockchain_configs {
-                info!(
-                    "loading blockchain state from configs : {:?}",
-                    blockchain_configs
-                );
-                blockchain.last_block_hash =
-                    SaitoHash::from_hex(blockchain_configs.last_block_hash.as_str())
-                        .unwrap_or([0; 32]);
-                blockchain.last_block_id = blockchain_configs.last_block_id;
-                blockchain.last_timestamp = blockchain_configs.last_timestamp;
-                blockchain.genesis_block_id = blockchain_configs.genesis_block_id;
-                blockchain.genesis_timestamp = blockchain_configs.genesis_timestamp;
-                blockchain.lowest_acceptable_timestamp =
-                    blockchain_configs.lowest_acceptable_timestamp;
-                blockchain.lowest_acceptable_block_hash =
-                    SaitoHash::from_hex(blockchain_configs.lowest_acceptable_block_hash.as_str())
-                        .unwrap_or([0; 32]);
-                blockchain.lowest_acceptable_block_id =
-                    blockchain_configs.lowest_acceptable_block_id;
-                blockchain.fork_id = Some(
-                    SaitoHash::from_hex(blockchain_configs.fork_id.as_str()).unwrap_or([0; 32]),
-                );
-            } else {
-                info!("blockchain state is not loaded");
-            }
+            info!(
+                "loading blockchain state from configs : {:?}",
+                blockchain_configs
+            );
+            blockchain.last_block_hash =
+                SaitoHash::from_hex(blockchain_configs.last_block_hash.as_str()).unwrap_or([0; 32]);
+            blockchain.last_block_id = blockchain_configs.last_block_id;
+            blockchain.last_timestamp = blockchain_configs.last_timestamp;
+            blockchain.genesis_block_id = blockchain_configs.genesis_block_id;
+            blockchain.genesis_timestamp = blockchain_configs.genesis_timestamp;
+            blockchain.lowest_acceptable_timestamp = blockchain_configs.lowest_acceptable_timestamp;
+            blockchain.lowest_acceptable_block_hash =
+                SaitoHash::from_hex(blockchain_configs.lowest_acceptable_block_hash.as_str())
+                    .unwrap_or([0; 32]);
+            blockchain.lowest_acceptable_block_id = blockchain_configs.lowest_acceptable_block_id;
+            blockchain.fork_id =
+                Some(SaitoHash::from_hex(blockchain_configs.fork_id.as_str()).unwrap_or([0; 32]));
         }
 
         let configs = self.config_lock.read().await;
@@ -504,6 +498,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 list.len(),
                 StatVariable::format_timestamp(start_time)
             );
+            let mut files_to_delete = list.clone();
+
             while !list.is_empty() {
                 let file_names: Vec<String> =
                     list.drain(..std::cmp::min(1000, list.len())).collect();
@@ -532,6 +528,34 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let mut mempool = self.mempool_lock.write().await;
                 info!("removing {} failed blocks from mempool so new blocks can be bundled after node loadup", mempool.blocks_queue.len());
                 mempool.blocks_queue.clear();
+            }
+            {
+                let purge_id = blockchain.get_latest_block_id()
+                    - (configs.get_consensus_config().unwrap().genesis_period * 2);
+                let retained_file_names: Vec<String> = blockchain
+                    .blocks
+                    .iter()
+                    .filter_map(|(_, block)| {
+                        if block.id < purge_id {
+                            return None;
+                        }
+                        Some(block.get_file_name())
+                    })
+                    .collect();
+                files_to_delete.retain(|name| !retained_file_names.contains(name));
+                info!(
+                    "removing {} blocks from disk which were not loaded to blockchain or older than genesis block : {}",
+                    files_to_delete.len(),
+                    blockchain.genesis_block_id
+                );
+                for file_name in files_to_delete {
+                    self.storage
+                        .delete_block_from_disk(
+                            (self.storage.io_interface.get_block_dir() + file_name.as_str())
+                                .as_str(),
+                        )
+                        .await;
+                }
             }
             info!(
                 "{:?} total blocks in blockchain. Timestamp : {:?}, elapsed_time : {:?}",

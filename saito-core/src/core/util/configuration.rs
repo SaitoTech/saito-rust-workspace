@@ -72,7 +72,7 @@ pub struct Server {
     pub reconnection_wait_time: Timestamp,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct BlockchainConfig {
     #[serde(default)]
     pub last_block_hash: String,
@@ -92,6 +92,8 @@ pub struct BlockchainConfig {
     pub lowest_acceptable_block_id: u64,
     #[serde(default)]
     pub fork_id: String,
+    #[serde(skip)]
+    pub initial_loading_completed: bool,
 }
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct ConsensusConfig {
@@ -125,7 +127,7 @@ impl Default for ConsensusConfig {
 pub trait Configuration: Debug {
     fn get_server_configs(&self) -> Option<&Server>;
     fn get_peer_configs(&self) -> &Vec<PeerConfig>;
-    fn get_blockchain_configs(&self) -> Option<BlockchainConfig>;
+    fn get_blockchain_configs(&self) -> &BlockchainConfig;
     fn get_block_fetch_url(&self) -> String;
     fn is_spv_mode(&self) -> bool;
     fn is_browser(&self) -> bool;

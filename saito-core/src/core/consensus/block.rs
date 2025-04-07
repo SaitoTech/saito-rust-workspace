@@ -3012,7 +3012,7 @@ impl Block {
         if !transactions_valid {
             error!("ERROR 579128: Invalid transactions found, block validation failed");
         }
-        trace!("transactions validated");
+        trace!("transactions validation complete");
 
         transactions_valid
     }

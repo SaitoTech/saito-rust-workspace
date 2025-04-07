@@ -31,6 +31,7 @@ pub struct SpammerConfigs {
     lite: bool,
     #[serde(default = "get_default_consensus")]
     consensus: Option<ConsensusConfig>,
+    blockchain: BlockchainConfig,
 }
 
 impl SpammerConfigs {
@@ -64,25 +65,40 @@ impl SpammerConfigs {
             },
             lite: false,
             consensus: Some(ConsensusConfig::default()),
+            blockchain: BlockchainConfig {
+                last_block_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .to_string(),
+                last_block_id: 0,
+                last_timestamp: 0,
+                genesis_block_id: 0,
+                genesis_timestamp: 0,
+                lowest_acceptable_timestamp: 0,
+                lowest_acceptable_block_hash:
+                    "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                lowest_acceptable_block_id: 0,
+                fork_id: "0000000000000000000000000000000000000000000000000000000000000000"
+                    .to_string(),
+                initial_loading_completed: false,
+            },
         }
     }
 
     pub fn get_spammer_configs(&self) -> &Spammer {
-        return &self.spammer;
+        &self.spammer
     }
 }
 
 impl Configuration for SpammerConfigs {
     fn get_server_configs(&self) -> Option<&Server> {
-        return Some(&self.server);
+        Some(&self.server)
     }
 
     fn get_peer_configs(&self) -> &Vec<PeerConfig> {
-        return &self.peers;
+        &self.peers
     }
 
-    fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
-        None
+    fn get_blockchain_configs(&self) -> &BlockchainConfig {
+        &self.blockchain
     }
 
     fn get_block_fetch_url(&self) -> String {
