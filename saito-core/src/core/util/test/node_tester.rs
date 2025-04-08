@@ -58,7 +58,7 @@ pub mod test {
     pub struct TestConfiguration {
         server: Option<Server>,
         peers: Vec<PeerConfig>,
-        blockchain: Option<BlockchainConfig>,
+        blockchain: BlockchainConfig,
         spv_mode: bool,
         browser_mode: bool,
         #[serde(default = "get_default_consensus")]
@@ -73,8 +73,8 @@ pub mod test {
             &self.peers
         }
 
-        fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
-            self.blockchain.clone()
+        fn get_blockchain_configs(&self) -> &BlockchainConfig {
+            &self.blockchain
         }
 
         fn get_block_fetch_url(&self) -> String {
@@ -117,7 +117,21 @@ pub mod test {
                     block_fetch_batch_size: 0,
                 }),
                 peers: vec![],
-                blockchain: None,
+                blockchain: BlockchainConfig {
+                    last_block_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
+                    last_block_id: 0,
+                    last_timestamp: 0,
+                    genesis_block_id: 0,
+                    genesis_timestamp: 0,
+                    lowest_acceptable_timestamp: 0,
+                    lowest_acceptable_block_hash:
+                        "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                    lowest_acceptable_block_id: 0,
+                    fork_id: "0000000000000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
+                    initial_loading_completed: false,
+                },
                 spv_mode: false,
                 browser_mode: false,
                 consensus: Some(ConsensusConfig {

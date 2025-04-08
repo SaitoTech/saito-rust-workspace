@@ -530,8 +530,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 mempool.blocks_queue.clear();
             }
             {
-                let purge_id = blockchain.get_latest_block_id()
-                    - (configs.get_consensus_config().unwrap().genesis_period * 2);
+                let purge_id = blockchain.get_latest_block_id().saturating_sub(blockchain.genesis_period * 2);
                 let retained_file_names: Vec<String> = blockchain
                     .blocks
                     .iter()

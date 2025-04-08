@@ -72,7 +72,7 @@ pub struct Server {
     pub reconnection_wait_time: Timestamp,
 }
 
-#[derive(Deserialize, Debug, Clone, Serialize)]
+#[derive(Deserialize, Debug, Clone, Serialize, Default)]
 pub struct BlockchainConfig {
     #[serde(default)]
     pub last_block_hash: String,

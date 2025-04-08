@@ -2478,7 +2478,7 @@ impl Block {
             //
             if cv.total_fees != self.total_fees {
                 error!(
-                    "total_fees error: {:?} expected : {:?}",
+                    "total_fees actual: {:?} expected : {:?}",
                     self.total_fees, cv.total_fees
                 );
                 return false;
@@ -2489,7 +2489,7 @@ impl Block {
             //
             if cv.total_fees_new != self.total_fees_new {
                 error!(
-                    "total_fees_new error: {:?} expected : {:?}",
+                    "total_fees_new actual: {:?} expected : {:?}",
                     self.total_fees_new, cv.total_fees_new
                 );
                 return false;
@@ -2500,7 +2500,7 @@ impl Block {
             //
             if cv.total_fees_atr != self.total_fees_atr {
                 error!(
-                    "total_fees_atr error: {:?} expected : {:?}",
+                    "total_fees_atr actual: {:?} expected : {:?}",
                     self.total_fees_atr, cv.total_fees_atr
                 );
                 return false;
@@ -2511,7 +2511,7 @@ impl Block {
             //
             if cv.total_fees_cumulative != self.total_fees_cumulative {
                 error!(
-                    "total_fees_cumulative error: {:?} expected : {:?}",
+                    "total_fees_cumulative actual: {:?} expected : {:?}",
                     self.total_fees_cumulative, cv.total_fees_cumulative
                 );
                 return false;
@@ -2522,7 +2522,7 @@ impl Block {
             //
             if cv.avg_total_fees != self.avg_total_fees {
                 error!(
-                    "avg_total_fees error: {:?} expected : {:?}",
+                    "avg_total_fees actual: {:?} expected : {:?}",
                     self.avg_total_fees, cv.avg_total_fees
                 );
                 return false;
@@ -2533,7 +2533,7 @@ impl Block {
             //
             if cv.avg_total_fees_new != self.avg_total_fees_new {
                 error!(
-                    "avg_total_fees_new error: {:?} expected : {:?}",
+                    "avg_total_fees_new actual: {:?} expected : {:?}",
                     self.avg_total_fees_new, cv.avg_total_fees_new
                 );
                 return false;
@@ -2566,7 +2566,7 @@ impl Block {
             //
             if cv.total_payout_mining != self.total_payout_mining {
                 error!(
-                    "total_payout_mining error: {:?} expected : {:?}",
+                    "total_payout_mining actual: {:?} expected : {:?}",
                     self.total_payout_mining, cv.total_payout_mining
                 );
                 return false;
@@ -2577,7 +2577,7 @@ impl Block {
             //
             if cv.total_payout_treasury != self.total_payout_treasury {
                 error!(
-                    "total_payout_treasury error: {:?} expected : {:?}",
+                    "total_payout_treasury actual: {:?} expected : {:?}",
                     self.total_payout_treasury, cv.total_payout_treasury
                 );
                 return false;
@@ -2588,7 +2588,7 @@ impl Block {
             //
             if cv.total_payout_graveyard != self.total_payout_graveyard {
                 error!(
-                    "total_payout_graveyard error: {:?} expected : {:?}",
+                    "total_payout_graveyard actual: {:?} expected : {:?}",
                     self.total_payout_graveyard, cv.total_payout_graveyard
                 );
                 return false;
@@ -2599,7 +2599,7 @@ impl Block {
             //
             if cv.total_payout_atr != self.total_payout_atr {
                 error!(
-                    "total_payout_atr error: {:?} expected : {:?}",
+                    "total_payout_atr actual: {:?} expected : {:?}",
                     self.total_payout_atr, cv.total_payout_atr
                 );
                 return false;
@@ -2610,7 +2610,7 @@ impl Block {
             //
             if cv.avg_payout_routing != self.avg_payout_routing {
                 error!(
-                    "avg_payout_routing error: {:?} expected : {:?}",
+                    "avg_payout_routing actual: {:?} expected : {:?}",
                     self.avg_payout_routing, cv.avg_payout_routing
                 );
                 return false;
@@ -2621,7 +2621,7 @@ impl Block {
             //
             if cv.avg_payout_mining != self.avg_payout_mining {
                 error!(
-                    "avg_payout_mining error: {:?} expected : {:?}",
+                    "avg_payout_mining actual: {:?} expected : {:?}",
                     self.avg_payout_mining, cv.avg_payout_mining
                 );
                 return false;
@@ -2632,7 +2632,7 @@ impl Block {
             //
             if cv.avg_payout_treasury != self.avg_payout_treasury {
                 error!(
-                    "avg_payout_treasury error: {:?} expected : {:?}",
+                    "avg_payout_treasury actual: {:?} expected : {:?}",
                     self.avg_payout_treasury, cv.avg_payout_treasury
                 );
                 return false;
@@ -2643,7 +2643,7 @@ impl Block {
             //
             if cv.avg_payout_graveyard != self.avg_payout_graveyard {
                 error!(
-                    "avg_payout_graveyard error: {:?} expected : {:?}",
+                    "avg_payout_graveyard actual: {:?} expected : {:?}",
                     self.avg_payout_graveyard, cv.avg_payout_graveyard
                 );
                 return false;
@@ -2654,7 +2654,7 @@ impl Block {
             //
             if cv.avg_payout_atr != self.avg_payout_atr {
                 error!(
-                    "avg_payout_atr error: {:?} expected : {:?}",
+                    "avg_payout_atr actual: {:?} expected : {:?}",
                     self.avg_payout_atr, cv.avg_payout_atr
                 );
                 return false;
