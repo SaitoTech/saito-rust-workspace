@@ -118,15 +118,17 @@ pub mod test {
                 }),
                 peers: vec![],
                 blockchain: BlockchainConfig {
-                    last_block_hash: "0000000000000000000000000000000000000000000000000000000000000000"
-                        .to_string(),
+                    last_block_hash:
+                        "0000000000000000000000000000000000000000000000000000000000000000"
+                            .to_string(),
                     last_block_id: 0,
                     last_timestamp: 0,
                     genesis_block_id: 0,
                     genesis_timestamp: 0,
                     lowest_acceptable_timestamp: 0,
                     lowest_acceptable_block_hash:
-                        "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                        "0000000000000000000000000000000000000000000000000000000000000000"
+                            .to_string(),
                     lowest_acceptable_block_id: 0,
                     fork_id: "0000000000000000000000000000000000000000000000000000000000000000"
                         .to_string(),
