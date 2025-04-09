@@ -7,7 +7,7 @@ import StunPeer from "./lib/stun_peer";
 import Wallet, { DefaultEmptyPrivateKey } from "./lib/wallet";
 import Blockchain from "./lib/blockchain";
 import BalanceSnapshot from "./lib/balance_snapshot";
-
+import Nft from "./lib/nft";
 
 export enum LogLevel {
     Error = 0,
@@ -338,6 +338,82 @@ export default class Saito {
         return tx;
     }
 
+    public async createBoundTransaction<T extends Transaction>(
+        amt: bigint,   
+        bid: number,           
+        tid: number,           
+        sid: number,           
+        num: number,           
+        deposit: bigint,
+        change: bigint,        
+        data: string = "",
+        fee: bigint,
+        recipient_public_key: string,      
+    ): Promise<T> {
+
+      console.log("values recieved at saito.ts:");
+      console.log(amt);
+      console.log(bid);
+      console.log(tid);
+      console.log(sid);
+      console.log(num);
+      console.log(deposit);
+      console.log(change);
+      console.log(data);
+      console.log(fee);
+      console.log(recipient_public_key);
+
+        let wasmTx = await Saito.getLibInstance().create_bound_transaction(
+            amt,
+            bid,
+            tid,
+            sid,
+            num,
+            deposit,
+            change,
+            data,
+            fee,
+            recipient_public_key
+        );
+
+        console.log("saito.ts tx: ", wasmTx);
+
+        let tx = Saito.getInstance().factory.createTransaction(wasmTx) as T;
+        tx.timestamp = new Date().getTime();
+
+        return tx;
+    }
+
+
+    public async createSendBoundTransaction<T extends Transaction>(
+      amt: bigint,
+      nft_id: string,
+      data: string = "",
+      recipient_public_key: string
+    ): Promise<T> {
+      console.log("Transfer NFT parameters:");
+      console.log("Amount:", amt);
+      console.log("NFT id:", nft_id);
+      console.log("Data:", data);
+      console.log("New recipient public key:", recipient_public_key);
+
+      let wasmTx = await Saito.getLibInstance().create_send_bound_transaction(
+        amt,
+        nft_id,
+        data,
+        recipient_public_key
+      );
+
+      console.log("WASM NFT transfer transaction:", wasmTx);
+
+      let tx = Saito.getInstance().factory.createTransaction(wasmTx) as T;
+      tx.timestamp = new Date().getTime();
+
+      return tx;
+    }
+
+
+
     public async getPeers(): Promise<Array<Peer>> {
         let peers = await Saito.getLibInstance().get_peers();
         return peers.map((peer: any) => {
@@ -489,6 +565,11 @@ export default class Saito {
     public async getBalanceSnapshot(keys: string[]): Promise<BalanceSnapshot> {
         let snapshot = await Saito.getLibInstance().get_balance_snapshot(keys);
         return new BalanceSnapshot(snapshot);
+    }
+
+    public async getNftList(): Promise<string> {
+        const nftList = (await Saito.getLibInstance().get_nft_list()).map((nft: any) => new Nft(nft));
+        return JSON.stringify(nftList.map((nft: any) => nft.toJSON()));
     }
 
     public async updateBalanceFrom(snapshot: BalanceSnapshot) {

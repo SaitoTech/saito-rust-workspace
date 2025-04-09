@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 
 use crate::core::consensus::blockchain::Blockchain;
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use primitive_types::U256;
@@ -584,7 +584,7 @@ impl Transaction {
             .iter_mut()
             .enumerate()
             .map(|(index, slip)| {
-                if slip.slip_type != SlipType::ATR || slip.slip_type != SlipType::Bound {
+                if slip.slip_type != SlipType::ATR && slip.slip_type != SlipType::Bound {
                     slip.block_id = block_id;
                     slip.tx_ordinal = tx_index;
                     slip.slip_index = index as u8;
@@ -662,7 +662,6 @@ impl Transaction {
             let half_of_routing_work: Currency = routing_work_available_to_public_key / 2;
             routing_work_available_to_public_key -= half_of_routing_work;
         }
-
         self.total_work_for_me = routing_work_available_to_public_key;
     }
 
@@ -1072,33 +1071,101 @@ impl Transaction {
         //
         if transaction_type == TransactionType::GoldenTicket {}
 
-        if transaction_type == TransactionType::Bound {
-            // TODO : check if bound slips have matching normal slips
-
-            // first input slip should be non-zero
-            if let Some(slip) = self.from.first() {
-                if slip.amount == 0 {
-                    // first slip should have a value to make sure the NFT creator cannot mint multiple transactions with the same hash
-                    return false;
-                }
-            } else {
+        if self.transaction_type == TransactionType::Bound {
+            // ----- Validate Input Slips -----
+            // Require at least one input slip.
+            if self.from.is_empty() {
+                error!("Bound transaction: no input slips found.");
                 return false;
             }
+            // For create_send_bound_transaction, we expect exactly 3 inputs;
+            // for create_bound_transaction, there may be more than 3.
+            // In either case, the first input should come from the NFT UTXO.
+            // (For send-bound, this should be a Bound slip.)
+            if self.from[0].slip_type != SlipType::Bound {
+                error!(
+                    "Bound transaction: first input slip is not Bound (found {:?}).",
+                    self.from[0].slip_type
+                );
+                return false;
+            }
+            // For any additional input slips expect them to be normal.
+            for slip in self.from.iter().skip(1) {
+                if slip.slip_type == SlipType::Bound {
+                    error!("Bound transaction: unexpected Bound slip in inputs.");
+                    return false;
+                }
+            }
 
-            // validate input bound slips
-
-            // validate output bound slips
+            // ----- Validate Output Slips -----
+            let output_count = self.to.len();
+            if output_count != 3 && output_count != 4 {
+                error!(
+                    "Bound transaction: expected 3 or 4 outputs, found {}.",
+                    output_count
+                );
+                return false;
+            }
+            // Output [0] must be a Bound slip (the new NFT slip).
+            if self.to[0].slip_type != SlipType::Bound {
+                error!(
+                    "Bound transaction: output 0 must be Bound (found {:?}).",
+                    self.to[0].slip_type
+                );
+                return false;
+            }
+            // Output [1] must be a Normal slip (the payment slip to the recipient).
+            if self.to[1].slip_type != SlipType::Normal {
+                error!(
+                    "Bound transaction: output 1 must be Normal (found {:?}).",
+                    self.to[1].slip_type
+                );
+                return false;
+            }
+            // Output [2] must be a Bound slip (the combined slip for original location).
+            if self.to[2].slip_type != SlipType::Bound {
+                error!(
+                    "Bound transaction: output 2 must be Bound (found {:?}).",
+                    self.to[2].slip_type
+                );
+                return false;
+            }
+            // If there is a fourth output, it must be a Normal slip (representing change).
+            if output_count == 4 {
+                if self.to[3].slip_type != SlipType::Normal {
+                    error!(
+                        "Bound transaction: output 3 must be Normal (found {:?}).",
+                        self.to[3].slip_type
+                    );
+                    return false;
+                }
+            }
+            // Check that the combined (tracking) slip has zero amount.
+            if self.to[2].amount != 0 {
+                error!("Bound transaction: output 2 (combined tracking slip) amount is not zero.");
+                return false;
+            }
+            // Ensure there are no duplicate UTXO keys across all slips.
+            let mut seen_keys = AHashSet::new();
+            for slip in self.from.iter().chain(self.to.iter()) {
+                if !seen_keys.insert(slip.utxoset_key) {
+                    error!(
+                        "Bound transaction: duplicate UTXO key detected: {:?}",
+                        slip.utxoset_key.to_hex()
+                    );
+                    return false;
+                }
+            }
         } else {
+            // For non-Bound transactions, ensure that no input or output slip is of type Bound.
             if self
                 .from
                 .iter()
                 .any(|slip| slip.slip_type == SlipType::Bound)
             {
-                // only bound txs can have bound slips
                 return false;
             }
             if self.to.iter().any(|slip| slip.slip_type == SlipType::Bound) {
-                // only bound txs can have bound slips
                 return false;
             }
         }
