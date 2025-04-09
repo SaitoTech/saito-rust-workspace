@@ -22,7 +22,7 @@ use crate::io_event::IoEvent;
 lazy_static! {
     pub static ref BLOCKS_DIR_PATH: String = configure_storage();
     pub static ref WALLET_DIR_PATH: String = String::from("./data/wallet");
-    pub static ref CHECKPOINT_DIR_PATH: String = String::from("./data/checkpoints");
+    pub static ref CHECKPOINT_DIR_PATH: String = String::from("./data/checkpoints/");
 }
 pub fn configure_storage() -> String {
     if cfg!(test) {

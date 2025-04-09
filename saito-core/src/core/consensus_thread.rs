@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use log::{debug, info, trace};
+use rayon::vec;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -14,7 +15,8 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
+    BlockHash, BlockId, PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER,
+    STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -459,31 +461,23 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
             );
             let mut blockchain = self.blockchain_lock.write().await;
             let blockchain_configs = configs.get_blockchain_configs();
-            if let Some(blockchain_configs) = blockchain_configs {
-                info!(
-                    "loading blockchain state from configs : {:?}",
-                    blockchain_configs
-                );
-                blockchain.last_block_hash =
-                    SaitoHash::from_hex(blockchain_configs.last_block_hash.as_str())
-                        .unwrap_or([0; 32]);
-                blockchain.last_block_id = blockchain_configs.last_block_id;
-                blockchain.last_timestamp = blockchain_configs.last_timestamp;
-                blockchain.genesis_block_id = blockchain_configs.genesis_block_id;
-                blockchain.genesis_timestamp = blockchain_configs.genesis_timestamp;
-                blockchain.lowest_acceptable_timestamp =
-                    blockchain_configs.lowest_acceptable_timestamp;
-                blockchain.lowest_acceptable_block_hash =
-                    SaitoHash::from_hex(blockchain_configs.lowest_acceptable_block_hash.as_str())
-                        .unwrap_or([0; 32]);
-                blockchain.lowest_acceptable_block_id =
-                    blockchain_configs.lowest_acceptable_block_id;
-                blockchain.fork_id = Some(
-                    SaitoHash::from_hex(blockchain_configs.fork_id.as_str()).unwrap_or([0; 32]),
-                );
-            } else {
-                info!("blockchain state is not loaded");
-            }
+            info!(
+                "loading blockchain state from configs : {:?}",
+                blockchain_configs
+            );
+            blockchain.last_block_hash =
+                SaitoHash::from_hex(blockchain_configs.last_block_hash.as_str()).unwrap_or([0; 32]);
+            blockchain.last_block_id = blockchain_configs.last_block_id;
+            blockchain.last_timestamp = blockchain_configs.last_timestamp;
+            blockchain.genesis_block_id = blockchain_configs.genesis_block_id;
+            blockchain.genesis_timestamp = blockchain_configs.genesis_timestamp;
+            blockchain.lowest_acceptable_timestamp = blockchain_configs.lowest_acceptable_timestamp;
+            blockchain.lowest_acceptable_block_hash =
+                SaitoHash::from_hex(blockchain_configs.lowest_acceptable_block_hash.as_str())
+                    .unwrap_or([0; 32]);
+            blockchain.lowest_acceptable_block_id = blockchain_configs.lowest_acceptable_block_id;
+            blockchain.fork_id =
+                Some(SaitoHash::from_hex(blockchain_configs.fork_id.as_str()).unwrap_or([0; 32]));
         }
 
         let configs = self.config_lock.read().await;
@@ -504,6 +498,8 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 list.len(),
                 StatVariable::format_timestamp(start_time)
             );
+            let mut files_to_delete = list.clone();
+
             while !list.is_empty() {
                 let file_names: Vec<String> =
                     list.drain(..std::cmp::min(1000, list.len())).collect();
@@ -532,6 +528,35 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 let mut mempool = self.mempool_lock.write().await;
                 info!("removing {} failed blocks from mempool so new blocks can be bundled after node loadup", mempool.blocks_queue.len());
                 mempool.blocks_queue.clear();
+            }
+            {
+                let purge_id = blockchain
+                    .get_latest_block_id()
+                    .saturating_sub(blockchain.genesis_period * 2);
+                let retained_file_names: Vec<String> = blockchain
+                    .blocks
+                    .iter()
+                    .filter_map(|(_, block)| {
+                        if block.id < purge_id {
+                            return None;
+                        }
+                        Some(block.get_file_name())
+                    })
+                    .collect();
+                files_to_delete.retain(|name| !retained_file_names.contains(name));
+                info!(
+                    "removing {} blocks from disk which were not loaded to blockchain or older than genesis block : {}",
+                    files_to_delete.len(),
+                    blockchain.genesis_block_id
+                );
+                for file_name in files_to_delete {
+                    self.storage
+                        .delete_block_from_disk(
+                            (self.storage.io_interface.get_block_dir() + file_name.as_str())
+                                .as_str(),
+                        )
+                        .await;
+                }
             }
             info!(
                 "{:?} total blocks in blockchain. Timestamp : {:?}, elapsed_time : {:?}",
@@ -644,12 +669,14 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 mod tests {
     use log::info;
 
+    use crate::core::consensus::block::{Block, BlockType};
     use crate::core::consensus::slip::SlipType;
     use crate::core::defs::{PrintForLog, SaitoHash, NOLAN_PER_SAITO, UTXO_KEY_LENGTH};
 
     use crate::core::process::keep_time::KeepTime;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::node_tester::test::{NodeTester, TestTimeKeeper};
+    use std::fs;
 
     #[tokio::test]
     #[serial_test::serial]
@@ -1167,7 +1194,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn reorg_over_checkpoints() {
-        pretty_env_logger::init();
+        // pretty_env_logger::init();
         NodeTester::delete_data().await.unwrap();
         let mut tester = NodeTester::new(10, None, None);
         let public_key = tester.get_public_key().await;
@@ -1325,6 +1352,105 @@ mod tests {
             let blockchain = tester.consensus_thread.blockchain_lock.read().await;
             let block = blockchain.get_block(&alternate_block_4.hash);
             assert!(block.is_none());
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn loading_isolated_forks_test() {
+        // pretty_env_logger::init();
+        NodeTester::delete_data().await.unwrap();
+        let mut tester = NodeTester::new(10, None, None);
+        let public_key = tester.get_public_key().await;
+        let private_key = tester.get_private_key().await;
+        let issuance = vec![(public_key.to_base58(), 100_000 * NOLAN_PER_SAITO)];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.set_staking_enabled(false).await;
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let mut old_block: Option<Block> = None;
+        // create a main fork first
+        for i in 2..=100 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+
+            if i == 25 {
+                old_block = tester
+                    .consensus_thread
+                    .blockchain_lock
+                    .read()
+                    .await
+                    .get_latest_block()
+                    .cloned();
+                assert_eq!(old_block.as_ref().unwrap().id, 24);
+            }
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+
+        // copy block 24 back to blocks folder
+        {
+            tester
+                .consensus_thread
+                .storage
+                .write_block_to_disk(&old_block.unwrap())
+                .await;
+        }
+        drop(tester);
+
+        // Check if the file count inside the data directory is 21
+        {
+            let data_dir = "./data/blocks";
+            let file_count = fs::read_dir(data_dir)
+                .unwrap_or_else(|_| panic!("Failed to read directory: {}", data_dir))
+                .count();
+
+            assert_eq!(
+                file_count, 21,
+                "Expected 21 files in the data directory, found {}",
+                file_count
+            );
+        }
+
+        // reload the node
+        let mut tester = NodeTester::new(10, Some(private_key), None);
+        tester.set_staking_enabled(false).await;
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(100).await.unwrap();
+
+        // check if the latest block is 5
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        let latest_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id, 100);
+
+        // Check if the file count inside the data directory is 20
+        {
+            let data_dir = "./data/blocks";
+            let file_count = fs::read_dir(data_dir)
+                .unwrap_or_else(|_| panic!("Failed to read directory: {}", data_dir))
+                .count();
+
+            assert_eq!(
+                file_count, 20,
+                "Expected 20 files in the data directory, found {}",
+                file_count
+            );
         }
     }
 }
