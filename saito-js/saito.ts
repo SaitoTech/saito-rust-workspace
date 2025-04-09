@@ -338,7 +338,7 @@ export default class Saito {
         return tx;
     }
 
-    public async createBoundUtxoTransaction<T extends Transaction>(
+    public async createBoundTransaction<T extends Transaction>(
         amt: bigint,   
         bid: number,           
         tid: number,           
@@ -363,7 +363,7 @@ export default class Saito {
       console.log(fee);
       console.log(recipient_public_key);
 
-        let wasmTx = await Saito.getLibInstance().create_bound_utxo_transaction(
+        let wasmTx = await Saito.getLibInstance().create_bound_transaction(
             amt,
             bid,
             tid,
@@ -385,42 +385,31 @@ export default class Saito {
     }
 
 
-
-    public async createSendBoundTransaction(
+    public async createSendBoundTransaction<T extends Transaction>(
       amt: bigint,
-      utxokey_bound: string,
-      utxokey_normal: string,    
-      nft_id: number,
+      nft_id: string,
       data: string = "",
-      fee: bigint,
       recipient_public_key: string
-    ): Promise<string> {
+    ): Promise<T> {
       console.log("Transfer NFT parameters:");
       console.log("Amount:", amt);
-      console.log("Bound UTXO Key:", utxokey_bound);
-      console.log("Normal UTXO Key:", utxokey_normal);
       console.log("NFT id:", nft_id);
-      console.log("Slip num:", num);
       console.log("Data:", data);
-      console.log("Fee:", fee);
       console.log("New recipient public key:", recipient_public_key);
 
       let wasmTx = await Saito.getLibInstance().create_send_bound_transaction(
         amt,
-        utxokey_bound,
-        utxokey_normal,
         nft_id,
         data,
-        fee,
         recipient_public_key
       );
 
       console.log("WASM NFT transfer transaction:", wasmTx);
 
-      let tx = Saito.getInstance().factory.createTransaction(wasmTx);
+      let tx = Saito.getInstance().factory.createTransaction(wasmTx) as T;
       tx.timestamp = new Date().getTime();
 
-      return JSON.stringify(tx);
+      return tx;
     }
 
 

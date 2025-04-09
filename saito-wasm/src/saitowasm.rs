@@ -483,7 +483,7 @@ pub async fn create_transaction_with_multiple_payments(
 }
 
 #[wasm_bindgen]
-pub async fn create_bound_utxo_transaction(
+pub async fn create_bound_transaction(
     amt: u64,
     bid: u64,
     tid: u64,
@@ -541,7 +541,7 @@ pub async fn create_bound_utxo_transaction(
     )))?;
 
     let transaction = wallet
-        .create_bound_utxo_transaction(
+        .create_bound_transaction(
             amt,
             bid,
             tid,
@@ -574,23 +574,21 @@ pub async fn create_bound_utxo_transaction(
 #[wasm_bindgen]
 pub async fn create_send_bound_transaction(
     amt: u64,
-    utxokey_bound: String,
-    utxokey_normal: String,
-    nft_id: u32,
+    nft_id: String,
     data: String,
-    fee: u64,
     recipient_public_key: JsString,
 ) -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.lock().await;
+    let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
+    let configs = config_lock.read().await;
+    let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
+    let blockchain = saito.as_ref().unwrap().context.blockchain_lock.read().await;
+    let latest_block_id = blockchain.get_latest_block_id();
     let mut wallet = saito.as_ref().unwrap().context.wallet_lock.write().await;
 
-    let utxo_bound = string_to_utxoset_key(&utxokey_bound)
-        .map_err(|_| JsValue::from_str("Invalid bound UTXO key"))?;
-
-    let utxo_normal = string_to_utxoset_key(&utxokey_normal)
-        .map_err(|_| JsValue::from_str("Invalid normal UTXO key"))?;
-
-    let nft_id_vec = nft_id.to_le_bytes().to_vec();
+    // Decode the NFT id hex string into a Vec<u8>
+    let nft_id_vec = hex::decode(&nft_id)
+        .map_err(|_| JsValue::from_str("Failed to decode nft_id hex string"))?;
 
     let serialized_data =
         serde_json::to_vec(&data).map_err(|_| JsValue::from_str("Failed to serialize data"))?;
@@ -605,19 +603,19 @@ pub async fn create_send_bound_transaction(
         })
         .collect();
 
-    let key = string_to_key(recipient_public_key).or(Err(JsValue::from(
+    let key = string_to_key(recipient_public_key).or(Err(JsValue::from_str(
         "Failed parsing public key string to key",
     )))?;
 
     let tx = wallet
         .create_send_bound_transaction(
             amt,
-            utxo_bound,
-            utxo_normal,
-            nft_id_vec,
+            nft_id_vec, // Pass decoded nft_id vector
             serialized_data_u32,
-            fee,
             &key,
+            Some(&saito.as_ref().unwrap().consensus_thread.network),
+            latest_block_id,
+            genesis_period,
         )
         .await
         .map_err(|_| JsValue::from_str("Failed to transfer NFT transaction"))?;

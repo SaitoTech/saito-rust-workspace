@@ -2966,7 +2966,7 @@ impl Block {
             // validate double-spend inputs
             if valid_tx && tx.transaction_type != TransactionType::Fee {
                 for input in tx.from.iter() {
-                    if input.amount == 0 {
+                    if input.amount == 0 || input.slip_type == SlipType::Bound {
                         continue;
                     }
                     let utxo_key = input.get_utxoset_key();
