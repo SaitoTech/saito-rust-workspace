@@ -1026,71 +1026,101 @@ impl Transaction {
         //
         if transaction_type == TransactionType::GoldenTicket {}
 
-        if transaction_type == TransactionType::Bound {
-            // ensure there is only one input slip
-            // if self.from.len() != 1 {
-            //     error!("Bound transaction must have exactly 1 input slip.");
-            //     return false;
-            // }
+        if self.transaction_type == TransactionType::Bound {
+            // ----- Validate Input Slips -----
+            // Require at least one input slip.
+            if self.from.is_empty() {
+                error!("Bound transaction: no input slips found.");
+                return false;
+            }
+            // For create_send_bound_transaction, we expect exactly 3 inputs;
+            // for create_bound_transaction, there may be more than 3.
+            // In either case, the first input should come from the NFT UTXO.
+            // (For send-bound, this should be a Bound slip.)
+            if self.from[0].slip_type != SlipType::Bound {
+                error!(
+                    "Bound transaction: first input slip is not Bound (found {:?}).",
+                    self.from[0].slip_type
+                );
+                return false;
+            }
+            // For any additional input slips expect them to be normal.
+            for slip in self.from.iter().skip(1) {
+                if slip.slip_type == SlipType::Bound {
+                    error!("Bound transaction: unexpected Bound slip in inputs.");
+                    return false;
+                }
+            }
 
-            // let slip = &self.from[0];
-
-            // // first slip shouldnt be bound
-            // if slip.slip_type == SlipType::Bound {
-            //     error!("Bound transaction input slip cannot be of type Bound.");
-            //     return false;
-            // }
-
-            // // there are exactly 2 or 3 output slips
-            // if self.to.len() < 2 || self.to.len() > 3 {
-            //     error!("Bound transaction must have exactly 2 or 3 output slips.");
-            //     return false;
-            // }
-
-            // // output contains at least 1 Bound slip and 1 Normal slip.
-            // let mut has_bound = false;
-            // let mut has_normal = false;
-
-            // for slip in &self.to {
-            //     match slip.slip_type {
-            //         SlipType::Bound => has_bound = true,
-            //         SlipType::Normal => has_normal = true,
-            //         _ => {}
-            //     }
-            // }
-
-            // if !has_bound || !has_normal {
-            //     error!(
-            //         "Bound transaction must contain at least one Bound slip and one Normal slip."
-            //     );
-            //     return false;
-            // }
-
-            // the first UTXO_KEY_LENGTH bytes of data match
-            // the input slip’s UTXO key
-            // if self.data.len() < UTXO_KEY_LENGTH {
-            //     error!("Bound transaction data is too short to contain a valid UTXO key.");
-            //     return false;
-            // }
-
-            // let expected_utxokey = &self.from[0].utxoset_key;
-            // let extracted_utxokey: &[u8] = &self.data[..UTXO_KEY_LENGTH];
-
-            // if extracted_utxokey != expected_utxokey {
-            //     error!("Bound transaction data does not start with the correct UTXO key.");
-            //     return false;
-            // }
+            // ----- Validate Output Slips -----
+            let output_count = self.to.len();
+            if output_count != 3 && output_count != 4 {
+                error!(
+                    "Bound transaction: expected 3 or 4 outputs, found {}.",
+                    output_count
+                );
+                return false;
+            }
+            // Output [0] must be a Bound slip (the new NFT slip).
+            if self.to[0].slip_type != SlipType::Bound {
+                error!(
+                    "Bound transaction: output 0 must be Bound (found {:?}).",
+                    self.to[0].slip_type
+                );
+                return false;
+            }
+            // Output [1] must be a Normal slip (the payment slip to the recipient).
+            if self.to[1].slip_type != SlipType::Normal {
+                error!(
+                    "Bound transaction: output 1 must be Normal (found {:?}).",
+                    self.to[1].slip_type
+                );
+                return false;
+            }
+            // Output [2] must be a Bound slip (the combined slip for original location).
+            if self.to[2].slip_type != SlipType::Bound {
+                error!(
+                    "Bound transaction: output 2 must be Bound (found {:?}).",
+                    self.to[2].slip_type
+                );
+                return false;
+            }
+            // If there is a fourth output, it must be a Normal slip (representing change).
+            if output_count == 4 {
+                if self.to[3].slip_type != SlipType::Normal {
+                    error!(
+                        "Bound transaction: output 3 must be Normal (found {:?}).",
+                        self.to[3].slip_type
+                    );
+                    return false;
+                }
+            }
+            // Check that the combined (tracking) slip has zero amount.
+            if self.to[2].amount != 0 {
+                error!("Bound transaction: output 2 (combined tracking slip) amount is not zero.");
+                return false;
+            }
+            // Ensure there are no duplicate UTXO keys across all slips.
+            let mut seen_keys = AHashSet::new();
+            for slip in self.from.iter().chain(self.to.iter()) {
+                if !seen_keys.insert(slip.utxoset_key) {
+                    error!(
+                        "Bound transaction: duplicate UTXO key detected: {:?}",
+                        slip.utxoset_key.to_hex()
+                    );
+                    return false;
+                }
+            }
         } else {
+            // For non-Bound transactions, ensure that no input or output slip is of type Bound.
             if self
                 .from
                 .iter()
                 .any(|slip| slip.slip_type == SlipType::Bound)
             {
-                // only bound txs can have bound slips
                 return false;
             }
             if self.to.iter().any(|slip| slip.slip_type == SlipType::Bound) {
-                // only bound txs can have bound slips
                 return false;
             }
         }
