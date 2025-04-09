@@ -669,12 +669,14 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
 mod tests {
     use log::info;
 
+    use crate::core::consensus::block::{Block, BlockType};
     use crate::core::consensus::slip::SlipType;
     use crate::core::defs::{PrintForLog, SaitoHash, NOLAN_PER_SAITO, UTXO_KEY_LENGTH};
 
     use crate::core::process::keep_time::KeepTime;
     use crate::core::util::crypto::generate_keys;
     use crate::core::util::test::node_tester::test::{NodeTester, TestTimeKeeper};
+    use std::fs;
 
     #[tokio::test]
     #[serial_test::serial]
@@ -1350,6 +1352,105 @@ mod tests {
             let blockchain = tester.consensus_thread.blockchain_lock.read().await;
             let block = blockchain.get_block(&alternate_block_4.hash);
             assert!(block.is_none());
+        }
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn loading_isolated_forks_test() {
+        // pretty_env_logger::init();
+        NodeTester::delete_data().await.unwrap();
+        let mut tester = NodeTester::new(10, None, None);
+        let public_key = tester.get_public_key().await;
+        let private_key = tester.get_private_key().await;
+        let issuance = vec![(public_key.to_base58(), 100_000 * NOLAN_PER_SAITO)];
+        tester.set_issuance(issuance).await.unwrap();
+        tester.set_staking_enabled(false).await;
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(1).await.unwrap();
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+
+        let mut old_block: Option<Block> = None;
+        // create a main fork first
+        for i in 2..=100 {
+            let tx = tester.create_transaction(10, 10, public_key).await.unwrap();
+
+            if i == 25 {
+                old_block = tester
+                    .consensus_thread
+                    .blockchain_lock
+                    .read()
+                    .await
+                    .get_latest_block()
+                    .cloned();
+                assert_eq!(old_block.as_ref().unwrap().id, 24);
+            }
+            tester.add_transaction(tx).await;
+            tester.wait_till_block_id(i).await.unwrap();
+            tester
+                .check_total_supply()
+                .await
+                .expect("total supply should not change");
+        }
+
+        // copy block 24 back to blocks folder
+        {
+            tester
+                .consensus_thread
+                .storage
+                .write_block_to_disk(&old_block.unwrap())
+                .await;
+        }
+        drop(tester);
+
+        // Check if the file count inside the data directory is 21
+        {
+            let data_dir = "./data/blocks";
+            let file_count = fs::read_dir(data_dir)
+                .unwrap_or_else(|_| panic!("Failed to read directory: {}", data_dir))
+                .count();
+
+            assert_eq!(
+                file_count, 21,
+                "Expected 21 files in the data directory, found {}",
+                file_count
+            );
+        }
+
+        // reload the node
+        let mut tester = NodeTester::new(10, Some(private_key), None);
+        tester.set_staking_enabled(false).await;
+        tester.init().await.unwrap();
+        tester.wait_till_block_id(100).await.unwrap();
+
+        // check if the latest block is 5
+        tester
+            .check_total_supply()
+            .await
+            .expect("total supply should not change");
+        let latest_block_id = tester
+            .consensus_thread
+            .blockchain_lock
+            .read()
+            .await
+            .get_latest_block_id();
+        assert_eq!(latest_block_id, 100);
+        
+        // Check if the file count inside the data directory is 20
+        {
+            let data_dir = "./data/blocks";
+            let file_count = fs::read_dir(data_dir)
+                .unwrap_or_else(|_| panic!("Failed to read directory: {}", data_dir))
+                .count();
+
+            assert_eq!(
+                file_count, 20,
+                "Expected 20 files in the data directory, found {}",
+                file_count
+            );
         }
     }
 }
