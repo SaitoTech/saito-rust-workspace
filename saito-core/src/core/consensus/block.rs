@@ -1539,105 +1539,168 @@ impl Block {
                         let expected_atr_multiplier = 1 + expected_atr_payout;
 
                         //
-                        // loop through block to find eligible transactions
-                        //
+                        // For each transaction in the ATR block:
+                        // Loop through each transaction in the ATR block:
                         for transaction in &atr_block.transactions {
-                            let mut outputs = vec![];
-                            let mut total_nolan_eligible_for_atr_payout: Currency = 0;
+                            // Check if this is a bound UTXO transaction, if the first input slip is of type Bound then we
+                            // treat the whole transaction as coming from a bound UTXO.
+                            if !transaction.from.is_empty()
+                                && transaction.from[0].slip_type == SlipType::Bound
+                            {
+                                let mut aggregated_amount: Currency = 0;
+                                let mut eligible_outputs: Vec<&Slip> = Vec::new();
 
-                            //
-                            // find eligible outputs
-                            //
-                            for output in transaction.to.iter() {
-                                if output.validate(&blockchain.utxoset) {
-                                    debug!("output slip is valid. so checking for rebroadcasting. slip : {}",output);
-                                    outputs.push(output);
-                                    total_nolan_eligible_for_atr_payout += output.amount;
-                                }
-                            }
-
-                            //
-                            // now process each output
-                            //
-                            if !outputs.is_empty() {
-                                let tx_size = transaction.get_serialized_size() as u64;
-                                let atr_fee = tx_size * previous_block_avg_fee_per_byte;
-
-                                //
-                                // every output pays the rebroadcast fee
-                                //
-                                for output in outputs {
-                                    let atr_payout_for_slip =
-                                        output.amount * expected_atr_multiplier;
-                                    let surplus_payout_to_subtract_from_treasury =
-                                        atr_payout_for_slip - output.amount;
-                                    let atr_fee_for_slip = atr_fee;
-
-                                    //
-                                    // the only slips that are eligible for payout are those where there is a surplus
-                                    // left over after the payout is added and then the fee is deducted. slips that do
-                                    // not pass this criteria have their fee collected but are not issued a payout.
-                                    //
-                                    if atr_payout_for_slip > atr_fee {
-                                        cv.total_rebroadcast_nolan += output.amount;
-                                        cv.total_rebroadcast_slips += 1;
-
-                                        //
-                                        // clone the slip, update the amount
-                                        //
-                                        let mut slip = output.clone();
-                                        slip.slip_type = SlipType::ATR;
-                                        slip.amount = atr_payout_for_slip - atr_fee_for_slip;
-
-                                        //
-                                        // we update the "input" slip so that it
-                                        // will result in cumulative fees being
-                                        // calculated correctly when the TX is
-                                        // examined....
-                                        //
-                                        let mut from_slip = output.clone();
-                                        from_slip.amount = atr_payout_for_slip;
-
-                                        //
-                                        // track payouts and fees
-                                        //
-                                        cv.total_payout_atr +=
-                                            surplus_payout_to_subtract_from_treasury;
-                                        cv.total_fees_atr += atr_fee_for_slip;
-
-                                        //
-                                        // create our ATR rebroadcast transaction
-                                        //
-                                        let rebroadcast_tx =
-                                            Transaction::create_rebroadcast_transaction(
-                                                transaction,
-                                                slip,
-                                                from_slip,
-                                            );
-
-                                        //
-                                        // update rebroadcast_hash (all ATRs)
-                                        //
-                                        let mut vbytes: Vec<u8> = vec![];
-                                        vbytes.extend(&cv.rebroadcast_hash);
-                                        vbytes.extend(&rebroadcast_tx.serialize_for_signature());
-                                        cv.rebroadcast_hash = hash(&vbytes);
-                                        cv.rebroadcasts.push(rebroadcast_tx);
-                                    } else {
-                                        //
-                                        // this UTXO will be worth less than zero if the atr_payout is
-                                        // added and then the atr_fee is deducted. so we do not rebroadcast
-                                        // it but collect the dust as a fee paid to the blockchain by the
-                                        // utxo with gratitude for its release.
-                                        //
-                                        cv.total_rebroadcast_nolan += output.amount;
-                                        cv.total_fees_atr += output.amount;
-                                        cv.total_fees_paid_by_nonrebroadcast_atr_transactions +=
-                                            output.amount;
-                                        debug!("we dont rebroadcast slip in tx - {:?} since atr_payout_for_slip = {:?} atr_fee = {:?} \n{}",transaction.hash_for_signature.unwrap().to_hex(),atr_payout_for_slip,atr_fee,output);
+                                // Collect eligible outputs from the transaction's output slips.
+                                for output in transaction.to.iter() {
+                                    if output.validate(&blockchain.utxoset) {
+                                        debug!("BOUND: Eligible output found: {}", output);
+                                        eligible_outputs.push(output);
+                                        aggregated_amount += output.amount;
                                     }
                                 }
-                            } // output loop
+
+                                if !eligible_outputs.is_empty() {
+                                    //  Compute fee requirement for this transaction.
+                                    let tx_size = transaction.get_serialized_size() as u64;
+                                    let required_fee = tx_size * previous_block_avg_fee_per_byte;
+
+                                    // Compute aggregated ATR payout based on the expected multiplier.
+                                    let aggregated_atr_payout =
+                                        aggregated_amount * expected_atr_multiplier;
+
+                                    // Determine the fee available from the linked normal UTXO
+                                    // summing up amounts in input without Bound.
+                                    let mut linked_fee_amount: Currency = 0;
+                                    for slip in transaction.from.iter() {
+                                        if slip.slip_type != SlipType::Bound {
+                                            linked_fee_amount += slip.amount;
+                                        }
+                                    }
+
+                                    if linked_fee_amount >= required_fee {
+                                        let base_public_key =
+                                            eligible_outputs.first().unwrap().public_key;
+
+                                        // Calculate amount for the "to" slip.
+                                        let aggregated_effective_amount =
+                                            aggregated_atr_payout.saturating_sub(required_fee);
+
+                                        // Create the aggregated "to" slip
+                                        let mut aggregated_to_slip = Slip::default();
+                                        aggregated_to_slip.public_key = base_public_key;
+                                        aggregated_to_slip.amount = aggregated_effective_amount;
+                                        aggregated_to_slip.slip_type = SlipType::ATR;
+
+                                        // Create  "from" slip
+                                        let mut aggregated_from_slip = Slip::default();
+                                        aggregated_from_slip.public_key = base_public_key;
+                                        aggregated_from_slip.amount = aggregated_atr_payout;
+                                        aggregated_from_slip.slip_type = SlipType::ATR;
+
+                                        cv.total_rebroadcast_nolan += aggregated_amount;
+                                        cv.total_rebroadcast_slips += 1;
+                                        let surplus =
+                                            aggregated_atr_payout.saturating_sub(aggregated_amount);
+                                        cv.total_payout_atr += surplus;
+                                        cv.total_fees_atr += required_fee;
+
+                                        // Create the aggregated ATR rebroadcast transaction.
+                                        let aggregated_rebroadcast_tx =
+                                            Transaction::create_rebroadcast_transaction(
+                                                transaction,
+                                                aggregated_to_slip,
+                                                aggregated_from_slip,
+                                            );
+
+                                        // Update the global rebroadcast hash inline.
+                                        let mut vbytes: Vec<u8> = Vec::new();
+                                        vbytes.extend(&cv.rebroadcast_hash);
+                                        vbytes.extend(
+                                            &aggregated_rebroadcast_tx.serialize_for_signature(),
+                                        );
+                                        cv.rebroadcast_hash = hash(&vbytes);
+
+                                        cv.rebroadcasts.push(aggregated_rebroadcast_tx);
+                                    } else {
+                                        // If the fee provided by the linked normal UTXO is insufficient,
+                                        // do not rebroadcast and instead add the entire eligible amount as fees.
+                                        cv.total_rebroadcast_nolan += aggregated_amount;
+                                        cv.total_fees_atr += aggregated_amount;
+                                        cv.total_fees_paid_by_nonrebroadcast_atr_transactions +=
+                                            aggregated_amount;
+                                        debug!(
+                                            "BOUND: Insufficient fee for rebroadcast: aggregated ATR payout {} required fee {} (available linked fee {})",
+                                            aggregated_atr_payout, required_fee, linked_fee_amount
+                                        );
+                                    }
+                                }
+                            } else {
+                                // Normal ATR process each eligible output individually
+                                let mut outputs: Vec<&Slip> = Vec::new();
+                                let mut total_nolan_eligible: Currency = 0;
+
+                                // Collect eligible outputs from the transaction's output slips.
+                                for output in transaction.to.iter() {
+                                    if output.validate(&blockchain.utxoset) {
+                                        debug!("Normal: Eligible output found: {}", output);
+                                        outputs.push(output);
+                                        total_nolan_eligible += output.amount;
+                                    }
+                                }
+
+                                if !outputs.is_empty() {
+                                    // Compute the fee for the transaction.
+                                    let tx_size = transaction.get_serialized_size() as u64;
+                                    let atr_fee = tx_size * previous_block_avg_fee_per_byte;
+
+                                    // Process each eligible output individually.
+                                    for output in outputs {
+                                        let atr_payout_for_slip =
+                                            output.amount * expected_atr_multiplier;
+                                        let surplus =
+                                            atr_payout_for_slip.saturating_sub(output.amount);
+                                        if atr_payout_for_slip > atr_fee {
+                                            cv.total_rebroadcast_nolan += output.amount;
+                                            cv.total_rebroadcast_slips += 1;
+
+                                            let mut new_to_slip = output.clone();
+                                            new_to_slip.slip_type = SlipType::ATR;
+                                            new_to_slip.amount =
+                                                atr_payout_for_slip.saturating_sub(atr_fee);
+
+                                            let mut new_from_slip = output.clone();
+                                            new_from_slip.amount = atr_payout_for_slip;
+
+                                            cv.total_payout_atr += surplus;
+                                            cv.total_fees_atr += atr_fee;
+
+                                            let rebroadcast_tx =
+                                                Transaction::create_rebroadcast_transaction(
+                                                    transaction,
+                                                    new_to_slip,
+                                                    new_from_slip,
+                                                );
+                                            // Update the rebroadcast hash inline.
+                                            let mut vbytes: Vec<u8> = Vec::new();
+                                            vbytes.extend(&cv.rebroadcast_hash);
+                                            vbytes
+                                                .extend(&rebroadcast_tx.serialize_for_signature());
+                                            cv.rebroadcast_hash = hash(&vbytes);
+
+                                            cv.rebroadcasts.push(rebroadcast_tx);
+                                        } else {
+                                            // Not enough payout after fee: do not rebroadcast this output.
+                                            cv.total_rebroadcast_nolan += output.amount;
+                                            cv.total_fees_atr += output.amount;
+                                            cv.total_fees_paid_by_nonrebroadcast_atr_transactions += output.amount;
+                                            debug!(
+                                                "Normal: Not rebroadcasting output (insufficient net payout): {}",
+                                                output
+                                            );
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         //
