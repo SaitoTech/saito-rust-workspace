@@ -95,6 +95,8 @@ pub struct Blockchain {
     pub social_stake_requirement: Currency,
     pub social_stake_period: u64,
     pub genesis_period: BlockId,
+
+    pub checkpoint_found: bool,
 }
 
 impl Blockchain {
@@ -126,6 +128,7 @@ impl Blockchain {
             social_stake_requirement: social_stake,
             social_stake_period,
             genesis_period,
+            checkpoint_found: false,
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -196,7 +199,9 @@ impl Blockchain {
                     "hash is empty for parent of block : {:?}",
                     block.hash.to_hex()
                 );
-            } else {
+            } else if configs.get_blockchain_configs().initial_loading_completed
+                || self.checkpoint_found
+            {
                 let previous_block_fetched = iterate!(mempool.blocks_queue, 100)
                     .any(|b| block.previous_block_hash == b.hash);
                 let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
@@ -302,7 +307,8 @@ impl Blockchain {
                 self.calculate_old_chain_for_add_block(latest_block_hash, shared_block_hash);
         } else {
             debug!(
-                "block without parent. block : {:?}, latest : {:?}",
+                "block without parent. block : {}-{:?}, latest : {:?}",
+                block_id,
                 block_hash.to_hex(),
                 latest_block_hash.to_hex()
             );
@@ -1743,6 +1749,7 @@ impl Blockchain {
                                         let block = self.blocks.get_mut(&block_hash).unwrap();
                                         block.graveyard += slip.amount;
                                         block.has_checkpoint = true;
+                                        self.checkpoint_found = true;
                                         info!("skipping slip : {} according to the checkpoint file : {}-{}",
                                             slip,block_id,block_hash.to_hex());
                                     } else {

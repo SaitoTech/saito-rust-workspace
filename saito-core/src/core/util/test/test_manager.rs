@@ -1133,7 +1133,7 @@ pub mod test {
             todo!()
         }
 
-        fn get_blockchain_configs(&self) -> Option<BlockchainConfig> {
+        fn get_blockchain_configs(&self) -> &BlockchainConfig {
             todo!()
         }
 
