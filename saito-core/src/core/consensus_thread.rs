@@ -1438,7 +1438,7 @@ mod tests {
             .await
             .get_latest_block_id();
         assert_eq!(latest_block_id, 100);
-        
+
         // Check if the file count inside the data directory is 20
         {
             let data_dir = "./data/blocks";

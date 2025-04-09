@@ -96,7 +96,7 @@ pub struct Blockchain {
     pub social_stake_period: u64,
     pub genesis_period: BlockId,
 
-    pub checkpoint_found:bool,
+    pub checkpoint_found: bool,
 }
 
 impl Blockchain {
@@ -199,7 +199,9 @@ impl Blockchain {
                     "hash is empty for parent of block : {:?}",
                     block.hash.to_hex()
                 );
-            } else if configs.get_blockchain_configs().initial_loading_completed || self.checkpoint_found {
+            } else if configs.get_blockchain_configs().initial_loading_completed
+                || self.checkpoint_found
+            {
                 let previous_block_fetched = iterate!(mempool.blocks_queue, 100)
                     .any(|b| block.previous_block_hash == b.hash);
                 let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
@@ -1708,7 +1710,7 @@ impl Blockchain {
         storage: &mut Storage,
         sender_to_miner: Option<Sender<MiningEvent>>,
         sender_to_router: Option<Sender<RoutingEvent>>,
-        configs: & (dyn Configuration + Send + Sync),
+        configs: &(dyn Configuration + Send + Sync),
     ) {
         debug!("adding blocks from mempool to blockchain");
         let mut blocks: VecDeque<Block>;
