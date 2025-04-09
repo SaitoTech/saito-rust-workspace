@@ -636,17 +636,11 @@ impl Wallet {
         latest_block_id: u64,
         genesis_period: u64,
     ) -> Result<Transaction, Error> {
-        info!("inside create_send_bound_transaction ////");
-
-        info!("create_send_bound_transaction 1");
         // ------------------------------------------------------------------------
         // 1. Locate the NFT to be transferred:
         // Search our wallet's NFT slips for one matching the provided nft_id.
         // Extract both the bound and normal UTXO keys from the matching NFT.
         // ------------------------------------------------------------------------
-
-        info!("self.nft_slips: {:?}", self.nft_slips);
-        info!("nft_id: {:?}", nft_id);
 
         let pos = self
             .nft_slips
@@ -654,8 +648,6 @@ impl Wallet {
             .position(|nft| nft.nft_id == nft_id)
             .ok_or(Error::new(ErrorKind::NotFound, "NFT not found"))?;
         let old_nft = self.nft_slips.remove(pos);
-
-        info!("create_send_bound_transaction 2");
 
         // ------------------------------------------------------------------------
         // 2. Verify that the normal UTXO exists:
@@ -665,15 +657,11 @@ impl Wallet {
             return Err(Error::new(ErrorKind::NotFound, "NFT UTXO not found"));
         }
 
-        info!("create_send_bound_transaction 3");
-
         // ------------------------------------------------------------------------
         // 3. Initialize a new Bound-type transaction:
         // ------------------------------------------------------------------------
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Bound;
-
-        info!("create_send_bound_transaction 4");
 
         // ------------------------------------------------------------------------
         // 4. Generate input slips:
@@ -687,8 +675,6 @@ impl Wallet {
         let input_slip1 = Slip::parse_slip_from_utxokey(&old_nft.utxokey_bound)?;
         transaction.add_from_slip(input_slip1.clone());
 
-        info!("create_send_bound_transaction 5");
-
         // (b) Generate the normal payment slip.
         let (normal_inputs, normal_outputs) =
             self.generate_slips(nft_amount, None, latest_block_id, genesis_period);
@@ -701,8 +687,6 @@ impl Wallet {
             .clone();
         transaction.add_from_slip(input_slip2.clone());
 
-        info!("create_send_bound_transaction 6");
-
         // (c) Generate the NFT data slip.
         // Here we convert the nft_id vector into a fixed-size UTXO key.
         let nft_array: SaitoUTXOSetKey = nft_id
@@ -711,8 +695,6 @@ impl Wallet {
             .map_err(|_| Error::new(ErrorKind::InvalidData, "nft_id length mismatch"))?;
         let input_slip3 = Slip::parse_slip_from_utxokey(&nft_array)?;
         transaction.add_from_slip(input_slip3.clone());
-
-        info!("create_send_bound_transaction 7");
 
         // ------------------------------------------------------------------------
         // 5. Generate output slips:
@@ -727,8 +709,6 @@ impl Wallet {
         let mut out_slip0 = input_slip1.clone();
         transaction.add_to_slip(out_slip0.clone());
 
-        info!("create_send_bound_transaction 8");
-
         // ---- Output Slip [1]: Normal Payment Slip ----
         // Use the first output slip from the generated normal_outputs.
         let mut out_slip1 = normal_outputs
@@ -740,8 +720,6 @@ impl Wallet {
             .clone();
         out_slip1.public_key = recipient_public_key.clone();
         transaction.add_to_slip(out_slip1.clone());
-
-        info!("create_send_bound_transaction 9");
 
         // ---- Output Slip [2]: Combined Slip for Original Location ----
         // Combine a portion of the NFT data slip’s public key with that of the recipient.
@@ -759,8 +737,6 @@ impl Wallet {
         output_slip2.amount = 0;
         transaction.add_to_slip(output_slip2);
 
-        info!("create_send_bound_transaction 10");
-
         // ------------------------------------------------------------------------
         // 6. Finalize the transaction:
         // Calculate the hash over the serialized data, set it, and sign the transaction.
@@ -769,8 +745,6 @@ impl Wallet {
         transaction.hash_for_signature = Some(hash_for_signature);
         transaction.sign(&self.private_key);
         let tx_sig = transaction.signature.clone();
-
-        info!("create_send_bound_transaction 11");
 
         info!("NFT transfer transaction created: {:?}", transaction);
         Ok(transaction)

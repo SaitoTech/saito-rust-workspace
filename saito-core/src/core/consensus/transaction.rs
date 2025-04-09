@@ -530,25 +530,12 @@ impl Transaction {
     // tx.work -> needed to confirm adequate routing work
     //
     pub fn generate(&mut self, public_key: &SaitoPublicKey, tx_index: u64, block_id: u64) -> bool {
-        info!("          ");
-        info!(
-            "tx generate: public_key: {:?} tx_index: {:?} block_id: {:?}",
-            public_key, tx_index, block_id
-        );
-        info!("          ");
-
-        info!("generate_hash_for_signature /////////");
-
         // ensure hash exists for signing
         self.generate_hash_for_signature();
 
-        info!("          ");
-        info!("generate_hash_for_signature /////////");
         // nolan_in, nolan_out, total fees
         self.generate_total_fees(tx_index, block_id);
 
-        info!("          ");
-        info!("generate_hash_for_signature /////////");
         // routing work for asserted public_key (creator)
         self.generate_total_work(public_key);
 
