@@ -181,7 +181,9 @@ impl Wallet {
         debug!("tx count : {}", block.transactions.len());
         let mut tx_index = 0;
         if lc {
+
             for tx in block.transactions.iter() {
+
                 for input in tx.from.iter() {
                     if input.public_key == self.public_key {
                         if input.amount > 0 {
@@ -197,23 +199,39 @@ impl Wallet {
 
                 let mut i = 0;
                 while i < tx.to.len() {
+
                     let output = &tx.to[i];
+
+		    //
                     // Process only outputs with nonzero amount that belong to our wallet.
+		    //
                     if output.amount > 0 && output.public_key == self.public_key {
+
+			//
                         // Check if the output is a Bound slip that may be the start of an NFT creation group.
+			//
                         if output.slip_type == SlipType::Bound {
+
+			    //
                             // Ensure there are at least two more outputs available.
+			    //
                             if i + 2 < tx.to.len() {
                                 let normal_slip = &tx.to[i + 1];
                                 let bound_slip2 = &tx.to[i + 2];
+
+				//
                                 // Check that the next two outputs are a Normal slip (with a nonzero amount)
                                 // and a Bound slip with zero amount, respectively.
+				//
                                 if normal_slip.slip_type == SlipType::Normal
                                     && normal_slip.amount > 0
                                     && bound_slip2.slip_type == SlipType::Bound
                                     && bound_slip2.amount == 0
                                 {
+
+				    //
                                     // Valid NFT creation outputs detected.
+				    //
                                     let nft = NFT {
                                         utxokey_bound: output.utxoset_key,       // first Bound slip
                                         utxokey_normal: normal_slip.utxoset_key, // linked Normal slip
@@ -221,18 +239,28 @@ impl Wallet {
                                         tx_sig: tx.signature,
                                     };
                                     self.nft_slips.push(nft);
+
                                     debug!("NFT slip group detected. Bound slip key: {:?}, Normal slip key: {:?}", 
                                            output.utxoset_key, normal_slip.utxoset_key);
+
+				    //
                                     // Process the normal slip as usual.
+				    //
                                     wallet_changed |= WALLET_UPDATED;
                                     self.add_slip(block.id, tx_index, normal_slip, true, None);
+
+				    //
                                     // Skip the first and third outputs that are part of the NFT group.
+				    //
                                     i += 3;
                                     continue;
                                 }
                             }
                         }
+
+			//
                         // Process outputs that aren't part of an NFT creation group normally.
+			//
                         wallet_changed |= WALLET_UPDATED;
                         self.add_slip(block.id, tx_index, output, true, None);
                     }
@@ -317,6 +345,7 @@ impl Wallet {
         lc: bool,
         network: Option<&Network>,
     ) {
+
         if self.slips.contains_key(&slip.get_utxoset_key()) {
             debug!("wallet already has slip : {}", slip);
             return;
@@ -514,17 +543,21 @@ impl Wallet {
         latest_block_id: u64,
         genesis_period: u64,
     ) -> Result<Transaction, Error> {
-        // **********************************************
-        // Initiate a new transaction of Bound type.
-        // **********************************************
+
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Bound;
 
-        // **********************************************
-        // Recreate the provided input slip using the NFT UUID parameters.
-        // This slip represents the original UTXO that is used to create the NFT.
-        // We check that the UTXO (determined by its key) is still unspent.
-        // **********************************************
+	//
+	// all NFTs have a UUID that is created from the UTXO slip that the 
+	// creator selects as an input value. this is because each slip is 
+	// guaranteed to be unique, which means that the NFT is guaranteed
+	// to be unique -- no-one else will be able to create an NFT with 
+	// the same values.
+	//
+	// here we recreate the input slip given the values provided to us
+	// by the application calling this function. this slip is expected
+	// to be valid. if it is not we will error-out.
+	//
         let input_slip = Slip {
             public_key: self.public_key,         // Wallet's own public key (creator)
             amount: nft_input_amount,            // The amount from the provided input UTXO
@@ -534,8 +567,13 @@ impl Wallet {
             ..Default::default()
         };
         let utxo_key = input_slip.get_utxoset_key(); // Compute the unique UTXO key for the input slip
+
+	//
+	// check that our wallet has this slip available. this check avoids 
+	// issues where the slip we are using to create our NFT has already 
+	// been spent for some reason.
+	//
         if !self.unspent_slips.contains(&utxo_key) {
-            // Ensure that this UTXO is still available (unspent)
             info!("UTXO Key not found: {:?}", utxo_key);
             return Err(Error::new(
                 ErrorKind::NotFound,
@@ -543,18 +581,22 @@ impl Wallet {
             ));
         }
 
-        // **********************************************
-        // Use generate_slips with the deposit amount to select additional inputs
-        // and compute change outputs.
-        // generate_slips returns (input_slips, output_slips).
-        // The input_slips will be used to fund the NFT creation deposit.
-        // **********************************************
+	//
+	// KHAN -- our imput slip may have enough SAITO to cover all costs and 
+	// also pay the fee. in that case we do not need to call generate_slips
+	// we can simply add a chance address ourselves. OR we can deduct the 
+	// amount in the input_slip from the deposit amount.
+	//
         let (input_slips, output_slips) = self.generate_slips(
             nft_create_deposit_amt,
             network,
             latest_block_id,
             genesis_period,
         );
+
+	//
+	// PLEASE MOVE BELOW -- the inputs and outputs should be added together...
+	//
         for input in input_slips {
             transaction.add_from_slip(input);
         }
@@ -585,6 +627,9 @@ impl Wallet {
         };
         transaction.add_to_slip(normal_slip);
 
+	//
+	// can this be cleaned up?
+	//
         // Output [2] - Bound slip 2: To track original input slip information.
         // Build a combined public key using:
         //   - The first 17 bytes from the original location (block_id, transaction_id, slip_id)
