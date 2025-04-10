@@ -1541,6 +1541,7 @@ impl Block {
                         //
                         // For each transaction in the ATR block:
                         // Loop through each transaction in the ATR block:
+			//
                         for transaction in &atr_block.transactions {
                             // Check if this is a bound UTXO transaction, if the first input slip is of type Bound then we
                             // treat the whole transaction as coming from a bound UTXO.
@@ -1635,6 +1636,7 @@ impl Block {
                                     }
                                 }
                             } else {
+
                                 // Normal ATR process each eligible output individually
                                 let mut outputs: Vec<&Slip> = Vec::new();
                                 let mut total_nolan_eligible: Currency = 0;
@@ -1649,6 +1651,7 @@ impl Block {
                                 }
 
                                 if !outputs.is_empty() {
+
                                     // Compute the fee for the transaction.
                                     let tx_size = transaction.get_serialized_size() as u64;
                                     let atr_fee = tx_size * previous_block_avg_fee_per_byte;
