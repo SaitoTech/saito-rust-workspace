@@ -869,11 +869,14 @@ impl Transaction {
         blockchain: &Blockchain,
         validate_against_utxo: bool,
     ) -> bool {
+
+	//
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
         // matches our self-generated safety check. We do not need to validate
         // their input slips as their input slips are records of what to do
         // when reversing/unwinding the chain and have been spent previously.
+	//
         if self.transaction_type == TransactionType::Fee {
             return true;
         }
@@ -1026,7 +1029,24 @@ impl Transaction {
         //
         if transaction_type == TransactionType::GoldenTicket {}
 
+        //
+        // NFT transactions
+        //
         if self.transaction_type == TransactionType::Bound {
+
+	    //
+	    // the transaction could be a NEWLY-created NFT transaction, in which 
+	    // case it will have no NFT input slips, or it will be a transfer of
+	    // an existing NFT, in which case it will....
+	    //
+	    // the first thing we do is determine which type of transaction this is
+	    // in order to know which kind of validation logic to expect. the two 
+	    // types of validation logic can then be applied separately and very 
+	    // clearly...
+	    //
+	
+
+
             // ----- Validate Input Slips -----
             // Require at least one input slip.
             if self.from.is_empty() {
