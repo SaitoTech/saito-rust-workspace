@@ -182,61 +182,89 @@ impl Wallet {
         let mut tx_index = 0;
         if lc {
             for tx in block.transactions.iter() {
-                for input in tx.from.iter() {
-                    if input.public_key == self.public_key {
-                        if input.amount > 0 {
-                            wallet_changed |= WALLET_UPDATED;
-                            self.delete_slip(input, None);
-                        }
-
-                        if self.delete_pending_transaction(tx) {
-                            wallet_changed |= WALLET_UPDATED;
-                        }
-                    }
-                }
-
                 let mut i = 0;
-                while i < tx.to.len() {
-                    let output = &tx.to[i];
-                    // Process only outputs with nonzero amount that belong to our wallet.
-                    if output.amount > 0 && output.public_key == self.public_key {
-                        // Check if the output is a Bound slip that may be the start of an NFT creation group.
-                        if output.slip_type == SlipType::Bound {
-                            // Ensure there are at least two more outputs available.
-                            if i + 2 < tx.to.len() {
-                                let normal_slip = &tx.to[i + 1];
-                                let bound_slip2 = &tx.to[i + 2];
-                                // Check that the next two outputs are a Normal slip (with a nonzero amount)
-                                // and a Bound slip with zero amount, respectively.
-                                if normal_slip.slip_type == SlipType::Normal
-                                    && normal_slip.amount > 0
-                                    && bound_slip2.slip_type == SlipType::Bound
-                                    && bound_slip2.amount == 0
-                                {
-                                    // Valid NFT creation outputs detected.
-                                    let nft = NFT {
-                                        utxokey_bound: output.utxoset_key,       // first Bound slip
-                                        utxokey_normal: normal_slip.utxoset_key, // linked Normal slip
-                                        nft_id: output.utxoset_key.to_vec(), // derive NFT id from first Bound slip's key
-                                        tx_sig: tx.signature,
-                                    };
-                                    self.nft_slips.push(nft);
-                                    debug!("NFT slip group detected. Bound slip key: {:?}, Normal slip key: {:?}", 
-                                           output.utxoset_key, normal_slip.utxoset_key);
-                                    // Process the normal slip as usual.
-                                    wallet_changed |= WALLET_UPDATED;
-                                    self.add_slip(block.id, tx_index, normal_slip, true, None);
-                                    // Skip the first and third outputs that are part of the NFT group.
-                                    i += 3;
-                                    continue;
+
+                //
+                // Handle Bound type transactions
+                // Extract bound slip and linked slip details
+                // Store details in wallet to be fetched later
+                //
+                if  let TransactionType::Bound = tx.transaction_type {
+                    for output in tx.to.iter() {
+                        if output.public_key == self.public_key {
+                       
+                            //
+                            // Check if the output is a Bound slip that may be the start of an NFT creation group.
+                            //
+                            if output.slip_type == SlipType::Bound {
+
+                                //
+                                // Ensure there are at least two more outputs available.
+                                //
+                                if i + 2 < tx.to.len() {
+                                    let normal_slip = &tx.to[i + 1];
+                                    let bound_slip2 = &tx.to[i + 2];
+
+                                    //
+                                    // Check that the next two outputs are a Normal slip (with a nonzero amount)
+                                    // and a Bound slip with zero amount, respectively.
+                                    //
+                                    if normal_slip.slip_type == SlipType::Normal
+                                        && normal_slip.amount > 0
+                                        && bound_slip2.slip_type == SlipType::Bound
+                                        && bound_slip2.amount == 0
+                                    {
+
+                                        //
+                                        // Valid NFT creation outputs detected.
+                                        //
+                                        let nft = NFT {
+                                            utxokey_bound: output.utxoset_key,       // first Bound slip
+                                            utxokey_normal: normal_slip.utxoset_key, // linked Normal slip
+                                            nft_id: output.utxoset_key.to_vec(), // derive NFT id from first Bound slip's key
+                                            tx_sig: tx.signature,
+                                        };
+                                        self.nft_slips.push(nft);
+
+                                        debug!("NFT slip group detected. Bound slip key: {:?}, Normal slip key: {:?}", 
+                                               output.utxoset_key, normal_slip.utxoset_key);
+
+                                        //
+                                        // Process the normal slip as usual.
+                                        //
+                                        wallet_changed |= WALLET_UPDATED;
+                                        self.add_slip(block.id, tx_index, normal_slip, true, None);
+
+                                        //
+                                        // Skip the first and third outputs that are part of the NFT group.
+                                        //
+                                        i += 3;
+                                        continue;
+                                    }
                                 }
                             }
                         }
-                        // Process outputs that aren't part of an NFT creation group normally.
-                        wallet_changed |= WALLET_UPDATED;
-                        self.add_slip(block.id, tx_index, output, true, None);
                     }
-                    i += 1;
+                
+                } else {
+                    for input in tx.from.iter() {
+                        if input.public_key == self.public_key {
+                            if input.amount > 0 {
+                                wallet_changed |= WALLET_UPDATED;
+                                self.delete_slip(input, None);
+                            }
+
+                            if self.delete_pending_transaction(tx) {
+                                wallet_changed |= WALLET_UPDATED;
+                            }
+                        }
+                    }
+                    for output in tx.to.iter() {
+                        if output.amount > 0 && output.public_key == self.public_key {
+                            wallet_changed |= WALLET_UPDATED;
+                            self.add_slip(block.id, tx_index, output, true, None);
+                        }
+                    }
                 }
 
                 if let TransactionType::SPV = tx.transaction_type {
