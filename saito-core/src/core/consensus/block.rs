@@ -1541,6 +1541,7 @@ impl Block {
                         //
                         // For each transaction in the ATR block:
                         // Loop through each transaction in the ATR block:
+                        //
                         for transaction in &atr_block.transactions {
                             // Check if this is a bound UTXO transaction, if the first input slip is of type Bound then we
                             // treat the whole transaction as coming from a bound UTXO.

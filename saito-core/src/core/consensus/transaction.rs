@@ -869,11 +869,13 @@ impl Transaction {
         blockchain: &Blockchain,
         validate_against_utxo: bool,
     ) -> bool {
+        //
         // Fee Transactions are validated in the block class. There can only
         // be one per block, and they are checked by ensuring the transaction hash
         // matches our self-generated safety check. We do not need to validate
         // their input slips as their input slips are records of what to do
         // when reversing/unwinding the chain and have been spent previously.
+        //
         if self.transaction_type == TransactionType::Fee {
             return true;
         }
@@ -1026,101 +1028,178 @@ impl Transaction {
         //
         if transaction_type == TransactionType::GoldenTicket {}
 
+        //
+        // NFT transactions validation for Bound type
+        //
         if self.transaction_type == TransactionType::Bound {
-            // ----- Validate Input Slips -----
-            // Require at least one input slip.
-            if self.from.is_empty() {
-                error!("Bound transaction: no input slips found.");
-                return false;
-            }
-            // For create_send_bound_transaction, we expect exactly 3 inputs;
-            // for create_bound_transaction, there may be more than 3.
-            // In either case, the first input should come from the NFT UTXO.
-            // (For send-bound, this should be a Bound slip.)
-            if self.from[0].slip_type != SlipType::Bound {
-                error!(
-                    "Bound transaction: first input slip is not Bound (found {:?}).",
-                    self.from[0].slip_type
-                );
-                return false;
-            }
-            // For any additional input slips expect them to be normal.
-            for slip in self.from.iter().skip(1) {
-                if slip.slip_type == SlipType::Bound {
-                    error!("Bound transaction: unexpected Bound slip in inputs.");
-                    return false;
-                }
-            }
+            // Determine whether this is a send-bound or create-bound transaction.
+            // Send-bound transaction has exactly 3 input slips.
+            // Otherwise, it's considered a create-bound (new NFT creation) transaction.
+            let is_send_bound = self.from.len() == 3;
 
-            // ----- Validate Output Slips -----
-            let output_count = self.to.len();
-            if output_count != 3 && output_count != 4 {
-                error!(
-                    "Bound transaction: expected 3 or 4 outputs, found {}.",
-                    output_count
-                );
-                return false;
-            }
-            // Output [0] must be a Bound slip (the new NFT slip).
-            if self.to[0].slip_type != SlipType::Bound {
-                error!(
-                    "Bound transaction: output 0 must be Bound (found {:?}).",
-                    self.to[0].slip_type
-                );
-                return false;
-            }
-            // Output [1] must be a Normal slip (the payment slip to the recipient).
-            if self.to[1].slip_type != SlipType::Normal {
-                error!(
-                    "Bound transaction: output 1 must be Normal (found {:?}).",
-                    self.to[1].slip_type
-                );
-                return false;
-            }
-            // Output [2] must be a Bound slip (the combined slip for original location).
-            if self.to[2].slip_type != SlipType::Bound {
-                error!(
-                    "Bound transaction: output 2 must be Bound (found {:?}).",
-                    self.to[2].slip_type
-                );
-                return false;
-            }
-            // If there is a fourth output, it must be a Normal slip (representing change).
-            if output_count == 4 {
-                if self.to[3].slip_type != SlipType::Normal {
+            if is_send_bound {
+                //
+                // Send-Bound Transaction Validation
+                //
+
+                // Validate Input Slips for Send-Bound
+                // Expect exactly 3 input slips.
+                if self.from.len() != 3 {
                     error!(
-                        "Bound transaction: output 3 must be Normal (found {:?}).",
-                        self.to[3].slip_type
+                        "Send-bound transaction: expected exactly 3 input slips, found {}.",
+                        self.from.len()
                     );
                     return false;
                 }
-            }
-            // Check that the combined (tracking) slip has zero amount.
-            if self.to[2].amount != 0 {
-                error!("Bound transaction: output 2 (combined tracking slip) amount is not zero.");
-                return false;
-            }
-            // Ensure there are no duplicate UTXO keys across all slips.
-            let mut seen_keys = AHashSet::new();
-            for slip in self.from.iter().chain(self.to.iter()) {
-                if !seen_keys.insert(slip.utxoset_key) {
+
+                // The first input slip must be of Bound type (coming from the NFT UTXO).
+                if self.from[0].slip_type != SlipType::Bound {
                     error!(
-                        "Bound transaction: duplicate UTXO key detected: {:?}",
-                        slip.utxoset_key.to_hex()
+                        "Send-bound transaction: first input slip is not Bound (found {:?}).",
+                        self.from[0].slip_type
                     );
+                    return false;
+                }
+                // The remaining input slips should be Normal.
+                for slip in self.from.iter().skip(1) {
+                    if slip.slip_type != SlipType::Normal {
+                        error!(
+                            "Send-bound transaction: unexpected slip type in additional inputs (found {:?}).",
+                            slip.slip_type
+                        );
+                        return false;
+                    }
+                }
+
+                // Validate Output Slips for Send-Bound
+                // For send-bound transactions, expect exactly 3 output slips.
+                if self.to.len() != 3 {
+                    error!(
+                        "Send-bound transaction: expected exactly 3 outputs, found {}.",
+                        self.to.len()
+                    );
+                    return false;
+                }
+                // Output [0] must be a Bound slip (the new NFT slip).
+                if self.to[0].slip_type != SlipType::Bound {
+                    error!(
+                        "Send-bound transaction: output 0 must be Bound (found {:?}).",
+                        self.to[0].slip_type
+                    );
+                    return false;
+                }
+                // Output [1] must be a Normal slip (the payment slip for the recipient).
+                if self.to[1].slip_type != SlipType::Normal {
+                    error!(
+                        "Send-bound transaction: output 1 must be Normal (found {:?}).",
+                        self.to[1].slip_type
+                    );
+                    return false;
+                }
+                // Output [2] must be a Bound slip tracking the original location.
+                if self.to[2].slip_type != SlipType::Bound {
+                    error!(
+                        "Send-bound transaction: output 2 must be Bound (found {:?}).",
+                        self.to[2].slip_type
+                    );
+                    return false;
+                }
+                // Check that the tracking slip has an amount of zero.
+                if self.to[2].amount != 0 {
+                    error!(
+                        "Send-bound transaction: output 2 (tracking slip) amount is not zero (found {}).",
+                        self.to[2].amount
+                    );
+                    return false;
+                }
+            } else {
+                //
+                // Create-Bound Transaction Validation
+                //
+
+                // Validate Input Slips for Create-Bound
+                // There must be at least one input slip.
+                if self.from.is_empty() {
+                    error!("Create-bound transaction: no input slips found.");
+                    return false;
+                }
+                // The first input slip must be Bound (from the NFT UTXO).
+                if self.from[0].slip_type != SlipType::Bound {
+                    error!(
+                        "Create-bound transaction: first input slip is not Bound (found {:?}).",
+                        self.from[0].slip_type
+                    );
+                    return false;
+                }
+                // All additional input slips (if any) should be Normal.
+                for slip in self.from.iter().skip(1) {
+                    if slip.slip_type != SlipType::Normal {
+                        error!(
+                            "Create-bound transaction: unexpected slip type in additional inputs (found {:?}).",
+                            slip.slip_type
+                        );
+                        return false;
+                    }
+                }
+
+                // Validate Output Slips for Create-Bound
+                // For create-bound transactions, expect exactly 3 or 4 outputs.
+                let output_count = self.to.len();
+                if output_count != 3 && output_count != 4 {
+                    error!(
+                        "Create-bound transaction: expected 3 or 4 outputs, found {}.",
+                        output_count
+                    );
+                    return false;
+                }
+                // Output [0] must be the new NFT slip; its slip type must be Bound.
+                if self.to[0].slip_type != SlipType::Bound {
+                    error!(
+                        "Create-bound transaction: output 0 must be Bound (found {:?}).",
+                        self.to[0].slip_type
+                    );
+                    return false;
+                }
+                // Output [1] must be a Normal payment slip.
+                if self.to[1].slip_type != SlipType::Normal {
+                    error!(
+                        "Create-bound transaction: output 1 must be Normal (found {:?}).",
+                        self.to[1].slip_type
+                    );
+                    return false;
+                }
+                // Output [2] must be a Bound slip (combined tracking slip).
+                if self.to[2].slip_type != SlipType::Bound {
+                    error!(
+                        "Create-bound transaction: output 2 must be Bound (found {:?}).",
+                        self.to[2].slip_type
+                    );
+                    return false;
+                }
+                // If there is a fourth output (change slip), it must be Normal.
+                if output_count == 4 {
+                    if self.to[3].slip_type != SlipType::Normal {
+                        error!(
+                            "Create-bound transaction: output 3 must be Normal (found {:?}).",
+                            self.to[3].slip_type
+                        );
+                        return false;
+                    }
+                }
+                // Check that the combined tracking slip (output [2]) has an amount of zero.
+                if self.to[2].amount != 0 {
+                    error!("Create-bound transaction: output 2 (tracking slip) amount is not zero (found {}).", self.to[2].amount);
                     return false;
                 }
             }
         } else {
-            // For non-Bound transactions, ensure that no input or output slip is of type Bound.
+            // For non-Bound transactions, ensure that no input or output slip has type Bound.
             if self
                 .from
                 .iter()
                 .any(|slip| slip.slip_type == SlipType::Bound)
+                || self.to.iter().any(|slip| slip.slip_type == SlipType::Bound)
             {
-                return false;
-            }
-            if self.to.iter().any(|slip| slip.slip_type == SlipType::Bound) {
                 return false;
             }
         }
