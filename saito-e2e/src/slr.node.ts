@@ -33,15 +33,18 @@ export default class SlrNode extends SaitoNode {
     this.node = spawn("npm", ["run", "dev"], { cwd: this.nodeDir });
 
     this.node.stdout.on("data", (data) => {
-      console.log(`${this.name} : stdout: ${data}`);
+      this.writeInfo(`${data}`);
+      // console.log(`${this.name} : stdout: ${data}`);
     });
 
     this.node.stderr.on("data", (data) => {
-      console.error(`${this.name} : stderr: ${data}`);
+      this.writeError(`${data}`);
+      // console.error(`${this.name} : stderr: ${data}`);
     });
 
     this.node.on("close", (code) => {
       console.log(`${this.name} : Child process exited with code ${code}`);
+      this.closeLog();
     });
     const afterTime = Date.now();
     console.log(`${this.name} : starting the node took : ${afterTime - beforeTime}ms`);
