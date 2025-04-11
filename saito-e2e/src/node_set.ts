@@ -204,7 +204,7 @@ class SlrBootstrapper extends NodeBootstrapper {
     }
     await fs.rm(this.dir, { recursive: true, force: true });
     await SaitoNode.runCommand(
-      `time rsync -a --exclude='nettest' --exclude='.git' --exclude='data' ${this.config.originalCodeLocation}/ ${this.dir}`,
+      `time rsync -a --exclude='nettest' --exclude='.git' --exclude='data' --exclude="node_modules" ${this.config.originalCodeLocation}/ ${this.dir}`,
       currentDir,
     );
     await SaitoNode.runCommand("time npm install", this.dir);
