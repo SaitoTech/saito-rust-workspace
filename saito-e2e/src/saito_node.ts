@@ -166,7 +166,7 @@ export default abstract class SaitoNode {
 
   public async fetchValueFromNode(path: string): Promise<unknown> {
     const url = this.getUrl(path);
-    console.log("url : " + url);
+    // console.log("url : " + url);
     return fetch(url).then((res) => res.json());
   }
   public getUrl(path: string): string {
