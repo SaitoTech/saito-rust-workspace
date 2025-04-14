@@ -527,14 +527,15 @@ impl Wallet {
 
     pub async fn create_bound_transaction(
         &mut self,
-        nft_input_amount: Currency,
-        nft_uuid_block_id: u64,
-        nft_uuid_transaction_id: u64,
-        nft_uuid_slip_id: u64,
-        nft_create_deposit_amt: Currency,
-        nft_data: Vec<u32>,
-        recipient_public_key: &SaitoPublicKey,
+        nft_input_amount: Currency,			// amount in input slip creating NFT
+        nft_uuid_block_id: u64,				// block_id in input slip creating NFT
+        nft_uuid_transaction_id: u64,			// transaction_id in input slip creating NFT
+        nft_uuid_slip_id: u64,				// slip_id in input slip creating NFT
+        nft_create_deposit_amt: Currency,		// AMOUNT to deposit in "bound" normal tx
+        nft_data: Vec<u32>,				// DATA field to attach to TX
+        recipient_public_key: &SaitoPublicKey,		// receiver
     ) -> Result<Transaction, Error> {
+
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Bound;
 
@@ -550,11 +551,11 @@ impl Wallet {
         // to be valid. if it is not we will error-out.
         //
         let input_slip = Slip {
-            public_key: self.public_key,         // Wallet's own public key (creator)
-            amount: nft_input_amount,            // The amount from the provided input UTXO
-            block_id: nft_uuid_block_id,         // Block id from the NFT UUID parameters
-            slip_index: nft_uuid_slip_id as u8,  // Slip index from the NFT UUID parameters
-            tx_ordinal: nft_uuid_transaction_id, // Transaction ordinal from the NFT UUID parameters
+            public_key: 	self.public_key,             // Wallet's own public key (creator)
+            amount: 		nft_input_amount,            // The amount from the provided input UTXO
+            block_id: 		nft_uuid_block_id,           // Block id from the NFT UUID parameters
+            slip_index: 	nft_uuid_slip_id as u8,      // Slip index from the NFT UUID parameters
+            tx_ordinal: 	nft_uuid_transaction_id,     // Transaction ordinal from the NFT UUID parameters
             ..Default::default()
         };
         let utxo_key = input_slip.get_utxoset_key(); // Compute the unique UTXO key for the input slip
@@ -588,7 +589,7 @@ impl Wallet {
             ..Default::default()
         };
 
-        // Output [1] - Normal linked slip: Direct payment to the recipient.
+        // Output [1] - Normal linked slip: must loop with NFT
         let output_slip2 = Slip {
             public_key: *recipient_public_key,
             amount: nft_create_deposit_amt,
@@ -603,30 +604,33 @@ impl Wallet {
         //       • 8 bytes of nft_uuid_transaction_id,
         //       • 1 byte of nft_uuid_slip_id (totaling 17 bytes)
         //   - with the last 16 bytes of the recipient's public key.
-
+	//
+	// the transaction includes a copy of the NFT UUID at the head of the
+	// transaction MSG field. Whenever the NFT is send between addresses
+	// this field is recreated using the two non-normal bound slips that 
+	// encode the UTXO that was used to create the NFT originally. 
+	//
         let mut nft_uuid_data = Vec::with_capacity(17);
         nft_uuid_data.extend(&nft_uuid_block_id.to_be_bytes()); // 8 bytes for block_id
         nft_uuid_data.extend(&nft_uuid_transaction_id.to_be_bytes()); // 8 bytes for transaction_id
         nft_uuid_data.push(nft_uuid_slip_id as u8); // 1 byte for slip_id
-
-        // Extract the tail (last 16 bytes) of the recipient's public key.
-        //
         let recipient_pubkey_bytes = recipient_public_key.as_slice();
-
-        // Combine the nft_uuid_data and last 16 recipient bytes to form a placeholder.
+	//
+        // combine the nft_uuid_data and last 16 recipient bytes to form a placeholder.
         //
         let mut input_placeholder = Vec::with_capacity(33);
         input_placeholder.extend(&nft_uuid_data); // 17 bytes from location
         input_placeholder.extend(&recipient_pubkey_bytes[17..33]); // 16 bytes from recipient's key
 
+	//
         // Convert the combined bytes into a fixed-size array.
         //
         let input_placeholder: [u8; 33] = input_placeholder
             .try_into()
             .expect("Combined public key must be exactly 33 bytes");
 
-        // Create the bound slip (output slip) with zero amount,
-        // which is used only to track the original input slip's location.
+	//
+        // Output [2] - 2nd Bound Slip (used w/ Output [0] to recreate full input slip)
         //
         let output_slip3 = Slip {
             public_key: input_placeholder,
@@ -635,7 +639,7 @@ impl Wallet {
             ..Default::default()
         };
 
-        // Output [3] - Change slip: Calculate and add change if input amount exceeds deposit.
+        // Output [3] - any change: Calculate and add change if input amount exceeds deposit.
         let change_slip = if nft_input_amount > nft_create_deposit_amt {
             let change_slip_amt = nft_input_amount - nft_create_deposit_amt;
             Some(Slip {
@@ -682,6 +686,7 @@ impl Wallet {
         nft_data: Vec<u32>,
         recipient_public_key: &SaitoPublicKey,
     ) -> Result<Transaction, Error> {
+
         //
         // Locate the NFT to be transferred:
         // Search our wallet's NFT slips for one matching the provided nft_id.
