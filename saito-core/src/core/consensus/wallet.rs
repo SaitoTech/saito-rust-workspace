@@ -534,6 +534,9 @@ impl Wallet {
         nft_create_deposit_amt: Currency,
         nft_data: Vec<u32>,
         recipient_public_key: &SaitoPublicKey,
+        network: Option<&Network>,
+        latest_block_id: u64,
+        genesis_period: u64,
     ) -> Result<Transaction, Error> {
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Bound;
@@ -635,33 +638,67 @@ impl Wallet {
             ..Default::default()
         };
 
-        // Output [3] - Change slip: Calculate and add change if input amount exceeds deposit.
-        let change_slip = if nft_input_amount > nft_create_deposit_amt {
-            let change_slip_amt = nft_input_amount - nft_create_deposit_amt;
-            Some(Slip {
-                public_key: self.public_key, // Return the change to the creator's address
-                amount: change_slip_amt,
-                slip_type: SlipType::Normal,
-                ..Default::default()
-            })
+        // Determine Change Slip
+        // We initialize vectors to hold any additional input slips if needed
+        // and an optional change slip.
+        let mut additional_input_slips: Vec<Slip> = Vec::new();
+        let mut change_slip_opt: Option<Slip> = None;
+
+        // Case 1: The provided input amount covers the required deposit.
+        //
+        if nft_input_amount >= nft_create_deposit_amt {
+            let change_amt = nft_input_amount - nft_create_deposit_amt;
+            if change_amt > 0 {
+                change_slip_opt = Some(Slip {
+                    public_key: self.public_key, // Return change to the creator's address
+                    amount: change_amt,
+                    slip_type: SlipType::Normal,
+                    ..Default::default()
+                });
+            }
         } else {
-            None
-        };
+            // Case 2: The provided input amount is insufficient.
+            // Calculate the additional amount required.
+            //
+            let additional_needed = nft_create_deposit_amt - nft_input_amount;
+
+            // Call generate_slips to acquire additional inputs and a corresponding change output.
+            //
+            let (generated_inputs, generated_outputs) =
+                self.generate_slips(additional_needed, network, latest_block_id, genesis_period);
+            additional_input_slips = generated_inputs;
+
+            // Use the first generated output (if available) as the change slip.
+            //
+            if let Some(first_generated_output) = generated_outputs.into_iter().next() {
+                change_slip_opt = Some(first_generated_output);
+            } else {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    "Failed to generate change slip via generate_slips",
+                ));
+            }
+        }
 
         //
-        // Add input and output slips, that were created earlier,
-        // to the bound transaction.
+        // Add input and output slips to the bound transaction.
         //
 
-        // Add the input slip.
+        // Add the primary input slip.
         transaction.add_from_slip(input_slip);
 
-        // Add the outputs.
+        // Add any additional input slips (only in case 2 for change slip)
+        for slip in additional_input_slips {
+            transaction.add_from_slip(slip);
+        }
+
+        // Add outputs.
         transaction.add_to_slip(output_slip1);
         transaction.add_to_slip(output_slip2);
         transaction.add_to_slip(output_slip3);
 
-        if let Some(change) = change_slip {
+        // Add change slip if any
+        if let Some(change) = change_slip_opt {
             transaction.add_to_slip(change);
         }
 
