@@ -184,111 +184,144 @@ impl Wallet {
         let mut tx_index = 0;
         if lc {
             for tx in block.transactions.iter() {
+                // Handle outputs
+                //
                 let mut i = 0;
+                while i < tx.to.len() {
+                    let output = &tx.to[i];
 
-                //
-                // Handle Bound type transactions
-                // Extract bound slip and linked slip details
-                // Store details in wallet to be fetched later
-                //
-                if let TransactionType::Bound = tx.transaction_type {
-                    for output in tx.to.iter() {
-                        if output.public_key == self.public_key {
+                    // For Bound or ATR transactions, check for NFT group outputs
+                    //
+                    if tx.transaction_type == TransactionType::Bound
+                        || tx.transaction_type == TransactionType::ATR
+                    {
+                        // If the output is owned by us and of Bound type, it may be the start of an NFT group.
+                        //
+                        if output.public_key == self.public_key
+                            && output.slip_type == SlipType::Bound
+                        {
+                            // Ensure there are at least two more outputs available for a potential NFT group.
                             //
-                            // Check if the output is a Bound slip that may be the start of an NFT creation group.
-                            //
-                            if output.slip_type == SlipType::Bound {
+                            if i + 2 < tx.to.len() {
+                                let nft_slip1 = &tx.to[i];
+                                let normal_slip = &tx.to[i + 1];
+                                let nft_slip2 = &tx.to[i + 2];
+
+                                // Check the criteria for a valid NFT group:
+                                // - The second output must be a Normal slip with a nonzero amount.
+                                // - The third output must be a Bound slip with zero amount.
                                 //
-                                // Ensure there are at least two more outputs available.
-                                //
-                                if i + 2 < tx.to.len() {
-                                    let nft_slip1 = &tx.to[i];
-                                    let normal_slip = &tx.to[i + 1];
-                                    let nft_slip2 = &tx.to[i + 2];
+                                if normal_slip.slip_type == SlipType::Normal
+                                    && normal_slip.amount > 0
+                                    && nft_slip2.slip_type == SlipType::Bound
+                                    && nft_slip2.amount == 0
+                                {
+                                    // Valid NFT output group detected.
+
+                                    // Add NFT slip group to wallet
+                                    //
 
                                     //
-                                    // Check that the next two outputs are a Normal slip (with a nonzero amount)
-                                    // and a Bound slip with zero amount, respectively.
+                                    // "nft_id" is utxokey of second bound slip (nft_slip2):
                                     //
-                                    if normal_slip.slip_type == SlipType::Normal
-                                        && normal_slip.amount > 0
-                                        && nft_slip2.slip_type == SlipType::Bound
-                                        && nft_slip2.amount == 0
-                                    {
-                                        //
-                                        // Valid NFT creation outputs detected.
-                                        //
+                                    // Use cases of `nft_id`:
+                                    //
+                                    // 1. We can get original input slip, used for creating NFT, from `nft_id`
+                                    //
+                                    //    `parse_slip_from_utxokey(nft_id)` gives us second bound slip (nft_slip2)
+                                    //
+                                    //     And 'nft_slip2.publickey' contains:
+                                    //       • 8 bytes of original input's block_id,
+                                    //       • 8 bytes of original input's transaction_id,
+                                    //       • 1 byte of original input's slip_id
+                                    //
+                                    //      Combining above with nft creator's public_key
+                                    //      gives us the original input slip used for creating NFT.
+                                    //
+                                    // 2. When sending NFT from wallet to another recepient we can just
+                                    //    send `nft_id` instead of sending utxokey of all  3 nft slips.
+                                    //
+                                    //    Using `nft_id` we can filter `this.nft` list of our wallet and get:
+                                    //     - nft_slip1,
+                                    //     - normal linked slip
+                                    //     - nft_slip2
+                                    //
+                                    //     Then we can use these 3 slips as input for sending NFT to another recepient
+                                    //     inside create_send_bound() transaction
 
-                                        // Add NFT slip group to wallet
-                                        //
+                                    let nft = NFT {
+                                        nft_slip1_utxokey: nft_slip1.utxoset_key, // first Bound slip
+                                        normal_slip_utxokey: normal_slip.utxoset_key, // linked Normal slip
+                                        nft_slip2_utxokey: nft_slip2.utxoset_key, // second Bound slip for tracking
+                                        nft_id: nft_slip2.utxoset_key.to_vec(), // derive NFT id from second Bound slip’s key
+                                        tx_sig: tx.signature,
+                                    };
+                                    self.nft_slips.push(nft);
 
-                                        //
-                                        // "nft_id" is utxokey of second bound slip (nft_slip2):
-                                        //
-                                        // Use cases of `nft_id`:
-                                        //
-                                        // 1. We can get original input slip, used for creating NFT, from `nft_id`
-                                        //
-                                        //    `parse_slip_from_utxokey(nft_id)` gives us second bound slip (nft_slip2)
-                                        //
-                                        //     And 'nft_slip2.publickey' contains:
-                                        //       • 8 bytes of original input's block_id,
-                                        //       • 8 bytes of original input's transaction_id,
-                                        //       • 1 byte of original input's slip_id
-                                        //
-                                        //      Combining above with nft creator's public_key
-                                        //      gives us the original input slip used for creating NFT.
-                                        //
-                                        // 2. When sending NFT from wallet to another recepient we can just
-                                        //    send `nft_id` instead of sending utxokey of all  3 nft slips.
-                                        //
-                                        //    Using `nft_id` we can filter `this.nft` list of our wallet and get:
-                                        //     - nft_slip1,
-                                        //     - normal linked slip
-                                        //     - nft_slip2
-                                        //
-                                        //     Then we can use these 3 slips as input for sending NFT to another recepient
-                                        //     inside create_send_bound() transaction
+                                    debug!(
+                                        "NFT slip group detected. Bound slip key: {:?}, Normal slip key: {:?}",
+                                        nft_slip1.utxoset_key, normal_slip.utxoset_key
+                                    );
 
-                                        let nft = NFT {
-                                            nft_slip1_utxokey: nft_slip1.utxoset_key, // first Bound slip
-                                            normal_slip_utxokey: normal_slip.utxoset_key, // linked Normal slip
-                                            nft_slip2_utxokey: nft_slip2.utxoset_key, // first Bound slip for tracking original
-                                            nft_id: nft_slip2.utxoset_key.to_vec(), // derive NFT id from second Bound slip's key
-                                            tx_sig: tx.signature,
-                                        };
-                                        self.nft_slips.push(nft);
-
-                                        debug!("NFT slip group detected. Bound slip key: {:?}, Normal slip key: {:?}", 
-                                               output.utxoset_key, normal_slip.utxoset_key);
-
-                                        //
-                                        // Skip the first,second, third outputs that are part of the NFT group.
-                                        //
-                                        i += 3;
-                                        continue;
-                                    }
+                                    // Skip these three outputs that form the NFT group.
+                                    //
+                                    i += 3;
+                                    continue;
                                 }
                             }
                         }
                     }
-                } else {
-                    for input in tx.from.iter() {
-                        if input.public_key == self.public_key {
-                            if input.amount > 0 {
-                                wallet_changed |= WALLET_UPDATED;
-                                self.delete_slip(input, None);
-                            }
 
-                            if self.delete_pending_transaction(tx) {
-                                wallet_changed |= WALLET_UPDATED;
+                    // For outputs not part of an NFT group, if the output amount is > 0 and is owned by us, add slip.
+                    //
+                    if output.amount > 0 && output.public_key == self.public_key {
+                        wallet_changed |= WALLET_UPDATED;
+                        self.add_slip(block.id, tx_index, output, true, None);
+                    }
+                    i += 1;
+                }
+
+                // Handle input slips
+                //
+                for (index, input) in tx.from.iter().enumerate() {
+                    if input.public_key == self.public_key {
+                        // If the input has a nonzero amount, mark the slip as spent.
+                        //
+                        if input.amount > 0 {
+                            wallet_changed |= WALLET_UPDATED;
+                            self.delete_slip(input, None);
+                        }
+
+                        // If this is the first input and it is of Bound type,
+                        // then check if this input group represents a send-bound NFT group.
+                        // An NFT input group is assumed to contain at least three inputs:
+                        //   - input at index 0 (Bound slip, representing the NFT slip #1),
+                        //   - input at index 1 (Normal slip, representing the linked payment slip),
+                        //   - input at index 2 (Bound slip, whose utxoset key will serve as the NFT id)
+                        //
+                        if index == 0 && input.slip_type == SlipType::Bound && tx.from.len() >= 3 {
+                            let nft_id_utxo = &tx.from[2].utxoset_key;
+
+                            // Find the NFT entry in self.nft_slips where the nft_id (derived from the utxoset key)
+                            // matches this value. If found, remove it from self.nft_slips.
+                            //
+                            if let Some(pos) = self
+                                .nft_slips
+                                .iter()
+                                .position(|nft| nft.nft_id == nft_id_utxo.to_vec())
+                            {
+                                self.nft_slips.remove(pos);
+                                debug!(
+                                    "Send-bound NFT input group detected. Removed NFT with id: {:?}",
+                                    nft_id_utxo.to_hex()
+                                );
                             }
                         }
-                    }
-                    for output in tx.to.iter() {
-                        if output.amount > 0 && output.public_key == self.public_key {
+
+                        // Check for pending transaction deletion
+                        //
+                        if self.delete_pending_transaction(tx) {
                             wallet_changed |= WALLET_UPDATED;
-                            self.add_slip(block.id, tx_index, output, true, None);
                         }
                     }
                 }
@@ -299,6 +332,7 @@ impl Wallet {
                     tx_index += 1;
                 }
             }
+
             if block.id > genesis_period {
                 self.remove_old_slips(block.id - genesis_period);
             }
@@ -810,13 +844,12 @@ impl Wallet {
         nft_data: Vec<u32>,
         recipient_public_key: &SaitoPublicKey,
     ) -> Result<Transaction, Error> {
-
         //
         // Locate the NFT to be transferred:
-	//
-        // Search our wallet's repository of NFT slips for one matching the 
-	// provided nft_id. We then need to extract both the bound (2 NFT slips) 
-	// and the normal UTXO slip to which they are bound....
+        //
+        // Search our wallet's repository of NFT slips for one matching the
+        // provided nft_id. We then need to extract both the bound (2 NFT slips)
+        // and the normal UTXO slip to which they are bound....
         //
         let pos = self
             .nft_slips
@@ -827,7 +860,7 @@ impl Wallet {
 
         //
         // Verify that the normal UTXO exists:
-	//
+        //
         // Use the extracted utxokey_normal.
         //
         //if !self.unspent_slips.contains(&old_nft.utxokey_normal) {
@@ -842,15 +875,15 @@ impl Wallet {
 
         //
         // Generate input slips:
-	//
-        // To send an existing NFT to another participant, our BoundTransaction should 
-	// have the following three input slips:
-	//
+        //
+        // To send an existing NFT to another participant, our BoundTransaction should
+        // have the following three input slips:
+        //
         //    (a) The NFT slip #1
         //    (b) The normal slip #2
         //    (c) The NFT slip #3
         //
-	//
+        //
 
         // (a) Bound NFT input slip: create from old_nft.utxokey_bound.
         let input_slip1 = Slip::parse_slip_from_utxokey(&old_nft.nft_slip1_utxokey)?;
