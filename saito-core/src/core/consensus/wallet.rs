@@ -810,10 +810,13 @@ impl Wallet {
         nft_data: Vec<u32>,
         recipient_public_key: &SaitoPublicKey,
     ) -> Result<Transaction, Error> {
+
         //
         // Locate the NFT to be transferred:
-        // Search our wallet's NFT slips for one matching the provided nft_id.
-        // Extract both the bound and normal UTXO keys from the matching NFT.
+	//
+        // Search our wallet's repository of NFT slips for one matching the 
+	// provided nft_id. We then need to extract both the bound (2 NFT slips) 
+	// and the normal UTXO slip to which they are bound....
         //
         let pos = self
             .nft_slips
@@ -823,6 +826,15 @@ impl Wallet {
         let old_nft = self.nft_slips.remove(pos);
 
         //
+        // Verify that the normal UTXO exists:
+	//
+        // Use the extracted utxokey_normal.
+        //
+        //if !self.unspent_slips.contains(&old_nft.utxokey_normal) {
+        //    return Err(Error::new(ErrorKind::NotFound, "NFT UTXO not found"));
+        //}
+
+        //
         // Initialize a new Bound-type transaction:
         //
         let mut transaction = Transaction::default();
@@ -830,11 +842,15 @@ impl Wallet {
 
         //
         // Generate input slips:
-        // For a bound transaction we require three input slips:
-        //    (a) The bound NFT slip from utxokey_bound.
-        //    (b) The normal payment slip from utxokey_normal.
-        //    (c) The NFT data slip derived directly from nft_id.
+	//
+        // To send an existing NFT to another participant, our BoundTransaction should 
+	// have the following three input slips:
+	//
+        //    (a) The NFT slip #1
+        //    (b) The normal slip #2
+        //    (c) The NFT slip #3
         //
+	//
 
         // (a) Bound NFT input slip: create from old_nft.utxokey_bound.
         let input_slip1 = Slip::parse_slip_from_utxokey(&old_nft.nft_slip1_utxokey)?;
@@ -852,9 +868,9 @@ impl Wallet {
         //
         // Generate output slips:
         // We require three output slips:
-        //   [0] The new NFT slip (carry over the bound NFT slip).
+        //   [0] The new NFT slip #1 (publickey as received);
         //   [1] The normal payment slip directed to the recipient; this is created by cloning input_slip1
-        //   [2] A combined slip that ties the NFT’s original slip
+        //   [2] The new NFT slip #3 (publickey as received)
         //
 
         // Output Slip [0]: New NFT Slip
