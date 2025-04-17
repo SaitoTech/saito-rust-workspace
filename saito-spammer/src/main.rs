@@ -208,6 +208,7 @@ async fn run_consensus_event_processor(
         stat_sender: sender_to_stat.clone(),
         config_lock: context.config_lock.clone(),
         produce_blocks_by_timer: true,
+        delete_old_blocks: true,
     };
 
     debug!("running mempool thread");

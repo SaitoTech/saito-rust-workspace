@@ -1,4 +1,6 @@
 const { exec, spawn } = require("child_process");
+import fs from "fs";
+import path from "path";
 
 export enum NodeType {
   RUST = "rust",
@@ -22,10 +24,53 @@ export default abstract class SaitoNode {
   private _dataDir: string = "./data";
   private _nodeDir: string = ".";
   private _config: NodeConfig;
+  private _timestamp: number = 0;
+  private _log_file:string = "";
+  private _logStream: fs.WriteStream;
 
   constructor(config: NodeConfig) {
     this._config = config;
     this._nodeDir = config.dir;
+    this._timestamp = Date.now();
+    this._log_file = this._dataDir + "/" + this._config.name + "_" + this._timestamp + ".log";
+
+    console.log("using log file : " + this._log_file);
+    // Ensure the data directory exists
+    if (!fs.existsSync(this._dataDir)) {
+      fs.mkdirSync(this._dataDir, { recursive: true });
+    }
+
+    // Open the log file for writing
+    const logFilePath = path.resolve(this._log_file);
+    this._logStream = fs.createWriteStream(logFilePath, { flags: "a" });
+
+    // Write a log entry indicating the start of logging
+    this._logStream.write(`Log started for node: ${this._config.name} at ${new Date().toISOString()}\n`);
+  }
+
+  public writeLog(message: string) {
+    // Write the message to the log file
+    this._logStream.write(`${new Date().toISOString()} - ${message}\n`);
+  }
+  public closeLog() {
+    // Close the log stream when done
+    this._logStream.end();
+  }
+  public writeError(message: string) {
+    // Write the error message to the log file
+    this._logStream.write(`${new Date().toISOString()} - ERROR: ${message}\n`);
+  }
+  public writeInfo(message: string) {
+    // Write the info message to the log file
+    this._logStream.write(`${new Date().toISOString()} - INFO: ${message}\n`);
+  }
+  public writeWarning(message: string) {
+    // Write the warning message to the log file
+    this._logStream.write(`${new Date().toISOString()} - WARNING: ${message}\n`);
+  }
+  public writeDebug(message: string) {
+    // Write the debug message to the log file
+    this._logStream.write(`${new Date().toISOString()} - DEBUG: ${message}\n`);
   }
 
   public set dataDir(dir: string) {
@@ -121,7 +166,7 @@ export default abstract class SaitoNode {
 
   public async fetchValueFromNode(path: string): Promise<unknown> {
     const url = this.getUrl(path);
-    console.log("url : " + url);
+    // console.log("url : " + url);
     return fetch(url).then((res) => res.json());
   }
   public getUrl(path: string): string {

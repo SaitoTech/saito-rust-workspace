@@ -221,6 +221,7 @@ async fn run_consensus_event_processor(
         stat_sender: sender_to_stat.clone(),
         config_lock: context.config_lock.clone(),
         produce_blocks_by_timer: true,
+        delete_old_blocks: true,
     };
     let (interface_sender_to_blockchain, _interface_receiver_for_mempool) =
         tokio::sync::mpsc::channel::<NetworkEvent>(channel_size);
