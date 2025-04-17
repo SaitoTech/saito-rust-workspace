@@ -184,42 +184,55 @@ impl Wallet {
         let mut tx_index = 0;
         if lc {
             for tx in block.transactions.iter() {
-                // Handle outputs
+
+		//
+                // outputs
                 //
                 let mut i = 0;
                 while i < tx.to.len() {
+
                     let output = &tx.to[i];
+                    let mut is_this_an_nft = false;
 
-                    // For Bound or ATR transactions, check for NFT group outputs
+		    //
+                    // if the output is a bound slip, then we are expecting
+		    // the 2nd slip to be NORMAL and the 3rd slip to be another
+		    // bound slip.
                     //
-                    if tx.transaction_type == TransactionType::Bound
-                        || tx.transaction_type == TransactionType::ATR
-                    {
-                        // If the output is owned by us and of Bound type, it may be the start of an NFT group.
-                        //
-                        if output.public_key == self.public_key
-                            && output.slip_type == SlipType::Bound
-                        {
-                            // Ensure there are at least two more outputs available for a potential NFT group.
-                            //
-                            if i + 2 < tx.to.len() {
-                                let nft_slip1 = &tx.to[i];
-                                let normal_slip = &tx.to[i + 1];
-                                let nft_slip2 = &tx.to[i + 2];
+		    if output.slip_type == SlipType::Bound {
 
-                                // Check the criteria for a valid NFT group:
-                                // - The second output must be a Normal slip with a nonzero amount.
-                                // - The third output must be a Bound slip with zero amount.
-                                //
-                                if normal_slip.slip_type == SlipType::Normal
-                                    && normal_slip.amount > 0
-                                    && nft_slip2.slip_type == SlipType::Bound
-                                    && nft_slip2.amount == 0
-                                {
-                                    // Valid NFT output group detected.
+			//
+			// is this an NFT ?
+			//
+			// note that we do not need to validate that the NFT meets the
+			// criteria here as we only process blocks that pass validation
+			// requirements. so we are just doing a superficial check to 
+			// make sure that we will not be "skipping" any normal slips
+			// before inserting into the wallet
+			//
+                        if i + 2 < tx.to.len() {
 
-                                    // Add NFT slip group to wallet
-                                    //
+                            let slip1 = &tx.to[i];
+                            let slip2 = &tx.to[i + 1];
+                            let slip3 = &tx.to[i + 2];
+
+			    if slip1.slip_type == SlipType::Bound && slip3.slip_type == SlipType::Bound && slip2.slip_type != SlipType::Bound {
+			        is_this_an_nft = true;
+			    }
+		        }
+
+		    }
+
+
+		    //
+		    // NFT slips are added to a separate data-storage space, so that 
+		    // they will not be affected by the normal workings of the wallet
+		    //
+		    if (is_this_an_nft {
+
+                        let slip1 = &tx.to[i];
+                        let slip2 = &tx.to[i + 1];
+                        let slip3 = &tx.to[i + 2];
 
                                     //
                                     // "nft_id" is utxokey of second bound slip (nft_slip2):
@@ -248,57 +261,84 @@ impl Wallet {
                                     //
                                     //     Then we can use these 3 slips as input for sending NFT to another recepient
                                     //     inside create_send_bound() transaction
+                        let nft = NFT {
+                             nft_slip1_utxokey: nft_slip1.utxoset_key, // first Bound slip
+                             normal_slip_utxokey: normal_slip.utxoset_key, // linked Normal slip
+                             nft_slip2_utxokey: nft_slip2.utxoset_key, // second Bound slip for tracking
+                             nft_id: nft_slip2.utxoset_key.to_vec(), // derive NFT id from second Bound slip’s key
+                             tx_sig: tx.signature,
+                        };
+                        self.nft_slips.push(nft);
 
-                                    let nft = NFT {
-                                        nft_slip1_utxokey: nft_slip1.utxoset_key, // first Bound slip
-                                        normal_slip_utxokey: normal_slip.utxoset_key, // linked Normal slip
-                                        nft_slip2_utxokey: nft_slip2.utxoset_key, // second Bound slip for tracking
-                                        nft_id: nft_slip2.utxoset_key.to_vec(), // derive NFT id from second Bound slip’s key
-                                        tx_sig: tx.signature,
-                                    };
-                                    self.nft_slips.push(nft);
 
-                                    debug!(
-                                        "NFT slip group detected. Bound slip key: {:?}, Normal slip key: {:?}",
-                                        nft_slip1.utxoset_key, normal_slip.utxoset_key
-                                    );
+                        i += 3;
 
-                                    // Skip these three outputs that form the NFT group.
-                                    //
-                                    i += 3;
-                                    continue;
-                                }
-                            }
+		    //
+		    // normal transactions are processed 
+		    //
+		    } else {
+
+                        if output.amount > 0 && output.public_key == self.public_key {
+                            wallet_changed |= WALLET_UPDATED;
+                            self.add_slip(block.id, tx_index, output, true, None);
                         }
-                    }
 
-                    // For outputs not part of an NFT group, if the output amount is > 0 and is owned by us, add slip.
-                    //
-                    if output.amount > 0 && output.public_key == self.public_key {
-                        wallet_changed |= WALLET_UPDATED;
-                        self.add_slip(block.id, tx_index, output, true, None);
-                    }
-                    i += 1;
+                        i += 1;
+
+		    }
+
                 }
 
-                // Handle input slips
+		// 
+                // inputs
                 //
-                for (index, input) in tx.from.iter().enumerate() {
-                    if input.public_key == self.public_key {
-                        // If the input has a nonzero amount, mark the slip as spent.
-                        //
-                        if input.amount > 0 {
-                            wallet_changed |= WALLET_UPDATED;
-                            self.delete_slip(input, None);
-                        }
+                let mut i = 0;
+                while i < tx.from.len() {
 
-                        // If this is the first input and it is of Bound type,
-                        // then check if this input group represents a send-bound NFT group.
-                        // An NFT input group is assumed to contain at least three inputs:
-                        //   - input at index 0 (Bound slip, representing the NFT slip #1),
-                        //   - input at index 1 (Normal slip, representing the linked payment slip),
-                        //   - input at index 2 (Bound slip, whose utxoset key will serve as the NFT id)
-                        //
+		    let input = tx.from[i];
+                    let mut is_this_an_nft = false;
+
+                    //
+                    // if the output is a bound slip, then we are expecting
+                    // the 2nd slip to be NORMAL and the 3rd slip to be another
+                    // bound slip.
+                    //
+                    if input.slip_type == SlipType::Bound {
+
+                        //          
+                        // is this an NFT ?
+                        //          
+                        // note that we do not need to validate that the NFT meets the
+                        // criteria here as we only process blocks that pass validation
+                        // requirements. so we are just doing a superficial check to  
+                        // make sure that we will not be "skipping" any normal slips 
+                        // before inserting into the wallet
+                        //   
+                        if i+2 < tx.from.len() {
+                        
+                            let slip1 = &tx.to[i];
+                            let slip2 = &tx.to[i + 1];
+                            let slip3 = &tx.to[i + 2];
+                        
+                            if slip1.slip_type == SlipType::Bound && slip3.slip_type == SlipType::Bound && slip2.slip_type != SlipType::Bound {
+                                is_this_an_nft = true;
+                            } 
+                        }   
+
+		    }
+
+
+		    //
+		    // NFT slips are removed from the existing NFT storage
+		    // area, as we have received new versions and need to 
+		    // update our NFT storage.
+		    //
+		    if is_this_an_nft == true {
+
+
+//
+// please confirm 
+//
                         if index == 0 && input.slip_type == SlipType::Bound && tx.from.len() >= 3 {
                             let nft_id_utxo = &tx.from[2].utxoset_key;
 
@@ -318,24 +358,55 @@ impl Wallet {
                             }
                         }
 
-                        // Check for pending transaction deletion
-                        //
-                        if self.delete_pending_transaction(tx) {
-                            wallet_changed |= WALLET_UPDATED;
+
+
+
+		      i += 3;
+
+		    //
+		    // otherwise we have a normal transaction
+		    //
+		    } else {
+
+			//
+			// normal slip must be addressed to us
+			//
+                        if input.public_key == self.public_key {
+
+			    //
+                            // with non-zero amount
+                            //
+                            if input.amount > 0 {
+                                wallet_changed |= WALLET_UPDATED;
+                                self.delete_slip(input, None);
+                            }
+
+			    //
+			    // also delete from pending
+			    //
+                            if self.delete_pending_transaction(tx) {
+                                wallet_changed |= WALLET_UPDATED;
+                            }
                         }
                     }
-                }
 
-                if let TransactionType::SPV = tx.transaction_type {
-                    tx_index += tx.txs_replacements as u64;
-                } else {
-                    tx_index += 1;
+                    if let TransactionType::SPV = tx.transaction_type {
+                        tx_index += tx.txs_replacements as u64;
+                    } else {
+                        tx_index += 1;
+                    }
                 }
-            }
 
             if block.id > genesis_period {
                 self.remove_old_slips(block.id - genesis_period);
             }
+
+
+	//
+	// this is run if the block is not part of the longest-chain, i.e. if 
+	// we are "unwinding" the wallet. In this case inputs are outputs and
+	// outputs are inputs/
+	//
         } else {
             for tx in block.transactions.iter() {
                 for input in tx.from.iter() {
