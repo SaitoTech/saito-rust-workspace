@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use log::{debug, info, trace};
-use rayon::vec;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -15,8 +14,7 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    BlockHash, BlockId, PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER,
-    STAT_BIN_COUNT,
+    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -89,6 +87,7 @@ pub struct ConsensusThread {
     pub stat_sender: Sender<String>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     pub produce_blocks_by_timer: bool,
+    pub delete_old_blocks: bool,
 }
 
 impl ConsensusThread {
@@ -529,7 +528,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 info!("removing {} failed blocks from mempool so new blocks can be bundled after node loadup", mempool.blocks_queue.len());
                 mempool.blocks_queue.clear();
             }
-            {
+            if self.delete_old_blocks {
                 let purge_id = blockchain
                     .get_latest_block_id()
                     .saturating_sub(blockchain.genesis_period * 2);

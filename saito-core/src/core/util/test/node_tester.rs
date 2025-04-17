@@ -272,6 +272,7 @@ pub mod test {
                     stat_sender: sender_to_stat.clone(),
                     config_lock: configuration.clone(),
                     produce_blocks_by_timer: true,
+                    delete_old_blocks: true,
                 },
                 mining_thread: MiningThread {
                     wallet_lock: context.wallet_lock.clone(),
