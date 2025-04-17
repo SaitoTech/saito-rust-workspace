@@ -4,7 +4,6 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use log::{debug, info, trace};
-use rayon::vec;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -15,7 +14,7 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    BlockHash, BlockId, PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER,
+    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER,
     STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
