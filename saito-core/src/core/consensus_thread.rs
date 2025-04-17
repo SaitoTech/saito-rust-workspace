@@ -14,8 +14,7 @@ use crate::core::consensus::mempool::Mempool;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER,
-    STAT_BIN_COUNT,
+    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
