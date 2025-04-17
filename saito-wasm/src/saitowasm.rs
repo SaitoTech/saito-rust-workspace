@@ -67,7 +67,7 @@ pub struct SaitoWasm {
 }
 
 lazy_static! {
-    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true, 100_000, 0, 60)));
+    pub static ref SAITO: Mutex<Option<SaitoWasm>> = Mutex::new(Some(new(1, true, 100_000, 0, 60,false)));
     static ref CONFIGS: Arc<RwLock<dyn Configuration + Send + Sync>> =
         Arc::new(RwLock::new(WasmConfiguration::new()));
     static ref PRIVATE_KEY: Mutex<String> = Mutex::new("".to_string());
@@ -79,6 +79,7 @@ pub fn new(
     genesis_period: BlockId,
     social_stake: Currency,
     social_stake_period: BlockId,
+    delete_old_blocks:bool
 ) -> SaitoWasm {
     info!("creating new saito wasm instance");
     console_error_panic_hook::set_once();
@@ -173,6 +174,7 @@ pub fn new(
             stat_sender: sender_to_stat.clone(),
             config_lock: configuration.clone(),
             produce_blocks_by_timer: true,
+            delete_old_blocks,
         },
         mining_thread: MiningThread {
             wallet_lock: context.wallet_lock.clone(),
@@ -337,7 +339,11 @@ pub async fn initialize(
     private_key: JsString,
     log_level_num: u8,
     hasten_multiplier: u64,
+    delete_old_blocks:bool,
 ) -> Result<JsValue, JsValue> {
+
+    // TODO : move these parameters to a config object to clean the interface
+
     let log_level = match log_level_num {
         0 => log::Level::Error,
         1 => log::Level::Warn,
@@ -396,6 +402,7 @@ pub async fn initialize(
         genesis_period,
         social_stake,
         social_stake_period,
+        delete_old_blocks
     ));
 
     let private_key: SaitoPrivateKey = string_to_hex(private_key).or(Err(JsValue::from(

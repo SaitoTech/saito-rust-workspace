@@ -89,6 +89,7 @@ pub struct ConsensusThread {
     pub stat_sender: Sender<String>,
     pub config_lock: Arc<RwLock<dyn Configuration + Send + Sync>>,
     pub produce_blocks_by_timer: bool,
+    pub delete_old_blocks: bool,
 }
 
 impl ConsensusThread {
@@ -529,7 +530,7 @@ impl ProcessEvent<ConsensusEvent> for ConsensusThread {
                 info!("removing {} failed blocks from mempool so new blocks can be bundled after node loadup", mempool.blocks_queue.len());
                 mempool.blocks_queue.clear();
             }
-            {
+            if self.delete_old_blocks {
                 let purge_id = blockchain
                     .get_latest_block_id()
                     .saturating_sub(blockchain.genesis_period * 2);
