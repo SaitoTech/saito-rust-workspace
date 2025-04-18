@@ -988,12 +988,15 @@ impl Wallet {
         nft_data: Vec<u32>,
         recipient_public_key: &SaitoPublicKey,
     ) -> Result<Transaction, Error> {
+
         //
-        // Locate the NFT to be transferred:
+        // create our Bound-type transaction for this transfer
         //
-        // Search our wallet's repository of NFT slips for one matching the
-        // provided nft_id. We then need to extract both the bound (2 NFT slips)
-        // and the normal UTXO slip to which they are bound....
+        let mut transaction = Transaction::default();
+        transaction.transaction_type = TransactionType::Bound;
+
+        //
+        // locate NFT from our repository of NFT slips
         //
         let pos = self
             .nfts
@@ -1002,86 +1005,47 @@ impl Wallet {
             .ok_or(Error::new(ErrorKind::NotFound, "NFT not found"))?;
         let old_nft = self.nfts.remove(pos);
 
+	//
         //
-        // Verify that the normal UTXO exists:
+        // extract the 3 input slips
         //
-        // Use the extracted utxokey_normal.
+        // slip #1 - bound
+	// slip #2 - normal
+	// slip #3 - bound
+	//
+	// validation rules require all three slips to move together in order
+	// for an NFT transfer to be considered valid by network rules. lucky
+	// for us, our NFT repository stores this information.
         //
-        //if !self.unspent_slips.contains(&old_nft.utxokey_normal) {
-        //    return Err(Error::new(ErrorKind::NotFound, "NFT UTXO not found"));
-        //}
+        let input_slip1 = Slip::parse_slip_from_utxokey(&old_nft.slip1)?;
+        let input_slip2 = Slip::parse_slip_from_utxokey(&old_nft.slip2)?;
+        let input_slip3 = Slip::parse_slip_from_utxokey(&old_nft.slip3)?;
+
 
         //
-        // Initialize a new Bound-type transaction:
-        //
-        let mut transaction = Transaction::default();
-        transaction.transaction_type = TransactionType::Bound;
-
-        //
-        // Generate input slips:
-        //
-        // To send an existing NFT to another participant, our BoundTransaction should
-        // have the following three input slips:
-        //
-        //    (a) The NFT slip #1
-        //    (b) The normal slip #2
-        //    (c) The NFT slip #3
-        //
-        //
-
-        // (a) Bound NFT input slip: create from old_nft.utxokey_bound.
-        let input_slip1 = Slip::parse_slip_from_utxokey(&old_nft.nft_slip1_utxokey)?;
-
-        // (b) Normal payment input slip: create from old_nft.utxokey_normal.
-        let input_slip2 = Slip::parse_slip_from_utxokey(&old_nft.normal_slip_utxokey)?;
-
-        // (c) NFT data input slip: derive from the provided nft_id.
-        let nft_utxo: SaitoUTXOSetKey = nft_id
-            .as_slice()
-            .try_into()
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "nft_id length mismatch"))?;
-        let input_slip3 = Slip::parse_slip_from_utxokey(&nft_utxo)?;
-
-        //
-        // Generate output slips:
-        // We require three output slips:
-        //   [0] The new NFT slip #1 (publickey as received);
-        //   [1] The normal payment slip directed to the recipient; this is created by cloning input_slip1
-        //   [2] The new NFT slip #3 (publickey as received)
-        //
-
-        // Output Slip [0]: New NFT Slip
-        // For the new NFT slip, we simply clone input_slip1 which is bound slips.
+        // generate the 3 output slips
         //
         let output_slip1 = input_slip1.clone();
+        let output_slip2 = input_slip2.clone();
+        let output_slip3 = input_slip3.clone();
 
-        // Output Slip [1]: Normal Payment Slip
-        // Clone input_slip2 and then replacing its public key with the recipient's public key.
-        //
-        let mut output_slip2 = input_slip2.clone();
+	//
+	// update recipient of output_slip2
+	//
         output_slip2.public_key = recipient_public_key.clone();
 
-        // Output Slip [2]: Slip for tracking original slip used for creating NFT
-        let mut output_slip3 = input_slip3.clone();
-
-        //
-        // Add input and output slips, that were created earlier,
-        // to the bound transaction.
-        //
-
-        // Add the input slip.
+	//
+        // add slips
+	//
         transaction.add_from_slip(input_slip1.clone());
         transaction.add_from_slip(input_slip2.clone());
         transaction.add_from_slip(input_slip3.clone());
-
-        // Add the outputs.
         transaction.add_to_slip(output_slip1);
         transaction.add_to_slip(output_slip2);
         transaction.add_to_slip(output_slip3);
 
         //
-        // 6. Finalize the transaction:
-        // Calculate the hash over the serialized data, set it, and sign the transaction.
+        // finalize transaction
         //
         let hash_for_signature: SaitoHash = hash(&transaction.serialize_for_signature());
         transaction.hash_for_signature = Some(hash_for_signature);
