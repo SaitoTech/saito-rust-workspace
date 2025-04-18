@@ -15,12 +15,16 @@ export default class Nft extends WasmWrapper<WasmNFT> {
         return this.instance.nft_id;
     }
 
-    public get utxokey_bound(): Uint8Array {
-        return this.instance.utxokey_bound;
+    public get nft_slip2_utxokey(): Uint8Array {
+        return this.instance.nft_slip2_utxokey;
     }
 
-    public get utxokey_normal(): Uint8Array {
-        return this.instance.utxokey_normal;
+    public get nft_slip1_utxokey(): Uint8Array {
+        return this.instance.nft_slip1_utxokey;
+    }
+
+    public get normal_slip_utxokey(): Uint8Array {
+        return this.instance.normal_slip_utxokey;
     }
 
     public get tx_sig(): Uint8Array {
@@ -41,8 +45,9 @@ export default class Nft extends WasmWrapper<WasmNFT> {
     public toJSON(): Record<string, string> {
         return {
             nft_id: Buffer.from(this.nft_id).toString("hex"),
-            utxokey_bound: Buffer.from(this.utxokey_bound).toString("hex"),
-            utxokey_normal: Buffer.from(this.utxokey_normal).toString("hex"),
+            nft_slip2_utxokey: Buffer.from(this.nft_slip2_utxokey).toString("hex"),
+            nft_slip1_utxokey: Buffer.from(this.nft_slip1_utxokey).toString("hex"),
+            normal_slip_utxokey: Buffer.from(this.normal_slip_utxokey).toString("hex"),
             tx_sig: Buffer.from(this.tx_sig).toString("hex"),
         };
     }
