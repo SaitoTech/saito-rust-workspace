@@ -1193,6 +1193,7 @@ impl Transaction {
 	    // - input slip3 publickey matches output slip3 publickey
 	    // - input slip1 amount matches output slip1 amount
 	    // - input slip3 amount matches output slip3 amount
+	    // - slip1, slip2, slip3 are identical block_id, tx_id, and sequential slip_id
 	    //
 	    } else {
 
@@ -1346,6 +1347,13 @@ impl Transaction {
                         );
                         return false;
 	        }
+
+		//
+		// FROM slips have the same block_id, transaction_id and sequential slip_ids
+		//
+		// this is to prevent funny business of sometone trying to attach a totally
+		// separate and un-bound normal slip as if it were the appropriate one.
+		//
 
 	    }
 
