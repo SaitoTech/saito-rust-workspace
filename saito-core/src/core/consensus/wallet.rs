@@ -864,22 +864,14 @@ impl Wallet {
         //
         // accordingly, we merge these fields into a new "publickey"
         //
-        let mut nft_uuid_data = Vec::with_capacity(17);
-        let mut input_placeholder = Vec::with_capacity(33);
-        nft_uuid_data.extend(&nft_uuid_block_id.to_be_bytes()); // 8 bytes for block_id
-        nft_uuid_data.extend(&nft_uuid_transaction_id.to_be_bytes()); // 8 bytes for transaction_id
-        nft_uuid_data.push(nft_uuid_slip_id as u8); // 1 byte for slip_id
-        let recipient_pubkey_bytes = recipient.as_slice();
-        input_placeholder.extend(&nft_uuid_data); // 17 bytes from location
-        input_placeholder.extend(&recipient_pubkey_bytes[17..33]); // 16 bytes from recipient's key
-        let input_placeholder: [u8; 33] = input_placeholder
-            .try_into()
-            .expect("Combined public key must be exactly 33 bytes");
+
+        let uuid_pubkey = Wallet::create_nft_uuid(&input_slip, recipient);
+
         //
         // and create the slip with this "artificially-created" publickey
         //
         let output_slip3 = Slip {
-            public_key: input_placeholder,
+            public_key: uuid_pubkey,
             amount: 0,
             slip_type: SlipType::Bound,
             ..Default::default()
@@ -1007,7 +999,7 @@ impl Wallet {
         // generate the 3 output slips
         //
         let output_slip1 = input_slip1.clone();
-        let output_slip2 = input_slip2.clone();
+        let mut output_slip2 = input_slip2.clone();
         let output_slip3 = input_slip3.clone();
 
         //
@@ -1035,6 +1027,45 @@ impl Wallet {
 
         info!("NFT transfer transaction created: {:?}", transaction);
         Ok(transaction)
+    }
+
+    //
+    // Constructs the 33‑byte “NFT UUID” placeholder that encodes the original
+    // UTXO coordinates and a bit of the recipient’s key.
+    //
+    // NFTs are uniquely identified by the specific UTXO spent to mint them:
+    //   1. `block_id` (8 bytes)
+    //   2. `tx_ordinal` (8 bytes)
+    //   3. `slip_index` (1 byte)
+    //
+    // We pack those 17 bytes at the front of a 33‑byte array, then fill out
+    // the remaining 16 bytes with the end of the recipient’s public key.
+    // This ensures that:
+    //   - The NFT’s ID remains unforgeable (derived from a spent slip).
+    //   - We can still carry the holder’s address data for routing/ATR.
+    //
+    // Used both when creating (minting) an NFT and when validating BoundTransactions
+    // to guarantee the same byte‑ordering and layout is applied consistently.
+    //
+    pub fn create_nft_uuid(input_slip: &Slip, recipient: &SaitoPublicKey) -> [u8; 33] {
+        // 1) Gather the 17 bytes of original UTXO coordinates:
+        //
+        let mut nft_uuid_data = Vec::with_capacity(17);
+        nft_uuid_data.extend(&input_slip.block_id.to_be_bytes()); // 8 bytes
+        nft_uuid_data.extend(&input_slip.tx_ordinal.to_be_bytes()); // 8 bytes
+        nft_uuid_data.push(input_slip.slip_index); // 1 byte
+
+        // 2) Allocate the full 33‑byte placeholder and mix in recipient public_key:
+        //
+        let mut public_key_placeholder = Vec::with_capacity(33);
+        public_key_placeholder.extend(&nft_uuid_data); // first 17
+        public_key_placeholder.extend(&recipient.as_ref()[17..33]); // last 16
+
+        // 3) Ensure if correct size 33 bytes
+        //
+        public_key_placeholder
+            .try_into()
+            .expect("Combined NFT‑UUID public key must be exactly 33 bytes")
     }
 
     pub async fn create_golden_ticket_transaction(

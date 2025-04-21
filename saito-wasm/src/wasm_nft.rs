@@ -19,31 +19,31 @@ impl WasmNFT {
         }
     }
 
-    #[wasm_bindgen(getter = nft_slip1_utxokey)]
-    pub fn get_nft_slip1_utxokey(&self) -> Uint8Array {
-        let buffer = Uint8Array::new_with_length(self.nft.nft_slip1_utxokey.len() as u32);
-        buffer.copy_from(self.nft.nft_slip1_utxokey.as_slice());
+    #[wasm_bindgen(getter = slip1)]
+    pub fn get_slip1(&self) -> Uint8Array {
+        let buffer = Uint8Array::new_with_length(self.nft.slip1.len() as u32);
+        buffer.copy_from(self.nft.slip1.as_slice());
         buffer
     }
 
-    #[wasm_bindgen(getter = normal_slip_utxokey)]
-    pub fn get_normal_slip_utxokey(&self) -> Uint8Array {
-        let buffer = Uint8Array::new_with_length(self.nft.normal_slip_utxokey.len() as u32);
-        buffer.copy_from(self.nft.normal_slip_utxokey.as_slice());
+    #[wasm_bindgen(getter = slip2)]
+    pub fn get_slip2(&self) -> Uint8Array {
+        let buffer = Uint8Array::new_with_length(self.nft.slip2.len() as u32);
+        buffer.copy_from(self.nft.slip2.as_slice());
         buffer
     }
 
-    #[wasm_bindgen(getter = nft_slip2_utxokey)]
-    pub fn get_nft_slip2_utxokey(&self) -> Uint8Array {
-        let buffer = Uint8Array::new_with_length(self.nft.nft_slip2_utxokey.len() as u32);
-        buffer.copy_from(self.nft.nft_slip2_utxokey.as_slice());
+    #[wasm_bindgen(getter = slip3)]
+    pub fn get_slip3(&self) -> Uint8Array {
+        let buffer = Uint8Array::new_with_length(self.nft.slip3.len() as u32);
+        buffer.copy_from(self.nft.slip3.as_slice());
         buffer
     }
 
-    #[wasm_bindgen(getter = nft_id)]
-    pub fn get_nft_id(&self) -> Uint8Array {
-        let buffer = Uint8Array::new_with_length(self.nft.nft_id.len() as u32);
-        buffer.copy_from(self.nft.nft_id.as_slice());
+    #[wasm_bindgen(getter = id)]
+    pub fn get_id(&self) -> Uint8Array {
+        let buffer = Uint8Array::new_with_length(self.nft.id.len() as u32);
+        buffer.copy_from(self.nft.id.as_slice());
         buffer
     }
 

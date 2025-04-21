@@ -1164,66 +1164,43 @@ impl Transaction {
                     }
                 }
 
+                //
+                // We must ensure the two “bound” output slips really tie back to the exact UTXO 
+                // that got used to mint this NFT—otherwise someone could forge a duplicate 
+                // NFT by spending any other slip.
+                //
+                // Here we pull out the original input slip (which carries the UTXO being spent)
+                // and the recipient’s public key (carried in output[1]) so we can re‑compute
+                // the two bound‑slip checks below:
 
-                //      
-                // Ensure correct input is used to create NFT
-                // to avoid forgery.
+                // Grab the original input slip (provides the NFT’s unique source UTXO)
+                // and the recipient public key (used to mix into the NFT‑UUID placeholder).
                 //
                 let input = &self.from[0];
-                let recipient_public_key_bytes = self.to[1].public_key.as_slice();
-                
-                // expected public key for output[0] is exactly original input.public_key
-                let expected_public_key = input.public_key;
+                let recipient_pk = self.to[1].public_key;
 
-                // Match public_key of output[0] with 
-                // public_key of input used to create NFT
+                // Ensure the first bound output slip (output[0]) preserves the exact same
+                // public_key as the spent UTXO. This makes output[0] an indelible record of
+                // which specific UTXO was burned to mint the NFT, and guards against someone
+                // “mimicking” an NFT by using a different UTXO.
                 //
-                if self.to[0].public_key != expected_public_key {
-                    error!("Create-bound TX: output[0].public_key does not match the spent UTXO’s public_key");
+                if self.to[0].public_key != input.public_key {
+                    error!("Create-bound TX: output[0].public_key != spent UTXO pubkey");
                     return false;
                 }
 
+                // Recompute the NFT‑UUID placeholder from the input slip + recipient key.
+                // The NFT‑UUID packs the original slip’s block_id, tx_ordinal, and slip_index
+                // into the first 17 bytes, then tacks on the last 16 bytes of the recipient’s
+                // pubkey to fill out the 33‑byte UTXO public key. This “placeholder” must match
+                // exactly the public_key we stuffed into output[2], otherwise someone could slip
+                // in a fake UUID and undermine the NFT’s uniqueness.
                 //
-                // We need to check the nft uuid data inside public_key                 
-                // of output[2] contains accurate details that matches
-                // the original input used to create the NFT.
-                // This check is used to make sure another random input isnt
-                // used to create duplicate NFT.
-                // 
-
-                // Reconstruct the data NFT data from original input and 
-                // match it with output[2].public_key.
-                // public_key of output[2] is used a placeholder for tracking
-                // data of original nft input.
-                //  
-                // expected public key for output[2] is:
-                //   8B - block_id 
-                //   8B - tx_ordinal 
-                //   1B slip_index 
-                //   last 16B of recipient public_key
-                //
-                let mut nft_uuid_data = Vec::with_capacity(17);
-                nft_uuid_data.extend_from_slice(&input.block_id.to_be_bytes());
-                nft_uuid_data.extend_from_slice(&input.tx_ordinal.to_be_bytes());
-                nft_uuid_data.push(input.slip_index);
-                
-                let mut nft_uuid_placeholder = Vec::with_capacity(33);
-                nft_uuid_placeholder.extend_from_slice(&nft_uuid_data);
-                nft_uuid_placeholder.extend_from_slice(&recipient_public_key_bytes[17..33]);
-
-                let nft_uuid_placeholder: [u8;33] = nft_uuid_placeholder.try_into().unwrap();
-
-                if self.to[2].public_key != nft_uuid_placeholder {
-                    error!("Create-bound TX: output[2].public_key does not correctly encode the NFT UUID");
+                let expected_uuid = Wallet::create_nft_uuid(input, &recipient_pk);
+                if self.to[2].public_key != expected_uuid {
+                    error!("Create-bound TX: output[2].public_key does not encode the NFT UUID correctly");
                     return false;
                 }
-
-            //
-            // output[0] and output[2] match the UUID of input[0]
-            //
-            //
-            // return false if this is not true
-            //
 
             //
             // otherwise, this is an existing NFT which is being transferred between
@@ -1353,7 +1330,7 @@ impl Transaction {
                 if self.from[0].public_key != self.to[0].public_key {
                     error!(
                         "Send-bound Transaction: NFT slip #1 has modified publickey {:?}",
-                        slip.public_key
+                        self.from[0].public_key
                     );
                     return false;
                 }
@@ -1364,7 +1341,7 @@ impl Transaction {
                 if self.from[2].public_key != self.to[2].public_key {
                     error!(
                         "Send-bound Transaction: NFT slip #3 has modified publickey {:?}",
-                        slip.public_key
+                        self.from[2].public_key
                     );
                     return false;
                 }
@@ -1375,7 +1352,7 @@ impl Transaction {
                 if self.from[0].amount != self.to[0].amount {
                     error!(
                         "Send-bound Transaction: NFT slip #1 has modified amount {:?}",
-                        slip.amount
+                        self.from[0].amount
                     );
                     return false;
                 }
@@ -1386,7 +1363,7 @@ impl Transaction {
                 if self.from[2].amount != self.to[2].amount {
                     error!(
                         "Send-bound Transaction: NFT slip #1 has modified amount {:?}",
-                        slip.amount
+                        self.from[2].amount
                     );
                     return false;
                 }
@@ -1397,7 +1374,7 @@ impl Transaction {
                 if self.from[2].amount != 0 {
                     error!(
                         "Send-bound Transaction: NFT slip #1 has modified amount {:?}",
-                        slip.amount
+                        self.from[2].amount
                     );
                     return false;
                 }
@@ -1412,33 +1389,38 @@ impl Transaction {
                 let block_id0 = self.from[0].block_id;
                 let block_id1 = self.from[1].block_id;
                 let block_id2 = self.from[2].block_id;
-                
+
                 if block_id0 != block_id1 || block_id1 != block_id2 {
-                    error!("Send-bound TX: input slips have mismatched block_id ({} / {} / {}).", block_id0, block_id1, block_id2);
+                    error!(
+                        "Send-bound TX: input slips have mismatched block_id ({} / {} / {}).",
+                        block_id0, block_id1, block_id2
+                    );
                     return false;
                 }
 
                 let tx_ordinal0 = self.from[0].tx_ordinal;
                 let tx_ordinal1 = self.from[1].tx_ordinal;
                 let tx_ordinal2 = self.from[2].tx_ordinal;
-                
+
                 if tx_ordinal0 != tx_ordinal1 || tx_ordinal1 != tx_ordinal2 {
-                    error!("Send-bound TX: input slips have mismatched tx_ordinal ({} / {} / {}).", tx_oridinal0, tx_oridinal1, tx_oridinal2);
+                    error!(
+                        "Send-bound TX: input slips have mismatched tx_ordinal ({} / {} / {}).",
+                        tx_ordinal0, tx_ordinal1, tx_ordinal2
+                    );
                     return false;
                 }
 
                 let slip_index0 = self.from[0].slip_index;
                 let slip_index1 = self.from[1].slip_index;
                 let slip_index2 = self.from[2].slip_index;
-                
+
                 if slip_index1 != slip_index0 + 1 || slip_index2 != slip_index1 + 1 {
                     error!(
                         "Send-bound TX: input slips slip_index are not sequential ({} / {} / {}).",
-                       slip_index0,slip_index1,slip_index2
+                        slip_index0, slip_index1, slip_index2
                     );
                     return false;
                 }
-    
             }
         } else {
             //
