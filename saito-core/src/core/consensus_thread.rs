@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use log::{debug, info, trace};
+use log::{debug, info, trace, warn};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 
@@ -11,10 +11,11 @@ use crate::core::consensus::block::{Block, BlockType};
 use crate::core::consensus::blockchain::Blockchain;
 use crate::core::consensus::golden_ticket::GoldenTicket;
 use crate::core::consensus::mempool::Mempool;
+use crate::core::consensus::slip::Slip;
 use crate::core::consensus::transaction::{Transaction, TransactionType};
 use crate::core::consensus::wallet::Wallet;
 use crate::core::defs::{
-    PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
+    Currency, PrintForLog, SaitoHash, StatVariable, Timestamp, CHANNEL_SAFE_BUFFER, STAT_BIN_COUNT,
 };
 use crate::core::io::network::Network;
 use crate::core::io::network_event::NetworkEvent;
@@ -92,7 +93,7 @@ pub struct ConsensusThread {
 
 impl ConsensusThread {
     async fn generate_issuance_tx(
-        &self,
+        &mut self,
         mempool_lock: Arc<RwLock<Mempool>>,
         blockchain_lock: Arc<RwLock<Blockchain>>,
     ) {
@@ -107,15 +108,19 @@ impl ConsensusThread {
             public_key = wallet.public_key;
         }
         let mut txs: Vec<Transaction> = vec![];
+        let mut initial_token_supply = 0;
         for slip in slips {
             debug!("{:?} slip public key", slip.public_key.to_base58());
+            initial_token_supply += slip.amount;
             let mut tx = Transaction::create_issuance_transaction(slip.public_key, slip.amount);
             tx.generate(&public_key, 0, 0);
             tx.sign(&private_key);
             txs.push(tx);
         }
 
-        let blockchain = blockchain_lock.read().await;
+        let mut blockchain = blockchain_lock.write().await;
+        // setting the initial token supply to the blockchain here if we are generating the genesis block
+        blockchain.initial_token_supply = initial_token_supply;
         let mut mempool = mempool_lock.write().await;
 
         for tx in txs {
@@ -276,12 +281,8 @@ impl ConsensusThread {
 
     async fn produce_genesis_block(&mut self, timestamp: Timestamp) {
         info!("producing genesis block");
-        Self::generate_issuance_tx(
-            self,
-            self.mempool_lock.clone(),
-            self.blockchain_lock.clone(),
-        )
-        .await;
+        self.generate_issuance_tx(self.mempool_lock.clone(), self.blockchain_lock.clone())
+            .await;
 
         let configs = self.config_lock.read().await;
         let mut blockchain = self.blockchain_lock.write().await;

@@ -2,6 +2,7 @@ use std::cmp::max;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::io::Error;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use ahash::{AHashMap, HashMap};
@@ -97,6 +98,7 @@ pub struct Blockchain {
     pub genesis_period: BlockId,
 
     pub checkpoint_found: bool,
+    pub initial_token_supply: Currency,
 }
 
 impl Blockchain {
@@ -129,6 +131,7 @@ impl Blockchain {
             social_stake_period,
             genesis_period,
             checkpoint_found: false,
+            initial_token_supply: 0,
         }
     }
     pub fn init(&mut self) -> Result<(), Error> {
@@ -423,6 +426,9 @@ impl Blockchain {
             // );
 
             if does_new_chain_validate {
+                // crash if total supply has changed
+                self.check_total_supply(configs).await;
+
                 self.add_block_success(block_hash, storage, mempool, configs)
                     .await;
 
@@ -1187,34 +1193,14 @@ impl Blockchain {
         let does_block_validate;
         {
             debug!("winding hash validates: {:?}", block_hash.to_hex());
-            // does_block_validate = current_wind_index == 0
-            //     || block
-            //         .validate(self, &self.utxoset, configs, storage, &wallet)
-            //         .await;
-            let has_first_block = self
-                .blockring
-                .get_longest_chain_block_hash_at_block_id(1)
-                .is_some();
             let genesis_period = configs.get_consensus_config().unwrap().genesis_period;
-            let latest_block_id = self.get_latest_block_id();
-            let mut has_genesis_period_of_blocks = false;
-            if latest_block_id > genesis_period {
-                let result = self
-                    .blockring
-                    .get_longest_chain_block_hash_at_block_id(latest_block_id - genesis_period);
-                has_genesis_period_of_blocks = result.is_some();
-            }
-            // let has_genesis_period_of_blocks = self.get_latest_block_id()
-            //     > configs.get_consensus_config().unwrap().genesis_period + self.genesis_block_id;
-            let validate_against_utxo = has_first_block || has_genesis_period_of_blocks;
+            let validate_against_utxo = self.has_total_supply_loaded(genesis_period);
 
             does_block_validate = block
                 .validate(self, &self.utxoset, configs, storage, validate_against_utxo)
                 .await;
 
             if !does_block_validate {
-                debug!("validate against utxo: {:?}, has_first_block : {:?}, has_genesis_period_of_blocks : {:?}", 
-                    validate_against_utxo,has_first_block,has_genesis_period_of_blocks);
                 debug!("latest_block_id = {:?}", self.get_latest_block_id());
                 debug!("genesis_block_id = {:?}", self.genesis_block_id);
                 debug!(
@@ -1392,6 +1378,22 @@ impl Blockchain {
                 }
             }
         }
+    }
+
+    fn has_total_supply_loaded(&self, genesis_period: BlockId) -> bool {
+        let has_genesis_block = self
+            .blockring
+            .get_longest_chain_block_hash_at_block_id(1)
+            .is_some();
+        let latest_block_id = self.get_latest_block_id();
+        let mut has_genesis_period_of_blocks = false;
+        if latest_block_id > genesis_period {
+            let result = self
+                .blockring
+                .get_longest_chain_block_hash_at_block_id(latest_block_id - genesis_period);
+            has_genesis_period_of_blocks = result.is_some();
+        }
+        has_genesis_block || has_genesis_period_of_blocks
     }
 
     // when new_chain and old_chain are generated the block_hashes are pushed
@@ -2071,6 +2073,79 @@ impl Blockchain {
             return 0;
         }
         current_supply
+    }
+    pub async fn check_total_supply(&mut self, configs: &(dyn Configuration + Send + Sync)) {
+        if !self.has_total_supply_loaded(configs.get_consensus_config().unwrap().genesis_period) {
+            debug!("total supply not loaded yet. skipping check");
+            return;
+        }
+        if configs.is_browser() || configs.is_spv_mode() {
+            debug!("skipping total supply check in spv mode");
+            return;
+        }
+
+        let mut current_supply = 0;
+        let amount_in_utxo = self
+            .utxoset
+            .iter()
+            .filter(|(_, value)| **value)
+            .map(|(key, value)| {
+                let slip = Slip::parse_slip_from_utxokey(key).unwrap();
+                info!(
+                    "Utxo : {:?} : {} : {:?}, block : {}-{}-{}, valid : {}",
+                    slip.public_key.to_base58(),
+                    slip.amount,
+                    slip.slip_type,
+                    slip.block_id,
+                    slip.tx_ordinal,
+                    slip.slip_index,
+                    value
+                );
+                slip.amount
+            })
+            .sum::<Currency>();
+
+        current_supply += amount_in_utxo;
+
+        let latest_block = self
+            .get_latest_block()
+            .expect("There should be a latest block in blockchain");
+        current_supply += latest_block.graveyard;
+        current_supply += latest_block.treasury;
+        current_supply += latest_block.previous_block_unpaid;
+        current_supply += latest_block.total_fees;
+
+        if self.initial_token_supply == 0 {
+            self.initial_token_supply = current_supply;
+        }
+
+        if current_supply != self.initial_token_supply {
+            let latest_block = self.get_latest_block().unwrap();
+            debug!(
+                "diff : {}",
+                self.initial_token_supply as i64 - current_supply as i64
+            );
+            debug!("Current supply is {}", current_supply);
+            debug!("Initial token supply is {}", self.initial_token_supply);
+            debug!(
+                "Social Stake Requirement is {}",
+                self.social_stake_requirement
+            );
+            debug!("Graveyard is {}", latest_block.graveyard);
+            debug!("Treasury is {}", latest_block.treasury);
+            debug!("Unpaid fees is {}", latest_block.previous_block_unpaid);
+            debug!("Total Fees ATR is {}", latest_block.total_fees_atr);
+            debug!("Total Fees New is {}", latest_block.total_fees_new);
+            debug!("Total Fee is {}", latest_block.total_fees);
+            debug!("Amount in utxo {}", amount_in_utxo);
+
+            info!("latest block : {}", latest_block);
+            warn!(
+                "current supply : {:?} doesn't equal to initial supply : {:?}",
+                current_supply, self.initial_token_supply
+            );
+            panic!("cannot continue with invalid total supply");
+        }
     }
 }
 
