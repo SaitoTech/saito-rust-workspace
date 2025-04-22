@@ -348,7 +348,8 @@ export default class Saito {
         change: bigint,        
         data: string = "",
         fee: bigint,
-        recipient_public_key: string,      
+        recipient_public_key: string,     
+        nft_type: string, 
     ): Promise<T> {
 
       console.log("values recieved at saito.ts:");
@@ -373,7 +374,8 @@ export default class Saito {
             change,
             data,
             fee,
-            recipient_public_key
+            recipient_public_key,
+            nft_type
         );
 
         console.log("saito.ts tx: ", wasmTx);

@@ -723,6 +723,7 @@ impl Wallet {
         network: Option<&Network>,
         latest_block_id: u64,
         genesis_period: u64,
+        nft_type: String,
     ) -> Result<Transaction, Error> {
         let mut transaction = Transaction::default();
         transaction.transaction_type = TransactionType::Bound;
@@ -865,7 +866,7 @@ impl Wallet {
         // accordingly, we merge these fields into a new "publickey"
         //
 
-        let uuid_pubkey = Wallet::create_nft_uuid(&input_slip, recipient);
+        let uuid_pubkey = Wallet::create_nft_uuid(&input_slip, &nft_type);
 
         //
         // and create the slip with this "artificially-created" publickey
@@ -1030,42 +1031,64 @@ impl Wallet {
     }
 
     //
-    // Constructs the 33‑byte “NFT UUID” placeholder that encodes the original
-    // UTXO coordinates and a bit of the recipient’s key.
+    // Constructs a 33-byte “UUID” for an NFT based on:
+    //   1. The unique coordinates of the UTXO slip used to mint the NFT
+    //      (block ID, transaction ordinal, slip index)
+    //   2. A short, up-to-16‑byte string identifier (`nft_type`) that lets
+    //      us tag or categorize the NFT.
     //
-    // NFTs are uniquely identified by the specific UTXO spent to mint them:
-    //   1. `block_id` (8 bytes)
-    //   2. `tx_ordinal` (8 bytes)
-    //   3. `slip_index` (1 byte)
+    // By embedding both pieces of data in a fixed 33-byte array, we ensure:
+    //  The NFT is globally unique (no two UTXOs share the same coords)
+    //  We carry along an easy-to-read type tag in the final bytes
     //
-    // We pack those 17 bytes at the front of a 33‑byte array, then fill out
-    // the remaining 16 bytes with the end of the recipient’s public key.
-    // This ensures that:
-    //   - The NFT’s ID remains unforgeable (derived from a spent slip).
-    //   - We can still carry the holder’s address data for routing/ATR.
+    // Layout of the 33 bytes:
+    //   [0..8)   = block ID (8 bytes, big-endian)
+    //   [8..16)  = tx ordinal (8 bytes, big-endian)
+    //   [16]     = slip index (1 byte)
+    //   [17..33) = `nft_type` string (up to 16 bytes, UTF‑8; padded or truncated)
     //
-    // Used both when creating (minting) an NFT and when validating BoundTransactions
-    // to guarantee the same byte‑ordering and layout is applied consistently.
-    //
-    pub fn create_nft_uuid(input_slip: &Slip, recipient: &SaitoPublicKey) -> [u8; 33] {
-        // 1) Gather the 17 bytes of original UTXO coordinates:
+    pub fn create_nft_uuid(input_slip: &Slip, nft_type: &str) -> [u8; 33] {
+        
         //
-        let mut nft_uuid_data = Vec::with_capacity(17);
-        nft_uuid_data.extend(&input_slip.block_id.to_be_bytes()); // 8 bytes
-        nft_uuid_data.extend(&input_slip.tx_ordinal.to_be_bytes()); // 8 bytes
-        nft_uuid_data.push(input_slip.slip_index); // 1 byte
+        // 1: Encode the UTXO coordinates (17 bytes total)
+        // Every slip in the blockchain is uniquely identified by:
+        //   which block it came from (block_id)
+        //   the index of the transaction within that block (tx_ordinal)
+        //   which slip number inside that transaction (slip_index)
+        //
+        // By concatenating these, we get a 17-byte “fingerprint” that no
+        // one else can duplicate unless they somehow create an identical UTXO.
+        //
+        let mut uuid = Vec::with_capacity(33);
+        uuid.extend(&input_slip.block_id.to_be_bytes());   //  8 bytes
+        uuid.extend(&input_slip.tx_ordinal.to_be_bytes()); //  8 bytes
+        uuid.push(input_slip.slip_index);                  //  1 byte
 
-        // 2) Allocate the full 33‑byte placeholder and mix in recipient public_key:
         //
-        let mut public_key_placeholder = Vec::with_capacity(33);
-        public_key_placeholder.extend(&nft_uuid_data); // first 17
-        public_key_placeholder.extend(&recipient.as_ref()[17..33]); // last 16
+        // 2: Embed the `nft_type` label into the remaining 16 bytes
+        // We take the UTF‑8 bytes of the provided `nft_type` string, then:
+        //  If it’s shorter than 16 bytes, pad with zeros (null bytes).
+        //  If it’s longer, truncate to the first 16 bytes.
+        //
+        // This way, anyone reading the UUID can extract those final bytes
+        // categorizing the NFT.
+        //
+        let mut tbytes = nft_type.as_bytes().to_vec();
+        if tbytes.len() < 16 {
+            // Pad with zero bytes to reach exactly 16
+            tbytes.resize(16, 0);
+        } else if tbytes.len() > 16 {
+            // Truncate to the first 16 bytes
+            tbytes.truncate(16);
+        }
+        uuid.extend(&tbytes); // Now uuid.len() == 17 + 16 = 33
 
-        // 3) Ensure if correct size 33 bytes
         //
-        public_key_placeholder
-            .try_into()
-            .expect("Combined NFT‑UUID public key must be exactly 33 bytes")
+        // 3: At this point, `uuid` is exactly 33 bytes long. We can safely
+        // turn it into a `[u8; 33]` for use as a Slip.public_key.
+        //
+        uuid.try_into()
+            .expect("NFT UUID must be exactly 33 bytes")
     }
 
     pub async fn create_golden_ticket_transaction(

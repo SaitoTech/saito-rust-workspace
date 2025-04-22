@@ -494,6 +494,7 @@ pub async fn create_bound_transaction(
     data: String,
     fee: u64,
     recipient_public_key: JsString,
+    nft_type: JsString,
 ) -> Result<WasmTransaction, JsValue> {
     let saito = SAITO.lock().await;
     let config_lock = saito.as_ref().unwrap().routing_thread.config_lock.clone();
@@ -552,6 +553,7 @@ pub async fn create_bound_transaction(
             Some(&saito.as_ref().unwrap().consensus_thread.network),
             latest_block_id,
             genesis_period,
+            nft_type.as_string().unwrap(),
         )
         .await;
 
