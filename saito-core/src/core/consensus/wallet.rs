@@ -1048,7 +1048,6 @@ impl Wallet {
     //   [17..33) = `nft_type` string (up to 16 bytes, UTF‑8; padded or truncated)
     //
     pub fn create_nft_uuid(input_slip: &Slip, nft_type: &str) -> [u8; 33] {
-        
         //
         // 1: Encode the UTXO coordinates (17 bytes total)
         // Every slip in the blockchain is uniquely identified by:
@@ -1060,9 +1059,9 @@ impl Wallet {
         // one else can duplicate unless they somehow create an identical UTXO.
         //
         let mut uuid = Vec::with_capacity(33);
-        uuid.extend(&input_slip.block_id.to_be_bytes());   //  8 bytes
+        uuid.extend(&input_slip.block_id.to_be_bytes()); //  8 bytes
         uuid.extend(&input_slip.tx_ordinal.to_be_bytes()); //  8 bytes
-        uuid.push(input_slip.slip_index);                  //  1 byte
+        uuid.push(input_slip.slip_index); //  1 byte
 
         //
         // 2: Embed the `nft_type` label into the remaining 16 bytes
@@ -1087,8 +1086,7 @@ impl Wallet {
         // 3: At this point, `uuid` is exactly 33 bytes long. We can safely
         // turn it into a `[u8; 33]` for use as a Slip.public_key.
         //
-        uuid.try_into()
-            .expect("NFT UUID must be exactly 33 bytes")
+        uuid.try_into().expect("NFT UUID must be exactly 33 bytes")
     }
 
     pub async fn create_golden_ticket_transaction(

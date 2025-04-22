@@ -1165,40 +1165,39 @@ impl Transaction {
                 }
 
                 //
-                // We must ensure the two “bound” output slips really tie back to the exact UTXO 
-                // that got used to mint this NFT—otherwise someone could forge a duplicate 
-                // NFT by spending any other slip.
+                // This section ensures that the bound slip (output[2]) truly encodes
+                // the unique UTXO that was consumed to mint this NFT. We decode the 33‑byte
+                // public_key on output[2] to extract:
                 //
-                // Here we pull out the original input slip (which carries the UTXO being spent)
-                // and the recipient’s public key (carried in output[1]) so we can re‑compute
-                // the two bound‑slip checks below:
+                //  - rec_block_id   – the original block_id (bytes 0..8)
+                //  - rec_tx_ord     – the original transaction ordinal (bytes 8..16)
+                //  - rec_slip_id    – the original slip_index (byte 16)
+                //
+                // We then compare these directly against the values on the slip we burned
+                // (self.from[0]). If any differ, the NFT‑UUID was forged or tampered with.
+                //
 
-                // Grab the original input slip (provides the NFT’s unique source UTXO)
-                // and the recipient public key (used to mix into the NFT‑UUID placeholder).
-                //
-                let input = &self.from[0];
-                let recipient_pk = self.to[1].public_key;
+                // Extract the 33‑byte “UUID” from the third output slip
+                let uuid_pk = self.to[2].public_key;
 
-                // Ensure the first bound output slip (output[0]) preserves the exact same
-                // public_key as the spent UTXO. This makes output[0] an indelible record of
-                // which specific UTXO was burned to mint the NFT, and guards against someone
-                // “mimicking” an NFT by using a different UTXO.
-                //
-                if self.to[0].public_key != input.public_key {
-                    error!("Create-bound TX: output[0].public_key != spent UTXO pubkey");
-                    return false;
-                }
+                // 1) Decode original block_id (8 bytes, big-endian)
+                let rec_block_id = u64::from_be_bytes(uuid_pk[0..8].try_into().unwrap());
 
-                // Recompute the NFT‑UUID placeholder from the input slip + recipient key.
-                // The NFT‑UUID packs the original slip’s block_id, tx_ordinal, and slip_index
-                // into the first 17 bytes, then tacks on the last 16 bytes of the recipient’s
-                // pubkey to fill out the 33‑byte UTXO public key. This “placeholder” must match
-                // exactly the public_key we stuffed into output[2], otherwise someone could slip
-                // in a fake UUID and undermine the NFT’s uniqueness.
-                //
-                let expected_uuid = Wallet::create_nft_uuid(input, &recipient_pk);
-                if self.to[2].public_key != expected_uuid {
-                    error!("Create-bound TX: output[2].public_key does not encode the NFT UUID correctly");
+                // 2) Decode original transaction ordinal (next 8 bytes)
+                let rec_tx_ord = u64::from_be_bytes(uuid_pk[8..16].try_into().unwrap());
+
+                // 3) Decode original slip_index (1 byte)
+                let rec_slip_id = uuid_pk[16];
+
+                // The slip we actually consumed to mint this NFT
+                let original_input = &self.from[0];
+
+                // Directly verify each identifier
+                if rec_block_id != original_input.block_id
+                    || rec_tx_ord != original_input.tx_ordinal
+                    || rec_slip_id != original_input.slip_index
+                {
+                    error!("Create‑bound TX: NFT UUID identifiers do not match the consumed UTXO");
                     return false;
                 }
 
